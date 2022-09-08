@@ -5,19 +5,24 @@ use serde_yaml::Value as YamlValue;
 use std::collections::HashSet;
 use std::path::PathBuf;
 // use std::process::Command;
-use std::{collections::BTreeMap, io};
-use std::{fs, str};
+use std::collections::BTreeMap;
+use std::str;
 use tera::{Context, Tera};
 use walkdir::WalkDir;
 
+mod build;
 mod metadata;
-use metadata::{BuildOptions, Metadata, Recipe, Requirements};
+mod solver;
+use metadata::{BuildOptions, Metadata, Requirements};
+use solver::create_environment;
 
 mod packaging;
 use packaging::package_conda;
 
 mod selectors;
 use selectors::{eval_selector, flatten_selectors};
+
+use build::run_build;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -131,14 +136,58 @@ fn main() {
 
     // println!("{:?}", myrec);
     // println!("{}", myrec.name);
-    flatten_selectors(&myrec);
-    render_recipe(&myrec);
-    println!(
-        "starlark says: {}",
-        eval_selector("sel(unix and max(4,3) == 4)")
-    );
+    // flatten_selectors(&myrec);
+    // render_recipe(&myrec);
+    // println!(
+    //     "starlark says: {}",
+    //     eval_selector("sel(unix and max(4,3) == 4)")
+    // );
 
-    package_conda(Metadata::default());
+    // package_conda(Metadata::default());
+    let requirements: Requirements = serde_yaml::from_value(
+        myrec
+            .get("requirements")
+            .expect("Could not find key requirements")
+            .to_owned(),
+    )
+    .expect("Could not get requirements");
+
+    let build_options: BuildOptions = serde_yaml::from_value(
+        myrec
+            .get("build")
+            .expect("Could not find build key")
+            .clone(),
+    )
+    .expect("Could not read build options");
+
+    let output = metadata::Output {
+        name: String::from(
+            myrec
+                .get("name")
+                .expect("Could not find name")
+                .as_str()
+                .expect("..."),
+        ),
+        version: String::from(
+            myrec
+                .get("version")
+                .expect("Could not find version")
+                .as_str()
+                .expect("..."),
+        ),
+        build: build_options,
+        requirements: requirements,
+    };
+
+    // let res = create_environment(
+    //     vec!["xtensor"],
+    //     vec!["conda-forge"],
+    //     "/Users/wolfvollprecht/Programs/guessing_game/env".into(),
+    // );
+
+    // println!("The result of the micromamba operation is: {:?}", res);
+
+    run_build(&output);
 
     // for (k, v) in myrec.context.iter() {
     //     println!("{k}");

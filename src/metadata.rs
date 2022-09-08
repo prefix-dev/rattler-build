@@ -57,3 +57,10 @@ impl Default for Metadata {
         }
     }
 }
+
+pub struct Output {
+    pub build: BuildOptions,
+    pub name: String,
+    pub version: String,
+    pub requirements: Requirements,
+}
