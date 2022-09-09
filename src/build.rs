@@ -1,3 +1,5 @@
+use crate::solver;
+
 use super::metadata::Output;
 use anyhow;
 use std::fs::File;
@@ -10,14 +12,23 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-fn get_work_dir(recipe: &Output) -> anyhow::Result<PathBuf> {
+pub struct Directories {
+    recipe_dir : PathBuf,
+    host_prefix : PathBuf,
+    build_prefix : PathBuf,
+    root_prefix : PathBuf,
+    source_dir : PathBuf,
+    work_dir : PathBuf,
+    build_dir : PathBuf
+}
+
+fn setup_build_dir(recipe: &Output) -> anyhow::Result<PathBuf> {
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
     let dirname = format!("{}_{:?}", recipe.name, since_the_epoch.as_millis());
-    let path = env::current_dir()?.join(dirname).join("work");
-    println!("Canonicalized: {:?}", path);
-    fs::create_dir_all(&path)?;
+    let path = env::current_dir()?.join(dirname);
+    fs::create_dir_all(&path.join("work"))?;
     Ok(path)
 }
 
@@ -27,7 +38,7 @@ macro_rules! s {
     };
 }
 
-pub fn get_build_env_script(build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
+pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf> {
     let host_prefix = "...";
     let build_prefix = "...";
     let root_prefix = "...";
@@ -35,12 +46,12 @@ pub fn get_build_env_script(build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
-        (s!("CONDA_DEFAULT_ENV"), s!(host_prefix)),
+        (s!("CONDA_DEFAULT_ENV"), s!(directories.host_prefix.to_string_lossy())),
         (s!("ARCH"), s!("arm64")),
-        (s!("PREFIX"), s!(host_prefix)),
-        (s!("BUILD_PREFIX"), s!(build_prefix)),
-        (s!("SYS_PREFIX"), s!(root_prefix)),
-        (s!("SYS_PYTHON"), s!(root_prefix)),
+        (s!("PREFIX"), s!(directories.host_prefix.to_string_lossy())),
+        (s!("BUILD_PREFIX"), s!(directories.build_prefix.to_string_lossy())),
+        (s!("SYS_PREFIX"), s!(directories.root_prefix.to_string_lossy())),
+        (s!("SYS_PYTHON"), s!(directories.root_prefix.to_string_lossy())),
     ];
 
     // export SUBDIR="osx-arm64"
@@ -97,7 +108,7 @@ pub fn get_build_env_script(build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
     // conda activate "/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla"
     // conda activate --stack "/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env"
 
-    let build_env_script_path = build_folder.join("build_env.sh");
+    let build_env_script_path = directories.work_dir.join("build_env.sh");
     let mut fout = File::create(&build_env_script_path)?;
     for v in vars {
         writeln!(fout, "{}=\"{}\"", v.0, v.1);
@@ -108,7 +119,7 @@ pub fn get_build_env_script(build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
     // eval "$('/Users/wolfvollprecht/micromamba/bin/python3.9' -m conda shell.bash hook)"
     // conda activate "$PREFIX"
     // conda activate --stack "$BUILD_PREFIX"
-
+    writeln!(fout, "export MAMBA_EXE={}", env::var("MAMBA_EXE").expect("Could not find MAMBA_EXE"));
     writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"");
     writeln!(fout, "micromamba activate \"$PREFIX\"");
     writeln!(fout, "micromamba activate --stack \"$BUILD_PREFIX\"");
@@ -116,9 +127,9 @@ pub fn get_build_env_script(build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
     Ok(build_env_script_path)
 }
 
-pub fn get_conda_build_script(recipe: &Output, build_folder: &PathBuf) -> anyhow::Result<PathBuf> {
+pub fn get_conda_build_script(recipe: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
-        get_build_env_script(build_folder).expect("Could not write build script");
+        get_build_env_script(&directories).expect("Could not write build script");
     // let build_env_script_path = build_folder.join("work/build_env.sh");
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource ${{{}}}\nfi",
@@ -126,15 +137,15 @@ pub fn get_conda_build_script(recipe: &Output, build_folder: &PathBuf) -> anyhow
     );
 
     // let orig_build_file = File::open(recipe.build.script)
-    let mut orig_build_file = File::open("build.sh").expect("Could not open build.sh file");
+    let mut orig_build_file = File::open("build.sh")
+        .expect("Could not open build.sh file");
     let mut orig_build_file_text = String::new();
     orig_build_file
         .read_to_string(&mut orig_build_file_text)
         .expect("Could not read file");
+
     let full_script = format!("{}\n{}", preambel, orig_build_file_text);
-    println!("Full script is {}", full_script);
-    let build_script_path = build_folder.join("conda_build.sh");
-    println!("Tried to write to {:?}", build_script_path);
+    let build_script_path = directories.work_dir.join("conda_build.sh");
 
     let mut build_script_file = File::create(&build_script_path)?;
     build_script_file
@@ -144,9 +155,29 @@ pub fn get_conda_build_script(recipe: &Output, build_folder: &PathBuf) -> anyhow
     return Ok(build_script_path);
 }
 
+pub fn setup_environments(recipe: &Output, directories: &Directories) {
+    if recipe.requirements.build.len() > 0 {
+        solver::create_environment(&recipe.requirements.build, &[], directories.build_prefix.clone());
+    }
+    if recipe.requirements.host.len() > 0 {
+        solver::create_environment(&recipe.requirements.host, &[], directories.host_prefix.clone());
+    }
+}
+
 pub fn run_build(recipe: &Output) {
-    let work_dir = get_work_dir(&recipe).expect("Could not create work directory");
-    let build_script = get_conda_build_script(&recipe, &work_dir);
-    println!("Work dir: {:?}", work_dir);
+    let build_dir = setup_build_dir(&recipe).expect("Could not create build directory");
+    let directories = Directories {
+        build_dir  : build_dir.clone(),
+        source_dir : build_dir.join("work"),
+        build_prefix : build_dir.join("build_env"),
+        host_prefix  : build_dir.join("host_env"),
+        work_dir : build_dir.join("work"),
+        root_prefix  : PathBuf::from(env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX")),
+        recipe_dir : PathBuf::from(".")
+    };
+
+    let build_script = get_conda_build_script(&recipe, &directories);
+    println!("Work dir: {:?}", &directories.work_dir);
     println!("Build script: {:?}", build_script.unwrap());
+    setup_environments(&recipe, &directories);
 }

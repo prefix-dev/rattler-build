@@ -1,12 +1,10 @@
 use std::ffi::OsStr;
-use std::fs::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 pub fn create_environment(
-    specs: Vec<&str>,
-    channels: Vec<&str>,
+    specs: &[String],
+    channels: &[String],
     prefix: PathBuf,
 ) -> Result<std::process::ExitStatus, std::io::Error> {
     let mut mm_cmd = Command::new("micromamba");
