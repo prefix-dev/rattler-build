@@ -2,6 +2,7 @@ use self::package_metadata::PathRecord;
 use anyhow::Ok;
 use anyhow::Result;
 use tempdir::TempDir;
+use walkdir::WalkDir;
 
 use super::metadata::Metadata;
 use fs::File;
@@ -13,8 +14,7 @@ use bzip2::Compression;
 
 use std::path::{Path, PathBuf};
 use tar::Builder;
-
-use sha2::{Digest, Sha256};
+use super::hash::sha256_digest;
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
 
@@ -92,11 +92,9 @@ fn create_paths_json(paths: Vec<PathBuf>) -> Result<String> {
         if meta.is_dir() {
             continue;
         };
-        let mut hasher = Sha256::new();
-        let mut file = std::fs::File::open(&p).expect("Give file");
-        std::io::copy(&mut file, &mut hasher).expect("Could not compute hash");
+
         res.push(PathRecord {
-            sha256: hex::encode(hasher.finalize()),
+            sha256: sha256_digest(&p),
             size: meta.size(),
             path: p,
         })
@@ -115,6 +113,19 @@ fn create_index_json(recipe: &metadata::Recipe) -> Result<String> {
     };
     return Ok(serde_json::to_string_pretty(&recipe)?);
 }
+
+pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
+    let mut res = HashSet::new();
+
+    for entry in WalkDir::new(directory) {
+        let entry = entry?.path().to_owned();
+        println!("{:?}", &entry);
+        res.insert(entry);
+    }
+
+    Ok(res)
+}
+
 
 pub fn package_conda(meta: Metadata) -> Result<()> {
     let tmp_dir = TempDir::new("package")?;

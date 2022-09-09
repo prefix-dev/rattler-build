@@ -10,19 +10,23 @@ use std::str;
 use tera::{Context, Tera};
 use walkdir::WalkDir;
 
+use tokio;
+
 mod build;
 mod metadata;
 mod solver;
-use metadata::{BuildOptions, Metadata, Requirements};
-use solver::create_environment;
+mod source;
+mod hash;
+use metadata::{BuildOptions, Metadata, Requirements, Source};
 
 mod packaging;
-use packaging::package_conda;
 
 mod selectors;
 use selectors::{eval_selector, flatten_selectors};
 
 use build::run_build;
+
+use crate::source::fetch_sources;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -39,18 +43,6 @@ struct Output {
     build: BuildOptions,
     #[serde(default)]
     requirements: Requirements,
-}
-
-fn record_files(directory: PathBuf) -> Result<HashSet<PathBuf>> {
-    let mut res = HashSet::new();
-
-    for entry in WalkDir::new(directory) {
-        let entry = entry?.path().to_owned();
-        println!("{:?}", &entry);
-        res.insert(entry);
-    }
-
-    Ok(res)
 }
 
 fn render_recipe_recursively(recipe: &mut serde_yaml::Mapping, context: &Context) {
@@ -130,7 +122,8 @@ fn render_recipe(recipe: &YamlValue) {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let myrec: YamlValue =
         serde_yaml::from_reader(std::fs::File::open("test.yaml").unwrap()).expect("Give yaml");
 
@@ -160,6 +153,15 @@ fn main() {
     )
     .expect("Could not read build options");
 
+    let sources: Vec<Source> = serde_yaml::from_value(
+        myrec
+            .get("source")
+            .expect("Could not find source key")
+            .clone(),
+    ).expect("Could not deserialize source");
+
+    print!("{:?}", &sources);
+
     let output = metadata::Output {
         name: String::from(
             myrec
@@ -175,6 +177,7 @@ fn main() {
                 .as_str()
                 .expect("..."),
         ),
+        source: sources,
         build: build_options,
         requirements: requirements,
     };
@@ -186,8 +189,8 @@ fn main() {
     // );
 
     // println!("The result of the micromamba operation is: {:?}", res);
-
-    run_build(&output);
+    // fetch_sources(&sources).await;
+    run_build(&output).await;
 
     // for (k, v) in myrec.context.iter() {
     //     println!("{k}");

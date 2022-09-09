@@ -2011,9 +2011,11 @@ dependencies = [
  "anyhow",
  "bzip2",
  "flate2",
+ "futures",
  "hex",
  "rand 0.8.5",
  "rattler",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -2022,6 +2024,7 @@ dependencies = [
  "tar",
  "tempdir",
  "tera",
+ "tokio",
  "walkdir",
 ]
 
