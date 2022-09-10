@@ -15,11 +15,11 @@ use std::{env, fs};
 use bzip2::read::{BzDecoder, BzEncoder};
 use bzip2::Compression;
 
-use std::path::{Path, PathBuf};
-use tar::Builder;
 use super::hash::sha256_digest;
 use std::collections::HashSet;
 use std::os::unix::fs::MetadataExt;
+use std::path::{Path, PathBuf};
+use tar::Builder;
 
 use super::metadata;
 pub mod package_metadata;
@@ -86,7 +86,7 @@ fn compress_tarbz2(directory: &Path) -> Result<BzEncoder<File>, std::io::Error> 
     return ar.into_inner();
 }
 
-fn create_paths_json(paths: &HashSet<PathBuf>, prefix : &PathBuf) -> Result<String> {
+fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<String> {
     let mut paths: Vec<PathBuf> = paths.clone().into_iter().collect();
     paths.sort();
     let mut res = Vec::new();
@@ -143,9 +143,12 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
 
     Ok(res)
 }
-  
 
-pub fn package_conda(output: &Output, new_files : &HashSet<PathBuf>, prefix : &PathBuf) -> Result<()> {
+pub fn package_conda(
+    output: &Output,
+    new_files: &HashSet<PathBuf>,
+    prefix: &PathBuf,
+) -> Result<()> {
     let tmp_dir = TempDir::new(&output.name)?;
 
     for f in new_files {

@@ -26,7 +26,7 @@ pub struct Recipe {
     pub context: BTreeMap<String, serde_yaml::Value>,
     pub name: String,
     pub version: String,
-    pub source : Vec<Source>,
+    pub source: Vec<Source>,
     #[serde(default)]
     pub build: BuildOptions,
     #[serde(default)]
@@ -59,39 +59,38 @@ impl Default for Metadata {
     }
 }
 
-
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Checksum {
     sha256(String),
-    md5(String)
+    md5(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GitSrc {
-    pub git_src : String,
-    pub git_rev : String,
-    pub git_depth : u32
+    pub git_src: String,
+    pub git_rev: String,
+    pub git_depth: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UrlSrc {
-    pub url : String,
+    pub url: String,
 
     #[serde(flatten)]
-    pub checksum : Checksum
+    pub checksum: Checksum,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Source {
     Git(GitSrc),
-    Url(UrlSrc)
+    Url(UrlSrc),
 }
 
 pub struct Output {
     pub build: BuildOptions,
     pub name: String,
     pub version: String,
-    pub source : Vec<Source>,
+    pub source: Vec<Source>,
     pub requirements: Requirements,
 }

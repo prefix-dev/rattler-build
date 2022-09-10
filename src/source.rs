@@ -47,7 +47,11 @@ fn extract(
     target_directory: &PathBuf,
 ) -> Result<std::process::Output, std::io::Error> {
     // tar -xf file.name.tar -C /path/to/directory
-    println!("tar -xf {} -C {}", archive.to_string_lossy(), target_directory.to_string_lossy());
+    println!(
+        "tar -xf {} -C {}",
+        archive.to_string_lossy(),
+        target_directory.to_string_lossy()
+    );
     let output = Command::new("tar")
         .arg("-xf")
         .arg(String::from(archive.to_string_lossy()))

@@ -1,4 +1,4 @@
-use crate::packaging::{record_files, package_conda};
+use crate::packaging::{package_conda, record_files};
 use crate::solver;
 
 use super::metadata::Output;
@@ -228,7 +228,8 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
     let build_cmd = Command::new("/bin/bash")
         .current_dir(&directories.source_dir)
         .arg(directories.source_dir.join("conda_build.sh"))
-        .stdin(Stdio::null()).status()
+        .stdin(Stdio::null())
+        .status()
         .expect("Failed to execute command");
 
     let files_after = record_files(&directories.host_prefix).expect("Could not record file");
@@ -241,7 +242,7 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
     print!("{:?}", paths);
     // block_on(fetch_sources(&[]));
 
-    let mut diff_paths : HashSet<PathBuf> = HashSet::new();
+    let mut diff_paths: HashSet<PathBuf> = HashSet::new();
     for el in paths {
         diff_paths.insert(el.clone());
     }

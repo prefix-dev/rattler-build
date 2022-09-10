@@ -13,10 +13,10 @@ use walkdir::WalkDir;
 use tokio;
 
 mod build;
+mod hash;
 mod metadata;
 mod solver;
 mod source;
-mod hash;
 use metadata::{BuildOptions, Metadata, Requirements, Source};
 
 mod packaging;
@@ -158,7 +158,8 @@ async fn main() {
             .get("source")
             .expect("Could not find source key")
             .clone(),
-    ).expect("Could not deserialize source");
+    )
+    .expect("Could not deserialize source");
 
     print!("{:?}", &sources);
 
