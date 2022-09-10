@@ -1,3 +1,6 @@
+use crate::build::Directories;
+use crate::metadata::Output;
+
 use self::package_metadata::PathRecord;
 use anyhow::Ok;
 use anyhow::Result;
@@ -83,8 +86,8 @@ fn compress_tarbz2(directory: &Path) -> Result<BzEncoder<File>, std::io::Error> 
     return ar.into_inner();
 }
 
-fn create_paths_json(paths: Vec<PathBuf>) -> Result<String> {
-    let mut paths: Vec<PathBuf> = paths.into_iter().collect();
+fn create_paths_json(paths: &HashSet<PathBuf>, prefix : &PathBuf) -> Result<String> {
+    let mut paths: Vec<PathBuf> = paths.clone().into_iter().collect();
     paths.sort();
     let mut res = Vec::new();
     for p in paths {
@@ -96,13 +99,28 @@ fn create_paths_json(paths: Vec<PathBuf>) -> Result<String> {
         res.push(PathRecord {
             sha256: sha256_digest(&p),
             size: meta.size(),
-            path: p,
+            path: p.strip_prefix(prefix)?.into(),
         })
     }
     return Ok(serde_json::to_string_pretty(&res)?);
 }
 
-fn create_index_json(recipe: &metadata::Recipe) -> Result<String> {
+// {
+//     "arch": "arm64",
+//     "build": "hffc8910_0",
+//     "build_number": 0,
+//     "depends": [
+//       "libcxx >=14.0.4"
+//     ],
+//     "license": "BSD-3-Clause",
+//     "license_family": "BSD",
+//     "name": "xsimd",
+//     "platform": "osx",
+//     "subdir": "osx-arm64",
+//     "timestamp": 1661428002610,
+//     "version": "9.0.1"
+//   }
+fn create_index_json(recipe: &Output) -> Result<String> {
     let meta: package_metadata::MetaIndex = package_metadata::MetaIndex {
         name: recipe.name.clone(),
         version: recipe.version.clone(),
@@ -111,7 +129,7 @@ fn create_index_json(recipe: &metadata::Recipe) -> Result<String> {
         dependencies: recipe.requirements.run.clone(),
         constrains: recipe.requirements.constrains.clone(),
     };
-    return Ok(serde_json::to_string_pretty(&recipe)?);
+    return Ok(serde_json::to_string_pretty(&meta)?);
 }
 
 pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
@@ -125,28 +143,42 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
 
     Ok(res)
 }
+  
 
+pub fn package_conda(output: &Output, new_files : &HashSet<PathBuf>, prefix : &PathBuf) -> Result<()> {
+    let tmp_dir = TempDir::new(&output.name)?;
 
-pub fn package_conda(meta: Metadata) -> Result<()> {
-    let tmp_dir = TempDir::new("package")?;
-    let info_folder = tmp_dir.path().join("info");
-    fs::create_dir(&info_folder);
-    let file_path = info_folder.join("my-temporary-note.txt");
-    let mut f = File::create(file_path)?;
-    writeln!(f, "Hello My Friend")?;
+    for f in new_files {
+        let f_rel = f.strip_prefix(prefix)?;
+        let dest = tmp_dir.path().join(f_rel);
+        if fs::metadata(dest.parent().expect("parent")).is_ok() != true {
+            fs::create_dir_all(dest.parent().unwrap());
+        }
 
-    let include_dir = tmp_dir.path().join("include");
-    fs::create_dir(&include_dir);
-    let paths = copy_all(
-        "/Users/wolfvollprecht/micromamba/pkgs/libmamba-0.25.0-h1c735bf_1/include",
-        include_dir,
-    );
+        let meta = fs::metadata(&f)?;
+        if meta.is_dir() {
+            continue;
+        };
+
+        println!("Copying {:?} to {:?}", f, dest);
+        fs::copy(f, dest).expect("Could not copy to dest");
+    }
+
+    println!("Copying done!");
 
     for entry in fs::read_dir(&tmp_dir.path()) {
         println!("Entry {:?}", entry);
     }
 
-    create_paths_json(paths.expect("Could not list paths"));
+    let info_folder = tmp_dir.path().join("info");
+    fs::create_dir(&info_folder);
+
+    let mut paths_json = File::create(&info_folder.join("paths.json"))?;
+    paths_json.write(create_paths_json(new_files, &prefix)?.as_bytes());
+
+    let mut index_json = File::create(&info_folder.join("index.json"))?;
+    index_json.write(create_index_json(&output)?.as_bytes());
+
     compress_tarbz2(tmp_dir.path());
 
     Ok(())

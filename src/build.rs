@@ -1,8 +1,9 @@
-use crate::packaging::record_files;
+use crate::packaging::{record_files, package_conda};
 use crate::solver;
 
 use super::metadata::Output;
 use anyhow;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -240,5 +241,11 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
     print!("{:?}", paths);
     // block_on(fetch_sources(&[]));
 
+    let mut diff_paths : HashSet<PathBuf> = HashSet::new();
+    for el in paths {
+        diff_paths.insert(el.clone());
+    }
+
+    package_conda(&recipe, &diff_paths, &directories.host_prefix);
     Ok(())
 }
