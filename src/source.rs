@@ -6,33 +6,44 @@ use crate::hash::sha256_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
-fn validate_checksum(path: &PathBuf, checksum: &Checksum) {
+fn validate_checksum(path: &PathBuf, checksum: &Checksum) -> bool {
     match checksum {
-        Checksum::sha256(value) => {
+        Checksum::Sha256(value) => {
             let computed_sha = sha256_digest(&path);
-            if (!computed_sha.eq(value)) {
+            if !computed_sha.eq(value) {
                 eprintln!(
                     "SHA256 values of downloaded file not matching!\nDownloaded = {}, should be {}",
                     computed_sha, value
                 );
+                return false;
             } else {
                 println!("Validated SHA256 values of the downloaded file!");
+                return true;
             }
         }
-        Checksum::md5(value) => {
+        Checksum::Md5(_value) => {
             eprintln!("MD5 not implemented yet!");
         }
     }
+
+    return false;
 }
 
-async fn url_src(source: &UrlSrc, cache_dir: &PathBuf) -> anyhow::Result<PathBuf> {
-    let response = reqwest::get(&source.url).await?;
-
+async fn url_src(source: &UrlSrc, cache_dir: &PathBuf, checksum: &Checksum) -> anyhow::Result<PathBuf> {
     let cache_src = cache_dir.join("src_cache");
-    fs::create_dir_all(&cache_src);
+    fs::create_dir_all(&cache_src)?;
 
     let cache_name = cache_src.join("file.tar.gz");
+
     println!("Cache file is: {:?}", cache_name);
+
+    let metadata = fs::metadata(&cache_name);
+    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, &checksum) {
+        println!("Found valid source cache file.");
+        return Ok(cache_name.clone());
+    }
+
+    let response = reqwest::get(&source.url).await?;
 
     let mut file = std::fs::File::create(&cache_name)?;
     let mut content = Cursor::new(response.bytes().await?);
@@ -40,7 +51,7 @@ async fn url_src(source: &UrlSrc, cache_dir: &PathBuf) -> anyhow::Result<PathBuf
     Ok(cache_name)
 }
 
-fn git_src(source: &GitSrc) {}
+fn git_src(_source: &GitSrc) {}
 
 fn extract(
     archive: &PathBuf,
@@ -78,12 +89,8 @@ pub async fn fetch_sources(sources: &[Source], work_dir: &PathBuf) -> anyhow::Re
             }
             Source::Url(src) => {
                 println!("Fetching source! {}", &src.url);
-                let res = url_src(&src, &cache_dir).await?;
-                validate_checksum(&res, &src.checksum);
+                let res = url_src(&src, &cache_dir, &src.checksum).await?;
                 extract(&res, &work_dir).expect("Could not extract the file!");
-            }
-            _ => {
-                println!("Could not match any type!");
             }
         }
     }

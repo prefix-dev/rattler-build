@@ -46,10 +46,6 @@ macro_rules! s {
 }
 
 pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf> {
-    let host_prefix = "...";
-    let build_prefix = "...";
-    let root_prefix = "...";
-
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
@@ -130,11 +126,11 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
     let build_env_script_path = directories.work_dir.join("build_env.sh");
     let mut fout = File::create(&build_env_script_path)?;
     for v in vars {
-        writeln!(fout, "export {}=\"{}\"", v.0, v.1);
+        writeln!(fout, "export {}=\"{}\"", v.0, v.1)?;
     }
 
     // End of the build env script
-    writeln!(fout, "");
+    writeln!(fout, "")?;
     // eval "$('/Users/wolfvollprecht/micromamba/bin/python3.9' -m conda shell.bash hook)"
     // conda activate "$PREFIX"
     // conda activate --stack "$BUILD_PREFIX"
@@ -142,10 +138,10 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
         fout,
         "export MAMBA_EXE={}",
         env::var("MAMBA_EXE").expect("Could not find MAMBA_EXE")
-    );
-    writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"");
-    writeln!(fout, "micromamba activate \"$PREFIX\"");
-    writeln!(fout, "micromamba activate --stack \"$BUILD_PREFIX\"");
+    )?;
+    writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"")?;
+    writeln!(fout, "micromamba activate \"$PREFIX\"")?;
+    writeln!(fout, "micromamba activate --stack \"$BUILD_PREFIX\"")?;
 
     Ok(build_env_script_path)
 }
@@ -180,25 +176,28 @@ pub fn get_conda_build_script(
     return Ok(build_script_path);
 }
 
-pub fn setup_environments(recipe: &Output, directories: &Directories) {
+pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow::Result<()> {
     if recipe.requirements.build.len() > 0 {
         solver::create_environment(
             &recipe.requirements.build,
             &[],
             directories.build_prefix.clone(),
-        );
+        )?;
     } else {
-        fs::create_dir_all(&directories.build_prefix);
+        fs::create_dir_all(&directories.build_prefix)?;
     }
+
     if recipe.requirements.host.len() > 0 {
         solver::create_environment(
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
-        );
+        )?;
     } else {
-        fs::create_dir_all(&directories.host_prefix);
+        fs::create_dir_all(&directories.host_prefix)?;
     }
+
+    Ok(())
 }
 
 pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
@@ -219,7 +218,7 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
     let build_script = get_conda_build_script(&recipe, &directories);
     println!("Work dir: {:?}", &directories.work_dir);
     println!("Build script: {:?}", build_script.unwrap());
-    setup_environments(&recipe, &directories);
+    setup_environments(&recipe, &directories)?;
 
     fetch_sources(&recipe.source, &directories.source_dir).await;
 

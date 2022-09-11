@@ -18,6 +18,9 @@ pub fn create_environment(
 
     mm_cmd.args([OsStr::new("-p"), prefix.as_os_str()]);
 
+    // For debugging purposes only
+    mm_cmd.args(["--offline"]);
+
     mm_cmd.args(specs);
 
     let res = mm_cmd.stdin(Stdio::null()).status();

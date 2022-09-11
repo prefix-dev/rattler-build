@@ -60,9 +60,10 @@ impl Default for Metadata {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "lowercase")]
 pub enum Checksum {
-    sha256(String),
-    md5(String),
+    Sha256(String),
+    Md5(String),
 }
 
 #[derive(Serialize, Deserialize, Debug)]

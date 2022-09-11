@@ -1,14 +1,7 @@
-use anyhow::Result;
-// use rattler::MatchSpec;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::collections::HashSet;
-use std::path::PathBuf;
-// use std::process::Command;
-use std::collections::BTreeMap;
-use std::str;
+use std::{str, collections::BTreeMap};
 use tera::{Context, Tera};
-use walkdir::WalkDir;
 
 use tokio;
 
@@ -17,16 +10,14 @@ mod hash;
 mod metadata;
 mod solver;
 mod source;
-use metadata::{BuildOptions, Metadata, Requirements, Source};
+use metadata::{BuildOptions, Requirements, Source};
 
 mod packaging;
 
 mod selectors;
-use selectors::{eval_selector, flatten_selectors};
+// use selectors::{eval_selector, flatten_selectors};
 
 use build::run_build;
-
-use crate::source::fetch_sources;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -47,7 +38,7 @@ struct Output {
 
 fn render_recipe_recursively(recipe: &mut serde_yaml::Mapping, context: &Context) {
     // let mut remove_keys = Vec::new();
-    for (k, v) in recipe.iter_mut() {
+    for (_, v) in recipe.iter_mut() {
         // if let YamlValue::String(key) = k {
         //     if let Some(key) = key.strip_prefix("sel(") {
         //         let sel = key.strip_suffix(')').expect("nope");
