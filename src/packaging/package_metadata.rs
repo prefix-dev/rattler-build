@@ -6,22 +6,14 @@ use serde::{Deserialize, Serialize};
 pub struct PathRecord {
     #[serde(rename = "_path")]
     pub path: PathBuf,
-    pub path_type : String,
+    pub path_type: String,
     pub sha256: String,
     pub size_in_bytes: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 pub struct Paths {
-    pub paths : Vec<PathRecord>
-}
-
-impl Default for Paths {
-    fn default() -> Self {
-        Self {
-            paths : Vec::new()
-        }
-    }
+    pub paths: Vec<PathRecord>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,14 +24,14 @@ pub struct MetaIndex {
     pub build: String,
     pub build_number: u64,
 
-    pub arch : String,
-    pub subdir : String,
-    pub platform : String,
+    pub arch: String,
+    pub subdir: String,
+    pub platform: String,
 
-    pub license : String,
-    pub license_family : String,
+    pub license: String,
+    pub license_family: String,
 
-    pub timestamp : u128,
+    pub timestamp: u128,
 
     #[serde(default)]
     pub depends: Vec<String>,

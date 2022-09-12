@@ -1,23 +1,18 @@
-use crate::packaging::{package_conda, record_files};
-use crate::solver;
-
-use super::metadata::Output;
-use anyhow;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::process::{Command, Stdio};
-use std::{env, fs, path};
+use std::{env, fs};
 use std::{
     io::Read,
-    os,
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use futures::executor::block_on;
-
+use super::metadata::Output;
 use super::source::fetch_sources;
+use crate::packaging::{package_conda, record_files};
+use crate::solver;
 
 pub struct Directories {
     recipe_dir: PathBuf,
@@ -130,13 +125,12 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
     }
 
     // End of the build env script
-    writeln!(fout, "")?;
     // eval "$('/Users/wolfvollprecht/micromamba/bin/python3.9' -m conda shell.bash hook)"
     // conda activate "$PREFIX"
     // conda activate --stack "$BUILD_PREFIX"
     writeln!(
         fout,
-        "export MAMBA_EXE={}",
+        "\nexport MAMBA_EXE={}",
         env::var("MAMBA_EXE").expect("Could not find MAMBA_EXE")
     )?;
     writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"")?;
@@ -151,7 +145,7 @@ pub fn get_conda_build_script(
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
-        get_build_env_script(&directories).expect("Could not write build script");
+        get_build_env_script(directories).expect("Could not write build script");
     // let build_env_script_path = build_folder.join("work/build_env.sh");
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource {}\nfi",
@@ -173,11 +167,11 @@ pub fn get_conda_build_script(
         .write_all(full_script.as_bytes())
         .expect("Could not write to build script.");
 
-    return Ok(build_script_path);
+    Ok(build_script_path)
 }
 
 pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow::Result<()> {
-    if recipe.requirements.build.len() > 0 {
+    if !recipe.requirements.build.is_empty() {
         solver::create_environment(
             &recipe.requirements.build,
             &[],
@@ -187,7 +181,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
         fs::create_dir_all(&directories.build_prefix)?;
     }
 
-    if recipe.requirements.host.len() > 0 {
+    if !recipe.requirements.host.is_empty() {
         solver::create_environment(
             &recipe.requirements.host,
             &[],
@@ -201,7 +195,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
 }
 
 pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
-    let build_dir = setup_build_dir(&recipe).expect("Could not create build directory");
+    let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
 
     let directories = Directories {
         build_dir: build_dir.clone(),
@@ -215,12 +209,12 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
         recipe_dir: PathBuf::from("."),
     };
 
-    let build_script = get_conda_build_script(&recipe, &directories);
+    let build_script = get_conda_build_script(recipe, &directories);
     println!("Work dir: {:?}", &directories.work_dir);
     println!("Build script: {:?}", build_script.unwrap());
-    setup_environments(&recipe, &directories)?;
+    setup_environments(recipe, &directories)?;
 
-    fetch_sources(&recipe.source, &directories.source_dir).await;
+    fetch_sources(&recipe.source, &directories.source_dir).await?;
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record file");
 
@@ -246,6 +240,6 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
         diff_paths.insert(el.clone());
     }
 
-    package_conda(&recipe, &diff_paths, &directories.host_prefix);
+    package_conda(recipe, &diff_paths, &directories.host_prefix)?;
     Ok(())
 }

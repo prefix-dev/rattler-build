@@ -1,15 +1,18 @@
-use std::{fs, io::Cursor, path::PathBuf, process::Command};
-
-use reqwest;
+use std::{
+    fs,
+    io::Cursor,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use crate::hash::sha256_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
-fn validate_checksum(path: &PathBuf, checksum: &Checksum) -> bool {
+fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
     match checksum {
         Checksum::Sha256(value) => {
-            let computed_sha = sha256_digest(&path);
+            let computed_sha = sha256_digest(path);
             if !computed_sha.eq(value) {
                 eprintln!(
                     "SHA256 values of downloaded file not matching!\nDownloaded = {}, should be {}",
@@ -26,10 +29,14 @@ fn validate_checksum(path: &PathBuf, checksum: &Checksum) -> bool {
         }
     }
 
-    return false;
+    false
 }
 
-async fn url_src(source: &UrlSrc, cache_dir: &PathBuf, checksum: &Checksum) -> anyhow::Result<PathBuf> {
+async fn url_src(
+    source: &UrlSrc,
+    cache_dir: &Path,
+    checksum: &Checksum,
+) -> anyhow::Result<PathBuf> {
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
 
@@ -38,7 +45,7 @@ async fn url_src(source: &UrlSrc, cache_dir: &PathBuf, checksum: &Checksum) -> a
     println!("Cache file is: {:?}", cache_name);
 
     let metadata = fs::metadata(&cache_name);
-    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, &checksum) {
+    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, checksum) {
         println!("Found valid source cache file.");
         return Ok(cache_name.clone());
     }
@@ -54,8 +61,8 @@ async fn url_src(source: &UrlSrc, cache_dir: &PathBuf, checksum: &Checksum) -> a
 fn git_src(_source: &GitSrc) {}
 
 fn extract(
-    archive: &PathBuf,
-    target_directory: &PathBuf,
+    archive: &Path,
+    target_directory: &Path,
 ) -> Result<std::process::Output, std::io::Error> {
     // tar -xf file.name.tar -C /path/to/directory
     println!(
@@ -74,10 +81,10 @@ fn extract(
 
     // println!("{:?}", &output?.stdout);
     // println!("{:?}", &output?.stderr);
-    return output;
+    output
 }
 
-pub async fn fetch_sources(sources: &[Source], work_dir: &PathBuf) -> anyhow::Result<()> {
+pub async fn fetch_sources(sources: &[Source], work_dir: &Path) -> anyhow::Result<()> {
     let cache_dir = std::env::current_dir()?.join("CACHE");
     fs::create_dir_all(&cache_dir)?;
     println!("Fetching sources");
@@ -85,12 +92,12 @@ pub async fn fetch_sources(sources: &[Source], work_dir: &PathBuf) -> anyhow::Re
         println!("Checking source: {:?}", src);
         match &src {
             Source::Git(src) => {
-                git_src(&src);
+                git_src(src);
             }
             Source::Url(src) => {
                 println!("Fetching source! {}", &src.url);
-                let res = url_src(&src, &cache_dir, &src.checksum).await?;
-                extract(&res, &work_dir).expect("Could not extract the file!");
+                let res = url_src(src, &cache_dir, &src.checksum).await?;
+                extract(&res, work_dir).expect("Could not extract the file!");
             }
         }
     }

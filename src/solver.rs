@@ -11,7 +11,7 @@ pub fn create_environment(
 
     mm_cmd.arg("create");
 
-    for c in channels.into_iter() {
+    for c in channels.iter() {
         mm_cmd.arg("-c");
         mm_cmd.arg(c);
     }
@@ -27,5 +27,6 @@ pub fn create_environment(
     if res.is_err() {
         print!("{:?}", &res);
     }
-    return res;
+
+    res
 }

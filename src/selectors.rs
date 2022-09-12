@@ -37,7 +37,7 @@ pub fn eval_selector<S: Into<String>>(selector: S) -> bool {
 
     // And finally we evaluate the code using the evaluator.
     let res: Value = eval.eval_module(ast, &globals).expect("huuuuh?");
-    return res.unpack_bool().unwrap_or(false);
+    res.unpack_bool().unwrap_or(false)
 }
 
 pub fn flatten_selectors(val: &YamlValue) -> Option<YamlValue> {
@@ -83,5 +83,6 @@ pub fn flatten_selectors(val: &YamlValue) -> Option<YamlValue> {
         }
         // val = seq;
     }
-    return None;
+
+    None
 }

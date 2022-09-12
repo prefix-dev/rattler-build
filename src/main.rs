@@ -1,9 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{str, collections::BTreeMap};
+use std::{collections::BTreeMap, str};
 use tera::{Context, Tera};
-
-use tokio;
 
 mod build;
 mod hash;
@@ -171,7 +169,7 @@ async fn main() {
         ),
         source: sources,
         build: build_options,
-        requirements: requirements,
+        requirements,
     };
 
     // let res = create_environment(
@@ -182,7 +180,10 @@ async fn main() {
 
     // println!("The result of the micromamba operation is: {:?}", res);
     // fetch_sources(&sources).await;
-    run_build(&output).await;
+    let res = run_build(&output).await;
+    if res.is_err() {
+        eprintln!("Build did not succeed");
+    }
 
     // for (k, v) in myrec.context.iter() {
     //     println!("{k}");
