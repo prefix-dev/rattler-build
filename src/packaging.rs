@@ -26,8 +26,6 @@ use std::collections::HashSet;
 
 use std::path::{Path, PathBuf};
 
-pub mod package_metadata;
-
 pub fn copy_all<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<Vec<PathBuf>> {
     let mut stack = Vec::new();
     let mut paths: Vec<PathBuf> = Vec::new();
