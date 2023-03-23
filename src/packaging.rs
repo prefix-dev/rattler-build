@@ -2,7 +2,7 @@ use crate::metadata::Output;
 
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry};
 use rattler_conda_types::package::{IndexJson, PathsJson};
-use rattler_conda_types::Version;
+use rattler_conda_types::{Version, NoArchType};
 
 use anyhow::Ok;
 use anyhow::Result;
@@ -184,7 +184,7 @@ fn create_index_json(recipe: &Output) -> Result<String> {
         timestamp: Some(since_the_epoch),
         depends: recipe.requirements.run.clone(),
         constrains: recipe.requirements.constrains.clone(),
-        noarch: None,
+        noarch: NoArchType::none(),
         track_features: vec![],
         features: None,
     };
