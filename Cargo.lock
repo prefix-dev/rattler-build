@@ -1848,8 +1848,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acaeac886143c83acdf72b437f97c43e0fc0bb8b24bc03921b1c3afe5d1f273d"
+source = "git+https://github.com/mamba-org/rattler#265b80bc7e043573001439baa1912d576a1a290d"
 dependencies = [
  "fxhash",
  "glob",
@@ -1859,6 +1858,7 @@ dependencies = [
  "md-5",
  "nom",
  "rattler_digest",
+ "rattler_macros",
  "regex",
  "serde",
  "serde_json",
@@ -1876,12 +1876,20 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "728bb764f4094f8286a23da5b4e5d3f0f5739eb6e49a15aadb075dc97890aa34"
+source = "git+https://github.com/mamba-org/rattler#265b80bc7e043573001439baa1912d576a1a290d"
 dependencies = [
  "digest",
  "hex",
  "serde",
+]
+
+[[package]]
+name = "rattler_macros"
+version = "0.1.0"
+source = "git+https://github.com/mamba-org/rattler#265b80bc7e043573001439baa1912d576a1a290d"
+dependencies = [
+ "quote",
+ "syn 2.0.6",
 ]
 
 [[package]]

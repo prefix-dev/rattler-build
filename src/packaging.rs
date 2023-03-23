@@ -1,7 +1,8 @@
 use crate::metadata::Output;
 
-use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry};
+use rattler_conda_types::package::{IndexJson, PathsJson};
+use rattler_conda_types::{Version, NoArchType};
 
 use anyhow::Ok;
 use anyhow::Result;
@@ -12,6 +13,7 @@ use walkdir::WalkDir;
 use fs::File;
 
 use std::io::{Read, Write};
+use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::{env, fs};
@@ -23,8 +25,6 @@ use super::hash::sha256_digest;
 use std::collections::HashSet;
 
 use std::path::{Path, PathBuf};
-
-pub mod package_metadata;
 
 pub fn copy_all<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<Vec<PathBuf>> {
     let mut stack = Vec::new();
@@ -159,22 +159,35 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     // TODO use global timestamp?
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+    let since_the_epoch = since_the_epoch.as_millis() as u64;
 
-    let meta: package_metadata::MetaIndex = package_metadata::MetaIndex {
+    let subdir = String::from("osx-arm64");
+    let (platform, arch) = if subdir == "noarch" {
+        (None, None)
+    } else {
+        let parts: Vec<&str> = subdir.split('-').collect();
+        (Some(String::from(parts[0])), Some(String::from(parts[1])))
+    };
+
+    let index_json = IndexJson {
         name: recipe.name.clone(),
-        version: recipe.version.clone(),
+        version: Version::from_str(&recipe.version).expect("Could not parse version"),
         build: String::from("hash_0"),
         build_number: 0,
-        arch: String::from("arm64"),
-        platform: String::from("osx"),
-        subdir: String::from("osx-arm64"),
-        license: String::from("BSD-3-Clause"),
-        license_family: String::from("BSD"),
-        timestamp: since_the_epoch.as_millis(),
+        arch,
+        platform,
+        subdir: Some(String::from("osx-arm64")),
+        license: Some(String::from("BSD-3-Clause")),
+        license_family: Some(String::from("BSD")),
+        timestamp: Some(since_the_epoch),
         depends: recipe.requirements.run.clone(),
         constrains: recipe.requirements.constrains.clone(),
+        noarch: NoArchType::none(),
+        track_features: vec![],
+        features: None,
     };
-    Ok(serde_json::to_string_pretty(&meta)?)
+
+    Ok(serde_json::to_string_pretty(&index_json)?)
 }
 
 pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
