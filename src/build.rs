@@ -30,7 +30,7 @@ fn setup_build_dir(recipe: &Output) -> anyhow::Result<PathBuf> {
 
     let dirname = format!("{}_{:?}", recipe.name, since_the_epoch.as_millis());
     let path = env::current_dir()?.join(dirname);
-    fs::create_dir_all(&path.join("work"))?;
+    fs::create_dir_all(path.join("work"))?;
     Ok(path)
 }
 
@@ -141,7 +141,7 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
 }
 
 pub fn get_conda_build_script(
-    recipe: &Output,
+    _recipe: &Output,
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
@@ -218,7 +218,7 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record file");
 
-    let build_cmd = Command::new("/bin/bash")
+    let _build_cmd = Command::new("/bin/bash")
         .current_dir(&directories.source_dir)
         .arg(directories.source_dir.join("conda_build.sh"))
         .stdin(Stdio::null())

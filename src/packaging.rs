@@ -1,18 +1,16 @@
 use crate::metadata::Output;
 
-use rattler_conda_types::package::{AboutJson, IndexJson, PathsJson};
+use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{FileMode, PathType, PathsEntry};
 
-use self::package_metadata::PathRecord;
-use self::package_metadata::Paths;
 use anyhow::Ok;
 use anyhow::Result;
-use itertools;
+
 use tempdir::TempDir;
 use walkdir::WalkDir;
 
 use fs::File;
-use std::default;
+
 use std::io::{Read, Write};
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -23,7 +21,7 @@ use bzip2::Compression;
 
 use super::hash::sha256_digest;
 use std::collections::HashSet;
-use std::os::unix::fs::MetadataExt;
+
 use std::path::{Path, PathBuf};
 
 pub mod package_metadata;
@@ -99,17 +97,17 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<Strin
     };
 
     for p in itertools::sorted(paths) {
-        let meta = fs::metadata(&p)?;
+        let meta = fs::metadata(p)?;
 
         let relative_path = p.strip_prefix(prefix)?.to_path_buf();
 
         if meta.is_dir() {
             // check if dir is empty, and only then add it to paths.json
-            let mut entries = fs::read_dir(&p)?;
+            let mut entries = fs::read_dir(p)?;
             if entries.next().is_none() {
                 let path_entry = PathsEntry {
                     sha256: None,
-                    relative_path: relative_path,
+                    relative_path,
                     path_type: PathType::Directory,
                     // TODO put this away?
                     file_mode: FileMode::Binary,
@@ -126,7 +124,7 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<Strin
             let n = file.read(&mut buffer)?;
             let buffer = &buffer[..n];
 
-            let content_type = content_inspector::inspect(&buffer);
+            let content_type = content_inspector::inspect(buffer);
             let file_type = if content_type.is_text() {
                 FileMode::Text
             } else {
@@ -135,7 +133,7 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<Strin
 
             paths_json.paths.push(PathsEntry {
                 sha256: Some(sha256_digest(p)),
-                relative_path: relative_path,
+                relative_path,
                 path_type: PathType::HardLink,
                 file_mode: file_type,
                 prefix_placeholder: None,
@@ -145,7 +143,7 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<Strin
         } else if meta.file_type().is_symlink() {
             paths_json.paths.push(PathsEntry {
                 sha256: None,
-                relative_path: relative_path,
+                relative_path,
                 path_type: PathType::SoftLink,
                 file_mode: FileMode::Binary,
                 prefix_placeholder: None,
@@ -219,10 +217,10 @@ pub fn package_conda(
     let info_folder = tmp_dir.path().join("info");
     fs::create_dir(&info_folder)?;
 
-    let mut paths_json = File::create(&info_folder.join("paths.json"))?;
+    let mut paths_json = File::create(info_folder.join("paths.json"))?;
     paths_json.write_all(create_paths_json(new_files, prefix)?.as_bytes())?;
 
-    let mut index_json = File::create(&info_folder.join("index.json"))?;
+    let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
 
     // TODO get proper hash
