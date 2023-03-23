@@ -1,14 +1,19 @@
 use crate::metadata::Output;
 
+use rattler_conda_types::package::{AboutJson, IndexJson, PathsJson};
+use rattler_conda_types::package::{FileMode, PathType, PathsEntry};
+
 use self::package_metadata::PathRecord;
 use self::package_metadata::Paths;
 use anyhow::Ok;
 use anyhow::Result;
+use itertools;
 use tempdir::TempDir;
 use walkdir::WalkDir;
 
 use fs::File;
-use std::io::Write;
+use std::default;
+use std::io::{Read, Write};
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use std::{env, fs};
@@ -88,43 +93,70 @@ fn compress_tarbz2(
 }
 
 fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<String> {
-    let mut paths_json: Paths = Paths::default();
-    let mut paths: Vec<PathBuf> = paths.clone().into_iter().collect();
+    let mut paths_json: PathsJson = PathsJson {
+        paths: Vec::new(),
+        paths_version: 1,
+    };
 
-    // Sort paths to get "reproducible" metadata
-    paths.sort();
-
-    for p in paths {
+    for p in itertools::sorted(paths) {
         let meta = fs::metadata(&p)?;
-        if meta.is_dir() {
-            continue;
-        };
 
-        paths_json.paths.push(PathRecord {
-            sha256: sha256_digest(&p),
-            path_type: String::from("hardlink"),
-            size_in_bytes: meta.size(),
-            path: p.strip_prefix(prefix)?.into(),
-        })
+        let relative_path = p.strip_prefix(prefix)?.to_path_buf();
+
+        if meta.is_dir() {
+            // check if dir is empty, and only then add it to paths.json
+            let mut entries = fs::read_dir(&p)?;
+            if entries.next().is_none() {
+                let path_entry = PathsEntry {
+                    sha256: None,
+                    relative_path: relative_path,
+                    path_type: PathType::Directory,
+                    // TODO put this away?
+                    file_mode: FileMode::Binary,
+                    prefix_placeholder: None,
+                    no_link: false,
+                    size_in_bytes: None,
+                };
+                paths_json.paths.push(path_entry);
+            }
+        } else if meta.is_file() {
+            // read first 1024 bytes to determine file type
+            let mut file = File::open(p)?;
+            let mut buffer = [0; 1024];
+            let n = file.read(&mut buffer)?;
+            let buffer = &buffer[..n];
+
+            let content_type = content_inspector::inspect(&buffer);
+            let file_type = if content_type.is_text() {
+                FileMode::Text
+            } else {
+                FileMode::Binary
+            };
+
+            paths_json.paths.push(PathsEntry {
+                sha256: Some(sha256_digest(p)),
+                relative_path: relative_path,
+                path_type: PathType::HardLink,
+                file_mode: file_type,
+                prefix_placeholder: None,
+                no_link: false,
+                size_in_bytes: Some(meta.len()),
+            });
+        } else if meta.file_type().is_symlink() {
+            paths_json.paths.push(PathsEntry {
+                sha256: None,
+                relative_path: relative_path,
+                path_type: PathType::SoftLink,
+                file_mode: FileMode::Binary,
+                prefix_placeholder: None,
+                no_link: false,
+                size_in_bytes: None,
+            });
+        }
     }
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
 
-// {
-//     "arch": "arm64",
-//     "build": "hffc8910_0",
-//     "build_number": 0,
-//     "depends": [
-//       "libcxx >=14.0.4"
-//     ],
-//     "license": "BSD-3-Clause",
-//     "license_family": "BSD",
-//     "name": "xsimd",
-//     "platform": "osx",
-//     "subdir": "osx-arm64",
-//     "timestamp": 1661428002610,
-//     "version": "9.0.1"
-//   }
 fn create_index_json(recipe: &Output) -> Result<String> {
     // TODO use global timestamp?
     let now = SystemTime::now();
