@@ -1,13 +1,14 @@
+use clap::Parser;
+use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{collections::BTreeMap, str, path::PathBuf};
-use tera::{Context, Tera};
-use clap::Parser;
+use std::{collections::BTreeMap, path::PathBuf, str};
 
 mod build;
 mod hash;
 mod metadata;
+mod render;
 mod solver;
 mod source;
 use metadata::{BuildOptions, Requirements, Source};
@@ -38,83 +39,6 @@ struct Output {
     requirements: Requirements,
 }
 
-fn render_recipe_recursively(recipe: &mut serde_yaml::Mapping, context: &Context) {
-    // let mut remove_keys = Vec::new();
-    for (_, v) in recipe.iter_mut() {
-        // if let YamlValue::String(key) = k {
-        //     if let Some(key) = key.strip_prefix("sel(") {
-        //         let sel = key.strip_suffix(')').expect("nope");
-        //         let esval = eval_selector(sel);
-        //         println!("Evaluated {} to {}", sel, esval);
-        //         if !esval {
-        //             return None;
-        //         }
-        //         else {
-        //             return x
-        //         }
-        //     }
-        // }
-        match v {
-            YamlValue::String(var) => {
-                *v = YamlValue::String(Tera::one_off(var, context, true).unwrap());
-            }
-            YamlValue::Sequence(var) => {
-                render_recipe_recursively_seq(var, context);
-            }
-            YamlValue::Mapping(var) => {
-                render_recipe_recursively(var, context);
-            }
-            _ => {}
-        }
-    }
-    // remove_keys.iter().for_each(|key| {
-    //     recipe.remove(key);
-    // });
-}
-
-fn render_recipe_recursively_seq(recipe: &mut serde_yaml::Sequence, context: &Context) {
-    for v in recipe {
-        match v {
-            YamlValue::String(var) => {
-                *v = YamlValue::String(Tera::one_off(var, context, true).unwrap());
-            }
-            YamlValue::Sequence(var) => {
-                render_recipe_recursively_seq(var, context);
-            }
-            YamlValue::Mapping(var) => {
-                render_recipe_recursively(var, context);
-            }
-            _ => {}
-        }
-    }
-}
-
-fn render_recipe(recipe: &YamlValue) {
-    // Using the tera Context struct
-    let recipe = match recipe {
-        YamlValue::Mapping(map) => map,
-        _ => panic!("Expected a map"),
-    };
-
-    let mut context = Context::new();
-    if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
-        for (key, v) in map.iter() {
-            if let YamlValue::String(key) = key {
-                context.insert(key, v);
-            }
-        }
-        let res = Tera::one_off("Name is: {{ name }}", &context, true);
-        println!("{}", res.expect("Template no worki"));
-
-        let mut recipe_modified = recipe.clone();
-        recipe_modified.remove("context");
-        render_recipe_recursively(&mut recipe_modified, &context);
-        println!("{:#?}", &recipe_modified);
-    } else {
-        eprintln!("Did not find context");
-    }
-}
-
 #[derive(Parser, Debug)]
 struct Opts {
     #[arg(short, long)]
@@ -141,7 +65,9 @@ async fn main() {
         tracing::error!("Could not flatten selectors");
     }
 
-    // render_recipe(&myrec);
+    let myrec = render_recipe(&myrec);
+
+    print!("{:#?}", myrec);
 
     let requirements: Requirements = serde_yaml::from_value(
         myrec
@@ -177,19 +103,24 @@ async fn main() {
 
     let output = metadata::Output {
         build: build_options,
+        // get package.name
         name: String::from(
             myrec
+                .get("package")
+                .expect("Could not find package")
                 .get("name")
                 .expect("Could not find name")
                 .as_str()
-                .expect("..."),
+                .unwrap(),
         ),
         version: String::from(
             myrec
+                .get("package")
+                .expect("Could not find package")
                 .get("version")
-                .expect("Could not find version")
+                .expect("Could not find name")
                 .as_str()
-                .expect("..."),
+                .unwrap(),
         ),
         source: sources,
         requirements,

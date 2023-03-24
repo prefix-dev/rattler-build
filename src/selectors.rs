@@ -1,12 +1,8 @@
 use std::collections::HashMap;
-use std::panic;
 
+use minijinja::value::Value;
+use minijinja::Environment;
 use serde_yaml::Value as YamlValue;
-
-use starlark::environment::{GlobalsBuilder, Module};
-use starlark::eval::Evaluator;
-use starlark::syntax::{AstModule, Dialect};
-use starlark::values::Value;
 
 #[derive(Clone, Debug)]
 pub struct SelectorConfig {
@@ -31,56 +27,62 @@ impl SelectorConfig {
     fn is_linux(&self) -> bool {
         self.target_platform.starts_with("linux-")
     }
-
-    pub fn into_globals(self) -> GlobalsBuilder {
-        let mut globals = GlobalsBuilder::standard();
-        globals.set("unix", self.is_unix());
-        globals.set("win", self.is_win());
-        globals.set("osx", self.is_osx());
-        globals.set("linux", self.is_linux());
-
-        globals.set("arch", self.target_platform.split('-').last().unwrap_or("unknown"));
-        globals.set("python_version", self.python_version);
-        globals.set("target_platform", self.target_platform);
-        globals.set("build_platform", self.build_platform);
+    pub fn into_context(self) -> HashMap<String, Value> {
+        let mut context = HashMap::<String, Value>::new();
+        context.insert("unix".to_string(), Value::from(self.is_unix()));
+        context.insert("win".to_string(), Value::from(self.is_win()));
+        context.insert("osx".to_string(), Value::from(self.is_osx()));
+        context.insert("linux".to_string(), Value::from(self.is_linux()));
+        context.insert(
+            "arch".to_string(),
+            Value::from_safe_string(
+                self.target_platform
+                    .split('-')
+                    .last()
+                    .unwrap_or("unknown")
+                    .to_string(),
+            ),
+        );
+        context.insert(
+            "python_version".to_string(),
+            Value::from_safe_string(self.python_version),
+        );
+        context.insert(
+            "target_platform".to_string(),
+            Value::from_safe_string(self.target_platform),
+        );
+        context.insert(
+            "build_platform".to_string(),
+            Value::from_safe_string(self.build_platform),
+        );
         for (key, v) in std::env::vars() {
-            globals.set(&key, v);
+            context.insert(key, Value::from_safe_string(v));
         }
-        globals
+        context
     }
 }
 
 pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorConfig) -> bool {
+    let env = Environment::new();
+
     let selector = selector.into();
 
     // strip the sel() wrapper
     let selector = selector
         .strip_prefix("sel(")
         .and_then(|selector| selector.strip_suffix(')'))
-        .expect("Could not strip sel( ... ). Check your brackets.")
-        .into();
+        .expect("Could not strip sel( ... ). Check your brackets.");
 
-
-    // We first parse the content, giving a filename and the Starlark
-    // `Dialect` we'd like to use (we pick standard).
-    let ast: AstModule = AstModule::parse("selector.star", selector, &Dialect::Standard).unwrap();
-
-    // We create a `Globals`, defining the standard library functions available.
-    // The `standard` function uses those defined in the Starlark specification.
-    let globals = selector_config.clone().into_globals().build();
-
-    // We create a `Module`, which stores the global variables for our calculation.
-    let module: Module = Module::new();
-
-    // We create an evaluator, which controls how evaluation occurs.
-    let mut eval: Evaluator = Evaluator::new(&module);
-
-    // And finally we evaluate the code using the evaluator.
-    let res: Value = eval.eval_module(ast, &globals).expect("huuuuh?");
-    res.unpack_bool().unwrap_or(false)
+    let expr = env.compile_expression(selector).unwrap();
+    let ctx = selector_config.clone().into_context();
+    let result = expr.eval(ctx).unwrap();
+    result.is_true()
 }
 
-pub fn flatten_selectors(val: &mut YamlValue, selector_config: &SelectorConfig) -> Option<YamlValue> {
+pub fn flatten_selectors(
+    val: &mut YamlValue,
+    selector_config: &SelectorConfig,
+) -> Option<YamlValue> {
     if val.is_string() || val.is_number() || val.is_bool() {
         return Some(val.clone());
     }
@@ -102,15 +104,15 @@ pub fn flatten_selectors(val: &mut YamlValue, selector_config: &SelectorConfig) 
     }
 
     if val.is_sequence() {
-        let new_val = val.as_sequence_mut().unwrap()
+        let new_val = val
+            .as_sequence_mut()
+            .unwrap()
             .iter_mut()
-            .map(|el| flatten_selectors(el, selector_config))
-            .filter(|el| el.is_some())
-            .map(|el| el.unwrap())
+            .filter_map(|el| flatten_selectors(el, selector_config))
             .collect::<Vec<YamlValue>>();
 
         // flatten down list of lists
-        let new_val =  new_val
+        let new_val = new_val
             .into_iter()
             .flat_map(|el| {
                 if el.is_sequence() {
@@ -124,7 +126,7 @@ pub fn flatten_selectors(val: &mut YamlValue, selector_config: &SelectorConfig) 
         return Some(serde_yaml::to_value(&new_val).unwrap());
     }
 
-    return Some(val.clone());
+    Some(val.clone())
 }
 
 #[cfg(test)]
@@ -144,8 +146,22 @@ mod tests {
         assert!(!eval_selector("sel(osx)", &selector_config));
         assert!(eval_selector("sel(unix and not win)", &selector_config));
         assert!(!eval_selector("sel(unix and not linux)", &selector_config));
-        assert!(eval_selector("sel((unix and not osx) or win)", &selector_config));
-        assert!(eval_selector("sel((unix and not osx) or win or osx)", &selector_config));
+        assert!(eval_selector(
+            "sel((unix and not osx) or win)",
+            &selector_config
+        ));
+        assert!(eval_selector(
+            "sel((unix and not osx) or win or osx)",
+            &selector_config
+        ));
+    }
+
+    macro_rules! set_snapshot_suffix {
+        ($($expr:expr),*) => {
+            let mut settings = insta::Settings::clone_current();
+            settings.set_snapshot_suffix(format!($($expr,)*));
+            let _guard = settings.bind_to_scope();
+        }
     }
 
     #[rstest]
@@ -162,7 +178,7 @@ mod tests {
         };
 
         let res = flatten_selectors(&mut yaml, &selector_config);
-
+        set_snapshot_suffix!("{}", filename.replace('/', "_"));
         insta::assert_yaml_snapshot!(res);
     }
 }

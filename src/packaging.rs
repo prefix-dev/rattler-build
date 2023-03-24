@@ -126,13 +126,13 @@ fn create_index_json(recipe: &Output) -> Result<String> {
 
 fn create_about_json(recipe: &Output) -> Result<String> {
     let about_json = AboutJson {
-        home: recipe.about.home.clone(),
+        home: recipe.about.home.clone().unwrap_or_default(),
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
         summary: recipe.about.summary.clone(),
         description: recipe.about.description.clone(),
-        doc_url: recipe.about.doc_url.clone(),
-        dev_url: recipe.about.dev_url.clone(),
+        doc_url: recipe.about.doc_url.clone().unwrap_or_default(),
+        dev_url: recipe.about.dev_url.clone().unwrap_or_default(),
         source_url: None,
         channels: vec![], // TODO
     };
