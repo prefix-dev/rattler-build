@@ -8,6 +8,7 @@ rand = "^0.8.3"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_yaml = "0.9.11"
 rattler_conda_types = { git = "https://github.com/mamba-org/rattler" }
+rattler_package_streaming = { git = "https://github.com/mamba-org/rattler" }
 anyhow = "1.0.63"
 walkdir = "2.3.2"
 sha2 = "0.10.5"
@@ -24,3 +25,6 @@ futures = "0.3.24"
 tokio = {version = "1.21.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.10.5"
 content_inspector = "0.2.4"
+serde_with = "2.3.1"
+url = "2.3.1"
+tracing = "0.1.37"

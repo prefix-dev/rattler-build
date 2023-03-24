@@ -17,6 +17,8 @@ mod selectors;
 
 use build::run_build;
 
+use crate::metadata::{About, BuildConfiguration};
+
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
     context: BTreeMap<String, serde_yaml::Value>,
@@ -150,9 +152,16 @@ async fn main() {
     )
     .expect("Could not deserialize source");
 
-    print!("{:?}", &sources);
+    let about: About = serde_yaml::from_value(
+        myrec
+            .get("about")
+            .expect("Could not find about key")
+            .clone(),
+    )
+    .expect("Could not parse About");
 
     let output = metadata::Output {
+        build: build_options,
         name: String::from(
             myrec
                 .get("name")
@@ -168,8 +177,14 @@ async fn main() {
                 .expect("..."),
         ),
         source: sources,
-        build: build_options,
         requirements,
+        about,
+        build_configuration: BuildConfiguration {
+            target_platform: String::from("osx-arm64"),
+            build_platform: String::from("osx-arm64"),
+            hash: String::from("h1234_0"),
+            used_vars: vec![],
+        },
     };
 
     // let res = create_environment(

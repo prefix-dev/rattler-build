@@ -1,8 +1,9 @@
 use crate::metadata::Output;
 
-use rattler_conda_types::package::{FileMode, PathType, PathsEntry};
+use rattler_conda_types::package::{AboutJson, FileMode, PathType, PathsEntry};
 use rattler_conda_types::package::{IndexJson, PathsJson};
-use rattler_conda_types::{Version, NoArchType};
+use rattler_conda_types::{NoArchType, Version};
+use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use anyhow::Ok;
 use anyhow::Result;
@@ -12,83 +13,16 @@ use walkdir::WalkDir;
 
 use fs::File;
 
+use std::fs;
 use std::io::{Read, Write};
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
-use std::{env, fs};
-
-use bzip2::read::BzEncoder;
-use bzip2::Compression;
 
 use super::hash::sha256_digest;
 use std::collections::HashSet;
 
-use std::path::{Path, PathBuf};
-
-pub fn copy_all<U: AsRef<Path>, V: AsRef<Path>>(from: U, to: V) -> Result<Vec<PathBuf>> {
-    let mut stack = Vec::new();
-    let mut paths: Vec<PathBuf> = Vec::new();
-    stack.push(PathBuf::from(from.as_ref()));
-
-    let output_root = PathBuf::from(to.as_ref());
-    let input_root = PathBuf::from(from.as_ref()).components().count();
-    while let Some(working_path) = stack.pop() {
-        println!("process: {:?}", &working_path);
-
-        // Generate a relative path
-        let src: PathBuf = working_path.components().skip(input_root).collect();
-
-        // Create a destination if missing
-        let dest = if src.components().count() == 0 {
-            output_root.clone()
-        } else {
-            output_root.join(&src)
-        };
-        if fs::metadata(&dest).is_err() {
-            println!(" mkdir: {:?}", dest);
-            fs::create_dir_all(&dest)?;
-        }
-
-        for entry in fs::read_dir(working_path)? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.is_dir() {
-                stack.push(path);
-            } else {
-                match path.file_name() {
-                    Some(filename) => {
-                        let dest_path = dest.join(filename);
-                        println!("  copy: {:?} -> {:?}", &path, &dest_path);
-                        fs::copy(&path, &dest_path)?;
-                        paths.push(dest_path);
-                    }
-                    None => {
-                        println!("failed: {:?}", path);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(paths)
-}
-
-fn compress_tarbz2(
-    source_directory: &Path,
-    filename: &String,
-) -> Result<BzEncoder<File>, std::io::Error> {
-    let tar_bz2 = File::create(filename)?;
-
-    env::set_current_dir(source_directory).expect("OK");
-
-    let enc = BzEncoder::new(tar_bz2, Compression::default());
-
-    let mut ar = tar::Builder::new(enc);
-    ar.append_dir_all(".", source_directory).unwrap();
-
-    ar.into_inner()
-}
+use std::path::PathBuf;
 
 fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<String> {
     let mut paths_json: PathsJson = PathsJson {
@@ -161,7 +95,7 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
     let since_the_epoch = since_the_epoch.as_millis() as u64;
 
-    let subdir = String::from("osx-arm64");
+    let subdir = recipe.build_configuration.target_platform.clone();
     let (platform, arch) = if subdir == "noarch" {
         (None, None)
     } else {
@@ -172,13 +106,13 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     let index_json = IndexJson {
         name: recipe.name.clone(),
         version: Version::from_str(&recipe.version).expect("Could not parse version"),
-        build: String::from("hash_0"),
-        build_number: 0,
+        build: recipe.build_configuration.hash.clone(),
+        build_number: recipe.build.number,
         arch,
         platform,
-        subdir: Some(String::from("osx-arm64")),
-        license: Some(String::from("BSD-3-Clause")),
-        license_family: Some(String::from("BSD")),
+        subdir: Some(recipe.build_configuration.target_platform.clone()),
+        license: recipe.about.license.clone(),
+        license_family: recipe.about.license_family.clone(),
         timestamp: Some(since_the_epoch),
         depends: recipe.requirements.run.clone(),
         constrains: recipe.requirements.constrains.clone(),
@@ -188,6 +122,22 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     };
 
     Ok(serde_json::to_string_pretty(&index_json)?)
+}
+
+fn create_about_json(recipe: &Output) -> Result<String> {
+    let about_json = AboutJson {
+        home: recipe.about.home.clone(),
+        license: recipe.about.license.clone(),
+        license_family: recipe.about.license_family.clone(),
+        summary: recipe.about.summary.clone(),
+        description: recipe.about.description.clone(),
+        doc_url: recipe.about.doc_url.clone(),
+        dev_url: recipe.about.dev_url.clone(),
+        source_url: None,
+        channels: vec![], // TODO
+    };
+
+    Ok(serde_json::to_string_pretty(&about_json)?)
 }
 
 pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
@@ -225,7 +175,7 @@ pub fn package_conda(
         fs::copy(f, dest).expect("Could not copy to dest");
     }
 
-    println!("Copying done!");
+    tracing::info!("Copying done!");
 
     let info_folder = tmp_dir.path().join("info");
     fs::create_dir(&info_folder)?;
@@ -236,11 +186,17 @@ pub fn package_conda(
     let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
 
+    let mut about_json = File::create(info_folder.join("about.json"))?;
+    about_json.write_all(create_about_json(output)?.as_bytes())?;
+
     // TODO get proper hash
-    compress_tarbz2(
-        tmp_dir.path(),
-        &format!("{}-{}-{}.tar.bz2", output.name, output.version, "hash_0"),
-    )?;
+    let file = tmp_dir.path().join(format!(
+        "{}-{}-{}.tar.bz2",
+        output.name, output.version, "hash_0"
+    ));
+    let file = File::create(file)?;
+    let new_files = new_files.iter().cloned().collect::<Vec<_>>();
+    write_tar_bz2_package(file, tmp_dir.path(), &new_files, CompressionLevel::Default)?;
 
     Ok(())
 }
