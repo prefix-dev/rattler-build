@@ -28,3 +28,7 @@ content_inspector = "0.2.4"
 serde_with = "2.3.1"
 url = "2.3.1"
 tracing = "0.1.37"
+
+[dev-dependencies]
+insta = {version = "1.29.0", features = ["yaml"] }
+rstest = "0.17.0"

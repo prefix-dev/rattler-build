@@ -1,0 +1,11 @@
+---
+source: src/selectors.rs
+expression: res
+---
+build:
+  - "echo 'linux'"
+  - "echo 'linux2'"
+test:
+  - "echo 'linux'"
+  - "echo 'linux2'"
+

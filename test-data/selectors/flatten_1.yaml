@@ -1,0 +1,10 @@
+build:
+  - sel(linux): echo 'linux'
+  - sel(osx): echo 'osx'
+  - sel(linux): echo 'linux2'
+  - sel(osx): echo 'osx2'
+
+test:
+  - sel(linux): 
+      - echo 'linux'
+      - echo 'linux2'

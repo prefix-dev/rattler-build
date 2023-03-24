@@ -1,3 +1,4 @@
+use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{collections::BTreeMap, str};
@@ -118,9 +119,12 @@ async fn main() {
     let myrec: YamlValue =
         serde_yaml::from_reader(std::fs::File::open("test.yaml").unwrap()).expect("Give yaml");
 
-    // println!("{:?}", myrec);
-    // println!("{}", myrec.name);
-    // flatten_selectors(&myrec);
+    let selector_config = SelectorConfig {
+        target_platform: "osx-arm64".to_string(),
+        build_platform: "osx-arm64".to_string(),
+        python_version: "3.10".to_string(),
+    };
+    // flatten_selectors(&myrec, &selector_config);
     // render_recipe(&myrec);
     // println!(
     //     "starlark says: {}",

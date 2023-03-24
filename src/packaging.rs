@@ -192,7 +192,7 @@ pub fn package_conda(
     // TODO get proper hash
     let file = tmp_dir.path().join(format!(
         "{}-{}-{}.tar.bz2",
-        output.name, output.version, "hash_0"
+        output.name, output.version, output.build_configuration.hash
     ));
     let file = File::create(file)?;
     let new_files = new_files.iter().cloned().collect::<Vec<_>>();
