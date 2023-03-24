@@ -1,6 +1,9 @@
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
+use serde_with::formats::PreferOne;
+use serde_with::serde_as;
+use serde_with::OneOrMany;
+use std::collections::BTreeMap;
+use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Requirements {
@@ -16,9 +19,25 @@ pub struct Requirements {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BuildOptions {
-    pub number: u32,
+    pub number: u64,
     pub string: Option<String>,
-    pub script: String,
+    pub script: Option<String>,
+    pub ignore_run_exports: Option<Vec<String>>,
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct About {
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
+    pub home: Vec<Url>,
+    pub license: Option<String>,
+    pub license_family: Option<String>,
+    pub summary: Option<String>,
+    pub description: Option<String>,
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
+    pub doc_url: Vec<Url>,
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
+    pub dev_url: Vec<Url>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -31,6 +50,7 @@ pub struct Recipe {
     pub build: BuildOptions,
     #[serde(default)]
     pub requirements: Requirements,
+    pub about: About,
 }
 
 impl Default for BuildOptions {
@@ -88,10 +108,19 @@ pub enum Source {
     Url(UrlSrc),
 }
 
+pub struct BuildConfiguration {
+    pub target_platform: String,
+    pub build_platform: String,
+    pub used_vars: Vec<String>,
+    pub hash: String,
+}
+
 pub struct Output {
     pub build: BuildOptions,
     pub name: String,
     pub version: String,
     pub source: Vec<Source>,
     pub requirements: Requirements,
+    pub about: About,
+    pub build_configuration: BuildConfiguration,
 }

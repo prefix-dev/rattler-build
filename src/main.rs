@@ -1,7 +1,9 @@
+use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{collections::BTreeMap, str};
+use std::{collections::BTreeMap, str, path::PathBuf};
 use tera::{Context, Tera};
+use clap::Parser;
 
 mod build;
 mod hash;
@@ -16,6 +18,8 @@ mod selectors;
 // use selectors::{eval_selector, flatten_selectors};
 
 use build::run_build;
+
+use crate::metadata::{About, BuildConfiguration};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -111,21 +115,34 @@ fn render_recipe(recipe: &YamlValue) {
     }
 }
 
+#[derive(Parser, Debug)]
+struct Opts {
+    #[arg(short, long)]
+    recipe_file: PathBuf,
+}
+
 #[tokio::main]
 async fn main() {
-    let myrec: YamlValue =
-        serde_yaml::from_reader(std::fs::File::open("test.yaml").unwrap()).expect("Give yaml");
+    let args = Opts::parse();
 
-    // println!("{:?}", myrec);
-    // println!("{}", myrec.name);
-    // flatten_selectors(&myrec);
+    let mut myrec: YamlValue =
+        serde_yaml::from_reader(std::fs::File::open(args.recipe_file).unwrap()).expect("Give yaml");
+
+    let selector_config = SelectorConfig {
+        target_platform: "osx-arm64".to_string(),
+        build_platform: "osx-arm64".to_string(),
+        python_version: "3.10".to_string(),
+    };
+    if let Some(flattened_recipe) = flatten_selectors(&mut myrec, &selector_config) {
+        println!("Flattened selectors");
+        println!("{:#?}", myrec);
+        myrec = flattened_recipe;
+    } else {
+        tracing::error!("Could not flatten selectors");
+    }
+
     // render_recipe(&myrec);
-    // println!(
-    //     "starlark says: {}",
-    //     eval_selector("sel(unix and max(4,3) == 4)")
-    // );
 
-    // package_conda(Metadata::default());
     let requirements: Requirements = serde_yaml::from_value(
         myrec
             .get("requirements")
@@ -150,9 +167,16 @@ async fn main() {
     )
     .expect("Could not deserialize source");
 
-    print!("{:?}", &sources);
+    let about: About = serde_yaml::from_value(
+        myrec
+            .get("about")
+            .expect("Could not find about key")
+            .clone(),
+    )
+    .expect("Could not parse About");
 
     let output = metadata::Output {
+        build: build_options,
         name: String::from(
             myrec
                 .get("name")
@@ -168,17 +192,16 @@ async fn main() {
                 .expect("..."),
         ),
         source: sources,
-        build: build_options,
         requirements,
+        about,
+        build_configuration: BuildConfiguration {
+            target_platform: String::from("osx-arm64"),
+            build_platform: String::from("osx-arm64"),
+            hash: String::from("h1234_0"),
+            used_vars: vec![],
+        },
     };
 
-    // let res = create_environment(
-    //     vec!["xtensor"],
-    //     vec!["conda-forge"],
-    //     "/Users/wolfvollprecht/Programs/guessing_game/env".into(),
-    // );
-
-    // println!("The result of the micromamba operation is: {:?}", res);
     // fetch_sources(&sources).await;
     let res = run_build(&output).await;
     if res.is_err() {
