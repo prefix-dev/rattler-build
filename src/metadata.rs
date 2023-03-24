@@ -21,7 +21,8 @@ pub struct Requirements {
 pub struct BuildOptions {
     pub number: u64,
     pub string: Option<String>,
-    pub script: String,
+    pub script: Option<String>,
+    pub ignore_run_exports: Option<Vec<String>>,
 }
 
 #[serde_as]
