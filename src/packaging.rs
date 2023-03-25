@@ -97,7 +97,7 @@ impl PathMetadata {
     }
 }
 
-fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<String> {
+fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &Path) -> Result<String> {
     let mut paths_json: PathsJson = PathsJson {
         paths: Vec::new(),
         paths_version: 1,
@@ -233,8 +233,8 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
 pub fn package_conda(
     output: &Output,
     new_files: &HashSet<PathBuf>,
-    prefix: &PathBuf,
-    local_channel_dir: &PathBuf,
+    prefix: &Path,
+    local_channel_dir: &Path,
 ) -> Result<()> {
     let tmp_dir = TempDir::new(&output.name)?;
 

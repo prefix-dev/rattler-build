@@ -183,7 +183,7 @@ pub fn get_conda_build_script(
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
-        get_build_env_script(&recipe, directories).expect("Could not write build script");
+        get_build_env_script(recipe, directories).expect("Could not write build script");
     // let build_env_script_path = build_folder.join("work/build_env.sh");
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource {}\nfi",
