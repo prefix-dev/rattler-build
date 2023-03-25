@@ -241,30 +241,22 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
 
     setup_environments(recipe, &directories)?;
 
-    let files_before = record_files(&directories.host_prefix).expect("Could not record file");
+    let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
-    let _build_cmd = Command::new("/bin/bash")
+    Command::new("/bin/bash")
         .current_dir(&directories.source_dir)
         .arg(directories.source_dir.join("conda_build.sh"))
         .stdin(Stdio::null())
         .status()
         .expect("Failed to execute command");
 
-    let files_after = record_files(&directories.host_prefix).expect("Could not record file");
+    let files_after = record_files(&directories.host_prefix).expect("Could not record files");
 
-    let difference = files_after.difference(&files_before);
+    let difference = files_after
+        .difference(&files_before)
+        .cloned()
+        .collect::<HashSet<_>>();
 
-    let mut paths: Vec<&PathBuf> = difference.collect();
-    paths.sort();
-
-    print!("{:?}", paths);
-    // block_on(fetch_sources(&[]));
-
-    let mut diff_paths: HashSet<PathBuf> = HashSet::new();
-    for el in paths {
-        diff_paths.insert(el.clone());
-    }
-
-    package_conda(recipe, &diff_paths, &directories.host_prefix)?;
+    package_conda(recipe, &difference, &directories.host_prefix)?;
     Ok(())
 }
