@@ -108,8 +108,7 @@ pub fn flatten_selectors(
             .as_sequence_mut()
             .unwrap()
             .iter_mut()
-            .filter_map(|el| flatten_selectors(el, selector_config))
-            .collect::<Vec<YamlValue>>();
+            .filter_map(|el| flatten_selectors(el, selector_config));
 
         // flatten down list of lists
         let new_val = new_val

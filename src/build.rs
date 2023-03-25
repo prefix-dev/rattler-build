@@ -14,6 +14,7 @@ use super::source::fetch_sources;
 use crate::packaging::{package_conda, record_files};
 use crate::solver;
 
+#[allow(unused)]
 pub struct Directories {
     recipe_dir: PathBuf,
     host_prefix: PathBuf,
