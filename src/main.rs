@@ -4,6 +4,8 @@ use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{collections::BTreeMap, path::PathBuf, str};
+use tracing::metadata::LevelFilter;
+use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod hash;
@@ -12,12 +14,8 @@ mod render;
 mod solver;
 mod source;
 use metadata::{BuildOptions, Requirements, Source};
-
 mod packaging;
-
 mod selectors;
-// use selectors::{eval_selector, flatten_selectors};
-
 use build::run_build;
 
 use crate::metadata::{About, BuildConfiguration};
@@ -42,6 +40,9 @@ struct Output {
 #[derive(Parser)]
 struct Opts {
     #[arg(short, long)]
+    verbose: bool,
+
+    #[arg(short, long)]
     recipe_file: PathBuf,
 }
 
@@ -49,25 +50,44 @@ struct Opts {
 async fn main() {
     let args = Opts::parse();
 
+    let default_filter = if args.verbose {
+        LevelFilter::DEBUG
+    } else {
+        LevelFilter::INFO
+    };
+
+    let env_filter = EnvFilter::builder()
+        .with_default_directive(default_filter.into())
+        .from_env()
+        .unwrap();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_writer(std::io::stderr)
+        .without_time()
+        .finish()
+        .try_init()
+        .unwrap();
+
+    tracing::info!("Starting the build process");
+
     let mut myrec: YamlValue =
-        serde_yaml::from_reader(std::fs::File::open(args.recipe_file).unwrap()).expect("Give yaml");
+        serde_yaml::from_reader(std::fs::File::open(&args.recipe_file).unwrap())
+            .expect("Give yaml");
 
     let selector_config = SelectorConfig {
         target_platform: "osx-arm64".to_string(),
         build_platform: "osx-arm64".to_string(),
         python_version: "3.10".to_string(),
     };
+
     if let Some(flattened_recipe) = flatten_selectors(&mut myrec, &selector_config) {
-        println!("Flattened selectors");
-        println!("{:#?}", myrec);
         myrec = flattened_recipe;
     } else {
         tracing::error!("Could not flatten selectors");
     }
 
     let myrec = render_recipe(&myrec);
-
-    print!("{:#?}", myrec);
 
     let requirements: Requirements = serde_yaml::from_value(
         myrec
@@ -85,13 +105,20 @@ async fn main() {
     )
     .expect("Could not read build options");
 
-    let sources: Vec<Source> = serde_yaml::from_value(
-        myrec
-            .get("source")
-            .expect("Could not find source key")
-            .clone(),
-    )
-    .expect("Could not deserialize source");
+    let source_value = myrec.get("source");
+    let mut sources: Vec<Source> = Vec::new();
+    if let Some(source_value) = source_value {
+        if source_value.is_sequence() {
+            sources =
+                serde_yaml::from_value(source_value.clone()).expect("Could not deserialize source");
+        } else {
+            sources.push(
+                serde_yaml::from_value(source_value.clone()).expect("Could not deserialize source"),
+            );
+        }
+    } else {
+        tracing::info!("No sources found");
+    }
 
     let about: About = serde_yaml::from_value(
         myrec
@@ -103,7 +130,6 @@ async fn main() {
 
     let output = metadata::Output {
         build: build_options,
-        // get package.name
         name: String::from(
             myrec
                 .get("package")
@@ -133,8 +159,7 @@ async fn main() {
         },
     };
 
-    // fetch_sources(&sources).await;
-    let res = run_build(&output).await;
+    let res = run_build(&output, &args.recipe_file).await;
     if res.is_err() {
         eprintln!("Build did not succeed");
     }

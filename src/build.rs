@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::{env, fs};
 use std::{
@@ -142,7 +143,7 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
 }
 
 pub fn get_conda_build_script(
-    _recipe: &Output,
+    recipe: &Output,
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
@@ -153,8 +154,10 @@ pub fn get_conda_build_script(
         build_env_script_path.to_string_lossy()
     );
 
-    // let orig_build_file = File::open(recipe.build.script)
-    let mut orig_build_file = File::open("build.sh").expect("Could not open build.sh file");
+    let recipe_file = directories.recipe_dir.join("build.sh");
+    tracing::info!("Reading recipe file: {:?}", recipe_file);
+
+    let mut orig_build_file = File::open(recipe_file).expect("Could not open build.sh file");
     let mut orig_build_file_text = String::new();
     orig_build_file
         .read_to_string(&mut orig_build_file_text)
@@ -177,6 +180,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.build,
             &[],
             directories.build_prefix.clone(),
+            &recipe.build_configuration.build_platform
         )?;
     } else {
         fs::create_dir_all(&directories.build_prefix)?;
@@ -187,6 +191,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
+            &recipe.build_configuration.target_platform
         )?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;
@@ -195,7 +200,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
     Ok(())
 }
 
-pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
+pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()> {
     let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
 
     let directories = Directories {
@@ -207,7 +212,7 @@ pub async fn run_build(recipe: &Output) -> anyhow::Result<()> {
         root_prefix: PathBuf::from(
             env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX"),
         ),
-        recipe_dir: PathBuf::from("."),
+        recipe_dir: recipe_path.parent().unwrap().to_path_buf(),
     };
 
     let build_script = get_conda_build_script(recipe, &directories);

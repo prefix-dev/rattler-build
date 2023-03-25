@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::hash::sha256_digest;
+use url::Url;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
@@ -60,8 +61,8 @@ fn split_filename(filename: &str) -> (String, String) {
     (stem_without_tar.to_string(), full_extension)
 }
 
-fn cache_name_from_url(url: &str, checksum: &Checksum) -> String {
-    let filename = url.split('/').last().unwrap();
+fn cache_name_from_url(url: &Url, checksum: &Checksum) -> String {
+    let filename = url.path_segments().unwrap().last().unwrap();
     let (stem, extension) = split_filename(filename);
     let checksum = match checksum {
         Checksum::Sha256(value) => value,
@@ -79,14 +80,15 @@ async fn url_src(
     fs::create_dir_all(&cache_src)?;
 
     let cache_name = PathBuf::from(cache_name_from_url(&source.url, checksum));
+    let cache_name = cache_src.join(cache_name);
 
     let metadata = fs::metadata(&cache_name);
     if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, checksum) {
-        println!("Found valid source cache file.");
+        tracing::info!("Found valid source cache file.");
         return Ok(cache_name.clone());
     }
 
-    let response = reqwest::get(&source.url).await?;
+    let response = reqwest::get(source.url.clone()).await?;
 
     let mut file = std::fs::File::create(&cache_name)?;
     let mut content = Cursor::new(response.bytes().await?);
@@ -116,12 +118,13 @@ pub async fn fetch_sources(sources: &[Source], work_dir: &Path) -> anyhow::Resul
     let cache_dir = std::env::current_dir()?.join("ROAR_CACHE");
     fs::create_dir_all(&cache_dir)?;
     for src in sources {
-        tracing::info!("Fetching source: {:#?}", src);
         match &src {
             Source::Git(src) => {
+                tracing::info!("Fetching source from GIT: {}", src.git_src);
                 git_src(src);
             }
             Source::Url(src) => {
+                tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
                 extract(&res, work_dir).expect("Could not extract the file!");
             }
@@ -176,7 +179,8 @@ mod tests {
         ];
 
         for (url, checksum, expected) in cases {
-            let name = cache_name_from_url(url, &checksum);
+            let url = Url::parse(url).unwrap();
+            let name = cache_name_from_url(&url, &checksum);
             assert_eq!(name, expected);
         }
     }
