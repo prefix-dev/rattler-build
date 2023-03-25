@@ -17,7 +17,7 @@ pub struct Requirements {
     pub constrains: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BuildOptions {
     pub number: u64,
     pub string: Option<String>,
@@ -28,16 +28,16 @@ pub struct BuildOptions {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct About {
-    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
-    pub home: Vec<Url>,
+    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
+    pub home: Option<Vec<Url>>,
     pub license: Option<String>,
     pub license_family: Option<String>,
     pub summary: Option<String>,
     pub description: Option<String>,
-    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
-    pub doc_url: Vec<Url>,
-    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
-    pub dev_url: Vec<Url>,
+    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
+    pub doc_url: Option<Vec<Url>>,
+    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
+    pub dev_url: Option<Vec<Url>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -51,16 +51,6 @@ pub struct Recipe {
     #[serde(default)]
     pub requirements: Requirements,
     pub about: About,
-}
-
-impl Default for BuildOptions {
-    fn default() -> Self {
-        Self {
-            number: 0,
-            string: Default::default(),
-            script: String::from("build.sh"),
-        }
-    }
 }
 
 pub struct Metadata {
