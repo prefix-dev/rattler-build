@@ -1455,6 +1455,7 @@ dependencies = [
  "insta",
  "itertools",
  "minijinja",
+ "num_cpus",
  "rand 0.8.5",
  "rattler_conda_types",
  "rattler_digest 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

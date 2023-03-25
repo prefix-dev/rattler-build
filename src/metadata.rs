@@ -135,6 +135,13 @@ pub struct BuildConfiguration {
     pub build_platform: String,
     pub used_vars: Vec<String>,
     pub hash: String,
+    pub no_clean: bool,
+}
+
+impl BuildConfiguration {
+    pub fn cross_compilation(&self) -> bool {
+        self.target_platform != self.build_platform
+    }
 }
 
 pub struct Output {

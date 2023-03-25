@@ -10,10 +10,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use super::metadata::Output;
-use super::source::fetch_sources;
+use crate::index;
+use crate::metadata::Output;
 use crate::packaging::{package_conda, record_files};
 use crate::solver;
+use crate::source::fetch_sources;
 
 #[allow(unused)]
 pub struct Directories {
@@ -24,6 +25,7 @@ pub struct Directories {
     source_dir: PathBuf,
     work_dir: PathBuf,
     build_dir: PathBuf,
+    local_channel: PathBuf,
 }
 
 fn setup_build_dir(recipe: &Output) -> anyhow::Result<PathBuf> {
@@ -42,7 +44,7 @@ macro_rules! s {
     };
 }
 
-pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf> {
+pub fn get_build_env_script(recipe: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
@@ -64,17 +66,71 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
             s!("SYS_PYTHON"),
             s!(directories.root_prefix.to_string_lossy()),
         ),
+        (
+            s!("RECIPE_DIR"),
+            s!(directories.recipe_dir.to_string_lossy()),
+        ),
+        (s!("SRC_DIR"), s!(directories.source_dir.to_string_lossy())),
+        (s!("WORK_DIR"), s!(directories.work_dir.to_string_lossy())),
+        (s!("BUILD_DIR"), s!(directories.build_dir.to_string_lossy())),
+        // pip isolation
+        (s!("PIP_NO_BUILD_ISOLATION"), s!("False")),
+        (s!("PIP_NO_DEPENDENCIES"), s!("True")),
+        (s!("PIP_IGNORE_INSTALLED"), s!("True")),
+        (
+            s!("PIP_CACHE_DIR"),
+            s!(directories
+                .work_dir
+                .parent()
+                .unwrap()
+                .join("pip_cache")
+                .to_string_lossy()),
+        ),
+        (s!("PIP_NO_INDEX"), s!("True")),
+        (s!("PKG_NAME"), s!(recipe.name.clone())),
+        (s!("PKG_VERSION"), s!(recipe.version.clone())),
+        (s!("PKG_BUILDNUM"), s!(recipe.build.number.to_string())),
+        // TODO this is inaccurate
+        (
+            s!("PKG_BUILD_STRING"),
+            s!(recipe.build.string.clone().unwrap_or_default()),
+        ),
+        (s!("PKG_HASH"), s!(recipe.build_configuration.hash.clone())),
+        // build configuration
+        (
+            s!("CONDA_BUILD_CROSS_COMPILATION"),
+            s!(if recipe.build_configuration.cross_compilation() {
+                "1"
+            } else {
+                "0"
+            }),
+        ),
+        // (s!("CONDA_BUILD_SYSROOT"), s!("")),
+        (
+            s!("SUBDIR"),
+            s!(recipe.build_configuration.target_platform.clone()),
+        ),
+        (
+            s!("build_platform"),
+            s!(recipe.build_configuration.build_platform.clone()),
+        ),
+        (
+            s!("target_platform"),
+            s!(recipe.build_configuration.target_platform.clone()),
+        ),
+        (s!("CONDA_BUILD_STATE"), s!("BUILD")),
+        (
+            s!("CPU_COUNT"),
+            s!(env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())),
+        ),
+        // PY3K
+        // "PY_VER": py_ver,
+        // "STDLIB_DIR": stdlib_dir,
+        // "SP_DIR": sp_dir,
     ];
 
-    // export SUBDIR="osx-arm64"
-    // export build_platform="osx-arm64"
-    // export SRC_DIR="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/work"
     // export ROOT="/Users/wolfvollprecht/micromamba"
     // export CONDA_PY="39"
-    // export PY3K="1"
-    // export PY_VER="3.9"
-    // export STDLIB_DIR="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla/lib/python3.9"
-    // export SP_DIR="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla/lib/python3.9/site-packages"
     // export NPY_VER="1.16"
     // export CONDA_NPY="116"
     // export NPY_DISTUTILS_APPEND_FLAGS="1"
@@ -84,13 +140,6 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
     // export CONDA_LUA="5"
     // export R_VER="3.5"
     // export CONDA_R="3.5"
-    // export PKG_NAME="libsolv"
-    // export PKG_VERSION="0.7.22"
-    // export PKG_BUILDNUM="0"
-    // export PKG_BUILD_STRING="hd2a9e91_0"
-    // export PKG_HASH="hd2a9e91"
-    // export RECIPE_DIR="/Users/wolfvollprecht/Programs/boa-forge/libsolv"
-    // export CPU_COUNT="8"
     // export SHLIB_EXT=".dylib"
     // export PATH="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env/bin:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla/bin:/Users/wolfvollprecht/micromamba/bin:/Users/wolfvollprecht/micromamba/condabin:/opt/local/bin:/opt/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands"
     // export HOME="/Users/wolfvollprecht"
@@ -110,15 +159,6 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
     // export CMAKE_COLOR_MAKEFILE="ON"
     // export CXXFLAGS="-fdiagnostics-color=always"
     // export CFLAGS="-fdiagnostics-color=always"
-    // export PIP_NO_BUILD_ISOLATION="False"
-    // export PIP_NO_DEPENDENCIES="True"
-    // export PIP_IGNORE_INSTALLED="True"
-    // export PIP_CACHE_DIR="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/pip_cache"
-    // export PIP_NO_INDEX="True"
-
-    // eval "$('/Users/wolfvollprecht/micromamba/bin/python3.9' -m conda shell.bash hook)"
-    // conda activate "/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla"
-    // conda activate --stack "/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env"
 
     let build_env_script_path = directories.work_dir.join("build_env.sh");
     let mut fout = File::create(&build_env_script_path)?;
@@ -126,10 +166,6 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
         writeln!(fout, "export {}=\"{}\"", v.0, v.1)?;
     }
 
-    // End of the build env script
-    // eval "$('/Users/wolfvollprecht/micromamba/bin/python3.9' -m conda shell.bash hook)"
-    // conda activate "$PREFIX"
-    // conda activate --stack "$BUILD_PREFIX"
     writeln!(
         fout,
         "\nexport MAMBA_EXE={}",
@@ -147,7 +183,7 @@ pub fn get_conda_build_script(
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
-        get_build_env_script(directories).expect("Could not write build script");
+        get_build_env_script(&recipe, directories).expect("Could not write build script");
     // let build_env_script_path = build_folder.join("work/build_env.sh");
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource {}\nfi",
@@ -212,9 +248,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
 
 pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()> {
     let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
-
-    // get absolute path to recipe dir
-    let recipe_dir = fs::canonicalize(recipe_path.parent().unwrap())?;
+    let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
     let directories = Directories {
         build_dir: build_dir.clone(),
@@ -226,6 +260,7 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
             env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX"),
         ),
         recipe_dir,
+        local_channel: fs::canonicalize(PathBuf::from("./output"))?,
     };
 
     let build_script = get_conda_build_script(recipe, &directories);
@@ -257,6 +292,18 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
         .cloned()
         .collect::<HashSet<_>>();
 
-    package_conda(recipe, &difference, &directories.host_prefix)?;
+    package_conda(
+        recipe,
+        &difference,
+        &directories.host_prefix,
+        &directories.local_channel,
+    )?;
+
+    if !recipe.build_configuration.no_clean {
+        fs::remove_dir_all(&build_dir)?;
+    }
+
+    index::index(&directories.local_channel)?;
+
     Ok(())
 }

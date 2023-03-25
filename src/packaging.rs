@@ -234,6 +234,7 @@ pub fn package_conda(
     output: &Output,
     new_files: &HashSet<PathBuf>,
     prefix: &PathBuf,
+    local_channel_dir: &PathBuf,
 ) -> Result<()> {
     let tmp_dir = TempDir::new(&output.name)?;
 
@@ -278,13 +279,17 @@ pub fn package_conda(
         tmp_files.push(info_folder.join("run_exports.json"));
     }
 
+    let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
+    // make dirs
+    fs::create_dir_all(&output_folder)?;
+
     // TODO get proper hash
     let file = format!(
         "{}-{}-{}.tar.bz2",
         output.name, output.version, output.build_configuration.hash
     );
 
-    let file = File::create(file)?;
+    let file = File::create(output_folder.join(file))?;
     write_tar_bz2_package(file, tmp_dir.path(), &tmp_files, CompressionLevel::Default)?;
 
     Ok(())

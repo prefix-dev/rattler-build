@@ -3,7 +3,7 @@ use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{collections::BTreeMap, path::PathBuf, str};
+use std::{collections::BTreeMap, fs, path::PathBuf, str};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -13,6 +13,7 @@ mod render;
 mod solver;
 mod source;
 use metadata::{BuildOptions, Requirements, Source};
+mod index;
 mod packaging;
 mod selectors;
 use build::run_build;
@@ -46,7 +47,7 @@ struct Opts {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     let args = Opts::parse();
 
     let default_filter = if args.verbose {
@@ -70,9 +71,10 @@ async fn main() {
 
     tracing::info!("Starting the build process");
 
-    let mut myrec: YamlValue =
-        serde_yaml::from_reader(std::fs::File::open(&args.recipe_file).unwrap())
-            .expect("Could not parse yaml file");
+    let recipe_file = fs::canonicalize(args.recipe_file)?;
+
+    let mut myrec: YamlValue = serde_yaml::from_reader(std::fs::File::open(&recipe_file).unwrap())
+        .expect("Could not parse yaml file");
 
     let selector_config = SelectorConfig {
         target_platform: "osx-arm64".to_string(),
@@ -155,11 +157,15 @@ async fn main() {
             build_platform: String::from("osx-arm64"),
             hash: String::from("h1234_0"),
             used_vars: vec![],
+            no_clean: false,
         },
     };
 
-    let res = run_build(&output, &args.recipe_file).await;
+    let res = run_build(&output, &recipe_file).await;
+
     if res.is_err() {
-        eprintln!("Build did not succeed");
+        tracing::error!("Build did not succeed");
     }
+
+    Ok(())
 }
