@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{arg, Parser};
 use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ struct Output {
     requirements: Requirements,
 }
 
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 struct Opts {
     #[arg(short, long)]
     recipe_file: PathBuf,
