@@ -6,8 +6,15 @@ pub fn create_environment(
     specs: &[String],
     channels: &[String],
     prefix: PathBuf,
+    platform: &str,
 ) -> Result<std::process::ExitStatus, std::io::Error> {
-    let mut mm_cmd = Command::new("micromamba");
+    // check for MAMBA_EXE env var
+    // if it exists, use that instead of micromamba
+    let mut mm_cmd = if let Ok(mamba_exe) = std::env::var("MAMBA_EXE") {
+        Command::new(mamba_exe)
+    } else {
+        Command::new("micromamba")
+    };
 
     mm_cmd.arg("create");
 
@@ -17,10 +24,7 @@ pub fn create_environment(
     }
 
     mm_cmd.args([OsStr::new("-p"), prefix.as_os_str()]);
-
-    // For debugging purposes only
-    mm_cmd.args(["--offline"]);
-
+    mm_cmd.args(["--platform", platform]);
     mm_cmd.args(specs);
 
     let res = mm_cmd.stdin(Stdio::null()).status();

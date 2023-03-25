@@ -77,15 +77,27 @@ pub enum Checksum {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GitRev(String);
+
+impl Default for GitRev {
+    fn default() -> Self {
+        Self(String::from("HEAD"))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GitSrc {
-    pub git_src: String,
-    pub git_rev: String,
-    pub git_depth: u32,
+    pub git_src: Url,
+
+    #[serde(default)]
+    pub git_rev: GitRev,
+
+    pub git_depth: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UrlSrc {
-    pub url: String,
+    pub url: Url,
 
     #[serde(flatten)]
     pub checksum: Checksum,
