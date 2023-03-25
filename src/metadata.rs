@@ -3,6 +3,7 @@ use serde_with::formats::PreferOne;
 use serde_with::serde_as;
 use serde_with::OneOrMany;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -108,6 +109,8 @@ pub struct GitSrc {
     pub git_rev: GitRev,
 
     pub git_depth: Option<u32>,
+
+    pub patches: Option<Vec<PathBuf>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -116,6 +119,8 @@ pub struct UrlSrc {
 
     #[serde(flatten)]
     pub checksum: Checksum,
+
+    pub patches: Option<Vec<PathBuf>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

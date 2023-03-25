@@ -213,6 +213,9 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
 pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()> {
     let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
 
+    // get absolute path to recipe dir
+    let recipe_dir = fs::canonicalize(recipe_path.parent().unwrap())?;
+
     let directories = Directories {
         build_dir: build_dir.clone(),
         source_dir: build_dir.join("work"),
@@ -222,15 +225,21 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
         root_prefix: PathBuf::from(
             env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX"),
         ),
-        recipe_dir: recipe_path.parent().unwrap().to_path_buf(),
+        recipe_dir,
     };
 
     let build_script = get_conda_build_script(recipe, &directories);
     println!("Work dir: {:?}", &directories.work_dir);
     println!("Build script: {:?}", build_script.unwrap());
-    setup_environments(recipe, &directories)?;
 
-    fetch_sources(&recipe.source, &directories.source_dir).await?;
+    fetch_sources(
+        &recipe.source,
+        &directories.source_dir,
+        &directories.recipe_dir,
+    )
+    .await?;
+
+    setup_environments(recipe, &directories)?;
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record file");
 

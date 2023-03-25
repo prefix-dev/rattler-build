@@ -112,7 +112,36 @@ fn extract(
     output
 }
 
-pub async fn fetch_sources(sources: &[Source], work_dir: &Path) -> anyhow::Result<()> {
+pub fn apply_patches(
+    patches: &[PathBuf],
+    work_dir: &Path,
+    recipe_dir: &Path,
+) -> anyhow::Result<()> {
+    for patch in patches {
+        let patch = recipe_dir.join(patch);
+        let output = Command::new("patch")
+            .arg("-p1")
+            .arg("-i")
+            .arg(String::from(patch.to_string_lossy()))
+            .arg("-d")
+            .arg(String::from(work_dir.to_string_lossy()))
+            .output()?;
+
+        if !output.status.success() {
+            tracing::error!("Failed to apply patch: {}", patch.to_string_lossy());
+            tracing::error!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
+            tracing::error!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!("Failed to apply patch: {}", patch.to_string_lossy());
+        }
+    }
+    Ok(())
+}
+
+pub async fn fetch_sources(
+    sources: &[Source],
+    work_dir: &Path,
+    recipe_dir: &Path,
+) -> anyhow::Result<()> {
     let cache_dir = std::env::current_dir()?.join("ROAR_CACHE");
     fs::create_dir_all(&cache_dir)?;
     for src in sources {
@@ -120,11 +149,17 @@ pub async fn fetch_sources(sources: &[Source], work_dir: &Path) -> anyhow::Resul
             Source::Git(src) => {
                 tracing::info!("Fetching source from GIT: {}", src.git_src);
                 git_src(src);
+                if let Some(patches) = &src.patches {
+                    apply_patches(patches, work_dir, recipe_dir)?;
+                }
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
                 extract(&res, work_dir).expect("Could not extract the file!");
+                if let Some(patches) = &src.patches {
+                    apply_patches(patches, work_dir, recipe_dir)?;
+                }
             }
         }
     }
