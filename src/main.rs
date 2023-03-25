@@ -9,6 +9,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod metadata;
+mod osx;
 mod render;
 mod solver;
 mod source;
@@ -161,11 +162,14 @@ async fn main() -> anyhow::Result<()> {
         },
     };
 
-    let res = run_build(&output, &recipe_file).await;
+    run_build(&output, &recipe_file).await
+    // if res.is_err() {
+    //     tracing::error!("Build did not succeed");
+    //     return res;
+    // }
 
-    if res.is_err() {
-        tracing::error!("Build did not succeed");
-    }
-
-    Ok(())
+    // relink_paths(&files, &PathBuf::from("/Users/wolfv/Programs/roar")).map_err(|e| {
+    //     tracing::error!("Could not relink paths: {}", e);
+    //     anyhow::anyhow!(std::io::Error::new(std::io::ErrorKind::Other, "Could not relink paths"))
+    // })
 }

@@ -1,4 +1,5 @@
 use crate::metadata::Output;
+use crate::osx::relink;
 
 use rattler_conda_types::package::{AboutJson, FileMode, PathType, PathsEntry, RunExportsJson};
 use rattler_conda_types::package::{IndexJson, PathsJson};
@@ -236,12 +237,18 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
 ) -> Result<()> {
-    let tmp_dir = TempDir::new(&output.name)?;
+    // let lnk_dir = PathBuf::from("/Users/wolfv/Programs/roar/lnk");
+    // tracing::info!("lnk_dir: {:?}", lnk_dir);
+    // fs::create_dir(&lnk_dir)?;
+    // let tmp_dir_path = lnk_dir.clone();
 
-    let mut tmp_files = Vec::new();
+    let tmp_dir = TempDir::new(&output.name)?;
+    let tmp_dir_path = tmp_dir.path();
+
+    let mut tmp_files = HashSet::new();
     for f in new_files {
         let f_rel = f.strip_prefix(prefix)?;
-        let dest = tmp_dir.path().join(f_rel);
+        let dest = tmp_dir_path.join(f_rel);
 
         if fs::metadata(dest.parent().expect("parent")).is_err() {
             fs::create_dir_all(dest.parent().unwrap())?;
@@ -253,30 +260,32 @@ pub fn package_conda(
         };
 
         fs::copy(f, &dest).expect("Could not copy to dest");
-        tmp_files.push(dest.to_path_buf());
+        tmp_files.insert(dest.to_path_buf());
     }
 
     tracing::info!("Copying done!");
 
-    let info_folder = tmp_dir.path().join("info");
+    relink::relink_paths(&tmp_files, prefix).expect("Could not relink paths");
+
+    let info_folder = tmp_dir_path.join("info");
     fs::create_dir(&info_folder)?;
 
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
     paths_json.write_all(create_paths_json(new_files, prefix)?.as_bytes())?;
-    tmp_files.push(info_folder.join("paths.json"));
+    tmp_files.insert(info_folder.join("paths.json"));
 
     let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
-    tmp_files.push(info_folder.join("index.json"));
+    tmp_files.insert(info_folder.join("index.json"));
 
     let mut about_json = File::create(info_folder.join("about.json"))?;
     about_json.write_all(create_about_json(output)?.as_bytes())?;
-    tmp_files.push(info_folder.join("about.json"));
+    tmp_files.insert(info_folder.join("about.json"));
 
     let mut run_exports_json = File::create(info_folder.join("run_exports.json"))?;
     if let Some(run_exports) = create_run_exports_json(output)? {
         run_exports_json.write_all(run_exports.as_bytes())?;
-        tmp_files.push(info_folder.join("run_exports.json"));
+        tmp_files.insert(info_folder.join("run_exports.json"));
     }
 
     let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
@@ -290,7 +299,12 @@ pub fn package_conda(
     );
 
     let file = File::create(output_folder.join(file))?;
-    write_tar_bz2_package(file, tmp_dir.path(), &tmp_files, CompressionLevel::Default)?;
+    write_tar_bz2_package(
+        file,
+        &tmp_dir_path,
+        &tmp_files.into_iter().collect::<Vec<_>>(),
+        CompressionLevel::Default,
+    )?;
 
     Ok(())
 }
