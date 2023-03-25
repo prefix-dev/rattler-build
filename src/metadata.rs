@@ -18,11 +18,26 @@ pub struct Requirements {
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
+pub struct RunExports {
+    #[serde(default)]
+    pub strong: Vec<String>,
+    #[serde(default)]
+    pub weak: Vec<String>,
+    #[serde(default)]
+    pub weak_constrains: Vec<String>,
+    #[serde(default)]
+    pub strong_constrains: Vec<String>,
+    #[serde(default)]
+    pub noarch: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BuildOptions {
     pub number: u64,
     pub string: Option<String>,
     pub script: Option<String>,
     pub ignore_run_exports: Option<Vec<String>>,
+    pub run_exports: Option<RunExports>,
 }
 
 #[serde_as]

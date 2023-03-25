@@ -54,7 +54,24 @@ mod functions {
     }
 }
 
-pub fn render_recipe(recipe: &YamlValue) -> serde_yaml::Mapping {
+fn render_context(yaml_context: &serde_yaml::Mapping) -> HashMap<String, Value> {
+    let mut context = HashMap::<String, Value>::new();
+    for (key, v) in yaml_context.iter() {
+        if let YamlValue::String(key) = key {
+            context.insert(
+                key.to_string(),
+                Value::from_safe_string(v.as_str().unwrap().to_string()),
+            );
+        }
+    }
+
+    // TODO add more appropriate values here
+    context.insert("PYTHON".to_string(), "python".into());
+
+    context
+}
+
+pub fn render_recipe(recipe: &YamlValue) -> anyhow::Result<serde_yaml::Mapping> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
         _ => panic!("Expected a map"),
@@ -62,24 +79,15 @@ pub fn render_recipe(recipe: &YamlValue) -> serde_yaml::Mapping {
 
     let mut env = Environment::new();
     env.add_function("compiler", functions::compiler);
-    let mut context = HashMap::<String, Value>::new();
-
     if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
-        for (key, v) in map.iter() {
-            if let YamlValue::String(key) = key {
-                context.insert(
-                    key.to_string(),
-                    Value::from_safe_string(v.as_str().unwrap().to_string()),
-                );
-            }
-        }
+        let context = render_context(map);
         let mut recipe_modified = recipe.clone();
         recipe_modified.remove("context");
         render_recipe_recursively(&mut recipe_modified, &env, &context);
-        recipe_modified
+        Ok(recipe_modified)
     } else {
-        eprintln!("Did not find context");
-        recipe.clone()
+        tracing::info!("Did not find context");
+        Ok(recipe.clone())
     }
 }
 
@@ -103,7 +111,7 @@ mod tests {
                   sha256: "1234567890"
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe);
+        let recipe = render_recipe(&recipe).unwrap();
         insta::assert_yaml_snapshot!(recipe);
     }
 }

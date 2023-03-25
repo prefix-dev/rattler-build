@@ -143,7 +143,7 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
 }
 
 pub fn get_conda_build_script(
-    _recipe: &Output,
+    recipe: &Output,
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
@@ -154,16 +154,26 @@ pub fn get_conda_build_script(
         build_env_script_path.to_string_lossy()
     );
 
-    let recipe_file = directories.recipe_dir.join("build.sh");
-    tracing::info!("Reading recipe file: {:?}", recipe_file);
+    let script = recipe
+        .build
+        .script
+        .clone()
+        .unwrap_or_else(|| "build.sh".to_string());
+    let script = if script.ends_with(".sh") || script.ends_with(".bat") {
+        let recipe_file = directories.recipe_dir.join("build.sh");
+        tracing::info!("Reading recipe file: {:?}", recipe_file);
 
-    let mut orig_build_file = File::open(recipe_file).expect("Could not open build.sh file");
-    let mut orig_build_file_text = String::new();
-    orig_build_file
-        .read_to_string(&mut orig_build_file_text)
-        .expect("Could not read file");
+        let mut orig_build_file = File::open(recipe_file).expect("Could not open build.sh file");
+        let mut orig_build_file_text = String::new();
+        orig_build_file
+            .read_to_string(&mut orig_build_file_text)
+            .expect("Could not read file");
+        orig_build_file_text
+    } else {
+        script
+    };
 
-    let full_script = format!("{}\n{}", preambel, orig_build_file_text);
+    let full_script = format!("{}\n{}", preambel, script);
     let build_script_path = directories.work_dir.join("conda_build.sh");
 
     let mut build_script_file = File::create(&build_script_path)?;

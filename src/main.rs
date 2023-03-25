@@ -73,7 +73,7 @@ async fn main() {
 
     let mut myrec: YamlValue =
         serde_yaml::from_reader(std::fs::File::open(&args.recipe_file).unwrap())
-            .expect("Give yaml");
+            .expect("Could not parse yaml file");
 
     let selector_config = SelectorConfig {
         target_platform: "osx-arm64".to_string(),
@@ -87,7 +87,7 @@ async fn main() {
         tracing::error!("Could not flatten selectors");
     }
 
-    let myrec = render_recipe(&myrec);
+    let myrec = render_recipe(&myrec).expect("Could not render the recipe.");
 
     let requirements: Requirements = serde_yaml::from_value(
         myrec
