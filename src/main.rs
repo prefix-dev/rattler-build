@@ -138,30 +138,4 @@ async fn main() {
     if res.is_err() {
         eprintln!("Build did not succeed");
     }
-
-    // for (k, v) in myrec.context.iter() {
-    //     println!("{k}");
-    // }
-
-    // // let files = record_files(env::current_dir().unwrap()).expect("Expected files");
-    // let files = record_files(PathBuf::from(
-    //     "/Users/wolfvollprecht/Programs/guessing_game/src",
-    // ))
-    // .expect("Expected files");
-    // let records = create_paths_json(files).expect("JSON");
-    // // println!("{:?}", files);
-    // println!("{}", records);
-
-    // let index_json = create_index_json(&myrec).expect("Index json created");
-    // println!("{}", index_json);
-
-    // let output = Command::new("/bin/bash")
-    //     .arg(myrec.build.script)
-    //     .output()
-    //     .expect("Failed to execute command");
-
-    // println!(
-    //     "{}",
-    //     str::from_utf8(output.stdout.as_slice()).expect("give me string")
-    // );
 }

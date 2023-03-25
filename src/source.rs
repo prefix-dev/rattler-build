@@ -32,6 +32,44 @@ fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
     false
 }
 
+fn split_filename(filename: &str) -> (String, String) {
+    let stem = Path::new(filename)
+        .file_stem()
+        .and_then(|os_str| os_str.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let stem_without_tar = stem.trim_end_matches(".tar");
+
+    let extension = Path::new(filename)
+        .extension()
+        .and_then(|os_str| os_str.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    let full_extension = if stem != stem_without_tar {
+        format!(".tar.{}", extension)
+    } else {
+        if !extension.is_empty() {
+            format!(".{}", extension)
+        } else {
+            "".to_string()
+        }
+    };
+
+    (stem_without_tar.to_string(), full_extension)
+}
+
+fn cache_name_from_url(url: &str, checksum: &Checksum) -> String {
+    let filename = url.split('/').last().unwrap();
+    let (stem, extension) = split_filename(filename);
+    let checksum = match checksum {
+        Checksum::Sha256(value) => value,
+        Checksum::Md5(value) => value,
+    };
+    format!("{}_{}{}", stem, &checksum[0..8], extension)
+}
+
 async fn url_src(
     source: &UrlSrc,
     cache_dir: &Path,
@@ -40,9 +78,7 @@ async fn url_src(
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
 
-    let cache_name = cache_src.join("file.tar.gz");
-
-    println!("Cache file is: {:?}", cache_name);
+    let cache_name = PathBuf::from(cache_name_from_url(&source.url, checksum));
 
     let metadata = fs::metadata(&cache_name);
     if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, checksum) {
@@ -64,12 +100,6 @@ fn extract(
     archive: &Path,
     target_directory: &Path,
 ) -> Result<std::process::Output, std::io::Error> {
-    // tar -xf file.name.tar -C /path/to/directory
-    println!(
-        "tar -xf {} -C {}",
-        archive.to_string_lossy(),
-        target_directory.to_string_lossy()
-    );
     let output = Command::new("tar")
         .arg("-xf")
         .arg(String::from(archive.to_string_lossy()))
@@ -79,35 +109,75 @@ fn extract(
         .arg(String::from(target_directory.to_string_lossy()))
         .output();
 
-    // println!("{:?}", &output?.stdout);
-    // println!("{:?}", &output?.stderr);
     output
 }
 
 pub async fn fetch_sources(sources: &[Source], work_dir: &Path) -> anyhow::Result<()> {
-    let cache_dir = std::env::current_dir()?.join("CACHE");
+    let cache_dir = std::env::current_dir()?.join("ROAR_CACHE");
     fs::create_dir_all(&cache_dir)?;
-    println!("Fetching sources");
     for src in sources {
-        println!("Checking source: {:?}", src);
+        tracing::info!("Fetching source: {:#?}", src);
         match &src {
             Source::Git(src) => {
                 git_src(src);
             }
             Source::Url(src) => {
-                println!("Fetching source! {}", &src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
                 extract(&res, work_dir).expect("Could not extract the file!");
             }
         }
     }
-    println!("Checking source len: {}", sources.len());
     Ok(())
-    // println!("Getting stuff from the WWW");
-    // let text = reqwest::get("https://raw.githubusercontent.com/mamba-org/mamba/master/README.md")
-    //     .await?
-    //     .text()
-    //     .await?;
-    // println!("body = {:?}", text);
-    // Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_filename() {
+        let test_cases = vec![
+            ("example.tar.gz", ("example", ".tar.gz")),
+            ("example.tar.bz2", ("example", ".tar.bz2")),
+            ("example.zip", ("example", ".zip")),
+            ("example.tar", ("example", ".tar")),
+            ("example", ("example", "")),
+            (".hidden.tar.gz", (".hidden", ".tar.gz")),
+        ];
+
+        for (filename, expected) in test_cases {
+            let (name, ending) = split_filename(filename);
+            assert_eq!(
+                (name.as_str(), ending.as_str()),
+                expected,
+                "Failed for filename: {}",
+                filename
+            );
+        }
+    }
+
+    #[test]
+    fn test_cache_name() {
+        let cases = vec![
+            (
+                "https://example.com/example.tar.gz",
+                Checksum::Sha256(
+                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
+                ),
+                "example_12345678.tar.gz",
+            ),
+            (
+                "https://github.com/mamba-org/mamba/archive/refs/tags/micromamba-12.23.12.tar.gz",
+                Checksum::Sha256(
+                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8".to_string(),
+                ),
+                "micromamba-12.23.12_63fd8a1d.tar.gz",
+            ),
+        ];
+
+        for (url, checksum, expected) in cases {
+            let name = cache_name_from_url(url, &checksum);
+            assert_eq!(name, expected);
+        }
+    }
 }
