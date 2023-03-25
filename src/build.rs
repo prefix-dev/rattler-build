@@ -143,7 +143,7 @@ pub fn get_build_env_script(directories: &Directories) -> anyhow::Result<PathBuf
 }
 
 pub fn get_conda_build_script(
-    recipe: &Output,
+    _recipe: &Output,
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
@@ -180,7 +180,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.build,
             &[],
             directories.build_prefix.clone(),
-            &recipe.build_configuration.build_platform
+            &recipe.build_configuration.build_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.build_prefix)?;
@@ -191,7 +191,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
-            &recipe.build_configuration.target_platform
+            &recipe.build_configuration.target_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;

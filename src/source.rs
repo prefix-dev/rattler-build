@@ -50,12 +50,10 @@ fn split_filename(filename: &str) -> (String, String) {
 
     let full_extension = if stem != stem_without_tar {
         format!(".tar.{}", extension)
+    } else if !extension.is_empty() {
+        format!(".{}", extension)
     } else {
-        if !extension.is_empty() {
-            format!(".{}", extension)
-        } else {
-            "".to_string()
-        }
+        "".to_string()
     };
 
     (stem_without_tar.to_string(), full_extension)
