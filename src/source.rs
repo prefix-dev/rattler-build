@@ -5,7 +5,7 @@ use std::{
     process::Command,
 };
 
-use crate::hash::sha256_digest;
+use rattler_digest::compute_file_digest;
 use url::Url;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
@@ -13,24 +13,25 @@ use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
     match checksum {
         Checksum::Sha256(value) => {
-            let computed_sha = sha256_digest(path);
+            let digest =
+                compute_file_digest::<sha2::Sha256>(path).expect("Could not compute SHA256");
+            let computed_sha = hex::encode(digest);
             if !computed_sha.eq(value) {
-                eprintln!(
+                tracing::error!(
                     "SHA256 values of downloaded file not matching!\nDownloaded = {}, should be {}",
-                    computed_sha, value
+                    computed_sha,
+                    value
                 );
-                return false;
+                false
             } else {
                 println!("Validated SHA256 values of the downloaded file!");
-                return true;
+                true
             }
         }
         Checksum::Md5(_value) => {
-            eprintln!("MD5 not implemented yet!");
+            todo!("MD5 not implemented yet!");
         }
     }
-
-    false
 }
 
 fn split_filename(filename: &str) -> (String, String) {

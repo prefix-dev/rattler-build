@@ -1291,7 +1291,7 @@ dependencies = [
  "lazy-regex",
  "md-5",
  "nom",
- "rattler_digest",
+ "rattler_digest 0.2.0 (git+https://github.com/mamba-org/rattler)",
  "rattler_macros",
  "regex",
  "serde",
@@ -1305,6 +1305,16 @@ dependencies = [
  "thiserror",
  "tracing",
  "url",
+]
+
+[[package]]
+name = "rattler_digest"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c27ec7ef5421448f94228cb1aec5f4dc04b62d9cf9e22bca1b78a74d975eda8"
+dependencies = [
+ "digest",
+ "hex",
 ]
 
 [[package]]
@@ -1447,6 +1457,7 @@ dependencies = [
  "minijinja",
  "rand 0.8.5",
  "rattler_conda_types",
+ "rattler_digest 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rattler_package_streaming",
  "reqwest",
  "rstest",

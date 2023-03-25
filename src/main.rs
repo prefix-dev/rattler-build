@@ -8,7 +8,6 @@ use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
-mod hash;
 mod metadata;
 mod render;
 mod solver;

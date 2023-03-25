@@ -3,6 +3,7 @@ use crate::metadata::Output;
 use rattler_conda_types::package::{AboutJson, FileMode, PathType, PathsEntry, RunExportsJson};
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Version};
+use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use anyhow::Ok;
@@ -20,7 +21,6 @@ use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
-use super::hash::sha256_digest;
 use std::collections::HashSet;
 
 use std::path::{Path, PathBuf};
@@ -128,8 +128,10 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &PathBuf) -> Result<Strin
         } else if meta.is_file() {
             let metadata = PathMetadata::from_path(p, prefix)?;
 
+            let digest = compute_file_digest::<sha2::Sha256>(p)?;
+
             paths_json.paths.push(PathsEntry {
-                sha256: Some(sha256_digest(p)),
+                sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::HardLink,
                 file_mode: metadata.file_type,
