@@ -126,7 +126,7 @@ fn create_paths_json(
     };
 
     for p in itertools::sorted(paths) {
-        let meta = fs::metadata(p)?;
+        let meta = fs::symlink_metadata(p)?;
 
         let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
 
@@ -162,14 +162,16 @@ fn create_paths_json(
                 size_in_bytes: Some(meta.len()),
             });
         } else if meta.file_type().is_symlink() {
+            let digest = compute_file_digest::<sha2::Sha256>(p)?;
+
             paths_json.paths.push(PathsEntry {
-                sha256: None,
+                sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::SoftLink,
                 file_mode: FileMode::Binary,
                 prefix_placeholder: None,
                 no_link: false,
-                size_in_bytes: None,
+                size_in_bytes: Some(meta.len()),
             });
         }
     }
@@ -310,23 +312,49 @@ fn write_to_dest(
         }
 
         tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
+        tracing::info!("Symlink metadata: {:?}", metadata);
+        if let Result::Ok(link) = fs::read_link(&path) {
+            tracing::info!("Read link: {:?}", link);
+        } else {
+            tracing::warn!("Could not read link at {:?}", path);
+        }
 
         #[cfg(target_family = "unix")]
-        fs::read_link(&dest_path).and_then(|target| {
-            if target.is_relative() {
-                symlink(target, &dest_path)?;
-            } else {
-                let rel_target = pathdiff::diff_paths(target, prefix);
-                symlink(rel_target.unwrap(), &dest_path)?;
-            }
-
-            // copy permissions
-            let perm = metadata.permissions();
-            fs::set_permissions(&dest_path, perm)?;
-
-            Result::Ok(())
-        })?;
-
+        fs::read_link(&path)
+            .and_then(|target| {
+                if target.is_absolute() && target.starts_with(prefix) {
+                    let rel_target =
+                        pathdiff::diff_paths(target, path).expect("Could not make path relative");
+                    symlink(&rel_target, &dest_path)
+                        .map_err(|e| {
+                            tracing::error!(
+                                "Could not create symlink from {:?} to {:?}: {:?}",
+                                rel_target,
+                                dest_path,
+                                e
+                            );
+                            e
+                        })
+                        .expect("Could not create symlink");
+                } else {
+                    if target.is_absolute() {
+                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
+                    }
+                    symlink(&target, &dest_path)
+                        .map_err(|e| {
+                            tracing::error!(
+                                "Could not create symlink from {:?} to {:?}: {:?}",
+                                target,
+                                dest_path,
+                                e
+                            );
+                            e
+                        })
+                        .expect("Could not create symlink");
+                }
+                Result::Ok(())
+            })
+            .expect("Could not read link!");
         Ok(Some(dest_path))
     } else if metadata.is_dir() {
         // skip directories for now
@@ -381,7 +409,7 @@ pub fn package_conda(
         .target_platform
         .starts_with("osx-")
     {
-        relink::relink_paths(&tmp_files, prefix).expect("Could not relink paths");
+        relink::relink_paths(&tmp_files, tmp_dir_path, prefix).expect("Could not relink paths");
     }
 
     let info_folder = tmp_dir_path.join("info");

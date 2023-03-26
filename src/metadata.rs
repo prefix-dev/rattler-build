@@ -43,6 +43,7 @@ pub struct BuildOptions {
     pub run_exports: Option<RunExports>,
     #[serde(default = "NoArchType::default")]
     pub noarch: NoArchType,
+    #[serde(default)]
     pub entry_points: Vec<EntryPoint>,
 }
 

@@ -5,16 +5,18 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::error::Error>> {
+fn modify_dylib(
+    dylib_path: &Path,
+    prefix: &Path,
+    encoded_prefix: &Path,
+) -> Result<(), Box<dyn std::error::Error>> {
     println!("Dylib: {:?}", dylib_path);
     let mut data = fs::read(dylib_path)?;
 
     match goblin::mach::Mach::parse(&data)? {
         Mach::Binary(mach) => {
             let mut modified = false;
-            println!("Load commands: {}", mach.load_commands.len());
             for command in &mach.load_commands {
-                // println!("Command: {:?}", command.command);
                 if let goblin::mach::load_command::CommandVariant::LoadDylib(ref cmd) =
                     command.command
                 {
@@ -27,7 +29,7 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
 
                     println!("Dylib name: {}", libname);
                     let lib_path = Path::new(&libname);
-                    if lib_path.starts_with(prefix) {
+                    if lib_path.starts_with(encoded_prefix) {
                         let new_libname =
                             format!("@rpath/{}", lib_path.file_name().unwrap().to_string_lossy());
                         let mut lvec = new_libname.as_bytes().to_vec();
@@ -35,11 +37,21 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
 
                         let old_cmdsize = cmd.cmdsize as usize;
                         let new_cmdsize = lvec.len();
-                        println!("Old cmdsize: {}, new cmdsize: {}", old_cmdsize, new_cmdsize);
+                        println!(
+                            "Old cmdsize: {}, new cmdsize: {} vs {}",
+                            old_cmdsize,
+                            new_cmdsize,
+                            libname.len()
+                        );
 
-                        data.pwrite_with(lvec.as_slice(), libname_offset, ())?;
+                        data.pwrite_with::<&[u8]>(lvec.as_slice(), libname_offset, ())?;
 
-                        println!("Dylib Modified: '{}' -> '{}'", libname, new_libname);
+                        let written_libname = data
+                            .pread::<&str>(libname_offset)
+                            .expect("Could not get libname")
+                            .to_string();
+
+                        println!("Dylib Modified: '{}' -> '{}'", libname, written_libname);
                         modified = true;
                     }
                 }
@@ -58,8 +70,19 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
 
                     if rpath.starts_with('/') {
                         let rpath_path = Path::new(rpath);
-                        if rpath_path.starts_with(prefix) {
-                            let new_rpath = "@loader_path/../lib";
+                        if rpath_path.starts_with(encoded_prefix) {
+                            // get relative path from dylib to rpath
+
+                            let orig_path = encoded_prefix
+                                .join(dylib_path.strip_prefix(prefix).unwrap().parent().unwrap());
+                            tracing::info!("Original path: {}", orig_path.display());
+
+                            let relpath = pathdiff::diff_paths(rpath_path, orig_path)
+                                .expect("Could not get relative path");
+
+                            let new_rpath = format!("@loader_path/{}", relpath.to_string_lossy());
+                            tracing::info!("New rpath: {}", new_rpath);
+
                             let old_rpath = rpath.to_string();
                             let mut bytes = new_rpath.as_bytes().to_vec();
                             bytes.extend(
@@ -89,9 +112,10 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
 pub fn relink_paths(
     paths: &HashSet<PathBuf>,
     prefix: &Path,
+    encoded_prefix: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for p in paths {
-        if fs::metadata(p).unwrap().is_symlink() {
+        if fs::symlink_metadata(p)?.is_symlink() {
             println!("Skipping symlink: {}", p.display());
             continue;
         }
@@ -99,7 +123,7 @@ pub fn relink_paths(
         if let Some(ext) = p.extension() {
             if ext.to_string_lossy() == "dylib" {
                 println!("Relinking: {}", p.display());
-                match modify_dylib(p, prefix) {
+                match modify_dylib(p, prefix, encoded_prefix) {
                     Ok(_) => {}
                     Err(e) => {
                         eprintln!("Error: {}", e);
@@ -108,7 +132,7 @@ pub fn relink_paths(
             }
         } else if p.parent().unwrap().ends_with("bin") {
             println!("Relinking: {}", p.display());
-            match modify_dylib(p, prefix) {
+            match modify_dylib(p, prefix, encoded_prefix) {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("Error: {}", e);

@@ -7,8 +7,8 @@ edition = "2021"
 rand = "^0.8.3"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_yaml = "0.9.11"
-rattler_conda_types = { git = "https://github.com/mamba-org/rattler" }
-rattler_package_streaming = { git = "https://github.com/mamba-org/rattler" }
+rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
+rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
 anyhow = "1.0.63"
 walkdir = "2.3.2"
 sha2 = "0.10.5"

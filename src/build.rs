@@ -299,9 +299,9 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
         &directories.local_channel,
     )?;
 
-    if !recipe.build_configuration.no_clean {
-        fs::remove_dir_all(&build_dir)?;
-    }
+    // if !recipe.build_configuration.no_clean {
+    //     fs::remove_dir_all(&build_dir)?;
+    // }
 
     index::index(&directories.local_channel)?;
 
