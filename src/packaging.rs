@@ -38,7 +38,8 @@ use std::path::{Component, Path, PathBuf};
 fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
-    if cfg!(target_family = "windows") {
+    #[cfg(target_family = "windows")]
+    {
         tracing::warn!("Windows is not supported yet for binary prefix checking.");
         return Ok(false);
     }
