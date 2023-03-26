@@ -20,7 +20,13 @@ use fs::File;
 
 use std::fs;
 use std::io::{BufReader, Read, Write};
+
+#[cfg(target_family = "unix")]
 use std::os::unix::prelude::OsStrExt;
+
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::symlink;
+
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -29,27 +35,33 @@ use std::collections::HashSet;
 
 use std::path::{Component, Path, PathBuf};
 
-use std::os::unix::fs::symlink;
-
 fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
-    let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
+    if cfg!(target_family = "windows") {
+        tracing::warn!("Windows is not supported yet for binary prefix checking.");
+        return Ok(false);
+    }
 
-    // Open the file
-    let file = File::open(file_path)?;
-    let mut buf_reader = BufReader::new(file);
+    #[cfg(target_family = "unix")]
+    {
+        let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
 
-    // Read the file's content
-    let mut content = Vec::new();
-    buf_reader.read_to_end(&mut content)?;
+        // Open the file
+        let file = File::open(file_path)?;
+        let mut buf_reader = BufReader::new(file);
 
-    // Check if the content contains the prefix bytes
-    let contains_prefix = content
-        .windows(prefix_bytes.len())
-        .any(|window| window == prefix_bytes.as_slice());
+        // Read the file's content
+        let mut content = Vec::new();
+        buf_reader.read_to_end(&mut content)?;
 
-    Ok(contains_prefix)
+        // Check if the content contains the prefix bytes
+        let contains_prefix = content
+            .windows(prefix_bytes.len())
+            .any(|window| window == prefix_bytes.as_slice());
+
+        Ok(contains_prefix)
+    }
 }
 
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
@@ -290,12 +302,16 @@ fn write_to_dest(
     }
 
     let metadata = fs::symlink_metadata(path)?;
-    // make symlink relative
+
+    // make absolute symlinks relative
     if metadata.is_symlink() {
         if target_platform == "win-64" {
             tracing::warn!("Symlinks need administrator privileges on Windows");
         }
+
         tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
+
+        #[cfg(target_family = "unix")]
         fs::read_link(&dest_path).and_then(|target| {
             if target.is_relative() {
                 symlink(target, &dest_path)?;
@@ -342,11 +358,6 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
 ) -> Result<()> {
-    // let lnk_dir = PathBuf::from("/Users/wolfv/Programs/roar/lnk");
-    // tracing::info!("lnk_dir: {:?}", lnk_dir);
-    // fs::create_dir(&lnk_dir)?;
-    // let tmp_dir_path = lnk_dir.clone();
-
     let tmp_dir = TempDir::new(&output.name)?;
     let tmp_dir_path = tmp_dir.path();
 
