@@ -237,7 +237,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
-            &recipe.build_configuration.target_platform,
+            &recipe.build_configuration.host_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;

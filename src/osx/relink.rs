@@ -30,7 +30,7 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
                     if lib_path.starts_with(prefix) {
                         let new_libname =
                             format!("@rpath/{}", lib_path.file_name().unwrap().to_string_lossy());
-                        let mut lvec = new_libname.as_bytes().iter().cloned().collect::<Vec<_>>();
+                        let mut lvec = new_libname.as_bytes().to_vec();
                         lvec.extend(std::iter::repeat(0).take(libname.len() - new_libname.len()));
 
                         let old_cmdsize = cmd.cmdsize as usize;
@@ -56,13 +56,12 @@ fn modify_dylib(dylib_path: &Path, prefix: &Path) -> Result<(), Box<dyn std::err
                         .pread::<&str>(rpath_offset)
                         .expect("Could not read rpath");
 
-                    if rpath.starts_with("/") {
+                    if rpath.starts_with('/') {
                         let rpath_path = Path::new(rpath);
                         if rpath_path.starts_with(prefix) {
                             let new_rpath = "@loader_path/../lib";
                             let old_rpath = rpath.to_string();
-                            let mut bytes =
-                                new_rpath.as_bytes().iter().cloned().collect::<Vec<_>>();
+                            let mut bytes = new_rpath.as_bytes().to_vec();
                             bytes.extend(
                                 std::iter::repeat(0).take(old_rpath.len() - new_rpath.len()),
                             );

@@ -1,4 +1,5 @@
 use clap::{arg, Parser};
+use rattler_conda_types::Platform;
 use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
@@ -77,9 +78,16 @@ async fn main() -> anyhow::Result<()> {
     let mut myrec: YamlValue = serde_yaml::from_reader(std::fs::File::open(&recipe_file).unwrap())
         .expect("Could not parse yaml file");
 
+    let target_platform = if myrec.get("build").and_then(|v| v.get("noarch")).is_some() {
+        "noarch".to_string()
+    } else {
+        Platform::current().to_string()
+    };
+    tracing::info!("Target platform: {}", target_platform);
+
     let selector_config = SelectorConfig {
-        target_platform: "osx-arm64".to_string(),
-        build_platform: "osx-arm64".to_string(),
+        target_platform: target_platform.clone(),
+        build_platform: Platform::current().to_string(),
         python_version: "3.10".to_string(),
     };
 
@@ -106,6 +114,8 @@ async fn main() -> anyhow::Result<()> {
             .clone(),
     )
     .expect("Could not read build options");
+
+    println!("{:#?}", build_options);
 
     let source_value = myrec.get("source");
     let mut sources: Vec<Source> = Vec::new();
@@ -154,8 +164,13 @@ async fn main() -> anyhow::Result<()> {
         requirements,
         about,
         build_configuration: BuildConfiguration {
-            target_platform: String::from("osx-arm64"),
-            build_platform: String::from("osx-arm64"),
+            target_platform: target_platform.clone(),
+            host_platform: if target_platform == "noarch" {
+                Platform::current().to_string()
+            } else {
+                target_platform.clone()
+            },
+            build_platform: Platform::current().to_string(),
             hash: String::from("h1234_0"),
             used_vars: vec![],
             no_clean: false,
@@ -163,13 +178,4 @@ async fn main() -> anyhow::Result<()> {
     };
 
     run_build(&output, &recipe_file).await
-    // if res.is_err() {
-    //     tracing::error!("Build did not succeed");
-    //     return res;
-    // }
-
-    // relink_paths(&files, &PathBuf::from("/Users/wolfv/Programs/roar")).map_err(|e| {
-    //     tracing::error!("Could not relink paths: {}", e);
-    //     anyhow::anyhow!(std::io::Error::new(std::io::ErrorKind::Other, "Could not relink paths"))
-    // })
 }

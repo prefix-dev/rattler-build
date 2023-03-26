@@ -33,6 +33,7 @@ rattler_digest = "0.2.0"
 num_cpus = "1.15.0"
 goblin = "0.6.1"
 scroll = "0.11.0"
+pathdiff = "0.2.1"
 
 [dev-dependencies]
 insta = {version = "1.29.0", features = ["yaml"] }
