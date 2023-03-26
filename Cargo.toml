@@ -4,22 +4,18 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rand = "^0.8.3"
 serde = { version = "1.0.144", features = ["derive"] }
 serde_yaml = "0.9.11"
 rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "write_binary" }
 rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "write_binary" }
+rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "write_binary" }
 anyhow = "1.0.63"
 walkdir = "2.3.2"
 sha2 = "0.10.5"
 hex = "0.4.3"
 serde_json = "1.0.85"
 tempdir = "0.3.7"
-flate2 = "1.0.24"
-tar = "0.4.38"
-bzip2 = "0.4.3"
 reqwest = "0.11.11"
-futures = "0.3.24"
 tokio = {version = "1.21.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.10.5"
 content_inspector = "0.2.4"
@@ -29,7 +25,6 @@ tracing = "0.1.37"
 clap = { version = "4.1.13", features = ["derive"] }
 minijinja = "0.30.7"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
-rattler_digest = "0.2.0"
 num_cpus = "1.15.0"
 goblin = "0.6.1"
 scroll = "0.11.0"
