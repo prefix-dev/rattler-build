@@ -313,14 +313,14 @@ fn write_to_dest(
 
         tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
         tracing::info!("Symlink metadata: {:?}", metadata);
-        if let Result::Ok(link) = fs::read_link(&path) {
+        if let Result::Ok(link) = fs::read_link(path) {
             tracing::info!("Read link: {:?}", link);
         } else {
             tracing::warn!("Could not read link at {:?}", path);
         }
 
         #[cfg(target_family = "unix")]
-        fs::read_link(&path)
+        fs::read_link(path)
             .and_then(|target| {
                 if target.is_absolute() && target.starts_with(prefix) {
                     let rel_target =
