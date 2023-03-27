@@ -11,6 +11,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 mod build;
 mod metadata;
 mod osx;
+mod linux;
 mod render;
 mod solver;
 mod source;
