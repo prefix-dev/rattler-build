@@ -161,7 +161,7 @@ fn modify_dylib(
             }
 
             if modified {
-                install_name_tool(&dylib_path, &changes)?;
+                install_name_tool(dylib_path, &changes)?;
             }
         }
         _ => {

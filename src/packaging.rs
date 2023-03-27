@@ -35,6 +35,7 @@ use std::collections::HashSet;
 
 use std::path::{Component, Path, PathBuf};
 
+#[allow(unused_variables)]
 fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
