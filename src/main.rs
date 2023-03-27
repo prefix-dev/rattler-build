@@ -9,9 +9,9 @@ use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
+mod linux;
 mod metadata;
 mod osx;
-mod linux;
 mod render;
 mod solver;
 mod source;

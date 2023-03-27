@@ -1,7 +1,7 @@
 use goblin::elf::Elf;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::fs::{File, self};
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -10,13 +10,20 @@ struct ElfModifications {
     set_rpath: Vec<PathBuf>,
 }
 
-fn call_patchelf(elf_path: &Path, modifications: &ElfModifications) -> anyhow::Result<(), Box<dyn std::error::Error>> {
+fn call_patchelf(
+    elf_path: &Path,
+    modifications: &ElfModifications,
+) -> anyhow::Result<(), Box<dyn std::error::Error>> {
     // call patchelf
     tracing::info!("patchelf for {:?}: {:?}", elf_path, modifications);
 
     let mut cmd = std::process::Command::new("patchelf");
 
-    let new_rpath = modifications.set_rpath.iter().map(|p| p.to_string_lossy()).join(":");
+    let new_rpath = modifications
+        .set_rpath
+        .iter()
+        .map(|p| p.to_string_lossy())
+        .join(":");
 
     // conda-build forces `rpath` -> otherwise patchelf would use the newer `runpath`
     cmd.arg("--force-rpath");
@@ -34,11 +41,7 @@ fn call_patchelf(elf_path: &Path, modifications: &ElfModifications) -> anyhow::R
     }
 }
 
-fn modify_elf(
-    elf_path: &Path,
-    prefix: &Path,
-    encoded_prefix: &Path,
-) -> anyhow::Result<()> {
+fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::Result<()> {
     // find all RPATH and RUNPATH entries
     // replace them with the encoded prefix
     // if the prefix is not found, add it to the end of the list
@@ -65,13 +68,14 @@ fn modify_elf(
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
             println!("New relative path: $ORIGIN/{}", relative_path.display());
-            modifications.set_rpath.push(PathBuf::from(format!("$ORIGIN/{}", relative_path.to_string_lossy())));
+            modifications.set_rpath.push(PathBuf::from(format!(
+                "$ORIGIN/{}",
+                relative_path.to_string_lossy()
+            )));
         } else {
             modifications.set_rpath.push(PathBuf::from(rpath));
         }
     }
-
-
 
     for runpath in elf.runpaths {
         if runpath.starts_with(encoded_prefix.to_string_lossy().as_ref()) {
@@ -83,7 +87,10 @@ fn modify_elf(
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
             println!("New relative path: $ORIGIN/{}", relative_path.display());
-            modifications.set_rpath.push(PathBuf::from(format!("$ORIGIN/{}", relative_path.to_string_lossy())));
+            modifications.set_rpath.push(PathBuf::from(format!(
+                "$ORIGIN/{}",
+                relative_path.to_string_lossy()
+            )));
         } else {
             modifications.set_rpath.push(PathBuf::from(runpath));
         }
@@ -136,7 +143,6 @@ pub fn relink_paths(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod test {
     use std::path::Path;
@@ -145,6 +151,10 @@ mod test {
 
     #[test]
     fn test_print_elf() {
-        modify_elf(Path::new("/Users/wolfv/Programs/roar/elf/lib/python/lib/libpython3.11.so.1.0"), Path::new(""), Path::new(""));
+        modify_elf(
+            Path::new("/Users/wolfv/Programs/roar/elf/lib/python/lib/libpython3.11.so.1.0"),
+            Path::new(""),
+            Path::new(""),
+        );
     }
 }
