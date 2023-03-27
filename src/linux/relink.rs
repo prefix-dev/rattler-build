@@ -27,7 +27,7 @@ fn call_patchelf(
 
     // conda-build forces `rpath` -> otherwise patchelf would use the newer `runpath`
     cmd.arg("--force-rpath");
-    cmd.arg(elf_path);
+    cmd.arg(new_rpath);
 
     let output = cmd.output()?;
     if !output.status.success() {
@@ -35,7 +35,7 @@ fn call_patchelf(
             "patchelf failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        return Err("patchelf failed".into());
+        Err("patchelf failed".into())
     } else {
         Ok(())
     }
@@ -59,6 +59,11 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
     let mut modifications = ElfModifications::default();
 
     for rpath in elf.rpaths {
+        // split rpath at colon
+        rpath.split(':').for_each(|p| {
+            tracing::info!("TODO handle all inner RPATH: {}", p);
+        });
+
         if rpath.starts_with(encoded_prefix.to_string_lossy().as_ref()) {
             // remove this rpath and replace with relative path
             println!("Found encoded rpath: {}", rpath);
@@ -141,20 +146,4 @@ pub fn relink_paths(
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use std::path::Path;
-
-    use super::modify_elf;
-
-    #[test]
-    fn test_print_elf() {
-        modify_elf(
-            Path::new("/Users/wolfv/Programs/roar/elf/lib/python/lib/libpython3.11.so.1.0"),
-            Path::new(""),
-            Path::new(""),
-        );
-    }
 }

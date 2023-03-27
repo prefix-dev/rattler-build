@@ -250,6 +250,11 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
     let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
     let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
+    let output_dir = PathBuf::from("./output");
+    if !output_dir.exists() {
+        fs::create_dir(&output_dir)?;
+    }
+
     let directories = Directories {
         build_dir: build_dir.clone(),
         source_dir: build_dir.join("work"),
@@ -260,7 +265,7 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
             env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX"),
         ),
         recipe_dir,
-        local_channel: fs::canonicalize(PathBuf::from("./output"))?,
+        local_channel: fs::canonicalize(output_dir)?,
     };
 
     let build_script = get_conda_build_script(recipe, &directories);

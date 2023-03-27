@@ -1,5 +1,6 @@
+use crate::linux;
 use crate::metadata::Output;
-use crate::osx::relink;
+use crate::osx;
 
 use rattler_conda_types::package::{
     AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PythonEntryPoints,
@@ -131,6 +132,12 @@ fn create_paths_json(
         let meta = fs::symlink_metadata(p)?;
 
         let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
+
+        tracing::info!("Adding {:?}", &relative_path);
+        if !p.exists() {
+            tracing::warn!("File does not exist: {:?} (TODO)", &p);
+            continue;
+        }
 
         if meta.is_dir() {
             // check if dir is empty, and only then add it to paths.json
@@ -406,16 +413,19 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    if output
-        .build_configuration
-        .target_platform
-        .starts_with("osx-")
-    {
-        relink::relink_paths(&tmp_files, tmp_dir_path, prefix).expect("Could not relink paths");
+    let target_platform = &output.build_configuration.target_platform;
+    if target_platform.starts_with("osx-") {
+        osx::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
+            .expect("Could not relink paths");
+    } else if target_platform.starts_with("linux-") {
+        linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
+            .expect("Could not relink paths");
     }
 
+    println!("Relink done!");
+
     let info_folder = tmp_dir_path.join("info");
-    fs::create_dir(&info_folder)?;
+    fs::create_dir_all(&info_folder)?;
 
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
     paths_json.write_all(create_paths_json(&tmp_files, tmp_dir_path, prefix)?.as_bytes())?;
@@ -444,6 +454,7 @@ pub fn package_conda(
     }
 
     let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
+    println!("Creating target folder {:?}", output_folder);
     // make dirs
     fs::create_dir_all(&output_folder)?;
 
