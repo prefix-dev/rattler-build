@@ -1,6 +1,10 @@
 use crate::metadata::Output;
+use crate::osx::relink;
 
-use rattler_conda_types::package::{AboutJson, FileMode, PathType, PathsEntry, RunExportsJson};
+use rattler_conda_types::package::{
+    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PythonEntryPoints,
+    RunExportsJson,
+};
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Version};
 use rattler_digest::compute_file_digest;
@@ -16,34 +20,50 @@ use fs::File;
 
 use std::fs;
 use std::io::{BufReader, Read, Write};
+
+#[cfg(target_family = "unix")]
 use std::os::unix::prelude::OsStrExt;
+
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::symlink;
+
 use std::str::FromStr;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 use std::collections::HashSet;
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
+#[allow(unused_variables)]
 fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
-    let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
+    #[cfg(target_family = "windows")]
+    {
+        tracing::warn!("Windows is not supported yet for binary prefix checking.");
+        return Ok(false);
+    }
 
-    // Open the file
-    let file = File::open(file_path)?;
-    let mut buf_reader = BufReader::new(file);
+    #[cfg(target_family = "unix")]
+    {
+        let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
 
-    // Read the file's content
-    let mut content = Vec::new();
-    buf_reader.read_to_end(&mut content)?;
+        // Open the file
+        let file = File::open(file_path)?;
+        let mut buf_reader = BufReader::new(file);
 
-    // Check if the content contains the prefix bytes
-    let contains_prefix = content
-        .windows(prefix_bytes.len())
-        .any(|window| window == prefix_bytes.as_slice());
+        // Read the file's content
+        let mut content = Vec::new();
+        buf_reader.read_to_end(&mut content)?;
 
-    Ok(contains_prefix)
+        // Check if the content contains the prefix bytes
+        let contains_prefix = content
+            .windows(prefix_bytes.len())
+            .any(|window| window == prefix_bytes.as_slice());
+
+        Ok(contains_prefix)
+    }
 }
 
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
@@ -97,16 +117,20 @@ impl PathMetadata {
     }
 }
 
-fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &Path) -> Result<String> {
+fn create_paths_json(
+    paths: &HashSet<PathBuf>,
+    path_prefix: &Path,
+    encoded_prefix: &Path,
+) -> Result<String> {
     let mut paths_json: PathsJson = PathsJson {
         paths: Vec::new(),
         paths_version: 1,
     };
 
     for p in itertools::sorted(paths) {
-        let meta = fs::metadata(p)?;
+        let meta = fs::symlink_metadata(p)?;
 
-        let relative_path = p.strip_prefix(prefix)?.to_path_buf();
+        let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
 
         if meta.is_dir() {
             // check if dir is empty, and only then add it to paths.json
@@ -126,7 +150,7 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &Path) -> Result<String> 
             //     paths_json.paths.push(path_entry);
             // }
         } else if meta.is_file() {
-            let metadata = PathMetadata::from_path(p, prefix)?;
+            let metadata = PathMetadata::from_path(p, encoded_prefix)?;
 
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
@@ -140,14 +164,16 @@ fn create_paths_json(paths: &HashSet<PathBuf>, prefix: &Path) -> Result<String> 
                 size_in_bytes: Some(meta.len()),
             });
         } else if meta.file_type().is_symlink() {
+            let digest = compute_file_digest::<sha2::Sha256>(p)?;
+
             paths_json.paths.push(PathsEntry {
-                sha256: None,
+                sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::SoftLink,
                 file_mode: FileMode::Binary,
                 prefix_placeholder: None,
                 no_link: false,
-                size_in_bytes: None,
+                size_in_bytes: Some(meta.len()),
             });
         }
     }
@@ -181,7 +207,7 @@ fn create_index_json(recipe: &Output) -> Result<String> {
         timestamp: Some(since_the_epoch),
         depends: recipe.requirements.run.clone(),
         constrains: recipe.requirements.constrains.clone(),
-        noarch: NoArchType::none(),
+        noarch: recipe.build.noarch,
         track_features: vec![],
         features: None,
     };
@@ -230,6 +256,132 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
     Ok(res)
 }
 
+fn write_to_dest(
+    path: &Path,
+    prefix: &Path,
+    dest_folder: &Path,
+    target_platform: &str,
+    noarch: &NoArchType,
+) -> Result<Option<PathBuf>> {
+    let path_rel = path.strip_prefix(prefix)?;
+    let mut dest_path = dest_folder.join(path_rel);
+
+    if target_platform == "noarch" && noarch.is_python() {
+        if path.ends_with(".pyc") || path.ends_with(".pyo") {
+            return Ok(None); // skip .pyc files
+        }
+        // if any part of the path is __pycache__ skip it
+        if path_rel
+            .components()
+            .any(|c| c == Component::Normal("__pycache__".as_ref()))
+        {
+            return Ok(None);
+        }
+
+        // check if site-packages is in the path and strip everything before it
+        let pat = std::path::Component::Normal("site-packages".as_ref());
+        let parts = path_rel.components();
+        let mut new_parts = Vec::new();
+        let mut found = false;
+        for part in parts {
+            if part == pat {
+                found = true;
+            }
+            if found {
+                new_parts.push(part);
+            }
+        }
+
+        if !found {
+            // skip files that are not in site-packages
+            // TODO we need data files?
+            return Ok(None);
+        }
+
+        dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+    }
+
+    if fs::metadata(dest_path.parent().expect("parent")).is_err() {
+        fs::create_dir_all(dest_path.parent().unwrap())?;
+    }
+
+    let metadata = fs::symlink_metadata(path)?;
+
+    // make absolute symlinks relative
+    if metadata.is_symlink() {
+        if target_platform == "win-64" {
+            tracing::warn!("Symlinks need administrator privileges on Windows");
+        }
+
+        tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
+        tracing::info!("Symlink metadata: {:?}", metadata);
+        if let Result::Ok(link) = fs::read_link(path) {
+            tracing::info!("Read link: {:?}", link);
+        } else {
+            tracing::warn!("Could not read link at {:?}", path);
+        }
+
+        #[cfg(target_family = "unix")]
+        fs::read_link(path)
+            .and_then(|target| {
+                if target.is_absolute() && target.starts_with(prefix) {
+                    let rel_target =
+                        pathdiff::diff_paths(target, path).expect("Could not make path relative");
+                    symlink(&rel_target, &dest_path)
+                        .map_err(|e| {
+                            tracing::error!(
+                                "Could not create symlink from {:?} to {:?}: {:?}",
+                                rel_target,
+                                dest_path,
+                                e
+                            );
+                            e
+                        })
+                        .expect("Could not create symlink");
+                } else {
+                    if target.is_absolute() {
+                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
+                    }
+                    symlink(&target, &dest_path)
+                        .map_err(|e| {
+                            tracing::error!(
+                                "Could not create symlink from {:?} to {:?}: {:?}",
+                                target,
+                                dest_path,
+                                e
+                            );
+                            e
+                        })
+                        .expect("Could not create symlink");
+                }
+                Result::Ok(())
+            })
+            .expect("Could not read link!");
+        Ok(Some(dest_path))
+    } else if metadata.is_dir() {
+        // skip directories for now
+        Ok(None)
+    } else {
+        tracing::info!("Copying file {:?} to {:?}", path, dest_path);
+        fs::copy(path, &dest_path).expect("Could not copy file to dest");
+        Ok(Some(dest_path))
+        // TODO add relink stuff here?
+    }
+}
+
+fn create_link_json(output: &Output) -> Result<Option<String>> {
+    let noarch_links = PythonEntryPoints {
+        entry_points: output.build.entry_points.clone(),
+    };
+
+    let link_json = LinkJson {
+        noarch: NoArchLinks::Python(noarch_links),
+        package_metadata_version: 1,
+    };
+
+    Ok(Some(serde_json::to_string_pretty(&link_json)?))
+}
+
 pub fn package_conda(
     output: &Output,
     new_files: &HashSet<PathBuf>,
@@ -237,46 +389,58 @@ pub fn package_conda(
     local_channel_dir: &Path,
 ) -> Result<()> {
     let tmp_dir = TempDir::new(&output.name)?;
+    let tmp_dir_path = tmp_dir.path();
 
-    let mut tmp_files = Vec::new();
+    let mut tmp_files = HashSet::new();
     for f in new_files {
-        let f_rel = f.strip_prefix(prefix)?;
-        let dest = tmp_dir.path().join(f_rel);
-
-        if fs::metadata(dest.parent().expect("parent")).is_err() {
-            fs::create_dir_all(dest.parent().unwrap())?;
+        if let Some(dest_file) = write_to_dest(
+            f,
+            prefix,
+            tmp_dir_path,
+            &output.build_configuration.target_platform,
+            &output.build.noarch,
+        )? {
+            tmp_files.insert(dest_file);
         }
-
-        let meta = fs::metadata(f)?;
-        if meta.is_dir() {
-            continue;
-        };
-
-        fs::copy(f, &dest).expect("Could not copy to dest");
-        tmp_files.push(dest.to_path_buf());
     }
 
     tracing::info!("Copying done!");
 
-    let info_folder = tmp_dir.path().join("info");
+    if output
+        .build_configuration
+        .target_platform
+        .starts_with("osx-")
+    {
+        relink::relink_paths(&tmp_files, tmp_dir_path, prefix).expect("Could not relink paths");
+    }
+
+    let info_folder = tmp_dir_path.join("info");
     fs::create_dir(&info_folder)?;
 
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
-    paths_json.write_all(create_paths_json(new_files, prefix)?.as_bytes())?;
-    tmp_files.push(info_folder.join("paths.json"));
+    paths_json.write_all(create_paths_json(&tmp_files, tmp_dir_path, prefix)?.as_bytes())?;
+    tmp_files.insert(info_folder.join("paths.json"));
 
     let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
-    tmp_files.push(info_folder.join("index.json"));
+    tmp_files.insert(info_folder.join("index.json"));
 
     let mut about_json = File::create(info_folder.join("about.json"))?;
     about_json.write_all(create_about_json(output)?.as_bytes())?;
-    tmp_files.push(info_folder.join("about.json"));
+    tmp_files.insert(info_folder.join("about.json"));
 
-    let mut run_exports_json = File::create(info_folder.join("run_exports.json"))?;
     if let Some(run_exports) = create_run_exports_json(output)? {
+        let mut run_exports_json = File::create(info_folder.join("run_exports.json"))?;
         run_exports_json.write_all(run_exports.as_bytes())?;
-        tmp_files.push(info_folder.join("run_exports.json"));
+        tmp_files.insert(info_folder.join("run_exports.json"));
+    }
+
+    if output.build_configuration.target_platform == "noarch" {
+        if let Some(link) = create_link_json(output)? {
+            let mut link_json = File::create(info_folder.join("link.json"))?;
+            link_json.write_all(link.as_bytes())?;
+            tmp_files.insert(info_folder.join("link.json"));
+        }
     }
 
     let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
@@ -290,7 +454,12 @@ pub fn package_conda(
     );
 
     let file = File::create(output_folder.join(file))?;
-    write_tar_bz2_package(file, tmp_dir.path(), &tmp_files, CompressionLevel::Default)?;
+    write_tar_bz2_package(
+        file,
+        tmp_dir_path,
+        &tmp_files.into_iter().collect::<Vec<_>>(),
+        CompressionLevel::Default,
+    )?;
 
     Ok(())
 }

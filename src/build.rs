@@ -184,7 +184,7 @@ pub fn get_conda_build_script(
 ) -> anyhow::Result<PathBuf> {
     let build_env_script_path =
         get_build_env_script(recipe, directories).expect("Could not write build script");
-    // let build_env_script_path = build_folder.join("work/build_env.sh");
+
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource {}\nfi",
         build_env_script_path.to_string_lossy()
@@ -237,7 +237,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
-            &recipe.build_configuration.target_platform,
+            &recipe.build_configuration.host_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;
@@ -299,9 +299,9 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
         &directories.local_channel,
     )?;
 
-    if !recipe.build_configuration.no_clean {
-        fs::remove_dir_all(&build_dir)?;
-    }
+    // if !recipe.build_configuration.no_clean {
+    //     fs::remove_dir_all(&build_dir)?;
+    // }
 
     index::index(&directories.local_channel)?;
 

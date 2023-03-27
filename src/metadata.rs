@@ -1,3 +1,5 @@
+use rattler_conda_types::package::EntryPoint;
+use rattler_conda_types::NoArchType;
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
 use serde_with::serde_as;
@@ -39,6 +41,10 @@ pub struct BuildOptions {
     pub script: Option<String>,
     pub ignore_run_exports: Option<Vec<String>>,
     pub run_exports: Option<RunExports>,
+    #[serde(default = "NoArchType::default")]
+    pub noarch: NoArchType,
+    #[serde(default)]
+    pub entry_points: Vec<EntryPoint>,
 }
 
 #[serde_as]
@@ -132,6 +138,7 @@ pub enum Source {
 
 pub struct BuildConfiguration {
     pub target_platform: String,
+    pub host_platform: String,
     pub build_platform: String,
     pub used_vars: Vec<String>,
     pub hash: String,
