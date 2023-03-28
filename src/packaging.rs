@@ -90,20 +90,19 @@ fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<P
     let buffer = &buffer[..n];
 
     let content_type = content_inspector::inspect(buffer);
+    let mut has_prefix = None;
+
     let file_mode = if content_type.is_text() {
+        if contains_prefix_text(file_path, prefix)? {
+            has_prefix = Some(prefix.to_path_buf());
+        }
         FileMode::Text
     } else {
-        FileMode::Binary
-    };
-
-    let mut has_prefix = None;
-    if file_mode == FileMode::Binary {
         if contains_prefix_binary(file_path, prefix)? {
             has_prefix = Some(prefix.to_path_buf());
         }
-    } else if contains_prefix_text(file_path, prefix)? {
-        has_prefix = Some(prefix.to_path_buf());
-    }
+        FileMode::Binary
+    };
 
     if let Some(prefix_placeholder) = has_prefix {
         Ok(Some(PrefixPlaceholder {
