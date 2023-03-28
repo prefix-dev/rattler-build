@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use clap::{arg, Parser};
 use rattler_conda_types::Platform;
 use render::render_recipe;
@@ -9,18 +11,20 @@ use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
+mod linux;
 mod metadata;
 mod osx;
 mod render;
 mod solver;
 mod source;
+mod unix;
 use metadata::{BuildOptions, Requirements, Source};
 mod index;
 mod packaging;
 mod selectors;
 use build::run_build;
 
-use crate::metadata::{About, BuildConfiguration};
+use crate::metadata::{About, BuildConfiguration, Directories};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -140,17 +144,19 @@ async fn main() -> anyhow::Result<()> {
     )
     .expect("Could not parse About");
 
+    let output_name = String::from(
+        myrec
+            .get("package")
+            .expect("Could not find package")
+            .get("name")
+            .expect("Could not find name")
+            .as_str()
+            .unwrap(),
+    );
+
     let output = metadata::Output {
         build: build_options,
-        name: String::from(
-            myrec
-                .get("package")
-                .expect("Could not find package")
-                .get("name")
-                .expect("Could not find name")
-                .as_str()
-                .unwrap(),
-        ),
+        name: output_name.clone(),
         version: String::from(
             myrec
                 .get("package")
@@ -173,9 +179,10 @@ async fn main() -> anyhow::Result<()> {
             build_platform: Platform::current().to_string(),
             hash: String::from("h1234_0"),
             used_vars: vec![],
-            no_clean: false,
+            no_clean: true,
+            directories: Directories::create(&output_name, &recipe_file)?,
         },
     };
 
-    run_build(&output, &recipe_file).await
+    run_build(&output).await
 }

@@ -104,7 +104,7 @@ fn extract(
     let output = Command::new("tar")
         .arg("-xf")
         .arg(String::from(archive.to_string_lossy()))
-        .arg("--preserve")
+        .arg("--preserve-permissions")
         .arg("--strip-components=1")
         .arg("-C")
         .arg(String::from(target_directory.to_string_lossy()))
@@ -158,6 +158,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
                 extract(&res, work_dir).expect("Could not extract the file!");
+                println!("Extracted to {:?}", work_dir);
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
                 }

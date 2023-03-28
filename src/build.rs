@@ -1,42 +1,16 @@
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+
 use std::process::{Command, Stdio};
 use std::{env, fs};
-use std::{
-    io::Read,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::{io::Read, path::PathBuf};
 
 use crate::index;
-use crate::metadata::Output;
+use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
 use crate::solver;
 use crate::source::fetch_sources;
-
-#[allow(unused)]
-pub struct Directories {
-    recipe_dir: PathBuf,
-    host_prefix: PathBuf,
-    build_prefix: PathBuf,
-    root_prefix: PathBuf,
-    source_dir: PathBuf,
-    work_dir: PathBuf,
-    build_dir: PathBuf,
-    local_channel: PathBuf,
-}
-
-fn setup_build_dir(recipe: &Output) -> anyhow::Result<PathBuf> {
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-
-    let dirname = format!("{}_{:?}", recipe.name, since_the_epoch.as_millis());
-    let path = env::current_dir()?.join(dirname);
-    fs::create_dir_all(path.join("work"))?;
-    Ok(path)
-}
 
 macro_rules! s {
     ($x:expr) => {
@@ -246,35 +220,21 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
     Ok(())
 }
 
-pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()> {
-    let build_dir = setup_build_dir(recipe).expect("Could not create build directory");
-    let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
+pub async fn run_build(output: &Output) -> anyhow::Result<()> {
+    let directories = &output.build_configuration.directories;
+    let build_script = get_conda_build_script(output, directories);
 
-    let directories = Directories {
-        build_dir: build_dir.clone(),
-        source_dir: build_dir.join("work"),
-        build_prefix: build_dir.join("build_env"),
-        host_prefix: build_dir.join("host_env"),
-        work_dir: build_dir.join("work"),
-        root_prefix: PathBuf::from(
-            env::var("MAMBA_ROOT_PREFIX").expect("Could not find MAMBA_ROOT_PREFIX"),
-        ),
-        recipe_dir,
-        local_channel: fs::canonicalize(PathBuf::from("./output"))?,
-    };
-
-    let build_script = get_conda_build_script(recipe, &directories);
     println!("Work dir: {:?}", &directories.work_dir);
     println!("Build script: {:?}", build_script.unwrap());
 
     fetch_sources(
-        &recipe.source,
+        &output.source,
         &directories.source_dir,
         &directories.recipe_dir,
     )
     .await?;
 
-    setup_environments(recipe, &directories)?;
+    setup_environments(output, directories)?;
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
@@ -293,15 +253,15 @@ pub async fn run_build(recipe: &Output, recipe_path: &Path) -> anyhow::Result<()
         .collect::<HashSet<_>>();
 
     package_conda(
-        recipe,
+        output,
         &difference,
         &directories.host_prefix,
         &directories.local_channel,
     )?;
 
-    // if !recipe.build_configuration.no_clean {
-    //     fs::remove_dir_all(&build_dir)?;
-    // }
+    if !output.build_configuration.no_clean {
+        fs::remove_dir_all(&directories.build_dir)?;
+    }
 
     index::index(&directories.local_channel)?;
 
