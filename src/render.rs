@@ -58,6 +58,7 @@ fn render_context(yaml_context: &serde_yaml::Mapping) -> HashMap<String, Value> 
     let mut context = HashMap::<String, Value>::new();
     for (key, v) in yaml_context.iter() {
         if let YamlValue::String(key) = key {
+            // TODO actually render the value with minijinja and known values
             context.insert(
                 key.to_string(),
                 Value::from_safe_string(v.as_str().unwrap().to_string()),

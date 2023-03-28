@@ -33,6 +33,7 @@ impl SelectorConfig {
         context.insert("win".to_string(), Value::from(self.is_win()));
         context.insert("osx".to_string(), Value::from(self.is_osx()));
         context.insert("linux".to_string(), Value::from(self.is_linux()));
+
         context.insert(
             "arch".to_string(),
             Value::from_safe_string(
@@ -55,9 +56,10 @@ impl SelectorConfig {
             "build_platform".to_string(),
             Value::from_safe_string(self.build_platform),
         );
-        for (key, v) in std::env::vars() {
-            context.insert(key, Value::from_safe_string(v));
-        }
+        // for (key, v) in std::env::vars() {
+        //     context.insert(key, Value::from_safe_string(v));
+        // }
+        print!("Context: {:#?}", context);
         context
     }
 }
@@ -178,6 +180,24 @@ mod tests {
 
         let res = flatten_selectors(&mut yaml, &selector_config);
         set_snapshot_suffix!("{}", filename.replace('/', "_"));
+        insta::assert_yaml_snapshot!(res);
+    }
+
+    #[test]
+    fn test_config_selectors() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file =
+            std::fs::read_to_string(test_data_dir.join("selectors/config_1.yaml")).unwrap();
+
+        let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
+        let selector_config = SelectorConfig {
+            python_version: "3.8.5".into(),
+            target_platform: "linux-64".into(),
+            build_platform: "win-64".into(),
+        };
+
+        let res = flatten_selectors(&mut yaml, &selector_config);
+        // set_snapshot_suffix!("{}", filename.replace('/', "_"));
         insta::assert_yaml_snapshot!(res);
     }
 }

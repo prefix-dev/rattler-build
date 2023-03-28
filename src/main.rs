@@ -22,6 +22,8 @@ use metadata::{BuildOptions, Requirements, Source};
 mod index;
 mod packaging;
 mod selectors;
+mod used_variables;
+mod variant_config;
 use build::run_build;
 
 use crate::metadata::{About, BuildConfiguration, Directories};
@@ -50,6 +52,12 @@ struct Opts {
 
     #[arg(short, long)]
     recipe_file: PathBuf,
+
+    #[arg(long)]
+    target_platform: Option<String>,
+
+    #[arg(short = 'm', long)]
+    variant_config: Vec<PathBuf>,
 }
 
 #[tokio::main]
@@ -78,13 +86,24 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Starting the build process");
 
     let recipe_file = fs::canonicalize(args.recipe_file)?;
+    let recipe_text = fs::read_to_string(&recipe_file)?;
 
-    let mut myrec: YamlValue = serde_yaml::from_reader(std::fs::File::open(&recipe_file).unwrap())
-        .expect("Could not parse yaml file");
+    let used_vars = used_variables::used_vars_from_jinja(&recipe_text);
+
+    tracing::info!("Used outer variables: {:?}", used_vars);
+
+    let variant_config = variant_config::load_variant_configs(&args.variant_config);
+    print!("Variant config: {:#?}", variant_config);
+
+    let mut myrec: YamlValue =
+        serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
     let target_platform = if myrec.get("build").and_then(|v| v.get("noarch")).is_some() {
         "noarch".to_string()
+    } else if let Some(target_platform) = args.target_platform {
+        target_platform
     } else {
+        tracing::info!("No target platform specified, using current platform");
         Platform::current().to_string()
     };
     tracing::info!("Target platform: {}", target_platform);
