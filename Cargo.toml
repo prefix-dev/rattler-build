@@ -16,7 +16,7 @@ hex = "0.4.3"
 serde_json = "1.0.94"
 tempdir = "0.3.7"
 reqwest = "0.11.15"
-tokio = {version = "1.26.0", features = ["rt", "macros", "rt-multi-thread"] }
+tokio = {version = "1.27.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.10.5"
 content_inspector = "0.2.4"
 serde_with = "2.3.1"
