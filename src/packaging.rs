@@ -3,8 +3,8 @@ use crate::metadata::Output;
 use crate::osx;
 
 use rattler_conda_types::package::{
-    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PythonEntryPoints,
-    RunExportsJson,
+    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
+    PythonEntryPoints, RunExportsJson,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Version};
@@ -82,39 +82,36 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
     Ok(contains_prefix)
 }
 
-struct PathMetadata {
-    file_type: FileMode,
-    has_prefix: Option<PathBuf>,
-}
+fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<PrefixPlaceholder>> {
+    // read first 1024 bytes to determine file type
+    let mut file = File::open(file_path)?;
+    let mut buffer = [0; 1024];
+    let n = file.read(&mut buffer)?;
+    let buffer = &buffer[..n];
 
-impl PathMetadata {
-    fn from_path(file_path: &Path, prefix: &Path) -> Result<PathMetadata> {
-        // read first 1024 bytes to determine file type
-        let mut file = File::open(file_path)?;
-        let mut buffer = [0; 1024];
-        let n = file.read(&mut buffer)?;
-        let buffer = &buffer[..n];
+    let content_type = content_inspector::inspect(buffer);
+    let file_mode = if content_type.is_text() {
+        FileMode::Text
+    } else {
+        FileMode::Binary
+    };
 
-        let content_type = content_inspector::inspect(buffer);
-        let file_type = if content_type.is_text() {
-            FileMode::Text
-        } else {
-            FileMode::Binary
-        };
-
-        let mut has_prefix = None;
-        if file_type == FileMode::Binary {
-            if contains_prefix_binary(file_path, prefix)? {
-                has_prefix = Some(prefix.to_path_buf());
-            }
-        } else if contains_prefix_text(file_path, prefix)? {
+    let mut has_prefix = None;
+    if file_mode == FileMode::Binary {
+        if contains_prefix_binary(file_path, prefix)? {
             has_prefix = Some(prefix.to_path_buf());
         }
+    } else if contains_prefix_text(file_path, prefix)? {
+        has_prefix = Some(prefix.to_path_buf());
+    }
 
-        Ok(PathMetadata {
-            file_type,
-            has_prefix,
-        })
+    if let Some(prefix_placeholder) = has_prefix {
+        Ok(Some(PrefixPlaceholder {
+            file_mode,
+            placeholder: prefix_placeholder.to_string_lossy().to_string(),
+        }))
+    } else {
+        Ok(None)
     }
 }
 
@@ -157,7 +154,7 @@ fn create_paths_json(
             //     paths_json.paths.push(path_entry);
             // }
         } else if meta.is_file() {
-            let metadata = PathMetadata::from_path(p, encoded_prefix)?;
+            let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
 
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
@@ -165,8 +162,7 @@ fn create_paths_json(
                 sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::HardLink,
-                file_mode: metadata.file_type,
-                prefix_placeholder: metadata.has_prefix.map(|p| p.to_str().unwrap().to_string()),
+                prefix_placeholder,
                 no_link: false,
                 size_in_bytes: Some(meta.len()),
             });
@@ -177,7 +173,6 @@ fn create_paths_json(
                 sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::SoftLink,
-                file_mode: FileMode::Binary,
                 prefix_placeholder: None,
                 no_link: false,
                 size_in_bytes: Some(meta.len()),

@@ -1264,7 +1264,7 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "rattler_conda_types"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=write_binary#d84fecf2013dfada6f470890c96121699aa70734"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
 dependencies = [
  "fxhash",
  "glob",
@@ -1292,7 +1292,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=write_binary#d84fecf2013dfada6f470890c96121699aa70734"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
 dependencies = [
  "digest",
  "hex",
@@ -1302,7 +1302,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=write_binary#d84fecf2013dfada6f470890c96121699aa70734"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
 dependencies = [
  "quote",
  "syn 2.0.10",
@@ -1311,7 +1311,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=write_binary#d84fecf2013dfada6f470890c96121699aa70734"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
 dependencies = [
  "bzip2",
  "itertools",
