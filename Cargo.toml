@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { version = "1.0.158", features = ["derive"] }
+serde = { version = "1.0.159", features = ["derive"] }
 serde_yaml = "0.9.19"
 rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "write_binary" }
 rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "write_binary" }
