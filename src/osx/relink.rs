@@ -56,7 +56,7 @@ fn install_name_tool(
     let output = cmd.output()?;
 
     if !output.status.success() {
-        eprintln!(
+        tracing::error!(
             "install_name_tool failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
@@ -165,7 +165,7 @@ fn modify_dylib(
             }
         }
         _ => {
-            eprintln!("Not a valid Mach-O binary.");
+            tracing::error!("Not a valid Mach-O binary.");
             return Err("Not a valid Mach-O binary".into());
         }
     }
@@ -180,7 +180,7 @@ pub fn relink_paths(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
-            println!("Skipping symlink: {}", p.display());
+            tracing::info!("Skipping symlink: {}", p.display());
             continue;
         }
 
@@ -189,7 +189,7 @@ pub fn relink_paths(
                 match modify_dylib(p, prefix, encoded_prefix) {
                     Ok(_) => {}
                     Err(e) => {
-                        eprintln!("Error: {}", e);
+                        tracing::error!("Error: {}", e);
                     }
                 }
             }
@@ -197,7 +197,7 @@ pub fn relink_paths(
             match modify_dylib(p, prefix, encoded_prefix) {
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("Error: {}", e);
+                    tracing::error!("Error: {}", e);
                 }
             }
         }

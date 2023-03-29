@@ -24,7 +24,7 @@ fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
                 );
                 false
             } else {
-                println!("Validated SHA256 values of the downloaded file!");
+                tracing::info!("Validated SHA256 values of the downloaded file!");
                 true
             }
         }
@@ -158,7 +158,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
                 extract(&res, work_dir).expect("Could not extract the file!");
-                println!("Extracted to {:?}", work_dir);
+                tracing::info!("Extracted to {:?}", work_dir);
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
                 }

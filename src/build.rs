@@ -18,7 +18,9 @@ macro_rules! s {
     };
 }
 
-pub fn get_build_env_script(recipe: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
+pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
+    let recipe = &output.recipe;
+
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
@@ -61,19 +63,19 @@ pub fn get_build_env_script(recipe: &Output, directories: &Directories) -> anyho
                 .to_string_lossy()),
         ),
         (s!("PIP_NO_INDEX"), s!("True")),
-        (s!("PKG_NAME"), s!(recipe.name.clone())),
-        (s!("PKG_VERSION"), s!(recipe.version.clone())),
+        (s!("PKG_NAME"), s!(output.name())),
+        (s!("PKG_VERSION"), s!(output.version())),
         (s!("PKG_BUILDNUM"), s!(recipe.build.number.to_string())),
         // TODO this is inaccurate
         (
             s!("PKG_BUILD_STRING"),
             s!(recipe.build.string.clone().unwrap_or_default()),
         ),
-        (s!("PKG_HASH"), s!(recipe.build_configuration.hash.clone())),
+        (s!("PKG_HASH"), s!(output.build_configuration.hash.clone())),
         // build configuration
         (
             s!("CONDA_BUILD_CROSS_COMPILATION"),
-            s!(if recipe.build_configuration.cross_compilation() {
+            s!(if output.build_configuration.cross_compilation() {
                 "1"
             } else {
                 "0"
@@ -82,15 +84,15 @@ pub fn get_build_env_script(recipe: &Output, directories: &Directories) -> anyho
         // (s!("CONDA_BUILD_SYSROOT"), s!("")),
         (
             s!("SUBDIR"),
-            s!(recipe.build_configuration.target_platform.clone()),
+            s!(output.build_configuration.target_platform.clone()),
         ),
         (
             s!("build_platform"),
-            s!(recipe.build_configuration.build_platform.clone()),
+            s!(output.build_configuration.build_platform.clone()),
         ),
         (
             s!("target_platform"),
-            s!(recipe.build_configuration.target_platform.clone()),
+            s!(output.build_configuration.target_platform.clone()),
         ),
         (s!("CONDA_BUILD_STATE"), s!("BUILD")),
         (
@@ -153,11 +155,13 @@ pub fn get_build_env_script(recipe: &Output, directories: &Directories) -> anyho
 }
 
 pub fn get_conda_build_script(
-    recipe: &Output,
+    output: &Output,
     directories: &Directories,
 ) -> anyhow::Result<PathBuf> {
+    let recipe = &output.recipe;
+
     let build_env_script_path =
-        get_build_env_script(recipe, directories).expect("Could not write build script");
+        get_build_env_script(output, directories).expect("Could not write build script");
 
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\nsource {}\nfi",
@@ -194,13 +198,15 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
-pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow::Result<()> {
+pub fn setup_environments(output: &Output, directories: &Directories) -> anyhow::Result<()> {
+    let recipe = &output.recipe;
+
     if !recipe.requirements.build.is_empty() {
         solver::create_environment(
             &recipe.requirements.build,
             &[],
             directories.build_prefix.clone(),
-            &recipe.build_configuration.build_platform,
+            &output.build_configuration.build_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.build_prefix)?;
@@ -211,7 +217,7 @@ pub fn setup_environments(recipe: &Output, directories: &Directories) -> anyhow:
             &recipe.requirements.host,
             &[],
             directories.host_prefix.clone(),
-            &recipe.build_configuration.host_platform,
+            &output.build_configuration.host_platform,
         )?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;
@@ -224,11 +230,11 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     let directories = &output.build_configuration.directories;
     let build_script = get_conda_build_script(output, directories);
 
-    println!("Work dir: {:?}", &directories.work_dir);
-    println!("Build script: {:?}", build_script.unwrap());
+    tracing::info!("Work dir: {:?}", &directories.work_dir);
+    tracing::info!("Build script: {:?}", build_script.unwrap());
 
     fetch_sources(
-        &output.source,
+        &output.recipe.source,
         &directories.source_dir,
         &directories.recipe_dir,
     )

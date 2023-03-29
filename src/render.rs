@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use minijinja::{self, value::Value, Environment};
 use serde_yaml::Value as YamlValue;
@@ -7,7 +7,7 @@ use serde_yaml::Value as YamlValue;
 fn render_recipe_recursively(
     recipe: &mut serde_yaml::Mapping,
     jinja_env: &Environment,
-    context: &HashMap<String, Value>,
+    context: &BTreeMap<String, Value>,
 ) {
     for (_, v) in recipe.iter_mut() {
         match v {
@@ -28,7 +28,7 @@ fn render_recipe_recursively(
 fn render_recipe_recursively_seq(
     recipe: &mut serde_yaml::Sequence,
     environment: &Environment,
-    context: &HashMap<String, Value>,
+    context: &BTreeMap<String, Value>,
 ) {
     for v in recipe {
         match v {
@@ -54,25 +54,46 @@ mod functions {
     }
 }
 
-fn render_context(yaml_context: &serde_yaml::Mapping) -> HashMap<String, Value> {
-    let mut context = HashMap::<String, Value>::new();
+fn render_context(yaml_context: &serde_yaml::Mapping) -> BTreeMap<String, Value> {
+    let mut context = BTreeMap::<String, Value>::new();
+    let env = Environment::new();
     for (key, v) in yaml_context.iter() {
         if let YamlValue::String(key) = key {
-            // TODO actually render the value with minijinja and known values
-            context.insert(
-                key.to_string(),
-                Value::from_safe_string(v.as_str().unwrap().to_string()),
-            );
+            let rendered = env.render_str(v.as_str().unwrap(), &context).unwrap();
+            context.insert(key.to_string(), Value::from_safe_string(rendered));
         }
     }
-
-    // TODO add more appropriate values here
-    context.insert("PYTHON".to_string(), "python".into());
-
     context
 }
 
-pub fn render_recipe(recipe: &YamlValue) -> anyhow::Result<serde_yaml::Mapping> {
+fn render_dependencies(
+    recipe: &serde_yaml::Mapping,
+    context: &BTreeMap<String, Value>,
+) -> serde_yaml::Mapping {
+    let mut recipe = recipe.clone();
+
+    if let Some(requirements) = recipe.get_mut("requirements") {
+        ["build", "host", "run"].iter().for_each(|section| {
+            if let Some(YamlValue::Sequence(section)) = requirements.get_mut(section) {
+                for item in section {
+                    if let YamlValue::String(item) = item {
+                        if context.contains_key(item) {
+                            let pin = context.get(item).unwrap().as_str().unwrap().to_string();
+                            *item = format!("{} {}", item, pin);
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    recipe
+}
+
+pub fn render_recipe(
+    recipe: &YamlValue,
+    variant: BTreeMap<String, String>,
+) -> anyhow::Result<serde_yaml::Mapping> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
         _ => panic!("Expected a map"),
@@ -81,10 +102,20 @@ pub fn render_recipe(recipe: &YamlValue) -> anyhow::Result<serde_yaml::Mapping> 
     let mut env = Environment::new();
     env.add_function("compiler", functions::compiler);
     if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
-        let context = render_context(map);
+        let mut context = render_context(map);
         let mut recipe_modified = recipe.clone();
         recipe_modified.remove("context");
+
+        // TODO add more appropriate values here
+        context.insert("PYTHON".to_string(), "python".into());
+
+        // add in the variant
+        for (key, value) in variant {
+            context.insert(key, Value::from_safe_string(value));
+        }
+
         render_recipe_recursively(&mut recipe_modified, &env, &context);
+        recipe_modified = render_dependencies(&recipe_modified, &context);
         Ok(recipe_modified)
     } else {
         tracing::info!("Did not find context");
@@ -95,6 +126,18 @@ pub fn render_recipe(recipe: &YamlValue) -> anyhow::Result<serde_yaml::Mapping> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_render_context() {
+        let context = r#"
+        name: "foo"
+        version: "1.0"
+        version_name: "{{ name }}-{{ version }}"
+        "#;
+        let context = serde_yaml::from_str(context).unwrap();
+        let context = render_context(&context);
+        insta::assert_yaml_snapshot!(context);
+    }
 
     #[test]
     fn test_render() {
@@ -112,7 +155,7 @@ mod tests {
                   sha256: "1234567890"
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe).unwrap();
+        let recipe = render_recipe(&recipe, BTreeMap::new()).unwrap();
         insta::assert_yaml_snapshot!(recipe);
     }
 }

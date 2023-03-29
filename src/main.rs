@@ -1,12 +1,14 @@
 #![allow(dead_code)]
 
+use anyhow::Ok;
 use clap::{arg, Parser};
+
 use rattler_conda_types::Platform;
 use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{collections::BTreeMap, fs, path::PathBuf, str};
+use std::{collections::BTreeMap, fs, path::PathBuf, process::exit, str};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -18,7 +20,7 @@ mod render;
 mod solver;
 mod source;
 mod unix;
-use metadata::{BuildOptions, Requirements, Source};
+use metadata::{BuildOptions, Requirements};
 mod index;
 mod packaging;
 mod selectors;
@@ -26,7 +28,10 @@ mod used_variables;
 mod variant_config;
 use build::run_build;
 
-use crate::metadata::{About, BuildConfiguration, Directories};
+use crate::{
+    metadata::{BuildConfiguration, Directories, RenderedRecipe},
+    used_variables::find_variants,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -58,6 +63,9 @@ struct Opts {
 
     #[arg(short = 'm', long)]
     variant_config: Vec<PathBuf>,
+
+    #[arg(long)]
+    render_only: bool,
 }
 
 #[tokio::main]
@@ -88,9 +96,7 @@ async fn main() -> anyhow::Result<()> {
     let recipe_file = fs::canonicalize(args.recipe_file)?;
     let recipe_text = fs::read_to_string(&recipe_file)?;
 
-    let used_vars = used_variables::used_vars_from_jinja(&recipe_text);
-
-    tracing::info!("Used outer variables: {:?}", used_vars);
+    // let used_vars = used_variables::used_vars_from_jinja(&recipe_text);
 
     let variant_config = variant_config::load_variant_configs(&args.variant_config);
     print!("Variant config: {:#?}", variant_config);
@@ -106,12 +112,15 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("No target platform specified, using current platform");
         Platform::current().to_string()
     };
+
+    let variants = find_variants(&recipe_text, &variant_config, &target_platform);
+
     tracing::info!("Target platform: {}", target_platform);
 
     let selector_config = SelectorConfig {
         target_platform: target_platform.clone(),
         build_platform: Platform::current().to_string(),
-        python_version: "3.10".to_string(),
+        variant: BTreeMap::new(), // python_version: "3.10".to_string(),
     };
 
     if let Some(flattened_recipe) = flatten_selectors(&mut myrec, &selector_config) {
@@ -120,88 +129,43 @@ async fn main() -> anyhow::Result<()> {
         tracing::error!("Could not flatten selectors");
     }
 
-    let myrec = render_recipe(&myrec).expect("Could not render the recipe.");
-
-    let requirements: Requirements = serde_yaml::from_value(
-        myrec
-            .get("requirements")
-            .expect("Could not find key requirements")
-            .to_owned(),
-    )
-    .expect("Could not get requirements");
-
-    let build_options: BuildOptions = serde_yaml::from_value(
-        myrec
-            .get("build")
-            .expect("Could not find build key")
-            .clone(),
-    )
-    .expect("Could not read build options");
-
-    println!("{:#?}", build_options);
-
-    let source_value = myrec.get("source");
-    let mut sources: Vec<Source> = Vec::new();
-    if let Some(source_value) = source_value {
-        if source_value.is_sequence() {
-            sources =
-                serde_yaml::from_value(source_value.clone()).expect("Could not deserialize source");
-        } else {
-            sources.push(
-                serde_yaml::from_value(source_value.clone()).expect("Could not deserialize source"),
-            );
+    if args.render_only {
+        for variant in variants {
+            let myrec = render_recipe(&myrec, variant).expect("Could not render the recipe.");
+            println!("{}", serde_yaml::to_string(&myrec).unwrap());
         }
-    } else {
-        tracing::info!("No sources found");
+        exit(0);
     }
 
-    let about: About = serde_yaml::from_value(
-        myrec
-            .get("about")
-            .expect("Could not find about key")
-            .clone(),
-    )
-    .expect("Could not parse About");
+    for variant in variants {
+        let recipe: serde_yaml::Mapping =
+            render_recipe(&myrec, variant).expect("Could not render the recipe.");
 
-    let output_name = String::from(
-        myrec
-            .get("package")
-            .expect("Could not find package")
-            .get("name")
-            .expect("Could not find name")
-            .as_str()
-            .unwrap(),
-    );
+        let recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe))
+            .expect("Could not parse into rendered recipe");
 
-    let output = metadata::Output {
-        build: build_options,
-        name: output_name.clone(),
-        version: String::from(
-            myrec
-                .get("package")
-                .expect("Could not find package")
-                .get("version")
-                .expect("Could not find name")
-                .as_str()
-                .unwrap(),
-        ),
-        source: sources,
-        requirements,
-        about,
-        build_configuration: BuildConfiguration {
-            target_platform: target_platform.clone(),
-            host_platform: if target_platform == "noarch" {
-                Platform::current().to_string()
-            } else {
-                target_platform.clone()
+        let name = recipe.package.name.clone();
+        let output = metadata::Output {
+            recipe,
+            build_configuration: BuildConfiguration {
+                target_platform: target_platform.clone(),
+                host_platform: if target_platform == "noarch" {
+                    Platform::current().to_string()
+                } else {
+                    target_platform.clone()
+                },
+                build_platform: Platform::current().to_string(),
+                hash: String::from("h1234_0"),
+                used_vars: vec![],
+                no_clean: true,
+                directories: Directories::create(&name, &recipe_file)?,
             },
-            build_platform: Platform::current().to_string(),
-            hash: String::from("h1234_0"),
-            used_vars: vec![],
-            no_clean: true,
-            directories: Directories::create(&output_name, &recipe_file)?,
-        },
-    };
+        };
 
-    run_build(&output).await
+        tracing::info!("{:?}", output);
+
+        run_build(&output).await?;
+    }
+
+    Ok(())
 }
