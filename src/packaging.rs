@@ -199,7 +199,7 @@ fn create_index_json(output: &Output) -> Result<String> {
 
     let index_json = IndexJson {
         name: output.name().to_string(),
-        version: Version::from_str(&output.version()).expect("Could not parse version"),
+        version: Version::from_str(output.version()).expect("Could not parse version"),
         build: output.build_configuration.hash.clone(),
         build_number: recipe.build.number,
         arch,
@@ -392,7 +392,7 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
 ) -> Result<()> {
-    let tmp_dir = TempDir::new(&output.name())?;
+    let tmp_dir = TempDir::new(output.name())?;
     let tmp_dir_path = tmp_dir.path();
 
     let mut tmp_files = HashSet::new();
