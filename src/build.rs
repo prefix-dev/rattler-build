@@ -8,8 +8,8 @@ use std::{io::Read, path::PathBuf};
 
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
-use crate::solver;
 use crate::source::fetch_sources;
+use crate::{index, solver};
 
 macro_rules! s {
     ($x:expr) => {
@@ -268,7 +268,10 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
         fs::remove_dir_all(&directories.build_dir)?;
     }
 
-    // index::index(&directories.local_channel)?;
+    index::index(
+        &directories.local_channel,
+        Some(&output.build_configuration.target_platform),
+    )?;
 
     Ok(())
 }
