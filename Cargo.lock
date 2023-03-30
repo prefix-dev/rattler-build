@@ -1389,14 +1389,13 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "rattler_conda_types"
 version = "0.2.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
+source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
 dependencies = [
  "fxhash",
  "glob",
  "hex",
  "itertools",
  "lazy-regex",
- "md-5",
  "nom",
  "rattler_digest",
  "rattler_macros",
@@ -1406,7 +1405,6 @@ dependencies = [
  "serde_repr",
  "serde_with",
  "serde_yaml",
- "sha2",
  "smallvec",
  "strum",
  "thiserror",
@@ -1417,17 +1415,20 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.2.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
+source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
 dependencies = [
  "digest",
  "hex",
+ "md-5",
  "serde",
+ "serde_with",
+ "sha2",
 ]
 
 [[package]]
 name = "rattler_macros"
 version = "0.2.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
+source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
 dependencies = [
  "quote",
  "syn 2.0.11",
@@ -1436,7 +1437,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.2.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#e9669d71fab32be5c6f8b7e0811108e5946310fb"
+source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
 dependencies = [
  "bzip2",
  "itertools",

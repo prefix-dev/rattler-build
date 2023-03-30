@@ -158,7 +158,7 @@ fn create_paths_json(
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
             paths_json.paths.push(PathsEntry {
-                sha256: Some(hex::encode(digest)),
+                sha256: Some(digest),
                 relative_path,
                 path_type: PathType::HardLink,
                 prefix_placeholder,
@@ -169,7 +169,7 @@ fn create_paths_json(
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
             paths_json.paths.push(PathsEntry {
-                sha256: Some(hex::encode(digest)),
+                sha256: Some(digest),
                 relative_path,
                 path_type: PathType::SoftLink,
                 prefix_placeholder: None,
