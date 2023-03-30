@@ -141,6 +141,7 @@ pub enum Source {
     Url(UrlSrc),
 }
 
+#[derive(Debug)]
 pub struct Directories {
     pub recipe_dir: PathBuf,
     pub host_prefix: PathBuf,
@@ -191,6 +192,7 @@ impl Directories {
     }
 }
 
+#[derive(Debug)]
 pub struct BuildConfiguration {
     pub target_platform: String,
     pub host_platform: String,
@@ -207,12 +209,35 @@ impl BuildConfiguration {
     }
 }
 
-pub struct Output {
-    pub build: BuildOptions,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Package {
     pub name: String,
     pub version: String,
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RenderedRecipe {
+    pub package: Package,
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
     pub source: Vec<Source>,
+    pub build: BuildOptions,
     pub requirements: Requirements,
     pub about: About,
+}
+
+#[derive(Debug)]
+pub struct Output {
+    pub recipe: RenderedRecipe,
     pub build_configuration: BuildConfiguration,
+}
+
+impl Output {
+    pub fn name(&self) -> &str {
+        &self.recipe.package.name
+    }
+
+    pub fn version(&self) -> &str {
+        &self.recipe.package.version
+    }
 }

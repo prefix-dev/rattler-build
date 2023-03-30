@@ -31,7 +31,7 @@ fn call_patchelf(
 
     let output = cmd.output()?;
     if !output.status.success() {
-        eprintln!(
+        tracing::error!(
             "patchelf failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
@@ -52,10 +52,10 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
 
     let elf = Elf::parse(&buffer)?;
 
-    println!("Elf soname    : {:?}", elf.soname);
-    println!("Elf libraries : {:?}", elf.libraries);
-    println!("ELF RPATHS    : {:?}", elf.rpaths);
-    println!("ELF RUNPATHS  : {:?}", elf.runpaths);
+    tracing::info!("Elf soname    : {:?}", elf.soname);
+    tracing::info!("Elf libraries : {:?}", elf.libraries);
+    tracing::info!("ELF RPATHS    : {:?}", elf.rpaths);
+    tracing::info!("ELF RUNPATHS  : {:?}", elf.runpaths);
     let mut modifications = ElfModifications::default();
 
     for rpath in elf.rpaths {
@@ -66,13 +66,13 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
 
         if rpath.starts_with(encoded_prefix.to_string_lossy().as_ref()) {
             // remove this rpath and replace with relative path
-            println!("Found encoded rpath: {}", rpath);
+            tracing::info!("Found encoded rpath: {}", rpath);
             let r = PathBuf::from(rpath);
             let stripped = r.strip_prefix(encoded_prefix).unwrap();
             let new_path = prefix.join(stripped);
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
-            println!("New relative path: $ORIGIN/{}", relative_path.display());
+            tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
             modifications.set_rpath.push(PathBuf::from(format!(
                 "$ORIGIN/{}",
                 relative_path.to_string_lossy()
@@ -85,13 +85,13 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
     for runpath in elf.runpaths {
         if runpath.starts_with(encoded_prefix.to_string_lossy().as_ref()) {
             // remove this rpath and replace with relative path
-            println!("Found encoded runpath: {}", runpath);
+            tracing::info!("Found encoded runpath: {}", runpath);
             let r = PathBuf::from(runpath);
             let stripped = r.strip_prefix(encoded_prefix).unwrap();
             let new_path = prefix.join(stripped);
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
-            println!("New relative path: $ORIGIN/{}", relative_path.display());
+            tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
             modifications.set_rpath.push(PathBuf::from(format!(
                 "$ORIGIN/{}",
                 relative_path.to_string_lossy()
@@ -122,7 +122,7 @@ pub fn relink_paths(
 ) -> anyhow::Result<()> {
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
-            println!("Skipping symlink: {}", p.display());
+            tracing::info!("Skipping symlink: {}", p.display());
             continue;
         }
 
@@ -131,7 +131,7 @@ pub fn relink_paths(
                 match modify_elf(p, prefix, encoded_prefix) {
                     Ok(_) => {}
                     Err(e) => {
-                        eprintln!("Error: {}", e);
+                        tracing::error!("Error: {}", e);
                     }
                 }
             }
@@ -139,7 +139,7 @@ pub fn relink_paths(
             match modify_elf(p, prefix, encoded_prefix) {
                 Ok(_) => {}
                 Err(e) => {
-                    eprintln!("Error: {}", e);
+                    tracing::error!("Error: {}", e);
                 }
             }
         }

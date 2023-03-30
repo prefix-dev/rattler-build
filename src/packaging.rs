@@ -3,8 +3,8 @@ use crate::metadata::Output;
 use crate::osx;
 
 use rattler_conda_types::package::{
-    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PythonEntryPoints,
-    RunExportsJson,
+    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
+    PythonEntryPoints, RunExportsJson,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Version};
@@ -82,39 +82,35 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
     Ok(contains_prefix)
 }
 
-struct PathMetadata {
-    file_type: FileMode,
-    has_prefix: Option<PathBuf>,
-}
+fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<PrefixPlaceholder>> {
+    // read first 1024 bytes to determine file type
+    let mut file = File::open(file_path)?;
+    let mut buffer = [0; 1024];
+    let n = file.read(&mut buffer)?;
+    let buffer = &buffer[..n];
 
-impl PathMetadata {
-    fn from_path(file_path: &Path, prefix: &Path) -> Result<PathMetadata> {
-        // read first 1024 bytes to determine file type
-        let mut file = File::open(file_path)?;
-        let mut buffer = [0; 1024];
-        let n = file.read(&mut buffer)?;
-        let buffer = &buffer[..n];
+    let content_type = content_inspector::inspect(buffer);
+    let mut has_prefix = None;
 
-        let content_type = content_inspector::inspect(buffer);
-        let file_type = if content_type.is_text() {
-            FileMode::Text
-        } else {
-            FileMode::Binary
-        };
-
-        let mut has_prefix = None;
-        if file_type == FileMode::Binary {
-            if contains_prefix_binary(file_path, prefix)? {
-                has_prefix = Some(prefix.to_path_buf());
-            }
-        } else if contains_prefix_text(file_path, prefix)? {
+    let file_mode = if content_type.is_text() {
+        if contains_prefix_text(file_path, prefix)? {
             has_prefix = Some(prefix.to_path_buf());
         }
+        FileMode::Text
+    } else {
+        if contains_prefix_binary(file_path, prefix)? {
+            has_prefix = Some(prefix.to_path_buf());
+        }
+        FileMode::Binary
+    };
 
-        Ok(PathMetadata {
-            file_type,
-            has_prefix,
-        })
+    if let Some(prefix_placeholder) = has_prefix {
+        Ok(Some(PrefixPlaceholder {
+            file_mode,
+            placeholder: prefix_placeholder.to_string_lossy().to_string(),
+        }))
+    } else {
+        Ok(None)
     }
 }
 
@@ -157,7 +153,7 @@ fn create_paths_json(
             //     paths_json.paths.push(path_entry);
             // }
         } else if meta.is_file() {
-            let metadata = PathMetadata::from_path(p, encoded_prefix)?;
+            let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
 
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
@@ -165,8 +161,7 @@ fn create_paths_json(
                 sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::HardLink,
-                file_mode: metadata.file_type,
-                prefix_placeholder: metadata.has_prefix.map(|p| p.to_str().unwrap().to_string()),
+                prefix_placeholder,
                 no_link: false,
                 size_in_bytes: Some(meta.len()),
             });
@@ -177,7 +172,6 @@ fn create_paths_json(
                 sha256: Some(hex::encode(digest)),
                 relative_path,
                 path_type: PathType::SoftLink,
-                file_mode: FileMode::Binary,
                 prefix_placeholder: None,
                 no_link: false,
                 size_in_bytes: Some(meta.len()),
@@ -187,13 +181,15 @@ fn create_paths_json(
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
 
-fn create_index_json(recipe: &Output) -> Result<String> {
+fn create_index_json(output: &Output) -> Result<String> {
     // TODO use global timestamp?
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
     let since_the_epoch = since_the_epoch.as_millis() as u64;
 
-    let subdir = recipe.build_configuration.target_platform.clone();
+    let recipe = &output.recipe;
+
+    let subdir = output.build_configuration.target_platform.clone();
     let (platform, arch) = if subdir == "noarch" {
         (None, None)
     } else {
@@ -202,13 +198,13 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     };
 
     let index_json = IndexJson {
-        name: recipe.name.clone(),
-        version: Version::from_str(&recipe.version).expect("Could not parse version"),
-        build: recipe.build_configuration.hash.clone(),
+        name: output.name().to_string(),
+        version: Version::from_str(&output.version()).expect("Could not parse version"),
+        build: output.build_configuration.hash.clone(),
         build_number: recipe.build.number,
         arch,
         platform,
-        subdir: Some(recipe.build_configuration.target_platform.clone()),
+        subdir: Some(output.build_configuration.target_platform.clone()),
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
         timestamp: Some(since_the_epoch),
@@ -222,7 +218,8 @@ fn create_index_json(recipe: &Output) -> Result<String> {
     Ok(serde_json::to_string_pretty(&index_json)?)
 }
 
-fn create_about_json(recipe: &Output) -> Result<String> {
+fn create_about_json(output: &Output) -> Result<String> {
+    let recipe = &output.recipe;
     let about_json = AboutJson {
         home: recipe.about.home.clone().unwrap_or_default(),
         license: recipe.about.license.clone(),
@@ -239,7 +236,7 @@ fn create_about_json(recipe: &Output) -> Result<String> {
 }
 
 fn create_run_exports_json(recipe: &Output) -> Result<Option<String>> {
-    if let Some(run_exports) = &recipe.build.run_exports {
+    if let Some(run_exports) = &recipe.recipe.build.run_exports {
         let run_exports_json = RunExportsJson {
             strong: run_exports.strong.clone(),
             weak: run_exports.weak.clone(),
@@ -378,7 +375,7 @@ fn write_to_dest(
 
 fn create_link_json(output: &Output) -> Result<Option<String>> {
     let noarch_links = PythonEntryPoints {
-        entry_points: output.build.entry_points.clone(),
+        entry_points: output.recipe.build.entry_points.clone(),
     };
 
     let link_json = LinkJson {
@@ -395,7 +392,7 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
 ) -> Result<()> {
-    let tmp_dir = TempDir::new(&output.name)?;
+    let tmp_dir = TempDir::new(&output.name())?;
     let tmp_dir_path = tmp_dir.path();
 
     let mut tmp_files = HashSet::new();
@@ -405,7 +402,7 @@ pub fn package_conda(
             prefix,
             tmp_dir_path,
             &output.build_configuration.target_platform,
-            &output.build.noarch,
+            &output.recipe.build.noarch,
         )? {
             tmp_files.insert(dest_file);
         }
@@ -422,7 +419,7 @@ pub fn package_conda(
             .expect("Could not relink paths");
     }
 
-    println!("Relink done!");
+    tracing::info!("Relink done!");
 
     let info_folder = tmp_dir_path.join("info");
     fs::create_dir_all(&info_folder)?;
@@ -454,14 +451,16 @@ pub fn package_conda(
     }
 
     let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
-    println!("Creating target folder {:?}", output_folder);
+    tracing::info!("Creating target folder {:?}", output_folder);
     // make dirs
     fs::create_dir_all(&output_folder)?;
 
     // TODO get proper hash
     let file = format!(
         "{}-{}-{}.tar.bz2",
-        output.name, output.version, output.build_configuration.hash
+        output.name(),
+        output.version(),
+        output.build_configuration.hash
     );
 
     let file = File::create(output_folder.join(file))?;
