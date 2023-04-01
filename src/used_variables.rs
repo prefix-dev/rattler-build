@@ -186,9 +186,9 @@ pub fn find_variants(
     find_combinations(&variants, &keys, 0, vec![], &mut combinations);
 
     let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
-    for variant in combinations {
+    for _variant in combinations {
         let mut val = recipe_parsed.clone();
-        if let Some(flattened_recipe) = flatten_selectors(&mut val, &selector_config) {
+        if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {
             // extract all dependencies from the flattened recipe
             let dependencies = extract_dependencies(&flattened_recipe);
             for dependency in dependencies {

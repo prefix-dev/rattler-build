@@ -203,7 +203,7 @@ impl ToString for PlatformOrNoarch {
     fn to_string(&self) -> String {
         match self {
             PlatformOrNoarch::Platform(p) => p.to_string(),
-            PlatformOrNoarch::Noarch(n) => "noarch".to_string(),
+            PlatformOrNoarch::Noarch(_) => "noarch".to_string(),
         }
     }
 }

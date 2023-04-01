@@ -16,12 +16,10 @@ use rattler_solve::{LibsolvRepoData, SolverBackend, SolverTask};
 use reqwest::Client;
 use std::{
     borrow::Cow,
-    env,
     fmt::Write,
     future::ready,
     io::ErrorKind,
     path::{Path, PathBuf},
-    str::FromStr,
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -48,7 +46,7 @@ pub async fn create_environment(
     // this also requires the use of the `channel_config` so we have to do this manually.
     let channels = channels
         .into_iter()
-        .map(|channel_str| Channel::from_str(&channel_str, &channel_config))
+        .map(|channel_str| Channel::from_str(channel_str, &channel_config))
         .collect::<Result<Vec<_>, _>>()?;
 
     // Each channel contains multiple subdirectories. Users can specify the subdirectories they want
@@ -65,7 +63,7 @@ pub async fn create_environment(
         .collect::<Vec<_>>();
 
     // Determine the packages that are currently installed in the environment.
-    let installed_packages = find_installed_packages(&target_prefix, 100)
+    let installed_packages = find_installed_packages(target_prefix, 100)
         .await
         .context("failed to determine currently installed packages")?;
 
@@ -148,7 +146,7 @@ pub async fn create_environment(
     let transaction = Transaction::from_current_and_desired(
         installed_packages,
         required_packages,
-        target_platform.clone(),
+        *target_platform,
     )?;
 
     if !transaction.operations.is_empty() {
@@ -222,7 +220,6 @@ async fn execute_transaction(
     stream::iter(transaction.operations)
         .map(Ok)
         .try_for_each_concurrent(50, |op| {
-            let target_prefix = target_prefix.clone();
             let download_client = download_client.clone();
             let package_cache = &package_cache;
             let install_driver = &install_driver;
@@ -231,7 +228,7 @@ async fn execute_transaction(
             let install_options = &install_options;
             async move {
                 execute_operation(
-                    &target_prefix,
+                    target_prefix,
                     download_client,
                     package_cache,
                     install_driver,

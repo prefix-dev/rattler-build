@@ -7,7 +7,7 @@ use rattler_conda_types::package::{
     PythonEntryPoints, RunExportsJson,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
-use rattler_conda_types::{NoArchType, Version};
+use rattler_conda_types::Version;
 use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
@@ -131,6 +131,14 @@ fn create_paths_json(
 
         tracing::info!("Adding {:?}", &relative_path);
         if !p.exists() {
+            if (p.is_symlink()) {
+                tracing::warn!(
+                    "Symlink does not exist: {:?} -> {:?} (TODO)",
+                    &p,
+                    fs::read_link(p)?
+                );
+                continue;
+            }
             tracing::warn!("File does not exist: {:?} (TODO)", &p);
             continue;
         }
@@ -325,7 +333,7 @@ fn write_to_dest(
         tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
         tracing::info!("Symlink metadata: {:?}", metadata);
         if let Result::Ok(link) = fs::read_link(path) {
-            tracing::info!("Read link: {:?}", link);
+            tracing::info!("Read link: {:?} -> {:?}", path, link);
         } else {
             tracing::warn!("Could not read link at {:?}", path);
         }
@@ -334,8 +342,17 @@ fn write_to_dest(
         fs::read_link(path)
             .and_then(|target| {
                 if target.is_absolute() && target.starts_with(prefix) {
-                    let rel_target =
-                        pathdiff::diff_paths(target, path).expect("Could not make path relative");
+                    let rel_target = pathdiff::diff_paths(
+                        target,
+                        path.parent().expect("Could not get parent directory"),
+                    )
+                    .expect("Could not make path relative");
+
+                    tracing::info!(
+                        "Making symlink relative {:?} -> {:?}",
+                        dest_path,
+                        rel_target
+                    );
                     symlink(&rel_target, &dest_path)
                         .map_err(|e| {
                             tracing::error!(
@@ -458,7 +475,7 @@ pub fn package_conda(
     }
 
     let output_folder =
-        local_channel_dir.join(&output.build_configuration.target_platform.to_string());
+        local_channel_dir.join(output.build_configuration.target_platform.to_string());
     tracing::info!("Creating target folder {:?}", output_folder);
     // make dirs
     fs::create_dir_all(&output_folder)?;
