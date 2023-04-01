@@ -47,9 +47,30 @@ fn render_recipe_recursively_seq(
 }
 
 mod functions {
+    use std::collections::BTreeMap;
+
     use minijinja::Error;
 
-    pub fn compiler(lang: String) -> Result<String, Error> {
+    pub fn compiler(
+        lang: String,
+        variant: &BTreeMap<String, minijinja::value::Value>,
+    ) -> Result<String, Error> {
+        let (ckey, cver) = (
+            format!("{}_compiler", lang),
+            format!("{}_compiler_version", lang),
+        );
+
+        if let Some(compiler) = variant.get(&ckey) {
+            if let Some(version) = variant.get(&cver) {
+                return Ok(format!(
+                    "{}_{} {}*",
+                    compiler,
+                    variant.get("target_platform").unwrap(),
+                    version
+                ));
+            }
+        }
+
         Ok(format!("{}-compiler", lang))
     }
 }
@@ -100,7 +121,7 @@ pub fn render_recipe(
     };
 
     let mut env = Environment::new();
-    env.add_function("compiler", functions::compiler);
+
     if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
         let mut context = render_context(map);
         let mut recipe_modified = recipe.clone();
@@ -110,9 +131,18 @@ pub fn render_recipe(
         context.insert("PYTHON".to_string(), "python".into());
 
         // add in the variant
-        for (key, value) in variant {
-            context.insert(key, Value::from_safe_string(value));
+        for (key, value) in &variant {
+            context.insert(key.clone(), Value::from_safe_string(value.clone()));
         }
+
+        context.insert(
+            "target_platform".to_string(),
+            "osx-arm64".to_string().into(),
+        );
+        let context_cloned = context.clone();
+        env.add_function("compiler", move |lang| {
+            functions::compiler(lang, &context_cloned)
+        });
 
         render_recipe_recursively(&mut recipe_modified, &env, &context);
         recipe_modified = render_dependencies(&recipe_modified, &context);
