@@ -155,8 +155,11 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         .ok()
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
 
+    // if we are in a conda environment, we need to deactivate it before activating the host / build prefix
+    let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
+
     let activation_vars = ActivationVariables {
-        conda_prefix: None,
+        conda_prefix,
         path: current_path,
     };
 
@@ -276,10 +279,6 @@ pub async fn setup_environments(output: &Output, directories: &Directories) -> a
 
 pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     let directories = &output.build_configuration.directories;
-    let build_script = get_conda_build_script(output, directories);
-
-    tracing::info!("Work dir: {:?}", &directories.work_dir);
-    tracing::info!("Build script: {:?}", build_script.unwrap());
 
     fetch_sources(
         &output.recipe.source,
@@ -289,6 +288,10 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     .await?;
 
     setup_environments(output, directories).await?;
+
+    let build_script = get_conda_build_script(output, directories);
+    tracing::info!("Work dir: {:?}", &directories.work_dir);
+    tracing::info!("Build script: {:?}", build_script.unwrap());
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
