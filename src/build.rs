@@ -157,7 +157,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
 
     let activation_vars = ActivationVariables {
         conda_prefix: None,
-        path: current_path.clone(),
+        path: current_path,
     };
 
     let host_activation = host_prefix_activator
@@ -180,8 +180,8 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         .activation_script(activation_vars)
         .expect("Could not activate host prefix");
 
-    write!(fout, "{}\n", host_activation)?;
-    write!(fout, "{}\n", build_activation)?;
+    writeln!(fout, "{}", host_activation)?;
+    writeln!(fout, "{}", build_activation)?;
 
     Ok(build_env_script_path)
 }
