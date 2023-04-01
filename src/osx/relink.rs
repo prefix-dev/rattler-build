@@ -3,6 +3,7 @@ use goblin::mach::Mach;
 use scroll::Pread;
 use std::collections::HashSet;
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -180,25 +181,37 @@ pub fn relink_paths(
 ) -> Result<(), Box<dyn std::error::Error>> {
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
-            tracing::info!("Skipping symlink: {}", p.display());
+            tracing::trace!("relink: skipping symlink {}", p.display());
             continue;
         }
 
-        if let Some(ext) = p.extension() {
-            if ext.to_string_lossy() == "dylib" {
-                match modify_dylib(p, prefix, encoded_prefix) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        tracing::error!("Error: {}", e);
-                    }
-                }
-            }
-        } else if p.parent().unwrap().ends_with("bin") {
-            match modify_dylib(p, prefix, encoded_prefix) {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::error!("Error: {}", e);
-                }
+        // Skip files that are not binaries
+        let mut buffer = vec![0; 1024];
+        let mut file = fs::File::open(p)?;
+        let n = file.read(&mut buffer)?;
+        let buffer = &buffer[..n];
+
+        let content_type = content_inspector::inspect(buffer);
+        if content_type != content_inspector::ContentType::BINARY {
+            continue;
+        }
+
+        // now check if we find the magic number
+        let ctx_res = goblin::mach::parse_magic_and_ctx(buffer, 0);
+
+        if ctx_res.is_err() {
+            tracing::trace!("relink: skipping non-mach-o file {}", p.display());
+            continue;
+        } else {
+            tracing::trace!("relink: relinking {}", p.display());
+        }
+
+        let (_magic, _ctx) = ctx_res.unwrap();
+
+        match modify_dylib(p, prefix, encoded_prefix) {
+            Ok(_) => {}
+            Err(e) => {
+                tracing::error!("Could not modify dylib {}: {}", p.display(), e);
             }
         }
     }

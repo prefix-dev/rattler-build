@@ -16,6 +16,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+use crate::metadata::PlatformOrNoarch;
+
 fn package_record_from_index_json<T: Read>(
     file: &Path,
     index_json_reader: &mut T,
@@ -52,7 +54,7 @@ fn package_record_from_index_json<T: Read>(
     Ok(package_record)
 }
 
-pub fn index(output_folder: &Path, target_platform: Option<&str>) -> Result<()> {
+pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -> Result<()> {
     // find all subdirectories with conda packages
 
     // for entry in WalkDir::new(output_folder) {
@@ -84,7 +86,7 @@ pub fn index(output_folder: &Path, target_platform: Option<&str>) -> Result<()> 
 
     for platform in platforms {
         if let Some(target_platform) = target_platform {
-            if platform != target_platform {
+            if platform != target_platform.to_string() {
                 continue;
             }
         }
@@ -135,7 +137,6 @@ pub fn index(output_folder: &Path, target_platform: Option<&str>) -> Result<()> 
 }
 
 fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    println!("Adding: {:?}", file);
     let reader = std::fs::File::open(file).unwrap();
     let mut archive = read::stream_tar_bz2(reader);
 

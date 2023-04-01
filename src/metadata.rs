@@ -1,5 +1,6 @@
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
+use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
 use serde_with::serde_as;
@@ -192,11 +193,26 @@ impl Directories {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PlatformOrNoarch {
+    Platform(Platform),
+    Noarch(NoArchType),
+}
+
+impl ToString for PlatformOrNoarch {
+    fn to_string(&self) -> String {
+        match self {
+            PlatformOrNoarch::Platform(p) => p.to_string(),
+            PlatformOrNoarch::Noarch(_) => "noarch".to_string(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct BuildConfiguration {
-    pub target_platform: String,
-    pub host_platform: String,
-    pub build_platform: String,
+    pub target_platform: PlatformOrNoarch,
+    pub host_platform: Platform,
+    pub build_platform: Platform,
     pub used_vars: Vec<String>,
     pub hash: String,
     pub no_clean: bool,
@@ -205,7 +221,10 @@ pub struct BuildConfiguration {
 
 impl BuildConfiguration {
     pub fn cross_compilation(&self) -> bool {
-        self.target_platform != self.build_platform
+        match &self.target_platform {
+            PlatformOrNoarch::Platform(p) => p != &self.build_platform,
+            PlatformOrNoarch::Noarch(_) => false,
+        }
     }
 }
 

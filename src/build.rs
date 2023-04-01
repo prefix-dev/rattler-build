@@ -3,8 +3,13 @@ use std::fs::File;
 use std::io::Write;
 
 use std::process::{Command, Stdio};
+use std::str::FromStr;
 use std::{env, fs};
 use std::{io::Read, path::PathBuf};
+
+use rattler_conda_types::MatchSpec;
+use rattler_shell::activation::ActivationVariables;
+use rattler_shell::{activation::Activator, shell};
 
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
@@ -83,15 +88,15 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         // (s!("CONDA_BUILD_SYSROOT"), s!("")),
         (
             s!("SUBDIR"),
-            s!(output.build_configuration.target_platform.clone()),
+            s!(output.build_configuration.target_platform.to_string()),
         ),
         (
             s!("build_platform"),
-            s!(output.build_configuration.build_platform.clone()),
+            s!(output.build_configuration.build_platform.to_string()),
         ),
         (
             s!("target_platform"),
-            s!(output.build_configuration.target_platform.clone()),
+            s!(output.build_configuration.target_platform.to_string()),
         ),
         (s!("CONDA_BUILD_STATE"), s!("BUILD")),
         (
@@ -141,14 +146,42 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         writeln!(fout, "export {}=\"{}\"", v.0, v.1)?;
     }
 
-    writeln!(
-        fout,
-        "\nexport MAMBA_EXE={}",
-        env::var("MAMBA_EXE").expect("Could not find MAMBA_EXE")
+    let host_prefix_activator = Activator::from_path(
+        &directories.host_prefix,
+        shell::Bash,
+        rattler_shell::activation::OperatingSystem::Linux,
     )?;
-    writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"")?;
-    writeln!(fout, "micromamba activate \"$PREFIX\"")?;
-    writeln!(fout, "micromamba activate --stack \"$BUILD_PREFIX\"")?;
+    let current_path = std::env::var("PATH")
+        .ok()
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
+
+    let activation_vars = ActivationVariables {
+        conda_prefix: None,
+        path: current_path,
+    };
+
+    let host_activation = host_prefix_activator
+        .activation_script(activation_vars)
+        .expect("Could not activate host prefix");
+
+    let build_prefix_activator = Activator::from_path(
+        &directories.build_prefix,
+        shell::Bash,
+        rattler_shell::activation::OperatingSystem::MacOS,
+    )?;
+
+    // A small $PATH hack to get stacking to work ... we should do better!
+    let activation_vars = ActivationVariables {
+        conda_prefix: None,
+        path: Some(vec!["$PATH".into()]),
+    };
+
+    let build_activation = build_prefix_activator
+        .activation_script(activation_vars)
+        .expect("Could not activate host prefix");
+
+    writeln!(fout, "{}", host_activation)?;
+    writeln!(fout, "{}", build_activation)?;
 
     Ok(build_env_script_path)
 }
@@ -197,27 +230,43 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
-pub fn setup_environments(output: &Output, directories: &Directories) -> anyhow::Result<()> {
+pub async fn setup_environments(output: &Output, directories: &Directories) -> anyhow::Result<()> {
     let recipe = &output.recipe;
 
     if !recipe.requirements.build.is_empty() {
+        let specs = recipe
+            .requirements
+            .build
+            .iter()
+            .map(|s| MatchSpec::from_str(s))
+            .collect::<Result<Vec<MatchSpec>, _>>()?;
+
         solver::create_environment(
-            &recipe.requirements.build,
-            &[],
-            directories.build_prefix.clone(),
+            specs,
             &output.build_configuration.build_platform,
-        )?;
+            &directories.build_prefix,
+            vec!["conda-forge".to_string()],
+        )
+        .await?;
     } else {
         fs::create_dir_all(&directories.build_prefix)?;
     }
 
     if !recipe.requirements.host.is_empty() {
+        let specs = recipe
+            .requirements
+            .host
+            .iter()
+            .map(|s| MatchSpec::from_str(s))
+            .collect::<Result<Vec<MatchSpec>, _>>()?;
+
         solver::create_environment(
-            &recipe.requirements.host,
-            &[],
-            directories.host_prefix.clone(),
+            specs,
             &output.build_configuration.host_platform,
-        )?;
+            &directories.host_prefix,
+            vec!["conda-forge".to_string()],
+        )
+        .await?;
     } else {
         fs::create_dir_all(&directories.host_prefix)?;
     }
@@ -239,7 +288,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     )
     .await?;
 
-    setup_environments(output, directories)?;
+    setup_environments(output, directories).await?;
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
