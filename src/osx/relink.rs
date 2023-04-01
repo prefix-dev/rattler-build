@@ -1,9 +1,9 @@
 use goblin::mach::load_command::{CommandVariant, RpathCommand};
 use goblin::mach::Mach;
-use scroll::Pread;
+use scroll::{Pread, Pwrite};
 use std::collections::HashSet;
 use std::fs;
-use std::io::Read;
+use std::io::{BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default)]
@@ -67,6 +67,35 @@ fn install_name_tool(
     Ok(())
 }
 
+fn overwrite_string(
+    data: &mut Vec<u8>,
+    offset: usize,
+    new_string: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let old_string = data.pread::<&str>(offset)?;
+
+    // pad with null bytes
+    let mut new_string_bytes = new_string.as_bytes().to_vec();
+
+    println!("{} {}", old_string, new_string);
+    println!("{} {}", old_string.len(), new_string_bytes.len());
+    assert!(old_string.len() >= new_string.len());
+
+    new_string_bytes.resize(old_string.len() + 1, 0);
+
+    if old_string.len() + 1 != new_string_bytes.len() {
+        return Err(format!(
+            "Cannot overwrite string of length {} with string of length {}",
+            old_string.len() + 1,
+            new_string_bytes.len()
+        )
+        .into());
+    }
+
+    data.pwrite(new_string_bytes.as_slice(), offset)?;
+    Ok(())
+}
+
 /// Modify a dylib to use relative paths for rpaths and dylibs
 /// This makes the dylib relocatable and allows it to be used in a conda environment.
 ///
@@ -94,7 +123,7 @@ fn modify_dylib(
     prefix: &Path,
     encoded_prefix: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let data = fs::read(dylib_path)?;
+    let mut data = fs::read(dylib_path)?;
     let mut changes = DylibChanges::default();
 
     match goblin::mach::Mach::parse(&data)? {
@@ -117,12 +146,23 @@ fn modify_dylib(
                         if let Some(new_dylib) = exchange_dylib_rpath(&libname, encoded_prefix) {
                             match command.command {
                                 CommandVariant::IdDylib(_) => {
-                                    changes.change_id = Some(new_dylib);
+                                    // let new_string = format!("@rpath/{}", );
+                                    overwrite_string(
+                                        &mut data,
+                                        libname_offset,
+                                        &new_dylib.to_string_lossy(),
+                                    )?;
+                                    // changes.change_id = Some(new_dylib);
                                 }
                                 CommandVariant::LoadDylib(_)
                                 | CommandVariant::LoadWeakDylib(_)
                                 | CommandVariant::ReexportDylib(_) => {
-                                    changes.change_dylib.push((libname, new_dylib));
+                                    // changes.change_dylib.push((libname, new_dylib));
+                                    overwrite_string(
+                                        &mut data,
+                                        libname_offset,
+                                        &new_dylib.to_string_lossy(),
+                                    )?;
                                 }
                                 _ => {}
                             }
@@ -144,6 +184,16 @@ fn modify_dylib(
                             let orig_path = encoded_prefix
                                 .join(dylib_path.strip_prefix(prefix).unwrap().parent().unwrap());
 
+                            if !rpath.starts_with(encoded_prefix) {
+                                tracing::warn!(
+                                    "Rpath {} does not start with host prefix {}",
+                                    rpath.to_string_lossy(),
+                                    encoded_prefix.to_string_lossy()
+                                );
+                                // return Err("Rpath does not start with encoded prefix".into());
+                                continue;
+                            }
+
                             let relpath = pathdiff::diff_paths(&rpath, &orig_path)
                                 .expect("Could not get relative path");
 
@@ -152,8 +202,14 @@ fn modify_dylib(
                                 relpath.to_string_lossy()
                             ));
 
-                            changes.add_rpath.insert(new_rpath);
-                            changes.delete_rpath.insert(rpath);
+                            overwrite_string(
+                                &mut data,
+                                rpath_offset,
+                                &new_rpath.to_string_lossy(),
+                            )?;
+
+                            // changes.add_rpath.insert(new_rpath);
+                            // changes.delete_rpath.insert(rpath);
                             modified = true;
                         }
                     }
@@ -162,7 +218,12 @@ fn modify_dylib(
             }
 
             if modified {
-                install_name_tool(dylib_path, &changes)?;
+                let file = fs::File::create(dylib_path)?;
+                let mut writer = BufWriter::new(file);
+                writer.write_all(&data)?;
+                writer.flush()?;
+
+                //     install_name_tool(dylib_path, &changes)?;
             }
         }
         _ => {
