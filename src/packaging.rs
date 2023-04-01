@@ -131,9 +131,9 @@ fn create_paths_json(
 
         tracing::info!("Adding {:?}", &relative_path);
         if !p.exists() {
-            if (p.is_symlink()) {
+            if p.is_symlink() {
                 tracing::warn!(
-                    "Symlink does not exist: {:?} -> {:?} (TODO)",
+                    "Symlink target does not exist: {:?} -> {:?}",
                     &p,
                     fs::read_link(p)?
                 );
@@ -330,10 +330,8 @@ fn write_to_dest(
             }
         }
 
-        tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
-        tracing::info!("Symlink metadata: {:?}", metadata);
         if let Result::Ok(link) = fs::read_link(path) {
-            tracing::info!("Read link: {:?} -> {:?}", path, link);
+            tracing::info!("Copying link: {:?} -> {:?}", path, link);
         } else {
             tracing::warn!("Could not read link at {:?}", path);
         }
