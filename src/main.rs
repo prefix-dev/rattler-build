@@ -3,12 +3,20 @@
 use anyhow::Ok;
 use clap::{arg, Parser};
 
-use rattler_conda_types::Platform;
+use indicatif::{MultiProgress, ProgressDrawTarget};
+use once_cell::sync::Lazy;
+use rattler_conda_types::{NoArchType, Platform};
 use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
-use std::{collections::BTreeMap, fs, path::PathBuf, process::exit, str};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::PathBuf,
+    process::exit,
+    str::{self, FromStr},
+};
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -20,7 +28,7 @@ mod render;
 mod solver;
 mod source;
 mod unix;
-use metadata::{BuildOptions, Requirements};
+use metadata::{BuildOptions, PlatformOrNoarch, Requirements};
 mod index;
 mod packaging;
 mod selectors;
@@ -32,6 +40,20 @@ use crate::{
     metadata::{BuildConfiguration, Directories, RenderedRecipe},
     used_variables::find_variants,
 };
+
+/// Returns a global instance of [`indicatif::MultiProgress`].
+///
+/// Although you can always create an instance yourself any logging will interrupt pending
+/// progressbars. To fix this issue, logging has been configured in such a way to it will not
+/// interfere if you use the [`indicatif::MultiProgress`] returning by this function.
+pub fn global_multi_progress() -> MultiProgress {
+    static GLOBAL_MP: Lazy<MultiProgress> = Lazy::new(|| {
+        let mp = MultiProgress::new();
+        mp.set_draw_target(ProgressDrawTarget::stderr_with_hz(20));
+        mp
+    });
+    GLOBAL_MP.clone()
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -80,8 +102,8 @@ async fn main() -> anyhow::Result<()> {
 
     let env_filter = EnvFilter::builder()
         .with_default_directive(default_filter.into())
-        .from_env()
-        .unwrap();
+        .from_env()?
+        .add_directive("apple_codesign=off".parse()?);
 
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
@@ -104,25 +126,27 @@ async fn main() -> anyhow::Result<()> {
     let mut myrec: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
-    let target_platform = if myrec.get("build").and_then(|v| v.get("noarch")).is_some() {
-        "noarch".to_string()
-    } else if let Some(target_platform) = args.target_platform {
-        target_platform
-    } else {
-        tracing::info!("No target platform specified, using current platform");
-        Platform::current().to_string()
-    };
-
-    let variants = find_variants(&recipe_text, &variant_config, &target_platform);
-
-    tracing::info!("Target platform: {}", target_platform);
+    let target_platform: PlatformOrNoarch =
+        if myrec.get("build").and_then(|v| v.get("noarch")).is_some() {
+            let noarch_type: NoArchType =
+                serde_yaml::from_value(myrec.get("build").unwrap().get("noarch").unwrap().clone())?;
+            PlatformOrNoarch::Noarch(noarch_type)
+        } else if let Some(target_platform) = args.target_platform {
+            PlatformOrNoarch::Platform(Platform::from_str(&target_platform)?)
+        } else {
+            tracing::info!("No target platform specified, using current platform");
+            PlatformOrNoarch::Platform(Platform::current())
+        };
 
     let selector_config = SelectorConfig {
-        target_platform: target_platform.clone(),
+        target_platform: target_platform.to_string(),
         build_platform: Platform::current().to_string(),
         variant: BTreeMap::new(), // python_version: "3.10".to_string(),
     };
 
+    let variants = find_variants(&recipe_text, &variant_config, &selector_config);
+
+    // tracing::info!("Target platform: {}", target_platform);
     if let Some(flattened_recipe) = flatten_selectors(&mut myrec, &selector_config) {
         myrec = flattened_recipe;
     } else {
@@ -149,12 +173,11 @@ async fn main() -> anyhow::Result<()> {
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: target_platform.clone(),
-                host_platform: if target_platform == "noarch" {
-                    Platform::current().to_string()
-                } else {
-                    target_platform.clone()
+                host_platform: match target_platform {
+                    PlatformOrNoarch::Platform(p) => p,
+                    PlatformOrNoarch::Noarch(_) => Platform::current(),
                 },
-                build_platform: Platform::current().to_string(),
+                build_platform: Platform::current(),
                 hash: String::from("h1234_0"),
                 used_vars: vec![],
                 no_clean: true,

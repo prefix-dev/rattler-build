@@ -168,7 +168,7 @@ fn find_combinations(
 pub fn find_variants(
     recipe: &str,
     config: &BTreeMap<String, Vec<String>>,
-    target_platform: &str,
+    selector_config: &SelectorConfig,
 ) -> Vec<BTreeMap<String, String>> {
     let used_variables = used_vars_from_jinja(recipe);
     // now render all selectors with the used variables
@@ -187,11 +187,6 @@ pub fn find_variants(
 
     let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
     for variant in combinations {
-        let selector_config = SelectorConfig {
-            target_platform: target_platform.to_string(),
-            build_platform: target_platform.to_string(),
-            variant: variant.clone(),
-        };
         let mut val = recipe_parsed.clone();
         if let Some(flattened_recipe) = flatten_selectors(&mut val, &selector_config) {
             // extract all dependencies from the flattened recipe

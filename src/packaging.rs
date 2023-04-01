@@ -1,5 +1,5 @@
 use crate::linux;
-use crate::metadata::Output;
+use crate::metadata::{Output, PlatformOrNoarch};
 use crate::osx;
 
 use rattler_conda_types::package::{
@@ -189,12 +189,14 @@ fn create_index_json(output: &Output) -> Result<String> {
 
     let recipe = &output.recipe;
 
-    let subdir = output.build_configuration.target_platform.clone();
-    let (platform, arch) = if subdir == "noarch" {
-        (None, None)
-    } else {
-        let parts: Vec<&str> = subdir.split('-').collect();
-        (Some(String::from(parts[0])), Some(String::from(parts[1])))
+    let (platform, arch) = match output.build_configuration.target_platform {
+        PlatformOrNoarch::Platform(p) => {
+            // todo add better functions in rattler for this
+            let pstring = p.to_string();
+            let parts: Vec<&str> = pstring.split('-').collect();
+            (Some(String::from(parts[0])), Some(String::from(parts[1])))
+        }
+        PlatformOrNoarch::Noarch(_) => (None, None),
     };
 
     let index_json = IndexJson {
@@ -204,7 +206,7 @@ fn create_index_json(output: &Output) -> Result<String> {
         build_number: recipe.build.number,
         arch,
         platform,
-        subdir: Some(output.build_configuration.target_platform.clone()),
+        subdir: Some(output.build_configuration.target_platform.to_string()),
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
         timestamp: Some(since_the_epoch),
@@ -264,45 +266,46 @@ fn write_to_dest(
     path: &Path,
     prefix: &Path,
     dest_folder: &Path,
-    target_platform: &str,
-    noarch: &NoArchType,
+    target_platform: &PlatformOrNoarch,
 ) -> Result<Option<PathBuf>> {
     let path_rel = path.strip_prefix(prefix)?;
     let mut dest_path = dest_folder.join(path_rel);
 
-    if target_platform == "noarch" && noarch.is_python() {
-        if path.ends_with(".pyc") || path.ends_with(".pyo") {
-            return Ok(None); // skip .pyc files
-        }
-        // if any part of the path is __pycache__ skip it
-        if path_rel
-            .components()
-            .any(|c| c == Component::Normal("__pycache__".as_ref()))
-        {
-            return Ok(None);
-        }
-
-        // check if site-packages is in the path and strip everything before it
-        let pat = std::path::Component::Normal("site-packages".as_ref());
-        let parts = path_rel.components();
-        let mut new_parts = Vec::new();
-        let mut found = false;
-        for part in parts {
-            if part == pat {
-                found = true;
+    if let PlatformOrNoarch::Noarch(t) = target_platform {
+        if t.is_python() {
+            if path.ends_with(".pyc") || path.ends_with(".pyo") {
+                return Ok(None); // skip .pyc files
             }
-            if found {
-                new_parts.push(part);
+            // if any part of the path is __pycache__ skip it
+            if path_rel
+                .components()
+                .any(|c| c == Component::Normal("__pycache__".as_ref()))
+            {
+                return Ok(None);
             }
-        }
 
-        if !found {
-            // skip files that are not in site-packages
-            // TODO we need data files?
-            return Ok(None);
-        }
+            // check if site-packages is in the path and strip everything before it
+            let pat = std::path::Component::Normal("site-packages".as_ref());
+            let parts = path_rel.components();
+            let mut new_parts = Vec::new();
+            let mut found = false;
+            for part in parts {
+                if part == pat {
+                    found = true;
+                }
+                if found {
+                    new_parts.push(part);
+                }
+            }
 
-        dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+            if !found {
+                // skip files that are not in site-packages
+                // TODO we need data files?
+                return Ok(None);
+            }
+
+            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+        }
     }
 
     if fs::metadata(dest_path.parent().expect("parent")).is_err() {
@@ -313,8 +316,10 @@ fn write_to_dest(
 
     // make absolute symlinks relative
     if metadata.is_symlink() {
-        if target_platform == "win-64" {
-            tracing::warn!("Symlinks need administrator privileges on Windows");
+        if let PlatformOrNoarch::Platform(p) = target_platform {
+            if p.is_windows() {
+                tracing::warn!("Symlinks need administrator privileges on Windows");
+            }
         }
 
         tracing::info!("Copying symlink {:?} to {:?}", path, dest_path);
@@ -402,7 +407,6 @@ pub fn package_conda(
             prefix,
             tmp_dir_path,
             &output.build_configuration.target_platform,
-            &output.recipe.build.noarch,
         )? {
             tmp_files.insert(dest_file);
         }
@@ -410,13 +414,14 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    let target_platform = &output.build_configuration.target_platform;
-    if target_platform.starts_with("osx-") {
-        osx::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
-            .expect("Could not relink paths");
-    } else if target_platform.starts_with("linux-") {
-        linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
-            .expect("Could not relink paths");
+    if let PlatformOrNoarch::Platform(p) = &output.build_configuration.target_platform {
+        if p.is_linux() {
+            linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
+                .expect("Could not relink paths");
+        } else if p.is_osx() {
+            osx::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
+                .expect("Could not relink paths");
+        }
     }
 
     tracing::info!("Relink done!");
@@ -442,15 +447,18 @@ pub fn package_conda(
         tmp_files.insert(info_folder.join("run_exports.json"));
     }
 
-    if output.build_configuration.target_platform == "noarch" {
-        if let Some(link) = create_link_json(output)? {
-            let mut link_json = File::create(info_folder.join("link.json"))?;
-            link_json.write_all(link.as_bytes())?;
-            tmp_files.insert(info_folder.join("link.json"));
+    if let PlatformOrNoarch::Noarch(noarch_type) = output.build_configuration.target_platform {
+        if noarch_type.is_python() {
+            if let Some(link) = create_link_json(output)? {
+                let mut link_json = File::create(info_folder.join("link.json"))?;
+                link_json.write_all(link.as_bytes())?;
+                tmp_files.insert(info_folder.join("link.json"));
+            }
         }
     }
 
-    let output_folder = local_channel_dir.join(&output.build_configuration.target_platform);
+    let output_folder =
+        local_channel_dir.join(&output.build_configuration.target_platform.to_string());
     tracing::info!("Creating target folder {:?}", output_folder);
     // make dirs
     fs::create_dir_all(&output_folder)?;
