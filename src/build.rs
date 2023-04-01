@@ -8,6 +8,8 @@ use std::{env, fs};
 use std::{io::Read, path::PathBuf};
 
 use rattler_conda_types::MatchSpec;
+use rattler_shell::activation::ActivationVariables;
+use rattler_shell::{activation::Activator, shell};
 
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
@@ -144,14 +146,42 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         writeln!(fout, "export {}=\"{}\"", v.0, v.1)?;
     }
 
-    writeln!(
-        fout,
-        "\nexport MAMBA_EXE={}",
-        env::var("MAMBA_EXE").expect("Could not find MAMBA_EXE")
+    let host_prefix_activator = Activator::from_path(
+        &directories.host_prefix,
+        shell::Bash,
+        rattler_shell::activation::OperatingSystem::Linux,
     )?;
-    writeln!(fout, "eval \"$($MAMBA_EXE shell hook)\"")?;
-    writeln!(fout, "micromamba activate \"$PREFIX\"")?;
-    writeln!(fout, "micromamba activate --stack \"$BUILD_PREFIX\"")?;
+    let current_path = std::env::var("PATH")
+        .ok()
+        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
+
+    let activation_vars = ActivationVariables {
+        conda_prefix: None,
+        path: current_path.clone(),
+    };
+
+    let host_activation = host_prefix_activator
+        .activation_script(activation_vars)
+        .expect("Could not activate host prefix");
+
+    let build_prefix_activator = Activator::from_path(
+        &directories.build_prefix,
+        shell::Bash,
+        rattler_shell::activation::OperatingSystem::MacOS,
+    )?;
+
+    // A small $PATH hack to get stacking to work ... we should do better!
+    let activation_vars = ActivationVariables {
+        conda_prefix: None,
+        path: Some(vec!["$PATH".into()]),
+    };
+
+    let build_activation = build_prefix_activator
+        .activation_script(activation_vars)
+        .expect("Could not activate host prefix");
+
+    write!(fout, "{}\n", host_activation)?;
+    write!(fout, "{}\n", build_activation)?;
 
     Ok(build_env_script_path)
 }

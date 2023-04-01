@@ -331,7 +331,7 @@ fn write_to_dest(
         }
 
         if let Result::Ok(link) = fs::read_link(path) {
-            tracing::info!("Copying link: {:?} -> {:?}", path, link);
+            tracing::trace!("Copying link: {:?} -> {:?}", path, link);
         } else {
             tracing::warn!("Could not read link at {:?}", path);
         }
@@ -346,7 +346,7 @@ fn write_to_dest(
                     )
                     .expect("Could not make path relative");
 
-                    tracing::info!(
+                    tracing::trace!(
                         "Making symlink relative {:?} -> {:?}",
                         dest_path,
                         rel_target
@@ -386,7 +386,7 @@ fn write_to_dest(
         // skip directories for now
         Ok(None)
     } else {
-        tracing::info!("Copying file {:?} to {:?}", path, dest_path);
+        tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
         fs::copy(path, &dest_path).expect("Could not copy file to dest");
         Ok(Some(dest_path))
         // TODO add relink stuff here?

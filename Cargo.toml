@@ -12,6 +12,7 @@ rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main"
 rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main", features = ["sparse"] }
 rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 anyhow = "1.0.70"
 walkdir = "2.3.3"

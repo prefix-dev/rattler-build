@@ -3019,6 +3019,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler_shell"
+version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
+dependencies = [
+ "indexmap",
+ "serde_json",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "rattler_solve"
 version = "0.2.0"
 source = "git+https://github.com/mamba-org/rattler?branch=main#c4815c35da3b54b9ec74c6a56eab4af6e548499f"
@@ -3232,6 +3243,7 @@ dependencies = [
  "rattler_digest",
  "rattler_package_streaming",
  "rattler_repodata_gateway",
+ "rattler_shell",
  "rattler_solve",
  "rattler_virtual_packages",
  "reqwest",
@@ -3521,6 +3533,7 @@ version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d721eca97ac802aa7777b701877c8004d950fc142651367300d21c1cc0194744"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",
