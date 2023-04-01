@@ -35,9 +35,7 @@ pub async fn create_environment(
     // with this because we need to parse the `channel_config` when parsing matchspecs.
 
     // Find the default cache directory. Create it if it doesnt exist yet.
-    let cache_dir = dirs::cache_dir()
-        .ok_or_else(|| anyhow::anyhow!("could not determine cache directory for current platform"))?
-        .join("rattler/cache");
+    let cache_dir = rattler::default_cache_dir()?;
 
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;

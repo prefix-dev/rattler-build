@@ -3217,7 +3217,6 @@ dependencies = [
  "comfy-table",
  "console",
  "content_inspector",
- "dirs 5.0.0",
  "futures 0.3.28",
  "goblin",
  "hex",

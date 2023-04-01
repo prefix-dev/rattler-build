@@ -137,7 +137,6 @@ pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -
 }
 
 fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    println!("Adding: {:?}", file);
     let reader = std::fs::File::open(file).unwrap();
     let mut archive = read::stream_tar_bz2(reader);
 
