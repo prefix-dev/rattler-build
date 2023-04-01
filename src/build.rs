@@ -149,7 +149,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
     let host_prefix_activator = Activator::from_path(
         &directories.host_prefix,
         shell::Bash,
-        rattler_shell::activation::OperatingSystem::Linux,
+        output.build_configuration.build_platform,
     )?;
     let current_path = std::env::var("PATH")
         .ok()
@@ -167,7 +167,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
     let build_prefix_activator = Activator::from_path(
         &directories.build_prefix,
         shell::Bash,
-        rattler_shell::activation::OperatingSystem::MacOS,
+        output.build_configuration.build_platform,
     )?;
 
     // A small $PATH hack to get stacking to work ... we should do better!
