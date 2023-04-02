@@ -1,24 +1,25 @@
+//! find used variabels on a Raw (YAML) recipe
+//! This does an initial "prerender" step where we evaluate the Jinja expressions globally
+//! based on the variables in the `context` section of the recipe.
+//! This also evaluates any Jinja functions such as `compiler` and `pin_subpackage` in a way
+//! that we can post-process them as "used variables" more easily later.
+//!
+//! Step 1:
+//!    - use only outer variables such as `target_platform`
+//!    - extract all sel( ... ) and `jinja` statements and find used variables
+//!    - retrieve used variabels from configuration and flatten selectors
+//!    - extract all dependencies and add them to used variables to build full variant
+
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
 };
 use serde_yaml::Value as YamlValue;
-/// find used variabels on a Raw (YAML) recipe
-
-/// This does an initial "prerender" step where we evaluate the Jinja expressions globally
-/// based on the variables in the `context` section of the recipe.
-/// This also evaluates any Jinja functions such as `compiler` and `pin_subpackage` in a way
-/// that we can post-process them as "used variables" more easily later.
-///
-/// Step 1:
-///    - use only outer variables such as `target_platform`
-///    - extract all sel( ... ) and `jinja` statements and find used variables
-///    - retrieve used variabels from configuration and flatten selectors
-///    - extract all dependencies and add them to used variables to build full variant
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::selectors::{flatten_selectors, SelectorConfig};
 
+/// Extract all variables from a jinja statement
 fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
     match node {
         Stmt::IfCond(stmt) => {
@@ -38,6 +39,7 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
     }
 }
 
+/// Extract all variables from a jinja expression (called from [`extract_variables`])
 fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>) {
     match expr {
         Expr::Var(var) => {
@@ -75,7 +77,8 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
     }
 }
 
-pub fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
+/// This recursively finds all `sel(...)` expressions in a YAML node
+fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
     match node {
         YamlValue::Mapping(map) => {
             for (key, value) in map {
@@ -97,7 +100,7 @@ pub fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
 }
 
 /// This finds all variables used in jinja or `sel(...)` expressions
-pub fn used_vars_from_jinja(recipe: &str) -> HashSet<String> {
+fn used_vars_from_jinja(recipe: &str) -> HashSet<String> {
     // regex replace all `sel(...)` with `{{ ... }}` to turn them into jinja expressions
     let mut selectors = HashSet::new();
     let yaml_node = serde_yaml::from_str(recipe).unwrap();
@@ -164,7 +167,7 @@ fn find_combinations(
 }
 
 /// This finds all used variables in any dependency declarations, build, host, and run sections.
-/// As well as any used variables from Jinja functions
+/// As well as any used variables from Jinja functions to calculate the variants of this recipe.
 pub fn find_variants(
     recipe: &str,
     config: &BTreeMap<String, Vec<String>>,

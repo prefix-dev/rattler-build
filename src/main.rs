@@ -143,8 +143,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let selector_config = SelectorConfig {
-        target_platform: target_platform.to_string(),
-        build_platform: Platform::current().to_string(),
+        target_platform: target_platform.clone(),
+        build_platform: Platform::current(),
         variant: BTreeMap::new(),
     };
 
