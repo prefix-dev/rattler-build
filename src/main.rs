@@ -22,12 +22,14 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod linux;
+mod macos;
 mod metadata;
-mod osx;
+mod os_vars;
 mod render;
 mod solver;
 mod source;
 mod unix;
+mod windows;
 use metadata::{BuildOptions, PlatformOrNoarch, Requirements};
 mod index;
 mod packaging;

@@ -2,16 +2,17 @@ use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 
+use std::fs;
 use std::process::{Command, Stdio};
 use std::str::FromStr;
-use std::{env, fs};
 use std::{io::Read, path::PathBuf};
 
-use rattler_conda_types::MatchSpec;
+use rattler_conda_types::{MatchSpec, Platform};
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 
-use crate::metadata::{Directories, Output};
+use crate::metadata::{Directories, Output, PlatformOrNoarch};
+use crate::os_vars::os_vars;
 use crate::packaging::{package_conda, record_files};
 use crate::source::fetch_sources;
 use crate::{index, solver};
@@ -99,51 +100,27 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
             s!(output.build_configuration.target_platform.to_string()),
         ),
         (s!("CONDA_BUILD_STATE"), s!("BUILD")),
-        (
-            s!("CPU_COUNT"),
-            s!(env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())),
-        ),
         // PY3K
         // "PY_VER": py_ver,
         // "STDLIB_DIR": stdlib_dir,
         // "SP_DIR": sp_dir,
     ];
 
-    // export ROOT="/Users/wolfvollprecht/micromamba"
-    // export CONDA_PY="39"
-    // export NPY_VER="1.16"
-    // export CONDA_NPY="116"
-    // export NPY_DISTUTILS_APPEND_FLAGS="1"
-    // export PERL_VER="5.26"
-    // export CONDA_PERL="5.26"
-    // export LUA_VER="5"
-    // export CONDA_LUA="5"
-    // export R_VER="3.5"
-    // export CONDA_R="3.5"
-    // export SHLIB_EXT=".dylib"
-    // export PATH="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_build_env/bin:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla:/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla/bin:/Users/wolfvollprecht/micromamba/bin:/Users/wolfvollprecht/micromamba/condabin:/opt/local/bin:/opt/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/share/dotnet:~/.dotnet/tools:/Library/Apple/usr/bin:/Library/Frameworks/Mono.framework/Versions/Current/Commands"
-    // export HOME="/Users/wolfvollprecht"
-    // export PKG_CONFIG_PATH="/Users/wolfvollprecht/micromamba/conda-bld/libsolv_1657984860857/_h_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla/lib/pkgconfig"
-    // export CMAKE_GENERATOR="Unix Makefiles"
-    // export OSX_ARCH="arm64"
-    // export MACOSX_DEPLOYMENT_TARGET="11.0"
-    // export BUILD="arm64-apple-darwin20.0.0"
-    // export target_platform="osx-arm64"
-    // export CONDA_BUILD_SYSROOT="/Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.1.sdk"
-    // export macos_machine="arm64-apple-darwin20.0.0"
-    // export FEATURE_STATIC="0"
-    // export CONDA_BUILD_STATE="BUILD"
-    // export CLICOLOR_FORCE="1"
-    // export AM_COLOR_TESTS="always"
-    // export MAKE_TERMOUT="1"
-    // export CMAKE_COLOR_MAKEFILE="ON"
-    // export CXXFLAGS="-fdiagnostics-color=always"
-    // export CFLAGS="-fdiagnostics-color=always"
-
     let build_env_script_path = directories.work_dir.join("build_env.sh");
     let mut fout = File::create(&build_env_script_path)?;
     for v in vars {
         writeln!(fout, "export {}=\"{}\"", v.0, v.1)?;
+    }
+
+    let platform = match output.build_configuration.target_platform {
+        PlatformOrNoarch::Platform(p) => p,
+        PlatformOrNoarch::Noarch(_) => Platform::NoArch,
+    };
+
+    let additional_os_vars = os_vars(&directories.host_prefix, &platform);
+
+    for (k, v) in additional_os_vars {
+        writeln!(fout, "export {}=\"{}\"", k, v)?;
     }
 
     let host_prefix_activator = Activator::from_path(
