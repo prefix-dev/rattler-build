@@ -114,6 +114,7 @@ fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<P
     }
 }
 
+/// Create a `paths.json` file for the given paths.
 fn create_paths_json(
     paths: &HashSet<PathBuf>,
     path_prefix: &Path,
@@ -189,6 +190,7 @@ fn create_paths_json(
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
 
+/// Create the index.json file for the given output.
 fn create_index_json(output: &Output) -> Result<String> {
     // TODO use global timestamp?
     let now = SystemTime::now();
