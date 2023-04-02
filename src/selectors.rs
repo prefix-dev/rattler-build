@@ -81,6 +81,45 @@ pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorCon
     result.is_true()
 }
 
+/// Flatten a YAML value, returning a new value with selectors evaluated and removed.
+/// This is used in recipes to selectively include or exclude sections of the recipe.
+/// For example, the following YAML:
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - sel(unix): pkg-config
+///   - sel(win): m2-pkg-config
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// requirements:
+///  build:
+///   - pkg-config
+/// ```
+///
+/// Nested lists are supported as well, so teh following YAML:
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - sel(unix):
+///     - pkg-config
+///     - libtool
+///   - sel(win):
+///     - m2-pkg-config
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - pkg-config
+///   - libtool
+/// ```
 pub fn flatten_selectors(
     val: &mut YamlValue,
     selector_config: &SelectorConfig,
@@ -128,6 +167,50 @@ pub fn flatten_selectors(
     }
 
     Some(val.clone())
+}
+
+/// Flatten a YAML top-level mapping, returning a new mapping with all selectors.
+/// This is particularly useful for variant configuration files. For example,
+/// the following YAML:
+///
+/// ```yaml
+/// sel(unix):
+///  compiler: gcc
+///  compiler_version: 7.5.0
+/// sel(win):
+///  compiler: msvc
+///  compiler_version: 14.2
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// compiler: gcc
+/// compiler_version: 7.5.0
+/// ```
+pub fn flatten_toplevel(
+    val: &mut YamlValue,
+    selector_config: &SelectorConfig,
+) -> BTreeMap<String, YamlValue> {
+    let mut new_val = BTreeMap::<String, YamlValue>::new();
+    if val.is_mapping() {
+        for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
+            if let YamlValue::String(key) = k {
+                if key.starts_with("sel(") {
+                    if eval_selector(key, selector_config) {
+                        if let Some(inner_map) = flatten_selectors(v, selector_config) {
+                            for (k, v) in inner_map.as_mapping().unwrap().iter() {
+                                new_val.insert(k.as_str().unwrap().to_string(), v.clone());
+                            }
+                        }
+                    }
+                } else {
+                    new_val.insert(key.clone(), flatten_selectors(v, selector_config).unwrap());
+                }
+            }
+        }
+    }
+    new_val
 }
 
 #[cfg(test)]

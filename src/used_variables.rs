@@ -171,8 +171,8 @@ pub fn find_variants(
     selector_config: &SelectorConfig,
 ) -> Vec<BTreeMap<String, String>> {
     let used_variables = used_vars_from_jinja(recipe);
+
     // now render all selectors with the used variables
-    print!("Used variables: {:?}", used_variables);
     let mut variants = HashMap::new();
 
     for var in &used_variables {
@@ -198,6 +198,7 @@ pub fn find_variants(
             }
         };
     }
+
     let mut combinations = Vec::new();
     find_combinations(&variants, &keys, 0, vec![], &mut combinations);
     combinations

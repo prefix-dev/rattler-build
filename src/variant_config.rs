@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
+use crate::selectors::{flatten_selectors, SelectorConfig};
+
 fn value_to_map(value: serde_yaml::Value) -> BTreeMap<String, Vec<String>> {
     let mut map = BTreeMap::new();
     for (key, value) in value.as_mapping().unwrap() {
@@ -25,13 +27,19 @@ fn value_to_map(value: serde_yaml::Value) -> BTreeMap<String, Vec<String>> {
     map
 }
 
-pub fn load_variant_configs(files: &Vec<PathBuf>) -> BTreeMap<String, Vec<String>> {
+pub fn load_variant_configs(
+    files: &Vec<PathBuf>,
+    selector_config: &SelectorConfig,
+) -> BTreeMap<String, Vec<String>> {
     let mut variant_configs = Vec::new();
+
     for file in files {
         let file = std::fs::File::open(file).unwrap();
         let reader = std::io::BufReader::new(file);
-        let yaml_value = serde_yaml::from_reader(reader).unwrap();
-        variant_configs.push(value_to_map(yaml_value));
+        let mut yaml_value = serde_yaml::from_reader(reader).unwrap();
+        if let Some(yaml_value) = flatten_selectors(&mut yaml_value, selector_config) {
+            variant_configs.push(value_to_map(yaml_value));
+        }
     }
 
     let mut variant_config = BTreeMap::new();
@@ -45,4 +53,31 @@ pub fn load_variant_configs(files: &Vec<PathBuf>) -> BTreeMap<String, Vec<String
     }
 
     variant_config
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::selectors::{flatten_toplevel, SelectorConfig};
+    use rstest::rstest;
+    use serde_yaml::Value as YamlValue;
+
+    #[rstest]
+    #[case("selectors/config_1.yaml")]
+    fn test_flatten_selectors(#[case] filename: &str) {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
+        let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
+
+        let selector_config = SelectorConfig {
+            target_platform: "linux-64".into(),
+            build_platform: "linux-64".into(),
+            variant: vec![("python_version".into(), "3.8.5".into())]
+                .into_iter()
+                .collect(),
+        };
+
+        let res = flatten_toplevel(&mut yaml, &selector_config);
+        // set_snapshot_suffix!("{}", filename.replace('/', "_"));
+        insta::assert_yaml_snapshot!(res);
+    }
 }
