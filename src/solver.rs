@@ -1,5 +1,6 @@
 use crate::global_multi_progress;
 use anyhow::Context;
+use comfy_table::Table;
 use futures::{stream, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use indicatif::{HumanBytes, ProgressBar, ProgressState, ProgressStyle};
 use rattler::{
@@ -24,12 +25,45 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
+fn print_as_table(packages: &Vec<RepoDataRecord>) {
+    let mut table = Table::new();
+    table.load_preset(comfy_table::presets::UTF8_FULL_CONDENSED);
+    table.set_header(vec![
+        "Package", "Version", "Build", "Channel", "Size",
+        // "License",
+    ]);
+
+    for package in packages {
+        let channel_short = if package.channel.contains('/') {
+            package
+                .channel
+                .rsplit('/')
+                .find(|s| !s.is_empty())
+                .unwrap()
+                .to_string()
+        } else {
+            package.channel.to_string()
+        };
+
+        table.add_row(vec![
+            package.package_record.name.clone(),
+            package.package_record.version.to_string(),
+            package.package_record.build.clone(),
+            channel_short,
+            HumanBytes(package.package_record.size.unwrap_or(0)).to_string(),
+            // package.package_record.license.clone().unwrap_or_else(|| "".to_string()),
+        ]);
+    }
+
+    println!("\n{table}");
+}
+
 pub async fn create_environment(
     specs: Vec<MatchSpec>,
     target_platform: &Platform,
     target_prefix: &Path,
     channels: Vec<String>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<RepoDataRecord>> {
     let channel_config = ChannelConfig::default();
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
     // with this because we need to parse the `channel_config` when parsing matchspecs.
@@ -143,9 +177,11 @@ pub async fn create_environment(
     // Construct a transaction to
     let transaction = Transaction::from_current_and_desired(
         installed_packages,
-        required_packages,
+        required_packages.clone(),
         *target_platform,
     )?;
+
+    print_as_table(&required_packages);
 
     if !transaction.operations.is_empty() {
         // Execute the operations that are returned by the solver.
@@ -161,7 +197,7 @@ pub async fn create_environment(
         );
     }
 
-    Ok(())
+    Ok(required_packages)
 }
 
 /// Executes the transaction on the given environment.

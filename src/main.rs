@@ -185,8 +185,6 @@ async fn main() -> anyhow::Result<()> {
             },
         };
 
-        tracing::info!("{:?}", output);
-
         run_build(&output).await?;
     }
 
