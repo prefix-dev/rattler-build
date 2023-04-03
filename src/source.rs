@@ -92,11 +92,15 @@ async fn url_src(
     let mut file = std::fs::File::create(&cache_name)?;
     let mut content = Cursor::new(response.bytes().await?);
     std::io::copy(&mut content, &mut file)?;
+
     Ok(cache_name)
 }
 
-fn git_src(_source: &GitSrc) {}
+fn git_src(_source: &GitSrc) {
+    todo!("Git source support not implemented yet!");
+}
 
+/// Extracts a tar archive to the specified target directory
 fn extract(
     archive: &Path,
     target_directory: &Path,
@@ -112,12 +116,9 @@ fn extract(
 
     output
 }
-
-pub fn apply_patches(
-    patches: &[PathBuf],
-    work_dir: &Path,
-    recipe_dir: &Path,
-) -> anyhow::Result<()> {
+/// Applies all patches in a list of patches to the specified work directory
+/// Currently only supports patching with the `patch` command.
+fn apply_patches(patches: &[PathBuf], work_dir: &Path, recipe_dir: &Path) -> anyhow::Result<()> {
     for patch in patches {
         let patch = recipe_dir.join(patch);
         let output = Command::new("patch")
@@ -138,6 +139,7 @@ pub fn apply_patches(
     Ok(())
 }
 
+/// Fetches all sources in a list of sources and applies specified patches
 pub async fn fetch_sources(
     sources: &[Source],
     work_dir: &Path,
@@ -157,11 +159,34 @@ pub async fn fetch_sources(
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_dir, &src.checksum).await?;
-                extract(&res, work_dir).expect("Could not extract the file!");
+                let dest_dir = if let Some(folder) = &src.folder {
+                    work_dir.join(folder)
+                } else {
+                    work_dir.to_path_buf()
+                };
+                extract(&res, &dest_dir).expect("Could not extract the file!");
                 tracing::info!("Extracted to {:?}", work_dir);
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
                 }
+            }
+            Source::Path(src) => {
+                tracing::info!("Copying source from path: {:?}", src.path);
+                let src_path = recipe_dir.join(&src.path);
+
+                let dest_dir = if let Some(folder) = &src.folder {
+                    work_dir.join(folder)
+                } else {
+                    work_dir.to_path_buf()
+                };
+
+                fs::create_dir_all(dest_dir.parent().unwrap())?;
+                todo!(
+                    "Local sousrces are not yet supported! Should copy from {:?} to {:?}",
+                    src_path,
+                    dest_dir
+                );
+                // copy_dir::copy_dir(src_path, dest_dir)?;
             }
         }
     }

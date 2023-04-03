@@ -1,0 +1,14 @@
+sel(win):
+  cxx_compiler:
+  - vs2019
+  c_compiler:
+  - vs2019
+
+sel(linux):
+  cxx_compiler:
+  - super_gcc
+  c_compiler:
+  - super_g++
+
+sel(unix):
+  unix_level: 1

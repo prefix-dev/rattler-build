@@ -1,0 +1,10 @@
+---
+source: src/variant_config.rs
+expression: res
+---
+c_compiler:
+  - super_g++
+cxx_compiler:
+  - super_gcc
+unix_level: 1
+

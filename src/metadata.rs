@@ -113,26 +113,56 @@ impl Default for GitRev {
     }
 }
 
+/// A git source
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GitSrc {
+    /// Url to the git repository
     pub git_src: Url,
 
+    /// Optionally a revision to checkout, defaults to `HEAD`
     #[serde(default)]
     pub git_rev: GitRev,
 
+    /// Optionally a depth to clone the repository, defaults to `None`
     pub git_depth: Option<u32>,
 
+    /// Optionally patches to apply to the source code
     pub patches: Option<Vec<PathBuf>>,
+
+    /// Optionally a folder name under the `work` directory to place the source code
+    pub folder: Option<PathBuf>,
 }
 
+/// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
+/// will be extracted to the `work` (or `work/<folder>` directory).
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UrlSrc {
+    /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     pub url: Url,
 
+    /// Optionally a checksum to verify the downloaded file
     #[serde(flatten)]
     pub checksum: Checksum,
 
+    /// Patches to apply to the source code
     pub patches: Option<Vec<PathBuf>>,
+
+    /// Optionally a folder name under the `work` directory to place the source code
+    pub folder: Option<PathBuf>,
+}
+
+/// A local path source. The source code will be copied to the `work`
+/// (or `work/<folder>` directory).
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PathSrc {
+    /// Path to the local source code
+    pub path: PathBuf,
+
+    /// Patches to apply to the source code
+    pub patches: Option<Vec<PathBuf>>,
+
+    /// Optionally a folder name under the `work` directory to place the source code
+    pub folder: Option<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -140,6 +170,7 @@ pub struct UrlSrc {
 pub enum Source {
     Git(GitSrc),
     Url(UrlSrc),
+    Path(PathSrc),
 }
 
 #[derive(Debug)]

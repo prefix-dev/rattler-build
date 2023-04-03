@@ -1,57 +1,52 @@
 use std::collections::{BTreeMap, HashMap};
 
-use minijinja::value::Value;
-use minijinja::Environment;
+use minijinja::{value::Value, Environment};
+use rattler_conda_types::Platform;
 use serde_yaml::Value as YamlValue;
+
+use crate::metadata::PlatformOrNoarch;
 
 #[derive(Clone, Debug)]
 pub struct SelectorConfig {
-    pub target_platform: String,
-    pub build_platform: String,
+    pub target_platform: PlatformOrNoarch,
+    pub build_platform: Platform,
     pub variant: BTreeMap<String, String>,
 }
 
 impl SelectorConfig {
-    fn is_unix(&self) -> bool {
-        !self.target_platform.starts_with("win-")
-    }
-
-    fn is_win(&self) -> bool {
-        self.target_platform.starts_with("win-")
-    }
-
-    fn is_osx(&self) -> bool {
-        self.target_platform.starts_with("osx-")
-    }
-
-    fn is_linux(&self) -> bool {
-        self.target_platform.starts_with("linux-")
-    }
     pub fn into_context(self) -> HashMap<String, Value> {
         let mut context = HashMap::<String, Value>::new();
-        context.insert("unix".to_string(), Value::from(self.is_unix()));
-        context.insert("win".to_string(), Value::from(self.is_win()));
-        context.insert("osx".to_string(), Value::from(self.is_osx()));
-        context.insert("linux".to_string(), Value::from(self.is_linux()));
+
+        match self.target_platform {
+            PlatformOrNoarch::Platform(p) => {
+                context.insert(
+                    "target_platform".to_string(),
+                    Value::from_safe_string(p.to_string()),
+                );
+                context.insert("unix".to_string(), Value::from(p.is_unix()));
+                context.insert("win".to_string(), Value::from(p.is_windows()));
+                context.insert("osx".to_string(), Value::from(p.is_osx()));
+                context.insert("linux".to_string(), Value::from(p.is_linux()));
+                let arch = p.to_string().split('-').last().unwrap().to_string();
+                context.insert("arch".to_string(), Value::from_safe_string(arch));
+            }
+            PlatformOrNoarch::Noarch(_) => {
+                context.insert(
+                    "target_platform".to_string(),
+                    Value::from_safe_string("noarch".to_string()),
+                );
+                context.insert("unix".to_string(), Value::from(false));
+                context.insert("win".to_string(), Value::from(false));
+                context.insert("osx".to_string(), Value::from(false));
+                context.insert("linux".to_string(), Value::from(false));
+            }
+        }
 
         context.insert(
-            "arch".to_string(),
-            Value::from_safe_string(
-                self.target_platform
-                    .split('-')
-                    .last()
-                    .unwrap_or("unknown")
-                    .to_string(),
-            ),
-        );
-        context.insert(
-            "target_platform".to_string(),
-            Value::from_safe_string(self.target_platform),
-        );
-        context.insert(
             "build_platform".to_string(),
-            Value::from_safe_string(self.build_platform),
+            Value::from_safe_string(self.build_platform.to_string()),
         );
+
         // for (key, v) in std::env::vars() {
         //     context.insert(key, Value::from_safe_string(v));
         // }
@@ -81,6 +76,45 @@ pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorCon
     result.is_true()
 }
 
+/// Flatten a YAML value, returning a new value with selectors evaluated and removed.
+/// This is used in recipes to selectively include or exclude sections of the recipe.
+/// For example, the following YAML:
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - sel(unix): pkg-config
+///   - sel(win): m2-pkg-config
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// requirements:
+///  build:
+///   - pkg-config
+/// ```
+///
+/// Nested lists are supported as well, so teh following YAML:
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - sel(unix):
+///     - pkg-config
+///     - libtool
+///   - sel(win):
+///     - m2-pkg-config
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// requirements:
+///   build:
+///   - pkg-config
+///   - libtool
+/// ```
 pub fn flatten_selectors(
     val: &mut YamlValue,
     selector_config: &SelectorConfig,
@@ -130,6 +164,50 @@ pub fn flatten_selectors(
     Some(val.clone())
 }
 
+/// Flatten a YAML top-level mapping, returning a new mapping with all selectors.
+/// This is particularly useful for variant configuration files. For example,
+/// the following YAML:
+///
+/// ```yaml
+/// sel(unix):
+///  compiler: gcc
+///  compiler_version: 7.5.0
+/// sel(win):
+///  compiler: msvc
+///  compiler_version: 14.2
+/// ```
+///
+/// will be flattened to (if the selector config is `unix`):
+///
+/// ```yaml
+/// compiler: gcc
+/// compiler_version: 7.5.0
+/// ```
+pub fn flatten_toplevel(
+    val: &mut YamlValue,
+    selector_config: &SelectorConfig,
+) -> BTreeMap<String, YamlValue> {
+    let mut new_val = BTreeMap::<String, YamlValue>::new();
+    if val.is_mapping() {
+        for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
+            if let YamlValue::String(key) = k {
+                if key.starts_with("sel(") {
+                    if eval_selector(key, selector_config) {
+                        if let Some(inner_map) = flatten_selectors(v, selector_config) {
+                            for (k, v) in inner_map.as_mapping().unwrap().iter() {
+                                new_val.insert(k.as_str().unwrap().to_string(), v.clone());
+                            }
+                        }
+                    }
+                } else {
+                    new_val.insert(key.clone(), flatten_selectors(v, selector_config).unwrap());
+                }
+            }
+        }
+    }
+    new_val
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,8 +216,8 @@ mod tests {
     #[test]
     fn test_eval_selector() {
         let selector_config = SelectorConfig {
-            target_platform: "linux-64".into(),
-            build_platform: "linux-64".into(),
+            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
                 .collect(),
@@ -175,8 +253,8 @@ mod tests {
         let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
         let selector_config = SelectorConfig {
-            target_platform: "linux-64".into(),
-            build_platform: "linux-64".into(),
+            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
                 .collect(),
@@ -186,24 +264,4 @@ mod tests {
         set_snapshot_suffix!("{}", filename.replace('/', "_"));
         insta::assert_yaml_snapshot!(res);
     }
-
-    // #[test]
-    // fn test_config_selectors() {
-    //     let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-    //     let yaml_file =
-    //         std::fs::read_to_string(test_data_dir.join("selectors/config_1.yaml")).unwrap();
-
-    //     let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
-    //     let selector_config = SelectorConfig {
-    //         target_platform: "linux-64".into(),
-    //         build_platform: "win-64".into(),
-    //         variant: vec![("python_version".into(), "3.8.5".into())]
-    //             .into_iter()
-    //             .collect(),
-    //     };
-
-    //     let res = flatten_selectors(&mut yaml, &selector_config);
-    //     // set_snapshot_suffix!("{}", filename.replace('/', "_"));
-    //     insta::assert_yaml_snapshot!(res);
-    // }
 }

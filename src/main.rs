@@ -22,12 +22,14 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod linux;
+mod macos;
 mod metadata;
-mod osx;
+mod os_vars;
 mod render;
 mod solver;
 mod source;
 mod unix;
+mod windows;
 use metadata::{BuildOptions, PlatformOrNoarch, Requirements};
 mod index;
 mod packaging;
@@ -118,44 +120,51 @@ async fn main() -> anyhow::Result<()> {
     let recipe_file = fs::canonicalize(args.recipe_file)?;
     let recipe_text = fs::read_to_string(&recipe_file)?;
 
-    // let used_vars = used_variables::used_vars_from_jinja(&recipe_text);
-
-    let variant_config = variant_config::load_variant_configs(&args.variant_config);
-    print!("Variant config: {:#?}", variant_config);
-
-    let mut myrec: YamlValue =
+    let mut recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
-    let target_platform: PlatformOrNoarch =
-        if myrec.get("build").and_then(|v| v.get("noarch")).is_some() {
-            let noarch_type: NoArchType =
-                serde_yaml::from_value(myrec.get("build").unwrap().get("noarch").unwrap().clone())?;
-            PlatformOrNoarch::Noarch(noarch_type)
-        } else if let Some(target_platform) = args.target_platform {
-            PlatformOrNoarch::Platform(Platform::from_str(&target_platform)?)
-        } else {
-            tracing::info!("No target platform specified, using current platform");
-            PlatformOrNoarch::Platform(Platform::current())
-        };
+    let target_platform: PlatformOrNoarch = if recipe_yaml
+        .get("build")
+        .and_then(|v| v.get("noarch"))
+        .is_some()
+    {
+        let noarch_type: NoArchType = serde_yaml::from_value(
+            recipe_yaml
+                .get("build")
+                .unwrap()
+                .get("noarch")
+                .unwrap()
+                .clone(),
+        )?;
+        PlatformOrNoarch::Noarch(noarch_type)
+    } else if let Some(target_platform) = args.target_platform {
+        PlatformOrNoarch::Platform(Platform::from_str(&target_platform)?)
+    } else {
+        tracing::info!("No target platform specified, using current platform");
+        PlatformOrNoarch::Platform(Platform::current())
+    };
 
     let selector_config = SelectorConfig {
-        target_platform: target_platform.to_string(),
-        build_platform: Platform::current().to_string(),
-        variant: BTreeMap::new(), // python_version: "3.10".to_string(),
+        target_platform: target_platform.clone(),
+        build_platform: Platform::current(),
+        variant: BTreeMap::new(),
     };
+
+    let variant_config =
+        variant_config::load_variant_configs(&args.variant_config, &selector_config);
+    print!("Variant config: {:#?}", variant_config);
 
     let variants = find_variants(&recipe_text, &variant_config, &selector_config);
 
-    // tracing::info!("Target platform: {}", target_platform);
-    if let Some(flattened_recipe) = flatten_selectors(&mut myrec, &selector_config) {
-        myrec = flattened_recipe;
+    if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
+        recipe_yaml = flattened_recipe;
     } else {
         tracing::error!("Could not flatten selectors");
     }
 
     if args.render_only {
         for variant in variants {
-            let myrec = render_recipe(&myrec, variant).expect("Could not render the recipe.");
+            let myrec = render_recipe(&recipe_yaml, variant).expect("Could not render the recipe.");
             println!("{}", serde_yaml::to_string(&myrec).unwrap());
         }
         exit(0);
@@ -163,7 +172,7 @@ async fn main() -> anyhow::Result<()> {
 
     for variant in variants {
         let recipe: serde_yaml::Mapping =
-            render_recipe(&myrec, variant).expect("Could not render the recipe.");
+            render_recipe(&recipe_yaml, variant).expect("Could not render the recipe.");
 
         let recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe))
             .expect("Could not parse into rendered recipe");
