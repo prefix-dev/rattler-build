@@ -40,7 +40,7 @@ use build::run_build;
 
 use crate::{
     metadata::{BuildConfiguration, Directories, RenderedRecipe},
-    used_variables::find_variants,
+    variant_config::VariantConfig,
 };
 
 /// Returns a global instance of [`indicatif::MultiProgress`].
@@ -150,11 +150,14 @@ async fn main() -> anyhow::Result<()> {
         variant: BTreeMap::new(),
     };
 
-    let variant_config =
-        variant_config::load_variant_configs(&args.variant_config, &selector_config);
+    let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config);
     print!("Variant config: {:#?}", variant_config);
 
-    let variants = find_variants(&recipe_text, &variant_config, &selector_config);
+    let variants = variant_config
+        .find_variants(&recipe_text, &selector_config)
+        .expect("Could not compute variants");
+
+    println!("Variants: {:#?}", variants);
 
     if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
         recipe_yaml = flattened_recipe;

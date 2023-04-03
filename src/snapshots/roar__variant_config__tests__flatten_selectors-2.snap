@@ -3,14 +3,11 @@ source: src/variant_config.rs
 expression: res
 ---
 c_compiler:
-  - super_g++
+  - vs2019
 cplusplus:
-  - "10"
-  - "1000"
+  - "100"
 cxx_compiler:
-  - super_gcc
+  - vs2019
 python:
-  - "3.7"
-  - "3.8"
-unix_level: 1
+  - "3.10"
 

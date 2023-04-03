@@ -1,0 +1,76 @@
+zip_keys:
+  -
+    - c_compiler_version       
+    - cxx_compiler_version     
+    - fortran_compiler_version 
+    - docker_image
+  -                             
+    - cudnn                     
+    - cuda_compiler_version     
+  -
+    - python
+    - numpy
+    - python_impl
+  -
+    - arrow_cpp
+    - libarrow
+
+pin_run_as_build:
+  # boost is special, see https://github.com/conda-forge/boost-cpp-feedstock/pull/82
+  boost:
+    max_pin: x.x.x
+  boost-cpp:
+    max_pin: x.x.x
+  # TODO: add run_exports to the following feedstocks
+  flann:
+    max_pin: x.x.x
+  graphviz:
+    max_pin: x
+  libsvm:
+    max_pin: x
+  netcdf-cxx4:
+    max_pin: x.x
+  occt:
+    max_pin: x.x
+  poppler:
+    max_pin: x.x
+  r-base:
+    max_pin: x.x
+    min_pin: x.x
+  vlfeat:
+    max_pin: x.x.x
+
+# Pinning packages
+
+# blas
+libblas:
+  - 3.9 *netlib
+libcblas:
+  - 3.9 *netlib
+liblapack:
+  - 3.9 *netlib
+liblapacke:
+  - 3.9 *netlib
+blas_impl:
+  - openblas
+  - mkl          # [x86 or x86_64]
+  - blis         # [x86 or x86_64]
+
+# this output was dropped as of libabseil 20230125
+abseil_cpp:
+  - '20220623.0'
+alsa_lib:
+  - 1.2.8
+arb:
+  - '2.23'
+arpack:
+  - '3.7'
+# keep in sync with libarrow
+arrow_cpp:
+  - 11.0.0
+  - 10.0.1
+  - 9.0.0
+  - 8.0.1
+assimp:
+  - 5.2.5
+aws-sdk-cpp: "4.5"

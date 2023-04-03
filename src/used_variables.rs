@@ -15,9 +15,7 @@ use minijinja::machinery::{
     parse,
 };
 use serde_yaml::Value as YamlValue;
-use std::collections::{BTreeMap, HashMap, HashSet};
-
-use crate::selectors::{flatten_selectors, SelectorConfig};
+use std::collections::HashSet;
 
 /// Extract all variables from a jinja statement
 fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
@@ -33,9 +31,7 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
         Stmt::EmitExpr(expr) => {
             extract_variable_from_expression(&expr.expr, variables);
         }
-        _ => {
-            // println!("Received {:?}", node);
-        }
+        _ => {}
     }
 }
 
@@ -71,9 +67,7 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                 }
             }
         }
-        _ => {
-            // println!("Received {:?}", expr)
-        }
+        _ => {}
     }
 }
 
@@ -100,8 +94,7 @@ fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
 }
 
 /// This finds all variables used in jinja or `sel(...)` expressions
-fn used_vars_from_jinja(recipe: &str) -> HashSet<String> {
-    // regex replace all `sel(...)` with `{{ ... }}` to turn them into jinja expressions
+pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     let mut selectors = HashSet::new();
     let yaml_node = serde_yaml::from_str(recipe).unwrap();
     find_all_selectors(&yaml_node, &mut selectors);
@@ -123,7 +116,7 @@ fn used_vars_from_jinja(recipe: &str) -> HashSet<String> {
     variables
 }
 
-fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
+pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
     // we do this in simple mode for now, but could later also do intersections
     // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
     // says >=3.7 and then we only do 3.7-3.10)
@@ -142,67 +135,4 @@ fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
     }
 
     dependencies
-}
-
-fn find_combinations(
-    map: &HashMap<String, Vec<String>>,
-    keys: &[String],
-    index: usize,
-    current: Vec<(String, String)>,
-    result: &mut Vec<BTreeMap<String, String>>,
-) {
-    if index == keys.len() {
-        result.push(current.into_iter().collect());
-        return;
-    }
-
-    let key = &keys[index];
-    let values = map.get(key).unwrap();
-
-    for value in values {
-        let mut next = current.clone();
-        next.push((key.clone(), value.clone()));
-        find_combinations(map, keys, index + 1, next, result);
-    }
-}
-
-/// This finds all used variables in any dependency declarations, build, host, and run sections.
-/// As well as any used variables from Jinja functions to calculate the variants of this recipe.
-pub fn find_variants(
-    recipe: &str,
-    config: &BTreeMap<String, Vec<String>>,
-    selector_config: &SelectorConfig,
-) -> Vec<BTreeMap<String, String>> {
-    let used_variables = used_vars_from_jinja(recipe);
-
-    // now render all selectors with the used variables
-    let mut variants = HashMap::new();
-
-    for var in &used_variables {
-        if let Some(value) = config.get(var) {
-            variants.insert(var.clone(), value.clone());
-        }
-    }
-
-    let mut combinations = Vec::new();
-    let keys: Vec<String> = variants.keys().cloned().collect();
-    find_combinations(&variants, &keys, 0, vec![], &mut combinations);
-
-    let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
-    for _variant in combinations {
-        let mut val = recipe_parsed.clone();
-        if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {
-            // extract all dependencies from the flattened recipe
-            let dependencies = extract_dependencies(&flattened_recipe);
-            for dependency in dependencies {
-                if let Some(value) = config.get(&dependency) {
-                    variants.insert(dependency, value.clone());
-                }
-            }
-        };
-    }
-
-    let mut combinations = Vec::new();
-    find_combinations(&variants, &keys, 0, vec![], &mut combinations);
-    combinations
 }
