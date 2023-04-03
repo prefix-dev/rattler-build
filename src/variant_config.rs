@@ -158,7 +158,17 @@ mod tests {
         };
 
         let res = flatten_toplevel(&mut yaml, &selector_config);
-        // set_snapshot_suffix!("{}", filename.replace('/', "_"));
+        insta::assert_yaml_snapshot!(res);
+
+        let selector_config = SelectorConfig {
+            target_platform: PlatformOrNoarch::Platform(Platform::Win64),
+            build_platform: Platform::Win64,
+            variant: vec![("python_version".into(), "3.8.5".into())]
+                .into_iter()
+                .collect(),
+        };
+
+        let res = flatten_toplevel(&mut yaml, &selector_config);
         insta::assert_yaml_snapshot!(res);
     }
 }
