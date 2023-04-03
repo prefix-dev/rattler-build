@@ -36,6 +36,7 @@ mod packaging;
 mod selectors;
 mod used_variables;
 mod variant_config;
+mod dependencies;
 use build::run_build;
 
 use crate::{
