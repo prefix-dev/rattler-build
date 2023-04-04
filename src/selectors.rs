@@ -140,25 +140,32 @@ pub fn flatten_selectors(
     }
 
     if val.is_sequence() {
-        let new_val = val
+        let new_val: Vec<YamlValue> = val
             .as_sequence_mut()
             .unwrap()
             .iter_mut()
-            .filter_map(|el| flatten_selectors(el, selector_config));
+            .filter_map(|el| flatten_selectors(el, selector_config))
+            .collect();
 
-        // flatten down list of lists
-        let new_val = new_val
-            .into_iter()
-            .flat_map(|el| {
-                if el.is_sequence() {
-                    el.as_sequence().unwrap().clone()
-                } else {
-                    vec![el]
-                }
-            })
-            .collect::<Vec<_>>();
+        // This does not yet work for lists of list with selectors (it flattens them)
+        // This is relevant for zip_keys, which is a list of lists of strings.
+        if new_val.iter().ne(val.as_sequence().unwrap().iter()) {
+            // flatten down list of lists
+            let new_val = new_val
+                .into_iter()
+                .flat_map(|el| {
+                    if el.is_sequence() {
+                        el.as_sequence().unwrap().clone()
+                    } else {
+                        vec![el]
+                    }
+                })
+                .collect::<Vec<_>>();
 
-        return Some(serde_yaml::to_value(&new_val).unwrap());
+            return Some(serde_yaml::to_value(new_val).unwrap());
+        }
+
+        return Some(val.clone());
     }
 
     Some(val.clone())

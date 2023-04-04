@@ -12,3 +12,13 @@ sel(linux):
 
 sel(unix):
   unix_level: 1
+
+python:
+  - sel(unix): "3.7"
+  - sel(unix): "3.8"
+  - sel(win): "3.10"
+
+cplusplus:
+  - sel(unix): "10"
+  - sel(win): "100"
+  - sel(unix): "1000"

@@ -3256,6 +3256,7 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "tempdir",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",
