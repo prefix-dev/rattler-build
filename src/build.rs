@@ -141,7 +141,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
     };
 
     let host_activation = host_prefix_activator
-        .activation_script(activation_vars)
+        .activation(activation_vars)
         .expect("Could not activate host prefix");
 
     let build_prefix_activator = Activator::from_path(
@@ -150,18 +150,19 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
         output.build_configuration.build_platform,
     )?;
 
-    // A small $PATH hack to get stacking to work ... we should do better!
+    // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
+    // prefix on top of the host prefix
     let activation_vars = ActivationVariables {
         conda_prefix: None,
-        path: Some(vec!["$PATH".into()]),
+        path: Some(host_activation.path.clone()),
     };
 
     let build_activation = build_prefix_activator
-        .activation_script(activation_vars)
+        .activation(activation_vars)
         .expect("Could not activate host prefix");
 
-    writeln!(fout, "{}", host_activation)?;
-    writeln!(fout, "{}", build_activation)?;
+    writeln!(fout, "{}", host_activation.script)?;
+    writeln!(fout, "{}", build_activation.script)?;
 
     Ok(build_env_script_path)
 }
