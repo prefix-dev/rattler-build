@@ -1,8 +1,0 @@
----
-source: src/render.rs
-expression: context
----
-name: foo
-version: "1.0"
-version_name: foo-1.0
-

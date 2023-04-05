@@ -42,6 +42,7 @@ pub struct RunExports {
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BuildOptions {
+    #[serde(default)]
     pub number: u64,
     pub string: Option<String>,
     pub script: Option<String>,
@@ -269,8 +270,9 @@ pub struct Package {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RenderedRecipe {
     pub package: Package,
-    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
-    pub source: Vec<Source>,
+    #[serde_as(deserialize_as = "Option<OneOrMany<_, PreferOne>>")]
+    pub source: Option<Vec<Source>>,
+    #[serde(default)]
     pub build: BuildOptions,
     pub requirements: Requirements,
     pub about: About,

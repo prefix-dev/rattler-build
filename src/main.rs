@@ -6,7 +6,6 @@ use clap::{arg, Parser};
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use once_cell::sync::Lazy;
 use rattler_conda_types::{NoArchType, Platform};
-use render::render_recipe;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
@@ -40,6 +39,7 @@ use build::run_build;
 
 use crate::{
     metadata::{BuildConfiguration, Directories, RenderedRecipe},
+    render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
 

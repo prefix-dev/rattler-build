@@ -258,13 +258,9 @@ pub async fn setup_environments(output: &Output, directories: &Directories) -> a
 pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     let directories = &output.build_configuration.directories;
 
-    fetch_sources(
-        &output.recipe.source,
-        &directories.source_dir,
-        &directories.recipe_dir,
-    )
-    .await?;
-
+    if let Some(source) = &output.recipe.source {
+        fetch_sources(source, &directories.source_dir, &directories.recipe_dir).await?;
+    }
     setup_environments(output, directories).await?;
 
     let build_script = get_conda_build_script(output, directories);
