@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.159", features = ["derive"] }
-serde_yaml = "0.9.19"
+serde_yaml = "0.9.20"
 rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
