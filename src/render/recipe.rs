@@ -203,7 +203,7 @@ mod tests {
                   sha256: "1234567890"
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe, BTreeMap::new()).unwrap();
+        let recipe = render_recipe(&recipe, &BTreeMap::new()).unwrap();
         insta::assert_yaml_snapshot!(recipe);
     }
 }

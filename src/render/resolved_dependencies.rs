@@ -205,7 +205,6 @@ fn collect_run_exports_from_env(
 /// 4. Download the packages
 /// 5. Extract the run exports from the downloaded packages (for the next environent)
 #[allow(clippy::for_kv_map)]
-///
 pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependencies, ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
@@ -349,7 +348,6 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         }
     }
 
-    // TODO return proper stuff for each environment
     Ok(FinalizedDependencies {
         build: build_env,
         host: host_env,
