@@ -14,19 +14,22 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 use url::Url;
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+use crate::render::dependency_list::DependencyList;
+use crate::render::resolved_dependencies::FinalizedDependencies;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Requirements {
     #[serde(default)]
-    pub build: Vec<String>,
+    pub build: DependencyList,
     #[serde(default)]
-    pub host: Vec<String>,
+    pub host: DependencyList,
     #[serde(default)]
-    pub run: Vec<String>,
+    pub run: DependencyList,
     #[serde(default)]
-    pub constrains: Vec<String>,
+    pub constrains: DependencyList,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct RunExports {
     #[serde(default)]
     pub strong: Vec<String>,
@@ -40,7 +43,7 @@ pub struct RunExports {
     pub noarch: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BuildOptions {
     #[serde(default)]
     pub number: u64,
@@ -55,7 +58,7 @@ pub struct BuildOptions {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct About {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub home: Option<Vec<Url>>,
@@ -98,14 +101,14 @@ impl Default for Metadata {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Checksum {
     Sha256(String),
     Md5(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
 
 impl Default for GitRev {
@@ -115,7 +118,7 @@ impl Default for GitRev {
 }
 
 /// A git source
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitSrc {
     /// Url to the git repository
     pub git_src: Url,
@@ -136,7 +139,7 @@ pub struct GitSrc {
 
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UrlSrc {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     pub url: Url,
@@ -154,7 +157,7 @@ pub struct UrlSrc {
 
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PathSrc {
     /// Path to the local source code
     pub path: PathBuf,
@@ -166,7 +169,7 @@ pub struct PathSrc {
     pub folder: Option<PathBuf>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Source {
     Git(GitSrc),
@@ -174,7 +177,7 @@ pub enum Source {
     Path(PathSrc),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Directories {
     pub recipe_dir: PathBuf,
     pub host_prefix: PathBuf,
@@ -240,15 +243,16 @@ impl ToString for PlatformOrNoarch {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct BuildConfiguration {
     pub target_platform: PlatformOrNoarch,
     pub host_platform: Platform,
     pub build_platform: Platform,
-    pub used_vars: Vec<String>,
+    pub variant: BTreeMap<String, String>,
     pub hash: String,
     pub no_clean: bool,
     pub directories: Directories,
+    pub channels: Vec<String>,
 }
 
 impl BuildConfiguration {
@@ -260,14 +264,14 @@ impl BuildConfiguration {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Package {
     pub name: String,
     pub version: String,
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenderedRecipe {
     pub package: Package,
     #[serde_as(deserialize_as = "Option<OneOrMany<_, PreferOne>>")]
@@ -278,10 +282,11 @@ pub struct RenderedRecipe {
     pub about: About,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Output {
     pub recipe: RenderedRecipe,
     pub build_configuration: BuildConfiguration,
+    pub finalized_dependencies: Option<FinalizedDependencies>,
 }
 
 impl Output {

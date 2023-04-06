@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 
 use serde::Deserialize;
@@ -6,6 +7,7 @@ use serde_with::formats::PreferOne;
 use serde_with::serde_as;
 use serde_with::OneOrMany;
 use serde_yaml::Value as YamlValue;
+use thiserror::Error;
 
 use crate::selectors::{flatten_selectors, SelectorConfig};
 use crate::used_variables::extract_dependencies;
@@ -265,9 +267,6 @@ impl VariantConfig {
         self.combinations(&used_variables)
     }
 }
-
-use std::collections::{HashMap, HashSet};
-use thiserror::Error;
 
 #[derive(Debug, Clone)]
 enum VariantKey {

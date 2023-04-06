@@ -139,7 +139,7 @@ fn render_dependencies(
 
 pub fn render_recipe(
     recipe: &YamlValue,
-    variant: BTreeMap<String, String>,
+    variant: &BTreeMap<String, String>,
 ) -> anyhow::Result<serde_yaml::Mapping> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
@@ -159,7 +159,7 @@ pub fn render_recipe(
 
         // add in the variant
         for (key, value) in variant {
-            context.insert(key, Value::from_safe_string(value));
+            context.insert(key.clone(), Value::from_safe_string(value.clone()));
         }
 
         render_recipe_recursively(&mut recipe_modified, &env, &context);

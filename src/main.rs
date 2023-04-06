@@ -25,11 +25,10 @@ mod macos;
 mod metadata;
 mod os_vars;
 mod render;
-mod solver;
 mod source;
 mod unix;
 mod windows;
-use metadata::{BuildOptions, PlatformOrNoarch, Requirements};
+use metadata::PlatformOrNoarch;
 mod index;
 mod packaging;
 mod selectors;
@@ -62,16 +61,6 @@ struct RawRecipe {
     context: BTreeMap<String, serde_yaml::Value>,
     #[serde(flatten)]
     recipe: BTreeMap<String, serde_yaml::Value>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Output {
-    name: String,
-    version: String,
-    #[serde(default)]
-    build: BuildOptions,
-    #[serde(default)]
-    requirements: Requirements,
 }
 
 #[derive(Parser)]
@@ -167,15 +156,16 @@ async fn main() -> anyhow::Result<()> {
 
     if args.render_only {
         for variant in variants {
-            let myrec = render_recipe(&recipe_yaml, variant).expect("Could not render the recipe.");
-            println!("{}", serde_yaml::to_string(&myrec).unwrap());
+            let rendered_recipe =
+                render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
+            println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
         }
         exit(0);
     }
 
     for variant in variants {
         let recipe: serde_yaml::Mapping =
-            render_recipe(&recipe_yaml, variant).expect("Could not render the recipe.");
+            render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
 
         let recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe))
             .expect("Could not parse into rendered recipe");
@@ -191,10 +181,12 @@ async fn main() -> anyhow::Result<()> {
                 },
                 build_platform: Platform::current(),
                 hash: String::from("h1234_0"),
-                used_vars: vec![],
+                variant: variant.clone(),
                 no_clean: true,
                 directories: Directories::create(&name, &recipe_file)?,
+                channels: vec!["conda-forge".to_string()],
             },
+            finalized_dependencies: None,
         };
 
         run_build(&output).await?;

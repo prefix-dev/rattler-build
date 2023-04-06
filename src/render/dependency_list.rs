@@ -62,7 +62,6 @@ impl<'de> Deserialize<'de> for Dependency {
 
                     let get_value = |s: &str| {
                         let p = s.split('=').nth(1);
-                        println!("p: {:?}", p);
                         if let Some(p) = p {
                             if p.is_empty() {
                                 return Ok(None);
@@ -114,7 +113,7 @@ where
     T::from_str(&s).map_err(de::Error::custom)
 }
 
-type DependencyList = Vec<Dependency>;
+pub type DependencyList = Vec<Dependency>;
 
 #[cfg(test)]
 mod tests {

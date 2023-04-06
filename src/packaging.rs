@@ -220,8 +220,24 @@ fn create_index_json(output: &Output) -> Result<String> {
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
         timestamp: Some(since_the_epoch),
-        depends: recipe.requirements.run.clone(),
-        constrains: recipe.requirements.constrains.clone(),
+        depends: output
+            .finalized_dependencies
+            .clone()
+            .unwrap()
+            .run
+            .depends
+            .iter()
+            .map(|d| d.to_string())
+            .collect(),
+        constrains: output
+            .finalized_dependencies
+            .clone()
+            .unwrap()
+            .run
+            .constrains
+            .iter()
+            .map(|d| d.to_string())
+            .collect(),
         noarch: recipe.build.noarch,
         track_features: vec![],
         features: None,
@@ -240,8 +256,9 @@ fn create_about_json(output: &Output) -> Result<String> {
         description: recipe.about.description.clone(),
         doc_url: recipe.about.doc_url.clone().unwrap_or_default(),
         dev_url: recipe.about.dev_url.clone().unwrap_or_default(),
+        // TODO ?
         source_url: None,
-        channels: vec![], // TODO
+        channels: output.build_configuration.channels.clone(),
     };
 
     Ok(serde_json::to_string_pretty(&about_json)?)
@@ -414,6 +431,10 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
 ) -> Result<()> {
+    if output.finalized_dependencies.is_none() {
+        return Err(anyhow::anyhow!("Dependencies have not been finalized yet!"));
+    }
+
     let tmp_dir = TempDir::new(output.name())?;
     let tmp_dir_path = tmp_dir.path();
 
@@ -477,6 +498,7 @@ pub fn package_conda(
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
     tracing::info!("Creating target folder {:?}", output_folder);
+
     // make dirs
     fs::create_dir_all(&output_folder)?;
 

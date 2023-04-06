@@ -3,22 +3,19 @@ use std::fs::File;
 use std::io::Write;
 
 use std::fs;
-use std::path::Path;
 use std::process::{Command, Stdio};
-use std::str::FromStr;
 use std::{io::Read, path::PathBuf};
 
-use rattler::package_cache::CacheKey;
-use rattler_conda_types::package::{PackageFile, RunExportsJson};
-use rattler_conda_types::{MatchSpec, Platform, RepoDataRecord};
+use rattler_conda_types::Platform;
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 
-use crate::metadata::{Directories, Output, PlatformOrNoarch, RunExports};
+use crate::index;
+use crate::metadata::{Directories, Output, PlatformOrNoarch};
 use crate::os_vars::os_vars;
 use crate::packaging::{package_conda, record_files};
+use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
-use crate::{index, solver};
 
 macro_rules! s {
     ($x:expr) => {
@@ -28,7 +25,7 @@ macro_rules! s {
 
 pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
     let recipe = &output.recipe;
-
+    // TODO revisit this and factor out
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
@@ -36,7 +33,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
             s!("CONDA_DEFAULT_ENV"),
             s!(directories.host_prefix.to_string_lossy()),
         ),
-        (s!("ARCH"), s!("arm64")),
+        // (s!("ARCH"), s!("arm64")),
         (s!("PREFIX"), s!(directories.host_prefix.to_string_lossy())),
         (
             s!("BUILD_PREFIX"),
@@ -214,90 +211,23 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
-pub async fn setup_environments(output: &Output, directories: &Directories) -> anyhow::Result<()> {
-    let recipe = &output.recipe;
-    tracing::info!("Setting up environments...");
-
-    let cache_dir = rattler::default_cache_dir()?;
-    let cache_dir = cache_dir.join("pkgs");
-
-    if !recipe.requirements.build.is_empty() {
-        println!("Specs: {:?}", recipe.requirements.build);
-        let specs = recipe
-            .requirements
-            .build
-            .iter()
-            .map(|s| MatchSpec::from_str(s))
-            .collect::<Result<Vec<MatchSpec>, _>>()?;
-
-        let env = solver::create_environment(
-            specs,
-            &output.build_configuration.build_platform,
-            &directories.build_prefix,
-            vec!["conda-forge".to_string()],
-        )
-        .await?;
-
-        let run_exports = collect_run_exports_from_env(&env, &cache_dir)?;
-        println!("Run exports: {:?}", run_exports);
-    } else {
-        fs::create_dir_all(&directories.build_prefix)?;
-    }
-
-    if !recipe.requirements.host.is_empty() {
-        println!("Specs: {:?}", recipe.requirements.host);
-
-        let specs = recipe
-            .requirements
-            .host
-            .iter()
-            .map(|s| MatchSpec::from_str(s))
-            .collect::<Result<Vec<MatchSpec>, _>>()?;
-
-        solver::create_environment(
-            specs,
-            &output.build_configuration.host_platform,
-            &directories.host_prefix,
-            vec!["conda-forge".to_string()],
-        )
-        .await?;
-    } else {
-        fs::create_dir_all(&directories.host_prefix)?;
-    }
-
-    Ok(())
-}
-
-fn collect_run_exports_from_env(
-    env: &[RepoDataRecord],
-    cache_dir: &Path,
-) -> Result<RunExports, std::io::Error> {
-    let mut run_exports = RunExports::default();
-    for pkg in env {
-        let cache_key: CacheKey = Into::into(&pkg.package_record);
-        let pkc = cache_dir.join(cache_key.to_string());
-        let rex = RunExportsJson::from_package_directory(pkc).ok();
-
-        if let Some(rex) = rex {
-            run_exports.strong.extend(rex.strong);
-            run_exports.weak.extend(rex.weak);
-            run_exports.weak_constrains.extend(rex.weak_constrains);
-            run_exports.strong_constrains.extend(rex.strong_constrains);
-            run_exports.noarch.extend(rex.noarch);
-        }
-    }
-    Ok(run_exports)
-}
-
 pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     let directories = &output.build_configuration.directories;
 
     if let Some(source) = &output.recipe.source {
         fetch_sources(source, &directories.source_dir, &directories.recipe_dir).await?;
     }
-    setup_environments(output, directories).await?;
-    tracing::info!("Build environment setup");
-    let build_script = get_conda_build_script(output, directories);
+
+    let finalized_dependencies = resolve_dependencies(output).await?;
+
+    // The output with the resolved dependencies
+    let output = Output {
+        finalized_dependencies: Some(finalized_dependencies),
+        recipe: output.recipe.clone(),
+        build_configuration: output.build_configuration.clone(),
+    };
+
+    let build_script = get_conda_build_script(&output, directories);
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script.unwrap());
 
@@ -318,7 +248,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
         .collect::<HashSet<_>>();
 
     package_conda(
-        output,
+        &output,
         &difference,
         &directories.host_prefix,
         &directories.local_channel,
