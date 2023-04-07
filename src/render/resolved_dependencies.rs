@@ -56,8 +56,6 @@ pub enum ResolveError {
     DependencyResolutionError(#[from] anyhow::Error),
 }
 
-
-
 pub fn apply_variant(
     raw_specs: &DependencyList,
     variant: &BTreeMap<String, String>,
