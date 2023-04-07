@@ -1,4 +1,7 @@
-use std::str::FromStr;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 use rattler_conda_types::{MatchSpec, Version};
 use serde::{de, Deserialize, Deserializer, Serialize};
@@ -27,6 +30,12 @@ impl FromStr for PinExpression {
             ));
         }
         Ok(PinExpression(s.to_string()))
+    }
+}
+
+impl Display for PinExpression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -98,6 +107,54 @@ impl Pin {
         }
 
         Ok(MatchSpec::from_str(&spec)?)
+    }
+
+    pub(crate) fn internal_repr(&self) -> String {
+        let max_pin_str = if let Some(max_pin) = &self.max_pin {
+            format!("{}", max_pin)
+        } else {
+            "".to_string()
+        };
+
+        let min_pin_str = if let Some(min_pin) = &self.min_pin {
+            format!("{}", min_pin)
+        } else {
+            "".to_string()
+        };
+
+        format!(
+            "{} MAX_PIN={} MIN_PIN={} EXACT={}",
+            self.name, max_pin_str, min_pin_str, self.exact
+        )
+    }
+
+    pub(crate) fn from_internal_repr(s: &str) -> Self {
+        let parts = s.split(' ').collect::<Vec<_>>();
+        let name = parts[0].to_string();
+        let max_pin = parts[1];
+        let min_pin = parts[2];
+        let exact = parts[3];
+
+        let max_pin = if max_pin == "MAX_PIN=" {
+            None
+        } else {
+            Some(PinExpression::from_str(&max_pin[8..]).expect("Could not parse max pin"))
+        };
+
+        let min_pin = if min_pin == "MIN_PIN=" {
+            None
+        } else {
+            Some(PinExpression::from_str(&min_pin[8..]).expect("Could not parse min pin"))
+        };
+
+        let exact = exact == "EXACT=true";
+
+        Pin {
+            name,
+            max_pin,
+            min_pin,
+            exact,
+        }
     }
 }
 

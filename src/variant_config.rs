@@ -263,7 +263,6 @@ impl VariantConfig {
                 }
             };
         }
-
         self.combinations(&used_variables)
     }
 }

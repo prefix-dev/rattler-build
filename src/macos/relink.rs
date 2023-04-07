@@ -6,6 +6,30 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+#[derive(thiserror::Error, Debug)]
+pub enum RelinkError {
+    #[error("failed to run install_name_tool")]
+    InstallNameToolFailed,
+
+    #[error("failed to read or write MachO file: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("failed to strip prefix from path: {0}")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
+
+    #[error("failed to parse MachO file: {0}")]
+    ParseMachOError(#[from] goblin::error::Error),
+
+    #[error("filetype not handled")]
+    FileTypeNotHandled,
+
+    #[error("could not read string from MachO file: {0}")]
+    ReadStringError(#[from] scroll::Error),
+
+    #[error("failed to get relative path from {from} to {to}")]
+    PathDiffError { from: PathBuf, to: PathBuf },
+}
+
 #[derive(Debug, Default)]
 struct DylibChanges {
     // rpaths to delete
@@ -28,10 +52,7 @@ fn exchange_dylib_rpath(dylib: &Path, prefix: &Path) -> Option<PathBuf> {
     None
 }
 
-fn install_name_tool(
-    dylib_path: &Path,
-    changes: &DylibChanges,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
     tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
 
     let mut cmd = std::process::Command::new("install_name_tool");
@@ -61,7 +82,7 @@ fn install_name_tool(
             "install_name_tool failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        return Err("install_name_tool failed".into());
+        return Err(RelinkError::InstallNameToolFailed);
     }
 
     Ok(())
@@ -93,7 +114,7 @@ fn modify_dylib(
     dylib_path: &Path,
     prefix: &Path,
     encoded_prefix: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelinkError> {
     let data = fs::read(dylib_path)?;
     let mut changes = DylibChanges::default();
 
@@ -107,10 +128,7 @@ fn modify_dylib(
                     | CommandVariant::LoadWeakDylib(dylib_cmd)
                     | CommandVariant::ReexportDylib(dylib_cmd) => {
                         let libname_offset = command.offset + dylib_cmd.dylib.name as usize;
-                        let libname = data
-                            .pread::<&str>(libname_offset)
-                            .expect("Could not get libname")
-                            .to_string();
+                        let libname = data.pread::<&str>(libname_offset)?.to_string();
 
                         let libname = PathBuf::from(&libname);
 
@@ -135,17 +153,22 @@ fn modify_dylib(
                         path,
                     }) => {
                         let rpath_offset = command.offset + path as usize;
-                        let rpath = PathBuf::from(
-                            data.pread::<&str>(rpath_offset)
-                                .expect("Could not read rpath"),
-                        );
+                        let rpath = PathBuf::from(data.pread::<&str>(rpath_offset)?);
 
                         if rpath.is_absolute() {
-                            let orig_path = encoded_prefix
-                                .join(dylib_path.strip_prefix(prefix).unwrap().parent().unwrap());
+                            let orig_path = encoded_prefix.join(
+                                dylib_path
+                                    .strip_prefix(prefix)?
+                                    .parent()
+                                    .expect("Could not get parent"),
+                            );
 
-                            let relpath = pathdiff::diff_paths(&rpath, &orig_path)
-                                .expect("Could not get relative path");
+                            let relpath = pathdiff::diff_paths(&rpath, &orig_path).ok_or(
+                                RelinkError::PathDiffError {
+                                    from: orig_path.clone(),
+                                    to: rpath.clone(),
+                                },
+                            )?;
 
                             let new_rpath = PathBuf::from(format!(
                                 "@loader_path/{}",
@@ -167,7 +190,7 @@ fn modify_dylib(
         }
         _ => {
             tracing::error!("Not a valid Mach-O binary.");
-            return Err("Not a valid Mach-O binary".into());
+            return Err(RelinkError::FileTypeNotHandled);
         }
     }
 
@@ -178,7 +201,7 @@ pub fn relink_paths(
     paths: &HashSet<PathBuf>,
     prefix: &Path,
     encoded_prefix: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelinkError> {
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
             tracing::trace!("relink: skipping symlink {}", p.display());
@@ -206,7 +229,7 @@ pub fn relink_paths(
             tracing::trace!("relink: relinking {}", p.display());
         }
 
-        let (_magic, _ctx) = ctx_res.unwrap();
+        let (_magic, _ctx) = ctx_res?;
 
         match modify_dylib(p, prefix, encoded_prefix) {
             Ok(_) => {}

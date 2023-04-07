@@ -4,7 +4,7 @@ expression: spec
 ---
 - pin_subpackage:
     name: name
-    max_pin: x.x.x
-    min_pin: ~
+    max_pin: ~
+    min_pin: x.x.x
     exact: false
 

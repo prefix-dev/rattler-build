@@ -1,7 +1,5 @@
 use std::{fmt, str::FromStr};
 
-use crate::render::pin::PinExpression;
-
 use super::pin::Pin;
 use rattler_conda_types::MatchSpec;
 use serde::{
@@ -52,43 +50,9 @@ impl<'de> Deserialize<'de> for Dependency {
                     Ok(Dependency::Compiler(Compiler {
                         compiler: compiler.to_lowercase(),
                     }))
-                } else if let Some(pin_subpackage) = value.strip_prefix("__PIN_SUBPACKAGE ") {
-                    let elements = pin_subpackage.split(' ').collect::<Vec<_>>();
-                    if elements.len() != 4 {
-                        return Err(de::Error::custom(
-                            "Wrong internal format for __PIN_SUBPACKAGE",
-                        ));
-                    }
-
-                    let get_value = |s: &str| {
-                        let p = s.split('=').nth(1);
-                        if let Some(p) = p {
-                            if p.is_empty() {
-                                return Ok(None);
-                            }
-                            PinExpression::from_str(p)
-                                .map_err(de::Error::custom)
-                                .map(Some)
-                        } else {
-                            Ok(None)
-                        }
-                    };
-                    let min_pin = get_value(elements[1])?;
-                    let max_pin = get_value(elements[2])?;
-                    let exact = elements[3]
-                        .split('=')
-                        .nth(1)
-                        .map(|s| s == "true")
-                        .unwrap_or(false);
-                    let pin = Pin {
-                        name: elements[0].to_string(),
-                        min_pin,
-                        max_pin,
-                        exact,
-                    };
-
+                } else if let Some(pin) = value.strip_prefix("__PIN_SUBPACKAGE ") {
                     Ok(Dependency::PinSubpackage(PinSubpackage {
-                        pin_subpackage: pin,
+                        pin_subpackage: Pin::from_internal_repr(pin),
                     }))
                 } else {
                     // Assuming MatchSpec can be constructed from a string.
@@ -162,5 +126,23 @@ mod tests {
         let pin = "- __PIN_SUBPACKAGE name MAX_PIN= MIN_PIN=x.x.x EXACT=False";
         let spec: DependencyList = serde_yaml::from_str(pin).unwrap();
         insta::assert_yaml_snapshot!(spec);
+
+        let pin = "- __PIN_SUBPACKAGE super-package MAX_PIN=x.x MIN_PIN=x.x.x EXACT=true";
+        let spec: DependencyList = serde_yaml::from_str(pin).unwrap();
+        let p = &spec[0];
+        let p = match p {
+            Dependency::PinSubpackage(p) => p,
+            _ => panic!("Expected PinSubpackage"),
+        };
+        assert_eq!(p.pin_subpackage.name, "super-package");
+        assert_eq!(
+            p.pin_subpackage.max_pin.as_ref().unwrap().to_string(),
+            "x.x"
+        );
+        assert_eq!(
+            p.pin_subpackage.min_pin.as_ref().unwrap().to_string(),
+            "x.x.x"
+        );
+        assert_eq!(p.pin_subpackage.exact, true);
     }
 }

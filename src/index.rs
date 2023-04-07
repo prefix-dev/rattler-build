@@ -54,13 +54,46 @@ fn package_record_from_index_json<T: Read>(
     Ok(package_record)
 }
 
+fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
+    let reader = std::fs::File::open(file).unwrap();
+    let mut archive = read::stream_tar_bz2(reader);
+
+    for entry in archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path = entry.path().unwrap();
+        let path = path.to_str().unwrap();
+        if path == "info/index.json" {
+            return package_record_from_index_json(file, &mut entry);
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "No index.json found",
+    ))
+}
+
+fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Error> {
+    let reader = std::fs::File::open(file).unwrap();
+    let mut archive = seek::stream_conda_info(reader).expect("Could not open conda file");
+
+    for entry in archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path = entry.path().unwrap();
+        let path = path.to_str().unwrap();
+        if path == "info/index.json" {
+            return package_record_from_index_json(file, &mut entry);
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::Other,
+        "No index.json found",
+    ))
+}
+
+/// Create a new `repodata.json` for all packages in the given output folder. If `target_platform` is
+/// `Some`, only that specific subdir is indexed. Otherwise indexes all subdirs and creates a
+/// `repodata.json` for each.
 pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -> Result<()> {
-    // find all subdirectories with conda packages
-
-    // for entry in WalkDir::new(output_folder) {
-    //     println!("{}", entry?.path().display());
-    // }
-
     let entries = WalkDir::new(output_folder).into_iter();
     let entries: Vec<(PathBuf, ArchiveType)> = entries
         .filter_entry(|e| e.depth() <= 2)
@@ -134,42 +167,6 @@ pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -
     }
 
     Ok(())
-}
-
-fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    let reader = std::fs::File::open(file).unwrap();
-    let mut archive = read::stream_tar_bz2(reader);
-
-    for entry in archive.entries().unwrap() {
-        let mut entry = entry.unwrap();
-        let path = entry.path().unwrap();
-        let path = path.to_str().unwrap();
-        if path == "info/index.json" {
-            return package_record_from_index_json(file, &mut entry);
-        }
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "No index.json found",
-    ))
-}
-
-fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    let reader = std::fs::File::open(file).unwrap();
-    let mut archive = seek::stream_conda_info(reader).expect("Could not open conda file");
-
-    for entry in archive.entries().unwrap() {
-        let mut entry = entry.unwrap();
-        let path = entry.path().unwrap();
-        let path = path.to_str().unwrap();
-        if path == "info/index.json" {
-            return package_record_from_index_json(file, &mut entry);
-        }
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Other,
-        "No index.json found",
-    ))
 }
 
 #[cfg(test)]

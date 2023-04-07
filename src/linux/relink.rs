@@ -5,15 +5,27 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+#[derive(thiserror::Error, Debug)]
+pub enum RelinkError {
+    #[error("failed to run patchelf")]
+    PatchElfFailed,
+
+    #[error("failed to read or write elf file: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("failed to strip prefix from path: {0}")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
+
+    #[error("failed to parse elf file: {0}")]
+    ParseElfError(#[from] goblin::error::Error),
+}
+
 #[derive(Debug, Default)]
 struct ElfModifications {
     set_rpath: Vec<PathBuf>,
 }
 
-fn call_patchelf(
-    elf_path: &Path,
-    modifications: &ElfModifications,
-) -> anyhow::Result<(), Box<dyn std::error::Error>> {
+fn call_patchelf(elf_path: &Path, modifications: &ElfModifications) -> Result<(), RelinkError> {
     // call patchelf
     tracing::info!("patchelf for {:?}: {:?}", elf_path, modifications);
 
@@ -35,27 +47,26 @@ fn call_patchelf(
             "patchelf failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        Err("patchelf failed".into())
+        Err(RelinkError::PatchElfFailed)
     } else {
         Ok(())
     }
 }
 
-fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::Result<()> {
-    // find all RPATH and RUNPATH entries
-    // replace them with the encoded prefix
-    // if the prefix is not found, add it to the end of the list
-
+/// find all RPATH and RUNPATH entries
+/// replace them with the encoded prefix
+/// if the prefix is not found, add it to the end of the list
+fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
     let mut file = File::open(elf_path).unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
 
     let elf = Elf::parse(&buffer)?;
 
-    tracing::info!("Elf soname    : {:?}", elf.soname);
-    tracing::info!("Elf libraries : {:?}", elf.libraries);
-    tracing::info!("ELF RPATHS    : {:?}", elf.rpaths);
-    tracing::info!("ELF RUNPATHS  : {:?}", elf.runpaths);
+    // tracing::info!("ELF soname    : {:?}", elf.soname);
+    // tracing::info!("ELF libraries : {:?}", elf.libraries);
+    // tracing::info!("ELF RPATHS    : {:?}", elf.rpaths);
+    // tracing::info!("ELF RUNPATHS  : {:?}", elf.runpaths);
     let mut modifications = ElfModifications::default();
 
     for rpath in elf.rpaths {
@@ -68,7 +79,7 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
             // remove this rpath and replace with relative path
             tracing::info!("Found encoded rpath: {}", rpath);
             let r = PathBuf::from(rpath);
-            let stripped = r.strip_prefix(encoded_prefix).unwrap();
+            let stripped = r.strip_prefix(encoded_prefix)?;
             let new_path = prefix.join(stripped);
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
@@ -87,7 +98,7 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
             // remove this rpath and replace with relative path
             tracing::info!("Found encoded runpath: {}", runpath);
             let r = PathBuf::from(runpath);
-            let stripped = r.strip_prefix(encoded_prefix).unwrap();
+            let stripped = r.strip_prefix(encoded_prefix)?;
             let new_path = prefix.join(stripped);
 
             let relative_path = pathdiff::diff_paths(new_path, elf_path.parent().unwrap()).unwrap();
@@ -104,13 +115,7 @@ fn modify_elf(elf_path: &Path, prefix: &Path, encoded_prefix: &Path) -> anyhow::
     // keep only first unique entries
     modifications.set_rpath = modifications.set_rpath.into_iter().unique().collect();
 
-    call_patchelf(elf_path, &modifications).map_err(|e| {
-        anyhow::anyhow!(
-            "Error while calling patchelf for {}: {}",
-            elf_path.display(),
-            e
-        )
-    })?;
+    call_patchelf(elf_path, &modifications)?;
 
     Ok(())
 }
@@ -119,7 +124,7 @@ pub fn relink_paths(
     paths: &HashSet<PathBuf>,
     prefix: &Path,
     encoded_prefix: &Path,
-) -> anyhow::Result<()> {
+) -> Result<(), RelinkError> {
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
             tracing::info!("Skipping symlink: {}", p.display());

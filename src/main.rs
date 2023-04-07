@@ -37,7 +37,7 @@ mod variant_config;
 use build::run_build;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories, RenderedRecipe},
+    metadata::{BuildConfiguration, Directories},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -164,11 +164,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     for variant in variants {
-        let recipe: serde_yaml::Mapping =
-            render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
-
-        let recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe))
-            .expect("Could not parse into rendered recipe");
+        let recipe = render_recipe(&recipe_yaml, &variant)?;
 
         let name = recipe.package.name.clone();
         let output = metadata::Output {

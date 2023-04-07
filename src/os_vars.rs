@@ -8,6 +8,8 @@ use crate::macos;
 use crate::unix;
 use crate::windows;
 
+/// Returns a map of environment variables that are used in the build process.
+/// Also adds platform-specific variables.
 pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     let mut vars = HashMap::<String, String>::new();
 
