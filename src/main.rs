@@ -79,6 +79,9 @@ struct Opts {
 
     #[arg(long)]
     render_only: bool,
+
+    #[arg(long)]
+    keep_build: bool,
 }
 
 #[tokio::main]
@@ -178,7 +181,7 @@ async fn main() -> anyhow::Result<()> {
                 build_platform: Platform::current(),
                 hash: String::from("h1234_0"),
                 variant: variant.clone(),
-                no_clean: true,
+                no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,
                 channels: vec!["conda-forge".to_string()],
             },

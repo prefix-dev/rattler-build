@@ -64,6 +64,9 @@ pub enum PackagingError {
 
     #[error("Failed to relink MachO file: {0}")]
     MacOSRelinkError(#[from] macos::relink::RelinkError),
+
+    #[error("License file not found: {0}")]
+    LicenseFileNotFound(String),
 }
 
 #[allow(unused_variables)]
@@ -487,6 +490,48 @@ fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     Ok(Some(serde_json::to_string_pretty(&link_json)?))
 }
 
+/// This function copies the license files to the info/licenses folder.
+fn copy_license_files(
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Option<Vec<PathBuf>>, PackagingError> {
+    if let Some(license_files) = &output.recipe.about.license_file {
+        let licenses_folder = tmp_dir_path.join("info/licenses/");
+        fs::create_dir_all(&licenses_folder)?;
+        let mut copied_files = Vec::new();
+        for license in license_files {
+            // license file can be found either in the recipe folder or in the source folder
+            let candidates = vec![
+                output
+                    .build_configuration
+                    .directories
+                    .recipe_dir
+                    .join(license),
+                output
+                    .build_configuration
+                    .directories
+                    .work_dir
+                    .join(license),
+            ];
+
+            let found = candidates.iter().find(|c| c.exists());
+            if let Some(license_file) = found {
+                if license_file.is_dir() {
+                    todo!("License file is a directory");
+                }
+                let dest = licenses_folder.join(license);
+                fs::copy(license_file, &dest)?;
+                copied_files.push(dest);
+            } else {
+                return Err(PackagingError::LicenseFileNotFound(license.clone()));
+            }
+        }
+        Ok(Some(copied_files))
+    } else {
+        Ok(None)
+    }
+}
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -549,6 +594,10 @@ pub fn package_conda(
         let mut run_exports_json = File::create(info_folder.join("run_exports.json"))?;
         run_exports_json.write_all(run_exports.as_bytes())?;
         tmp_files.insert(info_folder.join("run_exports.json"));
+    }
+
+    if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
+        tmp_files.extend(license_files);
     }
 
     if let PlatformOrNoarch::Noarch(noarch_type) = output.build_configuration.target_platform {

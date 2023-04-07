@@ -63,6 +63,8 @@ pub struct About {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub home: Option<Vec<Url>>,
     pub license: Option<String>,
+    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
+    pub license_file: Option<Vec<String>>,
     pub license_family: Option<String>,
     pub summary: Option<String>,
     pub description: Option<String>,

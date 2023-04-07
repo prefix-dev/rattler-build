@@ -181,7 +181,6 @@ fn collect_run_exports_from_env(
         let cache_key: CacheKey = Into::into(&pkg.package_record);
         let pkc = cache_dir.join(cache_key.to_string());
         let rex = RunExportsJson::from_package_directory(pkc).ok();
-        println!("rex for {}: {:?}", pkg.package_record.name, rex);
         if let Some(rex) = rex {
             let rex = RunExports {
                 strong: rex.strong,
