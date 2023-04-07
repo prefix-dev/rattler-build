@@ -135,8 +135,14 @@ mod tests {
             _ => panic!("Expected PinSubpackage"),
         };
         assert_eq!(p.pin_subpackage.name, "super-package");
-        assert_eq!(p.pin_subpackage.max_pin.as_ref().unwrap().to_string(), "x.x");
-        assert_eq!(p.pin_subpackage.min_pin.as_ref().unwrap().to_string(), "x.x.x");
+        assert_eq!(
+            p.pin_subpackage.max_pin.as_ref().unwrap().to_string(),
+            "x.x"
+        );
+        assert_eq!(
+            p.pin_subpackage.min_pin.as_ref().unwrap().to_string(),
+            "x.x.x"
+        );
         assert_eq!(p.pin_subpackage.exact, true);
     }
 }

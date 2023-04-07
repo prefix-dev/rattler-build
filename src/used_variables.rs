@@ -62,7 +62,10 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     if let Expr::Const(constant) = &call.args[0] {
                         variables.insert(format!("{}_compiler", &constant.value));
                         variables.insert(format!("{}_compiler_version", &constant.value));
-                    } else {
+                    }
+                } else if function == "pin_subpackage" {
+                    if let Expr::Const(constant) = &call.args[0] {
+                        variables.insert(format!("{}", &constant.value));
                     }
                 }
             }
@@ -127,6 +130,9 @@ pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
             if let Some(YamlValue::Sequence(section)) = requirements.get(section) {
                 for item in section {
                     if let YamlValue::String(item) = item {
+                        if item.starts_with("{{") {
+                            continue;
+                        }
                         dependencies.insert(item.to_string());
                     }
                 }
@@ -135,4 +141,28 @@ pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
     }
 
     dependencies
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_used_vars_from_expressions() {
+        let recipe = r#"
+        - sel(llvm_variant > 10): llvm >= 10
+        - sel(linux): linux-gcc
+        - sel(osx): osx-clang
+        - "{{ compiler('c') }}"
+        - "{{ pin_subpackage('abcdef') }}"
+        "#;
+
+        let used_vars = used_vars_from_expressions(recipe);
+        assert!(used_vars.contains("llvm_variant"));
+        assert!(used_vars.contains("linux"));
+        assert!(used_vars.contains("osx"));
+        assert!(used_vars.contains("c_compiler"));
+        assert!(used_vars.contains("c_compiler_version"));
+        assert!(used_vars.contains("abcdef"));
+    }
 }

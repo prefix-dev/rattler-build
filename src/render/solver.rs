@@ -71,6 +71,12 @@ pub async fn create_environment(
     // Find the default cache directory. Create it if it doesnt exist yet.
     let cache_dir = rattler::default_cache_dir()?;
 
+    println!("\nResolving for environment specs:");
+    for spec in &specs {
+        println!(" - {}", spec);
+    }
+    println!("\n");
+
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;
 

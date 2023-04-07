@@ -150,9 +150,9 @@ pub fn apply_variant(
                     let compiler_version = variant.get(&compiler_version_variant);
 
                     let final_compiler = if let Some(compiler_version) = compiler_version {
-                        format!("{}={}", compiler_name, compiler_version)
+                        format!("{}_{} {}", compiler_name, target_platform, compiler_version)
                     } else {
-                        compiler_name
+                        format!("{}_{}", compiler_name, target_platform)
                     };
 
                     (
@@ -217,7 +217,9 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
             &output.build_configuration.variant,
             &output.build_configuration.target_platform,
         )?;
+
         let match_specs = specs.iter().map(|(_, s)| s).cloned().collect::<Vec<_>>();
+
         let env = create_environment(
             match_specs.clone(),
             &output.build_configuration.build_platform,
@@ -251,7 +253,10 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         &output.build_configuration.variant,
         &output.build_configuration.target_platform,
     )?;
+
     let mut match_specs = specs.iter().map(|(_, s)| s).cloned().collect::<Vec<_>>();
+
+    tracing::info!("Resolving host specs: {:?}", match_specs);
 
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {
