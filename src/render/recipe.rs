@@ -212,17 +212,21 @@ mod tests {
         context:
             name: "foo"
             version: "1.0"
-        build:
-            - name: "{{ name }}-{{ version }}"
-              version: "{{ version }}"
-              url: "https://example.com/{{ name }}-{{ version }}.tar.gz"
+        source:
+            - url: "https://example.com/{{ name }}-{{ version }}.tar.gz"
               sha256: "1234567890"
               patches:
-                - url: "https://example.com/{{ name }}-{{ version }}.patch"
-                  sha256: "1234567890"
+            - url: "https://example.com/{{ name }}-{{ version }}.patch"
+              sha256: "1234567890"
+        package:
+            name: "{{ name }}-{{ version }}"
+            version: "{{ version }}"
+        requirements:
+        about:
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe, &BTreeMap::new()).unwrap();
-        insta::assert_yaml_snapshot!(recipe);
+        let recipe = render_recipe(&recipe, &BTreeMap::new());
+        assert!(recipe.is_ok());
+        insta::assert_yaml_snapshot!(recipe.expect("could not render recipe"));
     }
 }

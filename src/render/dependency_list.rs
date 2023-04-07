@@ -126,5 +126,17 @@ mod tests {
         let pin = "- __PIN_SUBPACKAGE name MAX_PIN= MIN_PIN=x.x.x EXACT=False";
         let spec: DependencyList = serde_yaml::from_str(pin).unwrap();
         insta::assert_yaml_snapshot!(spec);
+
+        let pin = "- __PIN_SUBPACKAGE super-package MAX_PIN=x.x MIN_PIN=x.x.x EXACT=true";
+        let spec: DependencyList = serde_yaml::from_str(pin).unwrap();
+        let p = &spec[0];
+        let p = match p {
+            Dependency::PinSubpackage(p) => p,
+            _ => panic!("Expected PinSubpackage"),
+        };
+        assert_eq!(p.pin_subpackage.name, "super-package");
+        assert_eq!(p.pin_subpackage.max_pin.as_ref().unwrap().to_string(), "x.x");
+        assert_eq!(p.pin_subpackage.min_pin.as_ref().unwrap().to_string(), "x.x.x");
+        assert_eq!(p.pin_subpackage.exact, true);
     }
 }
