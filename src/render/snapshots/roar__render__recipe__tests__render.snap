@@ -30,6 +30,7 @@ requirements:
 about:
   home: ~
   license: ~
+  license_file: ~
   license_family: ~
   summary: ~
   description: ~
