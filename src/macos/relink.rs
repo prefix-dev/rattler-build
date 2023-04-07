@@ -229,7 +229,12 @@ pub fn relink_paths(
             tracing::trace!("relink: relinking {}", p.display());
         }
 
-        let (_magic, _ctx) = ctx_res?;
+        let (_, ctx) = ctx_res.unwrap();
+
+        if ctx.is_none() {
+            tracing::trace!("relink: skipping non-mach-o file {}", p.display());
+            continue;
+        }
 
         match modify_dylib(p, prefix, encoded_prefix) {
             Ok(_) => {}

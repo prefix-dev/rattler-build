@@ -6,6 +6,7 @@ use std::fs;
 use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 
+use itertools::Itertools;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
@@ -181,11 +182,19 @@ pub fn get_conda_build_script(
         build_env_script_path.to_string_lossy()
     );
 
+    let default_script = match output.build_configuration.target_platform {
+        PlatformOrNoarch::Platform(p) if p.is_windows() => "bld.bat",
+        _ => "build.sh",
+    };
+
     let script = recipe
         .build
         .script
         .clone()
-        .unwrap_or_else(|| "build.sh".to_string());
+        .unwrap_or_else(|| vec![default_script.into()])
+        .iter()
+        .join("\n");
+
     let script = if script.ends_with(".sh") || script.ends_with(".bat") {
         let recipe_file = directories.recipe_dir.join("build.sh");
         tracing::info!("Reading recipe file: {:?}", recipe_file);
