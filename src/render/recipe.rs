@@ -47,10 +47,57 @@ fn render_recipe_recursively_seq(
 }
 
 mod functions {
+    use std::str::FromStr;
+
     use minijinja::Error;
 
+    use crate::render::pin::{Pin, PinExpression};
+
     pub fn compiler(lang: String) -> Result<String, Error> {
-        Ok(format!("{}-compiler", lang))
+        // we translate the compiler into a YAML string
+        Ok(format!("{{compiler: \"{}\"}}", lang))
+    }
+
+    pub fn pin_subpackage(
+        name: String,
+        kwargs: Option<minijinja::value::Value>,
+    ) -> Result<String, Error> {
+        // we translate the compiler into a YAML string
+        let mut pin_subpackage = Pin {
+            name,
+            max_pin: None,
+            min_pin: None,
+            exact: false,
+        };
+
+        let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
+            PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
+                Error::new(
+                    minijinja::ErrorKind::SyntaxError,
+                    format!("Invalid pin expression: {}", e),
+                )
+            })
+        };
+
+        if let Some(kwargs) = kwargs {
+            let max_pin = kwargs.get_attr("max_pin")?;
+            if max_pin != minijinja::value::Value::UNDEFINED {
+                let pin_expr = pin_expr_from_value(&max_pin)?;
+                pin_subpackage.max_pin = Some(pin_expr);
+            }
+            let min = kwargs.get_attr("min_pin")?;
+            if min != minijinja::value::Value::UNDEFINED {
+                let pin_expr = pin_expr_from_value(&min)?;
+                pin_subpackage.min_pin = Some(pin_expr);
+            }
+            let exact = kwargs.get_attr("exact")?;
+            if exact != minijinja::value::Value::UNDEFINED {
+                pin_subpackage.exact = exact.is_true();
+            }
+        }
+
+        let yaml_str = serde_yaml::to_string(&pin_subpackage);
+        Ok(format!("{{pin_subpackage: {}}}", yaml_str.unwrap()))
     }
 }
 
@@ -92,7 +139,7 @@ fn render_dependencies(
 
 pub fn render_recipe(
     recipe: &YamlValue,
-    variant: BTreeMap<String, String>,
+    variant: &BTreeMap<String, String>,
 ) -> anyhow::Result<serde_yaml::Mapping> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
@@ -101,6 +148,7 @@ pub fn render_recipe(
 
     let mut env = Environment::new();
     env.add_function("compiler", functions::compiler);
+    env.add_function("pin_subpackage", functions::pin_subpackage);
     if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
         let mut context = render_context(map);
         let mut recipe_modified = recipe.clone();
@@ -111,7 +159,7 @@ pub fn render_recipe(
 
         // add in the variant
         for (key, value) in variant {
-            context.insert(key, Value::from_safe_string(value));
+            context.insert(key.clone(), Value::from_safe_string(value.clone()));
         }
 
         render_recipe_recursively(&mut recipe_modified, &env, &context);
@@ -155,7 +203,7 @@ mod tests {
                   sha256: "1234567890"
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe, BTreeMap::new()).unwrap();
+        let recipe = render_recipe(&recipe, &BTreeMap::new()).unwrap();
         insta::assert_yaml_snapshot!(recipe);
     }
 }

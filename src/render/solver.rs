@@ -62,7 +62,7 @@ pub async fn create_environment(
     specs: Vec<MatchSpec>,
     target_platform: &Platform,
     target_prefix: &Path,
-    channels: Vec<String>,
+    channels: &[String],
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let channel_config = ChannelConfig::default();
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
@@ -77,7 +77,7 @@ pub async fn create_environment(
     // Determine the channels to use from the command line or select the default. Like matchspecs
     // this also requires the use of the `channel_config` so we have to do this manually.
     let channels = channels
-        .into_iter()
+        .iter()
         .map(|channel_str| Channel::from_str(channel_str, &channel_config))
         .collect::<Result<Vec<_>, _>>()?;
 

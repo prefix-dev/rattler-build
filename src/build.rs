@@ -4,18 +4,18 @@ use std::io::Write;
 
 use std::fs;
 use std::process::{Command, Stdio};
-use std::str::FromStr;
 use std::{io::Read, path::PathBuf};
 
-use rattler_conda_types::{MatchSpec, Platform};
+use rattler_conda_types::Platform;
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 
+use crate::index;
 use crate::metadata::{Directories, Output, PlatformOrNoarch};
 use crate::os_vars::os_vars;
 use crate::packaging::{package_conda, record_files};
+use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
-use crate::{index, solver};
 
 macro_rules! s {
     ($x:expr) => {
@@ -25,7 +25,7 @@ macro_rules! s {
 
 pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
     let recipe = &output.recipe;
-
+    // TODO revisit this and factor out
     let vars: Vec<(String, String)> = vec![
         (s!("CONDA_BUILD"), s!("1")),
         (s!("PYTHONNOUSERSITE"), s!("1")),
@@ -33,7 +33,7 @@ pub fn get_build_env_script(output: &Output, directories: &Directories) -> anyho
             s!("CONDA_DEFAULT_ENV"),
             s!(directories.host_prefix.to_string_lossy()),
         ),
-        (s!("ARCH"), s!("arm64")),
+        // (s!("ARCH"), s!("arm64")),
         (s!("PREFIX"), s!(directories.host_prefix.to_string_lossy())),
         (
             s!("BUILD_PREFIX"),
@@ -211,63 +211,23 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
-pub async fn setup_environments(output: &Output, directories: &Directories) -> anyhow::Result<()> {
-    let recipe = &output.recipe;
-
-    if !recipe.requirements.build.is_empty() {
-        let specs = recipe
-            .requirements
-            .build
-            .iter()
-            .map(|s| MatchSpec::from_str(s))
-            .collect::<Result<Vec<MatchSpec>, _>>()?;
-
-        solver::create_environment(
-            specs,
-            &output.build_configuration.build_platform,
-            &directories.build_prefix,
-            vec!["conda-forge".to_string()],
-        )
-        .await?;
-    } else {
-        fs::create_dir_all(&directories.build_prefix)?;
-    }
-
-    if !recipe.requirements.host.is_empty() {
-        let specs = recipe
-            .requirements
-            .host
-            .iter()
-            .map(|s| MatchSpec::from_str(s))
-            .collect::<Result<Vec<MatchSpec>, _>>()?;
-
-        solver::create_environment(
-            specs,
-            &output.build_configuration.host_platform,
-            &directories.host_prefix,
-            vec!["conda-forge".to_string()],
-        )
-        .await?;
-    } else {
-        fs::create_dir_all(&directories.host_prefix)?;
-    }
-
-    Ok(())
-}
-
 pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     let directories = &output.build_configuration.directories;
 
-    fetch_sources(
-        &output.recipe.source,
-        &directories.source_dir,
-        &directories.recipe_dir,
-    )
-    .await?;
+    if let Some(source) = &output.recipe.source {
+        fetch_sources(source, &directories.source_dir, &directories.recipe_dir).await?;
+    }
 
-    setup_environments(output, directories).await?;
+    let finalized_dependencies = resolve_dependencies(output).await?;
 
-    let build_script = get_conda_build_script(output, directories);
+    // The output with the resolved dependencies
+    let output = Output {
+        finalized_dependencies: Some(finalized_dependencies),
+        recipe: output.recipe.clone(),
+        build_configuration: output.build_configuration.clone(),
+    };
+
+    let build_script = get_conda_build_script(&output, directories);
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script.unwrap());
 
@@ -288,7 +248,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
         .collect::<HashSet<_>>();
 
     package_conda(
-        output,
+        &output,
         &difference,
         &directories.host_prefix,
         &directories.local_channel,

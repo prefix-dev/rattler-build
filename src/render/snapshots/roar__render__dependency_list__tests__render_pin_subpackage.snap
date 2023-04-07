@@ -1,0 +1,10 @@
+---
+source: src/render/dependency_list.rs
+expression: spec
+---
+- pin_subpackage:
+    name: name
+    max_pin: x.x.x
+    min_pin: ~
+    exact: false
+

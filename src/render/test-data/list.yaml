@@ -1,0 +1,5 @@
+- { pin_subpackage: "name",
+    pin: {
+      max_pin: "x.x.x"
+    }
+  }

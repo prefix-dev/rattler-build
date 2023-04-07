@@ -1,0 +1,9 @@
+---
+source: src/render/dependency_list.rs
+expression: spec
+---
+- compiler: c
+- compiler: cxx
+- compiler: fortran
+- compiler: rust
+

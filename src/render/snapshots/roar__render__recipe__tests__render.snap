@@ -1,5 +1,5 @@
 ---
-source: src/render.rs
+source: src/render/recipe.rs
 expression: recipe
 ---
 build:

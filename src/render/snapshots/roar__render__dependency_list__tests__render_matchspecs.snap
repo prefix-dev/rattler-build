@@ -1,0 +1,15 @@
+---
+source: src/render/dependency_list.rs
+expression: spec
+---
+- name: python
+- name: python
+  version: ">=3.6"
+- name: python
+  version: ">=3.6,<3.7"
+- name: python
+  version: ">=3.6,<3.7.0a0"
+- name: python
+  version: ">=3.6,<3.7.0a0"
+  build: py36h6de7cb9_0
+
