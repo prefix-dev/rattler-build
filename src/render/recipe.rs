@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 use minijinja::{self, value::Value, Environment};
 use serde_yaml::Value as YamlValue;
 
+/// Given a YAML recipe, this renders all strings it encounters using Jinja
+/// templating.
 fn render_recipe_recursively(
     recipe: &mut serde_yaml::Mapping,
     jinja_env: &Environment,
@@ -101,6 +103,14 @@ mod functions {
     }
 }
 
+/// This iteratively renderes the "context" object of a recipe
+/// Later values can reference earlier values in the context, for example
+///
+/// ```yaml
+/// context:
+///   version: "3.0"
+///   version_min: "min_{{ version }}"
+/// ```
 fn render_context(yaml_context: &serde_yaml::Mapping) -> BTreeMap<String, Value> {
     let mut context = BTreeMap::<String, Value>::new();
     let env = Environment::new();

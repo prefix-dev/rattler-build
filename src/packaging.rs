@@ -11,9 +11,6 @@ use rattler_conda_types::Version;
 use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
-use anyhow::Ok;
-use anyhow::Result;
-
 use tempdir::TempDir;
 use walkdir::WalkDir;
 
@@ -36,8 +33,41 @@ use std::collections::HashSet;
 
 use std::path::{Component, Path, PathBuf};
 
+#[derive(Debug, thiserror::Error)]
+pub enum PackagingError {
+    #[error("Dependencies are not yet finalized / resolved")]
+    DependenciesNotFinalized,
+
+    #[error("Could not open or create, or write to file")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Could not strip a prefix from a Path")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
+
+    #[error("Could not serialize JSON: {0}")]
+    SerializationError(#[from] serde_json::Error),
+
+    #[error("Could not run walkdir: {0}")]
+    WalkDirError(#[from] walkdir::Error),
+
+    #[error("Could not get a relative path from {0} to {1}")]
+    RelativePathError(PathBuf, PathBuf),
+
+    #[error("Could not find parent directory of {0}")]
+    ParentDirError(PathBuf),
+
+    #[error("Failed to parse version {0}")]
+    VersionParseError(#[from] rattler_conda_types::ParseVersionError),
+
+    #[error("Failed to relink ELF file: {0}")]
+    LinuxRelinkError(#[from] linux::relink::RelinkError),
+
+    #[error("Failed to relink MachO file: {0}")]
+    MacOSRelinkError(#[from] macos::relink::RelinkError),
+}
+
 #[allow(unused_variables)]
-fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
+fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
     #[cfg(target_family = "windows")]
@@ -67,7 +97,7 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool> {
     }
 }
 
-fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
+fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
@@ -77,12 +107,16 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool> {
     buf_reader.read_to_string(&mut content)?;
 
     // Check if the content contains the prefix
-    let contains_prefix = content.contains(prefix.to_str().unwrap());
+    let prefix = prefix.to_string_lossy().to_string();
+    let contains_prefix = content.contains(&prefix);
 
     Ok(contains_prefix)
 }
 
-fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<PrefixPlaceholder>> {
+fn create_prefix_placeholder(
+    file_path: &Path,
+    prefix: &Path,
+) -> Result<Option<PrefixPlaceholder>, PackagingError> {
     // read first 1024 bytes to determine file type
     let mut file = File::open(file_path)?;
     let mut buffer = [0; 1024];
@@ -115,11 +149,13 @@ fn create_prefix_placeholder(file_path: &Path, prefix: &Path) -> Result<Option<P
 }
 
 /// Create a `paths.json` file for the given paths.
+/// Paths should be given as absolute paths under the `path_prefix` directory.
+/// This function will also determine if the file is binary or text, and if it contains the prefix.
 fn create_paths_json(
     paths: &HashSet<PathBuf>,
     path_prefix: &Path,
     encoded_prefix: &Path,
-) -> Result<String> {
+) -> Result<String, PackagingError> {
     let mut paths_json: PathsJson = PathsJson {
         paths: Vec::new(),
         paths_version: 1,
@@ -191,7 +227,7 @@ fn create_paths_json(
 }
 
 /// Create the index.json file for the given output.
-fn create_index_json(output: &Output) -> Result<String> {
+fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     // TODO use global timestamp?
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
@@ -201,17 +237,23 @@ fn create_index_json(output: &Output) -> Result<String> {
 
     let (platform, arch) = match output.build_configuration.target_platform {
         PlatformOrNoarch::Platform(p) => {
-            // todo add better functions in rattler for this
+            // TODO add better functions in rattler for this
             let pstring = p.to_string();
             let parts: Vec<&str> = pstring.split('-').collect();
-            (Some(String::from(parts[0])), Some(String::from(parts[1])))
+            let (platform, arch) = (String::from(parts[0]), String::from(parts[1]));
+
+            match arch.as_str() {
+                "64" => (Some(platform), Some("x86_64".to_string())),
+                "32" => (Some(platform), Some("x86".to_string())),
+                _ => (Some(platform), Some(arch)),
+            }
         }
         PlatformOrNoarch::Noarch(_) => (None, None),
     };
 
     let index_json = IndexJson {
         name: output.name().to_string(),
-        version: Version::from_str(output.version()).expect("Could not parse version"),
+        version: Version::from_str(output.version())?,
         build: output.build_configuration.hash.clone(),
         build_number: recipe.build.number,
         arch,
@@ -246,7 +288,8 @@ fn create_index_json(output: &Output) -> Result<String> {
     Ok(serde_json::to_string_pretty(&index_json)?)
 }
 
-fn create_about_json(output: &Output) -> Result<String> {
+/// Create the about.json file for the given output.
+fn create_about_json(output: &Output) -> Result<String, PackagingError> {
     let recipe = &output.recipe;
     let about_json = AboutJson {
         home: recipe.about.home.clone().unwrap_or_default(),
@@ -264,7 +307,8 @@ fn create_about_json(output: &Output) -> Result<String> {
     Ok(serde_json::to_string_pretty(&about_json)?)
 }
 
-fn create_run_exports_json(recipe: &Output) -> Result<Option<String>> {
+/// Create the run_exports.json file for the given output.
+fn create_run_exports_json(recipe: &Output) -> Result<Option<String>, PackagingError> {
     if let Some(run_exports) = &recipe.recipe.build.run_exports {
         let run_exports_json = RunExportsJson {
             strong: run_exports.strong.clone(),
@@ -281,7 +325,7 @@ fn create_run_exports_json(recipe: &Output) -> Result<Option<String>> {
 }
 
 // This function returns a HashSet of (recursively) all the files in the given directory.
-pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
+pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>, PackagingError> {
     let mut res = HashSet::new();
     for entry in WalkDir::new(directory) {
         res.insert(entry?.path().to_owned());
@@ -289,12 +333,19 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>> {
     Ok(res)
 }
 
+/// This function copies the given file to the destination folder and
+/// transforms it on the way if needed.
+///
+/// * For `noarch: python` packages, the "lib/pythonX.X" prefix is stripped so that only
+///   the "site-packages" part is kept. Additionally, any `__pycache__` directories or
+///  `.pyc` files are skipped.
+/// * Absolute symlinks are made relative so that they are easily relocatable.
 fn write_to_dest(
     path: &Path,
     prefix: &Path,
     dest_folder: &Path,
     target_platform: &PlatformOrNoarch,
-) -> Result<Option<PathBuf>> {
+) -> Result<Option<PathBuf>, PackagingError> {
     let path_rel = path.strip_prefix(prefix)?;
     let mut dest_path = dest_folder.join(path_rel);
 
@@ -303,6 +354,7 @@ fn write_to_dest(
             if path.ends_with(".pyc") || path.ends_with(".pyo") {
                 return Ok(None); // skip .pyc files
             }
+
             // if any part of the path is __pycache__ skip it
             if path_rel
                 .components()
@@ -335,8 +387,18 @@ fn write_to_dest(
         }
     }
 
-    if fs::metadata(dest_path.parent().expect("parent")).is_err() {
-        fs::create_dir_all(dest_path.parent().unwrap())?;
+    match dest_path.parent() {
+        Some(parent) => {
+            if fs::metadata(parent).is_err() {
+                fs::create_dir_all(parent)?;
+            }
+        }
+        None => {
+            return Err(PackagingError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Could not get parent directory",
+            )));
+        }
     }
 
     let metadata = fs::symlink_metadata(path)?;
@@ -356,63 +418,63 @@ fn write_to_dest(
         }
 
         #[cfg(target_family = "unix")]
-        fs::read_link(path)
-            .and_then(|target| {
-                if target.is_absolute() && target.starts_with(prefix) {
-                    let rel_target = pathdiff::diff_paths(
-                        target,
-                        path.parent().expect("Could not get parent directory"),
-                    )
-                    .expect("Could not make path relative");
+        fs::read_link(path).and_then(|target| {
+            if target.is_absolute() && target.starts_with(prefix) {
+                let rel_target = pathdiff::diff_paths(
+                    target,
+                    path.parent().ok_or(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Could not get parent directory",
+                    ))?,
+                )
+                .ok_or(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Could not get relative path",
+                ))?;
 
-                    tracing::trace!(
-                        "Making symlink relative {:?} -> {:?}",
+                tracing::trace!(
+                    "Making symlink relative {:?} -> {:?}",
+                    dest_path,
+                    rel_target
+                );
+                symlink(&rel_target, &dest_path).map_err(|e| {
+                    tracing::error!(
+                        "Could not create symlink from {:?} to {:?}: {:?}",
+                        rel_target,
                         dest_path,
-                        rel_target
+                        e
                     );
-                    symlink(&rel_target, &dest_path)
-                        .map_err(|e| {
-                            tracing::error!(
-                                "Could not create symlink from {:?} to {:?}: {:?}",
-                                rel_target,
-                                dest_path,
-                                e
-                            );
-                            e
-                        })
-                        .expect("Could not create symlink");
-                } else {
-                    if target.is_absolute() {
-                        tracing::warn!("Symlink {:?} points outside of the prefix", path);
-                    }
-                    symlink(&target, &dest_path)
-                        .map_err(|e| {
-                            tracing::error!(
-                                "Could not create symlink from {:?} to {:?}: {:?}",
-                                target,
-                                dest_path,
-                                e
-                            );
-                            e
-                        })
-                        .expect("Could not create symlink");
+                    e
+                })?;
+            } else {
+                if target.is_absolute() {
+                    tracing::warn!("Symlink {:?} points outside of the prefix", path);
                 }
-                Result::Ok(())
-            })
-            .expect("Could not read link!");
+                symlink(&target, &dest_path).map_err(|e| {
+                    tracing::error!(
+                        "Could not create symlink from {:?} to {:?}: {:?}",
+                        target,
+                        dest_path,
+                        e
+                    );
+                    e
+                })?;
+            }
+            Result::Ok(())
+        })?;
         Ok(Some(dest_path))
     } else if metadata.is_dir() {
         // skip directories for now
         Ok(None)
     } else {
         tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
-        fs::copy(path, &dest_path).expect("Could not copy file to dest");
+        fs::copy(path, &dest_path)?;
         Ok(Some(dest_path))
-        // TODO add relink stuff here?
     }
 }
 
-fn create_link_json(output: &Output) -> Result<Option<String>> {
+/// This function creates a link.json file for the given output.
+fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     let noarch_links = PythonEntryPoints {
         entry_points: output.recipe.build.entry_points.clone(),
     };
@@ -425,14 +487,20 @@ fn create_link_json(output: &Output) -> Result<Option<String>> {
     Ok(Some(serde_json::to_string_pretty(&link_json)?))
 }
 
+/// Given an output and a set of new files, create a conda package.
+/// This function will copy all the files to a temporary directory and then
+/// create a conda package from that. Note that the output needs to have its
+/// dependencies finalized before calling this function.
+///
+/// The `local_channel_dir` is the path to the local channel / output directory.
 pub fn package_conda(
     output: &Output,
     new_files: &HashSet<PathBuf>,
     prefix: &Path,
     local_channel_dir: &Path,
-) -> Result<()> {
+) -> Result<PathBuf, PackagingError> {
     if output.finalized_dependencies.is_none() {
-        return Err(anyhow::anyhow!("Dependencies have not been finalized yet!"));
+        return Err(PackagingError::DependenciesNotFinalized);
     }
 
     let tmp_dir = TempDir::new(output.name())?;
@@ -454,11 +522,9 @@ pub fn package_conda(
 
     if let PlatformOrNoarch::Platform(p) = &output.build_configuration.target_platform {
         if p.is_linux() {
-            linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
-                .expect("Could not relink paths");
+            linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
         } else if p.is_osx() {
-            macos::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)
-                .expect("Could not relink paths");
+            macos::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
         }
     }
 
@@ -510,7 +576,8 @@ pub fn package_conda(
         output.build_configuration.hash
     );
 
-    let file = File::create(output_folder.join(file))?;
+    let out_path = output_folder.join(file);
+    let file = File::create(&out_path)?;
     write_tar_bz2_package(
         file,
         tmp_dir_path,
@@ -518,5 +585,5 @@ pub fn package_conda(
         CompressionLevel::Default,
     )?;
 
-    Ok(())
+    Ok(out_path)
 }
