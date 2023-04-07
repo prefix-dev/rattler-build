@@ -43,12 +43,14 @@ pub struct RunExports {
     pub noarch: Vec<String>,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BuildOptions {
     #[serde(default)]
     pub number: u64,
     pub string: Option<String>,
-    pub script: Option<String>,
+    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
+    pub script: Option<Vec<String>>,
     pub ignore_run_exports: Option<Vec<String>>,
     pub run_exports: Option<RunExports>,
     #[serde(default = "NoArchType::default")]

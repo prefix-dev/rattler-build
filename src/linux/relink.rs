@@ -1,4 +1,5 @@
 use goblin::elf::Elf;
+use goblin::elf64::header::ELFMAG;
 use itertools::Itertools;
 use std::collections::HashSet;
 use std::fs::{self, File};
@@ -128,6 +129,24 @@ pub fn relink_paths(
     for p in paths {
         if fs::symlink_metadata(p)?.is_symlink() {
             tracing::info!("Skipping symlink: {}", p.display());
+            continue;
+        }
+
+        // Skip files that are not binaries
+        let mut buffer = vec![0; 1024];
+        let mut file = fs::File::open(p)?;
+        let n = file.read(&mut buffer)?;
+        let buffer = &buffer[..n];
+
+        let content_type = content_inspector::inspect(buffer);
+        if content_type != content_inspector::ContentType::BINARY {
+            continue;
+        }
+
+        // parse elf magic
+        let magic = &buffer[0..4];
+        if magic != ELFMAG {
+            tracing::info!("Skipping non-elf file: {}", p.display());
             continue;
         }
 
