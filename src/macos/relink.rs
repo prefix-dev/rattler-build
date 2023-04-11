@@ -6,6 +6,14 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+
+struct Dylib {
+    path: PathBuf,
+    id: Option<PathBuf>,
+    rpaths: Vec<PathBuf>,
+    dependencies: Vec<PathBuf>,
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
     #[error("failed to run install_name_tool")]
@@ -114,12 +122,19 @@ fn modify_dylib(
     dylib_path: &Path,
     prefix: &Path,
     encoded_prefix: &Path,
-) -> Result<(), RelinkError> {
+) -> Result<Dylib, RelinkError> {
     let data = fs::read(dylib_path)?;
     let mut changes = DylibChanges::default();
 
     match goblin::mach::Mach::parse(&data)? {
         Mach::Binary(mach) => {
+            let mut dylib = Dylib {
+                path: dylib_path.to_path_buf(),
+                id: None,
+                rpaths: Vec::new(),
+                dependencies: Vec::new(),
+            };
+
             let mut modified = false;
             for command in &mach.load_commands {
                 match command.command {
@@ -129,8 +144,13 @@ fn modify_dylib(
                     | CommandVariant::ReexportDylib(dylib_cmd) => {
                         let libname_offset = command.offset + dylib_cmd.dylib.name as usize;
                         let libname = data.pread::<&str>(libname_offset)?.to_string();
-
                         let libname = PathBuf::from(&libname);
+
+                        if matches!(command.command, CommandVariant::IdDylib(_)) {
+                            dylib.id = Some(libname.clone());
+                        } else {
+                            dylib.dependencies.push(libname.clone());
+                        }
 
                         if let Some(new_dylib) = exchange_dylib_rpath(&libname, encoded_prefix) {
                             match command.command {
@@ -154,6 +174,8 @@ fn modify_dylib(
                     }) => {
                         let rpath_offset = command.offset + path as usize;
                         let rpath = PathBuf::from(data.pread::<&str>(rpath_offset)?);
+
+                        dylib.rpaths.push(rpath.clone());
 
                         if rpath.is_absolute() {
                             let orig_path = encoded_prefix.join(
@@ -187,14 +209,13 @@ fn modify_dylib(
             if modified {
                 install_name_tool(dylib_path, &changes)?;
             }
+            return Ok(dylib);
         }
         _ => {
             tracing::error!("Not a valid Mach-O binary.");
             return Err(RelinkError::FileTypeNotHandled);
         }
     }
-
-    Ok(())
 }
 
 pub fn relink_paths(
