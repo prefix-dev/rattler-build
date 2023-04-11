@@ -35,8 +35,8 @@ fn package_record_from_index_json<T: Read>(
         build: index.build,
         build_number: index.build_number,
         subdir: index.subdir.unwrap_or_else(|| "unknown".to_string()),
-        md5: Some(hex::encode(md5_result)),
-        sha256: Some(hex::encode(sha256_result)),
+        md5: Some(md5_result),
+        sha256: Some(sha256_result),
         size: Some(size),
         arch: index.arch,
         platform: index.platform,
@@ -120,7 +120,14 @@ pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -
     for platform in platforms {
         if let Some(target_platform) = target_platform {
             if platform != target_platform.to_string() {
-                continue;
+                if platform != "noarch" {
+                    continue;
+                } else {
+                    // check that noarch is already indexed if it is not the target platform
+                    if output_folder.join("noarch/repodata.json").exists() {
+                        continue;
+                    }
+                }
             }
         }
 

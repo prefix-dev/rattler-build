@@ -1,6 +1,17 @@
-use crate::linux;
-use crate::macos;
-use crate::metadata::{Output, PlatformOrNoarch};
+use std::collections::HashSet;
+use std::io::{BufReader, Read, Write};
+use std::path::{Component, Path, PathBuf};
+use std::str::FromStr;
+use std::{fs, fs::File};
+
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::OsStrExt;
+
+#[cfg(target_family = "unix")]
+use std::os::unix::fs::symlink;
+
+use tempdir::TempDir;
+use walkdir::WalkDir;
 
 use rattler_conda_types::package::{
     AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
@@ -11,27 +22,9 @@ use rattler_conda_types::Version;
 use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
-use tempdir::TempDir;
-use walkdir::WalkDir;
-
-use fs::File;
-
-use std::fs;
-use std::io::{BufReader, Read, Write};
-
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::OsStrExt;
-
-#[cfg(target_family = "unix")]
-use std::os::unix::fs::symlink;
-
-use std::str::FromStr;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-
-use std::collections::HashSet;
-
-use std::path::{Component, Path, PathBuf};
+use crate::linux;
+use crate::macos;
+use crate::metadata::{Output, PlatformOrNoarch};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
@@ -232,10 +225,7 @@ fn create_paths_json(
 /// Create the index.json file for the given output.
 fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     // TODO use global timestamp?
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-    let since_the_epoch = since_the_epoch.as_millis() as u64;
-
+    let timestamp = chrono::Utc::now();
     let recipe = &output.recipe;
 
     let (platform, arch) = match output.build_configuration.target_platform {
@@ -264,7 +254,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         subdir: Some(output.build_configuration.target_platform.to_string()),
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
-        timestamp: Some(since_the_epoch),
+        timestamp: Some(timestamp),
         depends: output
             .finalized_dependencies
             .clone()

@@ -20,10 +20,10 @@ use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
+mod env_vars;
 mod linux;
 mod macos;
 mod metadata;
-mod os_vars;
 mod render;
 mod source;
 mod unix;
@@ -35,6 +35,8 @@ mod selectors;
 mod used_variables;
 mod variant_config;
 use build::run_build;
+
+mod test;
 
 use crate::{
     metadata::{BuildConfiguration, Directories},
@@ -64,10 +66,25 @@ struct RawRecipe {
 }
 
 #[derive(Parser)]
-struct Opts {
+enum SubCommands {
+    /// Build a package
+    Build(BuildOpts),
+
+    /// Test a package
+    Test(TestOpts),
+}
+
+#[derive(Parser)]
+struct App {
+    #[clap(subcommand)]
+    subcommand: SubCommands,
+
     #[arg(short, long)]
     verbose: bool,
+}
 
+#[derive(Parser)]
+struct BuildOpts {
     #[arg(short, long)]
     recipe_file: PathBuf,
 
@@ -84,9 +101,16 @@ struct Opts {
     keep_build: bool,
 }
 
+#[derive(Parser)]
+struct TestOpts {
+    /// The package file to test
+    #[arg(short, long)]
+    package_file: PathBuf,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Opts::parse();
+    let args = App::parse();
 
     let default_filter = if args.verbose {
         LevelFilter::DEBUG
@@ -109,6 +133,21 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting the build process");
 
+    match args.subcommand {
+        SubCommands::Build(args) => run_build_from_args(args).await,
+        SubCommands::Test(args) => run_test_from_args(args).await,
+    }?;
+
+    Ok(())
+}
+
+async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
+    let package_file = fs::canonicalize(args.package_file)?;
+    test::run_test(&package_file, None, Some(Platform::current())).await?;
+    Ok(())
+}
+
+async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     let recipe_file = fs::canonicalize(args.recipe_file)?;
     let recipe_text = fs::read_to_string(&recipe_file)?;
 
