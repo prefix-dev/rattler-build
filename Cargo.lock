@@ -2895,6 +2895,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "anyhow",
  "apple-codesign",
@@ -2934,7 +2935,9 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
+ "chrono",
  "fxhash",
  "glob",
  "hex",
@@ -2959,6 +2962,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "digest 0.10.6",
  "hex",
@@ -2972,6 +2976,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "quote",
  "syn 2.0.11",
@@ -2980,6 +2985,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "bzip2",
  "futures-util",
@@ -2999,6 +3005,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -3033,6 +3040,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "indexmap",
  "rattler_conda_types",
@@ -3044,6 +3052,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "anyhow",
  "cc",
@@ -3064,6 +3073,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.2.0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#e382d87f2189e6b4ccf8f5ae4016b47678e51dbb"
 dependencies = [
  "cfg-if",
  "libloading",
@@ -3244,6 +3254,7 @@ name = "roar"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "comfy-table",
  "console",
