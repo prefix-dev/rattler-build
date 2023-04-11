@@ -8,14 +8,22 @@
 //! * `files` - check if a list of files exist
 
 use std::{
+    fs::File,
+    io::Read,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, NoArchType, Platform};
+use rattler_conda_types::{
+    package::{ArchiveIdentifier, ArchiveType},
+    MatchSpec, NoArchType, Platform,
+};
+use rattler_shell::activation::ActivationVariables;
+use rattler_shell::{activation::Activator, shell};
+use std::io::Write;
 
-use crate::{index, metadata::PlatformOrNoarch, render::solver::create_environment};
+use crate::{env_vars, index, metadata::PlatformOrNoarch, render::solver::create_environment};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
@@ -42,9 +50,6 @@ enum Tests {
     Python(PathBuf),
 }
 
-use rattler_shell::activation::ActivationVariables;
-use rattler_shell::{activation::Activator, shell};
-
 fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
     let current_path = std::env::var("PATH")
         .ok()
@@ -64,9 +69,20 @@ fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
     let tmpfile = tempfile::NamedTempFile::new().unwrap();
     let tmpfile_path = tmpfile.path();
 
-    let final_script = format!("{}\n{}", script.script, cmd);
+    let mut out_script = File::create(tmpfile_path).unwrap();
+    let os_vars = env_vars::os_vars(environment, &Platform::current());
 
-    std::fs::write(tmpfile_path, final_script).unwrap();
+    for var in os_vars {
+        writeln!(out_script, "export {}=\"{}\"", var.0, var.1)?;
+    }
+
+    writeln!(out_script, "{}", script.script)?;
+    writeln!(
+        out_script,
+        "export PREFIX={}",
+        environment.to_string_lossy()
+    )?;
+    writeln!(out_script, "{}", cmd)?;
 
     let mut cmd = std::process::Command::new("bash");
     cmd.arg(tmpfile_path);
@@ -80,7 +96,28 @@ fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
     Ok(())
 }
 
-impl Tests {}
+impl Tests {
+    fn run(&self, environment: &Path) -> Result<(), TestError> {
+        match self {
+            Tests::Commands(path) => {
+                let ext = path.extension().unwrap().to_str().unwrap();
+                match (Platform::current().is_windows(), ext) {
+                    (true, "bat") => run_in_environment(
+                        &format!("cmd /c {}", path.to_string_lossy()),
+                        environment,
+                    ),
+                    (false, "sh") => {
+                        run_in_environment(&format!("bash {}", path.to_string_lossy()), environment)
+                    }
+                    _ => Ok(()),
+                }
+            }
+            Tests::Python(path) => {
+                run_in_environment(&format!("python {}", path.to_string_lossy()), environment)
+            }
+        }
+    }
+}
 
 async fn tests_from_folder(pkg: &Path) -> Result<Vec<Tests>, TestError> {
     let mut tests = Vec::new();
@@ -111,6 +148,50 @@ async fn tests_from_folder(pkg: &Path) -> Result<Vec<Tests>, TestError> {
     Ok(tests)
 }
 
+fn file_from_tar_bz2(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
+    let reader = std::fs::File::open(archive_path).unwrap();
+    let mut archive = rattler_package_streaming::read::stream_tar_bz2(reader);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        if path == find_path {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents)?;
+            return Ok(contents);
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("{:?} not found in {:?}", find_path, archive_path),
+    ))
+}
+
+fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
+    let reader = std::fs::File::open(archive_path).unwrap();
+
+    let mut archive = if find_path.starts_with("info") {
+        rattler_package_streaming::seek::stream_conda_info(reader)
+            .expect("Could not open conda file")
+    } else {
+        todo!("Not implemented yet");
+    };
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        if path == find_path {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents)?;
+            return Ok(contents);
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("{:?} not found in {:?}", find_path, archive_path),
+    ))
+}
+
 pub async fn run_test(
     package_file: &Path,
     test_prefix: Option<&Path>,
@@ -128,6 +209,30 @@ pub async fn run_test(
     std::fs::create_dir_all(&subdir).unwrap();
     std::fs::copy(package_file, subdir.join(package_file.file_name().unwrap())).unwrap();
 
+    let archive_type = ArchiveType::try_from(package_file).unwrap();
+    let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
+    let test_dependencies = match archive_type {
+        ArchiveType::TarBz2 => file_from_tar_bz2(package_file, &test_dep_json),
+        ArchiveType::Conda => file_from_conda(package_file, &test_dep_json),
+    };
+
+    let mut dependencies: Vec<MatchSpec> = match test_dependencies {
+        Ok(contents) => {
+            let test_deps: Vec<String> = serde_json::from_str(&contents).unwrap();
+            test_deps
+                .iter()
+                .map(|s| MatchSpec::from_str(s).unwrap())
+                .collect()
+        }
+        Err(error) => {
+            if error.kind() == std::io::ErrorKind::NotFound {
+                Vec::new()
+            } else {
+                return Err(TestError::TestFailed);
+            }
+        }
+    };
+
     // index the temporary channel
     index::index(tmp_repo.path(), Some(&target_platform)).unwrap();
 
@@ -137,6 +242,7 @@ pub async fn run_test(
     let match_spec =
         MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+    dependencies.push(match_spec);
 
     let build_output_folder = std::fs::canonicalize(Path::new("./output")).unwrap();
 
@@ -144,8 +250,10 @@ pub async fn run_test(
         build_output_folder.to_string_lossy().to_string(),
         "conda-forge".to_string(),
     ];
+
     let prefix = test_prefix.unwrap_or_else(|| Path::new("./test-env"));
-    create_environment(vec![match_spec], &Platform::current(), prefix, &channels)
+    let prefix = std::fs::canonicalize(prefix).unwrap();
+    create_environment(dependencies, &Platform::current(), &prefix, &channels)
         .await
         .map_err(|_| TestError::TestEnvironmentSetup)?;
 
@@ -155,7 +263,11 @@ pub async fn run_test(
     let tests = tests_from_folder(&dir).await?;
     println!("Running tests: {:?}", tests);
 
-    // for test in tests {}
+    for test in tests {
+        test.run(&prefix)?;
+    }
+
+    println!("Tests passed!");
 
     Ok(())
 }
