@@ -53,10 +53,10 @@ pub enum PackagingError {
     VersionParseError(#[from] rattler_conda_types::ParseVersionError),
 
     #[error("Failed to relink ELF file: {0}")]
-    LinuxRelinkError(#[from] linux::relink::RelinkError),
+    LinuxRelinkError(#[from] linux::link::RelinkError),
 
     #[error("Failed to relink MachO file: {0}")]
-    MacOSRelinkError(#[from] macos::relink::RelinkError),
+    MacOSRelinkError(#[from] macos::link::RelinkError),
 
     #[error("License file not found: {0}")]
     LicenseFileNotFound(String),
@@ -557,9 +557,9 @@ pub fn package_conda(
 
     if let PlatformOrNoarch::Platform(p) = &output.build_configuration.target_platform {
         if p.is_linux() {
-            linux::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
+            linux::link::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
         } else if p.is_osx() {
-            macos::relink::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
+            macos::link::relink_paths(&tmp_files, tmp_dir_path, prefix)?;
         }
     }
 

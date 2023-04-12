@@ -2,16 +2,85 @@ use goblin::mach::load_command::{CommandVariant, RpathCommand};
 use goblin::mach::Mach;
 use scroll::Pread;
 use std::collections::HashSet;
-use std::fs;
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-
 struct Dylib {
+    /// Path to the dylib
     path: PathBuf,
+    /// ID of the dylib (encoded)
     id: Option<PathBuf>,
+    /// rpaths in the dlib
     rpaths: Vec<PathBuf>,
+    /// all dependencies of the dylib
     dependencies: Vec<PathBuf>,
+}
+
+impl Dylib {
+    /// only parse the magic number of a file and check if it
+    /// is a Mach-O file
+    fn test_file(path: &Path) -> Result<bool, std::io::Error> {
+        let mut file = File::open(&path)?;
+        let mut buf: [u8; 4] = [0; 4];
+        file.read_exact(&mut buf)?;
+        let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
+        match ctx_res {
+            Ok(_) => Ok(true),
+            Err(_) => Ok(false),
+        }
+    }
+
+    /// parse the Mach-O file and extract all relevant information
+    fn new(path: &Path) -> Result<Self, RelinkError> {
+        let data = fs::read(path)?;
+
+        match goblin::mach::Mach::parse(&data)? {
+            Mach::Binary(mach) => {
+                let mut dylib = Dylib {
+                    path: path.to_path_buf(),
+                    id: None,
+                    rpaths: Vec::new(),
+                    dependencies: Vec::new(),
+                };
+
+                for command in &mach.load_commands {
+                    match command.command {
+                        CommandVariant::IdDylib(dylib_cmd)
+                        | CommandVariant::LoadDylib(dylib_cmd)
+                        | CommandVariant::LoadWeakDylib(dylib_cmd)
+                        | CommandVariant::ReexportDylib(dylib_cmd) => {
+                            let libname_offset = command.offset + dylib_cmd.dylib.name as usize;
+                            let libname = data.pread::<&str>(libname_offset)?.to_string();
+                            let libname = PathBuf::from(&libname);
+
+                            if matches!(command.command, CommandVariant::IdDylib(_)) {
+                                dylib.id = Some(libname.clone());
+                            } else {
+                                dylib.dependencies.push(libname.clone());
+                            }
+                        }
+                        CommandVariant::Rpath(RpathCommand {
+                            cmd: _,
+                            cmdsize: _,
+                            path,
+                        }) => {
+                            let rpath_offset = command.offset + path as usize;
+                            let rpath = PathBuf::from(data.pread::<&str>(rpath_offset)?);
+
+                            dylib.rpaths.push(rpath.clone());
+                        }
+                        _ => {}
+                    }
+                }
+                return Ok(dylib);
+            }
+            _ => {
+                tracing::error!("Not a valid Mach-O binary.");
+                return Err(RelinkError::FileTypeNotHandled);
+            }
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
