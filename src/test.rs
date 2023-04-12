@@ -8,7 +8,7 @@
 //! * `files` - check if a list of files exist
 
 use std::{
-    fs::File,
+    fs::{self, File},
     io::Read,
     path::{Path, PathBuf},
     str::FromStr,
@@ -102,17 +102,26 @@ impl Tests {
             Tests::Commands(path) => {
                 let ext = path.extension().unwrap().to_str().unwrap();
                 match (Platform::current().is_windows(), ext) {
-                    (true, "bat") => run_in_environment(
-                        &format!("cmd /c {}", path.to_string_lossy()),
-                        environment,
-                    ),
+                    (true, "bat") => {
+                        tracing::info!("Testing commands:");
+                        run_in_environment(
+                            &format!("cmd /c {}", path.to_string_lossy()),
+                            environment,
+                        )
+                    }
                     (false, "sh") => {
-                        run_in_environment(&format!("bash {}", path.to_string_lossy()), environment)
+                        tracing::info!("Testing commands:");
+                        run_in_environment(
+                            &format!("bash -x {}", path.to_string_lossy()),
+                            environment,
+                        )
                     }
                     _ => Ok(()),
                 }
             }
             Tests::Python(path) => {
+                let imports = fs::read_to_string(path)?;
+                tracing::info!("Testing Python imports:\n{imports}");
                 run_in_environment(&format!("python {}", path.to_string_lossy()), environment)
             }
         }
@@ -139,9 +148,7 @@ async fn tests_from_folder(pkg: &Path) -> Result<Vec<Tests>, TestError> {
         match file_name {
             "run_test.sh" | "run_test.bat" => tests.push(Tests::Commands(path)),
             "run_test.py" => tests.push(Tests::Python(path)),
-            _ => {
-                tracing::warn!("Unknown test file: {}", file_name)
-            }
+            _ => {}
         }
     }
 
@@ -260,8 +267,8 @@ pub async fn run_test(
     let cache_key = CacheKey::from(pkg);
     let dir = cache_dir.join("pkgs").join(cache_key.to_string());
 
+    println!("Collecting tests from {:?}", dir);
     let tests = tests_from_folder(&dir).await?;
-    println!("Running tests: {:?}", tests);
 
     for test in tests {
         test.run(&prefix)?;

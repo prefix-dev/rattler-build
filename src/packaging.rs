@@ -113,6 +113,12 @@ fn create_prefix_placeholder(
     file_path: &Path,
     prefix: &Path,
 ) -> Result<Option<PrefixPlaceholder>, PackagingError> {
+    // exclude pyc and pyo files from prefix replacement
+    if let Some(ext) = file_path.extension() {
+        if ext == "pyc" || ext == "pyo" {
+            return Ok(None);
+        }
+    }
     // read first 1024 bytes to determine file type
     let mut file = File::open(file_path)?;
     let mut buffer = [0; 1024];
@@ -317,7 +323,7 @@ fn create_run_exports_json(recipe: &Output) -> Result<Option<String>, PackagingE
     }
 }
 
-// This function returns a HashSet of (recursively) all the files in the given directory.
+/// This function returns a HashSet of (recursively) all the files in the given directory.
 pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>, PackagingError> {
     let mut res = HashSet::new();
     for entry in WalkDir::new(directory) {
@@ -532,18 +538,68 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
             let pyfile = if has_pycache {
                 // a pyc file with a pycache parent should be removed
                 // replace two last dots with .py
+                // these paths look like .../__pycache__/file_dependency.cpython-311.pyc
+                // where the `file_dependency.py` path would be found in the parent directory from __pycache__
                 let stem = path.file_name().unwrap().to_string_lossy().to_string();
-                let py_stem = stem.rsplitn(2, '.').last().unwrap_or_default();
-                parent.join(format!("{}.py", py_stem))
+                let py_stem = stem.rsplitn(3, '.').last().unwrap_or_default();
+                if let Some(pp) = parent.parent() {
+                    pp.join(format!("{}.py", py_stem))
+                } else {
+                    return true;
+                }
             } else {
                 path.with_extension("py")
             };
+
             if !new_files.contains(&pyfile) {
                 return true;
             }
         }
     }
     false
+}
+
+fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
+    let mut test_files = Vec::new();
+    if let Some(test) = &output.recipe.test {
+        let test_folder = tmp_dir_path.join("info/test/");
+        fs::create_dir_all(&test_folder)?;
+
+        if let Some(import_test) = &test.imports {
+            let test_file = test_folder.join("run_test.py");
+            let mut file = File::create(&test_file)?;
+            for el in import_test {
+                writeln!(file, "import {}\n", el)?;
+            }
+            test_files.push(test_file);
+        }
+
+        if let Some(commands) = &test.commands {
+            let test_file = test_folder.join("run_test.sh");
+            let mut file = File::create(&test_file)?;
+            for el in commands {
+                writeln!(file, "{}\n", el)?;
+            }
+            test_files.push(test_file);
+        }
+
+        if let Some(test_dependencies) = &test.requires {
+            let test_file = test_folder.join("test_time_dependencies.json");
+            let mut file = File::create(&test_file)?;
+            file.write_all(serde_json::to_string(test_dependencies)?.as_bytes())?;
+            test_files.push(test_file);
+        }
+
+        if let Some(_test_files) = &test.files {
+            todo!("Test files is not yet implemented!");
+        }
+
+        if let Some(_test_source_files) = &test.source_files {
+            todo!("Test files is not yet implemented!");
+        }
+    }
+
+    Ok(test_files)
 }
 
 /// Given an output and a set of new files, create a conda package.
@@ -613,6 +669,9 @@ pub fn package_conda(
     if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
         tmp_files.extend(license_files);
     }
+
+    let test_files = write_test_files(output, tmp_dir_path)?;
+    tmp_files.extend(test_files);
 
     if let PlatformOrNoarch::Noarch(noarch_type) = output.build_configuration.target_platform {
         if noarch_type.is_python() {

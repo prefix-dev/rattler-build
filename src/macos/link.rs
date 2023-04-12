@@ -48,7 +48,8 @@ impl Dylib {
         file.read_exact(&mut buf)?;
         let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
         match ctx_res {
-            Ok(_) => Ok(true),
+            Ok((_, Some(_))) => Ok(true),
+            Ok((_, None)) => Ok(false),
             Err(_) => Ok(false),
         }
     }
