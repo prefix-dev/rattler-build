@@ -15,10 +15,8 @@ use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
 
-pub fn get_conda_build_script(
-    output: &Output,
-    directories: &Directories,
-) -> anyhow::Result<PathBuf> {
+/// Create a conda build script and return the path to it
+fn get_conda_build_script(output: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
     let recipe = &output.recipe;
 
     let build_env_script_path = directories.work_dir.join("build_env.sh");
@@ -69,7 +67,9 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
-pub async fn run_build(output: &Output) -> anyhow::Result<()> {
+/// Run the build for the given output. This will fetch the sources, resolve the dependencies,
+/// and execute the build script. Returns the path to the resulting package.
+pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     if let Some(source) = &output.recipe.source {
@@ -86,6 +86,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
     };
 
     let build_script = get_conda_build_script(&output, directories);
+
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script.unwrap());
 
@@ -105,7 +106,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
         .cloned()
         .collect::<HashSet<_>>();
 
-    package_conda(
+    let result_package = package_conda(
         &output,
         &difference,
         &directories.host_prefix,
@@ -121,5 +122,5 @@ pub async fn run_build(output: &Output) -> anyhow::Result<()> {
         Some(&output.build_configuration.target_platform),
     )?;
 
-    Ok(())
+    Ok(result_package)
 }

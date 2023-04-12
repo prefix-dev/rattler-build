@@ -263,9 +263,6 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
             for spec in &rex.strong {
                 match_specs.push(MatchSpec::from_str(spec).expect("Invalid match spec"));
             }
-            for spec in &rex.weak {
-                match_specs.push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-            }
         }
     }
 

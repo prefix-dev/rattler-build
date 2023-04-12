@@ -1,6 +1,7 @@
 use rattler_conda_types::Platform;
 use std::{collections::HashMap, path::Path};
 
+/// Get default env vars for macOS
 pub fn default_env_vars(_prefix: &Path, target_platform: &Platform) -> HashMap<String, String> {
     let mut vars = HashMap::new();
     let t_string = target_platform.to_string();
