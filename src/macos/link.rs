@@ -43,7 +43,7 @@ impl Dylib {
     /// only parse the magic number of a file and check if it
     /// is a Mach-O file
     pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
-        let mut file = File::open(&path)?;
+        let mut file = File::open(path)?;
         let mut buf: [u8; 4] = [0; 4];
         file.read_exact(&mut buf)?;
         let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
@@ -61,14 +61,14 @@ impl Dylib {
             Mach::Binary(mach) => {
                 return Ok(Dylib {
                     path: path.to_path_buf(),
-                    id: mach.name.map(|s| PathBuf::from(s)),
-                    rpaths: mach.rpaths.iter().map(|s| PathBuf::from(s)).collect(),
-                    libraries: mach.libs.iter().map(|s| PathBuf::from(s)).collect(),
+                    id: mach.name.map(PathBuf::from),
+                    rpaths: mach.rpaths.iter().map(PathBuf::from).collect(),
+                    libraries: mach.libs.iter().map(PathBuf::from).collect(),
                 });
             }
             _ => {
                 tracing::error!("Not a valid Mach-O binary.");
-                return Err(RelinkError::FileTypeNotHandled);
+                Err(RelinkError::FileTypeNotHandled)
             }
         }
     }
@@ -108,7 +108,7 @@ impl Dylib {
                 );
 
                 let relpath =
-                    pathdiff::diff_paths(&rpath, &orig_path).ok_or(RelinkError::PathDiffError {
+                    pathdiff::diff_paths(rpath, &orig_path).ok_or(RelinkError::PathDiffError {
                         from: orig_path.clone(),
                         to: rpath.clone(),
                     })?;
@@ -125,8 +125,8 @@ impl Dylib {
         let exchange_dylib = |path: &Path| {
             if let Ok(relpath) = path.strip_prefix(prefix) {
                 let new_path = prefix.join(relpath);
-                let diff_path =
-                    pathdiff::diff_paths(&new_path, &self.path.parent().unwrap()).unwrap();
+                let _diff_path =
+                    pathdiff::diff_paths(new_path, self.path.parent().unwrap()).unwrap();
                 let new_path = PathBuf::from(format!("@rpath/{}", relpath.to_string_lossy()));
                 Some(new_path)
             } else {
@@ -135,7 +135,7 @@ impl Dylib {
         };
 
         if let Some(id) = &self.id {
-            if let Some(new_dylib) = exchange_dylib(&id) {
+            if let Some(new_dylib) = exchange_dylib(id) {
                 changes.change_id = Some(new_dylib);
                 modified = true;
             }

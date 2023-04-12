@@ -568,7 +568,7 @@ pub fn package_conda(
     let mut tmp_files = HashSet::new();
     for f in new_files {
         // temporary measure to remove pyc files that are not supposed to be there
-        if filter_pyc(&f, new_files) {
+        if filter_pyc(f, new_files) {
             continue;
         }
         if let Some(dest_file) = write_to_dest(

@@ -53,7 +53,7 @@ pub enum DllParseError {
 impl Dll {
     /// Check if the file is a DLL (PE) file.
     fn test_file(path: &Path) -> Result<bool, std::io::Error> {
-        let mut file = File::open(&path)?;
+        let mut file = File::open(path)?;
         let mut buf: [u8; 2] = [0; 2];
         file.read_exact(&mut buf)?;
         let signature = buf
@@ -66,7 +66,7 @@ impl Dll {
     /// libraries it depends on.
     fn new(path: &Path) -> Result<Self, DllParseError> {
         let mut buffer = Vec::new();
-        let mut file = File::open(&path)?;
+        let mut file = File::open(path)?;
         file.read_to_end(&mut buffer)?;
         let pe = PE::parse(&buffer)?;
         Ok(Self {

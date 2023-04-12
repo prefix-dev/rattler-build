@@ -143,6 +143,6 @@ mod tests {
             p.pin_subpackage.min_pin.as_ref().unwrap().to_string(),
             "x.x.x"
         );
-        assert_eq!(p.pin_subpackage.exact, true);
+        assert!(p.pin_subpackage.exact);
     }
 }

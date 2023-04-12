@@ -34,7 +34,7 @@ pub enum RelinkError {
 
 impl SharedObject {
     pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
-        let mut file = File::open(&path)?;
+        let mut file = File::open(path)?;
         let mut signature: [u8; 4] = [0; 4];
         file.read_exact(&mut signature)?;
         Ok(ELFMAG.iter().eq(signature.iter()))
@@ -42,7 +42,7 @@ impl SharedObject {
 
     pub fn new(path: &Path) -> Result<Self, RelinkError> {
         let mut buffer = Vec::new();
-        let mut file = File::open(&path).expect("Failed to open the DLL file");
+        let mut file = File::open(path).expect("Failed to open the DLL file");
         file.read_to_end(&mut buffer)
             .expect("Failed to read the DLL file");
         let elf = Elf::parse(&buffer).expect("Failed to parse the ELF file");
