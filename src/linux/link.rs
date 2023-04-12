@@ -6,15 +6,15 @@ use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-struct SharedObject {
+pub struct SharedObject {
     /// Path to the shared object
-    path: PathBuf,
+    pub path: PathBuf,
     /// Libraries that this shared object depends on
-    libraries: HashSet<String>,
+    pub libraries: HashSet<String>,
     /// RPATH entries
-    rpaths: Vec<String>,
+    pub rpaths: Vec<String>,
     /// RUNPATH entries
-    runpaths: Vec<String>,
+    pub runpaths: Vec<String>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -33,14 +33,14 @@ pub enum RelinkError {
 }
 
 impl SharedObject {
-    fn test_file(path: &Path) -> Result<bool, std::io::Error> {
+    pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
         let mut file = File::open(&path)?;
         let mut signature: [u8; 4] = [0; 4];
         file.read_exact(&mut signature)?;
         Ok(ELFMAG.iter().eq(signature.iter()))
     }
 
-    fn new(path: &Path) -> Result<Self, RelinkError> {
+    pub fn new(path: &Path) -> Result<Self, RelinkError> {
         let mut buffer = Vec::new();
         let mut file = File::open(&path).expect("Failed to open the DLL file");
         file.read_to_end(&mut buffer)
@@ -58,7 +58,7 @@ impl SharedObject {
     /// find all RPATH and RUNPATH entries
     /// replace them with the encoded prefix
     /// if the prefix is not found, add it to the end of the list
-    fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
         let rpaths = self
             .rpaths
             .iter()
@@ -77,10 +77,8 @@ impl SharedObject {
 
         for rpath in rpaths.iter().chain(runpaths.iter()) {
             if rpath.starts_with(encoded_prefix) {
-                let rel = rpath
-                    .strip_prefix(prefix)
-                    .expect("Failed to strip prefix from path");
-                let new_rpath = encoded_prefix.join(rel);
+                let rel = rpath.strip_prefix(encoded_prefix)?;
+                let new_rpath = prefix.join(rel);
 
                 let relative_path =
                     pathdiff::diff_paths(new_rpath, self.path.parent().unwrap()).unwrap();

@@ -31,6 +31,7 @@ mod windows;
 use metadata::PlatformOrNoarch;
 mod index;
 mod packaging;
+mod post;
 mod selectors;
 mod used_variables;
 mod variant_config;
