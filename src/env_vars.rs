@@ -61,6 +61,8 @@ macro_rules! insert {
     };
 }
 
+/// Return all variables that should be set during the build process, including
+/// operating system specific environment variables.
 pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     let mut vars = HashMap::<String, String>::new();
 
@@ -158,6 +160,8 @@ pub enum ScriptError {
     CreateActivation(#[from] ActivationError),
 }
 
+/// Write a script that can be sourced to set the environment variables for the build process.
+/// The script will also activate the host and build prefixes.
 pub fn write_env_script(
     output: &Output,
     state: &str,

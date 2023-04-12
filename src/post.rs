@@ -16,6 +16,24 @@ use rattler_conda_types::Platform;
 
 use crate::{linux::link::SharedObject, macos::link::Dylib};
 
+/// Relink dynamic libraries in the given paths to be relocatable
+/// This function first searches for any dynamic libraries (ELF or Mach-O) in the given paths,
+/// and then relinks them by changing the rpath to make them easily relocatable.
+///
+/// ### What is an "rpath"?
+///
+/// The rpath is a list of paths that are searched for shared libraries when a program is run.
+/// For example, if a program links to `libfoo.so`, the rpath is searched for `libfoo.so`.
+/// If the rpath is not set, the system library paths are searched.
+///
+/// ### Relinking
+///
+/// On Linux (ELF files) we relink the executables or shared libraries by setting the `rpath` to something that is relative to
+/// the library or executable location with the special `$ORIGIN` variable. The change is applied with the `patchelf` executable.
+/// For example, any rpath that starts with `/just/some/folder/_host_prefix/lib` will be changed to `$ORIGIN/../lib`.
+///
+/// On macOS (Mach-O files), we do the same trick and set the rpath to a relative path with the special
+/// `@loader_path` variable. The change for Mach-O files is applied with the `install_name_tool`.
 pub fn relink(
     paths: &HashSet<PathBuf>,
     prefix: &Path,
