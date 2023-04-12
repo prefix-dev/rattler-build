@@ -76,6 +76,22 @@ pub struct About {
     pub dev_url: Option<Vec<Url>>,
 }
 
+/// Define tests in your recipe that are executed after successfully
+/// building the package.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Test {
+    /// Try importing a python module as a sanity check
+    pub imports: Option<Vec<String>>,
+    /// Run a list of given commands
+    pub commands: Option<Vec<String>>,
+    /// Extra requirements to be installed at test time
+    pub requires: Option<Vec<String>>,
+    /// Extra files to be copied to the test environment from the source dir (can be globs)
+    pub source_files: Option<Vec<String>>,
+    /// Extra files to be copied to the test environment from the build dir (can be globs)
+    pub files: Option<Vec<String>>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Recipe {
     pub context: BTreeMap<String, serde_yaml::Value>,
@@ -284,6 +300,7 @@ pub struct RenderedRecipe {
     pub build: BuildOptions,
     pub requirements: Requirements,
     pub about: About,
+    pub test: Option<Test>,
 }
 
 #[derive(Debug, Clone)]

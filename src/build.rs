@@ -7,22 +7,31 @@ use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 
 use itertools::Itertools;
+use rattler_conda_types::Platform;
 
 use crate::env_vars::write_env_script;
-use crate::index;
 use crate::metadata::{Directories, Output, PlatformOrNoarch};
 use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
+use crate::{index, test};
 
 /// Create a conda build script and return the path to it
-fn get_conda_build_script(output: &Output, directories: &Directories) -> anyhow::Result<PathBuf> {
+pub fn get_conda_build_script(
+    output: &Output,
+    directories: &Directories,
+) -> Result<PathBuf, std::io::Error> {
     let recipe = &output.recipe;
 
     let build_env_script_path = directories.work_dir.join("build_env.sh");
     let mut fout = File::create(&build_env_script_path)?;
 
-    write_env_script(output, "BUILD", &mut fout)?;
+    write_env_script(output, "BUILD", &mut fout).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to write build env script: {}", e),
+        )
+    })?;
 
     let preambel = format!(
         "if [ -z ${{CONDA_BUILD+x}} ]; then\n    source {}\nfi",
@@ -46,11 +55,9 @@ fn get_conda_build_script(output: &Output, directories: &Directories) -> anyhow:
         let recipe_file = directories.recipe_dir.join("build.sh");
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
-        let mut orig_build_file = File::open(recipe_file).expect("Could not open build.sh file");
+        let mut orig_build_file = File::open(recipe_file)?;
         let mut orig_build_file_text = String::new();
-        orig_build_file
-            .read_to_string(&mut orig_build_file_text)
-            .expect("Could not read file");
+        orig_build_file.read_to_string(&mut orig_build_file_text)?;
         orig_build_file_text
     } else {
         script
@@ -60,9 +67,7 @@ fn get_conda_build_script(output: &Output, directories: &Directories) -> anyhow:
     let build_script_path = directories.work_dir.join("conda_build.sh");
 
     let mut build_script_file = File::create(&build_script_path)?;
-    build_script_file
-        .write_all(full_script.as_bytes())
-        .expect("Could not write to build script.");
+    build_script_file.write_all(full_script.as_bytes())?;
 
     Ok(build_script_path)
 }
@@ -86,7 +91,6 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     };
 
     let build_script = get_conda_build_script(&output, directories);
-
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script.unwrap());
 
@@ -106,7 +110,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         .cloned()
         .collect::<HashSet<_>>();
 
-    let result_package = package_conda(
+    let result = package_conda(
         &output,
         &difference,
         &directories.host_prefix,
@@ -122,5 +126,15 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         Some(&output.build_configuration.target_platform),
     )?;
 
-    Ok(result_package)
+    let test_dir = directories.work_dir.join("test");
+    fs::create_dir_all(&test_dir)?;
+    let platform = match output.build_configuration.target_platform {
+        PlatformOrNoarch::Platform(p) => p,
+        PlatformOrNoarch::Noarch(_) => Platform::NoArch,
+    };
+
+    tracing::info!("Running tests");
+    test::run_test(&result, Some(&test_dir), Some(platform)).await?;
+
+    Ok(result)
 }
