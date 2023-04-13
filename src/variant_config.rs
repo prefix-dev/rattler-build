@@ -334,7 +334,6 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::metadata::PlatformOrNoarch;
     use crate::selectors::{flatten_toplevel, SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
@@ -348,7 +347,7 @@ mod tests {
         let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
 
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
@@ -359,7 +358,7 @@ mod tests {
         insta::assert_yaml_snapshot!(res);
 
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Win64),
+            target_platform: Platform::Win64,
             build_platform: Platform::Win64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
@@ -375,7 +374,7 @@ mod tests {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let yaml_file = test_data_dir.join("variant_files/variant_config_1.yaml");
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: Default::default(),
         };

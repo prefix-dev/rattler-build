@@ -233,7 +233,7 @@ mod tests {
     #[test]
     fn test_eval_selector() {
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
@@ -270,7 +270,7 @@ mod tests {
         let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
