@@ -10,6 +10,8 @@ updates:
     commit-message:
       prefix: "bump"
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "rattler*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
