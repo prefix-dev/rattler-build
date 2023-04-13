@@ -248,24 +248,9 @@ impl Directories {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum PlatformOrNoarch {
-    Platform(Platform),
-    Noarch(NoArchType),
-}
-
-impl ToString for PlatformOrNoarch {
-    fn to_string(&self) -> String {
-        match self {
-            PlatformOrNoarch::Platform(p) => p.to_string(),
-            PlatformOrNoarch::Noarch(_) => "noarch".to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct BuildConfiguration {
-    pub target_platform: PlatformOrNoarch,
+    pub target_platform: Platform,
     pub host_platform: Platform,
     pub build_platform: Platform,
     pub variant: BTreeMap<String, String>,
@@ -277,10 +262,7 @@ pub struct BuildConfiguration {
 
 impl BuildConfiguration {
     pub fn cross_compilation(&self) -> bool {
-        match &self.target_platform {
-            PlatformOrNoarch::Platform(p) => p != &self.build_platform,
-            PlatformOrNoarch::Noarch(_) => false,
-        }
+        self.target_platform != self.build_platform
     }
 }
 

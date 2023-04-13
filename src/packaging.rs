@@ -18,12 +18,12 @@ use rattler_conda_types::package::{
     PythonEntryPoints, RunExportsJson,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
-use rattler_conda_types::Version;
+use rattler_conda_types::{NoArchType, Platform, Version};
 use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use crate::macos;
-use crate::metadata::{Output, PlatformOrNoarch};
+use crate::metadata::Output;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -60,6 +60,9 @@ pub enum PackagingError {
 
     #[error("License file not found: {0}")]
     LicenseFileNotFound(String),
+
+    #[error("Relink error: {0}")]
+    RelinkError(#[from] crate::post::RelinkError),
 }
 
 #[allow(unused_variables)]
@@ -235,7 +238,8 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     let recipe = &output.recipe;
 
     let (platform, arch) = match output.build_configuration.target_platform {
-        PlatformOrNoarch::Platform(p) => {
+        Platform::NoArch => (None, None),
+        p => {
             // TODO add better functions in rattler for this
             let pstring = p.to_string();
             let parts: Vec<&str> = pstring.split('-').collect();
@@ -247,7 +251,6 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
                 _ => (Some(platform), Some(arch)),
             }
         }
-        PlatformOrNoarch::Noarch(_) => (None, None),
     };
 
     let index_json = IndexJson {
@@ -343,47 +346,46 @@ fn write_to_dest(
     path: &Path,
     prefix: &Path,
     dest_folder: &Path,
-    target_platform: &PlatformOrNoarch,
+    target_platform: &Platform,
+    noarch_type: &NoArchType,
 ) -> Result<Option<PathBuf>, PackagingError> {
     let path_rel = path.strip_prefix(prefix)?;
     let mut dest_path = dest_folder.join(path_rel);
 
-    if let PlatformOrNoarch::Noarch(t) = target_platform {
-        if t.is_python() {
-            if path.ends_with(".pyc") || path.ends_with(".pyo") {
-                return Ok(None); // skip .pyc files
-            }
-
-            // if any part of the path is __pycache__ skip it
-            if path_rel
-                .components()
-                .any(|c| c == Component::Normal("__pycache__".as_ref()))
-            {
-                return Ok(None);
-            }
-
-            // check if site-packages is in the path and strip everything before it
-            let pat = std::path::Component::Normal("site-packages".as_ref());
-            let parts = path_rel.components();
-            let mut new_parts = Vec::new();
-            let mut found = false;
-            for part in parts {
-                if part == pat {
-                    found = true;
-                }
-                if found {
-                    new_parts.push(part);
-                }
-            }
-
-            if !found {
-                // skip files that are not in site-packages
-                // TODO we need data files?
-                return Ok(None);
-            }
-
-            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+    if noarch_type.is_python() {
+        if path.ends_with(".pyc") || path.ends_with(".pyo") {
+            return Ok(None); // skip .pyc files
         }
+
+        // if any part of the path is __pycache__ skip it
+        if path_rel
+            .components()
+            .any(|c| c == Component::Normal("__pycache__".as_ref()))
+        {
+            return Ok(None);
+        }
+
+        // check if site-packages is in the path and strip everything before it
+        let pat = std::path::Component::Normal("site-packages".as_ref());
+        let parts = path_rel.components();
+        let mut new_parts = Vec::new();
+        let mut found = false;
+        for part in parts {
+            if part == pat {
+                found = true;
+            }
+            if found {
+                new_parts.push(part);
+            }
+        }
+
+        if !found {
+            // skip files that are not in site-packages
+            // TODO we need data files?
+            return Ok(None);
+        }
+
+        dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
     }
 
     match dest_path.parent() {
@@ -404,10 +406,8 @@ fn write_to_dest(
 
     // make absolute symlinks relative
     if metadata.is_symlink() {
-        if let PlatformOrNoarch::Platform(p) = target_platform {
-            if p.is_windows() {
-                tracing::warn!("Symlinks need administrator privileges on Windows");
-            }
+        if target_platform.is_windows() {
+            tracing::warn!("Symlinks need administrator privileges on Windows");
         }
 
         if let Result::Ok(link) = fs::read_link(path) {
@@ -632,6 +632,7 @@ pub fn package_conda(
             prefix,
             tmp_dir_path,
             &output.build_configuration.target_platform,
+            &output.recipe.build.noarch,
         )? {
             tmp_files.insert(dest_file);
         }
@@ -639,8 +640,13 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    if let PlatformOrNoarch::Platform(p) = &output.build_configuration.target_platform {
-        post::relink(&tmp_files, tmp_dir_path, prefix, p).expect("...");
+    if output.build_configuration.target_platform != Platform::NoArch {
+        post::relink(
+            &tmp_files,
+            tmp_dir_path,
+            prefix,
+            &output.build_configuration.target_platform,
+        )?;
     }
 
     tracing::info!("Relink done!");
@@ -673,13 +679,11 @@ pub fn package_conda(
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
 
-    if let PlatformOrNoarch::Noarch(noarch_type) = output.build_configuration.target_platform {
-        if noarch_type.is_python() {
-            if let Some(link) = create_link_json(output)? {
-                let mut link_json = File::create(info_folder.join("link.json"))?;
-                link_json.write_all(link.as_bytes())?;
-                tmp_files.insert(info_folder.join("link.json"));
-            }
+    if output.recipe.build.noarch.is_python() {
+        if let Some(link) = create_link_json(output)? {
+            let mut link_json = File::create(info_folder.join("link.json"))?;
+            link_json.write_all(link.as_bytes())?;
+            tmp_files.insert(info_folder.join("link.json"));
         }
     }
 

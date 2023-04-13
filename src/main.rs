@@ -5,7 +5,7 @@ use clap::{arg, Parser};
 
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use once_cell::sync::Lazy;
-use rattler_conda_types::{NoArchType, Platform};
+use rattler_conda_types::Platform;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
@@ -21,20 +21,19 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod env_vars;
+mod index;
 mod linux;
 mod macos;
 mod metadata;
-mod render;
-mod source;
-mod unix;
-mod windows;
-use metadata::PlatformOrNoarch;
-mod index;
 mod packaging;
 mod post;
+mod render;
 mod selectors;
+mod source;
+mod unix;
 mod used_variables;
 mod variant_config;
+mod windows;
 use build::run_build;
 
 mod test;
@@ -155,29 +154,21 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     let mut recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
-    let target_platform: PlatformOrNoarch = if recipe_yaml
+    let target_platform = if recipe_yaml
         .get("build")
         .and_then(|v| v.get("noarch"))
         .is_some()
     {
-        let noarch_type: NoArchType = serde_yaml::from_value(
-            recipe_yaml
-                .get("build")
-                .unwrap()
-                .get("noarch")
-                .unwrap()
-                .clone(),
-        )?;
-        PlatformOrNoarch::Noarch(noarch_type)
+        Platform::NoArch
     } else if let Some(target_platform) = args.target_platform {
-        PlatformOrNoarch::Platform(Platform::from_str(&target_platform)?)
+        Platform::from_str(&target_platform)?
     } else {
         tracing::info!("No target platform specified, using current platform");
-        PlatformOrNoarch::Platform(Platform::current())
+        Platform::current()
     };
 
     let selector_config = SelectorConfig {
-        target_platform: target_platform.clone(),
+        target_platform,
         build_platform: Platform::current(),
         variant: BTreeMap::new(),
     };
@@ -213,10 +204,10 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         let output = metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {
-                target_platform: target_platform.clone(),
+                target_platform,
                 host_platform: match target_platform {
-                    PlatformOrNoarch::Platform(p) => p,
-                    PlatformOrNoarch::Noarch(_) => Platform::current(),
+                    Platform::NoArch => Platform::current(),
+                    _ => target_platform,
                 },
                 build_platform: Platform::current(),
                 hash: String::from("h1234_0"),
