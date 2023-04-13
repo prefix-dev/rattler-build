@@ -4,6 +4,7 @@ use rattler_conda_types::package::IndexJson;
 use rattler_conda_types::package::PackageFile;
 use rattler_conda_types::ChannelInfo;
 use rattler_conda_types::PackageRecord;
+use rattler_conda_types::Platform;
 use rattler_conda_types::RepoData;
 use rattler_package_streaming::read;
 use rattler_package_streaming::seek;
@@ -15,8 +16,6 @@ use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use walkdir::WalkDir;
-
-use crate::metadata::PlatformOrNoarch;
 
 fn package_record_from_index_json<T: Read>(
     file: &Path,
@@ -93,7 +92,7 @@ fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Erro
 /// Create a new `repodata.json` for all packages in the given output folder. If `target_platform` is
 /// `Some`, only that specific subdir is indexed. Otherwise indexes all subdirs and creates a
 /// `repodata.json` for each.
-pub fn index(output_folder: &Path, target_platform: Option<&PlatformOrNoarch>) -> Result<()> {
+pub fn index(output_folder: &Path, target_platform: Option<&Platform>) -> Result<()> {
     let entries = WalkDir::new(output_folder).into_iter();
     let entries: Vec<(PathBuf, ArchiveType)> = entries
         .filter_entry(|e| e.depth() <= 2)

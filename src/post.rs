@@ -16,6 +16,18 @@ use rattler_conda_types::Platform;
 
 use crate::{linux::link::SharedObject, macos::link::Dylib};
 
+#[derive(Debug, thiserror::Error)]
+pub enum RelinkError {
+    #[error("Error reading file: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Error relinking shared object: {0}")]
+    SharedObject(#[from] crate::linux::link::RelinkError),
+
+    #[error("Error relinking dylib: {0}")]
+    Dylib(#[from] crate::macos::link::RelinkError),
+}
+
 /// Relink dynamic libraries in the given paths to be relocatable
 /// This function first searches for any dynamic libraries (ELF or Mach-O) in the given paths,
 /// and then relinks them by changing the rpath to make them easily relocatable.
@@ -39,7 +51,7 @@ pub fn relink(
     prefix: &Path,
     encoded_prefix: &Path,
     target_platform: &Platform,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), RelinkError> {
     for p in paths {
         let metadata = fs::symlink_metadata(p)?;
         if metadata.is_symlink() || metadata.is_dir() {

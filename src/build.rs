@@ -7,10 +7,9 @@ use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 
 use itertools::Itertools;
-use rattler_conda_types::Platform;
 
 use crate::env_vars::write_env_script;
-use crate::metadata::{Directories, Output, PlatformOrNoarch};
+use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
@@ -38,9 +37,10 @@ pub fn get_conda_build_script(
         build_env_script_path.to_string_lossy()
     );
 
-    let default_script = match output.build_configuration.target_platform {
-        PlatformOrNoarch::Platform(p) if p.is_windows() => "bld.bat",
-        _ => "build.sh",
+    let default_script = if output.build_configuration.target_platform.is_windows() {
+        "bld.bat"
+    } else {
+        "build.sh"
     };
 
     let script = recipe
@@ -128,13 +128,14 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
 
     let test_dir = directories.work_dir.join("test");
     fs::create_dir_all(&test_dir)?;
-    let platform = match output.build_configuration.target_platform {
-        PlatformOrNoarch::Platform(p) => p,
-        PlatformOrNoarch::Noarch(_) => Platform::NoArch,
-    };
 
     tracing::info!("Running tests");
-    test::run_test(&result, Some(&test_dir), Some(platform)).await?;
+    test::run_test(
+        &result,
+        Some(&test_dir),
+        Some(output.build_configuration.target_platform),
+    )
+    .await?;
 
     Ok(result)
 }

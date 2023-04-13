@@ -7,7 +7,7 @@ use rattler_shell::shell;
 
 use crate::linux;
 use crate::macos;
-use crate::metadata::{Output, PlatformOrNoarch};
+use crate::metadata::Output;
 use crate::unix;
 use crate::windows;
 
@@ -174,10 +174,7 @@ pub fn write_env_script(
         writeln!(out, "export {}=\"{}\"", v.0, v.1)?;
     }
 
-    let platform = match output.build_configuration.target_platform {
-        PlatformOrNoarch::Platform(p) => p,
-        PlatformOrNoarch::Noarch(_) => Platform::NoArch,
-    };
+    let platform = output.build_configuration.target_platform;
 
     let additional_os_vars = os_vars(&directories.host_prefix, &platform);
 

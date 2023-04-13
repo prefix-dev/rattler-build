@@ -4,11 +4,9 @@ use minijinja::{value::Value, Environment};
 use rattler_conda_types::Platform;
 use serde_yaml::Value as YamlValue;
 
-use crate::metadata::PlatformOrNoarch;
-
 #[derive(Clone, Debug)]
 pub struct SelectorConfig {
-    pub target_platform: PlatformOrNoarch,
+    pub target_platform: Platform,
     pub build_platform: Platform,
     pub variant: BTreeMap<String, String>,
 }
@@ -17,30 +15,42 @@ impl SelectorConfig {
     pub fn into_context(self) -> HashMap<String, Value> {
         let mut context = HashMap::<String, Value>::new();
 
-        match self.target_platform {
-            PlatformOrNoarch::Platform(p) => {
-                context.insert(
-                    "target_platform".to_string(),
-                    Value::from_safe_string(p.to_string()),
-                );
-                context.insert("unix".to_string(), Value::from(p.is_unix()));
-                context.insert("win".to_string(), Value::from(p.is_windows()));
-                context.insert("osx".to_string(), Value::from(p.is_osx()));
-                context.insert("linux".to_string(), Value::from(p.is_linux()));
-                let arch = p.to_string().split('-').last().unwrap().to_string();
-                context.insert("arch".to_string(), Value::from_safe_string(arch));
-            }
-            PlatformOrNoarch::Noarch(_) => {
-                context.insert(
-                    "target_platform".to_string(),
-                    Value::from_safe_string("noarch".to_string()),
-                );
-                context.insert("unix".to_string(), Value::from(false));
-                context.insert("win".to_string(), Value::from(false));
-                context.insert("osx".to_string(), Value::from(false));
-                context.insert("linux".to_string(), Value::from(false));
-            }
-        }
+        context.insert(
+            "target_platform".to_string(),
+            Value::from_safe_string(self.target_platform.to_string()),
+        );
+        context.insert(
+            "unix".to_string(),
+            Value::from(self.target_platform.is_unix()),
+        );
+        context.insert(
+            "win".to_string(),
+            Value::from(self.target_platform.is_windows()),
+        );
+        context.insert(
+            "osx".to_string(),
+            Value::from(self.target_platform.is_osx()),
+        );
+        context.insert(
+            "linux".to_string(),
+            Value::from(self.target_platform.is_linux()),
+        );
+        let arch = self
+            .target_platform
+            .to_string()
+            .split('-')
+            .last()
+            .unwrap()
+            .to_string();
+        let arch = match arch.as_str() {
+            "64" => "x86_64",
+            "32" => "x86",
+            _ => &arch,
+        };
+        context.insert(
+            "arch".to_string(),
+            Value::from_safe_string(arch.to_string()),
+        );
 
         context.insert(
             "build_platform".to_string(),
@@ -223,7 +233,7 @@ mod tests {
     #[test]
     fn test_eval_selector() {
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()
@@ -260,7 +270,7 @@ mod tests {
         let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
         let selector_config = SelectorConfig {
-            target_platform: PlatformOrNoarch::Platform(Platform::Linux64),
+            target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: vec![("python_version".into(), "3.8.5".into())]
                 .into_iter()

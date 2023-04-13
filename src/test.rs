@@ -17,13 +17,13 @@ use std::{
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{ArchiveIdentifier, ArchiveType},
-    MatchSpec, NoArchType, Platform,
+    MatchSpec, Platform,
 };
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 use std::io::Write;
 
-use crate::{env_vars, index, metadata::PlatformOrNoarch, render::solver::create_environment};
+use crate::{env_vars, index, render::solver::create_environment};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
@@ -206,11 +206,6 @@ pub async fn run_test(
 ) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir().unwrap();
     let target_platform = target_platform.unwrap_or_else(Platform::current);
-
-    let target_platform = match target_platform {
-        Platform::NoArch => PlatformOrNoarch::Noarch(NoArchType(None)),
-        p => PlatformOrNoarch::Platform(p),
-    };
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
     std::fs::create_dir_all(&subdir).unwrap();

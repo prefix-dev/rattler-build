@@ -5,11 +5,11 @@ use std::{
     str::FromStr,
 };
 
-use crate::metadata::{Output, PlatformOrNoarch, RunExports};
+use crate::metadata::{Output, RunExports};
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, RepoDataRecord, VersionSpec,
+    MatchSpec, Platform, RepoDataRecord, VersionSpec,
 };
 use thiserror::Error;
 
@@ -59,7 +59,7 @@ pub enum ResolveError {
 pub fn apply_variant(
     raw_specs: &DependencyList,
     variant: &BTreeMap<String, String>,
-    target_platform: &PlatformOrNoarch,
+    target_platform: &Platform,
 ) -> Result<Vec<(Dependency, MatchSpec)>, ResolveError> {
     let applied = raw_specs
         .iter()
@@ -87,12 +87,9 @@ pub fn apply_variant(
                 }
                 Dependency::PinSubpackage(_) => todo!(),
                 Dependency::Compiler(compiler) => {
-                    let target_platform =
-                        if let PlatformOrNoarch::Platform(target_platform) = target_platform {
-                            target_platform
-                        } else {
-                            panic!("Noarch packages cannot have compilers");
-                        };
+                    if target_platform == &Platform::NoArch {
+                        panic!("Noarch packages cannot have compilers");
+                    }
 
                     let compiler_variant = format!("compiler_{}", compiler.compiler);
                     let compiler_name = variant
@@ -313,7 +310,16 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
 
     if let Some(host_env) = &host_env {
         match output.build_configuration.target_platform {
-            PlatformOrNoarch::Platform(_) => {
+            Platform::NoArch => {
+                for (_, rex) in &host_env.run_exports {
+                    for spec in &rex.noarch {
+                        run_specs
+                            .depends
+                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
+                    }
+                }
+            }
+            _ => {
                 for (_, rex) in &host_env.run_exports {
                     for spec in &rex.strong {
                         run_specs
@@ -333,15 +339,6 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
                     for spec in &rex.weak_constrains {
                         run_specs
                             .constrains
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                }
-            }
-            PlatformOrNoarch::Noarch(_) => {
-                for (_, rex) in &host_env.run_exports {
-                    for spec in &rex.noarch {
-                        run_specs
-                            .depends
                             .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
                     }
                 }
