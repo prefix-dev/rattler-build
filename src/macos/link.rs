@@ -1,9 +1,11 @@
+//! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+/// A macOS dylib (Mach-O)
 pub struct Dylib {
     /// Path to the dylib
     pub path: PathBuf,
@@ -157,6 +159,7 @@ impl Dylib {
     }
 }
 
+/// Changes to apply to a dylib
 #[derive(Debug, Default)]
 struct DylibChanges {
     // rpaths to delete

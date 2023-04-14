@@ -1,11 +1,13 @@
+//! Relink shared objects to use an relative path prefix
 use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
 use itertools::Itertools;
 use std::collections::HashSet;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+/// A linux shared object (ELF)
 pub struct SharedObject {
     /// Path to the shared object
     pub path: PathBuf,
@@ -33,6 +35,7 @@ pub enum RelinkError {
 }
 
 impl SharedObject {
+    /// Check if the file is an ELF file by reading the first 4 bytes
     pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
         let mut file = File::open(path)?;
         let mut signature: [u8; 4] = [0; 4];
@@ -40,6 +43,7 @@ impl SharedObject {
         Ok(ELFMAG.iter().eq(signature.iter()))
     }
 
+    /// Create a new shared object from a path
     pub fn new(path: &Path) -> Result<Self, RelinkError> {
         let mut buffer = Vec::new();
         let mut file = File::open(path).expect("Failed to open the DLL file");
@@ -122,35 +126,4 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
     } else {
         Ok(())
     }
-}
-
-pub fn relink_paths(
-    paths: &HashSet<PathBuf>,
-    prefix: &Path,
-    encoded_prefix: &Path,
-) -> Result<(), RelinkError> {
-    for p in paths {
-        if fs::symlink_metadata(p)?.is_symlink() {
-            tracing::info!("Skipping symlink: {}", p.display());
-            continue;
-        }
-
-        // Skip files that are not binaries
-        let mut buffer = vec![0; 1024];
-        let mut file = File::open(p)?;
-        let n = file.read(&mut buffer)?;
-        let buffer = &buffer[..n];
-
-        let content_type = content_inspector::inspect(buffer);
-        if content_type != content_inspector::ContentType::BINARY {
-            continue;
-        }
-
-        if SharedObject::test_file(p)? {
-            let so = SharedObject::new(p)?;
-            so.relink(prefix, encoded_prefix)?;
-        }
-    }
-
-    Ok(())
 }

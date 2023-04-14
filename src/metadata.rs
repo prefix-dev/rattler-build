@@ -1,3 +1,4 @@
+//! All the metadata that makes up a recipe file
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
 use rattler_conda_types::Platform;

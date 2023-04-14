@@ -1,3 +1,5 @@
+//! The build module contains the code for running the build process for a given [`Output`]
+
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
@@ -38,7 +40,7 @@ pub fn get_conda_build_script(
     );
 
     let default_script = if output.build_configuration.target_platform.is_windows() {
-        "bld.bat"
+        "build.bat"
     } else {
         "build.sh"
     };
