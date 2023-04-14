@@ -35,7 +35,7 @@ jobs:
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
         with:
-          mdbook-version: '0.4.10'
+          mdbook-version: 'latest'
 
 
       - uses: actions-rs/toolchain@v1
@@ -52,23 +52,24 @@ jobs:
         run: |
           echo "<meta name=\"robots\" content=\"noindex\">" > header.html
 
-      - name: Build Documentation
-        run: cargo doc --workspace --no-deps --all-features
+      # - uses: Swatinem/rust-cache@v2
+      # - name: Build Documentation
+      #   run: cargo doc --workspace --no-deps --all-features
       - name: Build Book
-        run: mdbook
+        run: mdbook 
 
       #  This adds the following:
       #   - A top level redirect to the bevy crate documentation
       #   - A robots.txt file to forbid any crawling of the site (to defer to the docs.rs site on search engines).
       #   - A .nojekyll file to disable Jekyll GitHub Pages builds.
+      #     echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
+      #     echo "User-Agent: *\nDisallow: /" > target/doc/robots.txt
+
+      #     mkdir final_docs
+      #     touch final_docs/.nojekyll
+      #     mv target/doc/* final_docs/reference
       - name: Finalize documentation
         run: |
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
-          echo "User-Agent: *\nDisallow: /" > target/doc/robots.txt
-
-          mkdir final_docs
-          touch final_docs/.nojekyll
-          mv target/doc/* final_docs/reference
           mv book/* final_docs/
 
       - name: Upload artifact
