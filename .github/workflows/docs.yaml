@@ -56,7 +56,7 @@ jobs:
       # - name: Build Documentation
       #   run: cargo doc --workspace --no-deps --all-features
       - name: Build Book
-        run: mdbook 
+        run: mdbook build
 
       #  This adds the following:
       #   - A top level redirect to the bevy crate documentation
