@@ -233,7 +233,7 @@ mod tests {
         about:
         "#;
         let recipe = serde_yaml::from_str(recipe).unwrap();
-        let recipe = render_recipe(&recipe, &BTreeMap::new());
+        let recipe = render_recipe(&recipe, &BTreeMap::new(), "h12341234");
         assert!(recipe.is_ok());
         insta::assert_yaml_snapshot!(recipe.expect("could not render recipe"));
     }

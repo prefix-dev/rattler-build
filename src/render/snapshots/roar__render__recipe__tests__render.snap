@@ -16,7 +16,7 @@ source:
     folder: ~
 build:
   number: 0
-  string: ~
+  string: h12341234
   script: ~
   ignore_run_exports: ~
   run_exports: ~

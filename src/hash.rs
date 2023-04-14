@@ -67,14 +67,14 @@ impl Formatter for PythonFormatter {
 }
 
 fn short_version_from_spec(input: &str, length: u32) -> String {
-    let mut parts = input.split(".");
+    let mut parts = input.split('.');
     let mut result = String::new();
     for _ in 0..length {
         if let Some(part) = parts.next() {
             result.push_str(part);
         }
     }
-    return result;
+    result
 }
 
 fn compute_hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
@@ -112,7 +112,7 @@ fn compute_hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) 
             result.push_str(format!("{}{}", key, value).as_str());
         }
     }
-    return result;
+    result
 }
 
 fn hash_variant(variant: &BTreeMap<String, String>) -> String {

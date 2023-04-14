@@ -66,6 +66,8 @@ blas_impl:
   - openblas
   - mkl
   - blis
+build_platform:
+  - linux-64
 libblas:
   - 3.9 *netlib
 libcblas:
@@ -74,4 +76,6 @@ liblapack:
   - 3.9 *netlib
 liblapacke:
   - 3.9 *netlib
+target_platform:
+  - linux-64
 

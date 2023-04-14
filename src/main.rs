@@ -215,7 +215,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &build_options.noarch);
         let recipe = render_recipe(&recipe_yaml, &variant, &hash)?;
-        let noarch_type = recipe.build.noarch.clone();
+        let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
         let output = metadata::Output {
             recipe,
