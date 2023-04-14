@@ -203,9 +203,9 @@ pub fn flatten_selectors(
 pub fn flatten_toplevel(
     val: &mut YamlValue,
     selector_config: &SelectorConfig,
-) -> BTreeMap<String, YamlValue> {
-    let mut new_val = BTreeMap::<String, YamlValue>::new();
+) -> Option<YamlValue> {
     if val.is_mapping() {
+        let mut new_val = BTreeMap::<String, YamlValue>::new();
         for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
             if let YamlValue::String(key) = k {
                 if key.starts_with("sel(") {
@@ -219,10 +219,14 @@ pub fn flatten_toplevel(
                 } else {
                     new_val.insert(key.clone(), flatten_selectors(v, selector_config).unwrap());
                 }
+            } else {
+                tracing::error!("Variant config key is not a string: {:?}. Ignoring", k);
             }
         }
+        Some(serde_yaml::to_value(new_val).unwrap())
+    } else {
+        None
     }
-    new_val
 }
 
 #[cfg(test)]
