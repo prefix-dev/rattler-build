@@ -11,7 +11,7 @@ use serde_with::OneOrMany;
 use serde_yaml::Value as YamlValue;
 use thiserror::Error;
 
-use crate::selectors::{flatten_selectors, SelectorConfig};
+use crate::selectors::{flatten_selectors, flatten_toplevel, SelectorConfig};
 use crate::used_variables::extract_dependencies;
 use crate::used_variables::used_vars_from_expressions;
 
@@ -148,7 +148,7 @@ impl VariantConfig {
             let reader = std::io::BufReader::new(file);
             let mut yaml_value = serde_yaml::from_reader(reader).unwrap();
 
-            if let Some(yaml_value) = flatten_selectors(&mut yaml_value, selector_config) {
+            if let Some(yaml_value) = flatten_toplevel(&mut yaml_value, selector_config) {
                 let config: VariantConfig = serde_yaml::from_value(yaml_value)
                     .expect("Could not deserialize variant config");
                 variant_configs.push(config);
