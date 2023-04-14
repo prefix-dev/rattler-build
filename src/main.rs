@@ -22,6 +22,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod env_vars;
+mod hash;
 mod index;
 mod linux;
 mod macos;
@@ -194,13 +195,19 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
             let rendered_recipe =
                 render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
             println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
+
+            let noarch_type = rendered_recipe.build.noarch.clone();
+            let name = rendered_recipe.package.name.clone();
+            let hash = hash::compute_buildstring(&variant, &noarch_type);
+            println!("Variant: {:#?}", variant);
+            println!("Hash: {}", hash);
         }
         exit(0);
     }
 
     for variant in variants {
         let recipe = render_recipe(&recipe_yaml, &variant)?;
-
+        let noarch_type = recipe.build.noarch.clone();
         let name = recipe.package.name.clone();
         let output = metadata::Output {
             recipe,
@@ -211,7 +218,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                     _ => target_platform,
                 },
                 build_platform: Platform::current(),
-                hash: String::from("h1234_0"),
+                hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
                 no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,

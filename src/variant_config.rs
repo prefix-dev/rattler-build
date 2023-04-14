@@ -168,20 +168,36 @@ impl VariantConfig {
             final_config.zip_keys = config.zip_keys;
         }
 
+        // always insert target_platform and build_platform
+        final_config.variants.insert(
+            "target_platform".into(),
+            vec![selector_config.target_platform.to_string()],
+        );
+        final_config.variants.insert(
+            "build_platform".into(),
+            vec![selector_config.build_platform.to_string()],
+        );
+
         final_config
     }
 
     fn validate_zip_keys(&self) -> Result<(), VariantError> {
         if let Some(zip_keys) = &self.zip_keys {
+            println!("zip_keys: {:?}", zip_keys);
             for zip in zip_keys {
-                let mut len = None;
+                let mut prev_len = None;
                 for key in zip {
-                    if let Some(l) = len {
-                        if l != key.len() {
+                    let value = self.variants.get(key);
+                    if value.is_none() {
+                        return Err(VariantError::InvalidZipKeyLength(key.to_string()));
+                    }
+                    let len = value.unwrap().len();
+                    if let Some(l) = prev_len {
+                        if l != len {
                             return Err(VariantError::InvalidZipKeyLength(key.to_string()));
                         }
                     }
-                    len = Some(key.len());
+                    prev_len = Some(len);
                 }
             }
         }
@@ -265,6 +281,16 @@ impl VariantConfig {
                 }
             };
         }
+
+        // special handling of CONDA_BUILD_SYSROOT
+        if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
+            used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+        }
+
+        // also always add `target_platform` and `channel_targets`
+        used_variables.insert("target_platform".to_string());
+        used_variables.insert("channel_targets".to_string());
+
         self.combinations(&used_variables)
     }
 }
