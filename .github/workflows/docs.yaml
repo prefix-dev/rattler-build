@@ -52,9 +52,9 @@ jobs:
         run: |
           echo "<meta name=\"robots\" content=\"noindex\">" > header.html
 
-      # - uses: Swatinem/rust-cache@v2
-      # - name: Build Documentation
-      #   run: cargo doc --workspace --no-deps --all-features
+      - uses: Swatinem/rust-cache@v2
+      - name: Build Documentation
+        run: cargo doc --workspace --no-deps --all-features
       - name: Build Book
         run: mdbook build
 
@@ -62,14 +62,14 @@ jobs:
       #   - A top level redirect to the bevy crate documentation
       #   - A robots.txt file to forbid any crawling of the site (to defer to the docs.rs site on search engines).
       #   - A .nojekyll file to disable Jekyll GitHub Pages builds.
-      #     echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
-      #     echo "User-Agent: *\nDisallow: /" > target/doc/robots.txt
-
-      #     mv target/doc/* final_docs/reference
       - name: Finalize documentation
         run: |
           mkdir final_docs
           touch final_docs/.nojekyll
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
+          echo "User-Agent: *\nDisallow: /" > target/doc/robots.txt
+
+          mv target/doc/* final_docs/reference
 
           mv book/* final_docs/
 
