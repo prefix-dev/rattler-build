@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    if: github.repository == 'mamba-org/rattler'
+    if: github.repository == 'prefix-dev/roar'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
