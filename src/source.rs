@@ -159,7 +159,7 @@ fn apply_patches(
             tracing::error!("Failed to apply patch: {}", patch.to_string_lossy());
             tracing::error!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
             tracing::error!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
-            SourceError::PatchFailed(patch.to_string_lossy().to_string());
+            return Err(SourceError::PatchFailed(patch.to_string_lossy().to_string()));
         }
     }
     Ok(())
