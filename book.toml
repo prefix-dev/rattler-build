@@ -1,0 +1,6 @@
+[book]
+authors = ["The rattler-build authors"]
+language = "en"
+multilingual = false
+src = "docs"
+title = "The rattler-build book"
