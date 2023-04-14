@@ -92,7 +92,10 @@ fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Erro
 /// Create a new `repodata.json` for all packages in the given output folder. If `target_platform` is
 /// `Some`, only that specific subdir is indexed. Otherwise indexes all subdirs and creates a
 /// `repodata.json` for each.
-pub fn index(output_folder: &Path, target_platform: Option<&Platform>) -> Result<(), std::io::Error> {
+pub fn index(
+    output_folder: &Path,
+    target_platform: Option<&Platform>,
+) -> Result<(), std::io::Error> {
     let entries = WalkDir::new(output_folder).into_iter();
     let entries: Vec<(PathBuf, ArchiveType)> = entries
         .filter_entry(|e| e.depth() <= 2)
