@@ -256,7 +256,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     let index_json = IndexJson {
         name: output.name().to_string(),
         version: Version::from_str(output.version())?,
-        build: output.build_configuration.hash.clone(),
+        build: output.build_string().to_string(),
         build_number: recipe.build.number,
         arch,
         platform,

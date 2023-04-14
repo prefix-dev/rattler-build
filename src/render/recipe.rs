@@ -174,8 +174,6 @@ pub fn render_recipe(
             let mut recipe_modified = recipe.clone();
             recipe_modified.remove("context");
 
-            // TODO add more appropriate values here
-            context.insert("PYTHON".to_string(), "python".into());
             context.insert("PKG_HASH".to_string(), pkg_hash.into());
             // add in the variant
             for (key, value) in variant {
@@ -193,7 +191,7 @@ pub fn render_recipe(
     let mut recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe_modified))?;
     // Set the build string to the package hash if it is not set
     if recipe.build.string.is_none() {
-        recipe.build.string = Some(pkg_hash.to_string());
+        recipe.build.string = Some(format!("{}_{}", pkg_hash, recipe.build.number));
     }
     Ok(recipe)
 }

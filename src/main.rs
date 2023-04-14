@@ -6,7 +6,7 @@ use clap::{arg, Parser};
 
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use once_cell::sync::Lazy;
-use rattler_conda_types::Platform;
+use rattler_conda_types::{NoArchType, Platform};
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
@@ -14,7 +14,6 @@ use std::{
     collections::BTreeMap,
     fs,
     path::PathBuf,
-    process::exit,
     str::{self, FromStr},
 };
 use tracing::metadata::LevelFilter;
@@ -41,7 +40,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, BuildOptions, Directories},
+    metadata::{BuildConfiguration, Directories},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -184,37 +183,38 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
 
     println!("Variants: {:#?}", variants);
 
-    if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
-        recipe_yaml = flattened_recipe;
-    } else {
-        tracing::error!("Could not flatten selectors");
-    }
-
-    let build_options: BuildOptions = serde_yaml::from_value(
-        recipe_yaml
-            .as_mapping()
-            .unwrap()
-            .get("build")
-            .unwrap()
-            .clone(),
-    )?;
-
-    if args.render_only {
-        for variant in variants {
-            let hash = hash::compute_buildstring(&variant, &build_options.noarch);
-
-            let rendered_recipe =
-                render_recipe(&recipe_yaml, &variant, &hash).expect("Could not render the recipe.");
-            println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
-            println!("Variant: {:#?}", variant);
-            println!("Hash: {}", hash);
-        }
-        exit(0);
-    }
+    // get recipe.build.noarch value as NoArchType from serde_yaml
+    let noarch = recipe_yaml
+        .get("build")
+        .and_then(|v| v.get("noarch"))
+        .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
+        .transpose()?
+        .unwrap_or_else(|| NoArchType::none());
 
     for variant in variants {
-        let hash = hash::compute_buildstring(&variant, &build_options.noarch);
+        let hash = hash::compute_buildstring(&variant, &noarch);
+
+        let selector_config = SelectorConfig {
+            variant: variant.clone(),
+            target_platform: selector_config.target_platform,
+            build_platform: selector_config.build_platform,
+        };
+
+        if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
+            recipe_yaml = flattened_recipe;
+        } else {
+            tracing::error!("Could not flatten selectors");
+        }
+
         let recipe = render_recipe(&recipe_yaml, &variant, &hash)?;
+
+        if args.render_only {
+            println!("{}", serde_yaml::to_string(&recipe).unwrap());
+            println!("Variant: {:#?}", variant);
+            println!("Hash: {}", recipe.build.string.unwrap());
+            continue;
+        }
+
         let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
         let output = metadata::Output {

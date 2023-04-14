@@ -1,7 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    str::FromStr,
+};
 
 use minijinja::{value::Value, Environment};
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Platform, Version, VersionSpec};
 use serde_yaml::Value as YamlValue;
 
 #[derive(Clone, Debug)]
@@ -42,15 +45,14 @@ impl SelectorConfig {
             .last()
             .unwrap()
             .to_string();
+
         let arch = match arch.as_str() {
             "64" => "x86_64",
             "32" => "x86",
             _ => &arch,
         };
-        context.insert(
-            "arch".to_string(),
-            Value::from_safe_string(arch.to_string()),
-        );
+
+        context.insert(arch.to_string(), Value::from(true));
 
         context.insert(
             "build_platform".to_string(),
@@ -70,7 +72,19 @@ impl SelectorConfig {
 }
 
 pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorConfig) -> bool {
-    let env = Environment::new();
+    let mut env = Environment::new();
+
+    env.add_function("cmp", |a: &Value, spec: &str| {
+        if let Some(version) = a.as_str() {
+            // check if version matches spec
+            let version = Version::from_str(version).unwrap();
+            let version_spec = VersionSpec::from_str(spec).unwrap();
+            Ok(version_spec.matches(&version))
+        } else {
+            // if a is undefined, we are currently searching for all variants and thus return true
+            Ok(true)
+        }
+    });
 
     let selector = selector.into();
 
@@ -256,6 +270,8 @@ mod tests {
             "sel((unix and not osx) or win or osx)",
             &selector_config
         ));
+        assert!(eval_selector("sel(linux and x86_64)", &selector_config));
+        assert!(!eval_selector("sel(linux and aarch64)", &selector_config));
     }
 
     macro_rules! set_snapshot_suffix {
