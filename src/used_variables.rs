@@ -126,18 +126,20 @@ pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
     let mut dependencies = HashSet::<String>::new();
 
     if let Some(requirements) = recipe.get("requirements") {
-        ["build", "host", "run"].iter().for_each(|section| {
-            if let Some(YamlValue::Sequence(section)) = requirements.get(section) {
-                for item in section {
-                    if let YamlValue::String(item) = item {
-                        if item.starts_with("{{") {
-                            continue;
+        ["build", "host", "run", "constrains"]
+            .iter()
+            .for_each(|section| {
+                if let Some(YamlValue::Sequence(section)) = requirements.get(section) {
+                    for item in section {
+                        if let YamlValue::String(item) = item {
+                            if item.starts_with("{{") {
+                                continue;
+                            }
+                            dependencies.insert(item.to_string());
                         }
-                        dependencies.insert(item.to_string());
                     }
                 }
-            }
-        });
+            });
     }
 
     dependencies

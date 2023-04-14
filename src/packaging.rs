@@ -699,7 +699,7 @@ pub fn package_conda(
         "{}-{}-{}.tar.bz2",
         output.name(),
         output.version(),
-        output.build_configuration.hash
+        output.build_string()
     );
 
     let out_path = output_folder.join(file);

@@ -330,4 +330,8 @@ impl Output {
     pub fn version(&self) -> &str {
         &self.recipe.package.version
     }
+
+    pub fn build_string(&self) -> &str {
+        self.recipe.build.string.as_ref().unwrap()
+    }
 }

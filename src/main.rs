@@ -22,6 +22,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 
 mod build;
 mod env_vars;
+mod hash;
 mod index;
 mod linux;
 mod macos;
@@ -40,7 +41,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories},
+    metadata::{BuildConfiguration, BuildOptions, Directories},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -189,18 +190,32 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         tracing::error!("Could not flatten selectors");
     }
 
+    let build_options: BuildOptions = serde_yaml::from_value(
+        recipe_yaml
+            .as_mapping()
+            .unwrap()
+            .get("build")
+            .unwrap()
+            .clone(),
+    )?;
+
     if args.render_only {
         for variant in variants {
+            let hash = hash::compute_buildstring(&variant, &build_options.noarch);
+
             let rendered_recipe =
-                render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
+                render_recipe(&recipe_yaml, &variant, &hash).expect("Could not render the recipe.");
             println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
+            println!("Variant: {:#?}", variant);
+            println!("Hash: {}", hash);
         }
         exit(0);
     }
 
     for variant in variants {
-        let recipe = render_recipe(&recipe_yaml, &variant)?;
-
+        let hash = hash::compute_buildstring(&variant, &build_options.noarch);
+        let recipe = render_recipe(&recipe_yaml, &variant, &hash)?;
+        let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
         let output = metadata::Output {
             recipe,
@@ -211,7 +226,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                     _ => target_platform,
                 },
                 build_platform: Platform::current(),
-                hash: String::from("h1234_0"),
+                hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
                 no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,
