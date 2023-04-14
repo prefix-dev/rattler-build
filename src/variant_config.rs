@@ -1,3 +1,5 @@
+//! Functions to read and parse variant configuration files.
+
 use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 

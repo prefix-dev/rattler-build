@@ -10,6 +10,21 @@ use url::Url;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
+#[derive(Debug, thiserror::Error)]
+pub enum SourceError {
+    #[error("IO Error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Failed to download source from url: {0}")]
+    Url(#[from] reqwest::Error),
+
+    #[error("Download could not be validated with checksum!")]
+    ValidationFailed,
+
+    #[error("Failed to apply patch: {0}")]
+    PatchFailed(String),
+}
+
 fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
     match checksum {
         Checksum::Sha256(value) => {
@@ -74,7 +89,7 @@ async fn url_src(
     source: &UrlSrc,
     cache_dir: &Path,
     checksum: &Checksum,
-) -> anyhow::Result<PathBuf> {
+) -> Result<PathBuf, SourceError> {
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
 
@@ -90,8 +105,15 @@ async fn url_src(
     let response = reqwest::get(source.url.clone()).await?;
 
     let mut file = std::fs::File::create(&cache_name)?;
+
     let mut content = Cursor::new(response.bytes().await?);
     std::io::copy(&mut content, &mut file)?;
+
+    if !validate_checksum(&cache_name, checksum) {
+        tracing::error!("Checksum validation failed!");
+        std::fs::remove_file(&cache_name)?;
+        return Err(SourceError::ValidationFailed);
+    }
 
     Ok(cache_name)
 }
@@ -118,7 +140,11 @@ fn extract(
 }
 /// Applies all patches in a list of patches to the specified work directory
 /// Currently only supports patching with the `patch` command.
-fn apply_patches(patches: &[PathBuf], work_dir: &Path, recipe_dir: &Path) -> anyhow::Result<()> {
+fn apply_patches(
+    patches: &[PathBuf],
+    work_dir: &Path,
+    recipe_dir: &Path,
+) -> Result<(), SourceError> {
     for patch in patches {
         let patch = recipe_dir.join(patch);
         let output = Command::new("patch")
@@ -133,7 +159,9 @@ fn apply_patches(patches: &[PathBuf], work_dir: &Path, recipe_dir: &Path) -> any
             tracing::error!("Failed to apply patch: {}", patch.to_string_lossy());
             tracing::error!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
             tracing::error!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
-            anyhow::bail!("Failed to apply patch: {}", patch.to_string_lossy());
+            return Err(SourceError::PatchFailed(
+                patch.to_string_lossy().to_string(),
+            ));
         }
     }
     Ok(())
@@ -144,7 +172,7 @@ pub async fn fetch_sources(
     sources: &[Source],
     work_dir: &Path,
     recipe_dir: &Path,
-) -> anyhow::Result<()> {
+) -> Result<(), SourceError> {
     let cache_dir = std::env::current_dir()?.join("ROAR_CACHE");
     fs::create_dir_all(&cache_dir)?;
     for src in sources {

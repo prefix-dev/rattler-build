@@ -1,3 +1,4 @@
+//! macOS specific environment variables
 use rattler_conda_types::Platform;
 use std::{collections::HashMap, path::Path};
 

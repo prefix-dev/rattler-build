@@ -1,3 +1,4 @@
+//! Linux specific environment variables
 use std::env::consts::ARCH;
 use std::{collections::HashMap, path::Path};
 

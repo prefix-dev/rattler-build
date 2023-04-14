@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+//! This is the main entry point for the `rattler-build` binary.
 
 use anyhow::Ok;
 use clap::{arg, Parser};

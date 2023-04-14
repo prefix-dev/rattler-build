@@ -1,3 +1,4 @@
+//! Functions to collect environment variables that are used during the build process.
 use std::path::Path;
 use std::{collections::HashMap, env};
 

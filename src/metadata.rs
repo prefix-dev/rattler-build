@@ -1,3 +1,4 @@
+//! All the metadata that makes up a recipe file
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
 use rattler_conda_types::Platform;
@@ -17,14 +18,32 @@ use url::Url;
 use crate::render::dependency_list::DependencyList;
 use crate::render::resolved_dependencies::FinalizedDependencies;
 
+/// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Requirements {
+    /// Requirements at _build_ time are requirements that can
+    /// be run on the machine that is executing the build script.
+    /// The environment will thus be resolved with the appropriate platform
+    /// that is currently running (e.g. on linux-64 it will be resolved with linux-64).
+    /// Typically things like compilers, build tools, etc. are installed here.
     #[serde(default)]
     pub build: DependencyList,
+    /// Requirements at _host_ time are requirements that the final executable is going
+    /// to _link_ against. The environment will be resolved with the target_platform
+    /// architecture (e.g. if you build _on_ linux-64 _for_ linux-aarch64, then the
+    /// host environment will be resolved with linux-aarch64).
+    ///
+    /// Typically things like libraries, headers, etc. are installed here.
     #[serde(default)]
     pub host: DependencyList,
+    /// Requirements at _run_ time are requirements that the final executable is going
+    /// to _run_ against. The environment will be resolved with the target_platform
+    /// at runtime.
     #[serde(default)]
     pub run: DependencyList,
+    /// Constrains are optional runtime requirements that are used to constrain the
+    /// environment that is resolved. They are not installed by default, but when
+    /// installed they will have to conform to the constrains specified here.
     #[serde(default)]
     pub constrains: DependencyList,
 }
@@ -43,18 +62,30 @@ pub struct RunExports {
     pub noarch: Vec<String>,
 }
 
+/// The build options contain information about how to build the package and some additional
+/// metadata about the package.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct BuildOptions {
+    /// The build number is a number that should be incremented every time the recipe is built.
     #[serde(default)]
     pub number: u64,
+    /// The build string is usually set automatically as the hash of the variant configuration.
+    /// It's possible to override this by setting it manually, but not recommended.
     pub string: Option<String>,
+    /// The build script can be either a list of commands or a path to a script. By
+    /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub script: Option<Vec<String>>,
+    /// A recipe can choose to ignore certain run exports of its dependencies
     pub ignore_run_exports: Option<Vec<String>>,
+    /// The recipe can specify a list of run exports that it provides
     pub run_exports: Option<RunExports>,
+    /// A noarch package runs on any platform. It can be either a python package or a generic package.
     #[serde(default = "NoArchType::default")]
     pub noarch: NoArchType,
+    /// For a Python noarch package to have executables it is necessary to specify the python entry points.
+    /// These contain the name of the executable and the module + function that should be executed.
     #[serde(default)]
     pub entry_points: Vec<EntryPoint>,
 }
@@ -76,8 +107,7 @@ pub struct About {
     pub dev_url: Option<Vec<Url>>,
 }
 
-/// Define tests in your recipe that are executed after successfully
-/// building the package.
+/// Define tests in your recipe that are executed after successfully building the package.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Test {
     /// Try importing a python module as a sanity check
