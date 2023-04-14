@@ -67,11 +67,13 @@ jobs:
           mkdir final_docs
           touch final_docs/.nojekyll
           echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
-          echo "User-Agent: *\nDisallow: /" > target/doc/robots.txt
 
+          mkdir -p final_docs/reference
           mv target/doc/* final_docs/reference
 
           mv book/* final_docs/
+
+          echo "User-Agent: *\nDisallow: /" > final_docs/robots.txt
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
