@@ -140,6 +140,7 @@ fn render_dependencies(
                     if let YamlValue::String(item) = item {
                         if context.contains_key(item) {
                             let pin = context.get(item).unwrap().as_str().unwrap().to_string();
+                            // TODO if the pin is a simple version, we need to add a `*` to it
                             *item = format!("{} {}", item, pin);
                         }
                     }
@@ -157,6 +158,7 @@ fn render_dependencies(
 pub fn render_recipe(
     recipe: &YamlValue,
     variant: &BTreeMap<String, String>,
+    pkg_hash: &str,
 ) -> anyhow::Result<RenderedRecipe> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
@@ -174,7 +176,7 @@ pub fn render_recipe(
 
             // TODO add more appropriate values here
             context.insert("PYTHON".to_string(), "python".into());
-
+            context.insert("PKG_HASH".to_string(), pkg_hash.into());
             // add in the variant
             for (key, value) in variant {
                 context.insert(key.clone(), Value::from_safe_string(value.clone()));
@@ -187,7 +189,13 @@ pub fn render_recipe(
 
     render_recipe_recursively(&mut recipe_modified, &env, &context);
     recipe_modified = render_dependencies(&recipe_modified, &context);
-    Ok(serde_yaml::from_value(YamlValue::from(recipe_modified))?)
+
+    let mut recipe : RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe_modified))?;
+    // Set the build string to the package hash if it is not set
+    if recipe.build.string.is_none() {
+        recipe.build.string = Some(pkg_hash.to_string());
+    }
+    Ok(recipe)
 }
 
 #[cfg(test)]

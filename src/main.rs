@@ -41,7 +41,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories},
+    metadata::{BuildConfiguration, BuildOptions, Directories},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -190,15 +190,22 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         tracing::error!("Could not flatten selectors");
     }
 
+    let build_options: BuildOptions = serde_yaml::from_value(
+        recipe_yaml
+            .as_mapping()
+            .unwrap()
+            .get("build")
+            .unwrap()
+            .clone(),
+    )?;
+
     if args.render_only {
         for variant in variants {
-            let rendered_recipe =
-                render_recipe(&recipe_yaml, &variant).expect("Could not render the recipe.");
-            println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
+            let hash = hash::compute_buildstring(&variant, &build_options.noarch);
 
-            let noarch_type = rendered_recipe.build.noarch.clone();
-            let name = rendered_recipe.package.name.clone();
-            let hash = hash::compute_buildstring(&variant, &noarch_type);
+            let rendered_recipe =
+                render_recipe(&recipe_yaml, &variant, &hash).expect("Could not render the recipe.");
+            println!("{}", serde_yaml::to_string(&rendered_recipe).unwrap());
             println!("Variant: {:#?}", variant);
             println!("Hash: {}", hash);
         }
@@ -206,7 +213,8 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     }
 
     for variant in variants {
-        let recipe = render_recipe(&recipe_yaml, &variant)?;
+        let hash = hash::compute_buildstring(&variant, &build_options.noarch);
+        let recipe = render_recipe(&recipe_yaml, &variant, &hash)?;
         let noarch_type = recipe.build.noarch.clone();
         let name = recipe.package.name.clone();
         let output = metadata::Output {
