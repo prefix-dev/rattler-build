@@ -233,8 +233,6 @@ fn create_paths_json(
 
 /// Create the index.json file for the given output.
 fn create_index_json(output: &Output) -> Result<String, PackagingError> {
-    // TODO use global timestamp?
-    let timestamp = chrono::Utc::now();
     let recipe = &output.recipe;
 
     let (platform, arch) = match output.build_configuration.target_platform {
@@ -263,7 +261,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         subdir: Some(output.build_configuration.target_platform.to_string()),
         license: recipe.about.license.clone(),
         license_family: recipe.about.license_family.clone(),
-        timestamp: Some(timestamp),
+        timestamp: Some(output.build_configuration.timestamp),
         depends: output
             .finalized_dependencies
             .clone()
@@ -341,6 +339,9 @@ pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>, PackagingEr
 /// * For `noarch: python` packages, the "lib/pythonX.X" prefix is stripped so that only
 ///   the "site-packages" part is kept. Additionally, any `__pycache__` directories or
 ///  `.pyc` files are skipped.
+/// * For `noarch: python` packages, furthermore `bin` is replaced with `python-scripts`, and
+///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
+///   as-is.
 /// * Absolute symlinks are made relative so that they are easily relocatable.
 fn write_to_dest(
     path: &Path,
@@ -353,7 +354,8 @@ fn write_to_dest(
     let mut dest_path = dest_folder.join(path_rel);
 
     if noarch_type.is_python() {
-        if path.ends_with(".pyc") || path.ends_with(".pyo") {
+        let ext = path.extension().unwrap_or_default();
+        if ext == "pyc" || ext == "pyo" {
             return Ok(None); // skip .pyc files
         }
 
@@ -365,27 +367,34 @@ fn write_to_dest(
             return Ok(None);
         }
 
-        // check if site-packages is in the path and strip everything before it
-        let pat = std::path::Component::Normal("site-packages".as_ref());
-        let parts = path_rel.components();
-        let mut new_parts = Vec::new();
-        let mut found = false;
-        for part in parts {
-            if part == pat {
-                found = true;
+        if path_rel
+            .components()
+            .any(|c| c == Component::Normal("site-packages".as_ref()))
+        {
+            // check if site-packages is in the path and strip everything before it
+            let pat = std::path::Component::Normal("site-packages".as_ref());
+            let parts = path_rel.components();
+            let mut new_parts = Vec::new();
+            let mut found = false;
+            for part in parts {
+                if part == pat {
+                    found = true;
+                }
+                if found {
+                    new_parts.push(part);
+                }
             }
-            if found {
-                new_parts.push(part);
-            }
-        }
 
-        if !found {
-            // skip files that are not in site-packages
-            // TODO we need data files?
-            return Ok(None);
+            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+        } else if path.starts_with("bin") || path.starts_with("Scripts") {
+            // replace bin with python-scripts
+            let mut new_parts = path_rel.components().collect::<Vec<_>>();
+            new_parts[0] = Component::Normal("python-scripts".as_ref());
+            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
+        } else {
+            // keep everything else as-is
+            dest_path = dest_folder.join(path_rel);
         }
-
-        dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
     }
 
     match dest_path.parent() {
@@ -627,6 +636,35 @@ pub fn package_conda(
         if filter_pyc(f, new_files) {
             continue;
         }
+
+        if output.recipe.build.noarch.is_python() {
+            // we need to remove files in bin/ that are registered as entry points
+            if f.starts_with("bin") {
+                if let Some(name) = f.file_name() {
+                    if output
+                        .recipe
+                        .build
+                        .entry_points
+                        .iter()
+                        .any(|ep| ep.command == name.to_string_lossy())
+                    {
+                        continue;
+                    }
+                }
+            }
+            // Windows
+            else if f.starts_with("Scripts") {
+                if let Some(name) = f.file_name() {
+                    if output.recipe.build.entry_points.iter().any(|ep| {
+                        format!("{}.exe", ep.command) == name.to_string_lossy()
+                            || format!("{}-script.py", ep.command) == name.to_string_lossy()
+                    }) {
+                        continue;
+                    }
+                }
+            }
+        }
+
         if let Some(dest_file) = write_to_dest(
             f,
             prefix,
@@ -675,6 +713,12 @@ pub fn package_conda(
     if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
         tmp_files.extend(license_files);
     }
+
+    let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
+    variant_config
+        .write_all(serde_json::to_string_pretty(&output.build_configuration.variant)?.as_bytes())?;
+
+    // TODO write recipe to info/recipe/ folder
 
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
