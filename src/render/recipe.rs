@@ -127,31 +127,6 @@ fn render_context(yaml_context: &serde_yaml::Mapping) -> BTreeMap<String, Value>
     context
 }
 
-fn render_dependencies(
-    recipe: &serde_yaml::Mapping,
-    context: &BTreeMap<String, Value>,
-) -> serde_yaml::Mapping {
-    let mut recipe = recipe.clone();
-
-    if let Some(requirements) = recipe.get_mut("requirements") {
-        ["build", "host", "run"].iter().for_each(|section| {
-            if let Some(YamlValue::Sequence(section)) = requirements.get_mut(section) {
-                for item in section {
-                    if let YamlValue::String(item) = item {
-                        if context.contains_key(item) {
-                            let pin = context.get(item).unwrap().as_str().unwrap().to_string();
-                            // TODO if the pin is a simple version, we need to add a `*` to it
-                            *item = format!("{} {}", item, pin);
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    recipe
-}
-
 /// This renders a recipe, given a variant
 /// This evaluates all selectors and jinja statements in the recipe
 /// It does _not_ apply the variants to the dependency list yet
@@ -168,6 +143,7 @@ pub fn render_recipe(
     let mut env = Environment::new();
     env.add_function("compiler", functions::compiler);
     env.add_function("pin_subpackage", functions::pin_subpackage);
+
     let (mut recipe_modified, context) =
         if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
             let mut context = render_context(map);
@@ -186,9 +162,9 @@ pub fn render_recipe(
         };
 
     render_recipe_recursively(&mut recipe_modified, &env, &context);
-    recipe_modified = render_dependencies(&recipe_modified, &context);
 
     let mut recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe_modified))?;
+
     // Set the build string to the package hash if it is not set
     if recipe.build.string.is_none() {
         recipe.build.string = Some(format!("{}_{}", pkg_hash, recipe.build.number));

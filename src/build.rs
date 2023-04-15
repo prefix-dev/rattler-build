@@ -98,12 +98,16 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
-    Command::new("/bin/bash")
+    let status = Command::new("/bin/bash")
         .current_dir(&directories.source_dir)
         .arg(directories.source_dir.join("conda_build.sh"))
         .stdin(Stdio::null())
         .status()
         .expect("Failed to execute command");
+
+    if !status.success() {
+        return Err(anyhow::anyhow!("Build failed"));
+    }
 
     let files_after = record_files(&directories.host_prefix).expect("Could not record files");
 

@@ -24,6 +24,7 @@ use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use crate::macos;
 use crate::metadata::Output;
+use crate::render::dependency_list::Dependency;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -309,13 +310,25 @@ fn create_about_json(output: &Output) -> Result<String, PackagingError> {
 
 /// Create the run_exports.json file for the given output.
 fn create_run_exports_json(recipe: &Output) -> Result<Option<String>, PackagingError> {
+    let to_specs = |specs: &Vec<Dependency>| {
+        let mut out = Vec::new();
+        for spec in specs {
+            if let Dependency::Spec(s) = spec {
+                out.push(s.to_string());
+            } else {
+                continue;
+            }
+        }
+        out
+    };
+
     if let Some(run_exports) = &recipe.recipe.build.run_exports {
         let run_exports_json = RunExportsJson {
-            strong: run_exports.strong.clone(),
-            weak: run_exports.weak.clone(),
-            strong_constrains: run_exports.strong_constrains.clone(),
-            weak_constrains: run_exports.weak_constrains.clone(),
-            noarch: run_exports.noarch.clone(),
+            strong: to_specs(&run_exports.strong),
+            weak: to_specs(&run_exports.weak),
+            strong_constrains: to_specs(&run_exports.strong_constrains),
+            weak_constrains: to_specs(&run_exports.weak_constrains),
+            noarch: to_specs(&run_exports.noarch),
         };
 
         Ok(Some(serde_json::to_string_pretty(&run_exports_json)?))

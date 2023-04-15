@@ -5,11 +5,11 @@ use std::{
     str::FromStr,
 };
 
-use crate::metadata::{Output, RunExports};
+use crate::metadata::{Output, PackageIdentifier};
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, Platform, RepoDataRecord, VersionSpec,
+    MatchSpec, Platform, RepoDataRecord, Version, VersionSpec,
 };
 use thiserror::Error;
 
@@ -27,6 +27,7 @@ pub enum DependencyInfo {
 pub struct FinalizedRunDependencies {
     pub depends: Vec<MatchSpec>,
     pub constrains: Vec<MatchSpec>,
+    pub run_exports: HashMap<String, Vec<MatchSpec>>,
 }
 
 pub struct ResolvedDependency {
@@ -38,9 +39,8 @@ pub struct ResolvedDependency {
 #[derive(Debug, Clone)]
 pub struct ResolvedDependencies {
     raw: DependencyList,
-    // resolved: Vec<ResolvedDependency>,
     resolved: Vec<RepoDataRecord>,
-    run_exports: HashMap<String, RunExports>,
+    run_exports: HashMap<String, RunExportsJson>,
 }
 
 #[derive(Debug, Clone)]
@@ -59,6 +59,7 @@ pub enum ResolveError {
 pub fn apply_variant(
     raw_specs: &DependencyList,
     variant: &BTreeMap<String, String>,
+    subpackages: &BTreeMap<String, PackageIdentifier>,
     target_platform: &Platform,
 ) -> Result<Vec<(Dependency, MatchSpec)>, ResolveError> {
     let applied = raw_specs
@@ -74,7 +75,7 @@ pub fn apply_variant(
                                     s.clone(),
                                     MatchSpec {
                                         version: Some(
-                                            VersionSpec::from_str(version)
+                                            VersionSpec::from_str(&format!("={}", version))
                                                 .expect("Invalid version spec"),
                                         ),
                                         ..m
@@ -85,13 +86,25 @@ pub fn apply_variant(
                     }
                     (s.clone(), m)
                 }
-                Dependency::PinSubpackage(_) => todo!(),
+                Dependency::PinSubpackage(pin) => {
+                    let name = &pin.pin_subpackage.name;
+                    let subpackage = subpackages.get(name).expect("Invalid subpackage");
+                    let pinned = pin
+                        .pin_subpackage
+                        .apply(
+                            &Version::from_str(&subpackage.version)
+                                .expect("could not parse version"),
+                            &subpackage.build_string,
+                        )
+                        .expect("could not apply pin");
+                    (s.clone(), pinned)
+                }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("compiler_{}", compiler.compiler);
+                    let compiler_variant = format!("{}_compiler", compiler.compiler);
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
@@ -147,7 +160,10 @@ pub fn apply_variant(
                     let compiler_version = variant.get(&compiler_version_variant);
 
                     let final_compiler = if let Some(compiler_version) = compiler_version {
-                        format!("{}_{} {}", compiler_name, target_platform, compiler_version)
+                        format!(
+                            "{}_{} ={}",
+                            compiler_name, target_platform, compiler_version
+                        )
                     } else {
                         format!("{}_{}", compiler_name, target_platform)
                     };
@@ -168,7 +184,7 @@ fn collect_run_exports_from_env(
     env: &[RepoDataRecord],
     cache_dir: &Path,
     filter: impl Fn(&RepoDataRecord) -> bool,
-) -> Result<HashMap<String, RunExports>, std::io::Error> {
+) -> Result<HashMap<String, RunExportsJson>, std::io::Error> {
     let mut run_exports = HashMap::new();
     for pkg in env {
         if !filter(pkg) {
@@ -179,13 +195,6 @@ fn collect_run_exports_from_env(
         let pkc = cache_dir.join(cache_key.to_string());
         let rex = RunExportsJson::from_package_directory(pkc).ok();
         if let Some(rex) = rex {
-            let rex = RunExports {
-                strong: rex.strong,
-                weak: rex.weak,
-                strong_constrains: rex.strong_constrains,
-                weak_constrains: rex.weak_constrains,
-                noarch: rex.noarch,
-            };
             run_exports.insert(pkg.package_record.name.clone(), rex);
         }
     }
@@ -211,6 +220,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         let specs = apply_variant(
             &reqs.build,
             &output.build_configuration.variant,
+            &output.build_configuration.subpackages,
             &output.build_configuration.target_platform,
         )?;
 
@@ -226,9 +236,15 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
-            match_specs
+            let res = match_specs
                 .iter()
-                .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
+                .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
+
+            if let Some(ignore_run_exports_from) = &output.recipe.build.ignore_run_exports_from {
+                res && !ignore_run_exports_from.contains(&rec.package_record.name)
+            } else {
+                res
+            }
         })
         .expect("Could not find run exports");
 
@@ -247,6 +263,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
     let specs = apply_variant(
         &reqs.host,
         &output.build_configuration.variant,
+        &output.build_configuration.subpackages,
         &output.build_configuration.target_platform,
     )?;
 
@@ -254,12 +271,18 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
 
     tracing::info!("Resolving host specs: {:?}", match_specs);
 
+    let clone_specs = |specs: &Vec<String>| -> Result<Vec<MatchSpec>, ResolveError> {
+        let mut cloned = Vec::new();
+        for spec in specs {
+            cloned.push(MatchSpec::from_str(spec).map_err(anyhow::Error::from)?);
+        }
+        Ok(cloned)
+    };
+
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {
         for (_, rex) in &build_env.run_exports {
-            for spec in &rex.strong {
-                match_specs.push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-            }
+            match_specs.extend(clone_specs(&rex.strong)?);
         }
     }
 
@@ -294,53 +317,51 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
     let run_depends = apply_variant(
         &reqs.run,
         &output.build_configuration.variant,
+        &output.build_configuration.subpackages,
         &output.build_configuration.target_platform,
     )?;
 
     let run_constrains = apply_variant(
         &reqs.constrains,
         &output.build_configuration.variant,
+        &output.build_configuration.subpackages,
         &output.build_configuration.target_platform,
     )?;
+
+    println!("run_depends: {:?}", output.recipe);
+
+    if let Some(run_exports) = &output.recipe.build.run_exports {
+        println!("RUN EXPORTS: {:?}", run_exports);
+        let run_exports = apply_variant(
+            &run_exports.weak,
+            &output.build_configuration.variant,
+            &output.build_configuration.subpackages,
+            &output.build_configuration.target_platform,
+        )?;
+        println!("run_exports: {:?}", run_exports);
+    }
 
     let mut run_specs = FinalizedRunDependencies {
         depends: run_depends.iter().map(|(_, s)| s).cloned().collect(),
         constrains: run_constrains.iter().map(|(_, s)| s).cloned().collect(),
+        run_exports: HashMap::default(),
     };
 
     if let Some(host_env) = &host_env {
         match output.build_configuration.target_platform {
             Platform::NoArch => {
                 for (_, rex) in &host_env.run_exports {
-                    for spec in &rex.noarch {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
+                    run_specs.depends.extend(clone_specs(&rex.noarch)?);
                 }
             }
             _ => {
                 for (_, rex) in &host_env.run_exports {
-                    for spec in &rex.strong {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.weak {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.strong_constrains {
-                        run_specs
-                            .constrains
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.weak_constrains {
-                        run_specs
-                            .constrains
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
+                    run_specs.depends.extend(clone_specs(&rex.strong)?);
+                    run_specs.depends.extend(clone_specs(&rex.weak)?);
+                    run_specs
+                        .depends
+                        .extend(clone_specs(&rex.strong_constrains)?);
+                    run_specs.depends.extend(clone_specs(&rex.weak_constrains)?);
                 }
             }
         }

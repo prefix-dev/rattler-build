@@ -40,7 +40,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories},
+    metadata::{BuildConfiguration, Directories, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -211,6 +211,16 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
             continue;
         }
 
+        let mut subpackages = BTreeMap::new();
+        subpackages.insert(
+            recipe.package.name.clone(),
+            PackageIdentifier {
+                name: recipe.package.name.clone(),
+                version: recipe.package.version.clone(),
+                build_string: recipe.build.string.clone().unwrap(),
+            },
+        );
+
         let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
         let output = metadata::Output {
@@ -228,6 +238,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 directories: Directories::create(&name, &recipe_file)?,
                 channels: vec!["conda-forge".to_string()],
                 timestamp: chrono::Utc::now(),
+                subpackages,
             },
             finalized_dependencies: None,
         };

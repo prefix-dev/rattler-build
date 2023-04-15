@@ -11,7 +11,7 @@ use sha1::{Digest, Sha1};
 /// 1. package is an explicit dependency in build, host, or run deps
 /// 2. package has a matching entry in conda_build_config.yaml which is a pin to a specific
 ///    version, not a lower bound
-/// 3. that package is not ignored by ignore_version
+/// 3. that package is not ignored by ignore_version (not implemented yet)
 ///
 /// The hash is computed based on the pinning value, NOT the build
 ///    dependency build string. This means hashes won't change as often,
