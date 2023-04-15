@@ -253,9 +253,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: vec![("python_version".into(), "3.8.5".into())]
-                .into_iter()
-                .collect(),
+            variant: Default::default(),
         };
         assert!(eval_selector("sel(unix)", &selector_config));
         assert!(!eval_selector("sel(win)", &selector_config));
@@ -272,6 +270,34 @@ mod tests {
         ));
         assert!(eval_selector("sel(linux and x86_64)", &selector_config));
         assert!(!eval_selector("sel(linux and aarch64)", &selector_config));
+    }
+
+    #[test]
+    fn test_cmp() {
+        let mut variant = BTreeMap::new();
+        variant.insert("python".to_string(), "3.7".to_string());
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant,
+        };
+
+        assert!(eval_selector("sel(cmp(python, '==3.7'))", &selector_config));
+        assert!(eval_selector("sel(cmp(python, '>=3.7'))", &selector_config));
+        assert!(eval_selector(
+            "sel(cmp(python, '>=3.7,<3.9'))",
+            &selector_config
+        ));
+
+        assert!(!eval_selector(
+            "sel(cmp(python, '!=3.7'))",
+            &selector_config
+        ));
+        assert!(!eval_selector("sel(cmp(python, '<3.7'))", &selector_config));
+        assert!(!eval_selector(
+            "sel(cmp(python, '>3.5,<3.7'))",
+            &selector_config
+        ));
     }
 
     macro_rules! set_snapshot_suffix {
@@ -292,9 +318,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: vec![("python_version".into(), "3.8.5".into())]
-                .into_iter()
-                .collect(),
+            variant: Default::default(),
         };
 
         let res = flatten_selectors(&mut yaml, &selector_config);

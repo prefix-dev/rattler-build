@@ -377,9 +377,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: vec![("python_version".into(), "3.8.5".into())]
-                .into_iter()
-                .collect(),
+            variant: Default::default(),
         };
 
         let res = flatten_toplevel(&mut yaml, &selector_config);
@@ -388,9 +386,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Win64,
             build_platform: Platform::Win64,
-            variant: vec![("python_version".into(), "3.8.5".into())]
-                .into_iter()
-                .collect(),
+            variant: Default::default(),
         };
 
         let res = flatten_toplevel(&mut yaml, &selector_config);
