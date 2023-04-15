@@ -219,7 +219,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo <1.2.4");
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4");
 
         let pin = Pin {
             name: "foo".to_string(),
@@ -229,7 +229,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1.2.3");
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<2");
     }
 
     #[test]
