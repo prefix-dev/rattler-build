@@ -74,7 +74,7 @@ pub fn get_conda_build_script(
     } else {
         let build_env_script_path = directories.work_dir.join("build_env.bat");
         let preambel = format!(
-            "if not defined CONDA_BUILD (\n    call {}\n)",
+            "IF \"%CONDA_BUILD%\" == \"\" (\n    call {}\n)",
             build_env_script_path.to_string_lossy()
         );
         let mut fout = File::create(&build_env_script_path)?;
