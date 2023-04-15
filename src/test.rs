@@ -255,7 +255,7 @@ pub async fn run_test(
 
     let prefix = test_prefix.unwrap_or_else(|| Path::new("./test-env"));
     let prefix = std::fs::canonicalize(prefix).unwrap();
-    create_environment(dependencies, &Platform::current(), &prefix, &channels)
+    create_environment(&dependencies, &Platform::current(), &prefix, &channels)
         .await
         .map_err(|_| TestError::TestEnvironmentSetup)?;
 

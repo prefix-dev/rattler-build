@@ -19,6 +19,7 @@ build:
   string: h12341234_0
   script: ~
   ignore_run_exports: ~
+  ignore_run_exports_from: ~
   run_exports: ~
   noarch: false
   entry_points: []

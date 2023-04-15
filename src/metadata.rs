@@ -48,18 +48,83 @@ pub struct Requirements {
     pub constrains: DependencyList,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+/// Run exports are applied to downstream packages that depend on this package.
+#[derive(Serialize, Debug, Default, Clone)]
 pub struct RunExports {
     #[serde(default)]
-    pub strong: Vec<String>,
+    pub noarch: DependencyList,
     #[serde(default)]
-    pub weak: Vec<String>,
+    pub strong: DependencyList,
     #[serde(default)]
-    pub weak_constrains: Vec<String>,
+    pub strong_constrains: DependencyList,
     #[serde(default)]
-    pub strong_constrains: Vec<String>,
+    pub weak: DependencyList,
     #[serde(default)]
-    pub noarch: Vec<String>,
+    pub weak_constrains: DependencyList,
+}
+
+use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
+use std::fmt;
+
+impl<'de> Deserialize<'de> for RunExports {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        enum RunExportsData {
+            Map(RunExports),
+            List(DependencyList),
+        }
+
+        struct RunExportsVisitor;
+
+        impl<'de> Visitor<'de> for RunExportsVisitor {
+            type Value = RunExportsData;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list or a map")
+            }
+
+            fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut run_exports = RunExports::default();
+                while let Some(key) = access.next_key()? {
+                    match key {
+                        "strong" => run_exports.strong = access.next_value()?,
+                        "weak" => run_exports.weak = access.next_value()?,
+                        "weak_constrains" => run_exports.weak_constrains = access.next_value()?,
+                        "strong_constrains" => {
+                            run_exports.strong_constrains = access.next_value()?
+                        }
+                        "noarch" => run_exports.noarch = access.next_value()?,
+                        _ => (),
+                    }
+                }
+                Ok(RunExportsData::Map(run_exports))
+            }
+
+            fn visit_seq<S>(self, mut access: S) -> Result<Self::Value, S::Error>
+            where
+                S: SeqAccess<'de>,
+            {
+                let weak =
+                    Deserialize::deserialize(de::value::SeqAccessDeserializer::new(&mut access))?;
+                Ok(RunExportsData::List(weak))
+            }
+        }
+
+        let run_exports_data = deserializer.deserialize_any(RunExportsVisitor)?;
+
+        match run_exports_data {
+            RunExportsData::Map(run_exports) => Ok(run_exports),
+            RunExportsData::List(weak) => Ok(RunExports {
+                weak,
+                ..Default::default()
+            }),
+        }
+    }
 }
 
 /// The build options contain information about how to build the package and some additional
@@ -79,6 +144,8 @@ pub struct BuildOptions {
     pub script: Option<Vec<String>>,
     /// A recipe can choose to ignore certain run exports of its dependencies
     pub ignore_run_exports: Option<Vec<String>>,
+    /// A recipe can choose to ignore all run exports of coming from some packages
+    pub ignore_run_exports_from: Option<Vec<String>>,
     /// The recipe can specify a list of run exports that it provides
     pub run_exports: Option<RunExports>,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
@@ -289,6 +356,7 @@ pub struct BuildConfiguration {
     pub directories: Directories,
     pub channels: Vec<String>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub subpackages: BTreeMap<String, PackageIdentifier>,
 }
 
 impl BuildConfiguration {
@@ -301,6 +369,13 @@ impl BuildConfiguration {
 pub struct Package {
     pub name: String,
     pub version: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PackageIdentifier {
+    pub name: String,
+    pub version: String,
+    pub build_string: String,
 }
 
 #[serde_as]

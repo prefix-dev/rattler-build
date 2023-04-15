@@ -59,7 +59,7 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
 }
 
 pub async fn create_environment(
-    specs: Vec<MatchSpec>,
+    specs: &[MatchSpec],
     target_platform: &Platform,
     target_prefix: &Path,
     channels: &[String],
@@ -72,7 +72,7 @@ pub async fn create_environment(
     let cache_dir = rattler::default_cache_dir()?;
 
     println!("\nResolving for environment specs:");
-    for spec in &specs {
+    for spec in specs {
         println!(" - {}", spec);
     }
     println!("\n");
@@ -170,7 +170,7 @@ pub async fn create_environment(
             .map(|record| record.repodata_record.clone())
             .collect(),
         virtual_packages,
-        specs,
+        specs: specs.to_vec(),
         pinned_packages: Vec::new(),
     };
 

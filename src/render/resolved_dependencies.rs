@@ -1,15 +1,15 @@
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use crate::metadata::{Output, RunExports};
+use crate::metadata::{BuildConfiguration, Output};
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, Platform, RepoDataRecord, VersionSpec,
+    MatchSpec, Platform, RepoDataRecord, Version, VersionSpec,
 };
 use thiserror::Error;
 
@@ -18,19 +18,54 @@ use super::{
     solver::create_environment,
 };
 
+/// A enum to keep track of where a given Dependency comes from
+#[derive(Debug, Clone)]
 pub enum DependencyInfo {
-    FromVariant { spec: MatchSpec, variant: String },
+    /// The dependency is a direct dependency of the package, with a variant applied
+    /// from the variant config
+    Variant { spec: MatchSpec, variant: String },
+    /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
+    Compiler { spec: MatchSpec },
+    /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
+    PinSubpackage { spec: MatchSpec },
+    /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
+    PinCompatible { spec: MatchSpec },
+    /// This is a special run_exports dependency from another package
+    RunExports {
+        spec: MatchSpec,
+        from: String,
+        source_package: String,
+    },
+    /// This is a regular dependency of the package without any modifications
     Raw { spec: MatchSpec },
+    /// This is a transient dependency of the package, which is not a direct dependency
+    /// of the package, but is a dependency of a dependency
+    Transient,
+}
+
+impl DependencyInfo {
+    pub fn spec(&self) -> &MatchSpec {
+        match self {
+            DependencyInfo::Variant { spec, .. } => spec,
+            DependencyInfo::Compiler { spec } => spec,
+            DependencyInfo::PinSubpackage { spec } => spec,
+            DependencyInfo::PinCompatible { spec } => spec,
+            DependencyInfo::RunExports { spec, .. } => spec,
+            DependencyInfo::Raw { spec } => spec,
+            DependencyInfo::Transient => panic!("Cannot get spec from transient dependency"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct FinalizedRunDependencies {
-    pub depends: Vec<MatchSpec>,
-    pub constrains: Vec<MatchSpec>,
+    pub depends: Vec<DependencyInfo>,
+    pub constrains: Vec<DependencyInfo>,
+    pub run_exports: Option<RunExportsJson>,
 }
 
 pub struct ResolvedDependency {
-    // source: Some(DependencyInfo),
+    source: DependencyInfo,
     resolved: RepoDataRecord,
     cache_fn: PathBuf,
 }
@@ -38,9 +73,9 @@ pub struct ResolvedDependency {
 #[derive(Debug, Clone)]
 pub struct ResolvedDependencies {
     raw: DependencyList,
-    // resolved: Vec<ResolvedDependency>,
+    // meta: Vec<ResolvedDependency>,
     resolved: Vec<RepoDataRecord>,
-    run_exports: HashMap<String, RunExports>,
+    run_exports: HashMap<String, RunExportsJson>,
 }
 
 #[derive(Debug, Clone)]
@@ -58,9 +93,12 @@ pub enum ResolveError {
 
 pub fn apply_variant(
     raw_specs: &DependencyList,
-    variant: &BTreeMap<String, String>,
-    target_platform: &Platform,
-) -> Result<Vec<(Dependency, MatchSpec)>, ResolveError> {
+    build_configuration: &BuildConfiguration,
+) -> Result<Vec<DependencyInfo>, ResolveError> {
+    let variant = &build_configuration.variant;
+    let subpackages = &build_configuration.subpackages;
+    let target_platform = &build_configuration.target_platform;
+
     let applied = raw_specs
         .iter()
         .map(|s| {
@@ -70,28 +108,42 @@ pub fn apply_variant(
                     if m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
                             if let Some(version) = variant.get(name) {
-                                return (
-                                    s.clone(),
-                                    MatchSpec {
-                                        version: Some(
-                                            VersionSpec::from_str(version)
-                                                .expect("Invalid version spec"),
-                                        ),
-                                        ..m
-                                    },
-                                );
+                                let final_spec = MatchSpec {
+                                    version: Some(
+                                        VersionSpec::from_str(&format!("={}", version))
+                                            .expect("Invalid version spec"),
+                                    ),
+                                    ..m
+                                };
+                                return DependencyInfo::Variant {
+                                    spec: final_spec,
+                                    variant: version.clone(),
+                                };
                             }
                         }
                     }
-                    (s.clone(), m)
+                    DependencyInfo::Raw { spec: m }
                 }
-                Dependency::PinSubpackage(_) => todo!(),
+                Dependency::PinSubpackage(pin) => {
+                    let name = &pin.pin_subpackage.name;
+                    let subpackage = subpackages.get(name).expect("Invalid subpackage");
+                    println!("Applying version: {} to {}", subpackage.version, name);
+                    let pinned = pin
+                        .pin_subpackage
+                        .apply(
+                            &Version::from_str(&subpackage.version)
+                                .expect("could not parse version"),
+                            &subpackage.build_string,
+                        )
+                        .expect("could not apply pin");
+                    DependencyInfo::PinSubpackage { spec: pinned }
+                }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("compiler_{}", compiler.compiler);
+                    let compiler_variant = format!("{}_compiler", compiler.compiler);
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
@@ -147,15 +199,18 @@ pub fn apply_variant(
                     let compiler_version = variant.get(&compiler_version_variant);
 
                     let final_compiler = if let Some(compiler_version) = compiler_version {
-                        format!("{}_{} {}", compiler_name, target_platform, compiler_version)
+                        format!(
+                            "{}_{} ={}",
+                            compiler_name, target_platform, compiler_version
+                        )
                     } else {
                         format!("{}_{}", compiler_name, target_platform)
                     };
 
-                    (
-                        s.clone(),
-                        MatchSpec::from_str(&final_compiler).expect("Invalid compiler spec"),
-                    )
+                    DependencyInfo::Compiler {
+                        spec: MatchSpec::from_str(&final_compiler)
+                            .expect("Could not parse compiler"),
+                    }
                 }
             }
         })
@@ -168,7 +223,7 @@ fn collect_run_exports_from_env(
     env: &[RepoDataRecord],
     cache_dir: &Path,
     filter: impl Fn(&RepoDataRecord) -> bool,
-) -> Result<HashMap<String, RunExports>, std::io::Error> {
+) -> Result<HashMap<String, RunExportsJson>, std::io::Error> {
     let mut run_exports = HashMap::new();
     for pkg in env {
         if !filter(pkg) {
@@ -179,13 +234,6 @@ fn collect_run_exports_from_env(
         let pkc = cache_dir.join(cache_key.to_string());
         let rex = RunExportsJson::from_package_directory(pkc).ok();
         if let Some(rex) = rex {
-            let rex = RunExports {
-                strong: rex.strong,
-                weak: rex.weak,
-                strong_constrains: rex.strong_constrains,
-                weak_constrains: rex.weak_constrains,
-                noarch: rex.noarch,
-            };
             run_exports.insert(pkg.package_record.name.clone(), rex);
         }
     }
@@ -208,16 +256,12 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
     let reqs = &output.recipe.requirements;
 
     let build_env = if !reqs.build.is_empty() {
-        let specs = apply_variant(
-            &reqs.build,
-            &output.build_configuration.variant,
-            &output.build_configuration.target_platform,
-        )?;
+        let specs = apply_variant(&reqs.build, &output.build_configuration)?;
 
-        let match_specs = specs.iter().map(|(_, s)| s).cloned().collect::<Vec<_>>();
+        let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
         let env = create_environment(
-            match_specs.clone(),
+            &match_specs,
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             &output.build_configuration.channels,
@@ -226,9 +270,15 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
-            match_specs
+            let res = match_specs
                 .iter()
-                .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
+                .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
+
+            if let Some(ignore_run_exports_from) = &output.recipe.build.ignore_run_exports_from {
+                res && !ignore_run_exports_from.contains(&rec.package_record.name)
+            } else {
+                res
+            }
         })
         .expect("Could not find run exports");
 
@@ -244,28 +294,37 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
     };
 
     // host env
-    let specs = apply_variant(
-        &reqs.host,
-        &output.build_configuration.variant,
-        &output.build_configuration.target_platform,
-    )?;
+    let mut specs = apply_variant(&reqs.host, &output.build_configuration)?;
 
-    let mut match_specs = specs.iter().map(|(_, s)| s).cloned().collect::<Vec<_>>();
-
-    tracing::info!("Resolving host specs: {:?}", match_specs);
+    let clone_specs =
+        |name: &str, env: &str, specs: &[String]| -> Result<Vec<DependencyInfo>, ResolveError> {
+            let mut cloned = Vec::new();
+            for spec in specs {
+                let spec = MatchSpec::from_str(spec).expect("...");
+                let dep = DependencyInfo::RunExports {
+                    spec,
+                    from: env.to_string(),
+                    source_package: name.to_string(),
+                };
+                cloned.push(dep);
+            }
+            Ok(cloned)
+        };
 
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {
-        for (_, rex) in &build_env.run_exports {
-            for spec in &rex.strong {
-                match_specs.push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-            }
+        for (name, rex) in &build_env.run_exports {
+            specs.extend(clone_specs(name, "host", &rex.strong)?);
         }
     }
 
+    let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+
+    tracing::info!("Resolving host specs: {:?}", match_specs);
+
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
-            match_specs.clone(),
+            &match_specs,
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
             &output.build_configuration.channels,
@@ -291,56 +350,81 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         None
     };
 
-    let run_depends = apply_variant(
-        &reqs.run,
-        &output.build_configuration.variant,
-        &output.build_configuration.target_platform,
-    )?;
+    let run_depends = apply_variant(&reqs.run, &output.build_configuration)?;
 
-    let run_constrains = apply_variant(
-        &reqs.constrains,
-        &output.build_configuration.variant,
-        &output.build_configuration.target_platform,
-    )?;
+    let run_constrains = apply_variant(&reqs.constrains, &output.build_configuration)?;
 
-    let mut run_specs = FinalizedRunDependencies {
-        depends: run_depends.iter().map(|(_, s)| s).cloned().collect(),
-        constrains: run_constrains.iter().map(|(_, s)| s).cloned().collect(),
+    let render_run_exports = |run_export: &DependencyList| -> Vec<String> {
+        let rendered = apply_variant(run_export, &output.build_configuration).unwrap();
+        println!("Rendered: {:?}", rendered);
+        rendered
+            .iter()
+            .map(|dep| dep.spec().to_string())
+            .collect::<Vec<_>>()
     };
 
+    let run_exports = &output
+        .recipe
+        .build
+        .run_exports
+        .as_ref()
+        .map(|run_exports| RunExportsJson {
+            strong: render_run_exports(&run_exports.strong),
+            weak: render_run_exports(&run_exports.weak),
+            noarch: render_run_exports(&run_exports.noarch),
+            strong_constrains: render_run_exports(&run_exports.strong_constrains),
+            weak_constrains: render_run_exports(&run_exports.weak_constrains),
+        });
+
+    let mut run_specs = FinalizedRunDependencies {
+        depends: run_depends,
+        constrains: run_constrains,
+        run_exports: run_exports.clone(),
+    };
+
+    // Propagate run exports from host env to run env
     if let Some(host_env) = &host_env {
         match output.build_configuration.target_platform {
             Platform::NoArch => {
-                for (_, rex) in &host_env.run_exports {
-                    for spec in &rex.noarch {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
+                for (name, rex) in &host_env.run_exports {
+                    run_specs
+                        .depends
+                        .extend(clone_specs(name, "host", &rex.noarch)?);
                 }
             }
             _ => {
-                for (_, rex) in &host_env.run_exports {
-                    for spec in &rex.strong {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.weak {
-                        run_specs
-                            .depends
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.strong_constrains {
-                        run_specs
-                            .constrains
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
-                    for spec in &rex.weak_constrains {
-                        run_specs
-                            .constrains
-                            .push(MatchSpec::from_str(spec).expect("Invalid match spec"));
-                    }
+                for (name, rex) in &host_env.run_exports {
+                    run_specs
+                        .depends
+                        .extend(clone_specs(name, "host", &rex.strong)?);
+                    run_specs
+                        .depends
+                        .extend(clone_specs(name, "host", &rex.weak)?);
+                    run_specs
+                        .constrains
+                        .extend(clone_specs(name, "host", &rex.strong_constrains)?);
+                    run_specs
+                        .constrains
+                        .extend(clone_specs(name, "host", &rex.weak_constrains)?);
+                }
+            }
+        }
+    }
+
+    // We also have to propagate the _strong_ run exports of the build environment to the run environment
+    if let Some(build_env) = &build_env {
+        match output.build_configuration.target_platform {
+            Platform::NoArch => {}
+            _ => {
+                for (name, rex) in &build_env.run_exports {
+                    run_specs
+                        .depends
+                        .extend(clone_specs(name, "build", &rex.strong)?);
+                    run_specs.constrains.extend(clone_specs(
+                        name,
+                        "build",
+                        &rex.strong_constrains,
+                    )?);
                 }
             }
         }

@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 
 use rattler_conda_types::package::{
     AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
-    PythonEntryPoints, RunExportsJson,
+    PythonEntryPoints,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Platform, Version};
@@ -269,7 +269,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .depends
             .iter()
-            .map(|d| d.to_string())
+            .map(|d| d.spec().to_string())
             .collect(),
         constrains: output
             .finalized_dependencies
@@ -278,7 +278,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .constrains
             .iter()
-            .map(|d| d.to_string())
+            .map(|d| d.spec().to_string())
             .collect(),
         noarch: recipe.build.noarch,
         track_features: vec![],
@@ -308,17 +308,15 @@ fn create_about_json(output: &Output) -> Result<String, PackagingError> {
 }
 
 /// Create the run_exports.json file for the given output.
-fn create_run_exports_json(recipe: &Output) -> Result<Option<String>, PackagingError> {
-    if let Some(run_exports) = &recipe.recipe.build.run_exports {
-        let run_exports_json = RunExportsJson {
-            strong: run_exports.strong.clone(),
-            weak: run_exports.weak.clone(),
-            strong_constrains: run_exports.strong_constrains.clone(),
-            weak_constrains: run_exports.weak_constrains.clone(),
-            noarch: run_exports.noarch.clone(),
-        };
-
-        Ok(Some(serde_json::to_string_pretty(&run_exports_json)?))
+fn create_run_exports_json(output: &Output) -> Result<Option<String>, PackagingError> {
+    if let Some(run_exports) = &output
+        .finalized_dependencies
+        .as_ref()
+        .unwrap()
+        .run
+        .run_exports
+    {
+        Ok(Some(serde_json::to_string_pretty(run_exports)?))
     } else {
         Ok(None)
     }

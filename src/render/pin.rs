@@ -83,57 +83,58 @@ impl Pin {
         let version_str = version.to_string();
 
         // extract same amount of digits as the pin expression (in the form of x.x.x) from version str
-        if let Some(min_pin) = &self.min_pin {
-            // mumber of digits in pin expression
-            let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
-            if pin_digits == 0 {
-                return Err(PinError::EmptyPinExpression);
-            }
-
-            // get version string up the to pin_digits dot
-            let pin = version_str
-                .split('.')
-                .take(pin_digits)
-                .collect::<Vec<_>>()
-                .join(".");
-            spec.push_str(&format!(" >={}", pin));
+        let min_pin = self
+            .min_pin
+            .clone()
+            .unwrap_or(PinExpression("x.x.x.x.x.x".to_string()));
+        // mumber of digits in pin expression
+        let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
+        if pin_digits == 0 {
+            return Err(PinError::EmptyPinExpression);
         }
 
-        if let Some(max_pin) = &self.max_pin {
-            // mumber of digits in pin expression
-            let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
-            if pin_digits == 0 {
-                return Err(PinError::EmptyPinExpression);
-            }
-            // get version strin gup the to pin_digits dot
-            let mut pin = version_str
-                .split('.')
-                .take(pin_digits)
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>();
+        // get version string up the to pin_digits dot
+        let pin = version_str
+            .split('.')
+            .take(pin_digits)
+            .collect::<Vec<_>>()
+            .join(".");
+        spec.push_str(&format!(" >={}", pin));
 
-            // fill up with 0s
-            while pin.len() < pin_digits {
-                pin.push("0".to_string());
-            }
+        let max_pin = self
+            .max_pin
+            .clone()
+            .unwrap_or(PinExpression("x".to_string()));
 
-            // increment last digit
-            let last = pin
-                .pop()
-                .unwrap_or("0".to_string())
-                .parse::<u64>()
-                .map_err(|_| PinError::CouldNotPin(version_str.clone()))?
-                + 1;
-            pin.push(last.to_string());
-            let pin = pin.join(".");
-
-            if self.min_pin.is_some() {
-                spec.push(',');
-            } else {
-                spec.push(' ');
-            }
-            spec.push_str(&format!("<{}", pin));
+        // mumber of digits in pin expression
+        let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
+        if pin_digits == 0 {
+            return Err(PinError::EmptyPinExpression);
         }
+        // get version strin gup the to pin_digits dot
+        let mut pin = version_str
+            .split('.')
+            .take(pin_digits)
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+
+        // fill up with 0s
+        while pin.len() < pin_digits {
+            pin.push("0".to_string());
+        }
+
+        // increment last digit
+        let last = pin
+            .pop()
+            .unwrap_or("0".to_string())
+            .parse::<u64>()
+            .map_err(|_| PinError::CouldNotPin(version_str.clone()))?
+            + 1;
+        pin.push(last.to_string());
+        let pin = pin.join(".");
+
+        spec.push(',');
+        spec.push_str(&format!("<{}", pin));
 
         Ok(MatchSpec::from_str(&spec)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
@@ -218,7 +219,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo <1.2.4");
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4");
 
         let pin = Pin {
             name: "foo".to_string(),
@@ -228,7 +229,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1.2.3");
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<2");
     }
 
     #[test]

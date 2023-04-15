@@ -14,6 +14,16 @@ rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# local deps 
+# rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
+# rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
+# rattler_digest = { path = "../rattler/crates/rattler_digest" }
+# rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway", features = ["sparse"] }
+# rattler = { path = "../rattler/crates/rattler" }
+# rattler_solve = { path = "../rattler/crates/rattler_solve" }
+# rattler_shell = { path = "../rattler/crates/rattler_shell" }
+# rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
+
 anyhow = "1.0.70"
 walkdir = "2.3.3"
 sha2 = "0.10.6"
