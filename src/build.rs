@@ -163,7 +163,14 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let (interpreter, args) = if cfg!(unix) {
         ("/bin/bash", vec![build_script.as_os_str().to_owned()])
     } else {
-        ("cmd.exe", vec![OsString::from("/d"),  OsString::from("/c"), build_script.as_os_str().to_owned()])
+        (
+            "cmd.exe",
+            vec![
+                OsString::from("/d"),
+                OsString::from("/c"),
+                build_script.as_os_str().to_owned(),
+            ],
+        )
     };
     run_process_with_replacements(
         interpreter,
