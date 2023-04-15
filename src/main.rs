@@ -189,7 +189,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         .and_then(|v| v.get("noarch"))
         .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
         .transpose()?
-        .unwrap_or_else(|| NoArchType::none());
+        .unwrap_or_else(NoArchType::none);
 
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &noarch);
@@ -231,6 +231,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,
                 channels: vec!["conda-forge".to_string()],
+                timestamp: chrono::Utc::now(),
             },
             finalized_dependencies: None,
         };

@@ -288,6 +288,7 @@ pub struct BuildConfiguration {
     pub no_clean: bool,
     pub directories: Directories,
     pub channels: Vec<String>,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
 impl BuildConfiguration {
