@@ -1,7 +1,7 @@
 //! The build module contains the code for running the build process for a given [`Output`]
 
 use std::collections::HashSet;
-use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
@@ -100,7 +100,7 @@ pub fn get_conda_build_script(
 fn run_process_with_replacements(
     command: &str,
     cwd: &PathBuf,
-    args: &[&OsStr],
+    args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> anyhow::Result<()> {
     let mut child = Command::new(command)
@@ -160,15 +160,15 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
-    #[cfg(unix)]
-    let interpreter = "/bin/bash";
-    #[cfg(windows)]
-    let interpreter = "cmd.exe";
-
+    let (interpreter, args) = if cfg!(unix) {
+        ("/bin/bash", vec![build_script.as_os_str().to_owned()])
+    } else {
+        ("cmd.exe", vec![OsString::from("/d"),  OsString::from("/c"), build_script.as_os_str().to_owned()])
+    };
     run_process_with_replacements(
         interpreter,
         &directories.work_dir,
-        &[build_script.as_os_str()],
+        &args,
         &[
             (
                 directories.host_prefix.to_string_lossy().as_ref(),
