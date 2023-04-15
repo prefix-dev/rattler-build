@@ -1,8 +1,9 @@
 //! The build module contains the code for running the build process for a given [`Output`]
 
 use std::collections::HashSet;
+use std::ffi::OsStr;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 
 use std::fs;
 use std::process::{Command, Stdio};
@@ -74,6 +75,47 @@ pub fn get_conda_build_script(
     Ok(build_script_path)
 }
 
+/// Spawns a process and replaces the given strings in the output with the given replacements.
+/// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
+fn run_process_with_replacements(
+    command: &str,
+    cwd: &PathBuf,
+    args: &[&OsStr],
+    replacements: &[(&str, &str)],
+) -> anyhow::Result<()> {
+    let mut child = Command::new(command)
+        .current_dir(cwd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("Failed to execute command");
+
+    if let Some(ref mut stdout) = child.stdout {
+        let reader = BufReader::new(stdout);
+
+        // Process the output line by line
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let filtered_line = replacements
+                    .iter()
+                    .fold(line, |acc, (from, to)| acc.replace(from, to));
+                println!("{}", filtered_line);
+            } else {
+                eprintln!("Error reading output: {:?}", line);
+            }
+        }
+    }
+
+    let status = child.wait().expect("Failed to wait on child");
+
+    if !status.success() {
+        return Err(anyhow::anyhow!("Build failed"));
+    }
+
+    Ok(())
+}
+
 /// Run the build for the given output. This will fetch the sources, resolve the dependencies,
 /// and execute the build script. Returns the path to the resulting package.
 pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
@@ -92,22 +134,32 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         build_configuration: output.build_configuration.clone(),
     };
 
-    let build_script = get_conda_build_script(&output, directories);
+    let build_script = get_conda_build_script(&output, directories)?;
     tracing::info!("Work dir: {:?}", &directories.work_dir);
-    tracing::info!("Build script: {:?}", build_script.unwrap());
+    tracing::info!("Build script: {:?}", build_script);
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
-    let status = Command::new("/bin/bash")
-        .current_dir(&directories.source_dir)
-        .arg(directories.source_dir.join("conda_build.sh"))
-        .stdin(Stdio::null())
-        .status()
-        .expect("Failed to execute command");
+    #[cfg(unix)]
+    let interpreter = "/bin/bash";
+    #[cfg(windows)]
+    let interpreter = "cmd.exe";
 
-    if !status.success() {
-        return Err(anyhow::anyhow!("Build failed"));
-    }
+    run_process_with_replacements(
+        interpreter,
+        &directories.work_dir,
+        &[build_script.as_os_str()],
+        &[
+            (
+                directories.host_prefix.to_string_lossy().as_ref(),
+                "$PREFIX",
+            ),
+            (
+                directories.build_prefix.to_string_lossy().as_ref(),
+                "$BUILD_PREFIX",
+            ),
+        ],
+    )?;
 
     let files_after = record_files(&directories.host_prefix).expect("Could not record files");
 

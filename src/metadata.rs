@@ -330,11 +330,26 @@ impl Directories {
         let mamba_root_prefix = std::env::var("MAMBA_ROOT_PREFIX").unwrap_or("./micromamba".into());
         let mamba_root_prefix = PathBuf::from(mamba_root_prefix);
 
+        let placeholder_template = "_placehold";
+        let mut placeholder = String::new();
+        let placeholder_length: usize = 255;
+
+        while placeholder.len() < placeholder_length {
+            placeholder.push_str(placeholder_template);
+        }
+
+        let placeholder = placeholder
+            [0..placeholder_length - build_dir.join("host_env").as_os_str().len()]
+            .to_string();
+
+        let host_prefix = build_dir.join(format!("host_env{}", placeholder));
+        assert!(host_prefix.as_os_str().len() == placeholder_length);
+
         let directories = Directories {
             build_dir: build_dir.clone(),
             source_dir: build_dir.join("work"),
             build_prefix: build_dir.join("build_env"),
-            host_prefix: build_dir.join("host_env"),
+            host_prefix,
             work_dir: build_dir.join("work"),
             root_prefix: mamba_root_prefix,
             recipe_dir,
