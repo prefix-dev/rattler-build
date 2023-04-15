@@ -4,7 +4,7 @@ use std::{collections::HashMap, env};
 
 use rattler_conda_types::Platform;
 use rattler_shell::activation::{ActivationError, ActivationVariables, Activator};
-use rattler_shell::shell;
+use rattler_shell::shell::Shell;
 
 use crate::linux;
 use crate::macos;
@@ -161,17 +161,18 @@ pub enum ScriptError {
 
 /// Write a script that can be sourced to set the environment variables for the build process.
 /// The script will also activate the host and build prefixes.
-pub fn write_env_script(
+pub fn write_env_script<T: Shell + Clone>(
     output: &Output,
     state: &str,
     out: &mut impl std::io::Write,
-    shell_type: shell::ShellType,
+    shell_type: T,
 ) -> Result<(), ScriptError> {
     let directories = &output.build_configuration.directories;
 
     let vars = vars(output, state);
+    let mut s = String::new();
     for v in vars {
-        writeln!(out, "export {}=\"{}\"", v.0, v.1)?;
+        shell_type.set_env_var(&mut s, &v.0, &v.1)?;
     }
 
     let platform = output.build_configuration.target_platform;
@@ -179,12 +180,14 @@ pub fn write_env_script(
     let additional_os_vars = os_vars(&directories.host_prefix, &platform);
 
     for (k, v) in additional_os_vars {
-        writeln!(out, "export {}=\"{}\"", k, v)?;
+        shell_type.set_env_var(&mut s, &k, &v)?;
     }
+
+    writeln!(out, "{}", s)?;
 
     let host_prefix_activator = Activator::from_path(
         &directories.host_prefix,
-        shell::Bash,
+        shell_type.clone(),
         output.build_configuration.build_platform,
     )?;
     let current_path = std::env::var("PATH")
@@ -205,7 +208,7 @@ pub fn write_env_script(
 
     let build_prefix_activator = Activator::from_path(
         &directories.build_prefix,
-        shell::Bash,
+        shell_type,
         output.build_configuration.build_platform,
     )?;
 
