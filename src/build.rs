@@ -41,7 +41,7 @@ pub fn get_conda_build_script(
         .join("\n");
 
     let script = if script.ends_with(".sh") || script.ends_with(".bat") {
-        let recipe_file = directories.recipe_dir.join("build.sh");
+        let recipe_file = directories.recipe_dir.join(script);
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
         let mut orig_build_file = File::open(recipe_file)?;
