@@ -165,6 +165,7 @@ pub fn write_env_script(
     output: &Output,
     state: &str,
     out: &mut impl std::io::Write,
+    shell_type: shell::ShellType,
 ) -> Result<(), ScriptError> {
     let directories = &output.build_configuration.directories;
 
