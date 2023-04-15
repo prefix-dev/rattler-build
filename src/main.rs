@@ -155,11 +155,15 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     let mut recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
-    let target_platform = if recipe_yaml
+    // get recipe.build.noarch value as NoArchType from serde_yaml
+    let noarch = recipe_yaml
         .get("build")
         .and_then(|v| v.get("noarch"))
-        .is_some()
-    {
+        .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
+        .transpose()?
+        .unwrap_or_else(NoArchType::none);
+
+    let target_platform = if !noarch.is_none() {
         Platform::NoArch
     } else if let Some(target_platform) = args.target_platform {
         Platform::from_str(&target_platform)?
@@ -182,14 +186,6 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         .expect("Could not compute variants");
 
     println!("Variants: {:#?}", variants);
-
-    // get recipe.build.noarch value as NoArchType from serde_yaml
-    let noarch = recipe_yaml
-        .get("build")
-        .and_then(|v| v.get("noarch"))
-        .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
-        .transpose()?
-        .unwrap_or_else(NoArchType::none);
 
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &noarch);
