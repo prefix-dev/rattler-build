@@ -15,7 +15,7 @@ use walkdir::WalkDir;
 
 use rattler_conda_types::package::{
     AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
-    PythonEntryPoints, RunExportsJson,
+    PythonEntryPoints,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Platform, Version};
@@ -24,7 +24,6 @@ use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use crate::macos;
 use crate::metadata::Output;
-use crate::render::dependency_list::Dependency;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -270,7 +269,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .depends
             .iter()
-            .map(|d| d.to_string())
+            .map(|d| d.spec().to_string())
             .collect(),
         constrains: output
             .finalized_dependencies
@@ -279,7 +278,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .constrains
             .iter()
-            .map(|d| d.to_string())
+            .map(|d| d.spec().to_string())
             .collect(),
         noarch: recipe.build.noarch,
         track_features: vec![],
@@ -309,29 +308,15 @@ fn create_about_json(output: &Output) -> Result<String, PackagingError> {
 }
 
 /// Create the run_exports.json file for the given output.
-fn create_run_exports_json(recipe: &Output) -> Result<Option<String>, PackagingError> {
-    let to_specs = |specs: &Vec<Dependency>| {
-        let mut out = Vec::new();
-        for spec in specs {
-            if let Dependency::Spec(s) = spec {
-                out.push(s.to_string());
-            } else {
-                continue;
-            }
-        }
-        out
-    };
-
-    if let Some(run_exports) = &recipe.recipe.build.run_exports {
-        let run_exports_json = RunExportsJson {
-            strong: to_specs(&run_exports.strong),
-            weak: to_specs(&run_exports.weak),
-            strong_constrains: to_specs(&run_exports.strong_constrains),
-            weak_constrains: to_specs(&run_exports.weak_constrains),
-            noarch: to_specs(&run_exports.noarch),
-        };
-
-        Ok(Some(serde_json::to_string_pretty(&run_exports_json)?))
+fn create_run_exports_json(output: &Output) -> Result<Option<String>, PackagingError> {
+    if let Some(run_exports) = &output
+        .finalized_dependencies
+        .as_ref()
+        .unwrap()
+        .run
+        .run_exports
+    {
+        Ok(Some(serde_json::to_string_pretty(run_exports)?))
     } else {
         Ok(None)
     }

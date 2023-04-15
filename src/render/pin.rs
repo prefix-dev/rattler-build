@@ -133,11 +133,7 @@ impl Pin {
         pin.push(last.to_string());
         let pin = pin.join(".");
 
-        if self.min_pin.is_some() {
-            spec.push(',');
-        } else {
-            spec.push(' ');
-        }
+        spec.push(',');
         spec.push_str(&format!("<{}", pin));
 
         Ok(MatchSpec::from_str(&spec)
