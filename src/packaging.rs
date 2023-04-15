@@ -43,12 +43,6 @@ pub enum PackagingError {
     #[error("Could not run walkdir: {0}")]
     WalkDirError(#[from] walkdir::Error),
 
-    #[error("Could not get a relative path from {0} to {1}")]
-    RelativePathError(PathBuf, PathBuf),
-
-    #[error("Could not find parent directory of {0}")]
-    ParentDirError(PathBuf),
-
     #[error("Failed to parse version {0}")]
     VersionParseError(#[from] rattler_conda_types::ParseVersionError),
 
