@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fs,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::{collections::HashMap, fs, path::Path, str::FromStr};
 
 use crate::metadata::{BuildConfiguration, Output};
 use rattler::package_cache::CacheKey;
@@ -19,6 +14,7 @@ use super::{
 };
 
 /// A enum to keep track of where a given Dependency comes from
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
@@ -44,6 +40,7 @@ pub enum DependencyInfo {
 }
 
 impl DependencyInfo {
+    /// Get the matchspec from a dependency info
     pub fn spec(&self) -> &MatchSpec {
         match self {
             DependencyInfo::Variant { spec, .. } => spec,
@@ -64,16 +61,10 @@ pub struct FinalizedRunDependencies {
     pub run_exports: Option<RunExportsJson>,
 }
 
-pub struct ResolvedDependency {
-    source: DependencyInfo,
-    resolved: RepoDataRecord,
-    cache_fn: PathBuf,
-}
-
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ResolvedDependencies {
-    raw: DependencyList,
-    // meta: Vec<ResolvedDependency>,
+    specs: Vec<DependencyInfo>,
     resolved: Vec<RepoDataRecord>,
     run_exports: HashMap<String, RunExportsJson>,
 }
@@ -91,6 +82,8 @@ pub enum ResolveError {
     DependencyResolutionError(#[from] anyhow::Error),
 }
 
+/// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
+/// dependencies
 pub fn apply_variant(
     raw_specs: &DependencyList,
     build_configuration: &BuildConfiguration,
@@ -283,7 +276,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         .expect("Could not find run exports");
 
         Some(ResolvedDependencies {
-            raw: reqs.build.clone(),
+            specs,
             resolved: env,
             run_exports,
         })
@@ -340,7 +333,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
         .expect("Could not find run exports");
 
         Some(ResolvedDependencies {
-            raw: reqs.host.clone(),
+            specs,
             resolved: env,
             run_exports,
         })

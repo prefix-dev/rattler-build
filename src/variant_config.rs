@@ -15,50 +15,6 @@ use crate::selectors::{flatten_selectors, flatten_toplevel, SelectorConfig};
 use crate::used_variables::extract_dependencies;
 use crate::used_variables::used_vars_from_expressions;
 
-/// This function normalizes a Map of String and List values to a List of Strings
-/// For example,
-///
-/// ```yaml
-/// compiler:
-///  - gcc
-///  - clang
-/// python: "3.9"
-/// ```
-///
-/// becomes
-///
-/// ```yaml
-/// compiler:
-/// - gcc
-/// - clang
-/// python:
-/// - "3.9"
-/// ```
-fn value_to_map(value: serde_yaml::Value) -> BTreeMap<String, Vec<String>> {
-    let mut map = BTreeMap::new();
-    for (key, value) in value.as_mapping().unwrap() {
-        let key = key.as_str().unwrap().to_string();
-        match value {
-            serde_yaml::Value::String(value) => {
-                map.insert(key, vec![value.to_string()]);
-                continue;
-            }
-            serde_yaml::Value::Sequence(value) => {
-                let value = value
-                    .iter()
-                    .map(|v| v.as_str().unwrap().to_string())
-                    .collect();
-                map.insert(key, value);
-                continue;
-            }
-            _ => {
-                panic!("Invalid value type");
-            }
-        }
-    }
-    map
-}
-
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
     pub max_pin: Option<String>,

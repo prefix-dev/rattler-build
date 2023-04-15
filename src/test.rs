@@ -40,10 +40,6 @@ pub enum TestError {
     TestEnvironmentSetup,
 }
 
-pub fn setup_test_environment() -> Result<(), TestError> {
-    Ok(())
-}
-
 #[derive(Debug)]
 enum Tests {
     Commands(PathBuf),

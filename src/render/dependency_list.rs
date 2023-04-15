@@ -67,16 +67,6 @@ impl<'de> Deserialize<'de> for Dependency {
     }
 }
 
-fn deserialize_match_spec<'de, D, T>(deserializer: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: FromStr,
-    T::Err: std::fmt::Display,
-{
-    let s = String::deserialize(deserializer)?;
-    T::from_str(&s).map_err(de::Error::custom)
-}
-
 pub type DependencyList = Vec<Dependency>;
 
 #[cfg(test)]
