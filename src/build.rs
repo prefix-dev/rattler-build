@@ -122,7 +122,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     if let Some(source) = &output.recipe.source {
-        fetch_sources(source, &directories.source_dir, &directories.recipe_dir).await?;
+        fetch_sources(source, &directories.work_dir, &directories.recipe_dir).await?;
     }
 
     let finalized_dependencies = resolve_dependencies(output).await?;

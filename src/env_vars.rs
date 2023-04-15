@@ -88,10 +88,8 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         directories.root_prefix.to_string_lossy()
     );
     insert!(vars, "RECIPE_DIR", directories.recipe_dir.to_string_lossy());
-    insert!(vars, "SRC_DIR", directories.source_dir.to_string_lossy());
-    insert!(vars, "WORK_DIR", directories.work_dir.to_string_lossy());
+    insert!(vars, "SRC_DIR", directories.work_dir.to_string_lossy());
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());
-    // insert!(vars, "SYS_PYTHON", directories.root_prefix.to_string_lossy());
 
     // python variables
     insert!(vars, "PIP_NO_BUILD_ISOLATION", "False");

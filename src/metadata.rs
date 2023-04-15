@@ -294,15 +294,24 @@ pub enum Source {
     Path(PathSrc),
 }
 
+/// Directories used during the build process
 #[derive(Debug, Clone)]
 pub struct Directories {
+    /// The directory where the recipe is located
     pub recipe_dir: PathBuf,
+    /// The host prefix is the directory where host dependencies are installed
+    /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
     pub host_prefix: PathBuf,
+    /// The build prefix is the directory where build dependencies are installed
+    /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build script
     pub build_prefix: PathBuf,
+    /// The root prefix is a legacy directory where the `conda` tool is installed
     pub root_prefix: PathBuf,
-    pub source_dir: PathBuf,
+    /// The work directory is the directory where the source code is copied to
     pub work_dir: PathBuf,
+    /// The parent directory of host, build and work directories
     pub build_dir: PathBuf,
+    /// The output directory or local channel directory
     pub local_channel: PathBuf,
 }
 
@@ -347,7 +356,6 @@ impl Directories {
 
         let directories = Directories {
             build_dir: build_dir.clone(),
-            source_dir: build_dir.join("work"),
             build_prefix: build_dir.join("build_env"),
             host_prefix,
             work_dir: build_dir.join("work"),
@@ -362,19 +370,30 @@ impl Directories {
 
 #[derive(Debug, Clone)]
 pub struct BuildConfiguration {
+    /// The target platform for the build
     pub target_platform: Platform,
+    /// The host platform (usually target platform, but for `noarch` it's the build platform)
     pub host_platform: Platform,
+    /// The build platform (the platform that the build is running on)
     pub build_platform: Platform,
+    /// The selected variant for this build
     pub variant: BTreeMap<String, String>,
+    /// THe computed hash of the variant
     pub hash: String,
+    /// Set to true if the build directories should be kept after the build
     pub no_clean: bool,
+    /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
+    /// The channels to use when resolving environments
     pub channels: Vec<String>,
+    /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// All subpackages coming from this output or other outputs from the same recipe
     pub subpackages: BTreeMap<String, PackageIdentifier>,
 }
 
 impl BuildConfiguration {
+    /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform
     }
@@ -382,7 +401,9 @@ impl BuildConfiguration {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Package {
+    /// The name of the package
     pub name: String,
+    /// The version of the package
     pub version: String,
 }
 
@@ -396,13 +417,19 @@ pub struct PackageIdentifier {
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenderedRecipe {
+    /// Information about the package
     pub package: Package,
+    /// The source section of the recipe
     #[serde_as(deserialize_as = "Option<OneOrMany<_, PreferOne>>")]
     pub source: Option<Vec<Source>>,
+    /// The build section of the recipe
     #[serde(default)]
     pub build: BuildOptions,
+    /// The requirements section of the recipe
     pub requirements: Requirements,
+    /// The about section of the recipe
     pub about: About,
+    /// The test section of the recipe
     pub test: Option<Test>,
 }
 
