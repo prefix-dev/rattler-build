@@ -185,7 +185,6 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     };
 
     let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config);
-    print!("Variant config: {:#?}", variant_config);
 
     let variants = variant_config
         .find_variants(&recipe_text, &selector_config)
