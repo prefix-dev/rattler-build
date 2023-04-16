@@ -1,6 +1,13 @@
-use std::{collections::HashMap, fs, path::Path, str::FromStr};
+use std::{
+    collections::HashMap,
+    fmt::{Display, Formatter},
+    fs,
+    path::Path,
+    str::FromStr,
+};
 
 use crate::metadata::{BuildConfiguration, Output};
+use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
@@ -52,6 +59,22 @@ impl DependencyInfo {
             DependencyInfo::Transient => panic!("Cannot get spec from transient dependency"),
         }
     }
+
+    pub fn render(&self) -> String {
+        match self {
+            DependencyInfo::Variant { spec, .. } => format!("{} (V)", spec),
+            DependencyInfo::Compiler { spec } => format!("{} (C)", spec),
+            DependencyInfo::PinSubpackage { spec } => format!("{} (PS)", spec),
+            DependencyInfo::PinCompatible { spec } => format!("{} (PC)", spec),
+            DependencyInfo::RunExports {
+                spec,
+                from,
+                source_package,
+            } => format!("{} (RE of [{}: {}])", spec, from, source_package),
+            DependencyInfo::Raw { spec } => spec.to_string(),
+            DependencyInfo::Transient => "transient".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +90,88 @@ pub struct ResolvedDependencies {
     specs: Vec<DependencyInfo>,
     resolved: Vec<RepoDataRecord>,
     run_exports: HashMap<String, RunExportsJson>,
+}
+
+fn short_channel(channel: &str) -> String {
+    if channel.contains('/') {
+        channel
+            .rsplit('/')
+            .find(|s| !s.is_empty())
+            .unwrap()
+            .to_string()
+    } else {
+        channel.to_string()
+    }
+}
+
+impl Display for ResolvedDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .set_header(vec![
+                "Package", "Spec", "Version", "Build", "Channel", "Size",
+            ]);
+        let column = table.column_mut(5).expect("This should be column two");
+        column.set_cell_alignment(comfy_table::CellAlignment::Right);
+
+        let resolved_w_specs = self
+            .resolved
+            .iter()
+            .map(|r| {
+                let spec = self
+                    .specs
+                    .iter()
+                    .find(|s| s.spec().name.as_ref() == Some(&r.package_record.name));
+                if let Some(s) = spec {
+                    (r, s)
+                } else {
+                    (r, &DependencyInfo::Transient)
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let (mut explicit, mut transient): (Vec<_>, Vec<_>) = resolved_w_specs
+            .into_iter()
+            .partition(|(_, s)| !matches!(s, DependencyInfo::Transient));
+
+        explicit.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
+        transient.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
+
+        for (record, dep_info) in &explicit {
+            table.add_row(vec![
+                record.package_record.name.clone(),
+                dep_info.render(),
+                record.package_record.version.to_string(),
+                record.package_record.build.to_string(),
+                short_channel(&record.channel),
+                record
+                    .package_record
+                    .size
+                    .map(|s| HumanBytes(s).to_string())
+                    .unwrap_or_default(),
+            ]);
+        }
+        for (record, _) in &transient {
+            table.add_row(vec![
+                record.package_record.name.clone(),
+                "".to_string(),
+                record.package_record.version.to_string(),
+                record.package_record.build.to_string(),
+                short_channel(&record.channel),
+                record
+                    .package_record
+                    .size
+                    .map(|s| HumanBytes(s).to_string())
+                    .unwrap_or_default(),
+            ]);
+        }
+
+        write!(f, "{}", table)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +225,6 @@ pub fn apply_variant(
                 Dependency::PinSubpackage(pin) => {
                     let name = &pin.pin_subpackage.name;
                     let subpackage = subpackages.get(name).expect("Invalid subpackage");
-                    println!("Applying version: {} to {}", subpackage.version, name);
                     let pinned = pin
                         .pin_subpackage
                         .apply(
@@ -316,8 +420,6 @@ pub async fn resolve_dependencies(
 
     let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
-    tracing::info!("Resolving host specs: {:?}", match_specs);
-
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
             &match_specs,
@@ -352,7 +454,6 @@ pub async fn resolve_dependencies(
 
     let render_run_exports = |run_export: &DependencyList| -> Vec<String> {
         let rendered = apply_variant(run_export, &output.build_configuration).unwrap();
-        println!("Rendered: {:?}", rendered);
         rendered
             .iter()
             .map(|dep| dep.spec().to_string())

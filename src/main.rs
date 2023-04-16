@@ -191,7 +191,18 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         .find_variants(&recipe_text, &selector_config)
         .expect("Could not compute variants");
 
-    println!("Variants: {:#?}", variants);
+    println!("Found variants:");
+    for variant in &variants {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .set_header(vec!["Variant", "Version"]);
+        for (key, value) in variant.iter() {
+            table.add_row(vec![key, value]);
+        }
+        println!("{}\n", table);
+    }
 
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &noarch);
