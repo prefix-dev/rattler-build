@@ -78,6 +78,13 @@ jobs:
         shell: bash
         run: echo "BUILD_CMD=cross" >> $GITHUB_ENV
 
+      - name: Add macOS cross build capability
+        if: matrix.job.target == 'aarch64-apple-darwin'
+        shell: bash
+        run: |
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+
       - name: Show version information (Rust, cargo, GCC)
         shell: bash
         run: |
@@ -153,6 +160,7 @@ jobs:
 
       - name: Run tests
         shell: bash
+        if: matrix.job.target != 'aarch64-apple-darwin'
         run: $BUILD_CMD test --locked --target=${{ matrix.job.target }} ${{ steps.build-options.outputs.CARGO_BUILD_OPTIONS}} ${{ steps.test-options.outputs.CARGO_TEST_OPTIONS}}
 
       - name: Create tarball
