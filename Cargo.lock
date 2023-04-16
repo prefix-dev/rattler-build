@@ -2933,6 +2933,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler-build"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "comfy-table",
+ "console",
+ "content_inspector",
+ "futures 0.3.28",
+ "goblin",
+ "hex",
+ "indicatif",
+ "insta",
+ "itertools",
+ "minijinja",
+ "num_cpus",
+ "once_cell",
+ "pathdiff",
+ "rattler",
+ "rattler_conda_types",
+ "rattler_digest",
+ "rattler_package_streaming",
+ "rattler_repodata_gateway",
+ "rattler_shell",
+ "rattler_solve",
+ "rattler_virtual_packages",
+ "reqwest",
+ "rstest",
+ "scroll",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "serde_yaml",
+ "sha1",
+ "sha2",
+ "tempdir",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "walkdir",
+]
+
+[[package]]
 name = "rattler_conda_types"
 version = "0.2.0"
 source = "git+https://github.com/mamba-org/rattler?branch=main#4c0d4d9b1259d23a29c6d764ee6e5b37f16b4f4f"
@@ -3247,53 +3294,6 @@ dependencies = [
  "untrusted",
  "web-sys",
  "winapi",
-]
-
-[[package]]
-name = "roar"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "comfy-table",
- "console",
- "content_inspector",
- "futures 0.3.28",
- "goblin",
- "hex",
- "indicatif",
- "insta",
- "itertools",
- "minijinja",
- "num_cpus",
- "once_cell",
- "pathdiff",
- "rattler",
- "rattler_conda_types",
- "rattler_digest",
- "rattler_package_streaming",
- "rattler_repodata_gateway",
- "rattler_shell",
- "rattler_solve",
- "rattler_virtual_packages",
- "reqwest",
- "rstest",
- "scroll",
- "serde",
- "serde_json",
- "serde_with",
- "serde_yaml",
- "sha1",
- "sha2",
- "tempdir",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "url",
- "walkdir",
 ]
 
 [[package]]
