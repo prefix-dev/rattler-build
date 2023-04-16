@@ -96,10 +96,6 @@ pub fn index(
     output_folder: &Path,
     target_platform: Option<&Platform>,
 ) -> Result<(), std::io::Error> {
-    if !output_folder.join("noarch").exists() {
-        std::fs::create_dir(output_folder.join("noarch"))?;
-    }
-
     let entries = WalkDir::new(output_folder).into_iter();
     let entries: Vec<(PathBuf, ArchiveType)> = entries
         .filter_entry(|e| e.depth() <= 2)
@@ -111,7 +107,7 @@ pub fn index(
         .collect();
 
     // find all subdirs
-    let platforms = entries
+    let mut platforms = entries
         .iter()
         .map(|(p, _)| {
             p.parent()
@@ -122,6 +118,12 @@ pub fn index(
                 .to_string()
         })
         .collect::<std::collections::HashSet<_>>();
+
+    // Always create noarch subdir
+    if !output_folder.join("noarch").exists() {
+        std::fs::create_dir(output_folder.join("noarch"))?;
+        platforms.insert("noarch".to_string());
+    }
 
     for platform in platforms {
         if let Some(target_platform) = target_platform {
