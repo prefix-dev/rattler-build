@@ -1,6 +1,8 @@
 [package]
 name = "rattler-build"
 version = "0.1.0"
+authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
+homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
 
 [dependencies]
