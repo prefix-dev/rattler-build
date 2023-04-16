@@ -37,7 +37,7 @@ pub enum TestError {
     MatchSpecParse(String),
 
     #[error("Failed to setup test environment:")]
-    TestEnvironmentSetup,
+    TestEnvironmentSetup(#[from] anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -281,7 +281,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         &config.channels,
     )
     .await
-    .map_err(|_| TestError::TestEnvironmentSetup)?;
+    .map_err(TestError::TestEnvironmentSetup)?;
 
     let cache_key = CacheKey::from(pkg);
     let dir = cache_dir.join("pkgs").join(cache_key.to_string());

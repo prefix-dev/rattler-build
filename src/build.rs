@@ -216,13 +216,17 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     fs::create_dir_all(&test_dir)?;
 
     tracing::info!("Running tests");
+
+    let mut channels = vec![directories.local_channel.to_string_lossy().to_string()];
+    channels.extend(output.build_configuration.channels.clone());
+
     test::run_test(
         &result,
         &TestConfiguration {
             test_prefix: test_dir.clone(),
             target_platform: Some(output.build_configuration.target_platform),
             keep_test_prefix: output.build_configuration.no_clean,
-            channels: output.build_configuration.channels.clone(),
+            channels,
         },
     )
     .await?;
