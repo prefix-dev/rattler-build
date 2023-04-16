@@ -197,9 +197,14 @@ fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std:
 
 #[derive(Default, Debug)]
 pub struct TestConfiguration {
+    /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
+    /// The target platform
     pub target_platform: Option<Platform>,
+    /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
+    /// The channels to use for the test – do not forget to add the local build outputs channel
+    /// if desired
     pub channels: Vec<String>,
 }
 
@@ -219,16 +224,15 @@ pub struct TestConfiguration {
 /// # Arguments
 ///
 /// * `package_file` - The path to the package file
-/// * `test_prefix` - The path to the test prefix. If `None`, a temporary directory will be created.
-/// * `target_platform` - The target platform. If `None`, the current platform will be used.
+/// * `config` - The test configuration
 ///
 /// # Returns
 ///
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_test(package_file: &Path, options: &TestConfiguration) -> Result<(), TestError> {
+pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir().unwrap();
-    let target_platform = options.target_platform.unwrap_or_else(Platform::current);
+    let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
     std::fs::create_dir_all(&subdir).unwrap();
@@ -269,12 +273,12 @@ pub async fn run_test(package_file: &Path, options: &TestConfiguration) -> Resul
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
     dependencies.push(match_spec);
 
-    let prefix = std::fs::canonicalize(&options.test_prefix).unwrap();
+    let prefix = std::fs::canonicalize(&config.test_prefix).unwrap();
     create_environment(
         &dependencies,
         &Platform::current(),
         &prefix,
-        &options.channels,
+        &config.channels,
     )
     .await
     .map_err(|_| TestError::TestEnvironmentSetup)?;
