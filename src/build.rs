@@ -17,6 +17,7 @@ use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
+use crate::test::TestConfiguration;
 use crate::{index, test};
 
 /// Create a conda build script and return the path to it
@@ -141,11 +142,20 @@ fn run_process_with_replacements(
 pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
+    index::index(
+        &directories.local_channel,
+        Some(&output.build_configuration.target_platform),
+    )?;
+
+    // Add the local channel to the list of channels
+    let mut channels = vec![directories.local_channel.to_string_lossy().to_string()];
+    channels.extend(output.build_configuration.channels.clone());
+
     if let Some(source) = &output.recipe.source {
         fetch_sources(source, &directories.work_dir, &directories.recipe_dir).await?;
     }
 
-    let finalized_dependencies = resolve_dependencies(output).await?;
+    let finalized_dependencies = resolve_dependencies(output, &channels).await?;
 
     // The output with the resolved dependencies
     let output = Output {
@@ -215,10 +225,15 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     fs::create_dir_all(&test_dir)?;
 
     tracing::info!("Running tests");
+
     test::run_test(
         &result,
-        Some(&test_dir),
-        Some(output.build_configuration.target_platform),
+        &TestConfiguration {
+            test_prefix: test_dir.clone(),
+            target_platform: Some(output.build_configuration.target_platform),
+            keep_test_prefix: output.build_configuration.no_clean,
+            channels,
+        },
     )
     .await?;
 
