@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
+license = "BSD-3-Clause"
+readme = "README.md"
 
 [features]
 default = ['native-tls']
