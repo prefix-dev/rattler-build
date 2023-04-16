@@ -15,6 +15,7 @@ use std::{
     path::PathBuf,
     str::{self, FromStr},
 };
+use test::TestConfiguration;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
@@ -143,7 +144,13 @@ async fn main() -> anyhow::Result<()> {
 
 async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
     let package_file = fs::canonicalize(args.package_file)?;
-    test::run_test(&package_file, None, Some(Platform::current())).await?;
+    let test_options = TestConfiguration {
+        test_prefix: fs::canonicalize(PathBuf::from("test-prefix"))?,
+        target_platform: Some(Platform::current()),
+        keep_test_prefix: false,
+        channels: vec!["conda-forge".to_string(), "./output".to_string()],
+    };
+    test::run_test(&package_file, &test_options).await?;
     Ok(())
 }
 

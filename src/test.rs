@@ -195,13 +195,40 @@ fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std:
     ))
 }
 
-pub async fn run_test(
-    package_file: &Path,
-    test_prefix: Option<&Path>,
-    target_platform: Option<Platform>,
-) -> Result<(), TestError> {
+#[derive(Default, Debug)]
+pub struct TestConfiguration {
+    pub test_prefix: PathBuf,
+    pub target_platform: Option<Platform>,
+    pub keep_test_prefix: bool,
+    pub channels: Vec<String>,
+}
+
+/// Run a test for a single package
+///
+/// This function creates a temporary directory, copies the package file into it, and then runs the
+/// indexing. It then creates a test environment that installs the package and any extra dependencies
+/// specified in the package test dependencies file.
+///
+/// With the activated test environment, the packaged test files are run:
+///
+/// * `info/test/run_test.sh` or `info/test/run_test.bat` on Windows
+/// * `info/test/run_test.py`
+///
+/// These test files are written at "package creation time" and are part of the package.
+///
+/// # Arguments
+///
+/// * `package_file` - The path to the package file
+/// * `test_prefix` - The path to the test prefix. If `None`, a temporary directory will be created.
+/// * `target_platform` - The target platform. If `None`, the current platform will be used.
+///
+/// # Returns
+///
+/// * `Ok(())` if the test was successful
+/// * `Err(TestError::TestFailed)` if the test failed
+pub async fn run_test(package_file: &Path, options: &TestConfiguration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir().unwrap();
-    let target_platform = target_platform.unwrap_or_else(Platform::current);
+    let target_platform = options.target_platform.unwrap_or_else(Platform::current);
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
     std::fs::create_dir_all(&subdir).unwrap();
@@ -242,18 +269,15 @@ pub async fn run_test(
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
     dependencies.push(match_spec);
 
-    let build_output_folder = std::fs::canonicalize(Path::new("./output")).unwrap();
-
-    let channels = vec![
-        build_output_folder.to_string_lossy().to_string(),
-        "conda-forge".to_string(),
-    ];
-
-    let prefix = test_prefix.unwrap_or_else(|| Path::new("./test-env"));
-    let prefix = std::fs::canonicalize(prefix).unwrap();
-    create_environment(&dependencies, &Platform::current(), &prefix, &channels)
-        .await
-        .map_err(|_| TestError::TestEnvironmentSetup)?;
+    let prefix = std::fs::canonicalize(&options.test_prefix).unwrap();
+    create_environment(
+        &dependencies,
+        &Platform::current(),
+        &prefix,
+        &options.channels,
+    )
+    .await
+    .map_err(|_| TestError::TestEnvironmentSetup)?;
 
     let cache_key = CacheKey::from(pkg);
     let dir = cache_dir.join("pkgs").join(cache_key.to_string());
@@ -266,6 +290,8 @@ pub async fn run_test(
     }
 
     println!("Tests passed!");
+
+    fs::remove_dir_all(prefix).unwrap();
 
     Ok(())
 }

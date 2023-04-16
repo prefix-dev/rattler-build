@@ -17,6 +17,7 @@ use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
+use crate::test::TestConfiguration;
 use crate::{index, test};
 
 /// Create a conda build script and return the path to it
@@ -217,8 +218,12 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     tracing::info!("Running tests");
     test::run_test(
         &result,
-        Some(&test_dir),
-        Some(output.build_configuration.target_platform),
+        &TestConfiguration {
+            test_prefix: test_dir.clone(),
+            target_platform: Some(output.build_configuration.target_platform),
+            keep_test_prefix: output.build_configuration.no_clean,
+            channels: output.build_configuration.channels.clone(),
+        },
     )
     .await?;
 
