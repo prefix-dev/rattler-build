@@ -244,7 +244,7 @@ fn collect_run_exports_from_env(
 #[allow(clippy::for_kv_map)]
 pub async fn resolve_dependencies(
     output: &Output,
-    channels: &Vec<String>,
+    channels: &[String],
 ) -> Result<FinalizedDependencies, ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
