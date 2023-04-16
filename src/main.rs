@@ -99,6 +99,9 @@ struct BuildOpts {
 
     #[arg(long)]
     keep_build: bool,
+
+    #[arg(long)]
+    timestamp: Option<i64>,
 }
 
 #[derive(Parser)]
@@ -222,6 +225,17 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
 
         let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
+
+        let timestamp = if let Some(timestamp) = args.timestamp {
+            let microseconds = timestamp * 1000;
+            chrono::DateTime::<chrono::Utc>::from_utc(
+                chrono::NaiveDateTime::from_timestamp_micros(microseconds).expect("Could not parse timestamp"),
+                chrono::Utc,
+            )
+        } else {
+            chrono::Utc::now()
+        };
+
         let output = metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {
@@ -236,7 +250,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,
                 channels: vec!["conda-forge".to_string()],
-                timestamp: chrono::Utc::now(),
+                timestamp,
                 subpackages,
             },
             finalized_dependencies: None,
