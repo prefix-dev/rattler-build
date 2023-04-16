@@ -242,7 +242,10 @@ fn collect_run_exports_from_env(
 /// 4. Download the packages
 /// 5. Extract the run exports from the downloaded packages (for the next environent)
 #[allow(clippy::for_kv_map)]
-pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependencies, ResolveError> {
+pub async fn resolve_dependencies(
+    output: &Output,
+    channels: &Vec<String>,
+) -> Result<FinalizedDependencies, ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
 
@@ -257,7 +260,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
             &match_specs,
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
-            &output.build_configuration.channels,
+            channels,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -320,7 +323,7 @@ pub async fn resolve_dependencies(output: &Output) -> Result<FinalizedDependenci
             &match_specs,
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
-            &output.build_configuration.channels,
+            channels,
         )
         .await
         .map_err(ResolveError::from)?;
