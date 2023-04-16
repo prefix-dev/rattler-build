@@ -20,7 +20,6 @@ jobs:
   build:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
-    needs: check
     strategy:
       fail-fast: false
       matrix:
