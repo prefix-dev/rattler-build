@@ -1,7 +1,7 @@
 //! The build module contains the code for running the build process for a given [`Output`]
 
 use std::collections::HashSet;
-use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 
@@ -10,6 +10,7 @@ use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 
 use itertools::Itertools;
+use rattler_shell::shell;
 
 use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
@@ -24,21 +25,6 @@ pub fn get_conda_build_script(
     directories: &Directories,
 ) -> Result<PathBuf, std::io::Error> {
     let recipe = &output.recipe;
-
-    let build_env_script_path = directories.work_dir.join("build_env.sh");
-    let mut fout = File::create(&build_env_script_path)?;
-
-    write_env_script(output, "BUILD", &mut fout).map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to write build env script: {}", e),
-        )
-    })?;
-
-    let preambel = format!(
-        "if [ -z ${{CONDA_BUILD+x}} ]; then\n    source {}\nfi",
-        build_env_script_path.to_string_lossy()
-    );
 
     let default_script = if output.build_configuration.target_platform.is_windows() {
         "build.bat"
@@ -55,7 +41,7 @@ pub fn get_conda_build_script(
         .join("\n");
 
     let script = if script.ends_with(".sh") || script.ends_with(".bat") {
-        let recipe_file = directories.recipe_dir.join("build.sh");
+        let recipe_file = directories.recipe_dir.join(script);
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
         let mut orig_build_file = File::open(recipe_file)?;
@@ -66,13 +52,47 @@ pub fn get_conda_build_script(
         script
     };
 
-    let full_script = format!("{}\n{}", preambel, script);
-    let build_script_path = directories.work_dir.join("conda_build.sh");
+    if cfg!(unix) {
+        let build_env_script_path = directories.work_dir.join("build_env.sh");
+        let preambel = format!(
+            "if [ -z ${{CONDA_BUILD+x}} ]; then\n    source {}\nfi",
+            build_env_script_path.to_string_lossy()
+        );
+        let mut fout = File::create(&build_env_script_path)?;
+        write_env_script(output, "BUILD", &mut fout, shell::Bash).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to write build env script: {}", e),
+            )
+        })?;
+        let full_script = format!("{}\n{}", preambel, script);
+        let build_script_path = directories.work_dir.join("conda_build.sh");
 
-    let mut build_script_file = File::create(&build_script_path)?;
-    build_script_file.write_all(full_script.as_bytes())?;
+        let mut build_script_file = File::create(&build_script_path)?;
+        build_script_file.write_all(full_script.as_bytes())?;
+        Ok(build_script_path)
+    } else {
+        let build_env_script_path = directories.work_dir.join("build_env.bat");
+        let preambel = format!(
+            "IF \"%CONDA_BUILD%\" == \"\" (\n    call {}\n)",
+            build_env_script_path.to_string_lossy()
+        );
+        let mut fout = File::create(&build_env_script_path)?;
 
-    Ok(build_script_path)
+        write_env_script(output, "BUILD", &mut fout, shell::CmdExe).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to write build env script: {}", e),
+            )
+        })?;
+
+        let full_script = format!("{}\n{}", preambel, script);
+        let build_script_path = directories.work_dir.join("conda_build.bat");
+
+        let mut build_script_file = File::create(&build_script_path)?;
+        build_script_file.write_all(full_script.as_bytes())?;
+        Ok(build_script_path)
+    }
 }
 
 /// Spawns a process and replaces the given strings in the output with the given replacements.
@@ -80,7 +100,7 @@ pub fn get_conda_build_script(
 fn run_process_with_replacements(
     command: &str,
     cwd: &PathBuf,
-    args: &[&OsStr],
+    args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> anyhow::Result<()> {
     let mut child = Command::new(command)
@@ -122,7 +142,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     if let Some(source) = &output.recipe.source {
-        fetch_sources(source, &directories.source_dir, &directories.recipe_dir).await?;
+        fetch_sources(source, &directories.work_dir, &directories.recipe_dir).await?;
     }
 
     let finalized_dependencies = resolve_dependencies(output).await?;
@@ -140,15 +160,22 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
 
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
-    #[cfg(unix)]
-    let interpreter = "/bin/bash";
-    #[cfg(windows)]
-    let interpreter = "cmd.exe";
-
+    let (interpreter, args) = if cfg!(unix) {
+        ("/bin/bash", vec![build_script.as_os_str().to_owned()])
+    } else {
+        (
+            "cmd.exe",
+            vec![
+                OsString::from("/d"),
+                OsString::from("/c"),
+                build_script.as_os_str().to_owned(),
+            ],
+        )
+    };
     run_process_with_replacements(
         interpreter,
         &directories.work_dir,
-        &[build_script.as_os_str()],
+        &args,
         &[
             (
                 directories.host_prefix.to_string_lossy().as_ref(),
