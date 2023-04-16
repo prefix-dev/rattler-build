@@ -8,6 +8,8 @@ use serde_with::serde_as;
 use serde_with::OneOrMany;
 use std::collections::BTreeMap;
 use std::env;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -454,5 +456,77 @@ impl Output {
 
     pub fn build_string(&self) -> &str {
         self.recipe.build.string.as_ref().unwrap()
+    }
+}
+
+impl Display for Output {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "\nOutput: {}-{}-{}\n",
+            self.name(),
+            self.version(),
+            self.build_string()
+        )?;
+
+        // make a table of the variant configuration
+        writeln!(f, "Variant configuration:")?;
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL)
+            .set_header(vec!["Variant", "Version"]);
+
+        self.build_configuration.variant.iter().for_each(|(k, v)| {
+            table.add_row(vec![k, v]);
+        });
+
+        writeln!(f, "{}\n", table)?;
+
+        if let Some(finalized_dependencies) = &self.finalized_dependencies {
+            // create a table with the finalized dependencies
+            if let Some(host) = &finalized_dependencies.build {
+                writeln!(f, "Build dependencies:")?;
+                writeln!(f, "{}\n", host)?;
+            }
+
+            if let Some(host) = &finalized_dependencies.host {
+                writeln!(f, "Host dependencies:")?;
+                writeln!(f, "{}\n", host)?;
+            }
+
+            if !finalized_dependencies.run.depends.is_empty() {
+                writeln!(f, "Run dependencies:")?;
+                let mut table = comfy_table::Table::new();
+                table
+                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+                    .set_header(vec!["Name", "Spec"]);
+
+                finalized_dependencies.run.depends.iter().for_each(|d| {
+                    let rendered = d.render();
+                    table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
+                });
+
+                writeln!(f, "{}\n", table)?;
+            }
+
+            if !finalized_dependencies.run.constrains.is_empty() {
+                writeln!(f, "Run constraints:")?;
+                let mut table = comfy_table::Table::new();
+                table
+                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+                    .set_header(vec!["Name", "Spec"]);
+
+                finalized_dependencies.run.constrains.iter().for_each(|d| {
+                    let rendered = d.render();
+                    table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
+                });
+
+                writeln!(f, "{}\n", table)?;
+            }
+        }
+        writeln!(f, "\n")
     }
 }

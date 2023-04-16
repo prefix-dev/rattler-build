@@ -293,7 +293,10 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         test.run(&prefix)?;
     }
 
-    println!("Tests passed!");
+    println!(
+        "{} all tests passed!",
+        console::style(console::Emoji("✔", "")).green()
+    );
 
     fs::remove_dir_all(prefix).unwrap();
 

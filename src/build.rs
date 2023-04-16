@@ -224,6 +224,8 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let test_dir = directories.work_dir.join("test");
     fs::create_dir_all(&test_dir)?;
 
+    println!("{}", output);
+
     tracing::info!("Running tests");
 
     test::run_test(
@@ -236,6 +238,10 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         },
     )
     .await?;
+
+    if !output.build_configuration.no_clean {
+        fs::remove_dir_all(&directories.build_dir)?;
+    }
 
     Ok(result)
 }
