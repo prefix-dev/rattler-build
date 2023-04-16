@@ -1,0 +1,230 @@
+# rattler-build
+
+The `rattler-build` tooling and library creates cross-platform relocatable binaries / packages from a simple recipe format.
+The recipe format is heavily inspired by `conda-build` and `boa`, and the output of a regular `rattler-build` run is a package that can be installed using `mamba`, `rattler` or `conda`.
+
+`rattler-build` does not have any dependencies on `conda-build` or `Python` and works as a standalone binary.
+
+### Installation
+
+You can grab a prerelease version of `rattler-build` from the Github Releases.
+
+### Usage
+
+`rattler-build` comes with two commands: `build` and `test`.
+
+The `build` command takes a `--recipe-file recipe.yaml` as input and produces a
+package as output. The `test` subcommand can be used to test existing packages
+(tests are shipped with the package).
+
+### The recipe format
+
+```{note}
+You can find all examples below in the [`examples`](./examples/) folder and run them with `rattler-build`.
+```
+
+A simple example recipe for the `xtensor` header-only C++ library:
+
+```yaml
+context:
+  name: xtensor
+  version: "0.24.6"
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://github.com/xtensor-stack/xtensor/archive/{{ version }}.tar.gz
+  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
+
+build:
+  number: 0
+  script:
+    - sel(unix): |
+        cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
+        make install
+    - sel(win): |
+        cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
+        nmake
+        nmake install
+
+requirements:
+  build:
+    - "{{ compiler('cxx') }}"
+    - cmake
+    - sel(unix): make
+  host:
+    - xtl >=0.7,<0.8
+  run:
+    - xtl >=0.7,<0.8
+  run_constrained:
+    - xsimd >=8.0.3,<10
+
+test:
+  commands:
+    - sel(unix): test -f ${PREFIX}/include/xtensor/xarray.hpp
+    - sel(win): if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+
+about:
+  home: https://github.com/xtensor-stack/xtensor
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: The C++ tensor algebra library
+```
+
+<details>
+  <summary>
+    A recipe for the `rich` Python package (using `noarch`)
+  </summary> 
+
+```yaml
+context:
+  version: "13.3.3"
+
+package:
+  name: rich
+  version: "{{ version }}"
+
+source:
+  - url: https://pypi.io/packages/source/r/rich/rich-{{ version }}.tar.gz
+    sha256: dc84400a9d842b3a9c5ff74addd8eb798d155f36c1c91303888e0a66850d2a15
+
+build:
+  # Thanks to `noarch: python` this package works on all platforms
+  noarch: python
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - pip
+    - poetry-core >=1.0.0
+    - python 3.11
+  run:
+    # sync with normalized deps from poetry-generated setup.py
+    - markdown-it-py >=2.2.0,<3.0.0
+    - pygments >=2.13.0,<3.0.0
+    - python 3.11
+    - typing_extensions >=4.0.0,<5.0.0
+
+test:
+  imports:
+    - rich
+  commands:
+    - pip check
+  requires:
+    - pip
+
+about:
+  home: https://github.com/Textualize/rich
+  license: MIT
+  license_family: MIT
+  license_file: LICENSE
+  summary: Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal
+  description: |
+    Rich is a Python library for rich text and beautiful formatting in the terminal.
+
+    The Rich API makes it easy to add color and style to terminal output. Rich
+    can also render pretty tables, progress bars, markdown, syntax highlighted
+    source code, tracebacks, and more — out of the box.
+  doc_url: https://rich.readthedocs.io
+  dev_url: https://github.com/Textualize/rich
+```
+</details>
+
+<details>
+<summary>A recipe for the `curl` library</summary>
+
+```yaml
+context:
+  version: "8.0.1"
+
+package:
+  name: curl
+  version: "{{ version }}"
+
+source:
+  url: http://curl.haxx.se/download/curl-{{ version }}.tar.bz2
+  sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - "{{ compiler('c') }}"
+    - sel(win): cmake
+    - sel(win): ninja
+    - sel(unix): make
+    - sel(unix): perl
+    - sel(unix): pkg-config
+    - sel(unix): libtool
+  host:
+    - sel(linux): openssl
+
+about:
+  home: http://curl.haxx.se/
+  license: MIT/X derivate (http://curl.haxx.se/docs/copyright.html)
+  license_family: MIT
+  license_file: COPYING
+  summary: tool and library for transferring data with URL syntax
+  description: |
+    Curl is an open source command line tool and library for transferring data
+    with URL syntax. It is used in command lines or scripts to transfer data.
+  doc_url: https://curl.haxx.se/docs/
+  dev_url: https://github.com/curl/curl
+  doc_source_url: https://github.com/curl/curl/tree/master/docs
+```
+
+For this recipe, two additional script files (`build.sh` and `build.bat`) are needed.
+
+**build.sh**
+
+```bash
+#!/bin/bash
+
+# Get an updated config.sub and config.guess
+cp $BUILD_PREFIX/share/libtool/build-aux/config.* .
+
+if [[ $target_platform =~ linux.* ]]; then
+    USESSL="--with-openssl=${PREFIX}"
+else
+    USESSL="--with-secure-transport"
+fi;
+
+./configure \
+    --prefix=${PREFIX} \
+    --host=${HOST} \
+    ${USESSL} \
+    --with-ca-bundle=${PREFIX}/ssl/cacert.pem \
+    --disable-static --enable-shared
+
+make -j${CPU_COUNT} ${VERBOSE_AT}
+make install
+
+# Includes man pages and other miscellaneous.
+rm -rf "${PREFIX}/share"
+```
+
+**build.bat**
+
+```cmd
+mkdir build
+
+cmake -GNinja ^
+      -DCMAKE_BUILD_TYPE=Release ^
+      -DBUILD_SHARED_LIBS=ON ^
+      -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
+      -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX% ^
+      -DCURL_USE_SCHANNEL=ON ^
+      -DCURL_USE_LIBSSH2=OFF ^
+      -DUSE_ZLIB=ON ^
+      -DENABLE_UNICODE=ON ^
+      %SRC_DIR%
+
+IF %ERRORLEVEL% NEQ 0 exit 1
+
+ninja install --verbose
+```
+</details>
