@@ -414,7 +414,7 @@ pub async fn resolve_dependencies(
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {
         for (name, rex) in &build_env.run_exports {
-            specs.extend(clone_specs(name, "host", &rex.strong)?);
+            specs.extend(clone_specs(name, "build", &rex.strong)?);
         }
     }
 
@@ -450,7 +450,7 @@ pub async fn resolve_dependencies(
 
     let run_depends = apply_variant(&reqs.run, &output.build_configuration)?;
 
-    let run_constrains = apply_variant(&reqs.constrains, &output.build_configuration)?;
+    let run_constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
 
     let render_run_exports = |run_export: &DependencyList| -> Vec<String> {
         let rendered = apply_variant(run_export, &output.build_configuration).unwrap();

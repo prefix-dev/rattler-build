@@ -47,7 +47,7 @@ pub struct Requirements {
     /// environment that is resolved. They are not installed by default, but when
     /// installed they will have to conform to the constrains specified here.
     #[serde(default)]
-    pub constrains: DependencyList,
+    pub run_constrained: DependencyList,
 }
 
 /// Run exports are applied to downstream packages that depend on this package.
