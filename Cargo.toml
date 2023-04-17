@@ -46,8 +46,8 @@ content_inspector = "0.2.4"
 serde_with = "2.3.2"
 url = "2.3.1"
 tracing = "0.1.37"
-clap = { version = "4.2.1", features = ["derive"] }
-minijinja = { version = "0.31.0", features = ["unstable_machinery"] }
+clap = { version = "4.2.2", features = ["derive"] }
+minijinja = { version = "0.31.1", features = ["unstable_machinery"] }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 num_cpus = "1.15.0"
 goblin = "0.6.1"
