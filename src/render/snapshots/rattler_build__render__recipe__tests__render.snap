@@ -27,7 +27,7 @@ requirements:
   build: []
   host: []
   run: []
-  constrains: []
+  run_constrained: []
 about:
   home: ~
   license: ~
