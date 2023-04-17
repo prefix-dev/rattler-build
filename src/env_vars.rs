@@ -82,11 +82,6 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         "BUILD_PREFIX",
         directories.build_prefix.to_string_lossy()
     );
-    insert!(
-        vars,
-        "SYS_PREFIX",
-        directories.root_prefix.to_string_lossy()
-    );
     insert!(vars, "RECIPE_DIR", directories.recipe_dir.to_string_lossy());
     insert!(vars, "SRC_DIR", directories.work_dir.to_string_lossy());
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());

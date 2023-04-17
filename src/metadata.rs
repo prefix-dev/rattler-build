@@ -307,8 +307,6 @@ pub struct Directories {
     /// The build prefix is the directory where build dependencies are installed
     /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build script
     pub build_prefix: PathBuf,
-    /// The root prefix is a legacy directory where the `conda` tool is installed
-    pub root_prefix: PathBuf,
     /// The work directory is the directory where the source code is copied to
     pub work_dir: PathBuf,
     /// The parent directory of host, build and work directories
@@ -328,18 +326,17 @@ fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
 }
 
 impl Directories {
-    pub fn create(name: &str, recipe_path: &Path) -> Result<Directories, std::io::Error> {
+    pub fn create(
+        name: &str,
+        recipe_path: &Path,
+        output_dir: &Path,
+    ) -> Result<Directories, std::io::Error> {
         let build_dir = setup_build_dir(name).expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
-        let output_dir = std::env::var("CONDA_BLD_PATH").unwrap_or("./output".into());
-        let output_dir = PathBuf::from(output_dir);
         if !output_dir.exists() {
-            fs::create_dir(&output_dir)?;
+            fs::create_dir(output_dir)?;
         }
-
-        let mamba_root_prefix = std::env::var("MAMBA_ROOT_PREFIX").unwrap_or("./micromamba".into());
-        let mamba_root_prefix = PathBuf::from(mamba_root_prefix);
 
         let host_prefix = if cfg!(target_os = "windows") {
             build_dir.join("h_env")
@@ -364,7 +361,6 @@ impl Directories {
             build_prefix: build_dir.join("build_env"),
             host_prefix,
             work_dir: build_dir.join("work"),
-            root_prefix: mamba_root_prefix,
             recipe_dir,
             local_channel: fs::canonicalize(output_dir)?,
         };

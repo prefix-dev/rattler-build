@@ -110,6 +110,10 @@ struct BuildOpts {
     /// Keep intermediate build artifacts after the build.
     #[arg(long)]
     keep_build: bool,
+
+    /// Output directory for build artifacts. Defaults to `./output`.
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
+    output_dir: PathBuf,
 }
 
 #[derive(Parser)]
@@ -267,7 +271,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
                 no_clean: args.keep_build,
-                directories: Directories::create(&name, &recipe_file)?,
+                directories: Directories::create(&name, &recipe_file, &args.output_dir)?,
                 channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,
