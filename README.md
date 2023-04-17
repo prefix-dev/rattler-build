@@ -7,7 +7,11 @@ The recipe format is heavily inspired by `conda-build` and `boa`, and the output
 
 ### Installation
 
-You can grab a prerelease version of `rattler-build` from the Github Releases.
+You can grab a prerelease version of `rattler-build` from the [Github Releases](https://github.com/prefix-dev/rattler-build/releases/).
+
+### Documentation
+
+We have extensive documentation for `rattler-build`. You can find the [book here](https://prefix-dev.github.io/rattler-build).
 
 ### Usage
 
