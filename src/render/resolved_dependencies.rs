@@ -344,7 +344,7 @@ fn collect_run_exports_from_env(
 /// 2. Extend the dependencies with the run exports of the dependencies "above"
 /// 3. Resolve the dependencies
 /// 4. Download the packages
-/// 5. Extract the run exports from the downloaded packages (for the next environent)
+/// 5. Extract the run exports from the downloaded packages (for the next environment)
 #[allow(clippy::for_kv_map)]
 pub async fn resolve_dependencies(
     output: &Output,

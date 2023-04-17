@@ -119,7 +119,7 @@ pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorCon
 ///   - pkg-config
 /// ```
 ///
-/// Nested lists are supported as well, so teh following YAML:
+/// Nested lists are supported as well, so the following YAML:
 ///
 /// ```yaml
 /// requirements:
