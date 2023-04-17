@@ -94,7 +94,8 @@ struct BuildOpts {
     #[arg(long)]
     target_platform: Option<String>,
 
-    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times. `conda-forge` is default and always added.
+    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
+    /// The default channel is `conda-forge`.
     #[arg(short = 'c', long)]
     channel: Option<Vec<String>>,
 
@@ -249,10 +250,10 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
         // Add the channels from the args and by default always conda-forge
-        let mut channels = vec!["conda-forge".to_string()];
-        if let Some(cli_channels) = &args.channel {
-            channels.extend(cli_channels.clone());
-        }
+        let channels = args
+            .channel
+            .clone()
+            .unwrap_or(vec!["conda-forge".to_string()]);
 
         let output = metadata::Output {
             recipe,
