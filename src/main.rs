@@ -86,18 +86,28 @@ struct App {
 
 #[derive(Parser)]
 struct BuildOpts {
+    /// The recipe file to be used in the build process.
     #[arg(short, long)]
     recipe_file: PathBuf,
 
+    /// The target platform for the build.
     #[arg(long)]
     target_platform: Option<String>,
 
+    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
+    /// The default channel is `conda-forge`.
+    #[arg(short = 'c', long)]
+    channel: Option<Vec<String>>,
+
+    /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     variant_config: Vec<PathBuf>,
 
+    /// Render the recipe files without executing the build.
     #[arg(long)]
     render_only: bool,
 
+    /// Keep intermediate build artifacts after the build.
     #[arg(long)]
     keep_build: bool,
 }
@@ -239,6 +249,12 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
 
         let noarch_type = recipe.build.noarch;
         let name = recipe.package.name.clone();
+        // Add the channels from the args and by default always conda-forge
+        let channels = args
+            .channel
+            .clone()
+            .unwrap_or(vec!["conda-forge".to_string()]);
+
         let output = metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {
@@ -252,7 +268,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 variant: variant.clone(),
                 no_clean: args.keep_build,
                 directories: Directories::create(&name, &recipe_file)?,
-                channels: vec!["conda-forge".to_string()],
+                channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,
             },
