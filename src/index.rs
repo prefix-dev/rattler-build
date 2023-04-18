@@ -125,6 +125,16 @@ pub fn index(
         platforms.insert("noarch".to_string());
     }
 
+    // Create target platform dir if needed
+    if target_platform.is_some() {
+        let platform_str= String::from(target_platform.unwrap());
+        if !output_folder.join(&platform_str).exists() {
+            std::fs::create_dir(output_folder.join(&platform_str))?;
+            platforms.insert(platform_str.parse().unwrap());
+        }
+    }
+
+
     for platform in platforms {
         if let Some(target_platform) = target_platform {
             if platform != target_platform.to_string() {
