@@ -126,14 +126,13 @@ pub fn index(
     }
 
     // Create target platform dir if needed
-    if target_platform.is_some() {
-        let platform_str= target_platform.unwrap().to_string();
+    if let Some(target_platform) = target_platform {
+        let platform_str = target_platform.to_string();
         if !output_folder.join(&platform_str).exists() {
             std::fs::create_dir(output_folder.join(&platform_str))?;
             platforms.insert(platform_str.parse().unwrap());
         }
     }
-
 
     for platform in platforms {
         if let Some(target_platform) = target_platform {
