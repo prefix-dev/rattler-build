@@ -112,9 +112,7 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 
     let mut cmd = std::process::Command::new("patchelf");
 
-    cmd.arg("--set-rpath")
-        .arg(new_rpath)
-        .arg(elf_path);
+    cmd.arg("--set-rpath").arg(new_rpath).arg(elf_path);
 
     let output = cmd.output()?;
     if !output.status.success() {
