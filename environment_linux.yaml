@@ -1,0 +1,5 @@
+name: rattler-build-env
+channels:
+  - conda-forge
+dependencies:
+  - patchelf

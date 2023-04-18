@@ -112,9 +112,9 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 
     let mut cmd = std::process::Command::new("patchelf");
 
-    // conda-build forces `rpath` -> otherwise patchelf would use the newer `runpath`
-    cmd.arg("--force-rpath");
-    cmd.arg(new_rpath);
+    cmd.arg("--set-rpath")
+        .arg(new_rpath)
+        .arg(elf_path);
 
     let output = cmd.output()?;
     if !output.status.success() {
