@@ -127,7 +127,7 @@ pub fn index(
 
     // Create target platform dir if needed
     if target_platform.is_some() {
-        let platform_str= String::from(target_platform.unwrap());
+        let platform_str= target_platform.unwrap().to_string();
         if !output_folder.join(&platform_str).exists() {
             std::fs::create_dir(output_folder.join(&platform_str))?;
             platforms.insert(platform_str.parse().unwrap());
