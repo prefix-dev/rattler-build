@@ -50,14 +50,14 @@ rattler-build -c robostack --recipe-file myrecipe/recipe.yaml
 ```
 ### Overview of a recipe.yaml
 
-A recipe.yaml file is seperated into multiple sections and can conditionally
+A recipe.yaml file is separated into multiple sections and can conditionally
 include or exclude sections. Recipe files also support a limited amount of
 string interpolation with `Jinja` (`minijinja` in our case).
 
 A simple example for the `zlib` package would look as follows:
 
 ```yaml
-# variables from the context section can be used in the rest of the recipe in jinja expresssions
+# variables from the context section can be used in the rest of the recipe in jinja expressions
 context:
   version: 1.2.13
 

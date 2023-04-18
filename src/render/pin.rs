@@ -87,7 +87,7 @@ impl Pin {
             .min_pin
             .clone()
             .unwrap_or(PinExpression("x.x.x.x.x.x".to_string()));
-        // mumber of digits in pin expression
+        // number of digits in pin expression
         let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
         if pin_digits == 0 {
             return Err(PinError::EmptyPinExpression);
@@ -106,7 +106,7 @@ impl Pin {
             .clone()
             .unwrap_or(PinExpression("x".to_string()));
 
-        // mumber of digits in pin expression
+        // number of digits in pin expression
         let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
         if pin_digits == 0 {
             return Err(PinError::EmptyPinExpression);

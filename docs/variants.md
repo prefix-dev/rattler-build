@@ -66,7 +66,7 @@ would be ignored.
 
 ## Package hash from variant
 
-You might have wondered what the role of the build string is. The build string is (if not explicity set) computed from the variant configuration.
+You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
 It serves as a mechanism to discern different build configurations that produce a package with the same name and version.
 
 The hash is computed by dumping all the variant configuration values that are used by a given recipe into a JSON file, and then hashing that JSON file.

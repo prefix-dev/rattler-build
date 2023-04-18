@@ -68,7 +68,7 @@ pub async fn create_environment(
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
     // with this because we need to parse the `channel_config` when parsing matchspecs.
 
-    // Find the default cache directory. Create it if it doesnt exist yet.
+    // Find the default cache directory. Create it if it doesn't exist yet.
     let cache_dir = rattler::default_cache_dir()?;
 
     println!("\nResolving for environment specs:");
@@ -147,7 +147,7 @@ pub async fn create_environment(
     })?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
-    // system. Some packages depend on these virtual packages to indiciate compability with the
+    // system. Some packages depend on these virtual packages to indicate compatibility with the
     // hardware of the system.
     let virtual_packages = wrap_in_progress("determining virtual packages", move || {
         rattler_virtual_packages::VirtualPackage::current().map(|vpkgs| {
@@ -216,7 +216,7 @@ async fn execute_transaction(
     // Open the package cache
     let package_cache = PackageCache::new(cache_dir.join("pkgs"));
 
-    // Create an install driver which helps limit the number of concurrent fileystem operations
+    // Create an install driver which helps limit the number of concurrent filesystem operations
     let install_driver = InstallDriver::default();
 
     // Define default installation options.
@@ -397,7 +397,7 @@ async fn install_package_to_environment(
         link: None,
     };
 
-    // Create the conda-meta directory if it doesnt exist yet.
+    // Create the conda-meta directory if it doesn't exist yet.
     let target_prefix = target_prefix.to_path_buf();
     match tokio::task::spawn_blocking(move || {
         let conda_meta_path = target_prefix.join("conda-meta");
