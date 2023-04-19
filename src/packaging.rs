@@ -745,6 +745,7 @@ pub fn package_conda(
         tmp_dir_path,
         &tmp_files.into_iter().collect::<Vec<_>>(),
         CompressionLevel::Default,
+        Some(&output.build_configuration.timestamp),
     )?;
 
     Ok(out_path)
