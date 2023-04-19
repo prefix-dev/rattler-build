@@ -117,6 +117,7 @@ pub fn index(
                 .to_string_lossy()
                 .to_string()
         })
+        .filter(|p| p != "src_cache")
         .collect::<std::collections::HashSet<_>>();
 
     // Always create noarch subdir

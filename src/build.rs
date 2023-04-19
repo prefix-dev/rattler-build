@@ -143,16 +143,22 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     index::index(
-        &directories.local_channel,
+        &directories.output_dir,
         Some(&output.build_configuration.target_platform),
     )?;
 
     // Add the local channel to the list of channels
-    let mut channels = vec![directories.local_channel.to_string_lossy().to_string()];
+    let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
 
     if let Some(source) = &output.recipe.source {
-        fetch_sources(source, &directories.work_dir, &directories.recipe_dir).await?;
+        fetch_sources(
+            source,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.output_dir,
+        )
+        .await?;
     }
 
     let finalized_dependencies = resolve_dependencies(output, &channels).await?;
@@ -209,7 +215,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         &output,
         &difference,
         &directories.host_prefix,
-        &directories.local_channel,
+        &directories.output_dir,
     )?;
 
     if !output.build_configuration.no_clean {
@@ -217,7 +223,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     }
 
     index::index(
-        &directories.local_channel,
+        &directories.output_dir,
         Some(&output.build_configuration.target_platform),
     )?;
 

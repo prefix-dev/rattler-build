@@ -312,7 +312,7 @@ pub struct Directories {
     /// The parent directory of host, build and work directories
     pub build_dir: PathBuf,
     /// The output directory or local channel directory
-    pub local_channel: PathBuf,
+    pub output_dir: PathBuf,
 }
 
 fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
@@ -362,7 +362,7 @@ impl Directories {
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,
-            local_channel: fs::canonicalize(output_dir)?,
+            output_dir: fs::canonicalize(output_dir)?,
         };
 
         Ok(directories)
