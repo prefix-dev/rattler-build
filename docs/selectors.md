@@ -59,15 +59,15 @@ sel(linux and (aarch64 or ppc64le)): ... # true for linux ppc64le or linux-aarch
 
 The following variables are available during the initial rendering and afterward:
 
-| Variable          | Description                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------------ |
-| `target_platform` | the configured target_platform for the build                                                     |
-| `build_platform`  | the build platform                                                                               |
-| `linux`           | true if target_platform is Linux                                                                 |
-| `osx`             | true if target_platform is OSX / macOS                                                           |
-| `win`             | true if target_platform is Windows                                                               |
-| `unix`            | true if target_platform is a Unix (macOS or Linux)                                               |
-| `arch`            | The architecture ("x86_64" for 64 bit, "x86" for 32 bit, otherwise arm64, aarch64, ppc64le, ...) |
+| Variable                      | Description                                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `target_platform`             | the configured target_platform for the build                                                     |
+| `build_platform`              | the build platform                                                                               |
+| `linux`                       | true if target_platform is Linux                                                                 |
+| `osx`                         | true if target_platform is OSX / macOS                                                           |
+| `win`                         | true if target_platform is Windows                                                               |
+| `unix`                        | true if target_platform is a Unix (macOS or Linux)                                               |
+| `x86_64`, `x86`, `arm64`, ... | The architecture ("x86_64" for 64 bit, "x86" for 32 bit, otherwise arm64, aarch64, ppc64le, ...) |
 
 After the initial phase, when the variant configuration is selected, the variant
 values are also available in selectors. For example, if the build uses `python:
