@@ -112,6 +112,14 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 
     let mut cmd = std::process::Command::new("patchelf");
 
+    // prefer using RPATH over RUNPATH because RPATH takes precedence when
+    // searching for shared libraries and cannot be overriden with
+    // `LD_LIBRARY_PATH`. This ensures that the libraries from the environment
+    // are found first, providing better isolation and preventing potential
+    // conflicts with system libraries.
+    cmd.arg("--force-rpath");
+
+    // set the new rpath
     cmd.arg("--set-rpath").arg(new_rpath).arg(elf_path);
 
     let output = cmd.output()?;
