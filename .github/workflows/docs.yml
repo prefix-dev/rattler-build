@@ -38,9 +38,9 @@ jobs:
           mdbook-version: 'latest'
 
 
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
-          profile: minimal
+          toolchain: 1.68.0
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
