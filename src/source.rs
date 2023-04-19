@@ -175,7 +175,7 @@ pub async fn fetch_sources(
     cache_dir: &Path,
 ) -> Result<(), SourceError> {
     // create the cache dir if it doesn't exist
-    fs::create_dir_all(&cache_dir)?;
+    fs::create_dir_all(cache_dir)?;
 
     for src in sources {
         match &src {
@@ -188,7 +188,7 @@ pub async fn fetch_sources(
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url);
-                let res = url_src(src, &cache_dir, &src.checksum).await?;
+                let res = url_src(src, cache_dir, &src.checksum).await?;
                 let dest_dir = if let Some(folder) = &src.folder {
                     work_dir.join(folder)
                 } else {

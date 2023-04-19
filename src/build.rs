@@ -152,7 +152,13 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
     channels.extend(output.build_configuration.channels.clone());
 
     if let Some(source) = &output.recipe.source {
-        fetch_sources(source, &directories.work_dir, &directories.recipe_dir, &directories.output_dir).await?;
+        fetch_sources(
+            source,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.output_dir,
+        )
+        .await?;
     }
 
     let finalized_dependencies = resolve_dependencies(output, &channels).await?;
