@@ -172,9 +172,11 @@ pub async fn fetch_sources(
     sources: &[Source],
     work_dir: &Path,
     recipe_dir: &Path,
+    cache_dir: &Path,
 ) -> Result<(), SourceError> {
-    let cache_dir = std::env::current_dir()?.join("ROAR_CACHE");
+    // create the cache dir if it doesn't exist
     fs::create_dir_all(&cache_dir)?;
+
     for src in sources {
         match &src {
             Source::Git(src) => {
