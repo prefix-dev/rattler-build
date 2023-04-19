@@ -1,17 +1,45 @@
 # rattler-build
 
-The `rattler-build` tooling and library creates cross-platform relocatable binaries / packages from a simple recipe format.
-The recipe format is heavily inspired by `conda-build` and `boa`, and the output of a regular `rattler-build` run is a package that can be installed using `mamba`, `rattler` or `conda`.
+The `rattler-build` tooling and library creates cross-platform relocatable
+binaries / packages from a simple recipe format. The recipe format is heavily
+inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
+run is a package that can be installed using `mamba`, `rattler` or `conda`.
 
-`rattler-build` does not have any dependencies on `conda-build` or `Python` and works as a standalone binary.
+`rattler-build` does not have any dependencies on `conda-build` or `Python` and
+works as a standalone binary.
 
 ### Installation
 
-You can grab a prerelease version of `rattler-build` from the [Github Releases](https://github.com/prefix-dev/rattler-build/releases/).
+You can grab a prerelease version of `rattler-build` from the [Github
+Releases](https://github.com/prefix-dev/rattler-build/releases/).
+
+#### Dependencies
+
+Currently `rattler-build` needs some dependencies on the host system which are
+executed as subprocess. We plan to reduce the number of external dependencies
+over time by writing what we need in Rust to make `rattler-build` fully
+self-contained.
+
+* `tar` to unpack tarballs downloaded from the internet in a variety of formats.
+  `.gz`, `.bz2` and `.xz` are widely used and one might have to install the
+  compression packages as well (e.g. `gzip`, `bzip2`, ...)
+* `patch` to patch source code after downloading
+* `install_name_tool` is necessary on macOS to rewrite the `rpath` of shared
+  libraries and executables to make it relative
+* `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
+  libraries and executables
+* `git` to checkout Git repositories (not implemented yet, but will require git
+  in the future)
+* `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
+  (needs to be installed on the host machine)
+
+On Windows, to obtain these dependencies from conda-forge, one can install
+`m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
 
 ### Documentation
 
-We have extensive documentation for `rattler-build`. You can find the [book here](https://prefix-dev.github.io/rattler-build).
+We have extensive documentation for `rattler-build`. You can find the [book
+here](https://prefix-dev.github.io/rattler-build).
 
 ### Usage
 
@@ -23,8 +51,8 @@ package as output. The `test` subcommand can be used to test existing packages
 
 ### The recipe format
 
-> **Note**
-> You can find all examples below in the [`examples`](./examples/) folder and run them with `rattler-build`.
+> **Note** You can find all examples below in the [`examples`](./examples/)
+> folder and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
 
@@ -180,7 +208,8 @@ about:
   doc_source_url: https://github.com/curl/curl/tree/master/docs
 ```
 
-For this recipe, two additional script files (`build.sh` and `build.bat`) are needed.
+For this recipe, two additional script files (`build.sh` and `build.bat`) are
+needed.
 
 **build.sh**
 
