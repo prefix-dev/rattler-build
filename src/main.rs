@@ -80,7 +80,7 @@ struct App {
     #[clap(subcommand)]
     subcommand: SubCommands,
 
-    #[arg(short, long)]
+    #[clap(short, long, global(true))]
     verbose: bool,
 }
 
