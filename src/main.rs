@@ -86,9 +86,9 @@ struct App {
 
 #[derive(Parser)]
 struct BuildOpts {
-    /// The recipe file to be used in the build process.
-    #[arg(short, long)]
-    recipe_file: PathBuf,
+    /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
+    #[arg(short, long, default_value = ".")]
+    recipe: PathBuf,
 
     /// The target platform for the build.
     #[arg(long)]
@@ -169,8 +169,35 @@ async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
 }
 
 async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
-    let recipe_file = fs::canonicalize(args.recipe_file)?;
-    let recipe_text = fs::read_to_string(&recipe_file)?;
+    let recipe_path = fs::canonicalize(&args.recipe);
+    if let Err(e) = &recipe_path {
+        match e.kind() {
+            std::io::ErrorKind::NotFound => {
+                tracing::error!("Error: The file {} could not be found.", args.recipe.to_string_lossy());
+            },
+            std::io::ErrorKind::PermissionDenied => {
+                tracing::error!("Error: Permission denied when trying to access the file {}.", args.recipe.to_string_lossy());
+            },
+            _ => {
+                tracing::error!("Error: An unknown error occurred while trying to access the file {}: {:?}", args.recipe.to_string_lossy(), e);
+            },
+        }
+        std::process::exit(1);
+    }
+    let mut recipe_path = recipe_path.unwrap();
+
+// If the recipe_path is a directory, look for "recipe.yaml" in the directory.
+    if recipe_path.is_dir() {
+        let recipe_yaml_path = recipe_path.join("recipe.yaml");
+        if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
+            recipe_path = recipe_yaml_path;
+        } else {
+            tracing::error!("Error: 'recipe.yaml' not found in the directory {}", args.recipe.to_string_lossy());
+            std::process::exit(1);
+        }
+    }
+
+    let recipe_text = fs::read_to_string(&recipe_path)?;
 
     let mut recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
@@ -271,7 +298,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
                 no_clean: args.keep_build,
-                directories: Directories::create(&name, &recipe_file, &args.output_dir)?,
+                directories: Directories::create(&name, &recipe_path, &args.output_dir)?,
                 channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,
