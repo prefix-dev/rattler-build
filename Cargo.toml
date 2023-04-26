@@ -23,7 +23,7 @@ rattler = { git = "https://github.com/mamba-org/rattler", branch = "main", defau
 rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# local deps 
+# local deps
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
 # rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
 # rattler_digest = { path = "../rattler/crates/rattler_digest" }

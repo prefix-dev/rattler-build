@@ -10,4 +10,3 @@ cxx_compiler:
   - vs2019
 python:
   - "3.10"
-

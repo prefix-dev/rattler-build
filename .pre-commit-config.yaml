@@ -1,0 +1,21 @@
+repos:
+  -   repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v4.4.0
+      hooks:
+        -   id: check-yaml
+        -   id: end-of-file-fixer
+        -   id: trailing-whitespace
+  -   repo: local
+      hooks:
+      - id: rustfmt
+        name: rustfmt
+        description: Check if all files follow the rustfmt style
+        entry: cargo fmt --all -- --check --color always
+        language: system
+        pass_filenames: false
+      - id: clippy
+        name: clippy
+        description: Checks a package to catch common mistakes and improve your Rust code.
+        entry: cargo clippy --all --color always
+        language: system
+        pass_filenames: false
