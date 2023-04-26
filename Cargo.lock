@@ -2877,7 +2877,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "anyhow",
  "apple-codesign",
@@ -2964,7 +2964,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "chrono",
  "fxhash",
@@ -2992,7 +2992,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "digest 0.10.6",
  "hex",
@@ -3006,7 +3006,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "quote",
  "syn 2.0.15",
@@ -3015,7 +3015,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "bzip2",
  "chrono",
@@ -3036,7 +3036,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -3071,7 +3071,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "indexmap",
  "rattler_conda_types",
@@ -3083,7 +3083,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "anyhow",
  "cc",
@@ -3104,7 +3104,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.2.0"
-source = "git+https://github.com/wolfv/rattler?branch=tls#11fa5812b8455675a961e837311b654045640685"
+source = "git+https://github.com/wolfv/rattler?branch=tls#2217c85e407c163590621baa5edad47fa8b1ae9b"
 dependencies = [
  "cfg-if",
  "libloading",
@@ -4092,9 +4092,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-stream"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76cd2598a37719e3cd4c28af93f978506a97a2920ef4d96e4b12e38b8cbc8940"
+checksum = "397c988d37662c7dda6d2208364a706264bf3d6138b11d436cbac0ad38832842"
 dependencies = [
  "futures-core",
  "pin-project-lite",

@@ -60,8 +60,8 @@ sha1 = "0.10.5"
 
 [features]
 default = ['native-tls']
-native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_package_streaming/native-tls', 'rattler_repodata_gateway/native-tls', 'rattler_conda_types/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls', 'rattler_package_streaming/rustls-tls', 'rattler_repodata_gateway/rustls-tls', 'rattler_conda_types/rustls-tls']
+native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_package_streaming/native-tls', 'rattler_repodata_gateway/native-tls']
+rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls', 'rattler_package_streaming/rustls-tls', 'rattler_repodata_gateway/rustls-tls']
 
 [dev-dependencies]
 insta = {version = "1.29.0", features = ["yaml"] }
