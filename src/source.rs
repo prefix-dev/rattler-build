@@ -4,9 +4,11 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use std::path::StripPrefixError;
 
 use rattler_digest::compute_file_digest;
 use url::Url;
+use walkdir::WalkDir;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
@@ -17,6 +19,15 @@ pub enum SourceError {
 
     #[error("Failed to download source from url: {0}")]
     Url(#[from] reqwest::Error),
+
+    #[error("WalkDir Error: {0}")]
+    WalkDir(#[from] walkdir::Error),
+
+    #[error("StripPrefixError Error: {0}")]
+    StripPrefixError(#[from] StripPrefixError),
+
+    #[error("Dir error: {0}")]
+    Dir(String),
 
     #[error("Download could not be validated with checksum!")]
     ValidationFailed,
@@ -111,7 +122,7 @@ async fn url_src(
 
     if !validate_checksum(&cache_name, checksum) {
         tracing::error!("Checksum validation failed!");
-        std::fs::remove_file(&cache_name)?;
+        fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);
     }
 
@@ -211,12 +222,27 @@ pub async fn fetch_sources(
                 };
 
                 fs::create_dir_all(dest_dir.parent().unwrap())?;
-                todo!(
-                    "Local sousrces are not yet supported! Should copy from {:?} to {:?}",
-                    src_path,
-                    dest_dir
-                );
-                // copy_dir::copy_dir(src_path, dest_dir)?;
+
+                // Copying from src_path to dest_dir
+                if src_path.is_dir() {
+                    for entry in WalkDir::new(&src_path) {
+                        let entry = entry?;
+                        let entry_path = entry.path();
+                        let relative_path = entry_path.strip_prefix(&src_path)?;
+                        let dest_path = dest_dir.join(relative_path);
+
+                        if entry_path.is_file() {
+                            fs::copy(&entry_path, &dest_path)?;
+                            tracing::info!("Copied from {:?} to {:?}", entry_path, dest_path);
+                        } else if entry_path.is_dir() {
+                            fs::create_dir_all(&dest_path)?;
+                        }
+                    }
+                } else {
+                    return Err(SourceError::Dir(
+                        format!("Source dir: {} doesn't exist", src_path.to_string_lossy())
+                    ));
+                }
             }
         }
     }
