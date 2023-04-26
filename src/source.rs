@@ -233,11 +233,12 @@ pub async fn fetch_sources(
 
                         if entry_path.is_file() {
                             fs::copy(entry_path, &dest_path)?;
-                            tracing::info!("Copied from {:?} to {:?}", entry_path, dest_path);
+                            tracing::debug!("Copied from {:?} to {:?}", entry_path, dest_path);
                         } else if entry_path.is_dir() {
                             fs::create_dir_all(&dest_path)?;
                         }
                     }
+                    tracing::info!("Copied source from {:?} to {:?}", &src_path, dest_dir);
                 } else {
                     return Err(SourceError::Dir(format!(
                         "Source dir: {} doesn't exist",
