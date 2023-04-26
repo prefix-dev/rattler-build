@@ -1,12 +1,12 @@
 zip_keys:
   -
-    - c_compiler_version       
-    - cxx_compiler_version     
-    - fortran_compiler_version 
+    - c_compiler_version
+    - cxx_compiler_version
+    - fortran_compiler_version
     - docker_image
-  -                             
-    - cudnn                     
-    - cuda_compiler_version     
+  -
+    - cudnn
+    - cuda_compiler_version
   -
     - python
     - numpy

@@ -107,7 +107,7 @@ about:
 <details>
   <summary>
     A recipe for the `rich` Python package (using `noarch`)
-  </summary> 
+  </summary>
 
 ```yaml
 context:

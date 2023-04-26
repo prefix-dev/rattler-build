@@ -79,12 +79,12 @@ For example, in our `python` example, we would get a variant configuration file 
 ```
 
 This JSON string is then hashed with the MD5 hash algorithm, and produces the hash.
-For certain packages (such as Python packages) special rules exists, and the `py<Major.Minor>` version is prepended to the hash, so that the final hash 
+For certain packages (such as Python packages) special rules exists, and the `py<Major.Minor>` version is prepended to the hash, so that the final hash
 would look something like `py38h123123`.
 
 ### Zip Keys
 
-Zip keys modify how variants are combined. Usually, each variant key that has multiple 
+Zip keys modify how variants are combined. Usually, each variant key that has multiple
 entries is expanded to a build matrix, for example if we have:
 
 ```yaml
@@ -109,8 +109,8 @@ python: ["3.8", "3.9"]
 numpy: ["1.12", "1.14"]
 ```
 
-Then the versions are "zipped up" and we only get two variants. Note that both, `python` and `numpy` need to specify the exact same number of 
-versions to make this work. 
+Then the versions are "zipped up" and we only get two variants. Note that both, `python` and `numpy` need to specify the exact same number of
+versions to make this work.
 The resulting variants with the zip applied are:
 
 ```
@@ -120,7 +120,7 @@ The resulting variants with the zip applied are:
 
 ### Pin run as build
 
-The `pin_run_as_build` key allows the user to inject additional pins. Usually, the `run_exports` mechanism is used to 
+The `pin_run_as_build` key allows the user to inject additional pins. Usually, the `run_exports` mechanism is used to
 specify constraints for runtime dependencies from _build_ time dependencies, but `pin_run_as_build` offers a mechanism
 to override that if the package does not contain a run exports file.
 
@@ -154,5 +154,3 @@ requirements:
   run:
   - libcurl >=8,<9
 ```
-
-

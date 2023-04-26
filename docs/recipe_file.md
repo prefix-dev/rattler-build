@@ -450,7 +450,7 @@ requirements:
 
 ```{note}
 When both build and host sections are defined, the build section can
-be thought of as "build tools" - things that run on the native platform, but output results for the target platform. 
+be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
 For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
 ```
 

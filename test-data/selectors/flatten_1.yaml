@@ -5,6 +5,6 @@ build:
   - sel(osx): echo 'osx2'
 
 test:
-  - sel(linux): 
+  - sel(linux):
       - echo 'linux'
       - echo 'linux2'

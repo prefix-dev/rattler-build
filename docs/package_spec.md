@@ -25,7 +25,7 @@ create an empty directory from the tar archive directly.
 
 There is also a newer archive type, suffixed with `.conda`. This archive type
 consists of an outer "zip" archive that is not compressed, and two inner
-archives that are compressed with `zstd`, which is very fast for decompression. 
+archives that are compressed with `zstd`, which is very fast for decompression.
 
 The inner archives are split into `info` and `pkg` files, which makes it
 possible to extract only the `info` part of the archive (only the metadata),
@@ -51,7 +51,7 @@ discussed below.
 This file contains basic information about the package, such as name, version,
 build string, and dependencies. The content of this file is stored in
 `repodata.json`, which is the repository index file, hence the name
-`index.json`. The JSON object is a dictionary containing the keys shown below. 
+`index.json`. The JSON object is a dictionary containing the keys shown below.
 
 
 * `name` - string - The lowercase name of the package. May contain lowercase

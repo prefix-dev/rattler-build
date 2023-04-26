@@ -7,4 +7,3 @@ expression: spec
     max_pin: ~
     min_pin: x.x.x
     exact: false
-

@@ -28,5 +28,3 @@ about:
   license: MIT
   description: "A utility for managing cargo dependencies from the command line."
   about: "A utility for managing cargo dependencies from the command line."
-
-

@@ -44,7 +44,7 @@ Running rattler-build is straight-forward, just execute (on the command line):
 rattler-build --recipe-file myrecipe/recipe.yaml
 ```
 
-Or add a custom channel that is not conda-forge which is the default one. 
+Or add a custom channel that is not conda-forge which is the default one.
 ```
 rattler-build -c robostack --recipe-file myrecipe/recipe.yaml
 ```

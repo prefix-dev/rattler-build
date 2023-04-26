@@ -6,4 +6,3 @@ expression: spec
 - compiler: cxx
 - compiler: fortran
 - compiler: rust
-
