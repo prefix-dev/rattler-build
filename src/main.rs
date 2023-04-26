@@ -173,26 +173,39 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
-                tracing::error!("Error: The file {} could not be found.", args.recipe.to_string_lossy());
-            },
+                tracing::error!(
+                    "Error: The file {} could not be found.",
+                    args.recipe.to_string_lossy()
+                );
+            }
             std::io::ErrorKind::PermissionDenied => {
-                tracing::error!("Error: Permission denied when trying to access the file {}.", args.recipe.to_string_lossy());
-            },
+                tracing::error!(
+                    "Error: Permission denied when trying to access the file {}.",
+                    args.recipe.to_string_lossy()
+                );
+            }
             _ => {
-                tracing::error!("Error: An unknown error occurred while trying to access the file {}: {:?}", args.recipe.to_string_lossy(), e);
-            },
+                tracing::error!(
+                    "Error: An unknown error occurred while trying to access the file {}: {:?}",
+                    args.recipe.to_string_lossy(),
+                    e
+                );
+            }
         }
         std::process::exit(1);
     }
     let mut recipe_path = recipe_path.unwrap();
 
-// If the recipe_path is a directory, look for "recipe.yaml" in the directory.
+    // If the recipe_path is a directory, look for "recipe.yaml" in the directory.
     if recipe_path.is_dir() {
         let recipe_yaml_path = recipe_path.join("recipe.yaml");
         if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
             recipe_path = recipe_yaml_path;
         } else {
-            tracing::error!("Error: 'recipe.yaml' not found in the directory {}", args.recipe.to_string_lossy());
+            tracing::error!(
+                "Error: 'recipe.yaml' not found in the directory {}",
+                args.recipe.to_string_lossy()
+            );
             std::process::exit(1);
         }
     }
