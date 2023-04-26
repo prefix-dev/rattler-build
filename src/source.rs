@@ -1,10 +1,10 @@
+use std::path::StripPrefixError;
 use std::{
     fs,
     io::Cursor,
     path::{Path, PathBuf},
     process::Command,
 };
-use std::path::StripPrefixError;
 
 use rattler_digest::compute_file_digest;
 use url::Url;
@@ -232,16 +232,17 @@ pub async fn fetch_sources(
                         let dest_path = dest_dir.join(relative_path);
 
                         if entry_path.is_file() {
-                            fs::copy(&entry_path, &dest_path)?;
+                            fs::copy(entry_path, &dest_path)?;
                             tracing::info!("Copied from {:?} to {:?}", entry_path, dest_path);
                         } else if entry_path.is_dir() {
                             fs::create_dir_all(&dest_path)?;
                         }
                     }
                 } else {
-                    return Err(SourceError::Dir(
-                        format!("Source dir: {} doesn't exist", src_path.to_string_lossy())
-                    ));
+                    return Err(SourceError::Dir(format!(
+                        "Source dir: {} doesn't exist",
+                        src_path.to_string_lossy()
+                    )));
                 }
             }
         }
