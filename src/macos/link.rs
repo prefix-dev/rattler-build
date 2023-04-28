@@ -1,8 +1,9 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
+use scroll::{Pread, Pwrite};
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 /// A macOS dylib (Mach-O)
@@ -76,6 +77,102 @@ impl Dylib {
         }
     }
 
+    pub fn rewrite_relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+        let mut data = fs::read(&self.path)?;
+        let mach = match goblin::mach::Mach::parse(&data)? {
+            Mach::Binary(mach) => {
+                mach
+            }
+            _ => {
+                tracing::error!("Not a valid Mach-O binary.");
+                return Err(RelinkError::FileTypeNotHandled);
+            }
+        };
+        use goblin::mach::load_command::CommandVariant;
+
+        let exchange_dylib = |path: &Path| {
+            if let Ok(relpath) = path.strip_prefix(encoded_prefix) {
+                println!("Relpath: {:?}", relpath);
+                let new_path = prefix.join(relpath);
+                let _diff_path =
+                    pathdiff::diff_paths(new_path, self.path.parent().unwrap()).unwrap();
+                let new_path = PathBuf::from(format!("@rpath/{}", relpath.to_string_lossy()));
+                Some(new_path)
+            } else {
+                None
+            }
+        };
+
+        for command in mach.load_commands {
+            match command.command {
+                CommandVariant::Rpath(rpath) => {
+                    tracing::debug!("Found rpath: {:?}", rpath.path);
+
+                    let orig_str = data.pread::<&str>(command.offset + rpath.path as usize)?;
+                    let orig_path = Path::new(orig_str);
+                    println!("R Path: {:?}", orig_path);
+                    if orig_path.is_absolute() {
+                        let lib_path = encoded_prefix.join(
+                            self.path
+                                .strip_prefix(prefix)?
+                                .parent()
+                                .expect("Could not get parent"),
+                        );
+        
+                        let relpath =
+                            pathdiff::diff_paths(orig_path, &lib_path).ok_or(RelinkError::PathDiffError {
+                                from: lib_path.clone(),
+                                to: orig_path.to_path_buf(),
+                            })?;
+        
+                        let new_rpath = format!("@loader_path/{}", relpath.to_string_lossy());
+        
+                        println!("Replacing rpath: {} -> {}", orig_str, new_rpath);
+                        // replace the rpath with @loader_path and 0 pad
+                        let l = orig_str.len();
+                        let mut new_data = new_rpath.as_bytes().to_vec();
+                        new_data.resize(l, 0);
+
+                        data.pwrite(
+                            new_data.as_slice(),
+                            command.offset + rpath.path as usize,
+                        )?;
+                    }
+                }
+                CommandVariant::LoadDylib(dylib) => {
+                    tracing::debug!("Found rpath: {:?}", dylib.dylib.name);
+
+                    let orig_path = data.pread::<&str>(command.offset + dylib.dylib.name as usize)?;
+                    println!("orig_path: {:?}", orig_path);
+                    // replace the rpath with @loader_path and 0 pad
+                    let l = orig_path.len();
+                    let p = Path::new(orig_path);
+                    if p.starts_with(encoded_prefix) {
+                        println!("Yes it does start");
+                        if let Some(new_path) = exchange_dylib(Path::new(orig_path)) {
+                            let mut new_data = new_path.to_string_lossy().as_bytes().to_vec();
+
+                            println!("Replacing dylib: {} -> {:?}", orig_path, new_path);
+
+                            new_data.resize(l, 0);
+
+                            data.pwrite(
+                                new_data.as_slice(),
+                                command.offset + dylib.dylib.name as usize,
+                            )?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut fout = File::create(&self.path.with_extension("out"))?;
+        fout.write(&data)?;
+
+        Ok(())
+    }
+
     /// Modify a dylib to use relative paths for rpaths and dylibs
     /// This makes the dylib relocatable and allows it to be used in a conda environment.
     ///
@@ -126,7 +223,7 @@ impl Dylib {
         }
 
         let exchange_dylib = |path: &Path| {
-            if let Ok(relpath) = path.strip_prefix(prefix) {
+            if let Ok(relpath) = path.strip_prefix(encoded_prefix) {
                 let new_path = prefix.join(relpath);
                 let _diff_path =
                     pathdiff::diff_paths(new_path, self.path.parent().unwrap()).unwrap();
@@ -206,4 +303,23 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use std::path::Path;
+    use super::*;
+
+
+    #[test]
+    fn test_rewrite() {
+        let fin = PathBuf::from("/Users/wolfv/Programs/rattler-build/bin/curl_init");
+
+        let dylib = Dylib::new(&fin).unwrap();
+        let encoded_prefix = PathBuf::from("/Users/wolfv/Programs/rattler-build/curl_1682536906697/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_p");
+        let prefix = PathBuf::from("/Users/wolfv/Programs/rattler-build/_prefix");
+
+        let bpref = PathBuf::from("/Users/wolfv/Programs/rattler-build");
+        dylib.rewrite_relink(&bpref, &encoded_prefix);
+    }
 }
