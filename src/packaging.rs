@@ -358,7 +358,7 @@ fn write_to_dest(
         {
             return Ok(None);
         }
-
+        println!("path_rel: {:?}", path_rel);
         if path_rel
             .components()
             .any(|c| c == Component::Normal("site-packages".as_ref()))
@@ -378,10 +378,21 @@ fn write_to_dest(
             }
 
             dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
-        } else if path.starts_with("bin") || path.starts_with("Scripts") {
+        } else if path_rel.starts_with("bin") || path_rel.starts_with("Scripts") {
             // replace bin with python-scripts
             let mut new_parts = path_rel.components().collect::<Vec<_>>();
             new_parts[0] = Component::Normal("python-scripts".as_ref());
+
+            // if the file ends with -script.py, remove the -script.py suffix
+            if let Some(Component::Normal(name)) = new_parts.last() {
+                if let Some(name_str) = name.to_str() {
+                    if name_str.ends_with("-script.py") {
+                        let new_name = name_str.trim_end_matches("-script.py");
+                        new_parts.last_mut() = Component::Normal(new_name.as_ref());
+                    }
+                }
+            }
+
             dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
         } else {
             // keep everything else as-is
