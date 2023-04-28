@@ -6,6 +6,7 @@ use std::{
     process::Command,
 };
 
+use git2::Repository;
 use rattler_digest::compute_file_digest;
 use url::Url;
 use walkdir::WalkDir;
@@ -34,6 +35,9 @@ pub enum SourceError {
 
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
+
+    #[error("Failed to checkout git repo: {0}")]
+    GitCheckout(#[from] git2::Error),
 }
 
 fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
@@ -129,8 +133,42 @@ async fn url_src(
     Ok(cache_name)
 }
 
-fn git_src(_source: &GitSrc) {
-    todo!("Git source support not implemented yet!");
+fn git_src(source: &GitSrc, cache_dir: &Path) -> Result<PathBuf, SourceError> {
+    // find or create cache
+    let cache_src = cache_dir.join("src_cache");
+    fs::create_dir_all(&cache_src)?;
+
+    let filename = source.git_url.path_segments().unwrap().last().unwrap();
+    let cache_name = PathBuf::from(filename);
+    let cache_path = cache_src.join(cache_name);
+
+    let repo = if cache_path.exists() {
+        Repository::init(&cache_path).unwrap()
+    } else {
+        let url = &source.git_url.to_string();
+
+        // TODO: Implement git depth clone
+        match Repository::clone_recurse(url, &cache_path) {
+            Ok(repo) => repo,
+            Err(e) => panic!("failed to clone: {}", e),
+        }
+    };
+
+    // Checkout
+    let reference = match repo.find_reference(&format!("refs/tags/{}", &source.git_rev.to_string()))
+    {
+        Ok(reference) => reference,
+        Err(e) => {
+            panic!("Failed to Checkout: {}", e);
+            // return Err(SourceError::GitCheckout(e));
+        }
+    };
+    repo.set_head(reference.name().unwrap())?;
+    repo.checkout_head(None)?;
+    println!("Checked out branch: {}", &source.git_rev);
+
+    // TODO: pull lfs stuff
+    Ok(cache_path)
 }
 
 /// Extracts a tar archive to the specified target directory
@@ -178,6 +216,33 @@ fn apply_patches(
     Ok(())
 }
 
+fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
+    fs::create_dir_all(to.parent().unwrap())?;
+    // Copying from src_path to dest_dir
+    if from.is_dir() {
+        for entry in WalkDir::new(from) {
+            let entry = entry?;
+            let entry_path = entry.path();
+            let relative_path = entry_path.strip_prefix(from)?;
+            let dest_path = to.join(relative_path);
+
+            if entry_path.is_file() {
+                fs::copy(entry_path, &dest_path)?;
+                tracing::debug!("Copied from {:?} to {:?}", entry_path, dest_path);
+            } else if entry_path.is_dir() {
+                fs::create_dir_all(&dest_path)?;
+            }
+        }
+        tracing::info!("Copied source from {:?} to {:?}", &from, to);
+    } else {
+        return Err(SourceError::Dir(format!(
+            "Source dir: {} doesn't exist",
+            from.to_string_lossy()
+        )));
+    }
+    Ok(())
+}
+
 /// Fetches all sources in a list of sources and applies specified patches
 pub async fn fetch_sources(
     sources: &[Source],
@@ -191,8 +256,14 @@ pub async fn fetch_sources(
     for src in sources {
         match &src {
             Source::Git(src) => {
-                tracing::info!("Fetching source from GIT: {}", src.git_src);
-                git_src(src);
+                tracing::info!("Fetching source from GIT: {}", src.git_url);
+                let result = git_src(src, cache_dir).unwrap();
+                let dest_dir = if let Some(folder) = &src.folder {
+                    work_dir.join(folder)
+                } else {
+                    work_dir.to_path_buf()
+                };
+                copy_dir(&result, &dest_dir).expect("TODO: panic message");
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
                 }
@@ -221,30 +292,8 @@ pub async fn fetch_sources(
                     work_dir.to_path_buf()
                 };
 
+                copy_dir(&src_path, &dest_dir).expect("TODO: panic message");
                 fs::create_dir_all(dest_dir.parent().unwrap())?;
-
-                // Copying from src_path to dest_dir
-                if src_path.is_dir() {
-                    for entry in WalkDir::new(&src_path) {
-                        let entry = entry?;
-                        let entry_path = entry.path();
-                        let relative_path = entry_path.strip_prefix(&src_path)?;
-                        let dest_path = dest_dir.join(relative_path);
-
-                        if entry_path.is_file() {
-                            fs::copy(entry_path, &dest_path)?;
-                            tracing::debug!("Copied from {:?} to {:?}", entry_path, dest_path);
-                        } else if entry_path.is_dir() {
-                            fs::create_dir_all(&dest_path)?;
-                        }
-                    }
-                    tracing::info!("Copied source from {:?} to {:?}", &src_path, dest_dir);
-                } else {
-                    return Err(SourceError::Dir(format!(
-                        "Source dir: {} doesn't exist",
-                        src_path.to_string_lossy()
-                    )));
-                }
             }
         }
     }

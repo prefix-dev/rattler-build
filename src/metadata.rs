@@ -235,19 +235,24 @@ impl Default for GitRev {
         Self(String::from("HEAD"))
     }
 }
+impl Display for GitRev {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 /// A git source
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitSrc {
     /// Url to the git repository
-    pub git_src: Url,
+    pub git_url: Url,
 
     /// Optionally a revision to checkout, defaults to `HEAD`
     #[serde(default)]
     pub git_rev: GitRev,
 
     /// Optionally a depth to clone the repository, defaults to `None`
-    pub git_depth: Option<u32>,
+    pub git_depth: Option<i32>,
 
     /// Optionally patches to apply to the source code
     pub patches: Option<Vec<PathBuf>>,
@@ -319,8 +324,8 @@ fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-    let dirname = format!("{}_{:?}", name, since_the_epoch.as_millis());
-    let path = env::current_dir()?.join(dirname);
+    let dirname = format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis());
+    let path = env::temp_dir().join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
 }

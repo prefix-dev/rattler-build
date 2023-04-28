@@ -62,6 +62,7 @@ thiserror = "1.0.40"
 tempfile = "3.5.0"
 chrono = "0.4.24"
 sha1 = "0.10.5"
+git2 = "0.17.1"
 
 [dev-dependencies]
 insta = {version = "1.29.0", features = ["yaml"] }
