@@ -358,7 +358,7 @@ fn write_to_dest(
         {
             return Ok(None);
         }
-
+        println!("path_rel: {:?}", path_rel);
         if path_rel
             .components()
             .any(|c| c == Component::Normal("site-packages".as_ref()))
@@ -378,10 +378,27 @@ fn write_to_dest(
             }
 
             dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
-        } else if path.starts_with("bin") || path.starts_with("Scripts") {
-            // replace bin with python-scripts
+        } else if path_rel.starts_with("bin") || path_rel.starts_with("Scripts") {
+            // Replace bin with python-scripts. These should really be encoded
+            // as entrypoints but sometimes recipe authors forget or don't know
+            // how to do that. Maybe sometimes it's also not actually an
+            // entrypoint. The reason for this is that on Windows, the
+            // entrypoints are in `Scripts/...` folder, and on Unix they are in
+            // the `bin/...` folder. So we need to make sure that the
+            // entrypoints are in the right place.
             let mut new_parts = path_rel.components().collect::<Vec<_>>();
             new_parts[0] = Component::Normal("python-scripts".as_ref());
+
+            // on Windows, if the file ends with -script.py, remove the -script.py suffix
+            if let Some(Component::Normal(name)) = new_parts.last_mut() {
+                if let Some(name_str) = name.to_str() {
+                    if target_platform.is_windows() && name_str.ends_with("-script.py") {
+                        let new_name = name_str.strip_suffix("-script.py").unwrap();
+                        *name = new_name.as_ref();
+                    }
+                }
+            }
+
             dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
         } else {
             // keep everything else as-is
