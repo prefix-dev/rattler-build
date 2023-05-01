@@ -6,12 +6,14 @@ use std::{
     process::Command,
 };
 
-use git2::Repository;
+use crate::metadata::GitUrl;
+use git2::{Cred, FetchOptions, RemoteCallbacks, Repository};
 use rattler_digest::compute_file_digest;
-use url::Url;
-use walkdir::WalkDir;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
+
+use fs_extra::dir::{copy, create, remove, CopyOptions};
+use fs_extra::error::ErrorKind::PermissionDenied;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SourceError {
@@ -24,11 +26,11 @@ pub enum SourceError {
     #[error("WalkDir Error: {0}")]
     WalkDir(#[from] walkdir::Error),
 
+    #[error("FileSystem error: '{0}'")]
+    FileSystemError(fs_extra::error::Error),
+
     #[error("StripPrefixError Error: {0}")]
     StripPrefixError(#[from] StripPrefixError),
-
-    #[error("Dir error: {0}")]
-    Dir(String),
 
     #[error("Download could not be validated with checksum!")]
     ValidationFailed,
@@ -90,7 +92,7 @@ fn split_filename(filename: &str) -> (String, String) {
     (stem_without_tar.to_string(), full_extension)
 }
 
-fn cache_name_from_url(url: &Url, checksum: &Checksum) -> String {
+fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> String {
     let filename = url.path_segments().unwrap().last().unwrap();
     let (stem, extension) = split_filename(filename);
     let checksum = match checksum {
@@ -105,11 +107,8 @@ async fn url_src(
     cache_dir: &Path,
     checksum: &Checksum,
 ) -> Result<PathBuf, SourceError> {
-    let cache_src = cache_dir.join("src_cache");
-    fs::create_dir_all(&cache_src)?;
-
     let cache_name = PathBuf::from(cache_name_from_url(&source.url, checksum));
-    let cache_name = cache_src.join(cache_name);
+    let cache_name = cache_dir.join(cache_name);
 
     let metadata = fs::metadata(&cache_name);
     if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, checksum) {
@@ -133,44 +132,73 @@ async fn url_src(
     Ok(cache_name)
 }
 
-fn git_src(source: &GitSrc, cache_dir: &Path) -> Result<PathBuf, SourceError> {
-    // find or create cache
-    let cache_src = cache_dir.join("src_cache");
-    fs::create_dir_all(&cache_src)?;
+/// Fetch the repo and its specific refspecs.
+fn fetch_repo(repo: &Repository, refspecs: &[String]) -> Result<(), git2::Error> {
+    let mut remote = repo.find_remote("origin")?;
 
-    let filename = source.git_url.path_segments().unwrap().last().unwrap();
+    let mut callbacks = RemoteCallbacks::new();
+    callbacks.credentials(|_url, username_from_url, _allowed_types| {
+        Cred::ssh_key_from_agent(username_from_url.unwrap_or("git"))
+    });
+
+    let mut fetch_options = FetchOptions::new();
+    fetch_options.remote_callbacks(callbacks);
+
+    remote.fetch(refspecs, Some(&mut fetch_options), None)?;
+
+    tracing::debug!("Repository fetched successfully!");
+
+    Ok(())
+}
+
+/// Find or create the cache for a git repository.
+fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, SourceError> {
+    // Create cache path based on given cache dir and name of the source package.
+    let filename = match &source.git_url {
+        GitUrl::Url(url) => url.path_segments().unwrap().last().unwrap().to_string(),
+        GitUrl::Path(path) => path.file_name().unwrap().to_string_lossy().to_string(),
+    };
     let cache_name = PathBuf::from(filename);
-    let cache_path = cache_src.join(cache_name);
+    let cache_path = cache_dir.join(cache_name);
 
-    let repo = if cache_path.exists() {
-        let repo = Repository::init(&cache_path).unwrap();
+    let repo = match &source.git_url {
+        GitUrl::Url(_) => {
+            // Create the repository struct from the given source.
+            if cache_path.exists() {
+                let repo = Repository::init(&cache_path).unwrap();
+                fetch_repo(&repo, &[source.git_rev.to_string()])?;
+                repo
+            } else {
+                let url = &source.git_url.to_string();
 
-        // Fetch origin if git_rev is not HEAD (Which would mean it is a local path.)
-        if source.git_rev.to_string() != "HEAD" {
-            match repo.find_remote("origin").unwrap().fetch(&[&source.git_rev.to_string()], None, None){
-                Ok(_) => tracing::debug!("Fetched remote origin"),
-                Err(e) => return Err(SourceError::GitError(e)),
+                // TODO: Make configure the clone more so git_depth is also used.
+                if source.git_depth.is_some() {
+                    tracing::warn!("No git depth implemented yet, will continue with full clone");
+                }
+
+                // Clone the repository recursively so all submodules are also cloned.
+                match Repository::clone_recurse(url, &cache_path) {
+                    Ok(repo) => repo,
+                    Err(e) => return Err(SourceError::GitError(e)),
+                }
             }
         }
-        repo
-    } else {
-        let url = &source.git_url.to_string();
+        GitUrl::Path(path) => {
+            if source.git_rev.to_string() == "HEAD" {
+                // If git source is a path and head then we can just make an exact copy without any git actions.
+                return Ok(PathBuf::from(path));
+            } else {
+                // Do a complete copy because there is a need for a specific git reference.
+                copy_dir(path, &cache_path)?;
 
-        // TODO: Make configure the clone more so git_depth is also used.
-        if source.git_depth.is_some(){
-            tracing::warn!("No git depth implemented yet, will continue with full clone");
-        }
-
-        // Clone the repository recursively so all submodules are also cloned.
-        match Repository::clone_recurse(url, &cache_path) {
-            Ok(repo) => repo,
-            Err(e) => return Err(SourceError::GitError(e)),
+                // Perform git operations on copy of source path
+                Repository::init(&cache_path).unwrap()
+            }
         }
     };
 
-    // Checkout the given git_rev
-    let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string())
-    {
+    // Set the proper reference on the cache repo.
+    let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string()) {
         Ok(reference) => reference,
         Err(e) => {
             return Err(SourceError::GitError(e));
@@ -178,7 +206,7 @@ fn git_src(source: &GitSrc, cache_dir: &Path) -> Result<PathBuf, SourceError> {
     };
     repo.set_head(reference.name().unwrap())?;
     repo.checkout_head(None)?;
-    tracing::info!("Checked out reference: {}", &source.git_rev);
+    tracing::info!("Checked out reference: '{}'", &source.git_rev);
 
     // TODO: pull lfs stuff, git2 doesn't support that.
     Ok(cache_path)
@@ -200,6 +228,7 @@ fn extract(
 
     output
 }
+
 /// Applies all patches in a list of patches to the specified work directory
 /// Currently only supports patching with the `patch` command.
 fn apply_patches(
@@ -230,28 +259,38 @@ fn apply_patches(
 }
 
 fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
-    fs::create_dir_all(to.parent().unwrap())?;
-    // Copying from src_path to dest_dir
-    if from.is_dir() {
-        for entry in WalkDir::new(from) {
-            let entry = entry?;
-            let entry_path = entry.path();
-            let relative_path = entry_path.strip_prefix(from)?;
-            let dest_path = to.join(relative_path);
+    // Create the to path because we're going to copy the contents only
+    create(to, true).unwrap();
 
-            if entry_path.is_file() {
-                fs::copy(entry_path, &dest_path)?;
-                tracing::debug!("Copied from {:?} to {:?}", entry_path, dest_path);
-            } else if entry_path.is_dir() {
-                fs::create_dir_all(&dest_path)?;
+    // Setup copy options, overwrite if needed, only copy the contents as we want to specify the dir name manually
+    let mut options = CopyOptions::new();
+    options.overwrite = true;
+    options.content_only = true;
+
+    match copy(from, to, &options) {
+        Ok(_) => tracing::info!(
+            "Copied {} to {}",
+            from.to_string_lossy(),
+            to.to_string_lossy()
+        ),
+        // Use matches as the ErrorKind does not support `==`
+        Err(e) if matches!(e.kind, PermissionDenied) => {
+            tracing::debug!("Permission error in cache, this often happens when the previous run was exited in a faulty way. Removing the cache and retrying the copy.");
+            if let Err(remove_error) = remove(to) {
+                tracing::error!("Failed to remove cache directory: {}", remove_error);
+                return Err(SourceError::FileSystemError(e));
+            } else if let Err(retry_error) = copy(from, to, &options) {
+                tracing::error!("Failed to retry the copy operation: {}", retry_error);
+                return Err(SourceError::FileSystemError(e));
+            } else {
+                tracing::debug!(
+                    "Successfully retried copying {} to {}",
+                    from.to_string_lossy(),
+                    to.to_string_lossy()
+                );
             }
         }
-        tracing::info!("Copied source from {:?} to {:?}", &from, to);
-    } else {
-        return Err(SourceError::Dir(format!(
-            "Source dir: {} doesn't exist",
-            from.to_string_lossy()
-        )));
+        Err(e) => return Err(SourceError::FileSystemError(e)),
     }
     Ok(())
 }
@@ -263,33 +302,36 @@ pub async fn fetch_sources(
     recipe_dir: &Path,
     cache_dir: &Path,
 ) -> Result<(), SourceError> {
-    // create the cache dir if it doesn't exist
-    fs::create_dir_all(cache_dir)?;
+    let cache_src = cache_dir.join("src_cache");
+    fs::create_dir_all(&cache_src)?;
 
     for src in sources {
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from GIT: {}", src.git_url);
-                let result = git_src(src, cache_dir).unwrap();
+                let result = match git_src(src, &cache_src) {
+                    Ok(path) => path,
+                    Err(e) => return Err(e),
+                };
                 let dest_dir = if let Some(folder) = &src.folder {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
-                copy_dir(&result, &dest_dir).expect("TODO: panic message");
+                copy_dir(&result, &dest_dir)?;
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url);
-                let res = url_src(src, cache_dir, &src.checksum).await?;
+                let res = url_src(src, &cache_src, &src.checksum).await?;
                 let dest_dir = if let Some(folder) = &src.folder {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
-                extract(&res, &dest_dir).expect("Could not extract the file!");
+                extract(&res, &dest_dir)?;
                 tracing::info!("Extracted to {:?}", work_dir);
                 if let Some(patches) = &src.patches {
                     apply_patches(patches, work_dir, recipe_dir)?;
@@ -304,9 +346,7 @@ pub async fn fetch_sources(
                 } else {
                     work_dir.to_path_buf()
                 };
-
-                copy_dir(&src_path, &dest_dir).expect("TODO: panic message");
-                fs::create_dir_all(dest_dir.parent().unwrap())?;
+                copy_dir(&src_path, &dest_dir)?;
             }
         }
     }
@@ -316,6 +356,7 @@ pub async fn fetch_sources(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use url::Url;
 
     #[test]
     fn test_split_filename() {

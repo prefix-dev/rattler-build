@@ -241,11 +241,19 @@ impl Display for GitRev {
     }
 }
 
+/// Type of the git_url which can be a path and a URL, let serde figure it out.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum GitUrl {
+    Url(Url),
+    Path(PathBuf),
+}
+
 /// A git source
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitSrc {
     /// Url to the git repository
-    pub git_url: Url,
+    pub git_url: GitUrl,
 
     /// Optionally a revision to checkout, defaults to `HEAD`
     #[serde(default)]
@@ -437,6 +445,15 @@ pub struct RenderedRecipe {
     pub about: About,
     /// The test section of the recipe
     pub test: Option<Test>,
+}
+
+impl fmt::Display for GitUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GitUrl::Url(url) => write!(f, "{}", url),
+            GitUrl::Path(path) => write!(f, "{:?}", path),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
