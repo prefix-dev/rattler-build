@@ -36,8 +36,8 @@ pub enum SourceError {
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
-    #[error("Failed to checkout git repo: {0}")]
-    GitCheckout(#[from] git2::Error),
+    #[error("Failed to run git command: {0}")]
+    GitError(#[from] git2::Error),
 }
 
 fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
@@ -143,31 +143,44 @@ fn git_src(source: &GitSrc, cache_dir: &Path) -> Result<PathBuf, SourceError> {
     let cache_path = cache_src.join(cache_name);
 
     let repo = if cache_path.exists() {
-        Repository::init(&cache_path).unwrap()
+        let repo = Repository::init(&cache_path).unwrap();
+
+        // Fetch origin if git_rev is not HEAD (Which would mean it is a local path.)
+        if source.git_rev.to_string() != "HEAD" {
+            match repo.find_remote("origin").unwrap().fetch(&[&source.git_rev.to_string()], None, None){
+                Ok(_) => tracing::debug!("Fetched remote origin"),
+                Err(e) => return Err(SourceError::GitError(e)),
+            }
+        }
+        repo
     } else {
         let url = &source.git_url.to_string();
 
-        // TODO: Implement git depth clone
+        // TODO: Make configure the clone more so git_depth is also used.
+        if source.git_depth.is_some(){
+            tracing::warn!("No git depth implemented yet, will continue with full clone");
+        }
+
+        // Clone the repository recursively so all submodules are also cloned.
         match Repository::clone_recurse(url, &cache_path) {
             Ok(repo) => repo,
-            Err(e) => panic!("failed to clone: {}", e),
+            Err(e) => return Err(SourceError::GitError(e)),
         }
     };
 
-    // Checkout
-    let reference = match repo.find_reference(&format!("refs/tags/{}", &source.git_rev.to_string()))
+    // Checkout the given git_rev
+    let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string())
     {
         Ok(reference) => reference,
         Err(e) => {
-            panic!("Failed to Checkout: {}", e);
-            // return Err(SourceError::GitCheckout(e));
+            return Err(SourceError::GitError(e));
         }
     };
     repo.set_head(reference.name().unwrap())?;
     repo.checkout_head(None)?;
-    println!("Checked out branch: {}", &source.git_rev);
+    tracing::info!("Checked out reference: {}", &source.git_rev);
 
-    // TODO: pull lfs stuff
+    // TODO: pull lfs stuff, git2 doesn't support that.
     Ok(cache_path)
 }
 
