@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::metadata::GitUrl;
-use git2::{Cred, FetchOptions, RemoteCallbacks, Repository};
+use git2::{Cred, FetchOptions, ObjectType, RemoteCallbacks, Repository, ResetType};
 use rattler_digest::compute_file_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
@@ -218,8 +218,9 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
             return Err(SourceError::GitError(e));
         }
     };
+    let object = reference.peel(ObjectType::Commit).unwrap();
     repo.set_head(reference.name().unwrap())?;
-    repo.checkout_head(None)?;
+    repo.reset(&object, ResetType::Hard, None)?;
     tracing::info!("Checked out reference: '{}'", &source.git_rev);
 
     // TODO: Implement support for pulling Git LFS files, as git2 does not support it.
@@ -369,8 +370,11 @@ pub async fn fetch_sources(
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+    use git2::Repository;
     use super::*;
     use url::Url;
+    use crate::metadata::GitRev;
 
     #[test]
     fn test_split_filename() {
@@ -417,6 +421,21 @@ mod tests {
             let url = Url::parse(url).unwrap();
             let name = cache_name_from_url(&url, &checksum);
             assert_eq!(name, expected);
+        }
+    }
+
+    #[test]
+    fn test_git_source() {
+        let cache_dir = "/tmp/rattler-build-test-git-source";
+        let cases = vec![
+            (GitSrc{git_rev: GitRev::from_str("v0.1.3").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
+            (GitSrc{git_rev: GitRev::from_str("v0.1.2").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
+            (GitSrc{git_rev: GitRev::from_str("main").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
+        ];
+        for (source, repo_name) in cases {
+            let path = git_src(&source, cache_dir.as_ref()).unwrap();
+            Repository::init(&path).expect("Could not create repo with the path speciefied.");
+            assert_eq!(path.to_string_lossy(), (cache_dir.to_owned() + "/" + repo_name));
         }
     }
 }

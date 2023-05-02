@@ -67,6 +67,7 @@ pub struct RunExports {
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::fmt;
+use std::str::FromStr;
 
 impl<'de> Deserialize<'de> for RunExports {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -230,6 +231,13 @@ pub enum Checksum {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
 
+impl FromStr for GitRev {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(GitRev(s.to_string()))
+    }
+}
 impl Default for GitRev {
     fn default() -> Self {
         Self(String::from("HEAD"))
