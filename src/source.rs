@@ -152,6 +152,21 @@ fn fetch_repo(repo: &Repository, refspecs: &[String]) -> Result<(), git2::Error>
 }
 
 /// Find or create the cache for a git repository.
+///
+/// This function has multiple paths depending on the source of the Git repository:
+/// 1. The source is a git URL:
+/// a. If the cache for the package exists, fetch and checkout the specified revision.
+/// b. If there is no cache, perform a recursive clone.
+/// 2. The source is a local path:
+/// a. If the specified revision is HEAD, return the given path as cache, because no action on the repo is needed.
+/// b. If any other revision is specified, copy the repo to the cache path and perform a checkout of the specified revision.
+///
+/// # Arguments
+/// - source: The GitSrc struct containing information about the source git repository.
+/// - cache_dir: The base cache directory where the repository will be stored.
+///
+/// # Returns
+/// - A Result containing the PathBuf to the cache, or a SourceError if an error occurs during the process.
 fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, SourceError> {
     // Create cache path based on given cache dir and name of the source package.
     let filename = match &source.git_url {
@@ -161,9 +176,10 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
 
+    // Initialize or clone the repository depending on the source's git_url.
     let repo = match &source.git_url {
         GitUrl::Url(_) => {
-            // Create the repository struct from the given source.
+            // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
                 let repo = Repository::init(&cache_path).unwrap();
                 fetch_repo(&repo, &[source.git_rev.to_string()])?;
@@ -176,7 +192,7 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
                     tracing::warn!("No git depth implemented yet, will continue with full clone");
                 }
 
-                // Clone the repository recursively so all submodules are also cloned.
+                // Clone the repository recursively to include all submodules.
                 match Repository::clone_recurse(url, &cache_path) {
                     Ok(repo) => repo,
                     Err(e) => return Err(SourceError::GitError(e)),
@@ -185,19 +201,17 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
         }
         GitUrl::Path(path) => {
             if source.git_rev.to_string() == "HEAD" {
-                // If git source is a path and head then we can just make an exact copy without any git actions.
+                // If the source is a path and the revision is HEAD, return the path as cache without any git actions.
                 return Ok(PathBuf::from(path));
             } else {
-                // Do a complete copy because there is a need for a specific git reference.
+                // Copy the repo to the cache_path and perform git operations on the copied source path.
                 copy_dir(path, &cache_path)?;
-
-                // Perform git operations on copy of source path
                 Repository::init(&cache_path).unwrap()
             }
         }
     };
 
-    // Set the proper reference on the cache repo.
+    // Resolve the reference and set the head to the specified revision.
     let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string()) {
         Ok(reference) => reference,
         Err(e) => {
@@ -208,7 +222,7 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
     repo.checkout_head(None)?;
     tracing::info!("Checked out reference: '{}'", &source.git_rev);
 
-    // TODO: pull lfs stuff, git2 doesn't support that.
+    // TODO: Implement support for pulling Git LFS files, as git2 does not support it.
     Ok(cache_path)
 }
 

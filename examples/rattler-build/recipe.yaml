@@ -10,8 +10,6 @@ package:
 
 source:
     git_url: "https://github.com/{{ org }}/{{ name }}"
-#    git_url: "/home/rarts/development/rattler-build-clean"
-#    git_url: "/home/rarts/development/rattler-build-https"
     git_rev: "v{{ version }}"
     git_depth: -1 # (Defaults to -1/not shallow)
 
