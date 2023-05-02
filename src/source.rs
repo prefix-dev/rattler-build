@@ -370,11 +370,11 @@ pub async fn fetch_sources(
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-    use git2::Repository;
     use super::*;
-    use url::Url;
     use crate::metadata::GitRev;
+    use git2::Repository;
+    use std::str::FromStr;
+    use url::Url;
 
     #[test]
     fn test_split_filename() {
@@ -428,14 +428,56 @@ mod tests {
     fn test_git_source() {
         let cache_dir = "/tmp/rattler-build-test-git-source";
         let cases = vec![
-            (GitSrc{git_rev: GitRev::from_str("v0.1.3").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
-            (GitSrc{git_rev: GitRev::from_str("v0.1.2").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
-            (GitSrc{git_rev: GitRev::from_str("main").unwrap(), git_depth: None, patches: None, git_url: GitUrl::Url("https://github.com/prefix-dev/rattler-build".parse().unwrap()), folder: None }, "rattler-build"),
+            (
+                GitSrc {
+                    git_rev: GitRev::from_str("v0.1.3").unwrap(),
+                    git_depth: None,
+                    patches: None,
+                    git_url: GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
+                    ),
+                    folder: None,
+                },
+                "rattler-build",
+            ),
+            (
+                GitSrc {
+                    git_rev: GitRev::from_str("v0.1.2").unwrap(),
+                    git_depth: None,
+                    patches: None,
+                    git_url: GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
+                    ),
+                    folder: None,
+                },
+                "rattler-build",
+            ),
+            (
+                GitSrc {
+                    git_rev: GitRev::from_str("main").unwrap(),
+                    git_depth: None,
+                    patches: None,
+                    git_url: GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
+                    ),
+                    folder: None,
+                },
+                "rattler-build",
+            ),
         ];
         for (source, repo_name) in cases {
             let path = git_src(&source, cache_dir.as_ref()).unwrap();
             Repository::init(&path).expect("Could not create repo with the path speciefied.");
-            assert_eq!(path.to_string_lossy(), (cache_dir.to_owned() + "/" + repo_name));
+            assert_eq!(
+                path.to_string_lossy(),
+                (cache_dir.to_owned() + "/" + repo_name)
+            );
         }
     }
 }
