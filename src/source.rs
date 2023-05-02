@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
+use std::ops::Deref;
 
 use crate::metadata::GitUrl;
 use git2::{Cred, FetchOptions, ObjectType, RemoteCallbacks, Repository, ResetType};
@@ -158,8 +159,8 @@ fn fetch_repo(repo: &Repository, refspecs: &[String]) -> Result<(), git2::Error>
 /// a. If the cache for the package exists, fetch and checkout the specified revision.
 /// b. If there is no cache, perform a recursive clone.
 /// 2. The source is a local path:
-/// a. If the specified revision is HEAD, return the given path as cache, because no action on the repo is needed.
-/// b. If any other revision is specified, copy the repo to the cache path and perform a checkout of the specified revision.
+/// a. If the specified revision is HEAD, do a local clone and return the cache path, because no action on the repo is needed.
+/// b. If any other revision is specified, clone the repo to the cache path and perform a checkout of the specified revision.
 ///
 /// # Arguments
 /// - source: The GitSrc struct containing information about the source git repository.
@@ -185,29 +186,34 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
                 fetch_repo(&repo, &[source.git_rev.to_string()])?;
                 repo
             } else {
-                let url = &source.git_url.to_string();
-
                 // TODO: Make configure the clone more so git_depth is also used.
                 if source.git_depth.is_some() {
                     tracing::warn!("No git depth implemented yet, will continue with full clone");
                 }
 
                 // Clone the repository recursively to include all submodules.
-                match Repository::clone_recurse(url, &cache_path) {
+                match Repository::clone_recurse(&source.git_url.to_string(), &cache_path) {
                     Ok(repo) => repo,
                     Err(e) => return Err(SourceError::GitError(e)),
                 }
             }
         }
         GitUrl::Path(path) => {
-            if source.git_rev.to_string() == "HEAD" {
-                // If the source is a path and the revision is HEAD, return the path as cache without any git actions.
-                return Ok(PathBuf::from(path));
-            } else {
-                // Copy the repo to the cache_path and perform git operations on the copied source path.
-                copy_dir(path, &cache_path)?;
-                Repository::init(&cache_path).unwrap()
+            if cache_path.exists() {
+                // Remove old cache so it can be overwritten.
+                if let Err(remove_error) = remove(&cache_path) {
+                    tracing::error!("Failed to remove old cache directory: {}", remove_error);
+                    return Err(SourceError::FileSystemError(remove_error));
+                }
             }
+
+            let repo = Repository::clone_recurse(path.to_string_lossy().deref(), &cache_path).unwrap();
+
+            if source.git_rev.to_string() == "HEAD" {
+                // If the source is a path and the revision is HEAD, return the path to avoid git actions.
+                return Ok(PathBuf::from(&cache_path));
+            }
+            repo
         }
     };
 
