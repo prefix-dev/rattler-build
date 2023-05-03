@@ -251,6 +251,7 @@ pub fn apply_variant(
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
+                                    "rust" => "rust".to_string(),
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
@@ -264,6 +265,7 @@ pub fn apply_variant(
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
+                                    "rust" => "rust".to_string(),
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
@@ -279,6 +281,7 @@ pub fn apply_variant(
                                     "c" => "vs2017".to_string(),
                                     "cxx" => "vs2017".to_string(),
                                     "fortran" => "gfortran".to_string(),
+                                    "rust" => "rust".to_string(),
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",

@@ -67,6 +67,7 @@ pub struct RunExports {
 
 use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
 use std::fmt;
+use std::str::FromStr;
 
 impl<'de> Deserialize<'de> for RunExports {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -230,24 +231,44 @@ pub enum Checksum {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
 
+impl FromStr for GitRev {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(GitRev(s.to_string()))
+    }
+}
 impl Default for GitRev {
     fn default() -> Self {
         Self(String::from("HEAD"))
     }
+}
+impl Display for GitRev {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// Type of the git_url which can be a path and a URL, let serde figure it out.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum GitUrl {
+    Url(Url),
+    Path(PathBuf),
 }
 
 /// A git source
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitSrc {
     /// Url to the git repository
-    pub git_src: Url,
+    pub git_url: GitUrl,
 
     /// Optionally a revision to checkout, defaults to `HEAD`
     #[serde(default)]
     pub git_rev: GitRev,
 
     /// Optionally a depth to clone the repository, defaults to `None`
-    pub git_depth: Option<u32>,
+    pub git_depth: Option<i32>,
 
     /// Optionally patches to apply to the source code
     pub patches: Option<Vec<PathBuf>>,
@@ -319,8 +340,8 @@ fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-    let dirname = format!("{}_{:?}", name, since_the_epoch.as_millis());
-    let path = env::current_dir()?.join(dirname);
+    let dirname = format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis());
+    let path = env::temp_dir().join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
 }
@@ -432,6 +453,15 @@ pub struct RenderedRecipe {
     pub about: About,
     /// The test section of the recipe
     pub test: Option<Test>,
+}
+
+impl fmt::Display for GitUrl {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GitUrl::Url(url) => write!(f, "{}", url),
+            GitUrl::Path(path) => write!(f, "{:?}", path),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
