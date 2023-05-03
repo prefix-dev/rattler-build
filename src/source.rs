@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::path::StripPrefixError;
 use std::{
     fs,
@@ -5,7 +6,6 @@ use std::{
     path::{Path, PathBuf},
     process::Command,
 };
-use std::ops::Deref;
 
 use crate::metadata::GitUrl;
 use git2::{Cred, FetchOptions, ObjectType, RemoteCallbacks, Repository, ResetType};
@@ -207,7 +207,8 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
                 }
             }
 
-            let repo = Repository::clone_recurse(path.to_string_lossy().deref(), &cache_path).unwrap();
+            let repo =
+                Repository::clone_recurse(path.to_string_lossy().deref(), &cache_path).unwrap();
 
             if source.git_rev.to_string() == "HEAD" {
                 // If the source is a path and the revision is HEAD, return the path to avoid git actions.
