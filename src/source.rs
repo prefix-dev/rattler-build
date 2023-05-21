@@ -168,11 +168,21 @@ fn fetch_repo(repo: &Repository, refspecs: &[String]) -> Result<(), git2::Error>
 ///
 /// # Returns
 /// - A Result containing the PathBuf to the cache, or a SourceError if an error occurs during the process.
-fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, SourceError> {
+fn git_src<'a>(
+    source: &'a GitSrc,
+    cache_dir: &'a Path,
+    recipe_dir: &'a Path,
+) -> Result<PathBuf, SourceError> {
     // Create cache path based on given cache dir and name of the source package.
     let filename = match &source.git_url {
         GitUrl::Url(url) => url.path_segments().unwrap().last().unwrap().to_string(),
-        GitUrl::Path(path) => path.file_name().unwrap().to_string_lossy().to_string(),
+        GitUrl::Path(path) => recipe_dir
+            .join(path)
+            .canonicalize()?
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string(),
     };
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
@@ -207,8 +217,14 @@ fn git_src<'a>(source: &'a GitSrc, cache_dir: &'a Path) -> Result<PathBuf, Sourc
                 }
             }
 
-            let repo =
-                Repository::clone_recurse(path.to_string_lossy().deref(), &cache_path).unwrap();
+            let repo = Repository::clone_recurse(
+                recipe_dir
+                    .join(path)
+                    .canonicalize()?
+                    .to_string_lossy()
+                    .deref(),
+                &cache_path,
+            )?;
 
             if source.git_rev.to_string() == "HEAD" {
                 // If the source is a path and the revision is HEAD, return the path to avoid git actions.
@@ -331,7 +347,7 @@ pub async fn fetch_sources(
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from GIT: {}", src.git_url);
-                let result = match git_src(src, &cache_src) {
+                let result = match git_src(src, &cache_src, recipe_dir) {
                     Ok(path) => path,
                     Err(e) => return Err(e),
                 };
@@ -380,6 +396,7 @@ mod tests {
     use super::*;
     use crate::metadata::GitRev;
     use git2::Repository;
+    use std::env;
     use std::str::FromStr;
     use url::Url;
 
@@ -477,9 +494,24 @@ mod tests {
                 },
                 "rattler-build",
             ),
+            (
+                GitSrc {
+                    git_rev: GitRev::from_str("").unwrap(),
+                    git_depth: None,
+                    patches: None,
+                    git_url: GitUrl::Path("../rattler-build".parse().unwrap()),
+                    folder: None,
+                },
+                "rattler-build",
+            ),
         ];
         for (source, repo_name) in cases {
-            let path = git_src(&source, cache_dir.as_ref()).unwrap();
+            let path = git_src(
+                &source,
+                cache_dir.as_ref(),
+                env::current_dir().unwrap().as_ref(),
+            )
+            .unwrap();
             Repository::init(&path).expect("Could not create repo with the path speciefied.");
             assert_eq!(
                 path.to_string_lossy(),
