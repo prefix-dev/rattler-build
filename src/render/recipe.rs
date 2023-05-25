@@ -1,4 +1,3 @@
-use core::panic;
 use std::collections::BTreeMap;
 
 use minijinja::{self, value::Value, Environment};
@@ -127,6 +126,17 @@ fn render_context(yaml_context: &serde_yaml::Mapping) -> BTreeMap<String, Value>
     context
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RecipeRenderError {
+    #[error("Invalid YAML")]
+    InvalidYaml(#[from] serde_yaml::Error),
+
+    #[error(
+        "YAML does not follow regular recipe structure (map with build, requirements, outputs...)"
+    )]
+    YamlNotMapping,
+}
+
 /// This renders a recipe, given a variant
 /// This evaluates all selectors and jinja statements in the recipe
 /// It does _not_ apply the variants to the dependency list yet
@@ -134,10 +144,10 @@ pub fn render_recipe(
     recipe: &YamlValue,
     variant: &BTreeMap<String, String>,
     pkg_hash: &str,
-) -> anyhow::Result<RenderedRecipe> {
+) -> Result<RenderedRecipe, RecipeRenderError> {
     let recipe = match recipe {
         YamlValue::Mapping(map) => map,
-        _ => panic!("Expected a map"),
+        _ => return Err(RecipeRenderError::YamlNotMapping),
     };
 
     let mut env = Environment::new();

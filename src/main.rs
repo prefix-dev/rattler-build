@@ -238,7 +238,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         variant: BTreeMap::new(),
     };
 
-    let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config);
+    let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config)?;
 
     let variants = variant_config
         .find_variants(&recipe_text, &selector_config)
@@ -272,7 +272,20 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
             tracing::error!("Could not flatten selectors");
         }
 
-        let recipe = render_recipe(&recipe_yaml, &variant, &hash)?;
+        let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
+            Result::Err(e) => {
+                match &e {
+                    render::recipe::RecipeRenderError::InvalidYaml(inner) => {
+                        tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
+                    }
+                    render::recipe::RecipeRenderError::YamlNotMapping => {
+                        tracing::error!("{}", e);
+                    }
+                }
+                return Err(e.into());
+            }
+            Result::Ok(r) => r,
+        };
 
         if args.render_only {
             println!("{}", serde_yaml::to_string(&recipe).unwrap());

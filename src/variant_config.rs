@@ -32,6 +32,15 @@ pub struct VariantConfig {
     pub variants: BTreeMap<String, Vec<String>>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum VariantConfigError {
+    #[error("Could not parse variant config file ({0}): {1}")]
+    ParseError(PathBuf, serde_yaml::Error),
+
+    #[error("Could not open file ({0}): {1}")]
+    IOError(PathBuf, std::io::Error),
+}
+
 impl VariantConfig {
     /// This function loads multiple variant configuration files and merges them into a single
     /// configuration. The configuration files are loaded in the order they are provided in the
@@ -96,17 +105,22 @@ impl VariantConfig {
     /// and
     /// [python=3.8, compiler=clang]
     /// ```
-    pub fn from_files(files: &Vec<PathBuf>, selector_config: &SelectorConfig) -> Self {
+    pub fn from_files(
+        files: &Vec<PathBuf>,
+        selector_config: &SelectorConfig,
+    ) -> Result<Self, VariantConfigError> {
         let mut variant_configs = Vec::new();
 
-        for file in files {
-            let file = std::fs::File::open(file).unwrap();
+        for filename in files {
+            let file = std::fs::File::open(filename)
+                .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
             let reader = std::io::BufReader::new(file);
-            let mut yaml_value = serde_yaml::from_reader(reader).unwrap();
+            let mut yaml_value = serde_yaml::from_reader(reader)
+                .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
 
             if let Some(yaml_value) = flatten_toplevel(&mut yaml_value, selector_config) {
                 let config: VariantConfig = serde_yaml::from_value(yaml_value)
-                    .expect("Could not deserialize variant config");
+                    .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
                 variant_configs.push(config);
             }
         }
@@ -134,12 +148,11 @@ impl VariantConfig {
             vec![selector_config.build_platform.to_string()],
         );
 
-        final_config
+        Ok(final_config)
     }
 
     fn validate_zip_keys(&self) -> Result<(), VariantError> {
         if let Some(zip_keys) = &self.zip_keys {
-            println!("zip_keys: {:?}", zip_keys);
             for zip in zip_keys {
                 let mut prev_len = None;
                 for key in zip {
