@@ -1,7 +1,7 @@
 //! This is the main entry point for the `rattler-build` binary.
 
 use anyhow::Ok;
-use clap::{arg, Parser};
+use clap::{arg, Parser, crate_version};
 
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use once_cell::sync::Lazy;
@@ -77,6 +77,7 @@ enum SubCommands {
 }
 
 #[derive(Parser)]
+#[clap(version = crate_version!())]
 struct App {
     #[clap(subcommand)]
     subcommand: SubCommands,
