@@ -206,10 +206,21 @@ pub fn apply_variant(
                     if m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
                             if let Some(version) = variant.get(name) {
+                                // if the variant starts with an alphanumeric character,
+                                // we have to add a '=' to the version spec
+                                let mut spec = version.clone();
+
+                                // check if all characters are alphanumeric or ., in that case add
+                                // a '=' to get "startswith" behavior
+                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                                    spec = format!("={}", version);
+                                } else {
+                                    spec = version.clone();
+                                }
+
                                 let final_spec = MatchSpec {
                                     version: Some(
-                                        VersionSpec::from_str(&format!("={}", version))
-                                            .expect("Invalid version spec"),
+                                        VersionSpec::from_str(&spec).expect("Invalid version spec"),
                                     ),
                                     ..m
                                 };
