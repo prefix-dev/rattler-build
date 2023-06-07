@@ -209,10 +209,13 @@ pub fn apply_variant(
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
                                 let mut spec = version.clone();
-                                if let Some(c) = version.chars().next() {
-                                    if c.is_alphanumeric() {
-                                        spec = format!("={}", version);
-                                    }
+
+                                // check if all characters are alphanumeric or ., in that case add
+                                // a '=' to get "startswith" behavior
+                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                                    spec = format!("={}", version);
+                                } else {
+                                    spec = version.clone();
                                 }
 
                                 let final_spec = MatchSpec {
