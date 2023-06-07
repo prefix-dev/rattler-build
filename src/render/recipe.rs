@@ -132,7 +132,7 @@ pub enum RecipeRenderError {
     InvalidYaml(#[from] serde_yaml::Error),
 
     #[error(
-        "YAML does not follow regular recipe structure (map with build, requirements, outputs...)"
+        "Invalid recipe file format. The recipe file YAML does not follow regular recipe structure (map with build, requirements, outputs...)"
     )]
     YamlNotMapping,
 }

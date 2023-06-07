@@ -13,6 +13,7 @@ use std::{
     collections::BTreeMap,
     fs,
     path::PathBuf,
+    process::ExitCode,
     str::{self, FromStr},
 };
 use test::TestConfiguration;
@@ -124,7 +125,7 @@ struct TestOpts {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> ExitCode {
     let args = App::parse();
 
     let default_filter = if args.verbose {
@@ -135,8 +136,9 @@ async fn main() -> anyhow::Result<()> {
 
     let env_filter = EnvFilter::builder()
         .with_default_directive(default_filter.into())
-        .from_env()?
-        .add_directive("apple_codesign=off".parse()?);
+        .from_env()
+        .expect("Could not parse RUST_LOG environment variable")
+        .add_directive("apple_codesign=off".parse().unwrap());
 
     tracing_subscriber::fmt()
         .with_env_filter(env_filter)
@@ -148,12 +150,18 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting the build process");
 
-    match args.subcommand {
+    let result = match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
-    }?;
+    };
 
-    Ok(())
+    match result {
+        Result::Ok(_) => ExitCode::SUCCESS,
+        Result::Err(e) => {
+            tracing::error!("Error: {}", e);
+            ExitCode::FAILURE
+        }
+    }
 }
 
 async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
@@ -173,26 +181,25 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
-                tracing::error!(
-                    "Error: The file {} could not be found.",
+                return Err(anyhow::anyhow!(
+                    "The file {} could not be found.",
                     args.recipe.to_string_lossy()
-                );
+                ));
             }
             std::io::ErrorKind::PermissionDenied => {
-                tracing::error!(
-                    "Error: Permission denied when trying to access the file {}.",
+                return Err(anyhow::anyhow!(
+                    "Permission denied when trying to access the file {}.",
                     args.recipe.to_string_lossy()
-                );
+                ));
             }
             _ => {
-                tracing::error!(
-                    "Error: An unknown error occurred while trying to access the file {}: {:?}",
+                return Err(anyhow::anyhow!(
+                    "An unknown error occurred while trying to access the file {}: {:?}",
                     args.recipe.to_string_lossy(),
                     e
-                );
+                ));
             }
         }
-        std::process::exit(1);
     }
     let mut recipe_path = recipe_path.unwrap();
 
@@ -202,11 +209,10 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
             recipe_path = recipe_yaml_path;
         } else {
-            tracing::error!(
-                "Error: 'recipe.yaml' not found in the directory {}",
+            return Err(anyhow::anyhow!(
+                "'recipe.yaml' not found in the directory {}",
                 args.recipe.to_string_lossy()
-            );
-            std::process::exit(1);
+            ));
         }
     }
 

@@ -372,7 +372,7 @@ mod tests {
             variant: Default::default(),
         };
 
-        let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config);
+        let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
 
         insta::assert_yaml_snapshot!(variant);
     }
