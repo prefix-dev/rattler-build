@@ -1,7 +1,7 @@
 //! This is the main entry point for the `rattler-build` binary.
 
 use anyhow::Ok;
-use clap::{arg, Parser, crate_version};
+use clap::{arg, crate_version, Parser};
 
 use indicatif::{MultiProgress, ProgressDrawTarget};
 use once_cell::sync::Lazy;
