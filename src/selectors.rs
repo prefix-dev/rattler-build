@@ -311,6 +311,7 @@ mod tests {
     #[rstest]
     #[case("selectors/flatten_1.yaml")]
     #[case("selectors/flatten_2.yaml")]
+    #[case("selectors/flatten_3.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();

@@ -13,7 +13,7 @@ use rattler_digest::compute_file_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
-use fs_extra::dir::{copy, create, remove, CopyOptions};
+use fs_extra::dir::{copy, create, remove, CopyOptions, create_all};
 use fs_extra::error::ErrorKind::PermissionDenied;
 
 #[derive(Debug, thiserror::Error)]
@@ -298,7 +298,7 @@ fn apply_patches(
 
 fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
     // Create the to path because we're going to copy the contents only
-    create(to, true).unwrap();
+    create_all(to, true).unwrap();
 
     // Setup copy options, overwrite if needed, only copy the contents as we want to specify the dir name manually
     let mut options = CopyOptions::new();
@@ -352,7 +352,8 @@ pub async fn fetch_sources(
                     Err(e) => return Err(e),
                 };
                 let dest_dir = if let Some(folder) = &src.folder {
-                    work_dir.join(folder)
+
+                    cache_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -365,7 +366,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_src, &src.checksum).await?;
                 let dest_dir = if let Some(folder) = &src.folder {
-                    work_dir.join(folder)
+                    cache_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -380,7 +381,7 @@ pub async fn fetch_sources(
                 let src_path = recipe_dir.join(&src.path);
 
                 let dest_dir = if let Some(folder) = &src.folder {
-                    work_dir.join(folder)
+                    cache_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
