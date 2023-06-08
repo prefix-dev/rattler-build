@@ -148,18 +148,33 @@ pub fn flatten_selectors(
     }
 
     if val.is_mapping() {
+        let only_selectors = val.as_mapping().unwrap().iter().all(|(k, _)| {
+            if let YamlValue::String(key) = k {
+                key.starts_with("sel(")
+            } else {
+                false
+            }
+        });
+
+        if only_selectors {
+            for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
+                if let YamlValue::String(key) = k {
+                    if eval_selector(key, selector_config) {
+                        return flatten_selectors(v, selector_config);
+                    }
+                }
+            }
+            return None;
+        }
+
         for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
             if let YamlValue::String(key) = k {
                 if key.starts_with("sel(") {
-                    if eval_selector(key, selector_config) {
-                        return flatten_selectors(v, selector_config);
-                    } else {
-                        return None;
-                    }
-                } else {
-                    *v = flatten_selectors(v, selector_config).unwrap();
+                    panic!("Cannot mix selector dictionary with other keys in: {:?}", val);
                 }
             }
+            let res = flatten_selectors(v, selector_config);
+            *v = res.unwrap_or_else(|| YamlValue::Null);
         }
     }
 
