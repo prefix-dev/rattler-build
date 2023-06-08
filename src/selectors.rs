@@ -170,7 +170,10 @@ pub fn flatten_selectors(
         for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
             if let YamlValue::String(key) = k {
                 if key.starts_with("sel(") {
-                    panic!("Cannot mix selector dictionary with other keys in: {:?}", val);
+                    panic!(
+                        "Cannot mix selector dictionary with other keys in: {:?}",
+                        val
+                    );
                 }
             }
             let res = flatten_selectors(v, selector_config);

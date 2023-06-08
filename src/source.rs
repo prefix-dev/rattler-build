@@ -13,7 +13,7 @@ use rattler_digest::compute_file_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
-use fs_extra::dir::{copy, create, remove, CopyOptions, create_all};
+use fs_extra::dir::{copy, create_all, remove, CopyOptions};
 use fs_extra::error::ErrorKind::PermissionDenied;
 
 #[derive(Debug, thiserror::Error)]
@@ -352,7 +352,6 @@ pub async fn fetch_sources(
                     Err(e) => return Err(e),
                 };
                 let dest_dir = if let Some(folder) = &src.folder {
-
                     cache_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
