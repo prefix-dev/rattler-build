@@ -87,9 +87,9 @@ pub struct FinalizedRunDependencies {
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ResolvedDependencies {
-    specs: Vec<DependencyInfo>,
-    resolved: Vec<RepoDataRecord>,
-    run_exports: HashMap<String, RunExportsJson>,
+    pub specs: Vec<DependencyInfo>,
+    pub resolved: Vec<RepoDataRecord>,
+    pub run_exports: HashMap<String, RunExportsJson>,
 }
 
 fn short_channel(channel: &str) -> String {

@@ -352,7 +352,7 @@ pub async fn fetch_sources(
                     Err(e) => return Err(e),
                 };
                 let dest_dir = if let Some(folder) = &src.folder {
-                    cache_dir.join(folder)
+                    work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -365,7 +365,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from URL: {}", src.url);
                 let res = url_src(src, &cache_src, &src.checksum).await?;
                 let dest_dir = if let Some(folder) = &src.folder {
-                    cache_dir.join(folder)
+                    work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -380,7 +380,7 @@ pub async fn fetch_sources(
                 let src_path = recipe_dir.join(&src.path);
 
                 let dest_dir = if let Some(folder) = &src.folder {
-                    cache_dir.join(folder)
+                    work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };

@@ -128,6 +128,25 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     );
     insert!(vars, "CONDA_BUILD_STATE", build_state);
 
+    if let Some(resolved_dependencies) = &output.finalized_dependencies {
+        if let Some(host) = &resolved_dependencies.host {
+            if let Some(python) = &host
+                .resolved
+                .iter()
+                .find(|d| d.package_record.name == "python")
+            {
+                let py_version = python.package_record.version.clone();
+                if let Some(maj_min) = py_version.as_major_minor() {
+                    let py_ver = format!("{}.{}", maj_min.0, maj_min.1);
+                    insert!(vars, "PY_VER", py_ver);
+                    let site_packages_dir = directories
+                        .host_prefix
+                        .join(format!("lib/python{}/site-packages", py_ver));
+                    insert!(vars, "SP_DIR", site_packages_dir.to_string_lossy());
+                }
+            }
+        }
+    }
     // let vars: Vec<(String, String)> = vec![
     //     // (s!("ARCH"), s!("arm64")),
     //     // pip isolation
