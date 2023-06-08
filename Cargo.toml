@@ -13,7 +13,7 @@ native-tls = ['reqwest/native-tls', 'rattler/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 
 [dependencies]
-serde = { version = "1.0.160", features = ["derive"] }
+serde = { version = "1.0.164", features = ["derive"] }
 serde_yaml = "0.9.21"
 rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
@@ -33,36 +33,36 @@ rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branc
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 
-anyhow = "1.0.70"
+anyhow = "1.0.71"
 walkdir = "2.3.3"
 sha2 = "0.10.6"
 hex = "0.4.3"
 serde_json = "1.0.96"
 tempdir = "0.3.7"
-reqwest = "0.11.16"
-tokio = {version = "1.27.0", features = ["rt", "macros", "rt-multi-thread"] }
+reqwest = "0.11.18"
+tokio = {version = "1.28.2", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.10.5"
 content_inspector = "0.2.4"
-serde_with = "2.3.2"
-url = "2.3.1"
+serde_with = "3.0.0"
+url = "2.4.0"
 tracing = "0.1.37"
-clap = { version = "4.2.2", features = ["derive", "env", "cargo"] }
-minijinja = { version = "0.31.1", features = ["unstable_machinery"] }
-tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+clap = { version = "4.3.2", features = ["derive", "env", "cargo"] }
+minijinja = { version = "0.34.0", features = ["unstable_machinery"] }
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 num_cpus = "1.15.0"
 goblin = "0.6.1"
 scroll = "0.11.0"
 pathdiff = "0.2.1"
-comfy-table = "6.1.4"
+comfy-table = "7.0.0"
 futures = "0.3.28"
-indicatif = "0.17.3"
-console = { version = "0.15.5", features = ["windows-console-colors"] }
-once_cell = "1.17.1"
+indicatif = "0.17.5"
+console = { version = "0.15.7", features = ["windows-console-colors"] }
+once_cell = "1.18.0"
 thiserror = "1.0.40"
-tempfile = "3.5.0"
-chrono = "0.4.24"
+tempfile = "3.6.0"
+chrono = "0.4.26"
 sha1 = "0.10.5"
-git2 = "0.17.1"
+git2 = "0.17.2"
 fs_extra = "1.3.0"
 
 [dev-dependencies]
