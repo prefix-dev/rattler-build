@@ -1,4 +1,8 @@
-![](https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg)
+<h1>
+  <a href="https://https://github.com/prefix-dev/rattler-build/">
+    <img alt="banner" src="https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg">
+  </a>
+</h1>
 
 <h1 align="center">
 
@@ -14,7 +18,7 @@
 
 </h1>
 
-# rattler-build
+# rattler-build: a fast conda-package builder
 
 The `rattler-build` tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
@@ -23,6 +27,8 @@ run is a package that can be installed using `mamba`, `rattler` or `conda`.
 
 `rattler-build` does not have any dependencies on `conda-build` or `Python` and
 works as a standalone binary.
+
+![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
 
 ### Installation
 
