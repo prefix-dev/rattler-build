@@ -70,7 +70,7 @@ pub fn python_vars(
         let np_ver = npy_version.split('.').collect::<Vec<_>>();
         let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
 
-        result.insert("NPY_VER".to_string(), np_ver.clone());
+        result.insert("NPY_VER".to_string(), np_ver);
     }
     result.insert("NPY_DISTUTILS_APPEND_FLAGS".to_string(), "1".to_string());
 
@@ -194,7 +194,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         .build_configuration
         .host_platform
         .to_string()
-        .rsplit_once("-")
+        .rsplit_once('-')
     {
         // TODO clear if we want/need this variable this seems to be pretty bad (in terms of cross compilation, etc.)
         insert!(vars, "ARCH", host_arch);
