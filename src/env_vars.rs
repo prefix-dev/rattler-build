@@ -1,5 +1,6 @@
 //! Functions to collect environment variables that are used during the build process.
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
 use rattler_conda_types::Platform;
@@ -12,8 +13,127 @@ use crate::metadata::Output;
 use crate::unix;
 use crate::windows;
 
+fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+    if platform.is_windows() {
+        prefix.join("Lib")
+    } else {
+        let lib_dir = prefix.join("lib");
+        lib_dir.join(format!("python{}", py_ver))
+    }
+}
+
+fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+    get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
+}
+
+/// Returns a map of environment variables for Python that are used in the build process.
+///
+/// Variables:
+/// - PY3K: 1 if Python 3, 0 if Python 2
+/// - PY_VER: Python version (major.minor), e.g. 3.8
+/// - STDLIB_DIR: Python standard library directory
+/// - SP_DIR: Python site-packages directory
+/// - NPY_VER: Numpy version (major.minor), e.g. 1.19
+/// - NPY_DISTUTILS_APPEND_FLAGS: 1 (https://github.com/conda/conda-build/pull/3015)
+pub fn python_vars(
+    prefix: &Path,
+    platform: &Platform,
+    variant: &BTreeMap<String, String>,
+) -> HashMap<String, String> {
+    let mut result = HashMap::<String, String>::new();
+
+    if let Some(py_ver) = variant.get("python") {
+        let py_ver = py_ver.split('.').collect::<Vec<_>>();
+        let py_ver_str = format!("{}.{}", py_ver[0], py_ver[1]);
+        let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
+        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        result.insert(
+            "PY3K".to_string(),
+            if py_ver[0] == "3" {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            },
+        );
+        result.insert("PY_VER".to_string(), py_ver_str);
+        result.insert(
+            "STDLIB_DIR".to_string(),
+            stdlib_dir.to_string_lossy().to_string(),
+        );
+        result.insert(
+            "SP_DIR".to_string(),
+            site_packages_dir.to_string_lossy().to_string(),
+        );
+    }
+
+    if let Some(npy_version) = variant.get("numpy") {
+        let np_ver = npy_version.split('.').collect::<Vec<_>>();
+        let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
+
+        result.insert("NPY_VER".to_string(), np_ver.clone());
+    }
+    result.insert("NPY_DISTUTILS_APPEND_FLAGS".to_string(), "1".to_string());
+
+    result
+}
+
+/// Returns a map of environment variables for R that are used in the build process.
+///
+/// Variables:
+/// - R_VER: R version (major.minor), e.g. 4.0
+/// - R: Path to R executable
+/// - R_USER: Path to R user directory
+///
+pub fn r_vars(
+    prefix: &Path,
+    platform: &Platform,
+    variant: &BTreeMap<String, String>,
+) -> HashMap<String, String> {
+    let mut result = HashMap::<String, String>::new();
+
+    if let Some(r_ver) = variant.get("r-base") {
+        result.insert("R_VER".to_string(), r_ver.clone());
+
+        let r_bin = if platform.is_windows() {
+            prefix.join("Scripts/R.exe")
+        } else {
+            prefix.join("bin/R")
+        };
+
+        let r_user = prefix.join("Libs/R");
+
+        result.insert("R".to_string(), r_bin.to_string_lossy().to_string());
+        result.insert("R_USER".to_string(), r_user.to_string_lossy().to_string());
+    }
+
+    result
+}
+
+pub fn language_vars(
+    prefix: &Path,
+    platform: &Platform,
+    variant: &BTreeMap<String, String>,
+) -> HashMap<String, String> {
+    let mut result = HashMap::<String, String>::new();
+
+    result.extend(python_vars(prefix, platform, variant).into_iter());
+    result.extend(r_vars(prefix, platform, variant).into_iter());
+
+    result
+}
+
 /// Returns a map of environment variables that are used in the build process.
 /// Also adds platform-specific variables.
+///
+/// Variables:
+/// - CPU_COUNT: Number of CPUs
+/// - SHLIB_EXT: Shared library extension for platform (e.g. Linux -> .so, Windows -> .dll, macOS -> .dylib)
+///
+/// Forwards the following environment variables:
+/// - PATH: Path where executables are found
+/// - LANG: Language (e.g. en_US.UTF-8)
+/// - LC_ALL: Language (e.g. en_US.UTF-8)
+/// - MAKEFLAGS: Make flags (e.g. -j4)
 pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     let mut vars = HashMap::<String, String>::new();
 
@@ -70,6 +190,16 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
+    if let Some((_, host_arch)) = output
+        .build_configuration
+        .host_platform
+        .to_string()
+        .rsplit_once("-")
+    {
+        // TODO clear if we want/need this variable this seems to be pretty bad (in terms of cross compilation, etc.)
+        insert!(vars, "ARCH", host_arch);
+    }
+
     let directories = &output.build_configuration.directories;
     insert!(
         vars,
@@ -87,18 +217,36 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     insert!(vars, "BUILD_DIR", directories.build_dir.to_string_lossy());
 
     // python variables
+    // hard-code this because we never want pip's build isolation
+    // https://github.com/conda/conda-build/pull/2972#discussion_r198290241
+    //
+    // Note that pip env "NO" variables are inverted logic.
+    //    PIP_NO_BUILD_ISOLATION=False means don't use build isolation.
     insert!(vars, "PIP_NO_BUILD_ISOLATION", "False");
+    // Some other env vars to have pip ignore dependencies. We supply them ourselves instead.
     insert!(vars, "PIP_NO_DEPENDENCIES", "True");
     insert!(vars, "PIP_IGNORE_INSTALLED", "True");
 
+    // pip's cache directory (PIP_NO_CACHE_DIR) should not be
+    // disabled as this results in .egg-info rather than
+    // .dist-info directories being created, see gh-3094
+    // set PIP_CACHE_DIR to a path in the work dir that does not exist.
     let pip_cache = directories.work_dir.parent().unwrap().join("pip_cache");
     insert!(vars, "PIP_CACHE_DIR", pip_cache.to_string_lossy());
+    // tell pip to not get anything from PyPI, please. We have everything we need
+    // locally, and if we don't, it's a problem.
     insert!(vars, "PIP_NO_INDEX", "True");
+
+    // For noarch packages, do not write any bytecode
+    if output.build_configuration.target_platform == Platform::NoArch {
+        insert!(vars, "PYTHONDONTWRITEBYTECODE", "1");
+    }
 
     // pkg vars
     insert!(vars, "PKG_NAME", output.name());
     insert!(vars, "PKG_VERSION", output.version());
     insert!(vars, "PKG_BUILDNUM", output.recipe.build.number.to_string());
+
     // TODO this is inaccurate
     insert!(
         vars,
@@ -128,34 +276,15 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     );
     insert!(vars, "CONDA_BUILD_STATE", build_state);
 
-    if let Some(resolved_dependencies) = &output.finalized_dependencies {
-        if let Some(host) = &resolved_dependencies.host {
-            if let Some(python) = &host
-                .resolved
-                .iter()
-                .find(|d| d.package_record.name == "python")
-            {
-                let py_version = python.package_record.version.clone();
-                if let Some(maj_min) = py_version.as_major_minor() {
-                    let py_ver = format!("{}.{}", maj_min.0, maj_min.1);
-                    insert!(vars, "PY_VER", py_ver);
-                    let site_packages_dir = directories
-                        .host_prefix
-                        .join(format!("lib/python{}/site-packages", py_ver));
-                    insert!(vars, "SP_DIR", site_packages_dir.to_string_lossy());
-                }
-            }
-        }
-    }
+    vars.extend(language_vars(
+        &directories.host_prefix,
+        &output.build_configuration.target_platform,
+        &output.build_configuration.variant,
+    ));
+
     // let vars: Vec<(String, String)> = vec![
-    //     // (s!("ARCH"), s!("arm64")),
-    //     // pip isolation
     //     // build configuration
     //     // (s!("CONDA_BUILD_SYSROOT"), s!("")),
-    //     // PY3K
-    //     // "PY_VER": py_ver,
-    //     // "STDLIB_DIR": stdlib_dir,
-    //     // "SP_DIR": sp_dir,
     // ];
 
     vars
