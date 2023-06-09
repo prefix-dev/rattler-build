@@ -13,7 +13,7 @@ use rattler_digest::compute_file_digest;
 
 use super::metadata::{Checksum, GitSrc, Source, UrlSrc};
 
-use fs_extra::dir::{copy, create, remove, CopyOptions};
+use fs_extra::dir::{copy, create_all, remove, CopyOptions};
 use fs_extra::error::ErrorKind::PermissionDenied;
 
 #[derive(Debug, thiserror::Error)]
@@ -298,7 +298,7 @@ fn apply_patches(
 
 fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
     // Create the to path because we're going to copy the contents only
-    create(to, true).unwrap();
+    create_all(to, true).unwrap();
 
     // Setup copy options, overwrite if needed, only copy the contents as we want to specify the dir name manually
     let mut options = CopyOptions::new();
