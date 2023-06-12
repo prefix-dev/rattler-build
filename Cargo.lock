@@ -2301,6 +2301,7 @@ version = "1.0.0-alpha.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24167c016c67b2be1772b99b682127566bad55ad12086ca5f9b313f7990d66d0"
 dependencies = [
+ "aho-corasick",
  "serde",
 ]
 

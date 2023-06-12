@@ -1,10 +1,10 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    str::FromStr,
 };
 
-use minijinja::{value::Value, Environment};
-use rattler_conda_types::{Platform, Version, VersionSpec};
+use crate::render::jinja::jinja_environment;
+use minijinja::{value::Value};
+use rattler_conda_types::{Platform};
 use serde_yaml::Value as YamlValue;
 
 #[derive(Clone, Debug)]
@@ -72,29 +72,17 @@ impl SelectorConfig {
 }
 
 pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorConfig) -> bool {
-    let mut env = Environment::new();
-
-    env.add_function("cmp", |a: &Value, spec: &str| {
-        if let Some(version) = a.as_str() {
-            // check if version matches spec
-            let version = Version::from_str(version).unwrap();
-            let version_spec = VersionSpec::from_str(spec).unwrap();
-            Ok(version_spec.matches(&version))
-        } else {
-            // if a is undefined, we are currently searching for all variants and thus return true
-            Ok(true)
-        }
-    });
+    let env = jinja_environment();
 
     let selector = selector.into();
 
     // strip the sel() wrapper
-    let selector = selector
+    let expr = selector
         .strip_prefix("sel(")
         .and_then(|selector| selector.strip_suffix(')'))
         .expect("Could not strip sel( ... ). Check your brackets.");
 
-    let expr = env.compile_expression(selector).unwrap();
+    let expr = env.compile_expression(expr).unwrap();
     let ctx = selector_config.clone().into_context();
     let result = expr.eval(ctx).unwrap();
     result.is_true()

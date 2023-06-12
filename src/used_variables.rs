@@ -155,8 +155,8 @@ mod test {
         - sel(llvm_variant > 10): llvm >= 10
         - sel(linux): linux-gcc
         - sel(osx): osx-clang
-        - "{{ compiler('c') }}"
-        - "{{ pin_subpackage('abcdef') }}"
+        - "${{ compiler('c') }}"
+        - "${{ pin_subpackage('abcdef') }}"
         "#;
 
         let used_vars = used_vars_from_expressions(recipe);

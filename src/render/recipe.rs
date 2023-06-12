@@ -5,6 +5,8 @@ use serde_yaml::Value as YamlValue;
 
 use crate::metadata::RenderedRecipe;
 
+use super::jinja::jinja_environment;
+
 /// Given a YAML recipe, this renders all strings it encounters using Jinja
 /// templating.
 fn render_recipe_recursively(
@@ -49,63 +51,6 @@ fn render_recipe_recursively_seq(
     }
 }
 
-mod functions {
-    use std::str::FromStr;
-
-    use minijinja::Error;
-
-    use crate::render::pin::{Pin, PinExpression};
-
-    pub fn compiler(lang: String) -> Result<String, Error> {
-        // we translate the compiler into a YAML string
-        Ok(format!("__COMPILER {}", lang.to_lowercase()))
-    }
-
-    pub fn pin_subpackage(
-        name: String,
-        kwargs: Option<minijinja::value::Value>,
-    ) -> Result<String, Error> {
-        // we translate the compiler into a YAML string
-        let mut pin_subpackage = Pin {
-            name,
-            max_pin: None,
-            min_pin: None,
-            exact: false,
-        };
-
-        let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
-            PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
-                Error::new(
-                    minijinja::ErrorKind::SyntaxError,
-                    format!("Invalid pin expression: {}", e),
-                )
-            })
-        };
-
-        if let Some(kwargs) = kwargs {
-            let max_pin = kwargs.get_attr("max_pin")?;
-            if max_pin != minijinja::value::Value::UNDEFINED {
-                let pin_expr = pin_expr_from_value(&max_pin)?;
-                pin_subpackage.max_pin = Some(pin_expr);
-            }
-            let min = kwargs.get_attr("min_pin")?;
-            if min != minijinja::value::Value::UNDEFINED {
-                let pin_expr = pin_expr_from_value(&min)?;
-                pin_subpackage.min_pin = Some(pin_expr);
-            }
-            let exact = kwargs.get_attr("exact")?;
-            if exact != minijinja::value::Value::UNDEFINED {
-                pin_subpackage.exact = exact.is_true();
-            }
-        }
-
-        Ok(format!(
-            "__PIN_SUBPACKAGE {}",
-            pin_subpackage.internal_repr()
-        ))
-    }
-}
-
 /// This iteratively renderes the "context" object of a recipe
 /// Later values can reference earlier values in the context, for example
 ///
@@ -116,7 +61,8 @@ mod functions {
 /// ```
 fn render_context(yaml_context: &serde_yaml::Mapping) -> BTreeMap<String, Value> {
     let mut context = BTreeMap::<String, Value>::new();
-    let env = Environment::new();
+    let env = jinja_environment();
+
     for (key, v) in yaml_context.iter() {
         if let YamlValue::String(key) = key {
             let rendered = env.render_str(v.as_str().unwrap(), &context).unwrap();
@@ -150,9 +96,7 @@ pub fn render_recipe(
         _ => return Err(RecipeRenderError::YamlNotMapping),
     };
 
-    let mut env = Environment::new();
-    env.add_function("compiler", functions::compiler);
-    env.add_function("pin_subpackage", functions::pin_subpackage);
+    let env = jinja_environment();
 
     let (mut recipe_modified, context) =
         if let Some(YamlValue::Mapping(map)) = &recipe.get("context") {
@@ -191,7 +135,7 @@ mod tests {
         let context = r#"
         name: "foo"
         version: "1.0"
-        version_name: "{{ name }}-{{ version }}"
+        version_name: "${{ name }}-${{ version }}"
         "#;
         let context = serde_yaml::from_str(context).unwrap();
         let context = render_context(&context);
@@ -205,14 +149,14 @@ mod tests {
             name: "foo"
             version: "1.0"
         source:
-            - url: "https://example.com/{{ name }}-{{ version }}.tar.gz"
+            - url: "https://example.com/${{ name }}-${{ version }}.tar.gz"
               sha256: "1234567890"
               patches:
-            - url: "https://example.com/{{ name }}-{{ version }}.patch"
+            - url: "https://example.com/${{ name }}-${{ version }}.patch"
               sha256: "1234567890"
         package:
-            name: "{{ name }}-{{ version }}"
-            version: "{{ version }}"
+            name: ${{ name }}-${{ version }}
+            version: ${{ version }}
         requirements:
         about:
         "#;
