@@ -1,7 +1,12 @@
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use minijinja::{self, value::Value, Environment};
+use rattler_conda_types::Version;
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 use serde_yaml::Value as YamlValue;
+use crate::metadata;
 
 use crate::metadata::RenderedRecipe;
 
@@ -132,7 +137,7 @@ pub enum RecipeRenderError {
     InvalidYaml(#[from] serde_yaml::Error),
 
     #[error(
-        "Invalid recipe file format. The recipe file YAML does not follow regular recipe structure (map with build, requirements, outputs...)"
+    "Invalid recipe file format. The recipe file YAML does not follow regular recipe structure (map with build, requirements, outputs...)"
     )]
     YamlNotMapping,
 }
@@ -182,9 +187,167 @@ pub fn render_recipe(
     Ok(recipe)
 }
 
+#[derive(Deserialize)]
+pub struct Recipe {
+    pub package: Config<Package>,
+}
+
+#[derive(Deserialize)]
+pub struct Package {
+    pub name: Config<String>,
+    pub version: Config<String>,
+}
+
+/// A trait that is implemented for types that can be rendered using minijinja.
+trait Renderable {
+    /// The type after rendering
+    type Target;
+
+    /// The error type that is returned in case of problems.
+    type Error;
+
+    /// Evaluates this instance using the specified environment.
+    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error>;
+}
+
+impl Renderable for String {
+    type Target = String;
+    type Error = minijinja::Error;
+
+    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
+        environment.render_str(&self, ctx)
+    }
+}
+
+impl Renderable for Package {
+    type Target = metadata::Package;
+    type Error = ControlFlowError;
+
+    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
+        Ok(metadata::Package {
+            name: self.name.render(environment, ctx)?,
+            version: self.version.render(environment, ctx)?,
+        })
+    }
+}
+
+/// A configurable value
+#[derive(Deserialize)]
+#[serde(transparent)]
+pub struct Config<T: Configurable>(T::DeserializableValue);
+
+impl<T: Configurable> Renderable for Config<T>
+    where
+        T::DeserializableValue: Renderable
+{
+    type Target = <T::DeserializableValue as Renderable>::Target;
+    type Error = <T::DeserializableValue as Renderable>::Error;
+
+    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
+        self.0.render(environment, ctx)
+    }
+}
+
+pub trait Configurable {
+    /// The type that is read from the recipe.
+    type DeserializableValue: DeserializeOwned;
+}
+
+impl Configurable for String { type DeserializableValue = ControlFlowValue<String>; }
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum ControlFlowValue<T> {
+    Expression(T),
+    Selectors(Vec<IfStatement<T>>),
+}
+
+impl<T: DeserializeOwned + Renderable> Renderable for ControlFlowValue<T>
+    where
+        T::Error: Into<ControlFlowError>
+{
+    type Target = T::Target;
+    type Error = ControlFlowError;
+
+    fn render<S: Serialize>(&self, environment: &Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
+        let expr = match self {
+            ControlFlowValue::Expression(expr) => expr,
+            ControlFlowValue::Selectors(branches) => {
+                let mut selected_value = None;
+                for branch in branches {
+                    dbg!(&branch.if_expr);
+
+                    let rendered = environment.render_str(&format!("{{{{ {} }}}}", branch.if_expr), ctx)?;
+                    dbg!(&rendered);
+
+                    if Value::from_safe_string(rendered).is_true() {
+                        match selected_value {
+                            Some(_) => return Err(ControlFlowError::MultipleSelectors),
+                            None => {
+                                selected_value = Some(&branch.value);
+                            }
+                        }
+                    }
+                }
+
+                match selected_value {
+                    Some(expr) => expr,
+                    None => return Err(ControlFlowError::EmptyBranchError),
+                }
+            }
+        };
+
+        expr.render(environment, ctx).map_err(Into::into)
+    }
+}
+
+/// An error that can occur during rendering of a
+#[derive(thiserror::Error, Debug)]
+enum ControlFlowError {
+    #[error(transparent)]
+    MiniJinjaError(#[from] minijinja::Error),
+
+    #[error("none of the selectors match")]
+    EmptyBranchError,
+
+    #[error("multiple matching selectors")]
+    MultipleSelectors,
+}
+
+#[derive(Deserialize)]
+pub struct IfStatement<T> {
+    #[serde(rename = "if")]
+    if_expr: String,
+    value: T,
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use super::*;
+
+    #[test]
+    fn test_renderable() {
+        let recipe = r#"
+        name: "{{ name }}"
+        version:
+        - if: win
+          value: "1.0"
+        - if: osx
+          value: "2.0"
+        "#;
+
+        let package: Package = serde_yaml::from_str(recipe).unwrap();
+
+        let context = HashMap::from([
+            ("name", "foo"),
+            ("win", "true"),
+        ]);
+        let environment = Environment::new();
+        let rendered_package = package.render(&environment, &context).unwrap();
+
+        insta::assert_yaml_snapshot!(rendered_package);
+    }
 
     #[test]
     fn test_render_context() {
