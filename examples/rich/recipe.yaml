@@ -6,14 +6,13 @@ package:
   name: ${{ name }}
   version: ${{ version }}
 
-
-
 source:
   - url: https://pypi.io/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz
     sha256: dc84400a9d842b3a9c5ff74addd8eb798d155f36c1c91303888e0a66850d2a15
 
 build:
   # Thanks to `noarch: python` this package works on all platforms
+  number: ${{ 0 if name == 'rich' else 100 }}
   noarch: python
   script:
     - python -m pip install . -vv --no-deps --no-build-isolation

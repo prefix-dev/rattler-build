@@ -1,10 +1,8 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-};
+use std::collections::{BTreeMap, HashMap};
 
 use crate::render::jinja::jinja_environment;
-use minijinja::{value::Value};
-use rattler_conda_types::{Platform};
+use minijinja::value::Value;
+use rattler_conda_types::Platform;
 use serde_yaml::Value as YamlValue;
 
 #[derive(Clone, Debug)]

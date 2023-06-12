@@ -17,7 +17,7 @@ fn render_recipe_recursively(
     for (_, v) in recipe.iter_mut() {
         match v {
             YamlValue::String(var) => {
-                *v = YamlValue::String(jinja_env.render_str(var, context).unwrap());
+                *v = serde_yaml::from_str(&jinja_env.render_str(var, context).unwrap()).unwrap();
             }
             YamlValue::Sequence(var) => {
                 render_recipe_recursively_seq(var, jinja_env, context);
@@ -32,19 +32,19 @@ fn render_recipe_recursively(
 
 fn render_recipe_recursively_seq(
     recipe: &mut serde_yaml::Sequence,
-    environment: &Environment,
+    jinja_env: &Environment,
     context: &BTreeMap<String, Value>,
 ) {
     for v in recipe {
         match v {
             YamlValue::String(var) => {
-                *v = YamlValue::String(environment.render_str(var, context).unwrap());
+                *v = serde_yaml::from_str(&jinja_env.render_str(var, context).unwrap()).unwrap();
             }
             YamlValue::Sequence(var) => {
-                render_recipe_recursively_seq(var, environment, context);
+                render_recipe_recursively_seq(var, jinja_env, context);
             }
             YamlValue::Mapping(var) => {
-                render_recipe_recursively(var, environment, context);
+                render_recipe_recursively(var, jinja_env, context);
             }
             _ => {}
         }
