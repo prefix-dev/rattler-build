@@ -46,11 +46,11 @@ content_inspector = "0.2.4"
 serde_with = "3.0.0"
 url = "2.4.0"
 tracing = "0.1.37"
-clap = { version = "4.3.2", features = ["derive", "env", "cargo"] }
-minijinja = { version = "0.34.0", features = ["unstable_machinery"] }
+clap = { version = "4.3.3", features = ["derive", "env", "cargo"] }
+minijinja = { version = "1.0.0-alpha.2", features = ["unstable_machinery"] }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 num_cpus = "1.15.0"
-goblin = "0.6.1"
+goblin = "0.7.1"
 scroll = "0.11.0"
 pathdiff = "0.2.1"
 comfy-table = "7.0.0"
