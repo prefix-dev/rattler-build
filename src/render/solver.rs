@@ -1,4 +1,3 @@
-use crate::global_multi_progress;
 use anyhow::Context;
 use comfy_table::Table;
 use futures::{stream, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -27,6 +26,23 @@ use std::{
     time::Duration,
 };
 use tokio::task::JoinHandle;
+
+use indicatif::{MultiProgress, ProgressDrawTarget};
+use once_cell::sync::Lazy;
+
+/// Returns a global instance of [`indicatif::MultiProgress`].
+///
+/// Although you can always create an instance yourself any logging will interrupt pending
+/// progressbars. To fix this issue, logging has been configured in such a way to it will not
+/// interfere if you use the [`indicatif::MultiProgress`] returning by this function.
+fn global_multi_progress() -> MultiProgress {
+    static GLOBAL_MP: Lazy<MultiProgress> = Lazy::new(|| {
+        let mp = MultiProgress::new();
+        mp.set_draw_target(ProgressDrawTarget::stderr_with_hz(20));
+        mp
+    });
+    GLOBAL_MP.clone()
+}
 
 fn print_as_table(packages: &Vec<RepoDataRecord>) {
     let mut table = Table::new();
