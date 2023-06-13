@@ -44,7 +44,6 @@ use crate::{
     variant_config::VariantConfig,
 };
 
-
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
     context: BTreeMap<String, serde_yaml::Value>,
