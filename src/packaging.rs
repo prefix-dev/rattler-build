@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::str::FromStr;
 use std::{fs, fs::File};
 
 #[cfg(target_family = "unix")]
@@ -18,7 +17,7 @@ use rattler_conda_types::package::{
     PythonEntryPoints,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
-use rattler_conda_types::{NoArchType, Platform, Version};
+use rattler_conda_types::{NoArchType, Platform};
 use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
@@ -247,7 +246,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
 
     let index_json = IndexJson {
         name: output.name().to_string(),
-        version: Version::from_str(output.version())?,
+        version: output.version().clone(),
         build: output.build_string().to_string(),
         build_number: recipe.build.number,
         arch,
@@ -444,10 +443,10 @@ fn write_to_dest(
                         "Could not get parent directory",
                     ))?,
                 )
-                .ok_or(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Could not get relative path",
-                ))?;
+                    .ok_or(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        "Could not get relative path",
+                    ))?;
 
                 tracing::trace!(
                     "Making symlink relative {:?} -> {:?}",

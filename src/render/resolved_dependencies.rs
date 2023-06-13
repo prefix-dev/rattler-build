@@ -11,7 +11,7 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, Platform, RepoDataRecord, Version, VersionSpec,
+    MatchSpec, Platform, RepoDataRecord, VersionSpec,
 };
 use thiserror::Error;
 
@@ -239,8 +239,7 @@ pub fn apply_variant(
                     let pinned = pin
                         .pin_subpackage
                         .apply(
-                            &Version::from_str(&subpackage.version)
-                                .expect("could not parse version"),
+                            &subpackage.version,
                             &subpackage.build_string,
                         )
                         .expect("could not apply pin");
@@ -380,8 +379,8 @@ pub async fn resolve_dependencies(
             &output.build_configuration.directories.build_prefix,
             channels,
         )
-        .await
-        .map_err(ResolveError::from)?;
+            .await
+            .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
             let res = match_specs
@@ -394,7 +393,7 @@ pub async fn resolve_dependencies(
                 res
             }
         })
-        .expect("Could not find run exports");
+            .expect("Could not find run exports");
 
         Some(ResolvedDependencies {
             specs,
@@ -441,15 +440,15 @@ pub async fn resolve_dependencies(
             &output.build_configuration.directories.host_prefix,
             channels,
         )
-        .await
-        .map_err(ResolveError::from)?;
+            .await
+            .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
             match_specs
                 .iter()
                 .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
         })
-        .expect("Could not find run exports");
+            .expect("Could not find run exports");
 
         Some(ResolvedDependencies {
             specs,

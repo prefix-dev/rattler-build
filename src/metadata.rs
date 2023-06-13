@@ -1,6 +1,6 @@
 //! All the metadata that makes up a recipe file
 use rattler_conda_types::package::EntryPoint;
-use rattler_conda_types::NoArchType;
+use rattler_conda_types::{NoArchType, Version};
 use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
@@ -161,7 +161,7 @@ pub struct BuildOptions {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct About {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub home: Option<Vec<Url>>,
@@ -426,13 +426,13 @@ pub struct Package {
     /// The name of the package
     pub name: String,
     /// The version of the package
-    pub version: String,
+    pub version: Version,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageIdentifier {
     pub name: String,
-    pub version: String,
+    pub version: Version,
     pub build_string: String,
 }
 
@@ -476,7 +476,7 @@ impl Output {
         &self.recipe.package.name
     }
 
-    pub fn version(&self) -> &str {
+    pub fn version(&self) -> &Version {
         &self.recipe.package.version
     }
 

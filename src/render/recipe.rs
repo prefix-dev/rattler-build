@@ -1,12 +1,18 @@
+use futures::StreamExt;
+use itertools::Either;
 use std::collections::BTreeMap;
+use std::error::Error;
 use std::str::FromStr;
 
+use crate::metadata;
 use minijinja::{self, value::Value, Environment};
 use rattler_conda_types::Version;
-use serde::{Deserialize, Serialize};
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_with::formats::{Format, PreferOne};
+use serde_with::{serde_as, OneOrMany};
 use serde_yaml::Value as YamlValue;
-use crate::metadata;
+use url::Url;
 
 use crate::metadata::RenderedRecipe;
 
@@ -187,166 +193,341 @@ pub fn render_recipe(
     Ok(recipe)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Recipe {
-    pub package: Config<Package>,
+    #[serde(default)]
+    pub context: BTreeMap<String, String>,
+
+    /// Information about the package
+    pub package: Package,
+
+    /// The source section of the recipe
+    #[serde(default, skip_serializing_if = "ListExpr::is_empty")]
+    pub source: ListExpr<Source>,
 }
 
-#[derive(Deserialize)]
-pub struct Package {
-    pub name: Config<String>,
-    pub version: Config<String>,
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct About {
+    #[serde(default, skip_serializing_if = "ListExpr::is_empty")]
+    pub home: ListExpr<Url>,
+    pub license: Option<Expr<String>>,
+    #[serde(default, skip_serializing_if = "ListExpr::is_empty")]
+    pub license_file: ListExpr<Url>,
+    pub license_family: Option<Expr<String>>,
+    pub summary: Option<Expr<String>>,
+    pub description: Option<Expr<String>>,
+    #[serde(default, skip_serializing_if = "ListExpr::is_empty")]
+    pub doc_url: ListExpr<Url>,
+    #[serde(default, skip_serializing_if = "ListExpr::is_empty")]
+    pub dev_url: ListExpr<Url>,
 }
 
-/// A trait that is implemented for types that can be rendered using minijinja.
-trait Renderable {
-    /// The type after rendering
-    type Target;
+impl Recipe {
+    pub fn render(
+        &self,
+        variant: &BTreeMap<String, String>,
+        pkg_hash: &str,
+    ) -> Result<RenderedRecipe, RenderError> {
+        // Construct an environment for the recipe
+        let mut env = Environment::new();
+        env.add_function("compiler", functions::compiler);
+        env.add_function("pin_subpackage", functions::pin_subpackage);
 
-    /// The error type that is returned in case of problems.
-    type Error;
+        // Build the context based on variables defined in the recipe.
+        let mut context = BTreeMap::<String, Value>::new();
+        for (key, v) in self.context.iter() {
+            let rendered = env
+                .render_str(v, &context)
+                .map_err(RenderError::MiniJinjaError)?;
+            context.insert(key.clone(), Value::from_safe_string(rendered));
+        }
 
-    /// Evaluates this instance using the specified environment.
-    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error>;
-}
+        // Add the PKG_HASH to the context
+        context.insert("PKG_HASH".to_string(), pkg_hash.into());
 
-impl Renderable for String {
-    type Target = String;
-    type Error = minijinja::Error;
+        // Add the variants to the context
+        for (key, value) in variant {
+            context.insert(key.clone(), Value::from_safe_string(value.clone()));
+        }
 
-    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
-        environment.render_str(&self, ctx)
-    }
-}
-
-impl Renderable for Package {
-    type Target = metadata::Package;
-    type Error = ControlFlowError;
-
-    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
-        Ok(metadata::Package {
-            name: self.name.render(environment, ctx)?,
-            version: self.version.render(environment, ctx)?,
+        Ok(RenderedRecipe {
+            package: self.package.render(&env, &context)?,
+            source: None,
+            build: metadata::BuildOptions::default(),
+            requirements: Default::default(),
+            about: Default::default(),
+            test: None,
         })
     }
 }
 
-/// A configurable value
-#[derive(Deserialize)]
-#[serde(transparent)]
-pub struct Config<T: Configurable>(T::DeserializableValue);
+#[derive(Deserialize, Serialize)]
+pub struct Package {
+    /// The name of the package
+    pub name: Expr<String>,
 
-impl<T: Configurable> Renderable for Config<T>
-    where
-        T::DeserializableValue: Renderable
-{
-    type Target = <T::DeserializableValue as Renderable>::Target;
-    type Error = <T::DeserializableValue as Renderable>::Error;
+    /// The version of the package
+    pub version: Expr<Version>,
+}
 
-    fn render<S: Serialize>(&self, environment: &minijinja::Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
-        self.0.render(environment, ctx)
+impl Package {
+    fn render<S: Serialize>(
+        &self,
+        env: &Environment,
+        ctx: &S,
+    ) -> Result<metadata::Package, RenderError> {
+        Ok(metadata::Package {
+            name: self.name.render(env, ctx)?,
+            version: self.version.render(env, ctx)?,
+        })
     }
 }
 
-pub trait Configurable {
-    /// The type that is read from the recipe.
-    type DeserializableValue: DeserializeOwned;
-}
-
-impl Configurable for String { type DeserializableValue = ControlFlowValue<String>; }
-
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(untagged)]
-pub enum ControlFlowValue<T> {
-    Expression(T),
-    Selectors(Vec<IfStatement<T>>),
+pub enum Source {
+    // Git(GitSrc),
+    Url(UrlSrc),
+    // Path(PathSrc),
 }
 
-impl<T: DeserializeOwned + Renderable> Renderable for ControlFlowValue<T>
-    where
-        T::Error: Into<ControlFlowError>
-{
-    type Target = T::Target;
-    type Error = ControlFlowError;
-
-    fn render<S: Serialize>(&self, environment: &Environment, ctx: &S) -> Result<Self::Target, Self::Error> {
-        let expr = match self {
-            ControlFlowValue::Expression(expr) => expr,
-            ControlFlowValue::Selectors(branches) => {
-                let mut selected_value = None;
-                for branch in branches {
-                    dbg!(&branch.if_expr);
-
-                    let rendered = environment.render_str(&format!("{{{{ {} }}}}", branch.if_expr), ctx)?;
-                    dbg!(&rendered);
-
-                    if Value::from_safe_string(rendered).is_true() {
-                        match selected_value {
-                            Some(_) => return Err(ControlFlowError::MultipleSelectors),
-                            None => {
-                                selected_value = Some(&branch.value);
-                            }
-                        }
-                    }
-                }
-
-                match selected_value {
-                    Some(expr) => expr,
-                    None => return Err(ControlFlowError::EmptyBranchError),
-                }
-            }
-        };
-
-        expr.render(environment, ctx).map_err(Into::into)
-    }
+/// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
+/// will be extracted to the `work` (or `work/<folder>` directory).
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UrlSrc {
+    /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
+    pub url: Expr<Url>,
+    // /// Optionally a checksum to verify the downloaded file
+    // #[serde(flatten)]
+    // pub checksum: Checksum,
+    //
+    // /// Patches to apply to the source code
+    // pub patches: Option<Vec<PathBuf>>,
+    //
+    // /// Optionally a folder name under the `work` directory to place the source code
+    // pub folder: Option<PathBuf>,
 }
 
-/// An error that can occur during rendering of a
-#[derive(thiserror::Error, Debug)]
-enum ControlFlowError {
+#[derive(Debug, thiserror::Error)]
+pub enum RenderError {
     #[error(transparent)]
     MiniJinjaError(#[from] minijinja::Error),
 
-    #[error("none of the selectors match")]
-    EmptyBranchError,
-
-    #[error("multiple matching selectors")]
-    MultipleSelectors,
+    /// An error that happened when converting from a jinja value.
+    #[error(transparent)]
+    FromStr(Box<dyn std::error::Error>),
 }
 
-#[derive(Deserialize)]
-pub struct IfStatement<T> {
+/// A dynamic value in the yaml file.
+#[derive(Deserialize, Serialize, Clone, Default)]
+#[serde(transparent)]
+pub struct Expr<T: ExprType>(T::Value);
+
+pub trait ExprType: Sized {
+    type Value: DeserializeOwned;
+
+    fn render<S: Serialize>(
+        value: &Self::Value,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Self, RenderError>;
+}
+
+impl ExprType for String {
+    type Value = StringExpr;
+
+    fn render<S: Serialize>(
+        value: &Self::Value,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Self, RenderError> {
+        value.render(environment, ctx)
+    }
+}
+
+impl ExprType for Version {
+    type Value = StringExpr;
+
+    fn render<S: Serialize>(
+        value: &Self::Value,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Self, RenderError> {
+        value.render(environment, ctx)
+    }
+}
+
+impl ExprType for Url {
+    type Value = StringExpr;
+
+    fn render<S: Serialize>(
+        value: &Self::Value,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Self, RenderError> {
+        value.render(environment, ctx)
+    }
+}
+
+impl<T: ExprType> Expr<T> {
+    fn render<S: Serialize>(&self, environment: &Environment, ctx: &S) -> Result<T, RenderError> {
+        T::render(&self.0, environment, ctx)
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(transparent)]
+pub struct StringExpr(String);
+
+impl StringExpr {
+    fn render<S: Serialize, T: FromStr>(
+        &self,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Option<T>, RenderError>
+    where
+        <T as FromStr>::Err: Into<Box<dyn Error>>,
+    {
+        let str_repr = environment
+            .render_str(&self.0, ctx)
+            .map_err(RenderError::MiniJinjaError)?;
+        if str_repr.trim().is_empty() {
+            Ok(None)
+        } else {
+            T::from_str(&str_repr)
+                .map_err(Into::into)
+                .map_err(RenderError::FromStr)
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Deserialize, Serialize)]
+#[serde(
+    transparent,
+    bound(
+        deserialize = "T: serde::Deserialize<'de>",
+        serialize = "T: serde::Serialize"
+    )
+)]
+pub struct ListExpr<T>(#[serde_as(as = "OneOrMany<_, PreferOne>")] pub Vec<ListExprEntry<T>>);
+
+impl<T> Default for ListExpr<T> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<T> ListExpr<T> {
+    pub fn eval<S: Serialize>(
+        &self,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<Vec<T>, RenderError> {
+        let mut result = Vec::new();
+        Ok(result)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ListExprEntry<T> {
+    ControlFlow(ControlFlowBlock<T>),
+    Single(T),
+}
+
+impl<T: Clone> ListExprEntry<T> {
+    pub fn eval<S: Serialize>(
+        &self,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<impl Iterator<Item = &'_ T> + '_, RenderError> {
+        match self {
+            ListExprEntry::ControlFlow(ctrl) => {
+                Ok(Either::Left(ctrl.eval(environment, ctx)?.into_iter()))
+            }
+            ListExprEntry::Single(value) => Ok(Either::Right(std::iter::once(value))),
+        }
+    }
+}
+
+#[serde_as]
+#[derive(Deserialize, Serialize)]
+#[serde(bound(
+    deserialize = "T: serde::Deserialize<'de>",
+    serialize = "T: serde::Serialize"
+))]
+pub struct ControlFlowBlock<T> {
     #[serde(rename = "if")]
-    if_expr: String,
-    value: T,
+    pub expr: String,
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
+    pub then: Vec<T>,
+    #[serde(
+        default = "Default::default",
+        rename = "else",
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
+    pub otherwise: Vec<T>,
+}
+
+impl<T: Clone> ControlFlowBlock<T> {
+    /// Evaluates the `if` part of the block and returns either the `then` result or the `else`.
+    pub fn eval<S: Serialize>(
+        &self,
+        environment: &Environment,
+        ctx: &S,
+    ) -> Result<&[T], RenderError> {
+        let expr = environment
+            .compile_expression(&self.expr)
+            .map_err(RenderError::MiniJinjaError)?;
+        let evaluated_expr = expr.eval(ctx).map_err(RenderError::MiniJinjaError)?;
+        if evaluated_expr.is_true() {
+            Ok(&self.then)
+        } else {
+            Ok(&self.otherwise)
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_renderable() {
         let recipe = r#"
-        name: "{{ name }}"
-        version:
-        - if: win
-          value: "1.0"
-        - if: osx
-          value: "2.0"
+        package:
+            name: "{{ name }}"
+            version: "1.9.2"
+
+        context:
+          name: xtensor
+          version: "0.24.6"
+
+        package:
+          name: "{{ name|lower }}"
+          version: "{{ version }}"
+
+        source:
+            - if: win
+              then:
+              - url: "blabla"
+            - if: unix
+              then:
+                url: "ok"
         "#;
 
-        let package: Package = serde_yaml::from_str(recipe).unwrap();
+        let recipe: Recipe = serde_yaml::from_str(recipe).unwrap();
+        let rendered_recipe = recipe.render(&Default::default(), "bla").unwrap();
 
-        let context = HashMap::from([
-            ("name", "foo"),
-            ("win", "true"),
-        ]);
-        let environment = Environment::new();
-        let rendered_package = package.render(&environment, &context).unwrap();
-
-        insta::assert_yaml_snapshot!(rendered_package);
+        insta::assert_yaml_snapshot!(rendered_recipe);
     }
 
     #[test]

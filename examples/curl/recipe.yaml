@@ -10,17 +10,19 @@ source:
   sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
 
 build:
-  number: 0
+  number: {{ }}
 
 requirements:
   build:
-    - "{{ compiler('c') }}"
-    - sel(win): cmake
-    - sel(win): ninja
-    - sel(unix): make
-    - sel(unix): perl
-    - sel(unix): pkg-config
-    - sel(unix): libtool
+    - ${{ compiler('c') }}
+    - ${{ win }}:
+      - cmake
+      - ninja
+    - ${{ unix }}: 
+      - make
+      - perl
+      - pkg-config
+      - libtool
   host:
     - sel(linux): openssl
 

@@ -1,3 +1,5 @@
+yaml-language-server: $schema=../../schema.json
+
 context:
   version: "0.11.9"
 
@@ -6,8 +8,12 @@ package:
   version: "{{ version }}"
 
 source:
-  url: https://github.com/killercup/cargo-edit/archive/refs/tags/v{{ version }}.tar.gz
-  sha256: 46670295e2323fc2f826750cdcfb2692fbdbea87122fe530a07c50c8dba1d3d7
+  - if: win
+    url: https://github.com/killercup/cargo-edit/archive/refs/tags/v{{ version }}.tar.gz
+    sha256: 46670295e2323fc2f826750cdcfb2692fbdbea87122fe530a07c50c8dba1d3d7
+  - if: unix
+    url: https://github.com/killercup/cargo-edit/archive/refs/tags/v{{ version }}.tar.gz
+    md5: 0800fc577294c34e0b28ad2839435945   
 
 build:
   script:
@@ -17,7 +23,7 @@ build:
 requirements:
   build:
     - "{{ compiler('rust') }}"
-    - cargo-bundle-licenses
+    - ${{ hello }}-cargo-bundle-licenses
 
 test:
   commands:
