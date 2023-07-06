@@ -67,7 +67,7 @@ here](https://prefix-dev.github.io/rattler-build).
 
 `rattler-build` comes with two commands: `build` and `test`.
 
-The `build` command takes a `--recipe-file recipe.yaml` as input and produces a
+The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
 (tests are shipped with the package).
 
