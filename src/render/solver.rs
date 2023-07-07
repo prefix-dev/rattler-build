@@ -11,9 +11,10 @@ use rattler_conda_types::{
     Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
     RepoDataRecord,
 };
+use rattler_networking::{AuthenticatedClient, AuthenticationStorage};
 use rattler_repodata_gateway::fetch::{CacheResult, DownloadProgress, FetchRepoDataOptions};
 use rattler_repodata_gateway::sparse::SparseRepoData;
-use rattler_solve::{LibsolvRepoData, SolverBackend, SolverTask};
+use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
 use reqwest::Client;
 use std::{
     borrow::Cow,
@@ -108,10 +109,13 @@ pub async fn create_environment(
     // For each channel/subdirectory combination, download and cache the `repodata.json` that should
     // be available from the corresponding Url. The code below also displays a nice CLI progress-bar
     // to give users some more information about what is going on.
-    let download_client = Client::builder()
-        .no_gzip()
-        .build()
-        .expect("failed to create client");
+    let download_client = AuthenticatedClient::from_client(
+        Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+        AuthenticationStorage::new("rattler", &PathBuf::from("~/.rattler")),
+    );
     let multi_progress = global_multi_progress();
 
     let repodata_cache_path = cache_dir.join("repodata");
@@ -143,7 +147,7 @@ pub async fn create_environment(
     // Get the package names from the matchspecs so we can only load the package records that we need.
     let package_names = specs.iter().filter_map(|spec| spec.name.as_ref());
     let repodatas = wrap_in_progress("parsing repodata", move || {
-        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names)
+        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
     })?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
@@ -162,9 +166,7 @@ pub async fn create_environment(
     // need to solve. We do this by constructing a `SolverProblem`. This encapsulates all the
     // information required to be able to solve the problem.
     let solver_task = SolverTask {
-        available_packages: repodatas
-            .iter()
-            .map(|records| LibsolvRepoData::from_records(records)),
+        available_packages: &repodatas,
         locked_packages: installed_packages
             .iter()
             .map(|record| record.repodata_record.clone())
@@ -176,9 +178,7 @@ pub async fn create_environment(
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
     // we need to apply to our environment to bring it up to date.
-    let required_packages = wrap_in_progress("solving", move || {
-        rattler_solve::LibsolvBackend.solve(solver_task)
-    })?;
+    let required_packages = wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
     // Construct a transaction to
     let transaction = Transaction::from_current_and_desired(
@@ -211,7 +211,7 @@ async fn execute_transaction(
     transaction: Transaction<PrefixRecord, RepoDataRecord>,
     target_prefix: &Path,
     cache_dir: &Path,
-    download_client: Client,
+    download_client: AuthenticatedClient,
 ) -> anyhow::Result<()> {
     // Open the package cache
     let package_cache = PackageCache::new(cache_dir.join("pkgs"));
@@ -290,7 +290,7 @@ async fn execute_transaction(
 #[allow(clippy::too_many_arguments)]
 async fn execute_operation(
     target_prefix: &Path,
-    download_client: Client,
+    download_client: AuthenticatedClient,
     package_cache: &PackageCache,
     install_driver: &InstallDriver,
     download_pb: Option<&ProgressBar>,
@@ -441,8 +441,9 @@ async fn remove_package_from_environment(
                 // Simply ignore if the file is already gone.
             }
             Err(e) => {
-                return Err(e)
-                    .with_context(|| format!("failed to delete {}", paths.relative_path.display()))
+                return Err(e).with_context(|| {
+                    format!("failed to delete {}", paths.relative_path.display())
+                });
             }
         }
     }
@@ -476,7 +477,7 @@ async fn fetch_repo_data_records_with_progress(
     channel: Channel,
     platform: Platform,
     repodata_cache: &Path,
-    client: Client,
+    client: AuthenticatedClient,
     multi_progress: indicatif::MultiProgress,
 ) -> Result<SparseRepoData, anyhow::Error> {
     // Create a progress bar
@@ -522,7 +523,7 @@ async fn fetch_repo_data_records_with_progress(
     // task.
     let repo_data_json_path = result.repo_data_json_path.clone();
     match tokio::task::spawn_blocking(move || {
-        SparseRepoData::new(channel, platform.to_string(), repo_data_json_path)
+        SparseRepoData::new(channel, platform.to_string(), repo_data_json_path, None)
     })
     .await
     {
