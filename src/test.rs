@@ -57,6 +57,7 @@ fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
     let av = ActivationVariables {
         conda_prefix,
         path: current_path,
+        path_modification_behaviour: Default::default(),
     };
 
     let activator = Activator::from_path(environment, shell::Bash, Platform::current()).unwrap();
