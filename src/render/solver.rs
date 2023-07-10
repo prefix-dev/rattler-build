@@ -12,7 +12,9 @@ use rattler_conda_types::{
     RepoDataRecord,
 };
 use rattler_networking::{AuthenticatedClient, AuthenticationStorage};
-use rattler_repodata_gateway::fetch::{CacheResult, DownloadProgress, FetchRepoDataOptions};
+use rattler_repodata_gateway::fetch::{
+    CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
+};
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
 use reqwest::Client;
@@ -133,6 +135,7 @@ pub async fn create_environment(
                     &repodata_cache,
                     download_client.clone(),
                     multi_progress,
+                    platform != Platform::NoArch,
                 )
                 .await
             }
@@ -142,6 +145,11 @@ pub async fn create_environment(
         .await
         // Collect into another iterator where we extract the first erroneous result
         .into_iter()
+        .filter_map(|res| match res {
+            Ok(Some(data)) => Some(Ok(data)), // If Ok contains Some, keep the data
+            Ok(None) => None,                 // If Ok contains None, discard it
+            Err(e) => Some(Err(e)),           // If Err, keep it as is
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     // Get the package names from the matchspecs so we can only load the package records that we need.
@@ -479,7 +487,8 @@ async fn fetch_repo_data_records_with_progress(
     repodata_cache: &Path,
     client: AuthenticatedClient,
     multi_progress: indicatif::MultiProgress,
-) -> Result<SparseRepoData, anyhow::Error> {
+    allow_not_found: bool,
+) -> anyhow::Result<Option<SparseRepoData>> {
     // Create a progress bar
     let progress_bar = multi_progress.add(
         indicatif::ProgressBar::new(1)
@@ -508,8 +517,13 @@ async fn fetch_repo_data_records_with_progress(
     // Error out if an error occurred, but also update the progress bar
     let result = match result {
         Err(e) => {
+            if matches!(e, FetchRepoDataError::NotFound(_)) && allow_not_found {
+                progress_bar.set_style(errored_progress_style());
+                progress_bar.finish_with_message("Not Found");
+                return Ok(None);
+            }
             progress_bar.set_style(errored_progress_style());
-            progress_bar.finish_with_message("Error");
+            progress_bar.finish_with_message("404 not found");
             return Err(e.into());
         }
         Ok(result) => result,
@@ -534,7 +548,7 @@ async fn fetch_repo_data_records_with_progress(
                 CacheResult::CacheHit | CacheResult::CacheHitAfterFetch
             );
             progress_bar.finish_with_message(if is_cache_hit { "Using cache" } else { "Done" });
-            Ok(repodata)
+            Ok(Some(repodata))
         }
         Ok(Err(err)) => {
             progress_bar.set_style(errored_progress_style());

@@ -33,7 +33,7 @@ rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "m
 # rattler_solve = { path = "../rattler/crates/rattler_solve" }
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-
+# rattler_networking = { path = "../rattler/crates/rattler_networking" }
 anyhow = "1.0.71"
 walkdir = "2.3.3"
 sha2 = "0.10.6"
