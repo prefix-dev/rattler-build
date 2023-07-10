@@ -12,7 +12,9 @@ use rattler_conda_types::{
     RepoDataRecord,
 };
 use rattler_networking::{AuthenticatedClient, AuthenticationStorage};
-use rattler_repodata_gateway::fetch::{CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions};
+use rattler_repodata_gateway::fetch::{
+    CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
+};
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
 use reqwest::Client;
