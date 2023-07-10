@@ -21,7 +21,6 @@ use super::{
 };
 
 /// A enum to keep track of where a given Dependency comes from
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
@@ -84,7 +83,6 @@ pub struct FinalizedRunDependencies {
     pub run_exports: Option<RunExportsJson>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
@@ -245,6 +243,9 @@ pub fn apply_variant(
                         )
                         .expect("could not apply pin");
                     DependencyInfo::PinSubpackage { spec: pinned }
+                }
+                Dependency::PinCompatible(pin) => {
+                    todo!("Pin compatible not yet implemented")
                 }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {

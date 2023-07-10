@@ -205,22 +205,6 @@ pub struct Recipe {
     pub about: About,
 }
 
-pub struct Metadata {
-    pub name: String,
-    pub version: String,
-    pub requirements: Vec<String>,
-}
-
-impl Default for Metadata {
-    fn default() -> Self {
-        Self {
-            name: String::from(""),
-            version: String::from("0.0.0"),
-            requirements: Vec::new(),
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Checksum {

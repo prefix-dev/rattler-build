@@ -12,6 +12,16 @@ pub struct PinSubpackage {
     pub pin_subpackage: Pin,
 }
 
+/// Pin a version compatible to a version of a package from the 
+/// host environment
+/// 
+/// This is usually used in the `run` section of a recipe to constrain the
+/// version to one similar to the build-time version.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PinCompatible {
+    pub pin_compatible: Pin,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Compiler {
     pub compiler: String,
@@ -23,6 +33,7 @@ pub enum Dependency {
     #[serde(deserialize_with = "deserialize_match_spec")]
     Spec(MatchSpec),
     PinSubpackage(PinSubpackage),
+    PinCompatible(PinCompatible),
     Compiler(Compiler),
 }
 
