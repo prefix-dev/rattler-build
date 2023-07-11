@@ -2,6 +2,7 @@
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
 use rattler_conda_types::Platform;
+use rattler_networking::AuthenticatedClient;
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
 use serde_with::serde_as;
@@ -464,11 +465,39 @@ impl fmt::Display for GitUrl {
     }
 }
 
-#[derive(Debug, Clone)]
+/// Global configuration for the build
+#[derive(Clone)]
+pub struct GlobalConfiguration {
+    /// If set to a value, a progress bar will be shown
+    pub multi_progress_indicator: indicatif::MultiProgress,
+
+    /// The authenticated reqwest download client to use
+    pub client: AuthenticatedClient,
+}
+
+impl Default for GlobalConfiguration {
+    fn default() -> Self {
+        Self {
+            multi_progress_indicator: indicatif::MultiProgress::new(),
+            client: AuthenticatedClient::from_client(
+                reqwest::Client::builder()
+                    .no_gzip()
+                    .build()
+                    .expect("failed to create client"),
+                rattler_networking::AuthenticationStorage::new(
+                    "rattler",
+                    &PathBuf::from("~/.rattler"),
+                ),
+            ),
+        }
+    }
+}
+#[derive(Clone)]
 pub struct Output {
     pub recipe: RenderedRecipe,
     pub build_configuration: BuildConfiguration,
     pub finalized_dependencies: Option<FinalizedDependencies>,
+    pub global_configuration: GlobalConfiguration,
 }
 
 impl Output {

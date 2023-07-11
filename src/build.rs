@@ -168,6 +168,7 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         finalized_dependencies: Some(finalized_dependencies),
         recipe: output.recipe.clone(),
         build_configuration: output.build_configuration.clone(),
+        global_configuration: output.global_configuration.clone(),
     };
 
     let build_script = get_conda_build_script(&output, directories)?;

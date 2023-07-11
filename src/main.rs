@@ -3,7 +3,9 @@
 use anyhow::Ok;
 use clap::{arg, crate_version, Parser};
 
+use indicatif::MultiProgress;
 use rattler_conda_types::{NoArchType, Platform};
+use rattler_networking::AuthenticatedClient;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
@@ -39,7 +41,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories, PackageIdentifier},
+    metadata::{BuildConfiguration, Directories, GlobalConfiguration, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -248,6 +250,11 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         println!("{}\n", table);
     }
 
+    let global_configuration = GlobalConfiguration {
+        client: AuthenticatedClient::default(),
+        multi_progress_indicator: MultiProgress::new(),
+    };
+
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &noarch);
 
@@ -321,6 +328,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 subpackages,
             },
             finalized_dependencies: None,
+            global_configuration: global_configuration.clone(),
         };
 
         run_build(&output).await?;

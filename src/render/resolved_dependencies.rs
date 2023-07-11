@@ -379,6 +379,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             channels,
+            &output.global_configuration,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -440,6 +441,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
             channels,
+            &output.global_configuration,
         )
         .await
         .map_err(ResolveError::from)?;
