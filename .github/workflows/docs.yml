@@ -76,7 +76,7 @@ jobs:
           echo "User-Agent: *\nDisallow: /" > final_docs/robots.txt
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: 'final_docs'
 
