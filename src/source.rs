@@ -240,10 +240,7 @@ fn git_src<'a>(
     let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string()) {
         Ok(reference) => reference,
         Err(_) => {
-            match repo.resolve_reference_from_short_name(&format!(
-                "origin/{}",
-                source.git_rev.to_string()
-            )) {
+            match repo.resolve_reference_from_short_name(&format!("origin/{}", source.git_rev)) {
                 Ok(reference) => reference,
                 Err(e) => {
                     return Err(SourceError::GitError(e));
