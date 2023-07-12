@@ -25,7 +25,7 @@ use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 use std::io::Write;
 
-use crate::{env_vars, index, metadata::GlobalConfiguration, render::solver::create_environment};
+use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
@@ -278,7 +278,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     let prefix = std::fs::canonicalize(&config.test_prefix).unwrap();
 
-    let global_configuration = GlobalConfiguration {
+    let global_configuration = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
     };

@@ -32,6 +32,7 @@ mod post;
 mod render;
 mod selectors;
 mod source;
+mod tool_configuration;
 mod unix;
 mod used_variables;
 mod variant_config;
@@ -41,7 +42,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    metadata::{BuildConfiguration, Directories, GlobalConfiguration, PackageIdentifier},
+    metadata::{BuildConfiguration, Directories, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
@@ -250,7 +251,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         println!("{}\n", table);
     }
 
-    let global_configuration = GlobalConfiguration {
+    let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
     };
@@ -328,10 +329,9 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 subpackages,
             },
             finalized_dependencies: None,
-            global_configuration: global_configuration.clone(),
         };
 
-        run_build(&output).await?;
+        run_build(&output, tool_config.clone()).await?;
     }
 
     Ok(())

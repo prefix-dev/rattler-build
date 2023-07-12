@@ -28,7 +28,7 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
-use crate::metadata::GlobalConfiguration;
+use crate::tool_configuration;
 
 fn print_as_table(packages: &Vec<RepoDataRecord>) {
     let mut table = Table::new();
@@ -68,7 +68,7 @@ pub async fn create_environment(
     target_platform: &Platform,
     target_prefix: &Path,
     channels: &[String],
-    global_configuration: &GlobalConfiguration,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let channel_config = ChannelConfig::default();
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
@@ -117,7 +117,7 @@ pub async fn create_environment(
 
     let repodata_cache_path = cache_dir.join("repodata");
     let channel_and_platform_len = channel_urls.len();
-    let repodata_download_client = global_configuration.client.clone();
+    let repodata_download_client = tool_configuration.client.clone();
     let sparse_repo_datas = futures::stream::iter(channel_urls)
         .map(move |(channel, platform)| {
             let repodata_cache = repodata_cache_path.clone();
@@ -128,7 +128,7 @@ pub async fn create_environment(
                     platform,
                     &repodata_cache,
                     download_client.clone(),
-                    &global_configuration.multi_progress_indicator,
+                    &tool_configuration.multi_progress_indicator,
                     platform != Platform::NoArch,
                 )
                 .await
@@ -197,8 +197,8 @@ pub async fn create_environment(
             transaction,
             target_prefix,
             &cache_dir,
-            global_configuration.client.clone(),
-            global_configuration.multi_progress_indicator.clone(),
+            tool_configuration.client.clone(),
+            tool_configuration.multi_progress_indicator.clone(),
         )
         .await?;
         println!(

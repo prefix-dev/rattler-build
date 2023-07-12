@@ -18,7 +18,7 @@ use crate::packaging::{package_conda, record_files};
 use crate::render::resolved_dependencies::resolve_dependencies;
 use crate::source::fetch_sources;
 use crate::test::TestConfiguration;
-use crate::{index, test};
+use crate::{index, test, tool_configuration};
 
 /// Create a conda build script and return the path to it
 pub fn get_conda_build_script(
@@ -139,7 +139,10 @@ fn run_process_with_replacements(
 
 /// Run the build for the given output. This will fetch the sources, resolve the dependencies,
 /// and execute the build script. Returns the path to the resulting package.
-pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
+pub async fn run_build(
+    output: &Output,
+    tool_configuration: tool_configuration::Configuration,
+) -> anyhow::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     index::index(
@@ -161,14 +164,14 @@ pub async fn run_build(output: &Output) -> anyhow::Result<PathBuf> {
         .await?;
     }
 
-    let finalized_dependencies = resolve_dependencies(output, &channels).await?;
+    let finalized_dependencies =
+        resolve_dependencies(output, &channels, tool_configuration).await?;
 
     // The output with the resolved dependencies
     let output = Output {
         finalized_dependencies: Some(finalized_dependencies),
         recipe: output.recipe.clone(),
         build_configuration: output.build_configuration.clone(),
-        global_configuration: output.global_configuration.clone(),
     };
 
     let build_script = get_conda_build_script(&output, directories)?;
