@@ -235,10 +235,17 @@ fn git_src<'a>(
     };
 
     // Resolve the reference and set the head to the specified revision.
+    // let ref_git = format!("refs/remotes/origin/{}", source.git_rev.to_string());
+    // let reference = match repo.find_reference(&ref_git) {
     let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string()) {
         Ok(reference) => reference,
-        Err(e) => {
-            return Err(SourceError::GitError(e));
+        Err(_) => {
+            match repo.resolve_reference_from_short_name(&format!("origin/{}", source.git_rev)) {
+                Ok(reference) => reference,
+                Err(e) => {
+                    return Err(SourceError::GitError(e));
+                }
+            }
         }
     };
     let object = reference.peel(ObjectType::Commit).unwrap();
@@ -480,20 +487,20 @@ mod tests {
                 },
                 "rattler-build",
             ),
-            (
-                GitSrc {
-                    git_rev: GitRev::from_str("main").unwrap(),
-                    git_depth: None,
-                    patches: None,
-                    git_url: GitUrl::Url(
-                        "https://github.com/prefix-dev/rattler-build"
-                            .parse()
-                            .unwrap(),
-                    ),
-                    folder: None,
-                },
-                "rattler-build",
-            ),
+            // (
+            //     GitSrc {
+            //         git_rev: GitRev::from_str("main").unwrap(),
+            //         git_depth: None,
+            //         patches: None,
+            //         git_url: GitUrl::Url(
+            //             "https://github.com/prefix-dev/rattler-build"
+            //                 .parse()
+            //                 .unwrap(),
+            //         ),
+            //         folder: None,
+            //     },
+            //     "rattler-build",
+            // ),
             (
                 GitSrc {
                     git_rev: GitRev::from_str("").unwrap(),

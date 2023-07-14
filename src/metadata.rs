@@ -464,7 +464,7 @@ impl fmt::Display for GitUrl {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Output {
     pub recipe: RenderedRecipe,
     pub build_configuration: BuildConfiguration,

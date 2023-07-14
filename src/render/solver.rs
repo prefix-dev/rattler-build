@@ -1,7 +1,7 @@
-use crate::global_multi_progress;
 use anyhow::Context;
 use comfy_table::Table;
 use futures::{stream, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+
 use indicatif::{HumanBytes, ProgressBar, ProgressState, ProgressStyle};
 use rattler::{
     install::{link_package, InstallDriver, InstallOptions, Transaction, TransactionOperation},
@@ -11,13 +11,13 @@ use rattler_conda_types::{
     Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
     RepoDataRecord,
 };
-use rattler_networking::{AuthenticatedClient, AuthenticationStorage};
+use rattler_networking::AuthenticatedClient;
 use rattler_repodata_gateway::fetch::{
     CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
-use reqwest::Client;
+
 use std::{
     borrow::Cow,
     fmt::Write,
@@ -27,6 +27,8 @@ use std::{
     time::Duration,
 };
 use tokio::task::JoinHandle;
+
+use crate::tool_configuration;
 
 fn print_as_table(packages: &Vec<RepoDataRecord>) {
     let mut table = Table::new();
@@ -66,6 +68,7 @@ pub async fn create_environment(
     target_platform: &Platform,
     target_prefix: &Path,
     channels: &[String],
+    tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let channel_config = ChannelConfig::default();
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
@@ -111,30 +114,21 @@ pub async fn create_environment(
     // For each channel/subdirectory combination, download and cache the `repodata.json` that should
     // be available from the corresponding Url. The code below also displays a nice CLI progress-bar
     // to give users some more information about what is going on.
-    let download_client = AuthenticatedClient::from_client(
-        Client::builder()
-            .no_gzip()
-            .build()
-            .expect("failed to create client"),
-        AuthenticationStorage::new("rattler", &PathBuf::from("~/.rattler")),
-    );
-    let multi_progress = global_multi_progress();
 
     let repodata_cache_path = cache_dir.join("repodata");
     let channel_and_platform_len = channel_urls.len();
-    let repodata_download_client = download_client.clone();
+    let repodata_download_client = tool_configuration.client.clone();
     let sparse_repo_datas = futures::stream::iter(channel_urls)
         .map(move |(channel, platform)| {
             let repodata_cache = repodata_cache_path.clone();
             let download_client = repodata_download_client.clone();
-            let multi_progress = multi_progress.clone();
             async move {
                 fetch_repo_data_records_with_progress(
                     channel,
                     platform,
                     &repodata_cache,
                     download_client.clone(),
-                    multi_progress,
+                    &tool_configuration.multi_progress_indicator,
                     platform != Platform::NoArch,
                 )
                 .await
@@ -199,7 +193,14 @@ pub async fn create_environment(
 
     if !transaction.operations.is_empty() {
         // Execute the operations that are returned by the solver.
-        execute_transaction(transaction, target_prefix, &cache_dir, download_client).await?;
+        execute_transaction(
+            transaction,
+            target_prefix,
+            &cache_dir,
+            tool_configuration.client.clone(),
+            tool_configuration.multi_progress_indicator.clone(),
+        )
+        .await?;
         println!(
             "{} Successfully updated the environment",
             console::style(console::Emoji("✔", "")).green(),
@@ -220,6 +221,7 @@ async fn execute_transaction(
     target_prefix: &Path,
     cache_dir: &Path,
     download_client: AuthenticatedClient,
+    multi_progress: indicatif::MultiProgress,
 ) -> anyhow::Result<()> {
     // Open the package cache
     let package_cache = PackageCache::new(cache_dir.join("pkgs"));
@@ -235,7 +237,6 @@ async fn execute_transaction(
     };
 
     // Create a progress bars for downloads.
-    let multi_progress = global_multi_progress();
     let total_packages_to_download = transaction
         .operations
         .iter()
@@ -486,7 +487,7 @@ async fn fetch_repo_data_records_with_progress(
     platform: Platform,
     repodata_cache: &Path,
     client: AuthenticatedClient,
-    multi_progress: indicatif::MultiProgress,
+    multi_progress: &indicatif::MultiProgress,
     allow_not_found: bool,
 ) -> anyhow::Result<Option<SparseRepoData>> {
     // Create a progress bar
@@ -498,16 +499,16 @@ async fn fetch_repo_data_records_with_progress(
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
 
+    let download_progress_bar = progress_bar.clone();
     // Download the repodata.json
-    let download_progress_progress_bar = progress_bar.clone();
     let result = rattler_repodata_gateway::fetch::fetch_repo_data(
         channel.platform_url(platform),
         client,
         repodata_cache,
         FetchRepoDataOptions {
             download_progress: Some(Box::new(move |DownloadProgress { total, bytes }| {
-                download_progress_progress_bar.set_length(total.unwrap_or(bytes));
-                download_progress_progress_bar.set_position(bytes);
+                download_progress_bar.set_length(total.unwrap_or(bytes));
+                download_progress_bar.set_position(bytes);
             })),
             ..Default::default()
         },
@@ -542,11 +543,11 @@ async fn fetch_repo_data_records_with_progress(
     .await
     {
         Ok(Ok(repodata)) => {
-            progress_bar.set_style(finished_progress_style());
             let is_cache_hit = matches!(
                 result.cache_result,
                 CacheResult::CacheHit | CacheResult::CacheHitAfterFetch
             );
+            progress_bar.set_style(finished_progress_style());
             progress_bar.finish_with_message(if is_cache_hit { "Using cache" } else { "Done" });
             Ok(Some(repodata))
         }

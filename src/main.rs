@@ -3,9 +3,9 @@
 use anyhow::Ok;
 use clap::{arg, crate_version, Parser};
 
-use indicatif::{MultiProgress, ProgressDrawTarget};
-use once_cell::sync::Lazy;
+use indicatif::MultiProgress;
 use rattler_conda_types::{NoArchType, Platform};
+use rattler_networking::AuthenticatedClient;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
@@ -32,6 +32,7 @@ mod post;
 mod render;
 mod selectors;
 mod source;
+mod tool_configuration;
 mod unix;
 mod used_variables;
 mod variant_config;
@@ -45,20 +46,6 @@ use crate::{
     render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
-
-/// Returns a global instance of [`indicatif::MultiProgress`].
-///
-/// Although you can always create an instance yourself any logging will interrupt pending
-/// progressbars. To fix this issue, logging has been configured in such a way to it will not
-/// interfere if you use the [`indicatif::MultiProgress`] returning by this function.
-pub fn global_multi_progress() -> MultiProgress {
-    static GLOBAL_MP: Lazy<MultiProgress> = Lazy::new(|| {
-        let mp = MultiProgress::new();
-        mp.set_draw_target(ProgressDrawTarget::stderr_with_hz(20));
-        mp
-    });
-    GLOBAL_MP.clone()
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
@@ -264,6 +251,11 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         println!("{}\n", table);
     }
 
+    let tool_config = tool_configuration::Configuration {
+        client: AuthenticatedClient::default(),
+        multi_progress_indicator: MultiProgress::new(),
+    };
+
     for variant in variants {
         let hash = hash::compute_buildstring(&variant, &noarch);
 
@@ -339,7 +331,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
             finalized_dependencies: None,
         };
 
-        run_build(&output).await?;
+        run_build(&output, tool_config.clone()).await?;
     }
 
     Ok(())

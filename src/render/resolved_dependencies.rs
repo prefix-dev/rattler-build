@@ -6,7 +6,10 @@ use std::{
     str::FromStr,
 };
 
-use crate::metadata::{BuildConfiguration, Output};
+use crate::{
+    metadata::{BuildConfiguration, Output},
+    tool_configuration,
+};
 use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
@@ -363,6 +366,7 @@ fn collect_run_exports_from_env(
 pub async fn resolve_dependencies(
     output: &Output,
     channels: &[String],
+    tool_configuration: tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
@@ -379,6 +383,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             channels,
+            &tool_configuration,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -440,6 +445,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
             channels,
+            &tool_configuration,
         )
         .await
         .map_err(ResolveError::from)?;

@@ -14,16 +14,18 @@ use std::{
     str::FromStr,
 };
 
+use indicatif::MultiProgress;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{ArchiveIdentifier, ArchiveType},
     MatchSpec, Platform,
 };
+use rattler_networking::AuthenticatedClient;
 use rattler_shell::activation::ActivationVariables;
 use rattler_shell::{activation::Activator, shell};
 use std::io::Write;
 
-use crate::{env_vars, index, render::solver::create_environment};
+use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
@@ -275,11 +277,18 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     dependencies.push(match_spec);
 
     let prefix = std::fs::canonicalize(&config.test_prefix).unwrap();
+
+    let global_configuration = tool_configuration::Configuration {
+        client: AuthenticatedClient::default(),
+        multi_progress_indicator: MultiProgress::new(),
+    };
+
     create_environment(
         &dependencies,
         &Platform::current(),
         &prefix,
         &config.channels,
+        &global_configuration,
     )
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
