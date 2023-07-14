@@ -26,7 +26,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.68.0
+          toolchain: 1.70.0
       - run: cargo check
 
   # check-rustdoc-links:
@@ -38,7 +38,7 @@ jobs:
   #         submodules: recursive
   #     - uses: dtolnay/rust-toolchain@master
   #       with:
-  #         toolchain: 1.68.0
+  #         toolchain: 1.70.0
   #     - run: |
   #         for package in $(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | .name'); do
   #           cargo rustdoc -p "$package" --all-features -- -D warnings -W unreachable-pub
@@ -63,7 +63,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.68.0
+          toolchain: 1.70.0
       - run: cargo test --all-features -- --nocapture
 
   fmt:
@@ -75,7 +75,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.68.0
+          toolchain: 1.70.0
       - uses: Swatinem/rust-cache@v2
       - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
@@ -89,7 +89,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: clippy
-          toolchain: 1.68.0
+          toolchain: 1.70.0
       - uses: Swatinem/rust-cache@v2
       - uses: actions-rs/clippy-check@v1
         with:

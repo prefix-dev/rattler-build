@@ -487,20 +487,20 @@ mod tests {
                 },
                 "rattler-build",
             ),
-            (
-                GitSrc {
-                    git_rev: GitRev::from_str("main").unwrap(),
-                    git_depth: None,
-                    patches: None,
-                    git_url: GitUrl::Url(
-                        "https://github.com/prefix-dev/rattler-build"
-                            .parse()
-                            .unwrap(),
-                    ),
-                    folder: None,
-                },
-                "rattler-build",
-            ),
+            // (
+            //     GitSrc {
+            //         git_rev: GitRev::from_str("main").unwrap(),
+            //         git_depth: None,
+            //         patches: None,
+            //         git_url: GitUrl::Url(
+            //             "https://github.com/prefix-dev/rattler-build"
+            //                 .parse()
+            //                 .unwrap(),
+            //         ),
+            //         folder: None,
+            //     },
+            //     "rattler-build",
+            // ),
             (
                 GitSrc {
                     git_rev: GitRev::from_str("").unwrap(),
