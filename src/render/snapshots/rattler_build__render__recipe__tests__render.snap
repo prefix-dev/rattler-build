@@ -1,5 +1,6 @@
 ---
 source: src/render/recipe.rs
+assertion_line: 222
 expression: "recipe.expect(\"could not render recipe\")"
 ---
 package:
@@ -18,6 +19,10 @@ build:
   number: 0
   string: h12341234_0
   script: ~
+  script_env:
+    passthrough: []
+    env: {}
+    secrets: []
   ignore_run_exports: ~
   ignore_run_exports_from: ~
   run_exports: ~
@@ -38,3 +43,4 @@ about:
   doc_url: ~
   dev_url: ~
 test: ~
+
