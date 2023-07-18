@@ -1,0 +1,16 @@
+---
+source: src/render/recipe.rs
+assertion_line: 387
+expression: recipe
+---
+package:
+  name: "{{ name }}"
+  version: 1.9.2
+source:
+  - if: win
+    then:
+      url: blabla
+  - if: unix
+    then:
+      url: ok
+

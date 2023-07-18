@@ -329,7 +329,7 @@ pub fn write_env_script<T: Shell + Clone>(
     for env_key in &output.recipe.build.script_env.passthrough {
         let var = std::env::var(env_key);
         if let Ok(var) = var {
-            shell_type.set_env_var(&mut s, &env_key, &var.as_str())?;
+            shell_type.set_env_var(&mut s, env_key, var.as_str())?;
         } else {
             tracing::warn!(
                 "Could not find passthrough environment variable: {}",
@@ -339,7 +339,7 @@ pub fn write_env_script<T: Shell + Clone>(
     }
 
     for (k, v) in &output.recipe.build.script_env.env {
-        shell_type.set_env_var(&mut s, &k, &v)?;
+        shell_type.set_env_var(&mut s, k, v)?;
     }
 
     if !output.recipe.build.script_env.secrets.is_empty() {
