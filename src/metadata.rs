@@ -130,6 +130,21 @@ impl<'de> Deserialize<'de> for RunExports {
     }
 }
 
+/// Extra environment variables to set during the build script execution
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct ScriptEnv {
+    /// Environments variables to leak into the build environment from the host system.
+    /// During build time these variables are recorded and stored in the package output.
+    /// Use `secrets` for environment variables that should not be recorded.
+    pub passthrough: Vec<String>,
+    /// Environment variables to set in the build environment.
+    pub env: BTreeMap<String, String>,
+    /// Environment variables to leak into the build environment from the host system that
+    /// contain sensitve information. Use with care because this might make recipes no
+    /// longer reproducible on other machines.
+    pub secrets: Vec<String>,
+}
+
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
 #[serde_as]
@@ -145,6 +160,8 @@ pub struct BuildOptions {
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub script: Option<Vec<String>>,
+    /// Environment variables to pass through or set in the script
+    pub script_env: ScriptEnv,
     /// A recipe can choose to ignore certain run exports of its dependencies
     pub ignore_run_exports: Option<Vec<String>>,
     /// A recipe can choose to ignore all run exports of coming from some packages

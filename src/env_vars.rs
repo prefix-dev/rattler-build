@@ -326,6 +326,26 @@ pub fn write_env_script<T: Shell + Clone>(
         shell_type.set_env_var(&mut s, &k, &v)?;
     }
 
+    for env_key in &output.recipe.build.script_env.passthrough {
+        let var = std::env::var(env_key);
+        if let Ok(var) = var {
+            shell_type.set_env_var(&mut s, &env_key, &var.as_str())?;
+        } else {
+            tracing::warn!(
+                "Could not find passthrough environment variable: {}",
+                env_key
+            );
+        }
+    }
+
+    for (k, v) in &output.recipe.build.script_env.env {
+        shell_type.set_env_var(&mut s, &k, &v)?;
+    }
+
+    if !output.recipe.build.script_env.secrets.is_empty() {
+        tracing::error!("Secrets are not supported yet");
+    }
+
     writeln!(out, "{}", s)?;
 
     let host_prefix_activator = Activator::from_path(
