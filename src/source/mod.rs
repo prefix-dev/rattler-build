@@ -10,7 +10,6 @@ use fs_extra::error::ErrorKind::PermissionDenied;
 use crate::metadata::Source;
 
 pub mod git_source;
-pub mod local;
 pub mod patch;
 pub mod url_source;
 
