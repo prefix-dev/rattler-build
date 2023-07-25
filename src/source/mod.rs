@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf, StripPrefixError},
-    process::Command,
+    process::Command, collections::HashSet,
 };
 
 use fs_extra::dir::{copy, create_all, remove, CopyOptions};
@@ -38,6 +38,9 @@ pub enum SourceError {
 
     #[error("Failed to run git command: {0}")]
     GitError(#[from] git2::Error),
+
+    #[error("Fileystem error: {0}")]
+    FilesystemError(#[from] fs_extra::error::Error),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -121,7 +124,7 @@ fn extract(
     output
 }
 
-fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
+pub fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), fs_extra::error::Error> {
     // Create the to path because we're going to copy the contents only
     create_all(to, true).unwrap();
 
@@ -141,10 +144,10 @@ fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
             tracing::debug!("Permission error in cache, this often happens when the previous run was exited in a faulty way. Removing the cache and retrying the copy.");
             if let Err(remove_error) = remove(to) {
                 tracing::error!("Failed to remove cache directory: {}", remove_error);
-                return Err(SourceError::FileSystemError(e));
+                return Err(fs_extra::error::Error::from(e));
             } else if let Err(retry_error) = copy(from, to, &options) {
                 tracing::error!("Failed to retry the copy operation: {}", retry_error);
-                return Err(SourceError::FileSystemError(e));
+                return Err(fs_extra::error::Error::from(e));
             } else {
                 tracing::debug!(
                     "Successfully retried copying {} to {}",
@@ -153,7 +156,53 @@ fn copy_dir(from: &PathBuf, to: &PathBuf) -> Result<(), SourceError> {
                 );
             }
         }
-        Err(e) => return Err(SourceError::FileSystemError(e)),
+        Err(e) => return Err(fs_extra::error::Error::from(e)),
     }
     Ok(())
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GlobError {
+    #[error("Pattern Error: {0}")]
+    Pattern(#[from] glob::PatternError),
+
+    #[error("Glob Error: {0}")]
+    Glob(#[from] glob::GlobError),
+
+    #[error("Could not strip path prefix: {0}")]
+    StripPrefixError(#[from] StripPrefixError),
+}
+
+pub fn collect_files(include_patterns: Vec<String>, exclude_patterns: Vec<String>) -> Result<Vec<PathBuf>, GlobError> {
+    let mut result_paths = HashSet::new();
+
+    let mut compiled_excludes = Vec::new();
+    for p in exclude_patterns {
+        compiled_excludes.push(glob::Pattern::new(&p)?);
+    }
+    
+    for pattern in include_patterns {
+        for p in glob::glob(&pattern)? {
+            let p = p?;
+            if !compiled_excludes.iter().any(|pattern| pattern.matches_path(&p)) {
+                result_paths.insert(p);
+            }
+        }
+    }
+
+    Ok(result_paths.into_iter().collect())
+}
+
+pub fn copy_files_glob(source_dir: &Path, dest_dir: &Path, include_patterns: Vec<String>, exclude_patterns: Vec<String>) -> Result<u64, GlobError> {
+    let include_patterns = include_patterns.iter().map(|p| source_dir.join(p).to_string_lossy().to_string()).collect();
+    let exclude_patterns = exclude_patterns.iter().map(|p| source_dir.join(p).to_string_lossy().to_string()).collect();
+    let files = collect_files(include_patterns, exclude_patterns)?;
+
+    let len = files.len();
+    for file in files {
+        let dest_path = dest_dir.join(file.strip_prefix(source_dir)?);
+        tracing::info!("Copying {:?} to {:?}", file, dest_path);
+    }
+
+    Ok(len as u64)
 }

@@ -23,6 +23,7 @@ use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
 
 use crate::macos;
 use crate::metadata::Output;
+use crate::source::{copy_dir, copy_files_glob};
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +57,12 @@ pub enum PackagingError {
 
     #[error("Relink error: {0}")]
     RelinkError(#[from] crate::post::RelinkError),
+
+    #[error("Could not glob files: {0}")]
+    GlobError(#[from] super::source::GlobError),
+
+    #[error("Filesystem error: {0}")]
+    FileSystemError(#[from] fs_extra::error::Error)
 }
 
 #[allow(unused_variables)]
@@ -512,6 +519,7 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
         let mut copied_files = Vec::new();
+
         for license in license_files {
             // license file can be found either in the recipe folder or in the source folder
             let candidates = vec![
@@ -527,15 +535,28 @@ fn copy_license_files(
                     .join(license),
             ];
 
-            let found = candidates.iter().find(|c| c.exists());
-            if let Some(license_file) = found {
-                if license_file.is_dir() {
-                    todo!("License file is a directory");
+            let mut found = false;
+            for c in candidates {
+                if c
+                let files = super::source::collect_files(vec![c.to_string()], vec![])?;
+                if files.len() > 0 {
+                    for f in files {
+                        if f.is_dir() {
+                            tracing::info!("Copying licenses from directory {:?}", f);
+                            let files = copy_dir(&f, &licenses_folder)?;
+                            copied_files.extend(files);
+                        } else {
+                            tracing::info!("Copying license from {:?}", f);
+                            fs::copy(&f, &licenses_folder.join(license))?;
+                            copied_files.push(licenses_folder.join(license));
+                        }
+                    }
+                    found = true;
+                    break;
                 }
-                let dest = licenses_folder.join(license);
-                fs::copy(license_file, &dest)?;
-                copied_files.push(dest);
-            } else {
+            }
+
+            if found == false {
                 return Err(PackagingError::LicenseFileNotFound(license.clone()));
             }
         }
@@ -607,12 +628,12 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
             test_files.push(test_file);
         }
 
-        if let Some(_test_files) = &test.files {
-            todo!("Test files is not yet implemented!");
+        if let Some(test_files) = &test.files {
+            copy_files_glob(&output.build_configuration.directories.recipe_dir, &test_folder, test_files.clone(), vec![])?;
         }
 
-        if let Some(_test_source_files) = &test.source_files {
-            todo!("Test files is not yet implemented!");
+        if let Some(test_source_files) = &test.source_files {
+            copy_files_glob(&output.build_configuration.directories.work_dir, &test_folder, test_source_files.clone(), vec![])?;
         }
     }
 
