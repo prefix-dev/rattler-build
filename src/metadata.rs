@@ -136,13 +136,22 @@ pub struct ScriptEnv {
     /// Environments variables to leak into the build environment from the host system.
     /// During build time these variables are recorded and stored in the package output.
     /// Use `secrets` for environment variables that should not be recorded.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub passthrough: Vec<String>,
     /// Environment variables to set in the build environment.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
     pub env: BTreeMap<String, String>,
     /// Environment variables to leak into the build environment from the host system that
     /// contain sensitve information. Use with care because this might make recipes no
     /// longer reproducible on other machines.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub secrets: Vec<String>,
+}
+
+impl ScriptEnv {
+    pub fn is_empty(&self) -> bool {
+        self.passthrough.is_empty() && self.env.is_empty() && self.secrets.is_empty()
+    }
 }
 
 /// The build options contain information about how to build the package and some additional
@@ -161,6 +170,7 @@ pub struct BuildOptions {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub script: Option<Vec<String>>,
     /// Environment variables to pass through or set in the script
+    #[serde(skip_serializing_if = "ScriptEnv::is_empty", default)]
     pub script_env: ScriptEnv,
     /// A recipe can choose to ignore certain run exports of its dependencies
     pub ignore_run_exports: Option<Vec<String>>,
