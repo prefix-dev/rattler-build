@@ -33,6 +33,9 @@ pub enum SourceError {
     #[error("Download could not be validated with checksum!")]
     ValidationFailed,
 
+    #[error("File not found!")]
+    FileNotFound,
+
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
