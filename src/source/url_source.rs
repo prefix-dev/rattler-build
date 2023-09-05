@@ -75,6 +75,25 @@ pub(crate) async fn url_src(
     cache_dir: &Path,
     checksum: &Checksum,
 ) -> Result<PathBuf, SourceError> {
+    if source.url.scheme() == "file" {
+        let local_path = source.url.to_file_path().map_err(|_| {
+            SourceError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Invalid local file path",
+            ))
+        })?;
+        if !local_path.is_file() {
+            return Err(SourceError::FileNotFound);
+        }
+        if validate_checksum(&local_path, checksum) {
+            tracing::info!("Using local source file.");
+            return Ok(local_path);
+        } else {
+            tracing::error!("Checksum validation failed!");
+            return Err(SourceError::ValidationFailed);
+        }
+    }
+
     let cache_name = PathBuf::from(cache_name_from_url(&source.url, checksum));
     let cache_name = cache_dir.join(cache_name);
 
