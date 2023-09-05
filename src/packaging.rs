@@ -245,7 +245,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     };
 
     let index_json = IndexJson {
-        name: output.name().to_string(),
+        name: output.name().clone(),
         version: output.version().parse()?,
         build: output.build_string().to_string(),
         build_number: recipe.build.number,
@@ -635,7 +635,7 @@ pub fn package_conda(
         return Err(PackagingError::DependenciesNotFinalized);
     }
 
-    let tmp_dir = TempDir::new(output.name())?;
+    let tmp_dir = TempDir::new(output.name().as_normalized())?;
     let tmp_dir_path = tmp_dir.path();
 
     let mut tmp_files = HashSet::new();
@@ -749,7 +749,7 @@ pub fn package_conda(
     // TODO get proper hash
     let file = format!(
         "{}-{}-{}.tar.bz2",
-        output.name(),
+        output.name().as_normalized(),
         output.version(),
         output.build_string()
     );

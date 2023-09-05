@@ -13,8 +13,8 @@ native-tls = ['reqwest/native-tls', 'rattler/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 
 [dependencies]
-serde = { version = "1.0.171", features = ["derive"] }
-serde_yaml = "0.9.24"
+serde = { version = "1.0.188", features = ["derive"] }
+serde_yaml = "0.9.25"
 rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main", default-features = false }
 rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
@@ -34,21 +34,21 @@ rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "m
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 # rattler_networking = { path = "../rattler/crates/rattler_networking" }
-anyhow = "1.0.72"
+anyhow = "1.0.75"
 walkdir = "2.3.3"
 sha2 = "0.10.7"
 hex = "0.4.3"
-serde_json = "1.0.103"
+serde_json = "1.0.105"
 tempdir = "0.3.7"
-reqwest = "0.11.18"
-tokio = {version = "1.29.1", features = ["rt", "macros", "rt-multi-thread"] }
+reqwest = "0.11.20"
+tokio = {version = "1.32.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.11.0"
 content_inspector = "0.2.4"
-serde_with = "3.1.0"
-url = "2.4.0"
+serde_with = "3.3.0"
+url = "2.4.1"
 tracing = "0.1.37"
-clap = { version = "4.3.16", features = ["derive", "env", "cargo"] }
-minijinja = { version = "1.0.5", features = ["unstable_machinery"] }
+clap = { version = "4.4.2", features = ["derive", "env", "cargo"] }
+minijinja = { version = "1.0.7", features = ["unstable_machinery"] }
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
 num_cpus = "1.16.0"
 goblin = "0.7.1"
@@ -56,19 +56,19 @@ scroll = "0.11.0"
 pathdiff = "0.2.1"
 comfy-table = "7.0.1"
 futures = "0.3.28"
-indicatif = "0.17.5"
+indicatif = "0.17.6"
 console = { version = "0.15.7", features = ["windows-console-colors"] }
 once_cell = "1.18.0"
-thiserror = "1.0.43"
-tempfile = "3.6.0"
-chrono = "0.4.26"
+thiserror = "1.0.48"
+tempfile = "3.8.0"
+chrono = "0.4.28"
 sha1 = "0.10.5"
 git2 = { version = "0.17.2", features = ["vendored-openssl"] }
 fs_extra = "1.3.0"
 
 [dev-dependencies]
 insta = {version = "1.31.0", features = ["yaml"] }
-rstest = "0.18.1"
+rstest = "0.18.2"
 
 [profile.dev.package."*"]
 opt-level = 3

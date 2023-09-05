@@ -243,7 +243,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     }
 
     // pkg vars
-    insert!(vars, "PKG_NAME", output.name());
+    insert!(vars, "PKG_NAME", output.name().as_normalized());
     insert!(vars, "PKG_VERSION", output.version());
     insert!(vars, "PKG_BUILDNUM", output.recipe.build.number.to_string());
 

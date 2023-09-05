@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use rattler_conda_types::{MatchSpec, Version};
+use rattler_conda_types::{MatchSpec, Version, PackageName};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ impl Display for PinExpression {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pin {
     /// The name of the package to pin
-    pub name: String,
+    pub name: PackageName,
 
     /// A pin to a version, using `x.x.x...` as syntax
     pub max_pin: Option<PinExpression>,
@@ -74,12 +74,12 @@ impl Pin {
     pub fn apply(&self, version: &Version, hash: &str) -> Result<MatchSpec, PinError> {
         if self.exact {
             return Ok(
-                MatchSpec::from_str(&format!("{} {} {}", self.name, version, hash))
+                MatchSpec::from_str(&format!("{} {} {}", self.name.as_normalized(), version, hash))
                     // TODO use MatchSpecError when it becomes accessible
                     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
             );
         }
-        let mut spec = self.name.clone();
+        let mut spec = self.name.as_normalized().to_string();
         let version_str = version.to_string();
 
         // extract same amount of digits as the pin expression (in the form of x.x.x) from version str
@@ -136,7 +136,7 @@ impl Pin {
         spec.push(',');
         spec.push_str(&format!("<{}", pin));
 
-        Ok(MatchSpec::from_str(&spec)
+        Ok(MatchSpec::from_str(spec.as_str())
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
     }
 
@@ -155,7 +155,7 @@ impl Pin {
 
         format!(
             "{} MAX_PIN={} MIN_PIN={} EXACT={}",
-            self.name, max_pin_str, min_pin_str, self.exact
+            self.name.as_normalized(), max_pin_str, min_pin_str, self.exact
         )
     }
 
@@ -179,9 +179,9 @@ impl Pin {
         };
 
         let exact = exact == "EXACT=true";
-
+        let package_name = PackageName::try_from(name).expect("could not parse back package name from internal representation");
         Pin {
-            name,
+            name: package_name,
             max_pin,
             min_pin,
             exact,
