@@ -323,7 +323,11 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
                 no_clean: args.keep_build,
-                directories: Directories::create(&name.as_normalized(), &recipe_path, &args.output_dir)?,
+                directories: Directories::create(
+                    name.as_normalized(),
+                    &recipe_path,
+                    &args.output_dir,
+                )?,
                 channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,

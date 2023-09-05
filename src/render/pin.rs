@@ -3,7 +3,7 @@ use std::{
     str::FromStr,
 };
 
-use rattler_conda_types::{MatchSpec, Version, PackageName};
+use rattler_conda_types::{MatchSpec, PackageName, Version};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,11 +73,14 @@ impl Pin {
     /// are given, the pin is applied to the version accordingly.
     pub fn apply(&self, version: &Version, hash: &str) -> Result<MatchSpec, PinError> {
         if self.exact {
-            return Ok(
-                MatchSpec::from_str(&format!("{} {} {}", self.name.as_normalized(), version, hash))
-                    // TODO use MatchSpecError when it becomes accessible
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?,
-            );
+            return Ok(MatchSpec::from_str(&format!(
+                "{} {} {}",
+                self.name.as_normalized(),
+                version,
+                hash
+            ))
+            // TODO use MatchSpecError when it becomes accessible
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?);
         }
         let mut spec = self.name.as_normalized().to_string();
         let version_str = version.to_string();
@@ -155,7 +158,10 @@ impl Pin {
 
         format!(
             "{} MAX_PIN={} MIN_PIN={} EXACT={}",
-            self.name.as_normalized(), max_pin_str, min_pin_str, self.exact
+            self.name.as_normalized(),
+            max_pin_str,
+            min_pin_str,
+            self.exact
         )
     }
 
@@ -179,7 +185,8 @@ impl Pin {
         };
 
         let exact = exact == "EXACT=true";
-        let package_name = PackageName::try_from(name).expect("could not parse back package name from internal representation");
+        let package_name = PackageName::try_from(name)
+            .expect("could not parse back package name from internal representation");
         Pin {
             name: package_name,
             max_pin,

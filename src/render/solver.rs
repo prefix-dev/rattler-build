@@ -415,7 +415,11 @@ async fn install_package_to_environment(
         // Write the conda-meta information
         let pkg_meta_path = conda_meta_path.join(format!(
             "{}-{}-{}.json",
-            prefix_record.repodata_record.package_record.name.as_normalized(),
+            prefix_record
+                .repodata_record
+                .package_record
+                .name
+                .as_normalized(),
             prefix_record.repodata_record.package_record.version,
             prefix_record.repodata_record.package_record.build
         ));

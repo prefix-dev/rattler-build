@@ -14,7 +14,7 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, Platform, RepoDataRecord, Version, VersionSpec, PackageName,
+    MatchSpec, PackageName, Platform, RepoDataRecord, Version, VersionSpec,
 };
 use thiserror::Error;
 
@@ -415,20 +415,22 @@ pub async fn resolve_dependencies(
     // host env
     let mut specs = apply_variant(&reqs.host, &output.build_configuration)?;
 
-    let clone_specs =
-        |name: &PackageName, env: &str, specs: &[String]| -> Result<Vec<DependencyInfo>, ResolveError> {
-            let mut cloned = Vec::new();
-            for spec in specs {
-                let spec = MatchSpec::from_str(spec).expect("...");
-                let dep = DependencyInfo::RunExports {
-                    spec,
-                    from: env.to_string(),
-                    source_package: name.as_normalized().to_string(),
-                };
-                cloned.push(dep);
-            }
-            Ok(cloned)
-        };
+    let clone_specs = |name: &PackageName,
+                       env: &str,
+                       specs: &[String]|
+     -> Result<Vec<DependencyInfo>, ResolveError> {
+        let mut cloned = Vec::new();
+        for spec in specs {
+            let spec = MatchSpec::from_str(spec).expect("...");
+            let dep = DependencyInfo::RunExports {
+                spec,
+                from: env.to_string(),
+                source_package: name.as_normalized().to_string(),
+            };
+            cloned.push(dep);
+        }
+        Ok(cloned)
+    };
 
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {
