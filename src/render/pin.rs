@@ -203,7 +203,7 @@ mod test {
     #[test]
     fn test_apply_pin() {
         let pin = Pin {
-            name: "foo".to_string(),
+            name: PackageName::from_str("foo").unwrap(),
             max_pin: Some(PinExpression("x.x.x".to_string())),
             min_pin: Some(PinExpression("x.x.x".to_string())),
             exact: false,
@@ -219,7 +219,7 @@ mod test {
         assert_eq!(spec.to_string(), "foo >=1,<1.0.1");
 
         let pin = Pin {
-            name: "foo".to_string(),
+            name: PackageName::from_str("foo").unwrap(),
             max_pin: Some(PinExpression("x.x.x".to_string())),
             min_pin: None,
             exact: false,
@@ -229,7 +229,7 @@ mod test {
         assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4");
 
         let pin = Pin {
-            name: "foo".to_string(),
+            name: PackageName::from_str("foo").unwrap(),
             max_pin: None,
             min_pin: Some(PinExpression("x.x.x".to_string())),
             exact: false,
@@ -242,7 +242,7 @@ mod test {
     #[test]
     fn test_apply_exact_pin() {
         let pin = Pin {
-            name: "foo".to_string(),
+            name: PackageName::from_str("foo").unwrap(),
             max_pin: Some(PinExpression("x.x.x".to_string())),
             min_pin: Some(PinExpression("x.x.x".to_string())),
             exact: true,
