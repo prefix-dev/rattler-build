@@ -1,6 +1,7 @@
 //! All the metadata that makes up a recipe file
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
+use rattler_conda_types::PackageName;
 use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
@@ -173,9 +174,9 @@ pub struct BuildOptions {
     #[serde(skip_serializing_if = "ScriptEnv::is_empty", default)]
     pub script_env: ScriptEnv,
     /// A recipe can choose to ignore certain run exports of its dependencies
-    pub ignore_run_exports: Option<Vec<String>>,
+    pub ignore_run_exports: Option<Vec<PackageName>>,
     /// A recipe can choose to ignore all run exports of coming from some packages
-    pub ignore_run_exports_from: Option<Vec<String>>,
+    pub ignore_run_exports_from: Option<Vec<PackageName>>,
     /// The recipe can specify a list of run exports that it provides
     pub run_exports: Option<RunExports>,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
@@ -438,7 +439,7 @@ pub struct BuildConfiguration {
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
-    pub subpackages: BTreeMap<String, PackageIdentifier>,
+    pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
 }
 
 impl BuildConfiguration {
@@ -451,14 +452,14 @@ impl BuildConfiguration {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Package {
     /// The name of the package
-    pub name: String,
+    pub name: PackageName,
     /// The version of the package
     pub version: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageIdentifier {
-    pub name: String,
+    pub name: PackageName,
     pub version: String,
     pub build_string: String,
 }
@@ -499,7 +500,7 @@ pub struct Output {
 }
 
 impl Output {
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> &PackageName {
         &self.recipe.package.name
     }
 
@@ -517,7 +518,7 @@ impl Display for Output {
         writeln!(
             f,
             "\nOutput: {}-{}-{}\n",
-            self.name(),
+            self.name().as_normalized(),
             self.version(),
             self.build_string()
         )?;

@@ -124,7 +124,7 @@ mod tests {
             Dependency::PinSubpackage(p) => p,
             _ => panic!("Expected PinSubpackage"),
         };
-        assert_eq!(p.pin_subpackage.name, "super-package");
+        assert_eq!(p.pin_subpackage.name.as_normalized(), "super-package");
         assert_eq!(
             p.pin_subpackage.max_pin.as_ref().unwrap().to_string(),
             "x.x"

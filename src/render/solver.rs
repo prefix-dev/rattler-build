@@ -51,7 +51,7 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
         };
 
         table.add_row(vec![
-            package.package_record.name.clone(),
+            package.package_record.name.as_normalized().to_string(),
             package.package_record.version.to_string(),
             package.package_record.build.clone(),
             channel_short,
@@ -147,7 +147,7 @@ pub async fn create_environment(
         .collect::<Result<Vec<_>, _>>()?;
 
     // Get the package names from the matchspecs so we can only load the package records that we need.
-    let package_names = specs.iter().filter_map(|spec| spec.name.as_ref());
+    let package_names = specs.iter().filter_map(|spec| spec.name.clone());
     let repodatas = wrap_in_progress("parsing repodata", move || {
         SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
     })?;
@@ -415,7 +415,11 @@ async fn install_package_to_environment(
         // Write the conda-meta information
         let pkg_meta_path = conda_meta_path.join(format!(
             "{}-{}-{}.json",
-            prefix_record.repodata_record.package_record.name,
+            prefix_record
+                .repodata_record
+                .package_record
+                .name
+                .as_normalized(),
             prefix_record.repodata_record.package_record.version,
             prefix_record.repodata_record.package_record.build
         ));
@@ -460,7 +464,7 @@ async fn remove_package_from_environment(
     // Remove the conda-meta file
     let conda_meta_path = target_prefix.join("conda-meta").join(format!(
         "{}-{}-{}.json",
-        package.repodata_record.package_record.name,
+        package.repodata_record.package_record.name.as_normalized(),
         package.repodata_record.package_record.version,
         package.repodata_record.package_record.build
     ));
@@ -506,12 +510,12 @@ async fn fetch_repo_data_records_with_progress(
         client,
         repodata_cache,
         FetchRepoDataOptions {
-            download_progress: Some(Box::new(move |DownloadProgress { total, bytes }| {
-                download_progress_bar.set_length(total.unwrap_or(bytes));
-                download_progress_bar.set_position(bytes);
-            })),
             ..Default::default()
         },
+        Some(Box::new(move |DownloadProgress { total, bytes }| {
+            download_progress_bar.set_length(total.unwrap_or(bytes));
+            download_progress_bar.set_position(bytes);
+        })),
     )
     .await;
 

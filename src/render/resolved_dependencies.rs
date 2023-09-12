@@ -14,7 +14,7 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, Platform, RepoDataRecord, Version, VersionSpec,
+    MatchSpec, PackageName, Platform, RepoDataRecord, Version, VersionSpec,
 };
 use thiserror::Error;
 
@@ -92,7 +92,7 @@ pub struct FinalizedRunDependencies {
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
     pub resolved: Vec<RepoDataRecord>,
-    pub run_exports: HashMap<String, RunExportsJson>,
+    pub run_exports: HashMap<PackageName, RunExportsJson>,
 }
 
 fn short_channel(channel: &str) -> String {
@@ -144,7 +144,7 @@ impl Display for ResolvedDependencies {
 
         for (record, dep_info) in &explicit {
             table.add_row(vec![
-                record.package_record.name.clone(),
+                record.package_record.name.as_normalized().to_string(),
                 dep_info.render(),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
@@ -158,7 +158,7 @@ impl Display for ResolvedDependencies {
         }
         for (record, _) in &transient {
             table.add_row(vec![
-                record.package_record.name.clone(),
+                record.package_record.name.as_normalized().to_string(),
                 "".to_string(),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
@@ -208,7 +208,7 @@ pub fn apply_variant(
                     let m = m.clone();
                     if m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(name) {
+                            if let Some(version) = variant.get(name.as_normalized()) {
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
                                 let mut spec = version.clone();
@@ -337,7 +337,7 @@ fn collect_run_exports_from_env(
     env: &[RepoDataRecord],
     cache_dir: &Path,
     filter: impl Fn(&RepoDataRecord) -> bool,
-) -> Result<HashMap<String, RunExportsJson>, std::io::Error> {
+) -> Result<HashMap<PackageName, RunExportsJson>, std::io::Error> {
     let mut run_exports = HashMap::new();
     for pkg in env {
         if !filter(pkg) {
@@ -415,20 +415,22 @@ pub async fn resolve_dependencies(
     // host env
     let mut specs = apply_variant(&reqs.host, &output.build_configuration)?;
 
-    let clone_specs =
-        |name: &str, env: &str, specs: &[String]| -> Result<Vec<DependencyInfo>, ResolveError> {
-            let mut cloned = Vec::new();
-            for spec in specs {
-                let spec = MatchSpec::from_str(spec).expect("...");
-                let dep = DependencyInfo::RunExports {
-                    spec,
-                    from: env.to_string(),
-                    source_package: name.to_string(),
-                };
-                cloned.push(dep);
-            }
-            Ok(cloned)
-        };
+    let clone_specs = |name: &PackageName,
+                       env: &str,
+                       specs: &[String]|
+     -> Result<Vec<DependencyInfo>, ResolveError> {
+        let mut cloned = Vec::new();
+        for spec in specs {
+            let spec = MatchSpec::from_str(spec).expect("...");
+            let dep = DependencyInfo::RunExports {
+                spec,
+                from: env.to_string(),
+                source_package: name.as_normalized().to_string(),
+            };
+            cloned.push(dep);
+        }
+        Ok(cloned)
+    };
 
     // add the run exports of the build environment
     if let Some(build_env) = &build_env {

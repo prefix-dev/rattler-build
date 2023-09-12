@@ -53,6 +53,7 @@ mod functions {
     use std::str::FromStr;
 
     use minijinja::Error;
+    use rattler_conda_types::PackageName;
 
     use crate::render::pin::{Pin, PinExpression};
 
@@ -66,8 +67,15 @@ mod functions {
         kwargs: Option<minijinja::value::Value>,
     ) -> Result<String, Error> {
         // we translate the compiler into a YAML string
+        let package_name = PackageName::try_from(name).map_err(|e| {
+            Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Invalid package name in pin_subpackage: {}", e),
+            )
+        })?;
+
         let mut pin_subpackage = Pin {
-            name,
+            name: package_name,
             max_pin: None,
             min_pin: None,
             exact: false,

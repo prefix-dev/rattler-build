@@ -152,6 +152,7 @@ pub fn index(
         let mut repodata = RepoData {
             info: Some(ChannelInfo {
                 subdir: platform.clone(),
+                base_url: None,
             }),
             packages: Default::default(),
             conda_packages: Default::default(),
