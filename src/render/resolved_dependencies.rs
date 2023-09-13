@@ -305,7 +305,11 @@ pub fn apply_variant(
                                 };
                                 default_compiler
                             } else {
-                                panic!("Unknown target platform: {}", target_platform);
+                                panic!(
+                                    "Could not find compiler ({}) configuration for platform: {}",
+                                    compiler.compiler,
+                                    target_platform.to_string()
+                                )
                             }
                         });
 

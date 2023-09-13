@@ -38,21 +38,11 @@ impl SelectorConfig {
             "linux".to_string(),
             Value::from(self.target_platform.is_linux()),
         );
-        let arch = self
-            .target_platform
-            .to_string()
-            .split('-')
-            .last()
-            .unwrap()
-            .to_string();
+        let arch = self.target_platform.arch().map(|x| x.to_string());
 
-        let arch = match arch.as_str() {
-            "64" => "x86_64",
-            "32" => "x86",
-            _ => &arch,
-        };
-
-        context.insert(arch.to_string(), Value::from(true));
+        if let Some(arch) = arch {
+            context.insert(arch, Value::from(true));
+        }
 
         context.insert(
             "build_platform".to_string(),
