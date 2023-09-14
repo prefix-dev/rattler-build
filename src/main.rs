@@ -119,7 +119,7 @@ async fn main() -> ExitCode {
     let default_filter = if args.verbose {
         LevelFilter::DEBUG
     } else {
-        LevelFilter::INFO
+        LevelFilter::WARN
     };
 
     let env_filter = EnvFilter::builder()
