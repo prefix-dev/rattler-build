@@ -139,11 +139,7 @@ pub async fn create_environment(
         .await
         // Collect into another iterator where we extract the first erroneous result
         .into_iter()
-        .filter_map(|res| match res {
-            Ok(Some(data)) => Some(Ok(data)), // If Ok contains Some, keep the data
-            Ok(None) => None,                 // If Ok contains None, discard it
-            Err(e) => Some(Err(e)),           // If Err, keep it as is
-        })
+        .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, _>>()?;
 
     // Get the package names from the matchspecs so we can only load the package records that we need.
