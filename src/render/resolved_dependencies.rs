@@ -307,8 +307,7 @@ pub fn apply_variant(
                             } else {
                                 panic!(
                                     "Could not find compiler ({}) configuration for platform: {}",
-                                    compiler.compiler,
-                                    target_platform.to_string()
+                                    compiler.compiler, target_platform
                                 )
                             }
                         });

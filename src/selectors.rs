@@ -22,27 +22,22 @@ impl SelectorConfig {
             "target_platform".to_string(),
             Value::from_safe_string(self.target_platform.to_string()),
         );
+
+        if let Some(platform) = self.target_platform.only_platform() {
+            context.insert(
+                platform.to_string(),
+                Value::from_safe_string(platform.to_string()),
+            );
+        }
+
+        if let Some(arch) = self.target_platform.arch() {
+            context.insert(arch.to_string(), Value::from(true));
+        }
+
         context.insert(
             "unix".to_string(),
             Value::from(self.target_platform.is_unix()),
         );
-        context.insert(
-            "win".to_string(),
-            Value::from(self.target_platform.is_windows()),
-        );
-        context.insert(
-            "osx".to_string(),
-            Value::from(self.target_platform.is_osx()),
-        );
-        context.insert(
-            "linux".to_string(),
-            Value::from(self.target_platform.is_linux()),
-        );
-        let arch = self.target_platform.arch().map(|x| x.to_string());
-
-        if let Some(arch) = arch {
-            context.insert(arch, Value::from(true));
-        }
 
         context.insert(
             "build_platform".to_string(),
