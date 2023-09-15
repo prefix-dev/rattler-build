@@ -186,7 +186,7 @@ pub struct FinalizedDependencies {
 
 #[derive(Error, Debug)]
 pub enum ResolveError {
-    #[error("Failed to resolve dependencies {0}")]
+    #[error("Failed to resolve dependencies\n{0}")]
     DependencyResolutionError(#[from] anyhow::Error),
 }
 
