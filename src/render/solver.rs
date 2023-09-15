@@ -16,7 +16,7 @@ use rattler_repodata_gateway::fetch::{
     CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
-use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
+use rattler_solve::{libsolv_rs::Solver, SolverImpl, SolverTask};
 
 use std::{
     borrow::Cow,
