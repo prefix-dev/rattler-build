@@ -2,3 +2,6 @@ book
 output/
 target/
 .idea/
+
+# pixi environments
+.pixi
