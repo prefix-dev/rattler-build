@@ -46,7 +46,7 @@ pub enum SourceError {
     IgnoreError(#[from] ignore::Error),
 
     #[error("Failed to parse glob pattern")]
-    Glob(#[from] glob::PatternError),
+    Glob(#[from] globset::Error),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -154,18 +154,16 @@ fn copy_dir(
     // catch its environment, so we need to move the globs in there.
     // Because it also needs `Send` (because it uses some Arc machinery internally)
     // we cannot use a normal Rc here, so we use an Arc
+    fn mkglobset(globs: &[&str]) -> Result<std::sync::Arc<globset::GlobSet>, globset::Error> {
+        let mut globset = globset::GlobSetBuilder::new();
+        for glob in globs {
+            globset.add(globset::Glob::new(glob)?);
+        }
+        globset.build().map(std::sync::Arc::new)
+    }
 
-    let include_globs = include_globs
-        .iter()
-        .map(|gl| glob::Pattern::new(gl).map_err(SourceError::from))
-        .collect::<Result<Vec<_>, _>>()
-        .map(std::sync::Arc::new)?;
-
-    let exclude_globs = exclude_globs
-        .iter()
-        .map(|gl| glob::Pattern::new(gl).map_err(SourceError::from))
-        .collect::<Result<Vec<_>, _>>()
-        .map(std::sync::Arc::new)?;
+    let include_globs = mkglobset(&include_globs)?;
+    let exclude_globs = mkglobset(&exclude_globs)?;
 
     WalkBuilder::new(from)
         // disregard global gitignore
@@ -173,8 +171,7 @@ fn copy_dir(
         .git_ignore(use_gitignore)
         .hidden(true)
         .filter_entry(move |entry| {
-            include_globs.iter().any(|gl| gl.matches_path(entry.path()))
-                && !exclude_globs.iter().any(|gl| gl.matches_path(entry.path()))
+            include_globs.is_match(entry.path()) && !exclude_globs.is_match(entry.path())
         })
         .build()
         .try_for_each(|entry| {
