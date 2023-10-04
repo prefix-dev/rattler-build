@@ -2281,6 +2281,7 @@ dependencies = [
  "fs_extra",
  "futures 0.3.28",
  "git2",
+ "glob",
  "goblin",
  "hex",
  "ignore",

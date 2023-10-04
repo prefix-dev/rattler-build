@@ -44,6 +44,9 @@ pub enum SourceError {
 
     #[error("Could not walk dir")]
     IgnoreError(#[from] ignore::Error),
+
+    #[error("Failed to parse glob pattern")]
+    Glob(#[from] glob::PatternError),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -147,55 +150,39 @@ fn copy_dir(
     options.overwrite = true;
     options.content_only = true;
 
+    // We need an Arc for the glob lists bcause WalkBuilder::filter_entry does not
+    // catch its environment, so we need to move the globs in there.
+    // Because it also needs `Send` (because it uses some Arc machinery internally)
+    // we cannot use a normal Rc here, so we use an Arc
+
+    let include_globs = include_globs
+        .iter()
+        .map(|gl| glob::Pattern::new(gl).map_err(SourceError::from))
+        .collect::<Result<Vec<_>, _>>()
+        .map(std::sync::Arc::new)?;
+
+    let exclude_globs = exclude_globs
+        .iter()
+        .map(|gl| glob::Pattern::new(gl).map_err(SourceError::from))
+        .collect::<Result<Vec<_>, _>>()
+        .map(std::sync::Arc::new)?;
+
     let walker = WalkBuilder::new(from)
         // disregard global gitignore
         .git_global(false)
         .git_ignore(use_gitignore)
         .hidden(true)
+        .filter_entry(move |entry| {
+            include_globs.iter().any(|gl| gl.matches_path(entry.path()))
+                && !exclude_globs.iter().any(|gl| gl.matches_path(entry.path()))
+        })
         .build();
-
-    let include_globber = if !include_globs.is_empty() {
-        let mut builder = ignore::gitignore::GitignoreBuilder::new(from);
-        for glob in include_globs {
-            builder.add_line(None, glob)?;
-        }
-        Some(builder.build()?)
-    } else {
-        None
-    };
-
-    let exclude_globber = if !exclude_globs.is_empty() {
-        let mut builder = ignore::gitignore::GitignoreBuilder::new(from);
-        for glob in exclude_globs {
-            builder.add_line(None, glob)?;
-        }
-        Some(builder.build()?)
-    } else {
-        None
-    };
 
     for entry in walker {
         let entry = entry?;
         let path = entry.path();
         let stripped_path = path.strip_prefix(from)?;
         let dest_path = to.join(stripped_path);
-        if let Some(include_globber) = &include_globber {
-            match include_globber.matched(path, path.is_dir()) {
-                ignore::Match::None | ignore::Match::Whitelist(_) => {
-                    continue;
-                }
-                ignore::Match::Ignore(_) => {}
-            }
-        }
-
-        if let Some(exclude_globber) = &exclude_globber {
-            match exclude_globber.matched(path, path.is_dir()) {
-                ignore::Match::None | ignore::Match::Whitelist(_) => {}
-                ignore::Match::Ignore(_) => {
-                    continue;
-                }
-            }
-        }
 
         if path.is_dir() {
             create_all(&dest_path, true).unwrap();
