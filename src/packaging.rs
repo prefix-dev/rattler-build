@@ -9,7 +9,7 @@ use std::os::unix::prelude::OsStrExt;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::symlink;
 
-use tempdir::TempDir;
+use tempfile::TempDir;
 use walkdir::WalkDir;
 
 use rattler_conda_types::package::{
@@ -635,7 +635,7 @@ pub fn package_conda(
         return Err(PackagingError::DependenciesNotFinalized);
     }
 
-    let tmp_dir = TempDir::new(output.name().as_normalized())?;
+    let tmp_dir = TempDir::with_prefix(output.name().as_normalized())?;
     let tmp_dir_path = tmp_dir.path();
 
     let mut tmp_files = HashSet::new();
