@@ -177,8 +177,7 @@ fn copy_dir(
                 && !exclude_globs.iter().any(|gl| gl.matches_path(entry.path()))
         })
         .build()
-        .into_iter()
-        .map(|entry| {
+        .try_for_each(|entry| {
             let entry = entry?;
             let path = entry.path();
             let stripped_path = path.strip_prefix(from)?;
@@ -192,7 +191,7 @@ fn copy_dir(
                     skip_exist: options.skip_exist,
                     buffer_size: options.buffer_size,
                 };
-                fs_extra::file::copy(&path, &dest_path, &file_options)
+                fs_extra::file::copy(path, &dest_path, &file_options)
                     .map_err(SourceError::FileSystemError)?;
 
                 tracing::debug!(
@@ -203,7 +202,6 @@ fn copy_dir(
                 Ok(())
             }
         })
-        .collect::<Result<_, _>>()
 }
 
 #[cfg(test)]
