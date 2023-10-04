@@ -1,4 +1,5 @@
 //! All the metadata that makes up a recipe file
+use rattler_conda_types::package::ArchiveType;
 use rattler_conda_types::package::EntryPoint;
 use rattler_conda_types::NoArchType;
 use rattler_conda_types::PackageName;
@@ -440,6 +441,8 @@ pub struct BuildConfiguration {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
+    /// Package format (.tar.bz2 or .conda)
+    pub package_format: ArchiveType,
 }
 
 impl BuildConfiguration {

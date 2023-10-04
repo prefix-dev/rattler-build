@@ -220,6 +220,7 @@ pub async fn run_build(
         &difference,
         &directories.host_prefix,
         &directories.output_dir,
+        output.build_configuration.package_format,
     )?;
 
     if !output.build_configuration.no_clean {

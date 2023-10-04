@@ -13,13 +13,15 @@ use tempdir::TempDir;
 use walkdir::WalkDir;
 
 use rattler_conda_types::package::{
-    AboutJson, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry, PrefixPlaceholder,
-    PythonEntryPoints,
+    AboutJson, ArchiveType, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry,
+    PrefixPlaceholder, PythonEntryPoints,
 };
 use rattler_conda_types::package::{IndexJson, PathsJson};
 use rattler_conda_types::{NoArchType, Platform};
 use rattler_digest::compute_file_digest;
-use rattler_package_streaming::write::{write_tar_bz2_package, CompressionLevel};
+use rattler_package_streaming::write::{
+    write_conda_package, write_tar_bz2_package, CompressionLevel,
+};
 
 use crate::macos;
 use crate::metadata::Output;
@@ -630,6 +632,7 @@ pub fn package_conda(
     new_files: &HashSet<PathBuf>,
     prefix: &Path,
     local_channel_dir: &Path,
+    package_format: ArchiveType,
 ) -> Result<PathBuf, PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -747,22 +750,40 @@ pub fn package_conda(
     fs::create_dir_all(&output_folder)?;
 
     // TODO get proper hash
-    let file = format!(
-        "{}-{}-{}.tar.bz2",
+    let file_name = format!(
+        "{}-{}-{}{}",
         output.name().as_normalized(),
         output.version(),
-        output.build_string()
+        output.build_string(),
+        package_format.extension()
     );
 
-    let out_path = output_folder.join(file);
+    let out_path = output_folder.join(file_name.clone());
     let file = File::create(&out_path)?;
-    write_tar_bz2_package(
-        file,
-        tmp_dir_path,
-        &tmp_files.into_iter().collect::<Vec<_>>(),
-        CompressionLevel::Default,
-        Some(&output.build_configuration.timestamp),
-    )?;
+
+    match package_format {
+        ArchiveType::TarBz2 => {
+            write_tar_bz2_package(
+                file,
+                tmp_dir_path,
+                &tmp_files.into_iter().collect::<Vec<_>>(),
+                CompressionLevel::Default,
+                Some(&output.build_configuration.timestamp),
+            )?;
+        }
+        ArchiveType::Conda => {
+            // This is safe because we're just putting it together before
+            let (out_name, _) = file_name.split_once('.').unwrap();
+            write_conda_package(
+                file,
+                tmp_dir_path,
+                &tmp_files.into_iter().collect::<Vec<_>>(),
+                CompressionLevel::Default,
+                out_name,
+                Some(&output.build_configuration.timestamp),
+            )?;
+        }
+    }
 
     Ok(out_path)
 }

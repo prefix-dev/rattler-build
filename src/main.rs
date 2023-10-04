@@ -4,7 +4,7 @@ use anyhow::Ok;
 use clap::{arg, crate_version, Parser};
 
 use indicatif::MultiProgress;
-use rattler_conda_types::{NoArchType, Platform};
+use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
 use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
@@ -73,6 +73,12 @@ struct App {
     verbose: bool,
 }
 
+#[derive(clap::ValueEnum, Clone)]
+enum PackageFormat {
+    TarBz2,
+    Conda,
+}
+
 #[derive(Parser)]
 struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
@@ -103,6 +109,11 @@ struct BuildOpts {
     /// Output directory for build artifacts. Defaults to `./output`.
     #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
     output_dir: PathBuf,
+
+    /// The package format to use for the build.
+    /// Defaults to `.tar.bz2`.
+    #[arg(long, default_value = "tar-bz2")]
+    package_format: PackageFormat,
 }
 
 #[derive(Parser)]
@@ -331,6 +342,10 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
                 channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,
+                package_format: match args.package_format {
+                    PackageFormat::TarBz2 => ArchiveType::TarBz2,
+                    PackageFormat::Conda => ArchiveType::Conda,
+                },
             },
             finalized_dependencies: None,
         };
