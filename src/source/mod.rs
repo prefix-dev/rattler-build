@@ -221,29 +221,26 @@ fn copy_dir(
 
 #[cfg(test)]
 mod test {
-    use std::{fs, path::PathBuf};
-
-    use tempfile::tempdir;
-
     #[test]
     fn test_copy_dir() {
-        let tmp_dir = tempdir::TempDir::new("test").unwrap().into_path();
-        let dir = tmp_dir.as_path().join("test_copy_dir");
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let tmp_dir_path = tmp_dir.into_path();
+        let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
         fs_extra::dir::create_all(&dir, true).unwrap();
-        fs::write(dir.join("test.txt"), "test").unwrap();
-        fs::create_dir(dir.join("test_dir")).unwrap();
-        fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
-        fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
+        std::fs::write(dir.join("test.txt"), "test").unwrap();
+        std::fs::create_dir(dir.join("test_dir")).unwrap();
+        std::fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
+        std::fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
 
-        let dest_dir = tmp_dir.as_path().join("test_copy_dir_dest");
+        let dest_dir = tmp_dir_path.as_path().join("test_copy_dir_dest");
         super::copy_dir(&dir, &dest_dir, &[], &[], false).unwrap();
 
         for entry in walkdir::WalkDir::new(dest_dir) {
             println!("{}", entry.unwrap().path().display());
         }
 
-        let dest_dir_2 = tmp_dir.as_path().join("test_copy_dir_dest_2");
+        let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         super::copy_dir(&dir, &dest_dir_2, &["*.txt"], &[], false).unwrap();
         println!("---------------------");
@@ -251,7 +248,7 @@ mod test {
             println!("{}", entry.unwrap().path().display());
         }
 
-        let dest_dir_2 = tmp_dir.as_path().join("test_copy_dir_dest_2");
+        let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         super::copy_dir(&dir, &dest_dir_2, &[], &["*.txt"], false).unwrap();
         println!("---------------------");
