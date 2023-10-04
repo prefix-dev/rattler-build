@@ -1,0 +1,23 @@
+[project]
+name = "rattler-build"
+version = "0.3.1"
+description = "Conda package builder, using the rattler rust backend"
+authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
+channels = ["conda-forge"]
+platforms = ["linux-64"]
+
+[tasks]
+build = "cargo build --release"
+install = "cargo install --path . --locked"
+test = "cargo test"
+lint = "pre-commit run --all"
+
+[dependencies]
+openssl = "3.*"
+rust = "1.70.0.*"
+pre-commit = "3.3.3.*"
+compilers = "1.6.0.*"
+libssh2 = "1.11.0.*"
+pkg-config = "0.29.2.*"
+cmake = "3.27.6.*"
+make = "4.3.*"

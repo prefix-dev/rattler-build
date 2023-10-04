@@ -16,7 +16,7 @@ use rattler_repodata_gateway::fetch::{
     CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
-use rattler_solve::{libsolv_c::Solver, SolverImpl, SolverTask};
+use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
 
 use std::{
     borrow::Cow,
@@ -504,7 +504,7 @@ async fn fetch_repo_data_records_with_progress(
     let result = rattler_repodata_gateway::fetch::fetch_repo_data(
         channel.platform_url(platform),
         client,
-        repodata_cache,
+        repodata_cache.to_path_buf(),
         FetchRepoDataOptions {
             ..Default::default()
         },

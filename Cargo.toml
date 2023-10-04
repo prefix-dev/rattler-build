@@ -15,25 +15,15 @@ rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 [dependencies]
 serde = { version = "1.0.188", features = ["derive"] }
 serde_yaml = "0.9.25"
-rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main", default-features = false }
-rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main", features = ["sparse"] }
-rattler = { git = "https://github.com/mamba-org/rattler", branch = "main", default-features = false }
-rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# local deps
-# rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
-# rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
-# rattler_digest = { path = "../rattler/crates/rattler_digest" }
-# rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway", features = ["sparse"] }
-# rattler = { path = "../rattler/crates/rattler" }
-# rattler_solve = { path = "../rattler/crates/rattler_solve" }
-# rattler_shell = { path = "../rattler/crates/rattler_shell" }
-# rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-# rattler_networking = { path = "../rattler/crates/rattler_networking" }
+rattler = { version = "0.10.0", default-features = false }
+rattler_conda_types = { version = "0.10.0", default-features = false }
+rattler_digest = { version = "0.10.0", default-features = false }
+rattler_networking = { version = "0.10.0", default-features = false }
+rattler_repodata_gateway = { version = "0.10.0", default-features = false, features = ["sparse"] }
+rattler_shell = { version = "0.10.0", default-features = false, features = ["sysinfo"] }
+rattler_solve = { version = "0.10.0", default-features = false, features = ["resolvo"] }
+rattler_virtual_packages = { version = "0.10.0", default-features = false }
+rattler_package_streaming = { version = "0.10.0", default-features = false }
 anyhow = "1.0.75"
 walkdir = "2.3.3"
 sha2 = "0.10.7"
@@ -78,3 +68,24 @@ pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH"
 ]
+
+[patch.crates-io]
+#rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+#rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+
+#rattler = { path = "../rattler/crates/rattler" }
+#rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
+#rattler_digest = { path = "../rattler/crates/rattler_digest" }
+#rattler_networking = { path = "../rattler/crates/rattler_networking" }
+#rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
+#rattler_shell = { path = "../rattler/crates/rattler_shell" }
+#rattler_solve = { path = "../rattler/crates/rattler_solve" }
+#rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
+#rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
