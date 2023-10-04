@@ -167,7 +167,7 @@ fn copy_dir(
         .collect::<Result<Vec<_>, _>>()
         .map(std::sync::Arc::new)?;
 
-    let walker = WalkBuilder::new(from)
+    WalkBuilder::new(from)
         // disregard global gitignore
         .git_global(false)
         .git_ignore(use_gitignore)
@@ -176,34 +176,34 @@ fn copy_dir(
             include_globs.iter().any(|gl| gl.matches_path(entry.path()))
                 && !exclude_globs.iter().any(|gl| gl.matches_path(entry.path()))
         })
-        .build();
+        .build()
+        .into_iter()
+        .map(|entry| {
+            let entry = entry?;
+            let path = entry.path();
+            let stripped_path = path.strip_prefix(from)?;
+            let dest_path = to.join(stripped_path);
 
-    for entry in walker {
-        let entry = entry?;
-        let path = entry.path();
-        let stripped_path = path.strip_prefix(from)?;
-        let dest_path = to.join(stripped_path);
+            if path.is_dir() {
+                create_all(&dest_path, true).map_err(SourceError::FileSystemError)
+            } else {
+                let file_options = fs_extra::file::CopyOptions {
+                    overwrite: options.overwrite,
+                    skip_exist: options.skip_exist,
+                    buffer_size: options.buffer_size,
+                };
+                fs_extra::file::copy(&path, &dest_path, &file_options)
+                    .map_err(SourceError::FileSystemError)?;
 
-        if path.is_dir() {
-            create_all(&dest_path, true).unwrap();
-        } else {
-            let file_options = fs_extra::file::CopyOptions {
-                overwrite: options.overwrite,
-                skip_exist: options.skip_exist,
-                buffer_size: options.buffer_size,
-            };
-            match fs_extra::file::copy(&path, &dest_path, &file_options) {
-                Ok(_) => tracing::debug!(
+                tracing::debug!(
                     "Copied {} to {}",
                     path.to_string_lossy(),
                     dest_path.to_string_lossy()
-                ),
-                Err(e) => return Err(SourceError::FileSystemError(e)),
+                );
+                Ok(())
             }
-        }
-    }
-
-    Ok(())
+        })
+        .collect::<Result<_, _>>()
 }
 
 #[cfg(test)]
