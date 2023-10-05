@@ -59,7 +59,7 @@ pub fn get_conda_build_script(
             let mut orig_build_file = File::open(recipe_file)?;
             let mut orig_build_file_text = String::new();
             orig_build_file.read_to_string(&mut orig_build_file_text)?;
-            orig_build_file_text    
+            orig_build_file_text
         }
     } else {
         script

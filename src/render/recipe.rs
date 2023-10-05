@@ -180,7 +180,7 @@ pub fn render_recipe(
         };
 
     render_recipe_recursively(&mut recipe_modified, &env, &context);
-    
+
     let mut recipe: RenderedRecipe = serde_yaml::from_value(YamlValue::from(recipe_modified))?;
 
     // Set the build string to the package hash if it is not set
