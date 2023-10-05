@@ -9,6 +9,7 @@ use std::os::unix::prelude::OsStrExt;
 #[cfg(target_family = "unix")]
 use std::os::unix::fs::symlink;
 
+use itertools::Itertools;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
@@ -741,6 +742,14 @@ pub fn package_conda(
             tmp_files.insert(info_folder.join("link.json"));
         }
     }
+
+    // print sorted files
+    println!("\nFiles in package:\n");
+    tmp_files
+        .iter()
+        .map(|x| x.strip_prefix(tmp_dir_path).unwrap())
+        .sorted()
+        .for_each(|f| println!("  - {}", f.to_string_lossy()));
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
