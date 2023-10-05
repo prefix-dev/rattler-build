@@ -1,6 +1,6 @@
 use indicatif::MultiProgress;
 use std::io;
-use tracing_subscriber::fmt::{MakeWriter, format, FmtContext, FormattedFields};
+use tracing_subscriber::fmt::MakeWriter;
 
 #[derive(Clone)]
 pub struct IndicatifWriter {
@@ -15,11 +15,11 @@ impl IndicatifWriter {
 
 impl io::Write for IndicatifWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.progress_bars.suspend(|| io::stderr().write(buf))
+        self.progress_bars.suspend(|| io::stdout().write(buf))
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.progress_bars.suspend(|| io::stderr().flush())
+        self.progress_bars.suspend(|| io::stdout().flush())
     }
 }
 

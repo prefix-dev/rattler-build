@@ -18,8 +18,7 @@ use std::{
     str::{self, FromStr},
 };
 use test::TestConfiguration;
-use tracing::metadata::LevelFilter;
-use tracing_subscriber::{prelude::*, EnvFilter, fmt, filter::Directive};
+use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
 mod build;
 mod console_utils;
@@ -44,10 +43,10 @@ use build::run_build;
 mod test;
 
 use crate::{
+    console_utils::IndicatifWriter,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
-    console_utils::IndicatifWriter,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -158,22 +157,18 @@ async fn main() -> ExitCode {
 
     // Setup tracing subscriber
     tracing_subscriber::registry()
-        .with(fmt::layer().with_writer(IndicatifWriter::new(multi_progress.clone())).with_level(false).without_time().with_target(false))
+        .with(
+            fmt::layer()
+                .with_writer(IndicatifWriter::new(multi_progress.clone()))
+                .with_level(false)
+                .without_time()
+                .with_target(false),
+        )
         .with(
             EnvFilter::try_from_default_env()
                 .unwrap_or_else(|_| get_default_env_filter(args.verbose.log_level_filter())),
         )
         .init();
-
-    // tracing_subscriber::fmt()
-    //     .with_env_filter(env_filter)
-    //     .with_writer(IndicatifWriter::new(multi_progress.clone()))
-    //     .with_level(false)
-    //     .with_target(false)
-    //     .without_time()
-    //     .finish()
-    //     .try_init()
-    //     .unwrap();
 
     tracing::info!("Starting the build process");
 

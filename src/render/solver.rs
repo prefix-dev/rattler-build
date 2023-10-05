@@ -128,7 +128,7 @@ pub async fn create_environment(
                     platform,
                     &repodata_cache,
                     download_client.clone(),
-                    &tool_configuration.multi_progress_indicator,
+                    tool_configuration.multi_progress_indicator.clone(),
                     platform != Platform::NoArch,
                 )
                 .await
@@ -141,6 +141,8 @@ pub async fn create_environment(
         .into_iter()
         .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, _>>()?;
+
+    tool_configuration.multi_progress_indicator.clear()?;
 
     // Get the package names from the matchspecs so we can only load the package records that we need.
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
@@ -487,7 +489,7 @@ async fn fetch_repo_data_records_with_progress(
     platform: Platform,
     repodata_cache: &Path,
     client: AuthenticatedClient,
-    multi_progress: &indicatif::MultiProgress,
+    multi_progress: indicatif::MultiProgress,
     allow_not_found: bool,
 ) -> anyhow::Result<Option<SparseRepoData>> {
     // Create a progress bar
