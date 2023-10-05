@@ -3,6 +3,7 @@
 use anyhow::Ok;
 use clap::{arg, crate_version, Parser};
 
+use clap_verbosity_flag::{InfoLevel, Verbosity};
 use indicatif::MultiProgress;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
@@ -18,9 +19,10 @@ use std::{
 };
 use test::TestConfiguration;
 use tracing::metadata::LevelFilter;
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{prelude::*, EnvFilter, fmt, filter::Directive};
 
 mod build;
+mod console_utils;
 mod env_vars;
 mod hash;
 mod index;
@@ -45,6 +47,7 @@ use crate::{
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
+    console_utils::IndicatifWriter,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -69,8 +72,8 @@ struct App {
     #[clap(subcommand)]
     subcommand: SubCommands,
 
-    #[clap(short, long, global(true))]
-    verbose: bool,
+    #[command(flatten)]
+    verbose: Verbosity<InfoLevel>,
 }
 
 #[derive(clap::ValueEnum, Clone)]
@@ -127,30 +130,55 @@ struct TestOpts {
 async fn main() -> ExitCode {
     let args = App::parse();
 
-    let default_filter = if args.verbose {
-        LevelFilter::DEBUG
-    } else {
-        LevelFilter::WARN
-    };
+    // let default_filter = match args.verbose.log_level() {
+    //     Some(clap_verbosity_flag::Level::Debug) => {
+    //         LevelFilter::DEBUG
+    //     },
+    //     Some(clap_verbosity_flag::Level::Trace) => {
+    //         LevelFilter::TRACE
+    //     },
+    //     _ => {
+    //         LevelFilter::INFO
+    //     },
+    // };
+    // println!("default_filter: {:?}", default_filter);
+    // println!("Filter is : {}", default_filter < LevelFilter::DEBUG);
+    // let env_filter = EnvFilter::builder()
+    //     .with_default_directive(default_filter.into())
+    //     .from_env()
+    //     .expect("Could not parse RUST_LOG environment variable")
+    //     .add_directive("apple_codesign=off".parse().unwrap())
+    //     .add_directive(if default_filter <= LevelFilter::DEBUG {
+    //         "resolvo::solver=warn".parse().unwrap()
+    //     } else {
+    //         "resolvo::solver=info".parse().unwrap()
+    //     });
 
-    let env_filter = EnvFilter::builder()
-        .with_default_directive(default_filter.into())
-        .from_env()
-        .expect("Could not parse RUST_LOG environment variable")
-        .add_directive("apple_codesign=off".parse().unwrap());
+    let multi_progress = MultiProgress::new();
 
-    tracing_subscriber::fmt()
-        .with_env_filter(env_filter)
-        .with_writer(std::io::stderr)
-        .without_time()
-        .finish()
-        .try_init()
-        .unwrap();
+    // Setup tracing subscriber
+    tracing_subscriber::registry()
+        .with(fmt::layer().with_writer(IndicatifWriter::new(multi_progress.clone())).with_level(false).without_time().with_target(false))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| get_default_env_filter(args.verbose.log_level_filter())),
+        )
+        .init();
+
+    // tracing_subscriber::fmt()
+    //     .with_env_filter(env_filter)
+    //     .with_writer(IndicatifWriter::new(multi_progress.clone()))
+    //     .with_level(false)
+    //     .with_target(false)
+    //     .without_time()
+    //     .finish()
+    //     .try_init()
+    //     .unwrap();
 
     tracing::info!("Starting the build process");
 
     let result = match args.subcommand {
-        SubCommands::Build(args) => run_build_from_args(args).await,
+        SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
     };
 
@@ -175,7 +203,7 @@ async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
+async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> anyhow::Result<()> {
     let recipe_path = fs::canonicalize(&args.recipe);
     if let Err(e) = &recipe_path {
         match e.kind() {
@@ -249,7 +277,7 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         .find_variants(&recipe_text, &selector_config)
         .expect("Could not compute variants");
 
-    println!("Found variants:");
+    tracing::info!("Found variants:");
     for variant in &variants {
         let mut table = comfy_table::Table::new();
         table
@@ -259,12 +287,12 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         for (key, value) in variant.iter() {
             table.add_row(vec![key, value]);
         }
-        println!("{}\n", table);
+        tracing::info!("{}\n", table);
     }
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
-        multi_progress_indicator: MultiProgress::new(),
+        multi_progress_indicator: multi_progress,
     };
 
     for variant in variants {
@@ -298,9 +326,9 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
         };
 
         if args.render_only {
-            println!("{}", serde_yaml::to_string(&recipe).unwrap());
-            println!("Variant: {:#?}", variant);
-            println!("Hash: {}", recipe.build.string.unwrap());
+            tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
+            tracing::info!("Variant: {:#?}", variant);
+            tracing::info!("Hash: {}", recipe.build.string.unwrap());
             continue;
         }
 
@@ -354,4 +382,16 @@ async fn run_build_from_args(args: BuildOpts) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+/// Constructs a default [`EnvFilter`] that is used when the user did not specify a custom RUST_LOG.
+pub fn get_default_env_filter(verbose: clap_verbosity_flag::LevelFilter) -> EnvFilter {
+    let mut result = EnvFilter::new("rattler_build=info");
+
+    if verbose >= clap_verbosity_flag::LevelFilter::Debug {
+        result = result.add_directive(Directive::from_str("resolvo=info").unwrap());
+        result = result.add_directive(Directive::from_str("rattler=info").unwrap());
+    }
+
+    result
 }
