@@ -162,8 +162,8 @@ fn copy_dir(
         globset.build().map(std::sync::Arc::new)
     }
 
-    let include_globs = mkglobset(&include_globs)?;
-    let exclude_globs = mkglobset(&exclude_globs)?;
+    let include_globs = mkglobset(include_globs)?;
+    let exclude_globs = mkglobset(exclude_globs)?;
 
     WalkBuilder::new(from)
         // disregard global gitignore
