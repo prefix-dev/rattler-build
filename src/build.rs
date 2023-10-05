@@ -45,10 +45,22 @@ pub fn get_conda_build_script(
         let recipe_file = directories.recipe_dir.join(script);
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
-        let mut orig_build_file = File::open(recipe_file)?;
-        let mut orig_build_file_text = String::new();
-        orig_build_file.read_to_string(&mut orig_build_file_text)?;
-        orig_build_file_text
+        if !recipe_file.exists() {
+            if recipe.build.script.is_none() {
+                tracing::info!("Empty build script");
+                String::new()
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Recipe file {:?} does not exist", recipe_file),
+                ));
+            }
+        } else {
+            let mut orig_build_file = File::open(recipe_file)?;
+            let mut orig_build_file_text = String::new();
+            orig_build_file.read_to_string(&mut orig_build_file_text)?;
+            orig_build_file_text    
+        }
     } else {
         script
     };
@@ -121,9 +133,9 @@ fn run_process_with_replacements(
                 let filtered_line = replacements
                     .iter()
                     .fold(line, |acc, (from, to)| acc.replace(from, to));
-                println!("{}", filtered_line);
+                tracing::info!("{}", filtered_line);
             } else {
-                eprintln!("Error reading output: {:?}", line);
+                tracing::warn!("Error reading output: {:?}", line);
             }
         }
     }
@@ -235,7 +247,7 @@ pub async fn run_build(
     let test_dir = directories.work_dir.join("test");
     fs::create_dir_all(&test_dir)?;
 
-    println!("{}", output);
+    tracing::info!("{}", output);
 
     tracing::info!("Running tests");
 

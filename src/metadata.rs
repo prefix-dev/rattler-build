@@ -187,7 +187,7 @@ pub struct BuildOptions {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct About {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub home: Option<Vec<Url>>,
@@ -228,7 +228,7 @@ pub struct Recipe {
     pub build: BuildOptions,
     #[serde(default)]
     pub requirements: Requirements,
-    pub about: About,
+    pub about: Option<About>,
 }
 
 pub struct Metadata {
@@ -478,6 +478,7 @@ pub struct RenderedRecipe {
     /// The requirements section of the recipe
     pub requirements: Requirements,
     /// The about section of the recipe
+    #[serde(default)]
     pub about: About,
     /// The test section of the recipe
     pub test: Option<Test>,
