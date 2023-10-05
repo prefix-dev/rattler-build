@@ -553,7 +553,7 @@ async fn fetch_repo_data_records_with_progress(
         }
         Ok(Err(err)) => {
             progress_bar.set_style(errored_progress_style());
-            progress_bar.finish_with_message("Error");
+            progress_bar.finish_with_message(format!("Error: {:?}", err));
             Err(err.into())
         }
         Err(err) => match err.try_into_panic() {

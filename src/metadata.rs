@@ -1,9 +1,6 @@
 //! All the metadata that makes up a recipe file
-use rattler_conda_types::package::ArchiveType;
-use rattler_conda_types::package::EntryPoint;
-use rattler_conda_types::NoArchType;
-use rattler_conda_types::PackageName;
-use rattler_conda_types::Platform;
+use rattler_conda_types::package::{ArchiveType, EntryPoint};
+use rattler_conda_types::{NoArchType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 use serde_with::formats::PreferOne;
 use serde_with::serde_as;
@@ -503,16 +500,29 @@ pub struct Output {
 }
 
 impl Output {
+    /// The name of the package
     pub fn name(&self) -> &PackageName {
         &self.recipe.package.name
     }
 
+    /// The version of the package
     pub fn version(&self) -> &str {
         &self.recipe.package.version
     }
 
+    /// The build string is usually set automatically as the hash of the variant configuration.
     pub fn build_string(&self) -> &str {
         self.recipe.build.string.as_ref().unwrap()
+    }
+
+    /// retrieve an identifier for this output ({name}-{version}-{build_string})
+    pub fn identifier(&self) -> String {
+        format!(
+            "{}-{}-{}",
+            self.name().as_normalized(),
+            self.version(),
+            self.build_string()
+        )
     }
 }
 
