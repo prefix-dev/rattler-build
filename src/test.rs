@@ -102,14 +102,14 @@ impl Tests {
                 let ext = path.extension().unwrap().to_str().unwrap();
                 match (Platform::current().is_windows(), ext) {
                     (true, "bat") => {
-                        tracing::info!("Testing commands:");
+                        println!("Testing commands:");
                         run_in_environment(
                             &format!("cmd /c {}", path.to_string_lossy()),
                             environment,
                         )
                     }
                     (false, "sh") => {
-                        tracing::info!("Testing commands:");
+                        println!("Testing commands:");
                         run_in_environment(
                             &format!("bash -x {}", path.to_string_lossy()),
                             environment,
@@ -120,7 +120,7 @@ impl Tests {
             }
             Tests::Python(path) => {
                 let imports = fs::read_to_string(path)?;
-                tracing::info!("Testing Python imports:\n{imports}");
+                println!("Testing Python imports:\n{imports}");
                 run_in_environment(&format!("python {}", path.to_string_lossy()), environment)
             }
         }
@@ -271,6 +271,16 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let cache_dir = rattler::default_cache_dir().unwrap();
 
     let pkg = ArchiveIdentifier::try_from_path(package_file).ok_or(TestError::TestFailed)?;
+
+    // if the package is already in the cache, remove it. TODO make this based on SHA256 instead!
+    let cache_key = CacheKey::from(pkg.clone());
+    let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
+
+    if package_folder.exists() {
+        println!("Removing previously cached package {:?}", package_folder);
+        fs::remove_dir_all(package_folder)?;
+    }
+
     let match_spec =
         MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
@@ -282,6 +292,8 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
     };
+
+    println!("Creating test environment in {:?}", prefix);
 
     create_environment(
         &dependencies,

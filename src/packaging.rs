@@ -359,7 +359,7 @@ fn write_to_dest(
         {
             return Ok(None);
         }
-        println!("path_rel: {:?}", path_rel);
+
         if path_rel
             .components()
             .any(|c| c == Component::Normal("site-packages".as_ref()))
