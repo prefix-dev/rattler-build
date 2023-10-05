@@ -562,9 +562,9 @@ async fn fetch_repo_data_records_with_progress(
             }
             Err(_) => {
                 progress_bar.set_style(errored_progress_style());
-                progress_bar.finish_with_message("Cancelled..");
+                progress_bar.finish_with_message("Canceled...");
                 // Since the task was cancelled most likely the whole async stack is being cancelled.
-                Err(anyhow::anyhow!("cancelled"))
+                Err(anyhow::anyhow!("canceled"))
             }
         },
     }
