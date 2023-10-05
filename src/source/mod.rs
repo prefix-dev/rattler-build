@@ -94,8 +94,8 @@ pub async fn fetch_sources(
                 }
             }
             Source::Path(src) => {
-                tracing::info!("Copying source from path: {:?}", src.path);
-                let src_path = recipe_dir.join(&src.path);
+                let src_path = recipe_dir.join(&src.path).canonicalize()?;
+                tracing::info!("Copying source from path: {:?}", src_path);
 
                 let dest_dir = if let Some(folder) = &src.folder {
                     work_dir.join(folder)
@@ -171,7 +171,8 @@ fn copy_dir(
         .git_ignore(use_gitignore)
         .hidden(true)
         .filter_entry(move |entry| {
-            include_globs.is_match(entry.path()) && !exclude_globs.is_match(entry.path())
+            (include_globs.len() == 0 || include_globs.is_match(entry.path()))
+                && !exclude_globs.is_match(entry.path())
         })
         .build()
         .try_for_each(|entry| {

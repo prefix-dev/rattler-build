@@ -746,19 +746,10 @@ pub fn package_conda(
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
     tracing::info!("Creating target folder {:?}", output_folder);
 
-    // make dirs
     fs::create_dir_all(&output_folder)?;
 
-    // TODO get proper hash
-    let file_name = format!(
-        "{}-{}-{}{}",
-        output.name().as_normalized(),
-        output.version(),
-        output.build_string(),
-        package_format.extension()
-    );
-
-    let out_path = output_folder.join(file_name.clone());
+    let identifier = output.identifier();
+    let out_path = output_folder.join(format!("{}{}", identifier, package_format.extension()));
     let file = File::create(&out_path)?;
 
     match package_format {
@@ -773,13 +764,12 @@ pub fn package_conda(
         }
         ArchiveType::Conda => {
             // This is safe because we're just putting it together before
-            let (out_name, _) = file_name.split_once('.').unwrap();
             write_conda_package(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
                 CompressionLevel::Default,
-                out_name,
+                &identifier,
                 Some(&output.build_configuration.timestamp),
             )?;
         }
