@@ -251,12 +251,12 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         name: output.name().clone(),
         version: output.version().parse()?,
         build: output.build_string().to_string(),
-        build_number: recipe.build.number,
+        build_number: recipe.build().number(),
         arch,
         platform,
         subdir: Some(output.build_configuration.target_platform.to_string()),
-        license: recipe.about.license.clone(),
-        license_family: recipe.about.license_family.clone(),
+        license: recipe.about().license().map(|l| l.to_owned()),
+        license_family: recipe.about().license_family().map(|l| l.to_owned()),
         timestamp: Some(output.build_configuration.timestamp),
         depends: output
             .finalized_dependencies
@@ -276,7 +276,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .iter()
             .map(|d| d.spec().to_string())
             .collect(),
-        noarch: recipe.build.noarch,
+        noarch: *recipe.build().noarch(),
         track_features: vec![],
         features: None,
     };
@@ -287,14 +287,30 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
 /// Create the about.json file for the given output.
 fn create_about_json(output: &Output) -> Result<String, PackagingError> {
     let recipe = &output.recipe;
+    // FIXME: Updated recipe specs don't allow for vectors in any of the About fields except license_files
     let about_json = AboutJson {
-        home: recipe.about.home.clone().unwrap_or_default(),
-        license: recipe.about.license.clone(),
-        license_family: recipe.about.license_family.clone(),
-        summary: recipe.about.summary.clone(),
-        description: recipe.about.description.clone(),
-        doc_url: recipe.about.doc_url.clone().unwrap_or_default(),
-        dev_url: recipe.about.dev_url.clone().unwrap_or_default(),
+        home: recipe
+            .about()
+            .homepage()
+            .cloned()
+            .map(|s| vec![s])
+            .unwrap_or_default(),
+        license: recipe.about().license().map(|s| s.to_owned()),
+        license_family: recipe.about().license_family().map(|s| s.to_owned()),
+        summary: recipe.about().summary().map(|s| s.to_owned()),
+        description: recipe.about().description().map(|s| s.to_owned()),
+        doc_url: recipe
+            .about()
+            .documentation()
+            .cloned()
+            .map(|url| vec![url])
+            .unwrap_or_default(),
+        dev_url: recipe
+            .about()
+            .repository()
+            .cloned()
+            .map(|url| vec![url])
+            .unwrap_or_default(),
         // TODO ?
         source_url: None,
         channels: output.build_configuration.channels.clone(),
@@ -515,7 +531,7 @@ fn write_to_dest(
 /// This function creates a link.json file for the given output.
 fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     let noarch_links = PythonEntryPoints {
-        entry_points: output.recipe.build.entry_points.clone(),
+        entry_points: output.recipe.build().entry_points().to_owned(),
     };
 
     let link_json = LinkJson {
@@ -531,7 +547,7 @@ fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Option<Vec<PathBuf>>, PackagingError> {
-    if let Some(license_globs) = &output.recipe.about.license_file {
+    if let Some(license_globs) = &output.recipe.about().license_files() {
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
@@ -621,7 +637,7 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
 
 fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
     let mut test_files = Vec::new();
-    if let Some(test) = &output.recipe.test {
+    if let Some(test) = &output.recipe.test() {
         let test_folder = tmp_dir_path.join("info/test/");
         fs::create_dir_all(&test_folder)?;
 
@@ -689,14 +705,14 @@ pub fn package_conda(
             continue;
         }
 
-        if output.recipe.build.noarch.is_python() {
+        if output.recipe.build().noarch().is_python() {
             // we need to remove files in bin/ that are registered as entry points
             if f.starts_with("bin") {
                 if let Some(name) = f.file_name() {
                     if output
                         .recipe
-                        .build
-                        .entry_points
+                        .build()
+                        .entry_points()
                         .iter()
                         .any(|ep| ep.command == name.to_string_lossy())
                     {
@@ -707,7 +723,7 @@ pub fn package_conda(
             // Windows
             else if f.starts_with("Scripts") {
                 if let Some(name) = f.file_name() {
-                    if output.recipe.build.entry_points.iter().any(|ep| {
+                    if output.recipe.build().entry_points().iter().any(|ep| {
                         format!("{}.exe", ep.command) == name.to_string_lossy()
                             || format!("{}-script.py", ep.command) == name.to_string_lossy()
                     }) {
@@ -722,7 +738,7 @@ pub fn package_conda(
             prefix,
             tmp_dir_path,
             &output.build_configuration.target_platform,
-            &output.recipe.build.noarch,
+            &output.recipe.build().noarch(),
         )? {
             tmp_files.insert(dest_file);
         }
@@ -777,7 +793,7 @@ pub fn package_conda(
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
 
-    if output.recipe.build.noarch.is_python() {
+    if output.recipe.build().noarch().is_python() {
         if let Some(link) = create_link_json(output)? {
             let mut link_json = File::create(info_folder.join("link.json"))?;
             link_json.write_all(link.as_bytes())?;
