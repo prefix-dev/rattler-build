@@ -18,12 +18,7 @@ use std::{
     str::{self, FromStr},
 };
 use test::TestConfiguration;
-use tracing_subscriber::{
-    filter::Directive,
-    fmt,
-    prelude::*,
-    EnvFilter,
-};
+use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
 mod build;
 mod console_utils;
