@@ -38,7 +38,7 @@ url = "2.4.1"
 tracing = "0.1.37"
 clap = { version = "4.4.6", features = ["derive", "env", "cargo"] }
 minijinja = { version = "1.0.8", features = ["unstable_machinery"] }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.17", features = ["env-filter", "fmt", "ansi"] }
 num_cpus = "1.16.0"
 goblin = "0.7.1"
 scroll = "0.11.0"
@@ -58,6 +58,7 @@ ignore = "0.4.20"
 globset = "0.4.13"
 tracing-indicatif = "0.3.5"
 clap-verbosity-flag = "2.0.1"
+tracing-core = "0.1.31"
 
 [dev-dependencies]
 insta = {version = "1.33.0", features = ["yaml"] }

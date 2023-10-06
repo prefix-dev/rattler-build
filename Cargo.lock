@@ -2332,6 +2332,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-core",
  "tracing-indicatif",
  "tracing-subscriber",
  "url",

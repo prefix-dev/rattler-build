@@ -18,7 +18,12 @@ use std::{
     str::{self, FromStr},
 };
 use test::TestConfiguration;
-use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{
+    filter::Directive,
+    fmt,
+    prelude::*,
+    EnvFilter,
+};
 
 mod build;
 mod console_utils;
@@ -43,7 +48,7 @@ use build::run_build;
 mod test;
 
 use crate::{
-    console_utils::IndicatifWriter,
+    console_utils::{IndicatifWriter, TracingFormatter},
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     render::recipe::render_recipe,
     variant_config::VariantConfig,
@@ -129,44 +134,15 @@ struct TestOpts {
 async fn main() -> ExitCode {
     let args = App::parse();
 
-    // let default_filter = match args.verbose.log_level() {
-    //     Some(clap_verbosity_flag::Level::Debug) => {
-    //         LevelFilter::DEBUG
-    //     },
-    //     Some(clap_verbosity_flag::Level::Trace) => {
-    //         LevelFilter::TRACE
-    //     },
-    //     _ => {
-    //         LevelFilter::INFO
-    //     },
-    // };
-    // println!("default_filter: {:?}", default_filter);
-    // println!("Filter is : {}", default_filter < LevelFilter::DEBUG);
-    // let env_filter = EnvFilter::builder()
-    //     .with_default_directive(default_filter.into())
-    //     .from_env()
-    //     .expect("Could not parse RUST_LOG environment variable")
-    //     .add_directive("apple_codesign=off".parse().unwrap())
-    //     .add_directive(if default_filter <= LevelFilter::DEBUG {
-    //         "resolvo::solver=warn".parse().unwrap()
-    //     } else {
-    //         "resolvo::solver=info".parse().unwrap()
-    //     });
-
     let multi_progress = MultiProgress::new();
 
     // Setup tracing subscriber
     tracing_subscriber::registry()
+        .with(get_default_env_filter(args.verbose.log_level_filter()))
         .with(
             fmt::layer()
                 .with_writer(IndicatifWriter::new(multi_progress.clone()))
-                .with_level(false)
-                .without_time()
-                .with_target(false),
-        )
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| get_default_env_filter(args.verbose.log_level_filter())),
+                .event_format(TracingFormatter),
         )
         .init();
 
@@ -383,9 +359,12 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 pub fn get_default_env_filter(verbose: clap_verbosity_flag::LevelFilter) -> EnvFilter {
     let mut result = EnvFilter::new("rattler_build=info");
 
-    if verbose >= clap_verbosity_flag::LevelFilter::Debug {
+    if verbose >= clap_verbosity_flag::LevelFilter::Trace {
         result = result.add_directive(Directive::from_str("resolvo=info").unwrap());
         result = result.add_directive(Directive::from_str("rattler=info").unwrap());
+    } else {
+        result = result.add_directive(Directive::from_str("resolvo=warn").unwrap());
+        result = result.add_directive(Directive::from_str("rattler=warn").unwrap());
     }
 
     result

@@ -142,8 +142,6 @@ pub async fn create_environment(
         .filter_map(Result::transpose)
         .collect::<Result<Vec<_>, _>>()?;
 
-    tool_configuration.multi_progress_indicator.clear()?;
-
     // Get the package names from the matchspecs so we can only load the package records that we need.
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
     let repodatas = wrap_in_progress("parsing repodata", move || {
