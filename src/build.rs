@@ -133,9 +133,9 @@ fn run_process_with_replacements(
                 let filtered_line = replacements
                     .iter()
                     .fold(line, |acc, (from, to)| acc.replace(from, to));
-                tracing::info!("{}", filtered_line);
+                println!("{}", filtered_line);
             } else {
-                tracing::warn!("Error reading output: {:?}", line);
+                eprintln!("Error reading output: {:?}", line);
             }
         }
     }
@@ -166,9 +166,9 @@ pub async fn run_build(
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
 
-    if let Some(source) = &output.recipe.source {
+    if output.recipe.source.len() > 0 {
         fetch_sources(
-            source,
+            &output.recipe.source,
             &directories.work_dir,
             &directories.recipe_dir,
             &directories.output_dir,
@@ -247,7 +247,7 @@ pub async fn run_build(
     let test_dir = directories.work_dir.join("test");
     fs::create_dir_all(&test_dir)?;
 
-    tracing::info!("{}", output);
+    println!("{}", output);
 
     tracing::info!("Running tests");
 

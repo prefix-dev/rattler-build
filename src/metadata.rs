@@ -228,7 +228,8 @@ pub struct Recipe {
     pub build: BuildOptions,
     #[serde(default)]
     pub requirements: Requirements,
-    pub about: Option<About>,
+    #[serde(default)]
+    pub about: About,
 }
 
 pub struct Metadata {
@@ -470,12 +471,13 @@ pub struct RenderedRecipe {
     /// Information about the package
     pub package: Package,
     /// The source section of the recipe
-    #[serde_as(deserialize_as = "Option<OneOrMany<_, PreferOne>>")]
-    pub source: Option<Vec<Source>>,
-    /// The build section of the recipe
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
     #[serde(default)]
+    pub source: Vec<Source>,
+    /// The build section of the recipe
     pub build: BuildOptions,
     /// The requirements section of the recipe
+    #[serde(default)]
     pub requirements: Requirements,
     /// The about section of the recipe
     #[serde(default)]
