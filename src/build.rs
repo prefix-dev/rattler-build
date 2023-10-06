@@ -45,10 +45,22 @@ pub fn get_conda_build_script(
         let recipe_file = directories.recipe_dir.join(script);
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
-        let mut orig_build_file = File::open(recipe_file)?;
-        let mut orig_build_file_text = String::new();
-        orig_build_file.read_to_string(&mut orig_build_file_text)?;
-        orig_build_file_text
+        if !recipe_file.exists() {
+            if recipe.build.script.is_none() {
+                tracing::info!("Empty build script");
+                String::new()
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Recipe file {:?} does not exist", recipe_file),
+                ));
+            }
+        } else {
+            let mut orig_build_file = File::open(recipe_file)?;
+            let mut orig_build_file_text = String::new();
+            orig_build_file.read_to_string(&mut orig_build_file_text)?;
+            orig_build_file_text
+        }
     } else {
         script
     };
@@ -154,9 +166,9 @@ pub async fn run_build(
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
 
-    if let Some(source) = &output.recipe.source {
+    if !output.recipe.source.is_empty() {
         fetch_sources(
-            source,
+            &output.recipe.source,
             &directories.work_dir,
             &directories.recipe_dir,
             &directories.output_dir,

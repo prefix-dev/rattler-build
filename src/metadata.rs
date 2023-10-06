@@ -187,7 +187,7 @@ pub struct BuildOptions {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct About {
     #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
     pub home: Option<Vec<Url>>,
@@ -228,6 +228,7 @@ pub struct Recipe {
     pub build: BuildOptions,
     #[serde(default)]
     pub requirements: Requirements,
+    #[serde(default)]
     pub about: About,
 }
 
@@ -470,14 +471,17 @@ pub struct RenderedRecipe {
     /// Information about the package
     pub package: Package,
     /// The source section of the recipe
-    #[serde_as(deserialize_as = "Option<OneOrMany<_, PreferOne>>")]
-    pub source: Option<Vec<Source>>,
+    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
+    #[serde(default)]
+    pub source: Vec<Source>,
     /// The build section of the recipe
     #[serde(default)]
     pub build: BuildOptions,
     /// The requirements section of the recipe
+    #[serde(default)]
     pub requirements: Requirements,
     /// The about section of the recipe
+    #[serde(default)]
     pub about: About,
     /// The test section of the recipe
     pub test: Option<Test>,
