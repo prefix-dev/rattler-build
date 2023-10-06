@@ -475,6 +475,7 @@ pub struct RenderedRecipe {
     #[serde(default)]
     pub source: Vec<Source>,
     /// The build section of the recipe
+    #[serde(default)]
     pub build: BuildOptions,
     /// The requirements section of the recipe
     #[serde(default)]
