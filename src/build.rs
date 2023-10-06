@@ -121,9 +121,9 @@ fn run_process_with_replacements(
                 let filtered_line = replacements
                     .iter()
                     .fold(line, |acc, (from, to)| acc.replace(from, to));
-                println!("{}", filtered_line);
+                tracing::info!("{}", filtered_line);
             } else {
-                eprintln!("Error reading output: {:?}", line);
+                tracing::warn!("Error reading output: {:?}", line);
             }
         }
     }
@@ -235,7 +235,7 @@ pub async fn run_build(
     let test_dir = directories.work_dir.join("test");
     fs::create_dir_all(&test_dir)?;
 
-    println!("{}", output);
+    tracing::info!("{}", output);
 
     tracing::info!("Running tests");
 

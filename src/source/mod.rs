@@ -220,23 +220,23 @@ mod test {
         super::copy_dir(&dir, &dest_dir, &[], &[], false).unwrap();
 
         for entry in walkdir::WalkDir::new(dest_dir) {
-            println!("{}", entry.unwrap().path().display());
+            tracing::info!("{}", entry.unwrap().path().display());
         }
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         super::copy_dir(&dir, &dest_dir_2, &["*.txt"], &[], false).unwrap();
-        println!("---------------------");
+        tracing::info!("---------------------");
         for entry in walkdir::WalkDir::new(dest_dir_2) {
-            println!("{}", entry.unwrap().path().display());
+            tracing::info!("{}", entry.unwrap().path().display());
         }
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         super::copy_dir(&dir, &dest_dir_2, &[], &["*.txt"], false).unwrap();
-        println!("---------------------");
+        tracing::info!("---------------------");
         for entry in walkdir::WalkDir::new(dest_dir_2) {
-            println!("{}", entry.unwrap().path().display());
+            tracing::info!("{}", entry.unwrap().path().display());
         }
     }
 }

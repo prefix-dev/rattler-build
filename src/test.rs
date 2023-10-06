@@ -308,14 +308,14 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let cache_key = CacheKey::from(pkg);
     let dir = cache_dir.join("pkgs").join(cache_key.to_string());
 
-    println!("Collecting tests from {:?}", dir);
+    tracing::info!("Collecting tests from {:?}", dir);
     let tests = tests_from_folder(&dir).await?;
 
     for test in tests {
         test.run(&prefix)?;
     }
 
-    println!(
+    tracing::info!(
         "{} all tests passed!",
         console::style(console::Emoji("✔", "")).green()
     );

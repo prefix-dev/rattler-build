@@ -87,7 +87,7 @@ impl Dll {
 //             "/Users/wolfv/Downloads/libmamba-0.24.0-h81a967f_1/Library/bin/libmamba.dll",
 //         );
 //         let dll = Dll::new(&path).unwrap();
-//         println!("{:?}", dll);
+//         tracing::info!("{:?}", dll);
 //         // assert_eq!(dll.path, PathBuf::from("C:\\Windows\\System32\\kernel32.dll"));
 //         // assert_eq!(dll.imports.len(), 0);
 //     }

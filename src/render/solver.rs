@@ -60,7 +60,7 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
         ]);
     }
 
-    println!("\n{table}");
+    tracing::info!("\n{table}");
 }
 
 pub async fn create_environment(
@@ -77,11 +77,11 @@ pub async fn create_environment(
     // Find the default cache directory. Create it if it doesn't exist yet.
     let cache_dir = rattler::default_cache_dir()?;
 
-    println!("\nResolving for environment specs:");
+    tracing::info!("\nResolving for environment specs:");
     for spec in specs {
-        println!(" - {}", spec);
+        tracing::info!(" - {}", spec);
     }
-    println!("\n");
+    tracing::info!("\n");
 
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;
@@ -128,7 +128,7 @@ pub async fn create_environment(
                     platform,
                     &repodata_cache,
                     download_client.clone(),
-                    &tool_configuration.multi_progress_indicator,
+                    tool_configuration.multi_progress_indicator.clone(),
                     platform != Platform::NoArch,
                 )
                 .await
@@ -197,12 +197,12 @@ pub async fn create_environment(
             tool_configuration.multi_progress_indicator.clone(),
         )
         .await?;
-        println!(
+        tracing::info!(
             "{} Successfully updated the environment",
             console::style(console::Emoji("✔", "")).green(),
         );
     } else {
-        println!(
+        tracing::info!(
             "{} Already up to date",
             console::style(console::Emoji("✔", "")).green(),
         );
@@ -487,7 +487,7 @@ async fn fetch_repo_data_records_with_progress(
     platform: Platform,
     repodata_cache: &Path,
     client: AuthenticatedClient,
-    multi_progress: &indicatif::MultiProgress,
+    multi_progress: indicatif::MultiProgress,
     allow_not_found: bool,
 ) -> anyhow::Result<Option<SparseRepoData>> {
     // Create a progress bar

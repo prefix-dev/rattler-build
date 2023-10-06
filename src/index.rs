@@ -171,7 +171,7 @@ pub fn index(
                             .packages
                             .insert(p.file_name().unwrap().to_string_lossy().into(), record);
                     } else {
-                        println!("Could not read package record from {:?}", p);
+                        tracing::info!("Could not read package record from {:?}", p);
                     }
                 }
                 ArchiveType::Conda => {
@@ -180,7 +180,7 @@ pub fn index(
                             .conda_packages
                             .insert(p.file_name().unwrap().to_string_lossy().to_string(), record);
                     } else {
-                        println!("Could not read package record from {:?}", p);
+                        tracing::info!("Could not read package record from {:?}", p);
                     }
                 }
             };

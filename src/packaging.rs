@@ -744,12 +744,12 @@ pub fn package_conda(
     }
 
     // print sorted files
-    println!("\nFiles in package:\n");
+    tracing::info!("\nFiles in package:\n");
     tmp_files
         .iter()
         .map(|x| x.strip_prefix(tmp_dir_path).unwrap())
         .sorted()
-        .for_each(|f| println!("  - {}", f.to_string_lossy()));
+        .for_each(|f| tracing::info!("  - {}", f.to_string_lossy()));
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
