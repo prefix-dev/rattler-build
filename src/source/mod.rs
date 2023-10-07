@@ -135,13 +135,18 @@ fn extract(
 /// to filter the files and directories to copy.
 ///
 /// The copy process also ignores hidden files and directories by default.
+///
+/// # Return
+///
+/// The returned `Vec<PathBuf>` contains the pathes of the copied files.
+/// If a directory is created in this function, the path to the directory is _not_ returned.
 fn copy_dir(
     from: &Path,
     to: &Path,
     include_globs: &[&str],
     exclude_globs: &[&str],
     use_gitignore: bool,
-) -> Result<(), SourceError> {
+) -> Result<Vec<PathBuf>, SourceError> {
     // Create the to path because we're going to copy the contents only
     create_all(to, true).unwrap();
 
@@ -175,14 +180,16 @@ fn copy_dir(
                 && !exclude_globs.is_match(entry.path())
         })
         .build()
-        .try_for_each(|entry| {
+        .map(|entry| {
             let entry = entry?;
             let path = entry.path();
             let stripped_path = path.strip_prefix(from)?;
             let dest_path = to.join(stripped_path);
 
             if path.is_dir() {
-                create_all(&dest_path, true).map_err(SourceError::FileSystemError)
+                create_all(&dest_path, true)
+                    .map(|_| None) // We do not return pathes to directories that are created
+                    .map_err(SourceError::FileSystemError)
             } else {
                 let file_options = fs_extra::file::CopyOptions {
                     overwrite: options.overwrite,
@@ -197,9 +204,11 @@ fn copy_dir(
                     path.to_string_lossy(),
                     dest_path.to_string_lossy()
                 );
-                Ok(())
+                Ok(Some(dest_path))
             }
         })
+        .filter_map(|res| res.transpose())
+        .collect()
 }
 
 #[cfg(test)]
