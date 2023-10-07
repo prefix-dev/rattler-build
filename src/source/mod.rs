@@ -136,8 +136,8 @@ fn extract(
 ///
 /// The copy process also ignores hidden files and directories by default.
 fn copy_dir(
-    from: &PathBuf,
-    to: &PathBuf,
+    from: &Path,
+    to: &Path,
     include_globs: &[&str],
     exclude_globs: &[&str],
     use_gitignore: bool,
