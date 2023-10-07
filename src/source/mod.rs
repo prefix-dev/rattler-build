@@ -140,7 +140,7 @@ fn extract(
 ///
 /// The returned `Vec<PathBuf>` contains the pathes of the copied files.
 /// If a directory is created in this function, the path to the directory is _not_ returned.
-fn copy_dir(
+pub(crate) fn copy_dir(
     from: &Path,
     to: &Path,
     include_globs: &[&str],
