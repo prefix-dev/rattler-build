@@ -24,6 +24,8 @@ rattler_shell = { version = "0.10.0", default-features = false, features = ["sys
 rattler_solve = { version = "0.10.0", default-features = false, features = ["resolvo"] }
 rattler_virtual_packages = { version = "0.10.0", default-features = false }
 rattler_package_streaming = { version = "0.10.0", default-features = false }
+# FIXME: temporary
+rattler_recipe = { path = "../format-experiments", package = "format-experiments" }
 anyhow = "1.0.75"
 walkdir = "2.4.0"
 sha2 = "0.10.8"

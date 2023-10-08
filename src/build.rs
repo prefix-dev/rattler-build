@@ -33,20 +33,20 @@ pub fn get_conda_build_script(
         "build.sh"
     };
 
-    let script = recipe
-        .build
-        .script
-        .clone()
-        .unwrap_or_else(|| vec![default_script.into()])
-        .iter()
-        .join("\n");
+    let script = if recipe.build().scripts().is_empty() {
+        &[default_script.into()]
+    } else {
+        recipe.build().scripts()
+    };
+
+    let script = script.iter().join("\n");
 
     let script = if script.ends_with(".sh") || script.ends_with(".bat") {
         let recipe_file = directories.recipe_dir.join(script);
         tracing::info!("Reading recipe file: {:?}", recipe_file);
 
         if !recipe_file.exists() {
-            if recipe.build.script.is_none() {
+            if recipe.build().scripts().is_empty() {
                 tracing::info!("Empty build script");
                 String::new()
             } else {
