@@ -547,7 +547,11 @@ fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Option<Vec<PathBuf>>, PackagingError> {
-    if let Some(license_globs) = &output.recipe.about().license_files() {
+    if output.recipe.about().license_files().is_empty() {
+        Ok(None)
+    } else {
+        let license_globs = output.recipe.about().license_files();
+
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
@@ -599,8 +603,6 @@ fn copy_license_files(
         }
 
         Ok(Some(copied_files))
-    } else {
-        Ok(None)
     }
 }
 
