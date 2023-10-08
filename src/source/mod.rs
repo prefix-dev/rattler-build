@@ -8,7 +8,7 @@ use std::{
 use fs_extra::dir::{create_all, CopyOptions};
 use ignore::WalkBuilder;
 
-use crate::metadata::Source;
+use rattler_recipe::stage2::Source;
 
 pub mod git_source;
 pub mod patch;

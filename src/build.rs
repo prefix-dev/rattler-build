@@ -166,9 +166,9 @@ pub async fn run_build(
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
 
-    if !output.recipe.source.is_empty() {
+    if !output.recipe.sources().is_empty() {
         fetch_sources(
-            &output.recipe.source,
+            output.recipe.sources(),
             &directories.work_dir,
             &directories.recipe_dir,
             &directories.output_dir,
