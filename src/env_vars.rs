@@ -254,13 +254,17 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // pkg vars
     insert!(vars, "PKG_NAME", output.name().as_normalized());
     insert!(vars, "PKG_VERSION", output.version());
-    insert!(vars, "PKG_BUILDNUM", output.recipe.build.number.to_string());
+    insert!(
+        vars,
+        "PKG_BUILDNUM",
+        output.recipe.build().number().to_string()
+    );
 
     // TODO this is inaccurate
     insert!(
         vars,
         "PKG_BUILD_STRING",
-        output.recipe.build.string.clone().unwrap_or_default()
+        output.recipe.build().string().clone().unwrap_or_default()
     );
     insert!(vars, "PKG_HASH", output.build_configuration.hash.clone());
     if output.build_configuration.cross_compilation() {
@@ -336,7 +340,7 @@ pub fn write_env_script<T: Shell + Clone>(
         shell_type.set_env_var(&mut s, &k, &v)?;
     }
 
-    for env_key in &output.recipe.build.script_env.passthrough {
+    for env_key in output.recipe.build().script_env().passthrough() {
         let var = std::env::var(env_key);
         if let Ok(var) = var {
             shell_type.set_env_var(&mut s, env_key, var.as_str())?;
@@ -348,11 +352,11 @@ pub fn write_env_script<T: Shell + Clone>(
         }
     }
 
-    for (k, v) in &output.recipe.build.script_env.env {
+    for (k, v) in output.recipe.build().script_env().env() {
         shell_type.set_env_var(&mut s, k, v)?;
     }
 
-    if !output.recipe.build.script_env.secrets.is_empty() {
+    if !output.recipe.build().script_env().secrets().is_empty() {
         tracing::error!("Secrets are not supported yet");
     }
 
