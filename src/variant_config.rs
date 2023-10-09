@@ -227,19 +227,35 @@ impl VariantConfig {
         Ok(result)
     }
 
+    fn extract_outputs(&self, recipe: &YamlValue) -> YamlValue {
+        let mut recipe = recipe.clone();
+        if let Some(outputs) = outputs.as_mapping_mut() {
+            outputs.remove(&YamlValue::String("outputs".to_string()));
+        }
+
+        outputs
+    }
+
     /// This finds all used variables in any dependency declarations, build, host, and run sections.
     /// As well as any used variables from Jinja functions to calculate the variants of this recipe.
-    pub fn find_variants(
+    pub fn find_variants_and_outputs(
         &self,
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+        let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
+
+        if recipe_parsed.as_mapping().unwrap().contains_key("outputs") {
+            let extract_all_outputs = extract_outputs(&recipe_parsed);
+        } else {
+            let extract_all_outputs = recipe_parsed;
+        }
+
         let mut used_variables = used_vars_from_expressions(recipe);
 
         // now render all selectors with the used variables
         let combinations = self.combinations(&used_variables)?;
 
-        let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
         for _ in combinations {
             let mut val = recipe_parsed.clone();
             if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {

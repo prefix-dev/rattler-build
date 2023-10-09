@@ -243,6 +243,8 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         .find_variants(&recipe_text, &selector_config)
         .expect("Could not compute variants");
 
+    // find all outputs
+
     tracing::info!("Found variants:");
     for variant in &variants {
         let mut table = comfy_table::Table::new();
@@ -344,7 +346,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             finalized_dependencies: None,
         };
 
-        run_build(&output, tool_config.clone()).await?;
+        // run_build(&output, tool_config.clone()).await?;
     }
 
     Ok(())

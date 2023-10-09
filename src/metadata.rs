@@ -218,20 +218,6 @@ pub struct Test {
     pub files: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Recipe {
-    pub context: BTreeMap<String, serde_yaml::Value>,
-    pub name: String,
-    pub version: String,
-    pub source: Vec<Source>,
-    #[serde(default)]
-    pub build: BuildOptions,
-    #[serde(default)]
-    pub requirements: Requirements,
-    #[serde(default)]
-    pub about: About,
-}
-
 pub struct Metadata {
     pub name: String,
     pub version: String,
@@ -465,6 +451,21 @@ pub struct PackageIdentifier {
     pub build_string: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RecipeOutput {
+    package: Package,
+    #[serde(default)]
+    source: Vec<Source>,
+    #[serde(default)]
+    build: BuildOptions,
+    #[serde(default)]
+    requirements: Requirements,
+    #[serde(default)]
+    about: About,
+    #[serde(default)]
+    test: Option<Test>,
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RenderedRecipe {
@@ -485,6 +486,9 @@ pub struct RenderedRecipe {
     pub about: About,
     /// The test section of the recipe
     pub test: Option<Test>,
+    /// The outputs section of the recipe
+    #[serde(default)]
+    pub outputs: Vec<RecipeOutput>
 }
 
 impl fmt::Display for GitUrl {
