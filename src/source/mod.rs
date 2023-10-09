@@ -1,6 +1,6 @@
 use std::{
     fs,
-    path::{Path, StripPrefixError},
+    path::{Path, PathBuf, StripPrefixError},
     process::Command,
 };
 
