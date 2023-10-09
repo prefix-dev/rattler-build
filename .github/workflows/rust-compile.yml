@@ -75,9 +75,9 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
+          components: rustfmt
           toolchain: 1.70.0
       - uses: Swatinem/rust-cache@v2
-      - run: rustup component add rustfmt
       - run: cargo fmt --all -- --check
 
   clippy:
