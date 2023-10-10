@@ -239,114 +239,119 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config)?;
 
-    let variants = variant_config
-        .find_variants(&recipe_text, &selector_config)
+    let outputs_variants = variant_config
+        .find_variants_and_outputs(&recipe_text, &selector_config)
         .expect("Could not compute variants");
 
+    println!("{:#?}", outputs_variants);
     // find all outputs
-
-    tracing::info!("Found variants:");
-    for variant in &variants {
-        let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-            .set_header(vec!["Variant", "Version"]);
-        for (key, value) in variant.iter() {
-            table.add_row(vec![key, value]);
-        }
-        tracing::info!("{}\n", table);
-    }
-
-    let tool_config = tool_configuration::Configuration {
-        client: AuthenticatedClient::default(),
-        multi_progress_indicator: multi_progress,
-    };
-
-    for variant in variants {
-        let hash = hash::compute_buildstring(&variant, &noarch);
-
-        let selector_config = SelectorConfig {
-            variant: variant.clone(),
-            target_platform: selector_config.target_platform,
-            build_platform: selector_config.build_platform,
-        };
-
-        if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
-            recipe_yaml = flattened_recipe;
-        } else {
-            tracing::error!("Could not flatten selectors");
-        }
-
-        let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
-            Result::Err(e) => {
-                match &e {
-                    render::recipe::RecipeRenderError::InvalidYaml(inner) => {
-                        tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
-                    }
-                    render::recipe::RecipeRenderError::YamlNotMapping => {
-                        tracing::error!("{}", e);
-                    }
-                }
-                return Err(e.into());
+    for (orig_recipe_yaml, variants) in outputs_variants {
+        tracing::info!("Found variants:");
+        for variant in &variants {
+            let mut table = comfy_table::Table::new();
+            table
+                .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+                .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+                .set_header(vec!["Variant", "Version"]);
+            for (key, value) in variant.iter() {
+                table.add_row(vec![key, value]);
             }
-            Result::Ok(r) => r,
-        };
-
-        if args.render_only {
-            tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
-            tracing::info!("Variant: {:#?}", variant);
-            tracing::info!("Hash: {}", recipe.build.string.unwrap());
-            continue;
+            tracing::info!("{}\n", table);
         }
 
-        let mut subpackages = BTreeMap::new();
-        subpackages.insert(
-            recipe.package.name.clone(),
-            PackageIdentifier {
-                name: recipe.package.name.clone(),
-                version: recipe.package.version.clone(),
-                build_string: recipe.build.string.clone().unwrap(),
-            },
-        );
-
-        let noarch_type = recipe.build.noarch;
-        let name = recipe.package.name.clone();
-        // Add the channels from the args and by default always conda-forge
-        let channels = args
-            .channel
-            .clone()
-            .unwrap_or(vec!["conda-forge".to_string()]);
-
-        let output = metadata::Output {
-            recipe,
-            build_configuration: BuildConfiguration {
-                target_platform,
-                host_platform: match target_platform {
-                    Platform::NoArch => Platform::current(),
-                    _ => target_platform,
-                },
-                build_platform: Platform::current(),
-                hash: hash::compute_buildstring(&variant, &noarch_type),
-                variant: variant.clone(),
-                no_clean: args.keep_build,
-                directories: Directories::create(
-                    name.as_normalized(),
-                    &recipe_path,
-                    &args.output_dir,
-                )?,
-                channels,
-                timestamp: chrono::Utc::now(),
-                subpackages,
-                package_format: match args.package_format {
-                    PackageFormat::TarBz2 => ArchiveType::TarBz2,
-                    PackageFormat::Conda => ArchiveType::Conda,
-                },
-            },
-            finalized_dependencies: None,
+        let tool_config = tool_configuration::Configuration {
+            client: AuthenticatedClient::default(),
+            multi_progress_indicator: multi_progress.clone(),
         };
 
-        // run_build(&output, tool_config.clone()).await?;
+        for variant in variants {
+            let hash = hash::compute_buildstring(&variant, &noarch);
+
+            let selector_config = SelectorConfig {
+                variant: variant.clone(),
+                target_platform: selector_config.target_platform,
+                build_platform: selector_config.build_platform,
+            };
+
+            let mut recipe_yaml = orig_recipe_yaml.clone();
+            if let Some(flattened_recipe) =
+                flatten_selectors(&mut recipe_yaml, &selector_config)
+            {
+                recipe_yaml = flattened_recipe;
+            } else {
+                tracing::error!("Could not flatten selectors");
+            }
+
+            let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
+                Result::Err(e) => {
+                    match &e {
+                        render::recipe::RecipeRenderError::InvalidYaml(inner) => {
+                            tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
+                        }
+                        render::recipe::RecipeRenderError::YamlNotMapping => {
+                            tracing::error!("{}", e);
+                        }
+                    }
+                    return Err(e.into());
+                }
+                Result::Ok(r) => r,
+            };
+
+            if args.render_only {
+                tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
+                tracing::info!("Variant: {:#?}", variant);
+                tracing::info!("Hash: {}", recipe.build.string.unwrap());
+                continue;
+            }
+
+            let mut subpackages = BTreeMap::new();
+            subpackages.insert(
+                recipe.package.name.clone(),
+                PackageIdentifier {
+                    name: recipe.package.name.clone(),
+                    version: recipe.package.version.clone(),
+                    build_string: recipe.build.string.clone().unwrap(),
+                },
+            );
+
+            let noarch_type = recipe.build.noarch;
+            let name = recipe.package.name.clone();
+            // Add the channels from the args and by default always conda-forge
+            let channels = args
+                .channel
+                .clone()
+                .unwrap_or(vec!["conda-forge".to_string()]);
+
+            let output = metadata::Output {
+                recipe,
+                build_configuration: BuildConfiguration {
+                    target_platform,
+                    host_platform: match target_platform {
+                        Platform::NoArch => Platform::current(),
+                        _ => target_platform,
+                    },
+                    build_platform: Platform::current(),
+                    hash: hash::compute_buildstring(&variant, &noarch_type),
+                    variant: variant.clone(),
+                    no_clean: args.keep_build,
+                    directories: Directories::create(
+                        name.as_normalized(),
+                        &recipe_path,
+                        &args.output_dir,
+                    )?,
+                    channels,
+                    timestamp: chrono::Utc::now(),
+                    subpackages,
+                    package_format: match args.package_format {
+                        PackageFormat::TarBz2 => ArchiveType::TarBz2,
+                        PackageFormat::Conda => ArchiveType::Conda,
+                    },
+                },
+                finalized_dependencies: None,
+            };
+
+            run_build(&output, tool_config.clone()).await?;
+        }
     }
 
     Ok(())

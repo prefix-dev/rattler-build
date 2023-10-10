@@ -41,6 +41,12 @@ pub enum VariantConfigError {
     IOError(PathBuf, std::io::Error),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RecipeOutputError {
+    #[error("Recipe does not contain a package name")]
+    NoPackageName,
+}
+
 impl VariantConfig {
     /// This function loads multiple variant configuration files and merges them into a single
     /// configuration. The configuration files are loaded in the order they are provided in the
@@ -227,13 +233,58 @@ impl VariantConfig {
         Ok(result)
     }
 
-    fn extract_outputs(&self, recipe: &YamlValue) -> YamlValue {
+    fn extract_outputs(&self, recipe: &YamlValue) -> Result<Vec<YamlValue>, RecipeOutputError> {
         let mut recipe = recipe.clone();
-        if let Some(outputs) = outputs.as_mapping_mut() {
-            outputs.remove(&YamlValue::String("outputs".to_string()));
+        let mapping = recipe.as_mapping_mut().expect("Recipe not a mapping");
+
+        if let Some(outputs) = mapping.get("outputs") {
+            let mut result = Vec::new();
+            // mapping.remove("outputs");
+            let mut outer_recipe = mapping.clone();
+            outer_recipe.remove("outputs");
+            for output in outputs.as_sequence().unwrap() {
+                // merge output with outer recipe
+                let mut output = output.clone();
+                let output_mapping = output.as_mapping_mut().unwrap();
+                if !output_mapping.contains_key("package")
+                    || !output_mapping
+                        .get("package")
+                        .unwrap()
+                        .as_mapping()
+                        .unwrap()
+                        .contains_key("name")
+                {
+                    return Err(RecipeOutputError::NoPackageName);
+                }
+
+                for (key, value) in outer_recipe.iter() {
+                    if !output_mapping.contains_key(key) {
+                        output_mapping.insert(key.clone(), value.clone());
+                    } else {
+                        // deep merge some keys
+                        if ["package", "about", "extra", "build"].contains(&key.as_str().unwrap()) {
+                            let output_value = output_mapping.get_mut(key).unwrap();
+                            let output_value_mapping = output_value.as_mapping_mut().unwrap();
+                            let mut outer_value = value.clone();
+                            let outer_value_mapping = outer_value.as_mapping_mut().unwrap();
+                            for (outer_key, outer_value) in outer_value_mapping.iter() {
+                                if !output_value_mapping.contains_key(outer_key) {
+                                    output_value_mapping
+                                        .insert(outer_key.clone(), outer_value.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                println!("{:?}", output_mapping);
+
+                result.push(serde_yaml::to_value(output_mapping).unwrap());
+            }
+
+            return Ok(result);
         }
 
-        outputs
+        Ok(vec![recipe])
     }
 
     /// This finds all used variables in any dependency declarations, build, host, and run sections.
@@ -242,41 +293,47 @@ impl VariantConfig {
         &self,
         recipe: &str,
         selector_config: &SelectorConfig,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+    ) -> Result<Vec<(YamlValue, Vec<BTreeMap<String, String>>)>, VariantError> {
         let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
 
-        if recipe_parsed.as_mapping().unwrap().contains_key("outputs") {
-            let extract_all_outputs = extract_outputs(&recipe_parsed);
+        let all_outputs = if recipe_parsed.as_mapping().unwrap().contains_key("outputs") {
+            self.extract_outputs(&recipe_parsed)?
         } else {
-            let extract_all_outputs = recipe_parsed;
+            vec![recipe_parsed]
+        };
+
+        let mut result = Vec::new();
+        for output in all_outputs {
+            let subrecipe = serde_yaml::to_string(&output).unwrap();
+
+            let mut used_variables = used_vars_from_expressions(&subrecipe);
+
+            // now render all selectors with the used variables
+            let combinations = self.combinations(&used_variables)?;
+
+            for _ in combinations {
+                let mut val = output.clone();
+                if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {
+                    // extract all dependencies from the flattened recipe
+                    let dependencies = extract_dependencies(&flattened_recipe);
+                    for dependency in dependencies {
+                        used_variables.insert(dependency);
+                    }
+                };
+            }
+
+            // special handling of CONDA_BUILD_SYSROOT
+            if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
+                used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+            }
+
+            // also always add `target_platform` and `channel_targets`
+            used_variables.insert("target_platform".to_string());
+            used_variables.insert("channel_targets".to_string());
+
+            result.push((output.clone(), self.combinations(&used_variables)?));
         }
-
-        let mut used_variables = used_vars_from_expressions(recipe);
-
-        // now render all selectors with the used variables
-        let combinations = self.combinations(&used_variables)?;
-
-        for _ in combinations {
-            let mut val = recipe_parsed.clone();
-            if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {
-                // extract all dependencies from the flattened recipe
-                let dependencies = extract_dependencies(&flattened_recipe);
-                for dependency in dependencies {
-                    used_variables.insert(dependency);
-                }
-            };
-        }
-
-        // special handling of CONDA_BUILD_SYSROOT
-        if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
-            used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-        }
-
-        // also always add `target_platform` and `channel_targets`
-        used_variables.insert("target_platform".to_string());
-        used_variables.insert("channel_targets".to_string());
-
-        self.combinations(&used_variables)
+        Ok(result)
     }
 }
 
@@ -321,6 +378,9 @@ impl VariantKey {
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
+
+    #[error("Could not parse outputs: {0}")]
+    ParseOutputsError(#[from] RecipeOutputError),
 }
 
 fn find_combinations(

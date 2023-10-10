@@ -488,7 +488,7 @@ pub struct RenderedRecipe {
     pub test: Option<Test>,
     /// The outputs section of the recipe
     #[serde(default)]
-    pub outputs: Vec<RecipeOutput>
+    pub outputs: Vec<RecipeOutput>,
 }
 
 impl fmt::Display for GitUrl {
