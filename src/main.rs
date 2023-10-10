@@ -243,6 +243,9 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         .find_variants_and_outputs(&recipe_text, &selector_config)
         .expect("Could not compute variants");
 
+    // order outputs topologically
+    // let outputs_variants = order_outputs(outputs_variants);
+
     println!("{:#?}", outputs_variants);
     // find all outputs
     for (orig_recipe_yaml, variants) in outputs_variants {
