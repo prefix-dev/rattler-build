@@ -18,10 +18,9 @@ use rattler_conda_types::{
 };
 use thiserror::Error;
 
-use super::{
-    dependency_list::{Dependency, DependencyList},
-    solver::create_environment,
-};
+use rattler_recipe::stage2::Dependency;
+
+use super::solver::create_environment;
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
@@ -193,7 +192,7 @@ pub enum ResolveError {
 /// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
 /// dependencies
 pub fn apply_variant(
-    raw_specs: &DependencyList,
+    raw_specs: &[Dependency],
     build_configuration: &BuildConfiguration,
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
@@ -237,10 +236,10 @@ pub fn apply_variant(
                     DependencyInfo::Raw { spec: m }
                 }
                 Dependency::PinSubpackage(pin) => {
-                    let name = &pin.pin_subpackage.name;
+                    let name = &pin.pin_value().name;
                     let subpackage = subpackages.get(name).expect("Invalid subpackage");
                     let pinned = pin
-                        .pin_subpackage
+                        .pin_value()
                         .apply(
                             &Version::from_str(&subpackage.version)
                                 .expect("could not parse version"),
@@ -254,14 +253,14 @@ pub fn apply_variant(
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("{}_compiler", compiler.compiler);
+                    let compiler_variant = format!("{}_compiler", compiler.as_str());
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
                             // defaults
                             if target_platform.is_linux() {
-                                let default_compiler = match compiler.compiler.as_str() {
+                                let default_compiler = match compiler.as_str() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -269,13 +268,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.compiler
+                                            compiler.as_str()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.compiler.as_str() {
+                                let default_compiler = match compiler.as_str() {
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -283,13 +282,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.compiler
+                                            compiler.as_str()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_windows() {
-                                let default_compiler = match compiler.compiler.as_str() {
+                                let default_compiler = match compiler.as_str() {
                                     // note with conda-build, these are dependent on the python version
                                     // we could also check the variant for the python version here!
                                     "c" => "vs2017".to_string(),
@@ -299,15 +298,15 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.compiler
+                                            compiler.as_str()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else {
                                 panic!(
-                                    "Could not find compiler ({}) configuration for platform: {}",
-                                    compiler.compiler, target_platform
+                                    "Could not find compiler ({}) configuration for platform: {target_platform}",
+                                    compiler.as_str(),
                                 )
                             }
                         });
@@ -374,10 +373,10 @@ pub async fn resolve_dependencies(
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
 
-    let reqs = &output.recipe.requirements;
+    let reqs = &output.recipe.requirements();
 
     let build_env = if !reqs.build.is_empty() {
-        let specs = apply_variant(&reqs.build, &output.build_configuration)?;
+        let specs = apply_variant(&reqs.build(), &output.build_configuration)?;
 
         let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
@@ -396,7 +395,8 @@ pub async fn resolve_dependencies(
                 .iter()
                 .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
 
-            if let Some(ignore_run_exports_from) = &output.recipe.build.ignore_run_exports_from {
+            let ignore_run_exports_from = output.recipe.build().ignore_run_exports_from();
+            if !ignore_run_exports_from.is_empty() {
                 res && !ignore_run_exports_from.contains(&rec.package_record.name)
             } else {
                 res
@@ -477,7 +477,7 @@ pub async fn resolve_dependencies(
 
     let run_constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
 
-    let render_run_exports = |run_export: &DependencyList| -> Vec<String> {
+    let render_run_exports = |run_export: &[Dependency]| -> Vec<String> {
         let rendered = apply_variant(run_export, &output.build_configuration).unwrap();
         rendered
             .iter()
@@ -485,18 +485,19 @@ pub async fn resolve_dependencies(
             .collect::<Vec<_>>()
     };
 
-    let run_exports = &output
-        .recipe
-        .build
-        .run_exports
-        .as_ref()
-        .map(|run_exports| RunExportsJson {
+    let run_exports = output.recipe.build().run_exports();
+
+    let run_exports = if !run_exports.is_empty() {
+        Some(RunExportsJson {
             strong: render_run_exports(&run_exports.strong),
             weak: render_run_exports(&run_exports.weak),
             noarch: render_run_exports(&run_exports.noarch),
             strong_constrains: render_run_exports(&run_exports.strong_constrains),
             weak_constrains: render_run_exports(&run_exports.weak_constrains),
-        });
+        })
+    } else {
+        None
+    };
 
     let mut run_specs = FinalizedRunDependencies {
         depends: run_depends,
