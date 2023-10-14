@@ -30,6 +30,7 @@ mod macos;
 mod metadata;
 mod packaging;
 mod post;
+mod recipe;
 mod render;
 mod selectors;
 mod source;
@@ -276,40 +277,53 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             tracing::error!("Could not flatten selectors");
         }
 
-        let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
-            Result::Err(e) => {
-                match &e {
-                    render::recipe::RecipeRenderError::InvalidYaml(inner) => {
-                        tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
-                    }
-                    render::recipe::RecipeRenderError::YamlNotMapping => {
-                        tracing::error!("{}", e);
-                    }
-                }
-                return Err(e.into());
+        // let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
+        //     Result::Err(e) => {
+        //         match &e {
+        //             render::recipe::RecipeRenderError::InvalidYaml(inner) => {
+        //                 tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
+        //             }
+        //             render::recipe::RecipeRenderError::YamlNotMapping => {
+        //                 tracing::error!("{}", e);
+        //             }
+        //         }
+        //         return Err(e.into());
+        //     }
+        //     Result::Ok(r) => r,
+        // };
+
+        let recipe = recipe::stage2::Recipe::from_yaml_with_default_hash_str(
+            &recipe_text,
+            &hash,
+            selector_config,
+        )
+        .map_err(|err| match err.kind() {
+            recipe::error::ErrorKind::YamlParsing(inner) => {
+                tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
+                err
             }
-            Result::Ok(r) => r,
-        };
+            _ => err,
+        })?;
 
         if args.render_only {
             tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
             tracing::info!("Variant: {:#?}", variant);
-            tracing::info!("Hash: {}", recipe.build.string.unwrap());
+            tracing::info!("Hash: {}", recipe.build().string().unwrap());
             continue;
         }
 
         let mut subpackages = BTreeMap::new();
         subpackages.insert(
-            recipe.package.name.clone(),
+            recipe.package().name().clone(),
             PackageIdentifier {
-                name: recipe.package.name.clone(),
-                version: recipe.package.version.clone(),
-                build_string: recipe.build.string.clone().unwrap(),
+                name: recipe.package().name().clone(),
+                version: recipe.package().version().to_owned(),
+                build_string: recipe.build().string().unwrap().to_owned(),
             },
         );
 
-        let noarch_type = recipe.build.noarch;
-        let name = recipe.package.name.clone();
+        let noarch_type = *recipe.build().noarch();
+        let name = recipe.package().name().clone();
         // Add the channels from the args and by default always conda-forge
         let channels = args
             .channel

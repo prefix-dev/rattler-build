@@ -639,40 +639,42 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
 
 fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
     let mut test_files = Vec::new();
-    if let Some(test) = &output.recipe.test() {
+    let test = output.recipe.test();
+    if !test.is_empty() {
         let test_folder = tmp_dir_path.join("info/test/");
         fs::create_dir_all(&test_folder)?;
 
-        if let Some(import_test) = &test.imports {
+        if !test.imports().is_empty() {
             let test_file = test_folder.join("run_test.py");
             let mut file = File::create(&test_file)?;
-            for el in import_test {
+            for el in test.imports() {
                 writeln!(file, "import {}\n", el)?;
             }
             test_files.push(test_file);
         }
 
-        if let Some(commands) = &test.commands {
+        if !test.commands().is_empty() {
             let test_file = test_folder.join("run_test.sh");
             let mut file = File::create(&test_file)?;
-            for el in commands {
+            for el in test.commands() {
                 writeln!(file, "{}\n", el)?;
             }
             test_files.push(test_file);
         }
 
-        if let Some(test_dependencies) = &test.requires {
+        if !test.requires().is_empty() {
+            let test_dependencies = test.requires();
             let test_file = test_folder.join("test_time_dependencies.json");
             let mut file = File::create(&test_file)?;
             file.write_all(serde_json::to_string(test_dependencies)?.as_bytes())?;
             test_files.push(test_file);
         }
 
-        if let Some(_test_files) = &test.files {
+        if !test.files().is_empty() {
             todo!("Test files is not yet implemented!");
         }
 
-        if let Some(_test_source_files) = &test.source_files {
+        if !test.source_files().is_empty() {
             todo!("Test files is not yet implemented!");
         }
     }

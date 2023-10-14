@@ -498,7 +498,7 @@ impl fmt::Display for GitUrl {
 
 #[derive(Clone)]
 pub struct Output {
-    pub recipe: rattler_recipe::stage2::Recipe,
+    pub recipe: crate::recipe::stage2::Recipe,
     pub build_configuration: BuildConfiguration,
     pub finalized_dependencies: Option<FinalizedDependencies>,
 }
@@ -511,7 +511,7 @@ impl Output {
 
     /// The version of the package
     pub fn version(&self) -> &str {
-        &self.recipe.package().version()
+        self.recipe.package().version()
     }
 
     /// The build string is usually set automatically as the hash of the variant configuration.

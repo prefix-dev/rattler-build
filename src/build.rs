@@ -28,13 +28,13 @@ pub fn get_conda_build_script(
     let recipe = &output.recipe;
 
     let default_script = if output.build_configuration.target_platform.is_windows() {
-        "build.bat"
+        ["build.bat".to_owned()]
     } else {
-        "build.sh"
+        ["build.sh".to_owned()]
     };
 
     let script = if recipe.build().scripts().is_empty() {
-        &[default_script.into()]
+        &default_script
     } else {
         recipe.build().scripts()
     };

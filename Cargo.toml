@@ -19,28 +19,42 @@ rattler = { version = "0.10.0", default-features = false }
 rattler_conda_types = { version = "0.10.0", default-features = false }
 rattler_digest = { version = "0.10.0", default-features = false }
 rattler_networking = { version = "0.10.0", default-features = false }
-rattler_repodata_gateway = { version = "0.10.0", default-features = false, features = ["sparse"] }
-rattler_shell = { version = "0.10.0", default-features = false, features = ["sysinfo"] }
-rattler_solve = { version = "0.10.0", default-features = false, features = ["resolvo"] }
+rattler_repodata_gateway = { version = "0.10.0", default-features = false, features = [
+    "sparse",
+] }
+rattler_shell = { version = "0.10.0", default-features = false, features = [
+    "sysinfo",
+] }
+rattler_solve = { version = "0.10.0", default-features = false, features = [
+    "resolvo",
+] }
 rattler_virtual_packages = { version = "0.10.0", default-features = false }
 rattler_package_streaming = { version = "0.10.0", default-features = false }
-# FIXME: temporary
-rattler_recipe = { path = "../format-experiments", package = "format-experiments" }
 anyhow = "1.0.75"
 walkdir = "2.4.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.107"
 reqwest = "0.11.22"
-tokio = {version = "1.32.0", features = ["rt", "macros", "rt-multi-thread"] }
+tokio = { version = "1.32.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.11.0"
 content_inspector = "0.2.4"
 serde_with = "3.3.0"
 url = "2.4.1"
 tracing = "0.1.37"
 clap = { version = "4.4.6", features = ["derive", "env", "cargo"] }
-minijinja = { version = "1.0.8", features = ["unstable_machinery"] }
-tracing-subscriber = { version = "0.3.17", features = ["env-filter", "fmt", "ansi"] }
+minijinja = { version = "1.0.8", features = [
+    "unstable_machinery",
+    "custom_syntax",
+] }
+tracing-subscriber = { version = "0.3.17", features = [
+    "env-filter",
+    "fmt",
+    "ansi",
+] }
+marked-yaml = { git = "https://github.com/GrayJack/marked-data.git", branch = "expand", package = "marked-yaml" }
+miette = { version = "5.10.0", features = ["fancy"] }
+linked-hash-map = "0.5.3"
 num_cpus = "1.16.0"
 goblin = "0.7.1"
 scroll = "0.11.0"
@@ -63,7 +77,7 @@ clap-verbosity-flag = "2.0.1"
 tracing-core = "0.1.31"
 
 [dev-dependencies]
-insta = {version = "1.33.0", features = ["yaml"] }
+insta = { version = "1.33.0", features = ["yaml"] }
 rstest = "0.18.2"
 
 [profile.dev.package."*"]
@@ -72,7 +86,7 @@ opt-level = 3
 [package.metadata.cross.target.x86_64-unknown-linux-gnu]
 pre-build = [
     "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH"
+    "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
 [patch.crates-io]

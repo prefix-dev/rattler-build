@@ -15,8 +15,8 @@ pub struct SelectorConfig {
 }
 
 impl SelectorConfig {
-    pub fn into_context(self) -> HashMap<String, Value> {
-        let mut context = HashMap::<String, Value>::new();
+    pub fn into_context(self) -> BTreeMap<String, Value> {
+        let mut context = BTreeMap::new();
 
         context.insert(
             "target_platform".to_string(),
@@ -53,6 +53,16 @@ impl SelectorConfig {
         }
 
         context
+    }
+}
+
+impl Default for SelectorConfig {
+    fn default() -> Self {
+        Self {
+            target_platform: Platform::current(),
+            build_platform: Platform::current(),
+            variant: Default::default(),
+        }
     }
 }
 

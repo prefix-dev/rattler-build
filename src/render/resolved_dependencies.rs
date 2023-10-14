@@ -18,9 +18,8 @@ use rattler_conda_types::{
 };
 use thiserror::Error;
 
-use rattler_recipe::stage2::Dependency;
-
 use super::solver::create_environment;
+use crate::recipe::stage2::Dependency;
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
@@ -376,7 +375,7 @@ pub async fn resolve_dependencies(
     let reqs = &output.recipe.requirements();
 
     let build_env = if !reqs.build.is_empty() {
-        let specs = apply_variant(&reqs.build(), &output.build_configuration)?;
+        let specs = apply_variant(reqs.build(), &output.build_configuration)?;
 
         let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
@@ -489,11 +488,11 @@ pub async fn resolve_dependencies(
 
     let run_exports = if !run_exports.is_empty() {
         Some(RunExportsJson {
-            strong: render_run_exports(&run_exports.strong),
-            weak: render_run_exports(&run_exports.weak),
-            noarch: render_run_exports(&run_exports.noarch),
-            strong_constrains: render_run_exports(&run_exports.strong_constrains),
-            weak_constrains: render_run_exports(&run_exports.weak_constrains),
+            strong: render_run_exports(run_exports.strong()),
+            weak: render_run_exports(run_exports.weak()),
+            noarch: render_run_exports(run_exports.noarch()),
+            strong_constrains: render_run_exports(run_exports.strong_constrains()),
+            weak_constrains: render_run_exports(run_exports.weak_constrains()),
         })
     } else {
         None
