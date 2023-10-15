@@ -515,6 +515,17 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
+        for license_glob in license_globs
+            .iter()
+            // Only license globs that do not end with '/' or '*'
+            .filter(|license_glob| !license_glob.ends_with('/') && !license_glob.ends_with('*'))
+        {
+            let filepath = licenses_folder.join(license_glob);
+            if !filepath.exists() {
+                tracing::warn!(path = %filepath.display(), "File does not exist");
+            }
+        }
+
         let include_globs = license_globs
             .iter()
             .filter(|glob| !glob.trim_start().starts_with('~'))
