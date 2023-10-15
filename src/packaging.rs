@@ -558,6 +558,10 @@ fn copy_license_files(
         })
         .collect::<Vec<PathBuf>>();
 
+        if copied_files.is_empty() {
+            tracing::warn!("No license files were copied");
+        }
+
         Ok(Some(copied_files))
     } else {
         Ok(None)
