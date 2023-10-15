@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::{Path, PathBuf, StripPrefixError},
-    process::Command,
+    process::Command, sync::Arc,
 };
 
 use fs_extra::dir::{create_all, CopyOptions};
@@ -167,10 +167,12 @@ pub(crate) fn copy_dir(
         globset.build().map(std::sync::Arc::new)
     }
 
-    let include_globs = mkglobset(include_globs)?;
+    let include_globs = Arc::new(mkglobset(include_globs)?);
+    let include_globs_copy = include_globs.clone();
+    let mut any_include_glob_matched = false;
     let exclude_globs = mkglobset(exclude_globs)?;
 
-    WalkBuilder::new(from)
+    let result = WalkBuilder::new(from)
         // disregard global gitignore
         .git_global(false)
         .git_ignore(use_gitignore)
@@ -183,6 +185,9 @@ pub(crate) fn copy_dir(
         .map(|entry| {
             let entry = entry?;
             let path = entry.path();
+
+            any_include_glob_matched = any_include_glob_matched || include_globs_copy.is_match(path);
+
             let stripped_path = path.strip_prefix(from)?;
             let dest_path = to.join(stripped_path);
 
@@ -208,7 +213,13 @@ pub(crate) fn copy_dir(
             }
         })
         .filter_map(|res| res.transpose())
-        .collect()
+        .collect();
+
+    if !any_include_glob_matched {
+        tracing::warn!("No glob matched");
+    }
+
+    result
 }
 
 #[cfg(test)]
