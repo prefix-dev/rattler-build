@@ -341,7 +341,7 @@ scalar_from_to_number!(usize, as_usize);
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 #[derive(Clone)]
-pub(crate) struct SequenceNode {
+pub struct SequenceNode {
     span: marked_yaml::Span,
     value: Vec<SequenceNodeInternal>,
 }
@@ -438,7 +438,7 @@ impl fmt::Debug for SequenceNode {
 /// **NOTE**: Nodes are considered equal even if they don't come from the same
 /// place.  *i.e. their spans are ignored for equality and hashing*
 #[derive(Clone)]
-pub(crate) struct MappingNode {
+pub struct MappingNode {
     span: marked_yaml::Span,
     value: LinkedHashMap<ScalarNode, Node>,
 }
@@ -519,7 +519,7 @@ impl ops::DerefMut for MappingNode {
 
 /// Special internal representation of the sequence node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum SequenceNodeInternal {
+pub enum SequenceNodeInternal {
     /// A simple node
     Simple(Node),
     /// A conditional node
@@ -600,7 +600,7 @@ impl TryFrom<marked_yaml::Node> for SequenceNodeInternal {
 
 /// Representation of the `if / then / else` selector in the recipe.
 #[derive(Clone)]
-pub(crate) struct IfSelector {
+pub struct IfSelector {
     pub(crate) cond: ScalarNode,
     pub(crate) then: Node,
     pub(crate) otherwise: Option<Node>,

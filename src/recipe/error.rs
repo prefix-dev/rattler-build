@@ -310,7 +310,7 @@ pub(crate) fn markerspan2span(src: &str, span: marked_yaml::Span) -> SourceSpan 
     SourceSpan::new(start, SourceOffset::from(length))
 }
 
-///
+#[allow(dead_code)]
 pub(crate) fn marker2offset(src: &str, mark: marked_yaml::Marker) -> SourceOffset {
     SourceOffset::from_location(src, mark.line(), mark.column())
 }

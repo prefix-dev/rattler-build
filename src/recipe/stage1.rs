@@ -197,8 +197,6 @@ impl RawRecipe {
                 "test" => test.node = Some(value.clone()),
                 "about" => {
                     if let Some(about_node) = value.as_mapping() {
-                        let about_span = markerspan2span(yaml, *about_node.span());
-
                         let mut ab = About::default();
 
                         for (key, value) in about_node.iter() {
