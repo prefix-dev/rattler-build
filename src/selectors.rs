@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    str::FromStr,
-};
+use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::{value::Value, Environment};
 use rattler_conda_types::{Platform, Version, VersionSpec};

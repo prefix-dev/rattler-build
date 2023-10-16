@@ -16,7 +16,6 @@ use std::{
     process::ExitCode,
     str::{self, FromStr},
 };
-use test::TestConfiguration;
 use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
 pub use rattler_build;
@@ -24,6 +23,7 @@ use rattler_build::build::run_build;
 use rattler_build::metadata::{BuildConfiguration, Directories, PackageIdentifier};
 use rattler_build::recipe::stage2::Recipe;
 use rattler_build::selectors::{flatten_selectors, SelectorConfig};
+use rattler_build::test::{self, TestConfiguration};
 use rattler_build::tool_configuration;
 
 mod console_utils;

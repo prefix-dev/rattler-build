@@ -207,7 +207,7 @@ impl VariantConfig {
 
         let variant_keys = used_zip_keys
             .into_iter()
-            .chain(variant_keys.into_iter())
+            .chain(variant_keys)
             .collect::<Vec<_>>();
 
         // get all combinations of variant keys
@@ -332,7 +332,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::selectors::{flatten_toplevel, SelectorConfig};
+    use rattler_build::selectors::{flatten_toplevel, SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
     use serde_yaml::Value as YamlValue;

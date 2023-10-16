@@ -1,7 +1,4 @@
-use std::{
-    fmt::{self, write},
-    str::ParseBoolError,
-};
+use std::{fmt, str::ParseBoolError};
 
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use thiserror::Error;

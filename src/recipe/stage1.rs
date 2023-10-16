@@ -175,7 +175,7 @@ impl RawRecipe {
                                 _ => {
                                     return Err(_error!(
                                         yaml,
-                                        markerspan2span(yaml, *value.span()),
+                                        requirements_span,
                                         ErrorKind::Other,
                                         label = "unexpected key",
                                         help = "expected one of `build`, `host`, `run` or `run_constrained`"

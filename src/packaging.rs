@@ -742,7 +742,7 @@ pub fn package_conda(
             prefix,
             tmp_dir_path,
             &output.build_configuration.target_platform,
-            &output.recipe.build().noarch(),
+            output.recipe.build().noarch(),
         )? {
             tmp_files.insert(dest_file);
         }
