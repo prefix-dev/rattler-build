@@ -5,8 +5,8 @@ use linked_hash_map::LinkedHashMap;
 
 use super::error::{markerspan2span, Error, ErrorKind};
 
-pub(crate) mod node;
-pub(crate) use node::Node;
+pub mod node;
+pub use node::Node;
 
 use crate::_error;
 

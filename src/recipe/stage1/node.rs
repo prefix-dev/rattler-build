@@ -8,7 +8,7 @@ use marked_yaml::types::MarkedScalarNode;
 
 use crate::_partialerror;
 use crate::recipe::{
-    error::{ErrorKind, PartialError, PartialError2},
+    error::{ErrorKind, PartialError},
     jinja::Jinja,
 };
 
@@ -26,7 +26,7 @@ use crate::recipe::{
 /// **NOTE**: Nodes are considered equal even if they don't come from the
 /// same place.  *i.e. their spans are ignored for equality and hashing*
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum Node {
+pub enum Node {
     /// A YAML scalar
     ///
     /// You can test if a node is a scalar, and retrieve it as one if you
@@ -134,7 +134,7 @@ impl From<&str> for Node {
 }
 
 impl TryFrom<marked_yaml::Node> for Node {
-    type Error = PartialError2;
+    type Error = PartialError;
 
     fn try_from(value: marked_yaml::Node) -> Result<Self, Self::Error> {
         Node::try_from(&value)
@@ -142,7 +142,7 @@ impl TryFrom<marked_yaml::Node> for Node {
 }
 
 impl TryFrom<&marked_yaml::Node> for Node {
-    type Error = PartialError2;
+    type Error = PartialError;
 
     fn try_from(value: &marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
@@ -385,7 +385,7 @@ impl From<Vec<SequenceNodeInternal>> for SequenceNode {
 }
 
 impl TryFrom<marked_yaml::types::MarkedSequenceNode> for SequenceNode {
-    type Error = PartialError2;
+    type Error = PartialError;
 
     fn try_from(node: marked_yaml::types::MarkedSequenceNode) -> Result<Self, Self::Error> {
         let mut value = Vec::with_capacity(node.len());
@@ -488,7 +488,7 @@ impl From<LinkedHashMap<ScalarNode, Node>> for MappingNode {
 }
 
 impl TryFrom<marked_yaml::types::MarkedMappingNode> for MappingNode {
-    type Error = PartialError2;
+    type Error = PartialError;
 
     fn try_from(value: marked_yaml::types::MarkedMappingNode) -> Result<Self, Self::Error> {
         let val: Result<LinkedHashMap<_, _>, _> = value
@@ -544,7 +544,7 @@ impl SequenceNodeInternal {
 }
 
 impl TryFrom<marked_yaml::Node> for SequenceNodeInternal {
-    type Error = PartialError2;
+    type Error = PartialError;
 
     fn try_from(value: marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
@@ -556,16 +556,21 @@ impl TryFrom<marked_yaml::Node> for SequenceNodeInternal {
                         let cond = if let marked_yaml::Node::Scalar(s) = val {
                             s.into()
                         } else {
-                            return Err(PartialError2::new(
+                            return Err(_partialerror!(
                                 *val.span(),
                                 ErrorKind::IfSelectorConditionNotScalar,
+                                label = "if-selector condition must be a scalar"
                             ));
                         };
 
                         let then = if let Some(t) = map.get("then") {
                             Node::try_from(t)?
                         } else {
-                            return Err(PartialError2::new(span, ErrorKind::IfSelectorMissingThen));
+                            return Err(_partialerror!(
+                                span,
+                                ErrorKind::IfSelectorMissingThen,
+                                label = "if-selector is missing `then` logic"
+                            ));
                         };
 
                         let otherwise = map.get("else").map(Node::try_from);

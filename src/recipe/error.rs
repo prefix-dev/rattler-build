@@ -102,23 +102,6 @@ pub struct PartialError {
     pub kind: ErrorKind,
 }
 
-/// Partial error for when it's not possible to have the full [`Error`] type.
-///
-/// ## Functions using
-/// - [`YamlNodeExt::to_element`](crate::stage1::YamlNodeExt::to_element)
-#[derive(Debug)]
-pub(crate) struct PartialError2 {
-    pub span: marked_yaml::Span,
-    pub kind: ErrorKind,
-}
-
-impl PartialError2 {
-    /// Create a new [`PartialError`].
-    pub(crate) fn new(span: marked_yaml::Span, kind: ErrorKind) -> Self {
-        Self { span, kind }
-    }
-}
-
 // Implement Display for ErrorKind manually bacause [`marked_yaml::LoadError`] does not implement
 // the way we want it.
 // CAUTION: Because of this impl, we cannot use `#[error()]` on the enum.
