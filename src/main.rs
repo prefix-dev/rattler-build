@@ -7,7 +7,6 @@ use clap_verbosity_flag::{InfoLevel, Verbosity};
 use indicatif::MultiProgress;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
-use selectors::{flatten_selectors, SelectorConfig};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
@@ -20,33 +19,20 @@ use std::{
 use test::TestConfiguration;
 use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
-mod build;
+pub use rattler_build;
+use rattler_build::build::run_build;
+use rattler_build::metadata::{BuildConfiguration, Directories, PackageIdentifier};
+use rattler_build::recipe::stage2::Recipe;
+use rattler_build::selectors::{flatten_selectors, SelectorConfig};
+use rattler_build::tool_configuration;
+
 mod console_utils;
-mod env_vars;
 mod hash;
-mod index;
-mod linux;
-mod macos;
-mod metadata;
-mod packaging;
-mod post;
-mod recipe;
-mod render;
-mod selectors;
-mod source;
-mod tool_configuration;
-mod unix;
 mod used_variables;
 mod variant_config;
-mod windows;
-use build::run_build;
-
-mod test;
 
 use crate::{
     console_utils::{IndicatifWriter, TracingFormatter},
-    metadata::{BuildConfiguration, Directories, PackageIdentifier},
-    render::recipe::render_recipe,
     variant_config::VariantConfig,
 };
 
@@ -292,18 +278,14 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         //     Result::Ok(r) => r,
         // };
 
-        let recipe = recipe::stage2::Recipe::from_yaml_with_default_hash_str(
-            &recipe_text,
-            &hash,
-            selector_config,
-        )
-        .map_err(|err| match err.kind() {
-            recipe::error::ErrorKind::YamlParsing(inner) => {
-                tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
-                err
-            }
-            _ => err,
-        })?;
+        let recipe = Recipe::from_yaml_with_default_hash_str(&recipe_text, &hash, selector_config)
+            .map_err(|err| match err.kind() {
+                rattler_build::recipe::error::ErrorKind::YamlParsing(inner) => {
+                    tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
+                    err
+                }
+                _ => err,
+            })?;
 
         if args.render_only {
             tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
@@ -330,7 +312,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             .clone()
             .unwrap_or(vec!["conda-forge".to_string()]);
 
-        let output = metadata::Output {
+        let output = rattler_build::metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform,

@@ -9,7 +9,7 @@
 
 use std::{
     fs::{self, File},
-    io::Read,
+    io::{Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -21,9 +21,10 @@ use rattler_conda_types::{
     MatchSpec, Platform,
 };
 use rattler_networking::AuthenticatedClient;
-use rattler_shell::activation::ActivationVariables;
-use rattler_shell::{activation::Activator, shell};
-use std::io::Write;
+use rattler_shell::{
+    activation::{ActivationVariables, Activator},
+    shell,
+};
 
 use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 

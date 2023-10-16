@@ -11,7 +11,8 @@ use serde_with::OneOrMany;
 use serde_yaml::Value as YamlValue;
 use thiserror::Error;
 
-use crate::selectors::{flatten_selectors, flatten_toplevel, SelectorConfig};
+use rattler_build::selectors::{flatten_selectors, flatten_toplevel, SelectorConfig};
+
 use crate::used_variables::extract_dependencies;
 use crate::used_variables::used_vars_from_expressions;
 
