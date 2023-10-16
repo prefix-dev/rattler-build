@@ -964,6 +964,13 @@ impl Compiler {
     pub fn as_str(&self) -> &str {
         &self.compiler
     }
+
+    /// Get the compiler value without the `__COMPILER` prefix.
+    pub fn without_prefix(&self) -> &str {
+        self.compiler
+            .strip_prefix("__COMPILER ")
+            .expect("compiler without prefix")
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

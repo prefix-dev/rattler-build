@@ -252,14 +252,14 @@ pub fn apply_variant(
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("{}_compiler", compiler.as_str());
+                    let compiler_variant = format!("{}_compiler", compiler.without_prefix());
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
                             // defaults
                             if target_platform.is_linux() {
-                                let default_compiler = match compiler.as_str() {
+                                let default_compiler = match compiler.without_prefix() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -273,7 +273,7 @@ pub fn apply_variant(
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.as_str() {
+                                let default_compiler = match compiler.without_prefix() {
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
