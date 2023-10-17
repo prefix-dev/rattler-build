@@ -132,12 +132,15 @@ mod test {
 
     #[test]
     fn test_used_vars_from_expressions() {
-        let recipe = r#"
-        - sel(llvm_variant > 10): llvm >= 10
-        - sel(linux): linux-gcc
-        - sel(osx): osx-clang
-        - "{{ compiler('c') }}"
-        - "{{ pin_subpackage('abcdef') }}"
+        let recipe = r#"build:
+            - if: llvm_variant > 10
+              then: llvm >= 10
+            - if: linux
+              then: linux-gcc
+            - if: osx
+              then: osx-clang
+            - "{{ compiler('c') }}"
+            - "{{ pin_subpackage('abcdef') }}"
         "#;
 
         let used_vars = used_vars_from_expressions(recipe);
