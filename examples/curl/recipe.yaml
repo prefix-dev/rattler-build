@@ -3,10 +3,10 @@ context:
 
 package:
   name: curl
-  version: "{{ version }}"
+  version: ${{ version }}
 
 source:
-  url: http://curl.haxx.se/download/curl-{{ version }}.tar.bz2
+  url: http://curl.haxx.se/download/curl-${{ version }}.tar.bz2
   sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
 
 build:
@@ -14,15 +14,22 @@ build:
 
 requirements:
   build:
-    - "{{ compiler('c') }}"
-    - sel(win): cmake
-    - sel(win): ninja
-    - sel(unix): make
-    - sel(unix): perl
-    - sel(unix): pkg-config
-    - sel(unix): libtool
+    - ${{ compiler('c') }}
+    - if: win
+      then:
+        - cmake
+        - ninja
+    - if: unix
+      then:
+        - make
+        - perl
+        - pkg-config
+        - libtool
   host:
-    - sel(linux): openssl
+    # - openssl
+    - if: linux
+      then:
+        - openssl
 
 about:
   home: http://curl.haxx.se/
@@ -35,4 +42,4 @@ about:
     with URL syntax. It is used in command lines or scripts to transfer data.
   doc_url: https://curl.haxx.se/docs/
   dev_url: https://github.com/curl/curl
-  doc_source_url: https://github.com/curl/curl/tree/master/docs
+  # doc_source_url: https://github.com/curl/curl/tree/master/docs
