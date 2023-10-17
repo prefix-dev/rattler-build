@@ -415,7 +415,7 @@ pub async fn resolve_dependencies(
     };
 
     // host env
-    let mut specs = apply_variant(&reqs.host, &output.build_configuration)?;
+    let mut specs = apply_variant(reqs.host(), &output.build_configuration)?;
 
     let clone_specs = |name: &PackageName,
                        env: &str,

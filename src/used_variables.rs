@@ -14,6 +14,7 @@ use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
 };
+use rattler_build::recipe::stage1::Node;
 use serde_yaml::Value as YamlValue;
 use std::collections::HashSet;
 
@@ -74,32 +75,39 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
     }
 }
 
-/// This recursively finds all `sel(...)` expressions in a YAML node
-fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
+/// This recursively finds all `if/then/else` expressions in a YAML node
+fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
+    use rattler_build::recipe::stage1::node::SequenceNodeInternal;
+
     match node {
-        YamlValue::Mapping(map) => {
-            for (key, value) in map {
-                if let YamlValue::String(key) = key {
-                    if key.starts_with("sel(") {
-                        selectors.insert(key[4..key.len() - 1].to_string());
-                    }
-                }
+        Node::Mapping(map) => {
+            for (_, value) in map.iter() {
                 find_all_selectors(value, selectors);
             }
         }
-        YamlValue::Sequence(seq) => {
-            for item in seq {
-                find_all_selectors(item, selectors);
+        Node::Sequence(seq) => {
+            for item in seq.iter() {
+                match item {
+                    SequenceNodeInternal::Simple(node) => find_all_selectors(node, selectors),
+                    SequenceNodeInternal::Conditional(if_sel) => {
+                        selectors.insert(if_sel.cond().as_str().to_owned());
+                        find_all_selectors(if_sel.then(), selectors);
+                        if let Some(otherwise) = if_sel.otherwise() {
+                            find_all_selectors(otherwise, selectors);
+                        }
+                    }
+                }
             }
         }
         _ => {}
     }
 }
 
-/// This finds all variables used in jinja or `sel(...)` expressions
+/// This finds all variables used in jinja or `if/then/else` expressions
 pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     let mut selectors = HashSet::new();
-    let yaml_node = serde_yaml::from_str(recipe).unwrap();
+
+    let yaml_node = Node::parse_yaml(0, recipe).unwrap();
     find_all_selectors(&yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();

@@ -8,7 +8,7 @@ use marked_yaml::types::MarkedScalarNode;
 
 use crate::_partialerror;
 use crate::recipe::{
-    error::{ErrorKind, PartialParsingError},
+    error::{ErrorKind, ParsingError, PartialParsingError},
     jinja::Jinja,
 };
 
@@ -45,6 +45,24 @@ pub enum Node {
 }
 
 impl Node {
+    /// Parse YAML from a string and return a Node representing
+    /// the content.
+    ///
+    /// When parsing YAML, the source is stored into all markers which are
+    /// in the node spans.  This means that later if you only have a node,
+    /// you can determine which source it came from without needing complex
+    /// lifetimes to bind strings or other non-copy data to nodes.
+    ///
+    /// This requires that the top level be a mapping, but the returned
+    /// type here is the generic Node enumeration to make it potentially easier
+    /// for callers to use.  Regardless, it's always possible to treat the
+    /// returned node as a mapping node without risk of panic.
+    pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
+        let yaml = marked_yaml::parse_yaml(init_span_index, src)
+            .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
+        Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
+    }
+
     /// Retrieve the Span from the contained Node
     pub fn span(&self) -> &marked_yaml::Span {
         match self {
@@ -620,6 +638,21 @@ impl IfSelector {
             otherwise,
             span,
         }
+    }
+
+    /// Get the conditional value
+    pub fn cond(&self) -> &ScalarNode {
+        &self.cond
+    }
+
+    /// Get the then value
+    pub fn then(&self) -> &Node {
+        &self.then
+    }
+
+    /// Get the otherwise value if it exists
+    pub fn otherwise(&self) -> Option<&Node> {
+        self.otherwise.as_ref()
     }
 
     pub fn span(&self) -> &marked_yaml::Span {
