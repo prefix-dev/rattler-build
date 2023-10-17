@@ -10,6 +10,7 @@ use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 
 use itertools::Itertools;
+use miette::IntoDiagnostic;
 use rattler_shell::shell;
 
 use crate::env_vars::write_env_script;
@@ -115,7 +116,7 @@ fn run_process_with_replacements(
     cwd: &PathBuf,
     args: &[OsString],
     replacements: &[(&str, &str)],
-) -> anyhow::Result<()> {
+) -> miette::Result<()> {
     let mut child = Command::new(command)
         .current_dir(cwd)
         .args(args)
@@ -143,7 +144,7 @@ fn run_process_with_replacements(
     let status = child.wait().expect("Failed to wait on child");
 
     if !status.success() {
-        return Err(anyhow::anyhow!("Build failed"));
+        return Err(miette::miette!("Build failed"));
     }
 
     Ok(())
@@ -154,13 +155,14 @@ fn run_process_with_replacements(
 pub async fn run_build(
     output: &Output,
     tool_configuration: tool_configuration::Configuration,
-) -> anyhow::Result<PathBuf> {
+) -> miette::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
     index::index(
         &directories.output_dir,
         Some(&output.build_configuration.target_platform),
-    )?;
+    )
+    .into_diagnostic()?;
 
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
@@ -173,11 +175,13 @@ pub async fn run_build(
             &directories.recipe_dir,
             &directories.output_dir,
         )
-        .await?;
+        .await
+        .into_diagnostic()?;
     }
 
-    let finalized_dependencies =
-        resolve_dependencies(output, &channels, tool_configuration).await?;
+    let finalized_dependencies = resolve_dependencies(output, &channels, tool_configuration)
+        .await
+        .into_diagnostic()?;
 
     // The output with the resolved dependencies
     let output = Output {
@@ -186,7 +190,7 @@ pub async fn run_build(
         build_configuration: output.build_configuration.clone(),
     };
 
-    let build_script = get_conda_build_script(&output, directories)?;
+    let build_script = get_conda_build_script(&output, directories).into_diagnostic()?;
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script);
 
@@ -233,19 +237,21 @@ pub async fn run_build(
         &directories.host_prefix,
         &directories.output_dir,
         output.build_configuration.package_format,
-    )?;
+    )
+    .into_diagnostic()?;
 
     if !output.build_configuration.no_clean {
-        fs::remove_dir_all(&directories.build_dir)?;
+        fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
     index::index(
         &directories.output_dir,
         Some(&output.build_configuration.target_platform),
-    )?;
+    )
+    .into_diagnostic()?;
 
     let test_dir = directories.work_dir.join("test");
-    fs::create_dir_all(&test_dir)?;
+    fs::create_dir_all(&test_dir).into_diagnostic()?;
 
     tracing::info!("{}", output);
 
@@ -260,10 +266,11 @@ pub async fn run_build(
             channels,
         },
     )
-    .await?;
+    .await
+    .into_diagnostic()?;
 
     if !output.build_configuration.no_clean {
-        fs::remove_dir_all(&directories.build_dir)?;
+        fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
     Ok(result)

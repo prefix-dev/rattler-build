@@ -1,10 +1,10 @@
 //! This is the main entry point for the `rattler-build` binary.
 
-use anyhow::Ok;
 use clap::{arg, crate_version, Parser};
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use indicatif::MultiProgress;
+use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
 use serde::{Deserialize, Serialize};
@@ -13,18 +13,18 @@ use std::{
     collections::BTreeMap,
     fs,
     path::PathBuf,
-    process::ExitCode,
     str::{self, FromStr},
 };
 use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
-pub use rattler_build;
-use rattler_build::build::run_build;
-use rattler_build::metadata::{BuildConfiguration, Directories, PackageIdentifier};
-use rattler_build::recipe::stage2::Recipe;
-use rattler_build::selectors::{flatten_selectors, SelectorConfig};
-use rattler_build::test::{self, TestConfiguration};
-use rattler_build::tool_configuration;
+use rattler_build::{
+    build::run_build,
+    metadata::{BuildConfiguration, Directories, PackageIdentifier},
+    recipe::stage2::Recipe,
+    selectors::{flatten_selectors, SelectorConfig},
+    test::{self, TestConfiguration},
+    tool_configuration,
+};
 
 mod console_utils;
 mod hash;
@@ -113,7 +113,7 @@ struct TestOpts {
 }
 
 #[tokio::main]
-async fn main() -> ExitCode {
+async fn main() -> miette::Result<()> {
     let args = App::parse();
 
     let multi_progress = MultiProgress::new();
@@ -136,44 +136,46 @@ async fn main() -> ExitCode {
     };
 
     match result {
-        Result::Ok(_) => ExitCode::SUCCESS,
+        Result::Ok(_) => Ok(()),
         Result::Err(e) => {
             tracing::error!("Error: {}", e);
-            ExitCode::FAILURE
+            Err(e)
         }
     }
 }
 
-async fn run_test_from_args(args: TestOpts) -> anyhow::Result<()> {
-    let package_file = fs::canonicalize(args.package_file)?;
+async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
+    let package_file = fs::canonicalize(args.package_file).into_diagnostic()?;
     let test_options = TestConfiguration {
-        test_prefix: fs::canonicalize(PathBuf::from("test-prefix"))?,
+        test_prefix: fs::canonicalize(PathBuf::from("test-prefix")).into_diagnostic()?,
         target_platform: Some(Platform::current()),
         keep_test_prefix: false,
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
     };
-    test::run_test(&package_file, &test_options).await?;
+    test::run_test(&package_file, &test_options)
+        .await
+        .into_diagnostic()?;
     Ok(())
 }
 
-async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> anyhow::Result<()> {
+async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> miette::Result<()> {
     let recipe_path = fs::canonicalize(&args.recipe);
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
-                return Err(anyhow::anyhow!(
+                return Err(miette::miette!(
                     "The file {} could not be found.",
                     args.recipe.to_string_lossy()
                 ));
             }
             std::io::ErrorKind::PermissionDenied => {
-                return Err(anyhow::anyhow!(
+                return Err(miette::miette!(
                     "Permission denied when trying to access the file {}.",
                     args.recipe.to_string_lossy()
                 ));
             }
             _ => {
-                return Err(anyhow::anyhow!(
+                return Err(miette::miette!(
                     "An unknown error occurred while trying to access the file {}: {:?}",
                     args.recipe.to_string_lossy(),
                     e
@@ -189,14 +191,14 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         if recipe_yaml_path.exists() && recipe_yaml_path.is_file() {
             recipe_path = recipe_yaml_path;
         } else {
-            return Err(anyhow::anyhow!(
+            return Err(miette::miette!(
                 "'recipe.yaml' not found in the directory {}",
                 args.recipe.to_string_lossy()
             ));
         }
     }
 
-    let recipe_text = fs::read_to_string(&recipe_path)?;
+    let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
     let mut recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
@@ -206,13 +208,14 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         .get("build")
         .and_then(|v| v.get("noarch"))
         .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
-        .transpose()?
+        .transpose()
+        .into_diagnostic()?
         .unwrap_or_else(NoArchType::none);
 
     let target_platform = if !noarch.is_none() {
         Platform::NoArch
     } else if let Some(target_platform) = args.target_platform {
-        Platform::from_str(&target_platform)?
+        Platform::from_str(&target_platform).into_diagnostic()?
     } else {
         tracing::info!("No target platform specified, using current platform");
         Platform::current()
@@ -224,7 +227,8 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         variant: BTreeMap::new(),
     };
 
-    let variant_config = VariantConfig::from_files(&args.variant_config, &selector_config)?;
+    let variant_config =
+        VariantConfig::from_files(&args.variant_config, &selector_config).into_diagnostic()?;
 
     let variants = variant_config
         .find_variants(&recipe_text, &selector_config)
@@ -328,7 +332,8 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     name.as_normalized(),
                     &recipe_path,
                     &args.output_dir,
-                )?,
+                )
+                .into_diagnostic()?,
                 channels,
                 timestamp: chrono::Utc::now(),
                 subpackages,
