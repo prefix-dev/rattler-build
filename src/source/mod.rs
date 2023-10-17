@@ -1,7 +1,8 @@
 use std::{
     fs,
     path::{Path, PathBuf, StripPrefixError},
-    process::Command, sync::Arc,
+    process::Command,
+    sync::Arc,
 };
 
 use fs_extra::dir::{create_all, CopyOptions};
@@ -159,16 +160,22 @@ pub(crate) fn copy_dir(
     // catch its environment, so we need to move the globs in there.
     // Because it also needs `Send` (because it uses some Arc machinery internally)
     // we cannot use a normal Rc here, so we use an Arc
-    fn mkglobset(globs: &[&str]) -> Result<std::sync::Arc<globset::GlobSet>, globset::Error> {
+    fn mkglobset(globs: &[&str]) -> Result<Arc<globset::GlobSet>, globset::Error> {
         let mut globset = globset::GlobSetBuilder::new();
         for glob in globs {
             globset.add(globset::Glob::new(glob)?);
         }
-        globset.build().map(std::sync::Arc::new)
+        globset.build().map(Arc::new)
     }
+    let (folders, globs) = include_globs
+        .iter()
+        .partition::<Vec<_>, _>(|glob| glob.ends_with('/') && !glob.contains('*'));
 
-    let include_globs = Arc::new(mkglobset(include_globs)?);
+    let folders = Arc::new(folders.iter().map(PathBuf::from).collect::<Vec<_>>());
+
+    let include_globs = mkglobset(&globs)?;
     let include_globs_copy = include_globs.clone();
+
     let mut any_include_glob_matched = false;
     let exclude_globs = mkglobset(exclude_globs)?;
 
@@ -178,15 +185,40 @@ pub(crate) fn copy_dir(
         .git_ignore(use_gitignore)
         .hidden(true)
         .filter_entry(move |entry| {
-            (include_globs.len() == 0 || include_globs.is_match(entry.path()))
-                && !exclude_globs.is_match(entry.path())
+            // if the entry is a directory, we always want to include it to make sure that we
+            // recurse into all the subdirs
+            if let Some(ft) = entry.file_type().as_ref() {
+                if ft.is_dir() {
+                    return true;
+                }
+            }
+
+            // We need to strip the path to the entry to make sure that the glob matches on relative paths
+            let stripped_path: PathBuf = {
+                let mut components: Vec<_> = entry
+                    .path()
+                    .components()
+                    .rev()
+                    .take(entry.depth())
+                    .collect();
+                components.reverse();
+                components.iter().collect()
+            };
+
+            let include = include_globs.len() == 0;
+            let include = include || include_globs.is_match(&stripped_path);
+            let include = include || folders.iter().any(|f| stripped_path.starts_with(f));
+            let exclude = exclude_globs.is_match(entry.path());
+
+            include && !exclude
         })
         .build()
         .map(|entry| {
             let entry = entry?;
             let path = entry.path();
 
-            any_include_glob_matched = any_include_glob_matched || include_globs_copy.is_match(path);
+            any_include_glob_matched =
+                any_include_glob_matched || include_globs_copy.is_match(path);
 
             let stripped_path = path.strip_prefix(from)?;
             let dest_path = to.join(stripped_path);
