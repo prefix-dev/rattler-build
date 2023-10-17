@@ -7,8 +7,8 @@ use thiserror::Error;
 ///
 /// This type was designed to be compatible with [`miette`], and its [`Diagnostic`] trait.
 #[derive(Debug, Error, Diagnostic)]
-#[error("{kind}")]
-pub struct Error {
+#[error("Parsing: {kind}")]
+pub struct ParsingError {
     // Source string of the recipe.
     #[source_code]
     pub src: String,
@@ -28,8 +28,8 @@ pub struct Error {
     pub kind: ErrorKind,
 }
 
-impl Error {
-    pub fn from_partial(src: &str, err: PartialError) -> Self {
+impl ParsingError {
+    pub fn from_partial(src: &str, err: PartialParsingError) -> Self {
         Self {
             src: src.to_owned(),
             span: markerspan2span(src, err.span),
@@ -87,8 +87,8 @@ pub enum ErrorKind {
 }
 
 #[derive(Debug, Error)]
-#[error("{kind}")]
-pub struct PartialError {
+#[error("Parsing: {kind}")]
+pub struct PartialParsingError {
     /// Offset in chars of the error.
     pub span: marked_yaml::Span,
 
@@ -156,7 +156,7 @@ impl fmt::Display for ErrorKind {
 #[doc(hidden)]
 macro_rules! _error {
     ($src:expr, $span:expr, $kind:expr $(,)?) => {{
-        $crate::recipe::error::Error {
+        $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
             label: None,
@@ -165,7 +165,7 @@ macro_rules! _error {
         }
     }};
     ($src:expr, $span:expr, $kind:expr, label = $label:expr $(,)?) => {{
-        $crate::recipe::error::Error {
+        $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
             label: Some($label),
@@ -174,7 +174,7 @@ macro_rules! _error {
         }
     }};
     ($src:expr, $span:expr, $kind:expr, help = $help:expr $(,)?) => {{
-        $crate::recipe::error::Error {
+        $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
             label: None,
@@ -189,7 +189,7 @@ macro_rules! _error {
         $crate::_error!($src, $span, $kind, $label, $help)
     }};
     ($src:expr, $span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
-        $crate::recipe::error::Error {
+        $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
             label: Some($label),
@@ -204,7 +204,7 @@ macro_rules! _error {
 #[doc(hidden)]
 macro_rules! _partialerror {
     ($span:expr, $kind:expr $(,)?) => {{
-        $crate::recipe::error::PartialError {
+        $crate::recipe::error::PartialParsingError {
             span: $span,
             label: None,
             help: None,
@@ -212,7 +212,7 @@ macro_rules! _partialerror {
         }
     }};
     ($span:expr, $kind:expr, label = $label:expr $(,)?) => {{
-        $crate::recipe::error::PartialError {
+        $crate::recipe::error::PartialParsingError {
             span: $span,
             label: Some($label),
             help: None,
@@ -220,7 +220,7 @@ macro_rules! _partialerror {
         }
     }};
     ($span:expr, $kind:expr, help = $help:expr $(,)?) => {{
-        $crate::recipe::error::PartialError {
+        $crate::recipe::error::PartialParsingError {
             span: $span,
             label: None,
             help: Some($help),
@@ -234,7 +234,7 @@ macro_rules! _partialerror {
         $crate::_error!($src, $span, $kind, $label, $help)
     }};
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
-        $crate::recipe::error::PartialError {
+        $crate::recipe::error::PartialParsingError {
             span: $span,
             label: Some($label),
             help: Some($help),
@@ -244,7 +244,7 @@ macro_rules! _partialerror {
 }
 
 /// Error handler for [`marked_yaml::LoadError`].
-pub(crate) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Error {
+pub(crate) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> ParsingError {
     _error!(
         src,
         marker2span(src, marker(&err)),

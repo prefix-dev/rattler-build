@@ -8,7 +8,7 @@ use marked_yaml::types::MarkedScalarNode;
 
 use crate::_partialerror;
 use crate::recipe::{
-    error::{ErrorKind, PartialError},
+    error::{ErrorKind, PartialParsingError},
     jinja::Jinja,
 };
 
@@ -134,7 +134,7 @@ impl From<&str> for Node {
 }
 
 impl TryFrom<marked_yaml::Node> for Node {
-    type Error = PartialError;
+    type Error = PartialParsingError;
 
     fn try_from(value: marked_yaml::Node) -> Result<Self, Self::Error> {
         Node::try_from(&value)
@@ -142,7 +142,7 @@ impl TryFrom<marked_yaml::Node> for Node {
 }
 
 impl TryFrom<&marked_yaml::Node> for Node {
-    type Error = PartialError;
+    type Error = PartialParsingError;
 
     fn try_from(value: &marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
@@ -385,7 +385,7 @@ impl From<Vec<SequenceNodeInternal>> for SequenceNode {
 }
 
 impl TryFrom<marked_yaml::types::MarkedSequenceNode> for SequenceNode {
-    type Error = PartialError;
+    type Error = PartialParsingError;
 
     fn try_from(node: marked_yaml::types::MarkedSequenceNode) -> Result<Self, Self::Error> {
         let mut value = Vec::with_capacity(node.len());
@@ -488,7 +488,7 @@ impl From<LinkedHashMap<ScalarNode, Node>> for MappingNode {
 }
 
 impl TryFrom<marked_yaml::types::MarkedMappingNode> for MappingNode {
-    type Error = PartialError;
+    type Error = PartialParsingError;
 
     fn try_from(value: marked_yaml::types::MarkedMappingNode) -> Result<Self, Self::Error> {
         let val: Result<LinkedHashMap<_, _>, _> = value
@@ -535,7 +535,7 @@ impl SequenceNodeInternal {
     }
 
     /// Process the sequence node using the given jinja environment, returning the chosen node.
-    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialError> {
+    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialParsingError> {
         match self {
             Self::Simple(node) => Ok(Some(node.clone())),
             Self::Conditional(selector) => selector.process(jinja),
@@ -544,7 +544,7 @@ impl SequenceNodeInternal {
 }
 
 impl TryFrom<marked_yaml::Node> for SequenceNodeInternal {
-    type Error = PartialError;
+    type Error = PartialParsingError;
 
     fn try_from(value: marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
@@ -627,7 +627,7 @@ impl IfSelector {
     }
 
     /// Process the if-selector using the given jinja environment, returning the chosen node.
-    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialError> {
+    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialParsingError> {
         let cond = jinja.eval(self.cond.as_str()).map_err(|err| {
             _partialerror!(
                 *self.cond.span(),

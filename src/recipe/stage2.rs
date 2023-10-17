@@ -10,7 +10,7 @@ use url::Url;
 use crate::{
     _partialerror,
     recipe::{
-        error::{Error, ErrorKind, PartialError},
+        error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::{Jinja, Pin},
         stage1::{
             self,
@@ -35,9 +35,9 @@ pub struct Recipe {
 
 impl Recipe {
     /// Build a recipe from a YAML string.
-    pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, Error> {
+    pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
         let raw = RawRecipe::from_yaml(yaml)?;
-        Self::from_raw(raw, jinja_opt).map_err(|err| Error::from_partial(yaml, err))
+        Self::from_raw(raw, jinja_opt).map_err(|err| ParsingError::from_partial(yaml, err))
     }
 
     /// Build a recipe from a YAML string and use a given package hash string as default value.
@@ -45,7 +45,7 @@ impl Recipe {
         yaml: &str,
         default_pkg_hash: &str,
         jinja_opt: SelectorConfig,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, ParsingError> {
         let mut recipe = Self::from_yaml(yaml, jinja_opt)?;
 
         // Set the build string to the package hash if it is not set
@@ -56,7 +56,10 @@ impl Recipe {
     }
 
     /// Build a recipe from a [`RawRecipe`].
-    pub fn from_raw(raw: RawRecipe, jinja_opt: SelectorConfig) -> Result<Self, PartialError> {
+    pub fn from_raw(
+        raw: RawRecipe,
+        jinja_opt: SelectorConfig,
+    ) -> Result<Self, PartialParsingError> {
         // Init minijinja
         let mut jinja = Jinja::new(jinja_opt);
 
@@ -144,7 +147,7 @@ pub struct Package {
 }
 
 impl Package {
-    fn from_stage1(package: &stage1::Package, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_stage1(package: &stage1::Package, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         let name = jinja.render_str(package.name.as_str()).map_err(|err| {
             _partialerror!(
                 *package.name.span(),
@@ -190,7 +193,10 @@ pub enum Source {
 }
 
 impl Source {
-    fn from_stage1(source: stage1::Source, jinja: &Jinja) -> Result<Vec<Self>, PartialError> {
+    fn from_stage1(
+        source: stage1::Source,
+        jinja: &Jinja,
+    ) -> Result<Vec<Self>, PartialParsingError> {
         let mut sources = Vec::new();
 
         if let Some(node) = source.node {
@@ -200,7 +206,7 @@ impl Source {
         Ok(sources)
     }
 
-    fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialError> {
+    fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialParsingError> {
         let mut sources = Vec::new();
 
         // we are expecting mapping or sequence
@@ -670,7 +676,7 @@ pub struct About {
 }
 
 impl About {
-    fn from_stage1(about: &stage1::About, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_stage1(about: &stage1::About, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         let homepage = about
             .homepage
             .as_ref()
@@ -804,7 +810,7 @@ impl About {
     }
 }
 
-fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError> {
+fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let script = jinja.render_str(s.as_str()).map_err(|err| {
@@ -870,7 +876,7 @@ pub struct Requirements {
 }
 
 impl Requirements {
-    fn from_stage1(req: &stage1::Requirements, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_stage1(req: &stage1::Requirements, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         let build = req
             .build
             .as_ref()
@@ -983,7 +989,7 @@ pub enum Dependency {
 }
 
 impl Dependency {
-    fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialError> {
+    fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialParsingError> {
         match node {
             Node::Scalar(s) => {
                 let dep = Self::from_scalar(s, jinja)?;
@@ -1012,7 +1018,7 @@ impl Dependency {
         }
     }
 
-    fn from_scalar(s: &ScalarNode, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_scalar(s: &ScalarNode, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         // compiler
         if s.as_str().contains("compiler(") {
             let compiler = jinja.render_str(s.as_str()).map_err(|err| {
@@ -1121,7 +1127,7 @@ pub struct Build {
 }
 
 impl Build {
-    fn from_stage1(build: &stage1::Build, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_stage1(build: &stage1::Build, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         Ok(build
             .node
             .as_ref()
@@ -1130,7 +1136,7 @@ impl Build {
             .unwrap_or_default())
     }
 
-    fn from_node(node: &MappingNode, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_node(node: &MappingNode, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         let mut build = Self::default();
 
         for (key, value) in node.iter() {
@@ -1284,7 +1290,7 @@ impl Build {
     }
 }
 
-fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialError> {
+fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let skip = jinja.eval(s.as_str()).map_err(|err| {
@@ -1319,7 +1325,7 @@ fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialError> {
     }
 }
 
-fn parse_script(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError> {
+fn parse_script(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let script = jinja.render_str(s.as_str()).map_err(|err| {
@@ -1354,7 +1360,7 @@ fn parse_script(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError>
     }
 }
 
-fn parse_entry_points(node: &Node, jinja: &Jinja) -> Result<Vec<EntryPoint>, PartialError> {
+fn parse_entry_points(node: &Node, jinja: &Jinja) -> Result<Vec<EntryPoint>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let entry_point = jinja.render_str(dbg!(s.as_str())).map_err(|err| {
@@ -1399,7 +1405,10 @@ fn parse_entry_points(node: &Node, jinja: &Jinja) -> Result<Vec<EntryPoint>, Par
     }
 }
 
-fn parse_ignore_run_exports(node: &Node, jinja: &Jinja) -> Result<Vec<PackageName>, PartialError> {
+fn parse_ignore_run_exports(
+    node: &Node,
+    jinja: &Jinja,
+) -> Result<Vec<PackageName>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let ignore_run_export = jinja.render_str(s.as_str()).map_err(|err| {
@@ -1470,7 +1479,7 @@ pub struct ScriptEnv {
 }
 
 impl ScriptEnv {
-    fn from_node(node: &Node, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_node(node: &Node, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         if let Some(map) = node.as_mapping() {
             let env = map
                 .get("env")
@@ -1536,7 +1545,7 @@ impl ScriptEnv {
     }
 }
 
-fn parse_env(node: &Node, jinja: &Jinja) -> Result<BTreeMap<String, String>, PartialError> {
+fn parse_env(node: &Node, jinja: &Jinja) -> Result<BTreeMap<String, String>, PartialParsingError> {
     if let Some(map) = node.as_mapping() {
         let mut env = BTreeMap::new();
         for (key, value) in map.iter() {
@@ -1564,7 +1573,7 @@ fn parse_env(node: &Node, jinja: &Jinja) -> Result<BTreeMap<String, String>, Par
 }
 
 // TODO: make the `secrets` not possible to be seen in the memory
-fn parse_secrets(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError> {
+fn parse_secrets(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let secret = jinja.render_str(s.as_str()).map_err(|err| {
@@ -1608,7 +1617,7 @@ fn parse_secrets(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError
     }
 }
 
-fn parse_passthrough(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError> {
+fn parse_passthrough(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let passthrough = jinja.render_str(s.as_str()).map_err(|err| {
@@ -1670,7 +1679,7 @@ pub struct RunExports {
 }
 
 impl RunExports {
-    fn from_node(node: &Node, jinja: &Jinja) -> Result<RunExports, PartialError> {
+    fn from_node(node: &Node, jinja: &Jinja) -> Result<RunExports, PartialParsingError> {
         let mut run_exports = RunExports::default();
 
         match node {
@@ -1744,7 +1753,7 @@ impl RunExports {
     }
 }
 
-fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, PartialError> {
+fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let dep = Dependency::from_scalar(s, jinja)?;
@@ -1789,7 +1798,7 @@ pub struct Test {
 }
 
 impl Test {
-    fn from_stage1(test: &stage1::Test, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_stage1(test: &stage1::Test, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         Ok(test
             .node
             .as_ref()
@@ -1798,9 +1807,9 @@ impl Test {
             .unwrap_or_default())
     }
 
-    fn from_node(node: &Node, jinja: &Jinja) -> Result<Self, PartialError> {
+    fn from_node(node: &Node, jinja: &Jinja) -> Result<Self, PartialParsingError> {
         /// Parse a [`Node`] that can be or a scalar, sequence of scalar or a conditional that results in scalar.
-        fn parse(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialError> {
+        fn parse(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
             match node {
                 Node::Scalar(s) => {
                     let imports = jinja.render_str(s.as_str()).map_err(|err| {

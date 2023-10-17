@@ -3,7 +3,7 @@
 
 use linked_hash_map::LinkedHashMap;
 
-use super::error::{markerspan2span, Error, ErrorKind};
+use super::error::{markerspan2span, ErrorKind, ParsingError};
 
 pub mod node;
 pub use node::Node;
@@ -30,7 +30,7 @@ pub struct RawRecipe {
 
 impl RawRecipe {
     /// Parse a recipe from a YAML string.
-    pub fn from_yaml(yaml: &str) -> Result<Self, Error> {
+    pub fn from_yaml(yaml: &str) -> Result<Self, ParsingError> {
         let yaml_root = marked_yaml::parse_yaml(0, yaml)
             .map_err(|err| super::error::load_error_handler(yaml, err))?;
 
@@ -200,9 +200,9 @@ impl RawRecipe {
                         let mut ab = About::default();
 
                         for (key, value) in about_node.iter() {
-                            let key = key.as_str();
+                            let key_str = key.as_str();
 
-                            match key {
+                            match key_str {
                                 "homepage" | "home" => ab.homepage = Some(value.clone()),
                                 "repository" | "dev_url" => {
                                     if let Some(repository_node) = value.as_scalar() {
@@ -304,10 +304,10 @@ impl RawRecipe {
                                 _ => {
                                     return Err(_error!(
                                         yaml,
-                                        markerspan2span(yaml, *value.span()),
+                                        markerspan2span(yaml, *key.span()),
                                         ErrorKind::Other,
                                         label = "unexpected key",
-                                        help = "expected one of `homepage`, `repository`, `documentation`, `license`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`"
+                                        help = "expected one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`"
                                     ));
                                 }
                             }
