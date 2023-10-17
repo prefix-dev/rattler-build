@@ -15,7 +15,6 @@ use minijinja::machinery::{
     parse,
 };
 use rattler_build::recipe::stage1::Node;
-use serde_yaml::Value as YamlValue;
 use std::collections::HashSet;
 
 /// Extract all variables from a jinja statement
@@ -125,32 +124,6 @@ pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     extract_variables(&template_ast, &mut variables);
 
     variables
-}
-
-pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
-    // we do this in simple mode for now, but could later also do intersections
-    // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-    // says >=3.7 and then we only do 3.7-3.10)
-    let mut dependencies = HashSet::<String>::new();
-
-    if let Some(requirements) = recipe.get("requirements") {
-        ["build", "host", "run", "constrains"]
-            .iter()
-            .for_each(|section| {
-                if let Some(YamlValue::Sequence(section)) = requirements.get(section) {
-                    for item in section {
-                        if let YamlValue::String(item) = item {
-                            if item.starts_with("{{") {
-                                continue;
-                            }
-                            dependencies.insert(item.to_string());
-                        }
-                    }
-                }
-            });
-    }
-
-    dependencies
 }
 
 #[cfg(test)]
