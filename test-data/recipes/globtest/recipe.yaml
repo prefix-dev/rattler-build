@@ -1,0 +1,19 @@
+context:
+  name: globtest
+  version: "0.24.6"
+
+package:
+  name: "{{ name|lower }}"
+  version: "{{ version }}"
+
+source:
+  url: https://github.com/xtensor-stack/xtensor/archive/{{ version }}.tar.gz
+  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
+
+about:
+  home: https://github.com/xtensor-stack/xtensor
+  license: BSD-3-Clause
+  license_file:
+    - LICENSE
+    - cmake/
+    - docs/*.yml

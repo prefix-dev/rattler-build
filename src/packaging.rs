@@ -54,11 +54,11 @@ pub enum PackagingError {
     #[error("Failed to relink MachO file: {0}")]
     MacOSRelinkError(#[from] macos::link::RelinkError),
 
-    #[error("License file not found: {0}")]
-    LicenseFileNotFound(String),
-
     #[error("Relink error: {0}")]
     RelinkError(#[from] crate::post::RelinkError),
+
+    #[error(transparent)]
+    SourceError(#[from] crate::source::SourceError),
 }
 
 #[allow(unused_variables)]
@@ -511,37 +511,57 @@ fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Option<Vec<PathBuf>>, PackagingError> {
-    if let Some(license_files) = &output.recipe.about.license_file {
+    if let Some(license_globs) = &output.recipe.about.license_file {
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
-        let mut copied_files = Vec::new();
-        for license in license_files {
-            // license file can be found either in the recipe folder or in the source folder
-            let candidates = vec![
-                output
-                    .build_configuration
-                    .directories
-                    .recipe_dir
-                    .join(license),
-                output
-                    .build_configuration
-                    .directories
-                    .work_dir
-                    .join(license),
-            ];
 
-            let found = candidates.iter().find(|c| c.exists());
-            if let Some(license_file) = found {
-                if license_file.is_dir() {
-                    todo!("License file is a directory");
-                }
-                let dest = licenses_folder.join(license);
-                fs::copy(license_file, &dest)?;
-                copied_files.push(dest);
-            } else {
-                return Err(PackagingError::LicenseFileNotFound(license.clone()));
+        for license_glob in license_globs
+            .iter()
+            // Only license globs that do not end with '/' or '*'
+            .filter(|license_glob| !license_glob.ends_with('/') && !license_glob.ends_with('*'))
+        {
+            let filepath = licenses_folder.join(license_glob);
+            if !filepath.exists() {
+                tracing::warn!(path = %filepath.display(), "File does not exist");
             }
         }
+
+        let include_globs = license_globs
+            .iter()
+            .filter(|glob| !glob.trim_start().starts_with('~'))
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>();
+        let exclude_globs = license_globs
+            .iter()
+            .filter(|glob| glob.trim_start().starts_with('~'))
+            .map(AsRef::as_ref)
+            .collect::<Vec<&str>>();
+        let use_gitignore = false;
+
+        let copied_files = crate::source::copy_dir(
+            &output.build_configuration.directories.recipe_dir,
+            &licenses_folder,
+            &include_globs,
+            &exclude_globs,
+            use_gitignore,
+        )?
+        .into_iter()
+        .chain({
+            crate::source::copy_dir(
+                &output.build_configuration.directories.work_dir,
+                &licenses_folder,
+                &include_globs,
+                &exclude_globs,
+                use_gitignore,
+            )?
+            .into_iter()
+        })
+        .collect::<Vec<PathBuf>>();
+
+        if copied_files.is_empty() {
+            tracing::warn!("No license files were copied");
+        }
+
         Ok(Some(copied_files))
     } else {
         Ok(None)
