@@ -29,6 +29,7 @@ fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> Pat
 /// Returns a map of environment variables for Python that are used in the build process.
 ///
 /// Variables:
+/// - PYTHON: path to Python executable
 /// - PY3K: 1 if Python 3, 0 if Python 2
 /// - PY_VER: Python version (major.minor), e.g. 3.8
 /// - STDLIB_DIR: Python standard library directory
@@ -41,6 +42,14 @@ pub fn python_vars(
     variant: &BTreeMap<String, String>,
 ) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
+
+    if platform.is_windows() {
+        let python = prefix.join("python.exe");
+        result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
+    } else {
+        let python = prefix.join("bin/python");
+        result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
+    }
 
     if let Some(py_ver) = variant.get("python") {
         let py_ver = py_ver.split('.').collect::<Vec<_>>();
@@ -278,7 +287,8 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
 
     vars.extend(language_vars(
         &directories.host_prefix,
-        &output.build_configuration.target_platform,
+        // Note: host_platform cannot be noarch
+        &output.build_configuration.host_platform,
         &output.build_configuration.variant,
     ));
 

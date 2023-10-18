@@ -12,7 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rattler_conda_types::Platform;
+use rattler_conda_types::{PackageName, Platform};
 
 use crate::{linux::link::SharedObject, macos::link::Dylib};
 
@@ -78,6 +78,48 @@ pub fn relink(
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;
             dylib.relink(prefix, encoded_prefix)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Find any .dist-info/INSTALLER files and replace the contents with "conda"
+/// This is to prevent pip from trying to uninstall the package when it is installed with conda
+pub fn python(
+    name: &PackageName,
+    version: &str,
+    paths: &HashSet<PathBuf>,
+) -> Result<(), std::io::Error> {
+    let metadata_glob = globset::Glob::new("**/*.dist-info/METADATA")
+        .unwrap()
+        .compile_matcher();
+
+    if let Some(p) = paths.iter().find(|p| metadata_glob.is_match(p)) {
+        // unwraps are OK because we already globbed
+        let distinfo = p
+            .parent()
+            .expect("Should never fail to get parent because we already globbed")
+            .file_name()
+            .expect("Should never fail to get file name because we already globbed")
+            .to_string_lossy()
+            .to_lowercase();
+        if distinfo.starts_with(name.as_normalized())
+            && distinfo != format!("{}-{}.dist-info", name.as_normalized(), version)
+        {
+            tracing::warn!(
+                "Found dist-info folder with incorrect name or version: {}",
+                distinfo
+            );
+        }
+    }
+
+    let glob = globset::Glob::new("**/*.dist-info/INSTALLER")
+        .unwrap()
+        .compile_matcher();
+    for p in paths {
+        if glob.is_match(p) {
+            fs::write(p, "conda\n")?;
         }
     }
 
