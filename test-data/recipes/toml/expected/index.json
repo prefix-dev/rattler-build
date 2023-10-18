@@ -1,0 +1,15 @@
+{
+  "build": "pyh4616a5c_0",
+  "build_number": 0,
+  "depends": [
+    "python",
+    "python"
+  ],
+  "license": "MIT",
+  "license_family": "MIT",
+  "name": "toml",
+  "noarch": "python",
+  "subdir": "noarch",
+  "timestamp": 1697628467786,
+  "version": "0.10.2"
+}
