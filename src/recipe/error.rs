@@ -236,10 +236,10 @@ macro_rules! _partialerror {
         }
     }};
     ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
+        $crate::_partialerror!($span, $kind, $label, $help)
     }};
     ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
+        $crate::_partialerror!($span, $kind, $label, $help)
     }};
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
