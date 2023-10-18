@@ -608,7 +608,7 @@ impl RunExports {
         match node {
             Node::Scalar(_) | Node::Sequence(_) => {
                 let deps = parse_dependency(node, jinja)?;
-                run_exports.strong = deps;
+                run_exports.weak = deps;
             }
             Node::Mapping(map) => {
                 for (key, value) in map.iter() {
