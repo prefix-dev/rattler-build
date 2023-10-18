@@ -2,9 +2,9 @@ on:
     push:
         branches: [ main ]
     pull_request:
-  
+
 name: End-to-End testing
-  
+
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
@@ -14,7 +14,7 @@ env:
     RUST_BACKTRACE: 1
     RUSTFLAGS: "-D warnings"
     CARGO_TERM_COLOR: always
-  
+
 jobs:
     run_tests:
         name: Run tests
