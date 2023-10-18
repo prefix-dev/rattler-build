@@ -1,13 +1,13 @@
 ---
 source: src/recipe/error.rs
-expression: res.unwrap_err()
+expression: out
 ---
-  [31m×[0m Parsing: Expected a mapping.
+  × Parsing: Expected a mapping.
    ╭─[2:1]
- [2m2[0m │                 context:
- [2m3[0m │ [35;1m╭[0m[35;1m─[0m[35;1m▶[0m                 - a
- [2m4[0m │ [35;1m├[0m[35;1m─[0m[35;1m▶[0m                 - b
-   · [35;1m╰[0m[35;1m───[0m[35;1m─[0m [35;1mexpected a mapping here[0m
- [2m5[0m │                 package:
+ 2 │                 context:
+ 3 │ ╭─▶                 - a
+ 4 │ ├─▶                 - b
+   · ╰──── expected a mapping here
+ 5 │                 package:
    ╰────
 

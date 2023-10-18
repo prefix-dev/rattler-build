@@ -336,40 +336,11 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
     end
 }
 
-/// Asserts a [`miette::Report`] snapshot.
-///
-/// The value needs to implement the `fmt::Debug` trait.  This is useful for
-/// simple values that do not implement the `Serialize` trait but does not
-/// permit redactions.
-///
-/// Debug is called with `"{:#?}"`, which means this uses pretty-print.
-///
-/// The snapshot name is optional.
-#[cfg_attr(test, macro_export)]
-#[allow(unused_macros)]
-macro_rules! assert_miette_snapshot {
-    ($value:expr, @$snapshot:literal) => {{
-        let value: &::miette::Report = &$value;
-        let value = format!("{:?}", $value);
-        ::insta::assert_snapshot!(value, stringify!($value), @$snapshot);
-    }};
-    ($name:expr, $value:expr) => {{
-        let value: &::miette::Report = &$value;
-        let value = format!("{:?}", value);
-        ::insta::assert_snapshot!(Some($name), value, stringify!($value));
-    }};
-    ($value:expr) => {{
-        let value: &::miette::Report = &$value;
-        let value = format!("{:?}", value);
-        ::insta::assert_snapshot!(::insta::_macro_support::AutoName, value, stringify!($value));
-    }};
-}
-
 #[cfg(test)]
 mod tests {
 
-    use crate::assert_miette_snapshot;
     use crate::recipe::stage1::RawRecipe;
+    use insta::assert_snapshot;
 
     #[test]
     fn miette_output() {
@@ -388,6 +359,13 @@ mod tests {
 
         let res = test();
 
-        assert_miette_snapshot!("{:?}", res.unwrap_err());
+        if let Err(err) = res {
+            let mut out = String::new();
+            miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::unicode_nocolor())
+                .with_width(80)
+                .render_report(&mut out, err.as_ref())
+                .unwrap();
+            assert_snapshot!("{:?}", out);
+        }
     }
 }
