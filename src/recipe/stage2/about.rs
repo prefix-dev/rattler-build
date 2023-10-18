@@ -6,9 +6,10 @@ use url::Url;
 use crate::{
     _partialerror,
     recipe::{
+        custom_yaml::{Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1::{self, node::SequenceNodeInternal, Node},
+        stage1,
     },
 };
 

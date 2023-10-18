@@ -14,7 +14,7 @@ use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
 };
-use rattler_build::recipe::stage1::Node;
+use rattler_build::recipe::custom_yaml::Node;
 use std::collections::HashSet;
 
 /// Extract all variables from a jinja statement
@@ -76,7 +76,7 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
 
 /// This recursively finds all `if/then/else` expressions in a YAML node
 fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
-    use rattler_build::recipe::stage1::node::SequenceNodeInternal;
+    use rattler_build::recipe::custom_yaml::SequenceNodeInternal;
 
     match node {
         Node::Mapping(map) => {

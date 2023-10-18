@@ -5,14 +5,12 @@
 
 use linked_hash_map::LinkedHashMap;
 
-use super::error::{marker_span_to_span, ErrorKind, ParsingError};
-
-pub mod node;
-pub use node::Node;
+use super::{
+    custom_yaml::{MappingNode, Node, ScalarNode},
+    error::{marker_span_to_span, ErrorKind, ParsingError},
+};
 
 use crate::_error;
-
-use self::node::{MappingNode, ScalarNode};
 
 /// This is the raw reprentation of a recipe, without any minijinja processing done.
 ///
@@ -39,6 +37,7 @@ impl RawRecipe {
         let yaml_root = Node::try_from(yaml_root)
             .map_err(|err| _error!(yaml, marker_span_to_span(yaml, err.span), err.kind))?;
 
+        // Panic here should never happen, as the marked_yaml requires that the root node is a mapping
         let root_map = yaml_root.as_mapping().expect("top level must be a mapping");
 
         let mut context = LinkedHashMap::new();

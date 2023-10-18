@@ -7,13 +7,10 @@ use serde::Serialize;
 use crate::{
     _partialerror,
     recipe::{
+        custom_yaml::{MappingNode, Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1::{
-            self,
-            node::{MappingNode, SequenceNodeInternal},
-            Node,
-        },
+        stage1,
     },
 };
 
