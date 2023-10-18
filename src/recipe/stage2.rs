@@ -1,4 +1,7 @@
-//! Second and final stage of the recipe pipeline.
+//! Second and final stage of the recipe parser pipeline.
+//!
+//! This stage takes the [`RawRecipe`] from the first stage and parses it into a [`Recipe`], where
+//! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 
 use std::{collections::BTreeMap, fmt, path::PathBuf, str::FromStr};
 

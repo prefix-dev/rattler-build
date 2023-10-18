@@ -86,6 +86,14 @@ pub enum ErrorKind {
     Other,
 }
 
+/// Partial error type, almost the same as the [`ParsingError`] but without the source string.
+///
+/// This is to use on the context where you want to produce a [`ParsingError`] but you don't have
+/// the source string, or including the source string would involve more complexity to handle. Like
+/// leveraging traits, simple conversions, etc.
+///
+/// Examples of this is [`Node`](crate::recipe::stage1::Node) to implement [`TryFrom`] for some
+/// types.
 #[derive(Debug, Error)]
 #[error("Parsing: {kind}")]
 pub struct PartialParsingError {

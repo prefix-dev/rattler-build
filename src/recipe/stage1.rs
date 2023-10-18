@@ -1,9 +1,11 @@
-//! First stage of the recipe pipeline.
+//! First stage of the recipe parser pipeline.
 //!
+//! This stage parses the recipe file into a raw representation, without any minijinja processing
+//! done and parsing only the required keys and their raw values (that can be jinja syntax).
 
 use linked_hash_map::LinkedHashMap;
 
-use super::error::{markerspan2span, ErrorKind, ParsingError};
+use super::error::{marker_span_to_span, ErrorKind, ParsingError};
 
 pub mod node;
 pub use node::Node;
@@ -35,7 +37,7 @@ impl RawRecipe {
             .map_err(|err| super::error::load_error_handler(yaml, err))?;
 
         let yaml_root = Node::try_from(yaml_root)
-            .map_err(|err| _error!(yaml, markerspan2span(yaml, err.span), err.kind))?;
+            .map_err(|err| _error!(yaml, marker_span_to_span(yaml, err.span), err.kind))?;
 
         let root_map = yaml_root.as_mapping().expect("top level must be a mapping");
 
@@ -57,7 +59,7 @@ impl RawRecipe {
             match key {
                 "context" => {
                     let context_node = value;
-                    let context_span = markerspan2span(yaml, *context_node.span());
+                    let context_span = marker_span_to_span(yaml, *context_node.span());
 
                     let context_mapping = context_node.as_mapping().ok_or({
                         _error!(
@@ -72,7 +74,7 @@ impl RawRecipe {
                         let value = value.as_scalar().ok_or_else(|| {
                             _error!(
                                 yaml,
-                                markerspan2span(yaml, *value.span()),
+                                marker_span_to_span(yaml, *value.span()),
                                 ErrorKind::ExpectedScalar,
                                 label = "expected a scalar value here",
                             )
@@ -83,7 +85,7 @@ impl RawRecipe {
                 }
                 "package" => {
                     if let Some(package_node) = value.as_mapping() {
-                        let package_span = markerspan2span(yaml, *package_node.span());
+                        let package_span = marker_span_to_span(yaml, *package_node.span());
 
                         let mut name = None;
                         let mut version = None;
@@ -98,7 +100,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -110,7 +112,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -119,7 +121,7 @@ impl RawRecipe {
                                 _ => {
                                     return Err(_error!(
                                         yaml,
-                                        markerspan2span(yaml, *value.span()),
+                                        marker_span_to_span(yaml, *value.span()),
                                         ErrorKind::Other,
                                         label = "unexpected key",
                                         help = "expected one of `name` or `version`"
@@ -150,7 +152,7 @@ impl RawRecipe {
                     } else {
                         return Err(_error!(
                             yaml,
-                            markerspan2span(yaml, *value.span()),
+                            marker_span_to_span(yaml, *value.span()),
                             ErrorKind::ExpectedMapping,
                             label = "expected a mapping here",
                         ));
@@ -160,7 +162,8 @@ impl RawRecipe {
                 "build" => build.node = value.as_mapping().cloned(),
                 "requirements" => {
                     if let Some(requirements_node) = value.as_mapping() {
-                        let requirements_span = markerspan2span(yaml, *requirements_node.span());
+                        let requirements_span =
+                            marker_span_to_span(yaml, *requirements_node.span());
 
                         let mut req = Requirements::default();
 
@@ -188,7 +191,7 @@ impl RawRecipe {
                     } else {
                         return Err(_error!(
                             yaml,
-                            markerspan2span(yaml, *value.span()),
+                            marker_span_to_span(yaml, *value.span()),
                             ErrorKind::ExpectedMapping,
                             label = "expected a mapping here",
                         ));
@@ -210,7 +213,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -222,7 +225,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -234,7 +237,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -246,7 +249,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -259,7 +262,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -271,7 +274,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -283,7 +286,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -295,7 +298,7 @@ impl RawRecipe {
                                     } else {
                                         return Err(_error!(
                                             yaml,
-                                            markerspan2span(yaml, *value.span()),
+                                            marker_span_to_span(yaml, *value.span()),
                                             ErrorKind::ExpectedScalar,
                                             label = "expected a scalar value here",
                                         ));
@@ -304,7 +307,7 @@ impl RawRecipe {
                                 _ => {
                                     return Err(_error!(
                                         yaml,
-                                        markerspan2span(yaml, *key.span()),
+                                        marker_span_to_span(yaml, *key.span()),
                                         ErrorKind::Other,
                                         label = "unexpected key",
                                         help = "expected one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`"
@@ -317,7 +320,7 @@ impl RawRecipe {
                     } else {
                         return Err(_error!(
                             yaml,
-                            markerspan2span(yaml, *value.span()),
+                            marker_span_to_span(yaml, *value.span()),
                             ErrorKind::ExpectedMapping,
                             label = "expected a mapping here",
                         ));
@@ -327,7 +330,7 @@ impl RawRecipe {
                 _ => {
                     return Err(_error!(
                         yaml,
-                        markerspan2span(yaml, *value.span()),
+                        marker_span_to_span(yaml, *value.span()),
                         ErrorKind::Other,
                         label = "unexpected key",
                         help = "expected one of `context`, `package`, `source`, `build`, `requirements`, `test`, `about` or `extra`"
