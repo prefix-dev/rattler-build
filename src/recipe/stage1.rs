@@ -7,10 +7,10 @@ use linked_hash_map::LinkedHashMap;
 
 use super::{
     custom_yaml::{MappingNode, Node, ScalarNode},
-    error::{marker_span_to_span, ErrorKind, ParsingError},
+    error::{marker_span_to_span, ErrorKind, ParsingError, PartialParsingError},
 };
 
-use crate::_error;
+use crate::{_error, _partialerror};
 
 /// This is the raw reprentation of a recipe, without any minijinja processing done.
 ///
@@ -83,247 +83,23 @@ impl RawRecipe {
                     }
                 }
                 "package" => {
-                    if let Some(package_node) = value.as_mapping() {
-                        let package_span = marker_span_to_span(yaml, *package_node.span());
-
-                        let mut name = None;
-                        let mut version = None;
-
-                        for (key, value) in package_node.iter() {
-                            let key = key.as_str();
-
-                            match key {
-                                "name" => {
-                                    if let Some(name_node) = value.as_scalar() {
-                                        name = Some(name_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "version" => {
-                                    if let Some(version_node) = value.as_scalar() {
-                                        version = Some(version_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                _ => {
-                                    return Err(_error!(
-                                        yaml,
-                                        marker_span_to_span(yaml, *value.span()),
-                                        ErrorKind::Other,
-                                        label = "unexpected key",
-                                        help = "expected one of `name` or `version`"
-                                    ));
-                                }
-                            }
-                        }
-
-                        let name = name.ok_or_else(|| {
-                            _error!(
-                                yaml,
-                                package_span,
-                                ErrorKind::Other,
-                                label = "missing key `name`",
-                            )
-                        })?;
-
-                        let version = version.ok_or_else(|| {
-                            _error!(
-                                yaml,
-                                package_span,
-                                ErrorKind::Other,
-                                label = "missing key `version`",
-                            )
-                        })?;
-
-                        package = Package { name, version };
-                    } else {
-                        return Err(_error!(
-                            yaml,
-                            marker_span_to_span(yaml, *value.span()),
-                            ErrorKind::ExpectedMapping,
-                            label = "expected a mapping here",
-                        ));
-                    }
+                    package = Package::from_node(value)
+                        .map_err(|err| ParsingError::from_partial(yaml, err))?;
                 }
                 "source" => source.node = Some(value.clone()),
                 "build" => build.node = value.as_mapping().cloned(),
                 "requirements" => {
-                    if let Some(requirements_node) = value.as_mapping() {
-                        let requirements_span =
-                            marker_span_to_span(yaml, *requirements_node.span());
-
-                        let mut req = Requirements::default();
-
-                        for (key, value) in requirements_node.iter() {
-                            let key = key.as_str();
-
-                            match key {
-                                "build" => req.build = Some(value.clone()),
-                                "host" => req.host = Some(value.clone()),
-                                "run" => req.run = Some(value.clone()),
-                                "run_constrained" => req.run_constrained = Some(value.clone()),
-                                _ => {
-                                    return Err(_error!(
-                                        yaml,
-                                        requirements_span,
-                                        ErrorKind::Other,
-                                        label = "unexpected key",
-                                        help = "expected one of `build`, `host`, `run` or `run_constrained`"
-                                    ));
-                                }
-                            }
-                        }
-
-                        requirements = Some(req);
-                    } else {
-                        return Err(_error!(
-                            yaml,
-                            marker_span_to_span(yaml, *value.span()),
-                            ErrorKind::ExpectedMapping,
-                            label = "expected a mapping here",
-                        ));
-                    }
+                    requirements = Some(
+                        Requirements::from_node(value)
+                            .map_err(|err| ParsingError::from_partial(yaml, err))?,
+                    );
                 }
                 "test" => test.node = Some(value.clone()),
                 "about" => {
-                    if let Some(about_node) = value.as_mapping() {
-                        let mut ab = About::default();
-
-                        for (key, value) in about_node.iter() {
-                            let key_str = key.as_str();
-
-                            match key_str {
-                                "homepage" | "home" => ab.homepage = Some(value.clone()),
-                                "repository" | "dev_url" => {
-                                    if let Some(repository_node) = value.as_scalar() {
-                                        ab.repository = Some(repository_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "documentation" | "doc_url" => {
-                                    if let Some(documentation_node) = value.as_scalar() {
-                                        ab.documentation = Some(documentation_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "license" => {
-                                    if let Some(license_node) = value.as_scalar() {
-                                        ab.license = Some(license_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "license_family" => {
-                                    if let Some(license_family_node) = value.as_scalar() {
-                                        ab.license_family = Some(license_family_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "license_file" => ab.license_file = Some(value.clone()),
-                                "license_url" => {
-                                    if let Some(license_url_node) = value.as_scalar() {
-                                        ab.license_url = Some(license_url_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "summary" => {
-                                    if let Some(summary_node) = value.as_scalar() {
-                                        ab.summary = Some(summary_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "description" => {
-                                    if let Some(description_node) = value.as_scalar() {
-                                        ab.description = Some(description_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                "prelink_message" => {
-                                    if let Some(prelink_message_node) = value.as_scalar() {
-                                        ab.prelink_message = Some(prelink_message_node.clone());
-                                    } else {
-                                        return Err(_error!(
-                                            yaml,
-                                            marker_span_to_span(yaml, *value.span()),
-                                            ErrorKind::ExpectedScalar,
-                                            label = "expected a scalar value here",
-                                        ));
-                                    }
-                                }
-                                _ => {
-                                    return Err(_error!(
-                                        yaml,
-                                        marker_span_to_span(yaml, *key.span()),
-                                        ErrorKind::Other,
-                                        label = "unexpected key",
-                                        help = "expected one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`"
-                                    ));
-                                }
-                            }
-                        }
-
-                        about = Some(ab);
-                    } else {
-                        return Err(_error!(
-                            yaml,
-                            marker_span_to_span(yaml, *value.span()),
-                            ErrorKind::ExpectedMapping,
-                            label = "expected a mapping here",
-                        ));
-                    }
+                    about = Some(
+                        About::from_node(value)
+                            .map_err(|err| ParsingError::from_partial(yaml, err))?,
+                    );
                 }
                 "extra" => extra.node = Some(value.clone()),
                 _ => {
@@ -360,6 +136,74 @@ pub struct Package {
     pub(crate) version: ScalarNode,
 }
 
+impl Package {
+    pub fn from_node(node: &Node) -> Result<Self, PartialParsingError> {
+        if let Some(package_node) = node.as_mapping() {
+            let package_span = *package_node.span();
+
+            let mut name = None;
+            let mut version = None;
+
+            for (key, value) in package_node.iter() {
+                let key = key.as_str();
+
+                match key {
+                    "name" => {
+                        if let Some(name_node) = value.as_scalar() {
+                            name = Some(name_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "version" => {
+                        if let Some(version_node) = value.as_scalar() {
+                            version = Some(version_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(_partialerror!(
+                            *value.span(),
+                            ErrorKind::Other,
+                            label = "unexpected key",
+                            help = "expected one of `name` or `version`"
+                        ));
+                    }
+                }
+            }
+
+            let name = name.ok_or_else(|| {
+                _partialerror!(package_span, ErrorKind::Other, label = "missing key `name`",)
+            })?;
+
+            let version = version.ok_or_else(|| {
+                _partialerror!(
+                    package_span,
+                    ErrorKind::Other,
+                    label = "missing key `version`",
+                )
+            })?;
+
+            Ok(Package { name, version })
+        } else {
+            Err(_partialerror!(
+                *node.span(),
+                ErrorKind::ExpectedMapping,
+                label = "expected a mapping here",
+            ))
+        }
+    }
+}
+
 /// A source of a package
 ///
 /// There are many possibilities for this field that cannot be semantically checked
@@ -389,6 +233,43 @@ pub struct Requirements {
     pub(crate) run_constrained: Option<Node>,
 }
 
+impl Requirements {
+    fn from_node(value: &Node) -> Result<Self, PartialParsingError> {
+        if let Some(requirements_node) = value.as_mapping() {
+            let requirements_span = *requirements_node.span();
+
+            let mut req = Requirements::default();
+
+            for (key, value) in requirements_node.iter() {
+                let key = key.as_str();
+
+                match key {
+                    "build" => req.build = Some(value.clone()),
+                    "host" => req.host = Some(value.clone()),
+                    "run" => req.run = Some(value.clone()),
+                    "run_constrained" => req.run_constrained = Some(value.clone()),
+                    _ => {
+                        return Err(_partialerror!(
+                            requirements_span,
+                            ErrorKind::Other,
+                            label = "unexpected key",
+                            help = "expected one of `build`, `host`, `run` or `run_constrained`"
+                        ));
+                    }
+                }
+            }
+
+            Ok(req)
+        } else {
+            Err(_partialerror!(
+                *value.span(),
+                ErrorKind::ExpectedMapping,
+                label = "expected a mapping here",
+            ))
+        }
+    }
+}
+
 /// A tests of a package
 ///
 /// There are many possibilities for this field that cannot be semantically checked
@@ -412,6 +293,127 @@ pub struct About {
     pub(crate) summary: Option<ScalarNode>,
     pub(crate) description: Option<ScalarNode>,
     pub(crate) prelink_message: Option<ScalarNode>,
+}
+
+impl About {
+    fn from_node(node: &Node) -> Result<Self, PartialParsingError> {
+        if let Some(about_node) = node.as_mapping() {
+            let mut ab = About::default();
+
+            for (key, value) in about_node.iter() {
+                let key_str = key.as_str();
+
+                match key_str {
+                    "homepage" | "home" => ab.homepage = Some(value.clone()),
+                    "repository" | "dev_url" => {
+                        if let Some(repository_node) = value.as_scalar() {
+                            ab.repository = Some(repository_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "documentation" | "doc_url" => {
+                        if let Some(documentation_node) = value.as_scalar() {
+                            ab.documentation = Some(documentation_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "license" => {
+                        if let Some(license_node) = value.as_scalar() {
+                            ab.license = Some(license_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "license_family" => {
+                        if let Some(license_family_node) = value.as_scalar() {
+                            ab.license_family = Some(license_family_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "license_file" => ab.license_file = Some(value.clone()),
+                    "license_url" => {
+                        if let Some(license_url_node) = value.as_scalar() {
+                            ab.license_url = Some(license_url_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "summary" => {
+                        if let Some(summary_node) = value.as_scalar() {
+                            ab.summary = Some(summary_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "description" => {
+                        if let Some(description_node) = value.as_scalar() {
+                            ab.description = Some(description_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    "prelink_message" => {
+                        if let Some(prelink_message_node) = value.as_scalar() {
+                            ab.prelink_message = Some(prelink_message_node.clone());
+                        } else {
+                            return Err(_partialerror!(
+                                *value.span(),
+                                ErrorKind::ExpectedScalar,
+                                label = "expected a scalar value here",
+                            ));
+                        }
+                    }
+                    _ => {
+                        return Err(_partialerror!(
+                            *key.span(),
+                            ErrorKind::Other,
+                            label = "unexpected key",
+                            help = "expected one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`"
+                        ));
+                    }
+                }
+            }
+
+            Ok(ab)
+        } else {
+            Err(_partialerror!(
+                *node.span(),
+                ErrorKind::ExpectedMapping,
+                label = "expected a mapping here",
+            ))
+        }
+    }
 }
 
 /// A tests of a package
