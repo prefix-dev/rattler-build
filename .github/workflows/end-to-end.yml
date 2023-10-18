@@ -1,0 +1,31 @@
+on:
+    push:
+        branches: [ main ]
+    pull_request:
+
+name: End-to-End testing
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    RUST_LOG: info
+    RUST_BACKTRACE: 1
+    RUSTFLAGS: "-D warnings"
+    CARGO_TERM_COLOR: always
+
+jobs:
+    run_tests:
+        name: Run tests
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout source code
+              uses: actions/checkout@v4
+            - uses: Swatinem/rust-cache@v2
+            - uses: prefix-dev/setup-pixi@v0.3.0
+              with:
+                pixi-version: v0.5.0
+                cache: true
+            - run: pixi run build
+            - run: pixi run end_to_end_test

@@ -101,7 +101,9 @@ def check_info(folder: Path, expected: Path):
                 c = cmp["paths"][i]
                 assert c["_path"] == p["_path"]
                 assert c["path_type"] == p["path_type"]
-                assert c["size_in_bytes"] == p["size_in_bytes"]
+                if "dist-info" not in p["_path"]:
+                    assert c["sha256"] == p["sha256"]
+                    assert c["size_in_bytes"] == p["size_in_bytes"]
         else:
             if actual != cmp:
                 print(f"Expected {f} to be {cmp} but was {actual}")
