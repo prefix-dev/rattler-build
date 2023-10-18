@@ -739,7 +739,7 @@ pub fn package_conda(
         )?;
     }
 
-    post::python(&tmp_files)?;
+    post::python(output.name(), output.version(), &tmp_files)?;
 
     tracing::info!("Relink done!");
 
