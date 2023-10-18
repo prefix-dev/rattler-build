@@ -99,9 +99,9 @@ pub fn python(
         // unwraps are OK because we already globbed
         let distinfo = p
             .parent()
-            .unwrap()
+            .expect("Should never fail to get parent because we already globbed")
             .file_name()
-            .unwrap()
+            .expect("Should never fail to get file name because we already globbed")
             .to_string_lossy()
             .to_lowercase();
         if distinfo.starts_with(name.as_normalized())
