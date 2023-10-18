@@ -472,9 +472,9 @@ pub async fn resolve_dependencies(
         None
     };
 
-    let run_depends = apply_variant(&reqs.run, &output.build_configuration)?;
+    let depends = apply_variant(&reqs.run, &output.build_configuration)?;
 
-    let run_constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
+    let constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
 
     let render_run_exports = |run_export: &[Dependency]| -> Vec<String> {
         let rendered = apply_variant(run_export, &output.build_configuration).unwrap();
@@ -499,9 +499,9 @@ pub async fn resolve_dependencies(
     };
 
     let mut run_specs = FinalizedRunDependencies {
-        depends: run_depends,
-        constrains: run_constrains,
-        run_exports: run_exports.clone(),
+        depends,
+        constrains,
+        run_exports,
     };
 
     // Propagate run exports from host env to run env

@@ -237,7 +237,7 @@ impl Source {
                         )),
                     })
                     .transpose()?
-                    .unwrap_or_else(Vec::new);
+                    .unwrap_or_default();
 
                 let folder = map
                     .get("folder")
@@ -1909,13 +1909,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() -> Result<(), miette::Report> {
+    fn it_works() {
         let recipe = include_str!("stage1/testfiles/xtensor_recipe.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default())?;
-
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         dbg!(&recipe);
-        // assert!(recipe.is_ok());
-
-        Ok(())
     }
 }

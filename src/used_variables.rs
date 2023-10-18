@@ -1,4 +1,4 @@
-//! find used variabels on a Raw (YAML) recipe
+//! find used variables on a Raw (YAML) recipe
 //! This does an initial "prerender" step where we evaluate the Jinja expressions globally
 //! based on the variables in the `context` section of the recipe.
 //! This also evaluates any Jinja functions such as `compiler` and `pin_subpackage` in a way
@@ -6,8 +6,8 @@
 //!
 //! Step 1:
 //!    - use only outer variables such as `target_platform`
-//!    - extract all sel( ... ) and `jinja` statements and find used variables
-//!    - retrieve used variabels from configuration and flatten selectors
+//!    - extract all `if ... then ... else ` and `jinja` statements and find used variables
+//!    - retrieve used variables from configuration and flatten selectors
 //!    - extract all dependencies and add them to used variables to build full variant
 
 use minijinja::machinery::{
