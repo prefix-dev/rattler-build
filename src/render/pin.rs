@@ -175,13 +175,19 @@ impl Pin {
         let max_pin = if max_pin == "MAX_PIN=" {
             None
         } else {
-            Some(PinExpression::from_str(&max_pin[8..]).expect("Could not parse max pin"))
+            let max_pin = max_pin
+                .strip_prefix("MAX_PIN=")
+                .expect("Could not parse max pin: invalid prefix");
+            Some(PinExpression::from_str(max_pin).expect("Could not parse max pin"))
         };
 
         let min_pin = if min_pin == "MIN_PIN=" {
             None
         } else {
-            Some(PinExpression::from_str(&min_pin[8..]).expect("Could not parse min pin"))
+            let min_pin = min_pin
+                .strip_prefix("MIN_PIN=")
+                .expect("Could not parse min pin: invalid prefix");
+            Some(PinExpression::from_str(min_pin).expect("Could not parse min pin"))
         };
 
         let exact = exact == "EXACT=true";
