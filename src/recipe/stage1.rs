@@ -431,6 +431,8 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
+    use crate::assert_miette_snapshot;
+
     use super::*;
 
     #[test]
@@ -442,5 +444,40 @@ mod tests {
         let raw_recipe = raw_recipe.unwrap();
 
         assert_debug_snapshot!(raw_recipe);
+    }
+
+    #[test]
+    fn context_not_mapping() {
+        let raw_recipe = r#"
+        context: "not-mapping"
+
+        package:
+          name: test
+          version: 0.1.0
+        "#;
+
+        let raw_recipe = RawRecipe::from_yaml(raw_recipe);
+        assert!(raw_recipe.is_err());
+
+        let err = raw_recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn context_value_not_scalar() {
+        let raw_recipe = r#"
+        context:
+          key: ["not-scalar"]
+
+        package:
+            name: test
+            version: 0.1.0
+        "#;
+
+        let raw_recipe = RawRecipe::from_yaml(raw_recipe);
+        assert!(raw_recipe.is_err());
+
+        let err = raw_recipe.unwrap_err();
+        assert_miette_snapshot!(err);
     }
 }

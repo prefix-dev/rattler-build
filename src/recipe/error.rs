@@ -92,7 +92,7 @@ pub enum ErrorKind {
 /// the source string, or including the source string would involve more complexity to handle. Like
 /// leveraging traits, simple conversions, etc.
 ///
-/// Examples of this is [`Node`](crate::recipe::stage1::Node) to implement [`TryFrom`] for some
+/// Examples of this is [`Node`](crate::recipe::custom_yaml::Node) to implement [`TryFrom`] for some
 /// types.
 #[derive(Debug, Error)]
 #[error("Parsing: {kind}")]
@@ -301,7 +301,7 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
     let length = match marked_end {
         Some(end) => {
             let end = SourceOffset::from_location(src, end.line() - 1, end.column());
-            end.offset() - start.offset() - 1
+            end.offset() - start.offset() + 1
         }
         None => {
             let l = find_length(src, start);
@@ -339,13 +339,11 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
 #[cfg(test)]
 mod tests {
 
-    use crate::recipe::stage1::RawRecipe;
-    use insta::assert_snapshot;
+    use crate::{assert_miette_snapshot, recipe::stage1::RawRecipe};
 
     #[test]
     fn miette_output() {
-        fn test() -> miette::Result<RawRecipe> {
-            let fault_yaml = r#"
+        let fault_yaml = r#"
             context:
                 - a
                 - b
@@ -353,19 +351,10 @@ mod tests {
                 name: test
                 version: 0.1.0
             "#;
-            let res = RawRecipe::from_yaml(fault_yaml)?;
-            Ok(res)
-        }
-
-        let res = test();
+        let res = RawRecipe::from_yaml(fault_yaml);
 
         if let Err(err) = res {
-            let mut out = String::new();
-            miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::unicode_nocolor())
-                .with_width(80)
-                .render_report(&mut out, err.as_ref())
-                .unwrap();
-            assert_snapshot!("{:?}", out);
+            assert_miette_snapshot!(err);
         }
     }
 }

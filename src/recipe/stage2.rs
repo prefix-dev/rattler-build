@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let recipe = include_str!("stage1/testfiles/xtensor_recipe.yaml");
+        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         dbg!(&recipe);
     }

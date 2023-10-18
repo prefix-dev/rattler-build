@@ -1,0 +1,13 @@
+---
+source: src/recipe/stage1.rs
+expression: err
+---
+  × Parsing: Expected a mapping.
+   ╭─[1:1]
+ 1 │ 
+ 2 │         context: "not-mapping"
+   ·                  ──────┬──────
+   ·                        ╰── expected a mapping here
+ 3 │ 
+   ╰────
+
