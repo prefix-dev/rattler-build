@@ -433,7 +433,7 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        let raw_recipe = include_str!("stage1/testfiles/xtensor_recipe.yaml");
+        let raw_recipe = include_str!("../../examples/xtensor/recipe.yaml");
         let raw_recipe = RawRecipe::from_yaml(raw_recipe);
         assert!(raw_recipe.is_ok());
 
