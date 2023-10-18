@@ -104,10 +104,13 @@ pub fn python(
             .unwrap()
             .to_string_lossy()
             .to_lowercase();
-        if distinfo.starts_with(name.as_normalized()) {
-            if distinfo != format!("{}-{}.dist-info", name.as_normalized(), version) {
-                tracing::warn!("Found dist-info folder with incorrect name or version: {}", distinfo);
-            }
+        if distinfo.starts_with(name.as_normalized())
+            && distinfo != format!("{}-{}.dist-info", name.as_normalized(), version)
+        {
+            tracing::warn!(
+                "Found dist-info folder with incorrect name or version: {}",
+                distinfo
+            );
         }
     }
 
