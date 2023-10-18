@@ -2,6 +2,8 @@ book
 output/
 target/
 .idea/
+__pycache__/
+.pytest_cache/
 
 # pixi environments
 .pixi
