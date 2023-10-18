@@ -1366,7 +1366,7 @@ fn parse_script(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsin
 fn parse_entry_points(node: &Node, jinja: &Jinja) -> Result<Vec<EntryPoint>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
-            let entry_point = jinja.render_str(dbg!(s.as_str())).map_err(|err| {
+            let entry_point = jinja.render_str(s.as_str()).map_err(|err| {
                 _partialerror!(
                     *s.span(),
                     ErrorKind::JinjaRendering(err),

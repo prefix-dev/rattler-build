@@ -241,7 +241,7 @@ impl VariantConfig {
         // now render all selectors with the used variables
         let combinations = self.combinations(&used_variables)?;
 
-        let recipe_parsed = Recipe::from_yaml(recipe, selector_config.clone()).unwrap();
+        let recipe_parsed = Recipe::from_yaml(recipe, selector_config.clone())?;
         for _ in combinations {
             let requirements = recipe_parsed.requirements();
 
@@ -317,6 +317,9 @@ impl VariantKey {
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
+
+    #[error("Recipe parsing failed: {0}")]
+    RecipeParseError(#[from] rattler_build::recipe::error::ParsingError),
 }
 
 fn find_combinations(
