@@ -347,9 +347,29 @@ fn write_to_dest(
     let path_rel = path.strip_prefix(prefix)?;
     let mut dest_path = dest_folder.join(path_rel);
 
+    // skip the share/info/dir file because multiple packages would write
+    // to the same index file
+    if path_rel == Path::new("share/info/dir") {
+        return Ok(None);
+    }
+
+    let ext = path.extension().unwrap_or_default();
+    // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
+    if ext == "pyo" {
+        return Ok(None); // skip .pyo files
+    }
+
+    if ext == "py" || ext == "pyc" {
+        // if we have a .so file of the same name, skip this path
+        let so_path = path.with_extension("so");
+        let pyd_path = path.with_extension("pyd");
+        if so_path.exists() || pyd_path.exists() {
+            return Ok(None);
+        }
+    }
+
     if noarch_type.is_python() {
-        let ext = path.extension().unwrap_or_default();
-        if ext == "pyc" || ext == "pyo" {
+        if ext == "pyc" {
             return Ok(None); // skip .pyc files
         }
 
@@ -718,6 +738,8 @@ pub fn package_conda(
             &output.build_configuration.target_platform,
         )?;
     }
+
+    post::python(&tmp_files)?;
 
     tracing::info!("Relink done!");
 

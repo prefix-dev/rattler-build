@@ -83,3 +83,18 @@ pub fn relink(
 
     Ok(())
 }
+
+/// Find any .dist-info/INSTALLER files and replace the contents with "conda"
+/// This is to prevent pip from trying to uninstall the package when it is installed with conda
+pub fn python(paths: &HashSet<PathBuf>) -> Result<(), std::io::Error> {
+    let glob = globset::Glob::new("**/*.dist-info/INSTALLER")
+        .unwrap()
+        .compile_matcher();
+    for p in paths {
+        if glob.is_match(p) {
+            fs::write(p, "conda\n")?;
+        }
+    }
+
+    Ok(())
+}
