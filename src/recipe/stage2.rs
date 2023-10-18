@@ -1040,7 +1040,13 @@ impl Dependency {
                     label = "error rendering pin_subpackage"
                 )
             })?;
-            let pin_subpackage = Pin::from_internal_repr(&pin_subpackage);
+
+            // Panic should never happen from this strip unless the prefix magic for the pin
+            // subpackage changes
+            let internal_repr = pin_subpackage
+                .strip_prefix("__PIN_SUBPACKAGE ")
+                .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
+            let pin_subpackage = Pin::from_internal_repr(internal_repr);
             Ok(Self::PinSubpackage(PinSubpackage { pin_subpackage }))
         } else {
             let spec = jinja.render_str(s.as_str()).map_err(|err| {
