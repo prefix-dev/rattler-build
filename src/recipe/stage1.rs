@@ -53,6 +53,7 @@ impl RawRecipe {
         let mut extra = Extra::default();
 
         for (key, value) in root_map.iter() {
+            let key_span = key.span();
             let key = key.as_str();
 
             match key {
@@ -83,7 +84,7 @@ impl RawRecipe {
                     }
                 }
                 "package" => {
-                    package = Package::from_node(value)
+                    package = Package::from_node(value, *key_span)
                         .map_err(|err| ParsingError::from_partial(yaml, err))?;
                 }
                 "source" => source.node = Some(value.clone()),
@@ -137,7 +138,10 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn from_node(node: &Node) -> Result<Self, PartialParsingError> {
+    pub fn from_node(
+        node: &Node,
+        package_key_span: marked_yaml::Span,
+    ) -> Result<Self, PartialParsingError> {
         if let Some(package_node) = node.as_mapping() {
             let package_span = *package_node.span();
 
@@ -145,9 +149,7 @@ impl Package {
             let mut version = None;
 
             for (key, value) in package_node.iter() {
-                let key = key.as_str();
-
-                match key {
+                match key.as_str() {
                     "name" => {
                         if let Some(name_node) = value.as_scalar() {
                             name = Some(name_node.clone());
@@ -172,7 +174,7 @@ impl Package {
                     }
                     _ => {
                         return Err(_partialerror!(
-                            *value.span(),
+                            *key.span(),
                             ErrorKind::Other,
                             label = "unexpected key",
                             help = "expected one of `name` or `version`"
@@ -182,12 +184,16 @@ impl Package {
             }
 
             let name = name.ok_or_else(|| {
-                _partialerror!(package_span, ErrorKind::Other, label = "missing key `name`",)
+                _partialerror!(
+                    package_key_span,
+                    ErrorKind::Other,
+                    label = "missing key `name`",
+                )
             })?;
 
             let version = version.ok_or_else(|| {
                 _partialerror!(
-                    package_span,
+                    package_key_span,
                     ErrorKind::Other,
                     label = "missing key `version`",
                 )
