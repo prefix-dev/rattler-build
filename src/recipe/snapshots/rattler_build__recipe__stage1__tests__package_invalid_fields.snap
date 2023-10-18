@@ -1,0 +1,14 @@
+---
+source: src/recipe/stage1.rs
+expression: err
+---
+  × Parsing: An unspecified error occurred.
+   ╭─[4:1]
+ 4 │             version: 0.1.0
+ 5 │             invalid: "field"
+   ·             ────┬───
+   ·                 ╰── unexpected key
+ 6 │         
+   ╰────
+  help: expected one of `name` or `version`
+

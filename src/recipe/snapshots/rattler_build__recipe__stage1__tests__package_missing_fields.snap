@@ -1,0 +1,13 @@
+---
+source: src/recipe/stage1.rs
+expression: err
+---
+  × Parsing: An unspecified error occurred.
+   ╭─[1:1]
+ 1 │ 
+ 2 │         package:
+   ·         ────┬───
+   ·             ╰── missing key `version`
+ 3 │             name: test
+   ╰────
+

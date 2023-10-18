@@ -486,4 +486,34 @@ mod tests {
         let err = raw_recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }
+
+    #[test]
+    fn package_missing_fields() {
+        let raw_recipe = r#"
+        package:
+            name: test
+        "#;
+
+        let raw_recipe = RawRecipe::from_yaml(raw_recipe);
+        assert!(raw_recipe.is_err());
+
+        let err = raw_recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn package_invalid_fields() {
+        let raw_recipe = r#"
+        package:
+            name: test
+            version: 0.1.0
+            invalid: "field"
+        "#;
+
+        let raw_recipe = RawRecipe::from_yaml(raw_recipe);
+        assert!(raw_recipe.is_err());
+
+        let err = raw_recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
 }
