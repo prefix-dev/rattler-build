@@ -32,7 +32,7 @@ impl ParsingError {
     pub fn from_partial(src: &str, err: PartialParsingError) -> Self {
         Self {
             src: src.to_owned(),
-            span: markerspan2span(src, err.span),
+            span: marker_span_to_span(src, err.span),
             label: err.label,
             help: err.help,
             kind: err.kind,
@@ -252,10 +252,10 @@ macro_rules! _partialerror {
 }
 
 /// Error handler for [`marked_yaml::LoadError`].
-pub(crate) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> ParsingError {
+pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> ParsingError {
     _error!(
         src,
-        marker2span(src, marker(&err)),
+        marker_to_span(src, marker(&err)),
         ErrorKind::YamlParsing(err),
         label = match err {
             marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
@@ -267,8 +267,7 @@ pub(crate) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Pars
 }
 
 /// Convert a [`marked_yaml::Marker`] to a [`SourceSpan`].
-#[inline(always)]
-pub(crate) fn marker2span(src: &str, mark: marked_yaml::Marker) -> SourceSpan {
+pub(super) fn marker_to_span(src: &str, mark: marked_yaml::Marker) -> SourceSpan {
     let start = SourceOffset::from_location(src, mark.line(), mark.column());
 
     SourceSpan::new(
@@ -278,8 +277,7 @@ pub(crate) fn marker2span(src: &str, mark: marked_yaml::Marker) -> SourceSpan {
 }
 
 /// Get the [`marked_yaml::Marker`] from a [`marked_yaml::LoadError`].
-#[inline(always)]
-pub(crate) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
+pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
     use marked_yaml::LoadError::*;
     match err {
         TopLevelMustBeMapping(m) => *m,
@@ -291,7 +289,7 @@ pub(crate) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
 }
 
 /// Convert a [`marked_yaml::Span`] to a [`SourceSpan`].
-pub(crate) fn markerspan2span(src: &str, span: marked_yaml::Span) -> SourceSpan {
+pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceSpan {
     let marked_start = span
         .start()
         .copied()
@@ -319,12 +317,12 @@ pub(crate) fn markerspan2span(src: &str, span: marked_yaml::Span) -> SourceSpan 
 }
 
 #[allow(dead_code)]
-pub(crate) fn marker2offset(src: &str, mark: marked_yaml::Marker) -> SourceOffset {
+pub(super) fn marker_to_offset(src: &str, mark: marked_yaml::Marker) -> SourceOffset {
     SourceOffset::from_location(src, mark.line(), mark.column())
 }
 
 /// Find the length of the token string starting at the `start` [`SourceOffset`].
-pub(crate) fn find_length(src: &str, start: SourceOffset) -> usize {
+pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
     let start = start.offset();
     let mut end = 0;
 
