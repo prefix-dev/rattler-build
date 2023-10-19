@@ -167,7 +167,6 @@ fn create_paths_json(
 
         let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
 
-        tracing::info!("Adding {:?}", &relative_path);
         if !p.exists() {
             if p.is_symlink() {
                 tracing::warn!(
