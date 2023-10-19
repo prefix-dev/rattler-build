@@ -8,7 +8,7 @@ use std::{
 use fs_extra::dir::{create_all, CopyOptions};
 use ignore::WalkBuilder;
 
-use crate::metadata::Source;
+use crate::recipe::stage2::Source;
 
 pub mod git_source;
 pub mod patch;
@@ -63,26 +63,26 @@ pub async fn fetch_sources(
     for src in sources {
         match &src {
             Source::Git(src) => {
-                tracing::info!("Fetching source from GIT: {}", src.git_url);
+                tracing::info!("Fetching source from GIT: {}", src.url());
                 let result = match git_source::git_src(src, &cache_src, recipe_dir) {
                     Ok(path) => path,
                     Err(e) => return Err(e),
                 };
-                let dest_dir = if let Some(folder) = &src.folder {
+                let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
                 copy_dir(&result, &dest_dir, &[], &[], false)?;
 
-                if let Some(patches) = &src.patches {
-                    patch::apply_patches(patches, work_dir, recipe_dir)?;
+                if !src.patches().is_empty() {
+                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
-                tracing::info!("Fetching source from URL: {}", src.url);
-                let res = url_source::url_src(src, &cache_src, &src.checksum).await?;
-                let dest_dir = if let Some(folder) = &src.folder {
+                tracing::info!("Fetching source from URL: {}", src.url());
+                let res = url_source::url_src(src, &cache_src, src.checksum().unwrap()).await?;
+                let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
@@ -90,23 +90,23 @@ pub async fn fetch_sources(
                 extract(&res, &dest_dir)?;
                 tracing::info!("Extracted to {:?}", work_dir);
 
-                if let Some(patches) = &src.patches {
-                    patch::apply_patches(patches, work_dir, recipe_dir)?;
+                if !src.patches().is_empty() {
+                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
             }
             Source::Path(src) => {
-                let src_path = recipe_dir.join(&src.path).canonicalize()?;
+                let src_path = recipe_dir.join(src.path()).canonicalize()?;
                 tracing::info!("Copying source from path: {:?}", src_path);
 
-                let dest_dir = if let Some(folder) = &src.folder {
+                let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
                 copy_dir(&src_path, &dest_dir, &[], &[], true)?;
 
-                if let Some(patches) = &src.patches {
-                    patch::apply_patches(patches, work_dir, recipe_dir)?;
+                if !src.patches().is_empty() {
+                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
             }
         }

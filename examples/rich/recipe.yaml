@@ -3,10 +3,10 @@ context:
 
 package:
   name: "rich"
-  version: "{{ version }}"
+  version: ${{ version }}
 
 source:
-  - url: https://pypi.io/packages/source/r/rich/rich-{{ version }}.tar.gz
+  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
     sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
 
 build:

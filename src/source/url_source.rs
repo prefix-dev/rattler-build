@@ -4,9 +4,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::recipe::stage2::{Checksum, UrlSource};
 use rattler_digest::compute_file_digest;
-
-use crate::metadata::{Checksum, UrlSrc};
 
 use super::SourceError;
 
@@ -71,12 +70,12 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> String {
 }
 
 pub(crate) async fn url_src(
-    source: &UrlSrc,
+    source: &UrlSource,
     cache_dir: &Path,
     checksum: &Checksum,
 ) -> Result<PathBuf, SourceError> {
-    if source.url.scheme() == "file" {
-        let local_path = source.url.to_file_path().map_err(|_| {
+    if source.url().scheme() == "file" {
+        let local_path = source.url().to_file_path().map_err(|_| {
             SourceError::Io(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Invalid local file path",
@@ -94,7 +93,7 @@ pub(crate) async fn url_src(
         }
     }
 
-    let cache_name = PathBuf::from(cache_name_from_url(&source.url, checksum));
+    let cache_name = PathBuf::from(cache_name_from_url(source.url(), checksum));
     let cache_name = cache_dir.join(cache_name);
 
     let metadata = fs::metadata(&cache_name);
@@ -103,7 +102,7 @@ pub(crate) async fn url_src(
         return Ok(cache_name.clone());
     }
 
-    let response = reqwest::get(source.url.clone()).await?;
+    let response = reqwest::get(source.url().clone()).await?;
 
     let mut file = std::fs::File::create(&cache_name)?;
 
@@ -122,7 +121,7 @@ pub(crate) async fn url_src(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metadata::Checksum;
+    use crate::recipe::stage2::Checksum;
     use url::Url;
 
     #[test]

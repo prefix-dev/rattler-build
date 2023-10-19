@@ -1,10 +1,12 @@
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
-use crate::metadata::GitUrl;
+// use crate::metadata::GitUrl;
 use git2::{Cred, FetchOptions, ObjectType, RemoteCallbacks, Repository, ResetType};
 
-use super::super::metadata::GitSrc;
+use crate::recipe::stage2::{GitSource, GitUrl};
+
+// use super::super::metadata::GitSrc;
 use super::SourceError;
 
 use fs_extra::dir::remove;
@@ -45,12 +47,12 @@ fn fetch_repo(repo: &Repository, refspecs: &[String]) -> Result<(), git2::Error>
 /// # Returns
 /// - A Result containing the PathBuf to the cache, or a SourceError if an error occurs during the process.
 pub(crate) fn git_src<'a>(
-    source: &'a GitSrc,
+    source: &'a GitSource,
     cache_dir: &'a Path,
     recipe_dir: &'a Path,
 ) -> Result<PathBuf, SourceError> {
     // Create cache path based on given cache dir and name of the source package.
-    let filename = match &source.git_url {
+    let filename = match &source.url() {
         GitUrl::Url(url) => url.path_segments().unwrap().last().unwrap().to_string(),
         GitUrl::Path(path) => recipe_dir
             .join(path)
@@ -64,21 +66,21 @@ pub(crate) fn git_src<'a>(
     let cache_path = cache_dir.join(cache_name);
 
     // Initialize or clone the repository depending on the source's git_url.
-    let repo = match &source.git_url {
+    let repo = match &source.url() {
         GitUrl::Url(_) => {
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
                 let repo = Repository::init(&cache_path).unwrap();
-                fetch_repo(&repo, &[source.git_rev.to_string()])?;
+                fetch_repo(&repo, &[source.rev().to_string()])?;
                 repo
             } else {
                 // TODO: Make configure the clone more so git_depth is also used.
-                if source.git_depth.is_some() {
+                if source.depth().is_some() {
                     tracing::warn!("No git depth implemented yet, will continue with full clone");
                 }
 
                 // Clone the repository recursively to include all submodules.
-                match Repository::clone_recurse(&source.git_url.to_string(), &cache_path) {
+                match Repository::clone_recurse(&source.url().to_string(), &cache_path) {
                     Ok(repo) => repo,
                     Err(e) => return Err(SourceError::GitError(e)),
                 }
@@ -102,7 +104,7 @@ pub(crate) fn git_src<'a>(
                 &cache_path,
             )?;
 
-            if source.git_rev.to_string() == "HEAD" {
+            if source.rev() == "HEAD" {
                 // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                 return Ok(PathBuf::from(&cache_path));
             }
@@ -113,10 +115,10 @@ pub(crate) fn git_src<'a>(
     // Resolve the reference and set the head to the specified revision.
     // let ref_git = format!("refs/remotes/origin/{}", source.git_rev.to_string());
     // let reference = match repo.find_reference(&ref_git) {
-    let reference = match repo.resolve_reference_from_short_name(&source.git_rev.to_string()) {
+    let reference = match repo.resolve_reference_from_short_name(source.rev()) {
         Ok(reference) => reference,
         Err(_) => {
-            match repo.resolve_reference_from_short_name(&format!("origin/{}", source.git_rev)) {
+            match repo.resolve_reference_from_short_name(&format!("origin/{}", source.rev())) {
                 Ok(reference) => reference,
                 Err(e) => {
                     return Err(SourceError::GitError(e));
@@ -127,7 +129,7 @@ pub(crate) fn git_src<'a>(
     let object = reference.peel(ObjectType::Commit).unwrap();
     repo.set_head(reference.name().unwrap())?;
     repo.reset(&object, ResetType::Hard, None)?;
-    tracing::info!("Checked out reference: '{}'", &source.git_rev);
+    tracing::info!("Checked out reference: '{}'", &source.rev());
 
     // TODO: Implement support for pulling Git LFS files, as git2 does not support it.
     Ok(cache_path)
@@ -135,12 +137,12 @@ pub(crate) fn git_src<'a>(
 
 #[cfg(test)]
 mod tests {
-    use std::{env, str::FromStr};
+    use std::env;
 
     use git2::Repository;
 
     use crate::{
-        metadata::{GitRev, GitSrc, GitUrl},
+        recipe::stage2::{GitSource, GitUrl},
         source::git_source::git_src,
     };
 
@@ -149,31 +151,31 @@ mod tests {
         let cache_dir = "/tmp/rattler-build-test-git-source";
         let cases = vec![
             (
-                GitSrc {
-                    git_rev: GitRev::from_str("v0.1.3").unwrap(),
-                    git_depth: None,
-                    patches: None,
-                    git_url: GitUrl::Url(
+                GitSource::create(
+                    GitUrl::Url(
                         "https://github.com/prefix-dev/rattler-build"
                             .parse()
                             .unwrap(),
                     ),
-                    folder: None,
-                },
+                    "v0.1.3".to_owned(),
+                    None,
+                    vec![],
+                    None,
+                ),
                 "rattler-build",
             ),
             (
-                GitSrc {
-                    git_rev: GitRev::from_str("v0.1.2").unwrap(),
-                    git_depth: None,
-                    patches: None,
-                    git_url: GitUrl::Url(
+                GitSource::create(
+                    GitUrl::Url(
                         "https://github.com/prefix-dev/rattler-build"
                             .parse()
                             .unwrap(),
                     ),
-                    folder: None,
-                },
+                    "v0.1.2".to_owned(),
+                    None,
+                    vec![],
+                    None,
+                ),
                 "rattler-build",
             ),
             // (
@@ -191,13 +193,13 @@ mod tests {
             //     "rattler-build",
             // ),
             (
-                GitSrc {
-                    git_rev: GitRev::from_str("").unwrap(),
-                    git_depth: None,
-                    patches: None,
-                    git_url: GitUrl::Path("../rattler-build".parse().unwrap()),
-                    folder: None,
-                },
+                GitSource::create(
+                    GitUrl::Path("../rattler-build".parse().unwrap()),
+                    "".to_owned(),
+                    None,
+                    vec![],
+                    None,
+                ),
                 "rattler-build",
             ),
         ];

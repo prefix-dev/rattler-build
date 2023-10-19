@@ -1,4 +1,4 @@
-//! find used variabels on a Raw (YAML) recipe
+//! find used variables on a Raw (YAML) recipe
 //! This does an initial "prerender" step where we evaluate the Jinja expressions globally
 //! based on the variables in the `context` section of the recipe.
 //! This also evaluates any Jinja functions such as `compiler` and `pin_subpackage` in a way
@@ -6,15 +6,15 @@
 //!
 //! Step 1:
 //!    - use only outer variables such as `target_platform`
-//!    - extract all sel( ... ) and `jinja` statements and find used variables
-//!    - retrieve used variabels from configuration and flatten selectors
+//!    - extract all `if ... then ... else ` and `jinja` statements and find used variables
+//!    - retrieve used variables from configuration and flatten selectors
 //!    - extract all dependencies and add them to used variables to build full variant
 
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
 };
-use serde_yaml::Value as YamlValue;
+use rattler_build::recipe::custom_yaml::Node;
 use std::collections::HashSet;
 
 /// Extract all variables from a jinja statement
@@ -74,32 +74,39 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
     }
 }
 
-/// This recursively finds all `sel(...)` expressions in a YAML node
-fn find_all_selectors(node: &YamlValue, selectors: &mut HashSet<String>) {
+/// This recursively finds all `if/then/else` expressions in a YAML node
+fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
+    use rattler_build::recipe::custom_yaml::SequenceNodeInternal;
+
     match node {
-        YamlValue::Mapping(map) => {
-            for (key, value) in map {
-                if let YamlValue::String(key) = key {
-                    if key.starts_with("sel(") {
-                        selectors.insert(key[4..key.len() - 1].to_string());
-                    }
-                }
+        Node::Mapping(map) => {
+            for (_, value) in map.iter() {
                 find_all_selectors(value, selectors);
             }
         }
-        YamlValue::Sequence(seq) => {
-            for item in seq {
-                find_all_selectors(item, selectors);
+        Node::Sequence(seq) => {
+            for item in seq.iter() {
+                match item {
+                    SequenceNodeInternal::Simple(node) => find_all_selectors(node, selectors),
+                    SequenceNodeInternal::Conditional(if_sel) => {
+                        selectors.insert(if_sel.cond().as_str().to_owned());
+                        find_all_selectors(if_sel.then(), selectors);
+                        if let Some(otherwise) = if_sel.otherwise() {
+                            find_all_selectors(otherwise, selectors);
+                        }
+                    }
+                }
             }
         }
         _ => {}
     }
 }
 
-/// This finds all variables used in jinja or `sel(...)` expressions
+/// This finds all variables used in jinja or `if/then/else` expressions
 pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     let mut selectors = HashSet::new();
-    let yaml_node = serde_yaml::from_str(recipe).unwrap();
+
+    let yaml_node = Node::parse_yaml(0, recipe).unwrap();
     find_all_selectors(&yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();
@@ -119,44 +126,21 @@ pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     variables
 }
 
-pub(crate) fn extract_dependencies(recipe: &YamlValue) -> HashSet<String> {
-    // we do this in simple mode for now, but could later also do intersections
-    // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-    // says >=3.7 and then we only do 3.7-3.10)
-    let mut dependencies = HashSet::<String>::new();
-
-    if let Some(requirements) = recipe.get("requirements") {
-        ["build", "host", "run", "constrains"]
-            .iter()
-            .for_each(|section| {
-                if let Some(YamlValue::Sequence(section)) = requirements.get(section) {
-                    for item in section {
-                        if let YamlValue::String(item) = item {
-                            if item.starts_with("{{") {
-                                continue;
-                            }
-                            dependencies.insert(item.to_string());
-                        }
-                    }
-                }
-            });
-    }
-
-    dependencies
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
     fn test_used_vars_from_expressions() {
-        let recipe = r#"
-        - sel(llvm_variant > 10): llvm >= 10
-        - sel(linux): linux-gcc
-        - sel(osx): osx-clang
-        - "{{ compiler('c') }}"
-        - "{{ pin_subpackage('abcdef') }}"
+        let recipe = r#"build:
+            - if: llvm_variant > 10
+              then: llvm >= 10
+            - if: linux
+              then: linux-gcc
+            - if: osx
+              then: osx-clang
+            - "{{ compiler('c') }}"
+            - "{{ pin_subpackage('abcdef') }}"
         "#;
 
         let used_vars = used_vars_from_expressions(recipe);

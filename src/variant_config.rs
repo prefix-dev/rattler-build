@@ -3,16 +3,17 @@
 use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 
+use miette::Diagnostic;
+use rattler_build::recipe::stage2::Recipe;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::formats::PreferOne;
 use serde_with::serde_as;
 use serde_with::OneOrMany;
-use serde_yaml::Value as YamlValue;
 use thiserror::Error;
 
-use crate::selectors::{flatten_selectors, flatten_toplevel, SelectorConfig};
-use crate::used_variables::extract_dependencies;
+use rattler_build::selectors::{flatten_toplevel, SelectorConfig};
+
 use crate::used_variables::used_vars_from_expressions;
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -206,7 +207,7 @@ impl VariantConfig {
 
         let variant_keys = used_zip_keys
             .into_iter()
-            .chain(variant_keys.into_iter())
+            .chain(variant_keys)
             .collect::<Vec<_>>();
 
         // get all combinations of variant keys
@@ -234,21 +235,33 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+        use rattler_build::recipe::stage2::Dependency;
+
         let mut used_variables = used_vars_from_expressions(recipe);
 
         // now render all selectors with the used variables
         let combinations = self.combinations(&used_variables)?;
 
-        let recipe_parsed: YamlValue = serde_yaml::from_str(recipe).unwrap();
+        let recipe_parsed = Recipe::from_yaml(recipe, selector_config.clone())?;
         for _ in combinations {
-            let mut val = recipe_parsed.clone();
-            if let Some(flattened_recipe) = flatten_selectors(&mut val, selector_config) {
-                // extract all dependencies from the flattened recipe
-                let dependencies = extract_dependencies(&flattened_recipe);
-                for dependency in dependencies {
-                    used_variables.insert(dependency);
+            let requirements = recipe_parsed.requirements();
+
+            // we do this in simple mode for now, but could later also do intersections
+            // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
+            // says >=3.7 and then we only do 3.7-3.10)
+            requirements.all().for_each(|dep| match dep {
+                Dependency::Spec(spec) => {
+                    if let Some(name) = &spec.name {
+                        let val = name.as_normalized().to_owned();
+                        used_variables.insert(val);
+                    }
                 }
-            };
+                Dependency::PinSubpackage(pin_sub) => {
+                    let val = pin_sub.pin_value().name.as_normalized().to_owned();
+                    used_variables.insert(val);
+                }
+                Dependency::Compiler(_) => (),
+            })
         }
 
         // special handling of CONDA_BUILD_SYSROOT
@@ -301,10 +314,14 @@ impl VariantKey {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Diagnostic)]
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    RecipeParseError(#[from] rattler_build::recipe::error::ParsingError),
 }
 
 fn find_combinations(
@@ -331,7 +348,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::selectors::{flatten_toplevel, SelectorConfig};
+    use rattler_build::selectors::{flatten_toplevel, SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
     use serde_yaml::Value as YamlValue;

@@ -1,0 +1,358 @@
+---
+source: src/recipe/stage1.rs
+expression: raw_recipe
+---
+RawRecipe {
+    context: {
+        ScalarNode {
+            value: "name",
+        }: ScalarNode {
+            value: "xtensor",
+        },
+        ScalarNode {
+            value: "version",
+        }: ScalarNode {
+            value: "0.24.6",
+        },
+        ScalarNode {
+            value: "sha256",
+        }: ScalarNode {
+            value: "f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655",
+        },
+    },
+    package: Package {
+        name: ScalarNode {
+            value: "${{ name|lower }}",
+        },
+        version: ScalarNode {
+            value: "${{ version }}",
+        },
+    },
+    source: Source {
+        node: Some(
+            Mapping(
+                MappingNode {
+                    value: {
+                        ScalarNode {
+                            value: "url",
+                        }: Scalar(
+                            ScalarNode {
+                                value: "https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz",
+                            },
+                        ),
+                        ScalarNode {
+                            value: "sha256",
+                        }: Scalar(
+                            ScalarNode {
+                                value: "${{ sha256 }}",
+                            },
+                        ),
+                    },
+                },
+            ),
+        ),
+    },
+    build: Build {
+        node: Some(
+            MappingNode {
+                value: {
+                    ScalarNode {
+                        value: "number",
+                    }: Scalar(
+                        ScalarNode {
+                            value: "0",
+                        },
+                    ),
+                    ScalarNode {
+                        value: "skip",
+                    }: Scalar(
+                        ScalarNode {
+                            value: "${{ true if (win and vc14) }}",
+                        },
+                    ),
+                    ScalarNode {
+                        value: "script",
+                    }: Sequence(
+                        SequenceNode {
+                            value: [
+                                Conditional(
+                                    IfSelector {
+                                        cond: ScalarNode {
+                                            value: "win",
+                                        },
+                                        then: Scalar(
+                                            ScalarNode {
+                                                value: "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
+                                            },
+                                        ),
+                                        otherwise: Some(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install\n",
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                },
+            },
+        ),
+    },
+    requirements: Some(
+        Requirements {
+            build: Some(
+                Sequence(
+                    SequenceNode {
+                        value: [
+                            Simple(
+                                Scalar(
+                                    ScalarNode {
+                                        value: "${{ compiler('cxx') }}",
+                                    },
+                                ),
+                            ),
+                            Simple(
+                                Scalar(
+                                    ScalarNode {
+                                        value: "cmake",
+                                    },
+                                ),
+                            ),
+                            Conditional(
+                                IfSelector {
+                                    cond: ScalarNode {
+                                        value: "unix",
+                                    },
+                                    then: Scalar(
+                                        ScalarNode {
+                                            value: "make",
+                                        },
+                                    ),
+                                    otherwise: None,
+                                },
+                            ),
+                        ],
+                    },
+                ),
+            ),
+            host: Some(
+                Sequence(
+                    SequenceNode {
+                        value: [
+                            Simple(
+                                Scalar(
+                                    ScalarNode {
+                                        value: "xtl >=0.7,<0.8",
+                                    },
+                                ),
+                            ),
+                        ],
+                    },
+                ),
+            ),
+            run: Some(
+                Sequence(
+                    SequenceNode {
+                        value: [
+                            Simple(
+                                Scalar(
+                                    ScalarNode {
+                                        value: "xtl >=0.7,<0.8",
+                                    },
+                                ),
+                            ),
+                        ],
+                    },
+                ),
+            ),
+            run_constrained: Some(
+                Sequence(
+                    SequenceNode {
+                        value: [
+                            Simple(
+                                Scalar(
+                                    ScalarNode {
+                                        value: "xsimd >=8.0.3,<10",
+                                    },
+                                ),
+                            ),
+                        ],
+                    },
+                ),
+            ),
+        },
+    ),
+    test: Test {
+        node: Some(
+            Mapping(
+                MappingNode {
+                    value: {
+                        ScalarNode {
+                            value: "commands",
+                        }: Sequence(
+                            SequenceNode {
+                                value: [
+                                    Conditional(
+                                        IfSelector {
+                                            cond: ScalarNode {
+                                                value: "unix or emscripten",
+                                            },
+                                            then: Sequence(
+                                                SequenceNode {
+                                                    value: [
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "test -d ${PREFIX}/include/xtensor",
+                                                                },
+                                                            ),
+                                                        ),
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "test -f ${PREFIX}/include/xtensor/xarray.hpp",
+                                                                },
+                                                            ),
+                                                        ),
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake",
+                                                                },
+                                                            ),
+                                                        ),
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            otherwise: None,
+                                        },
+                                    ),
+                                    Conditional(
+                                        IfSelector {
+                                            cond: ScalarNode {
+                                                value: "win",
+                                            },
+                                            then: Sequence(
+                                                SequenceNode {
+                                                    value: [
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                                                                },
+                                                            ),
+                                                        ),
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                                                                },
+                                                            ),
+                                                        ),
+                                                        Simple(
+                                                            Scalar(
+                                                                ScalarNode {
+                                                                    value: "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                                                                },
+                                                            ),
+                                                        ),
+                                                    ],
+                                                },
+                                            ),
+                                            otherwise: None,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                },
+            ),
+        ),
+    },
+    about: Some(
+        About {
+            homepage: Some(
+                Scalar(
+                    ScalarNode {
+                        value: "https://github.com/xtensor-stack/xtensor",
+                    },
+                ),
+            ),
+            repository: Some(
+                ScalarNode {
+                    value: "https://github.com/xtensor-stack/xtensor",
+                },
+            ),
+            documentation: Some(
+                ScalarNode {
+                    value: "https://xtensor.readthedocs.io",
+                },
+            ),
+            license: Some(
+                ScalarNode {
+                    value: "BSD-3-Clause",
+                },
+            ),
+            license_family: Some(
+                ScalarNode {
+                    value: "BSD",
+                },
+            ),
+            license_file: Some(
+                Scalar(
+                    ScalarNode {
+                        value: "LICENSE",
+                    },
+                ),
+            ),
+            license_url: None,
+            summary: Some(
+                ScalarNode {
+                    value: "The C++ tensor algebra library",
+                },
+            ),
+            description: Some(
+                ScalarNode {
+                    value: "Multi dimensional arrays with broadcasting and lazy computing",
+                },
+            ),
+            prelink_message: None,
+        },
+    ),
+    extra: Extra {
+        node: Some(
+            Mapping(
+                MappingNode {
+                    value: {
+                        ScalarNode {
+                            value: "recipe-maintainers",
+                        }: Sequence(
+                            SequenceNode {
+                                value: [
+                                    Simple(
+                                        Scalar(
+                                            ScalarNode {
+                                                value: "some-maintainer",
+                                            },
+                                        ),
+                                    ),
+                                ],
+                            },
+                        ),
+                    },
+                },
+            ),
+        ),
+    },
+}

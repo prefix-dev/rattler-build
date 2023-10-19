@@ -125,8 +125,8 @@ pub fn language_vars(
 ) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
-    result.extend(python_vars(prefix, platform, variant).into_iter());
-    result.extend(r_vars(prefix, platform, variant).into_iter());
+    result.extend(python_vars(prefix, platform, variant));
+    result.extend(r_vars(prefix, platform, variant));
 
     result
 }
@@ -171,15 +171,15 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     vars.insert("PATH".to_string(), env::var("PATH").unwrap_or_default());
 
     if cfg!(target_family = "windows") {
-        vars.extend(windows::env::default_env_vars(prefix, platform).into_iter());
+        vars.extend(windows::env::default_env_vars(prefix, platform));
     } else if cfg!(target_family = "unix") {
-        vars.extend(unix::env::default_env_vars(prefix).into_iter());
+        vars.extend(unix::env::default_env_vars(prefix));
     }
 
     if platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, platform).into_iter());
+        vars.extend(macos::env::default_env_vars(prefix, platform));
     } else if platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(prefix).into_iter());
+        vars.extend(linux::env::default_env_vars(prefix));
     }
 
     vars
@@ -254,13 +254,22 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // pkg vars
     insert!(vars, "PKG_NAME", output.name().as_normalized());
     insert!(vars, "PKG_VERSION", output.version());
-    insert!(vars, "PKG_BUILDNUM", output.recipe.build.number.to_string());
+    insert!(
+        vars,
+        "PKG_BUILDNUM",
+        output.recipe.build().number().to_string()
+    );
 
     // TODO this is inaccurate
     insert!(
         vars,
         "PKG_BUILD_STRING",
-        output.recipe.build.string.clone().unwrap_or_default()
+        output
+            .recipe
+            .build()
+            .string()
+            .unwrap_or_default()
+            .to_owned()
     );
     insert!(vars, "PKG_HASH", output.build_configuration.hash.clone());
     if output.build_configuration.cross_compilation() {
@@ -336,7 +345,7 @@ pub fn write_env_script<T: Shell + Clone>(
         shell_type.set_env_var(&mut s, &k, &v)?;
     }
 
-    for env_key in &output.recipe.build.script_env.passthrough {
+    for env_key in output.recipe.build().script_env().passthrough() {
         let var = std::env::var(env_key);
         if let Ok(var) = var {
             shell_type.set_env_var(&mut s, env_key, var.as_str())?;
@@ -348,11 +357,11 @@ pub fn write_env_script<T: Shell + Clone>(
         }
     }
 
-    for (k, v) in &output.recipe.build.script_env.env {
+    for (k, v) in output.recipe.build().script_env().env() {
         shell_type.set_env_var(&mut s, k, v)?;
     }
 
-    if !output.recipe.build.script_env.secrets.is_empty() {
+    if !output.recipe.build().script_env().secrets().is_empty() {
         tracing::error!("Secrets are not supported yet");
     }
 
