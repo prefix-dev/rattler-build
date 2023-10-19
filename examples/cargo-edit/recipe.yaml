@@ -3,10 +3,10 @@ context:
 
 package:
   name: cargo-edit
-  version: "{{ version }}"
+  version: ${{ version }}
 
 source:
-  url: https://github.com/killercup/cargo-edit/archive/refs/tags/v{{ version }}.tar.gz
+  url: https://github.com/killercup/cargo-edit/archive/refs/tags/v${{ version }}.tar.gz
   sha256: 46670295e2323fc2f826750cdcfb2692fbdbea87122fe530a07c50c8dba1d3d7
 
 build:
@@ -16,7 +16,7 @@ build:
 
 requirements:
   build:
-    - "{{ compiler('rust') }}"
+    - ${{ compiler('rust') }}
     - cargo-bundle-licenses
 
 test:
@@ -27,4 +27,4 @@ about:
   home: https://github.com/killercup/cargo-edit
   license: MIT
   description: "A utility for managing cargo dependencies from the command line."
-  about: "A utility for managing cargo dependencies from the command line."
+  summary: "A utility for managing cargo dependencies from the command line."
