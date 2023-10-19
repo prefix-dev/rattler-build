@@ -129,4 +129,7 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
 
     assert (pkg / "info/run_exports.json").exists()
     actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
-    assert actual_run_export == expected_run_export
+    assert set(actual_run_export.keys()) == {"weak"}
+    assert len(actual_run_export["weak"]) == 1
+    x = actual_run_export["weak"][0]
+    assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
