@@ -10,6 +10,7 @@ use ignore::WalkBuilder;
 
 use crate::recipe::stage2::Source;
 
+#[cfg(feature = "git")]
 pub mod git_source;
 pub mod patch;
 pub mod url_source;
@@ -40,6 +41,7 @@ pub enum SourceError {
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
+    #[cfg(feature = "git")]
     #[error("Failed to run git command: {0}")]
     GitError(#[from] git2::Error),
 
@@ -62,21 +64,24 @@ pub async fn fetch_sources(
 
     for src in sources {
         match &src {
-            Source::Git(src) => {
-                tracing::info!("Fetching source from GIT: {}", src.url());
-                let result = match git_source::git_src(src, &cache_src, recipe_dir) {
-                    Ok(path) => path,
-                    Err(e) => return Err(e),
-                };
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
-                } else {
-                    work_dir.to_path_buf()
-                };
-                copy_dir(&result, &dest_dir, &[], &[], false)?;
+            Source::Git(_src) => {
+                #[cfg(feature = "git")]
+                {
+                    tracing::info!("Fetching source from GIT: {}", _src.url());
+                    let result = match git_source::git_src(_src, &cache_src, recipe_dir) {
+                        Ok(path) => path,
+                        Err(e) => return Err(e),
+                    };
+                    let dest_dir = if let Some(folder) = _src.folder() {
+                        work_dir.join(folder)
+                    } else {
+                        work_dir.to_path_buf()
+                    };
+                    copy_dir(&result, &dest_dir, &[], &[], false)?;
 
-                if !src.patches().is_empty() {
-                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
+                    if !_src.patches().is_empty() {
+                        patch::apply_patches(_src.patches(), work_dir, recipe_dir)?;
+                    }
                 }
             }
             Source::Url(src) => {
