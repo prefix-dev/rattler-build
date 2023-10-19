@@ -54,9 +54,8 @@ impl RawRecipe {
 
         for (key, value) in root_map.iter() {
             let key_span = key.span();
-            let key = key.as_str();
 
-            match key {
+            match key.as_str() {
                 "context" => {
                     let context_node = value;
                     let context_span = marker_span_to_span(yaml, *context_node.span());
@@ -106,7 +105,7 @@ impl RawRecipe {
                 _ => {
                     return Err(_error!(
                         yaml,
-                        marker_span_to_span(yaml, *value.span()),
+                        marker_span_to_span(yaml, *key.span()),
                         ErrorKind::Other,
                         label = "unexpected key",
                         help = "expected one of `context`, `package`, `source`, `build`, `requirements`, `test`, `about` or `extra`"
@@ -240,21 +239,17 @@ pub struct Requirements {
 impl Requirements {
     fn from_node(value: &Node) -> Result<Self, PartialParsingError> {
         if let Some(requirements_node) = value.as_mapping() {
-            let requirements_span = *requirements_node.span();
-
             let mut req = Requirements::default();
 
             for (key, value) in requirements_node.iter() {
-                let key = key.as_str();
-
-                match key {
+                match key.as_str() {
                     "build" => req.build = Some(value.clone()),
                     "host" => req.host = Some(value.clone()),
                     "run" => req.run = Some(value.clone()),
                     "run_constrained" => req.run_constrained = Some(value.clone()),
                     _ => {
                         return Err(_partialerror!(
-                            requirements_span,
+                            *key.span(),
                             ErrorKind::Other,
                             label = "unexpected key",
                             help = "expected one of `build`, `host`, `run` or `run_constrained`"

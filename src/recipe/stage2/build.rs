@@ -146,7 +146,13 @@ impl Build {
 
                     build.entry_points = parse_entry_points(value, jinja)?;
                 }
-                _ => unimplemented!("unimplemented field: {}", key.as_str()),
+                _ => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::Other,
+                        label = "unknown key in build"
+                    ))
+                }
             }
         }
 
