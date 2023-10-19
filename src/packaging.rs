@@ -254,7 +254,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         arch,
         platform,
         subdir: Some(output.build_configuration.target_platform.to_string()),
-        license: recipe.about().license().map(|l| l.to_owned()),
+        license: recipe.about().license().map(|l| l.to_string()),
         license_family: recipe.about().license_family().map(|l| l.to_owned()),
         timestamp: Some(output.build_configuration.timestamp),
         depends: output
@@ -294,7 +294,7 @@ fn create_about_json(output: &Output) -> Result<String, PackagingError> {
             .cloned()
             .map(|s| vec![s])
             .unwrap_or_default(),
-        license: recipe.about().license().map(|s| s.to_owned()),
+        license: recipe.about().license().map(|s| s.to_string()),
         license_family: recipe.about().license_family().map(|s| s.to_owned()),
         summary: recipe.about().summary().map(|s| s.to_owned()),
         description: recipe.about().description().map(|s| s.to_owned()),

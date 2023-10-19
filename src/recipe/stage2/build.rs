@@ -7,14 +7,14 @@ use serde::Serialize;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{MappingNode, Node, SequenceNodeInternal},
+        custom_yaml::{HasSpan, MappingNode, Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1,
     },
 };
 
-use super::Dependency;
+use super::{Dependency, Render};
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
@@ -65,37 +65,10 @@ impl Build {
         for (key, value) in node.iter() {
             match key.as_str() {
                 "number" => {
-                    let number = value.as_scalar().ok_or_else(|| {
-                        _partialerror!(*value.span(), ErrorKind::Other, label = "expected scalar")
-                    })?;
-                    let number = jinja.render_str(number.as_str()).map_err(|err| {
-                        _partialerror!(
-                            *number.span(),
-                            ErrorKind::JinjaRendering(err),
-                            label = "error rendering number"
-                        )
-                    })?;
-                    let number = number.parse::<u64>().map_err(|_err| {
-                        _partialerror!(
-                            *value.span(),
-                            ErrorKind::Other,
-                            label = "error parsing number"
-                        )
-                    })?;
-                    build.number = number;
+                    build.number = key.render(jinja, "number")?;
                 }
                 "string" => {
-                    let string = value.as_scalar().ok_or_else(|| {
-                        _partialerror!(*value.span(), ErrorKind::Other, label = "expected scalar")
-                    })?;
-                    let string = jinja.render_str(string.as_str()).map_err(|err| {
-                        _partialerror!(
-                            *string.span(),
-                            ErrorKind::JinjaRendering(err),
-                            label = "error rendering string"
-                        )
-                    })?;
-                    build.string = Some(string);
+                    build.string = Some(key.render(jinja, "string")?);
                 }
                 "skip" => build.skip = parse_skip(value, jinja)?,
                 "script" => build.script = parse_script(value, jinja)?,
@@ -109,16 +82,7 @@ impl Build {
                     build.ignore_run_exports_from = parse_ignore_run_exports(value, jinja)?;
                 }
                 "noarch" => {
-                    let noarch = value.as_scalar().ok_or_else(|| {
-                        _partialerror!(*value.span(), ErrorKind::Other, label = "expected scalar")
-                    })?;
-                    let noarch = jinja.render_str(noarch.as_str()).map_err(|err| {
-                        _partialerror!(
-                            *noarch.span(),
-                            ErrorKind::JinjaRendering(err),
-                            label = "error rendering noarch"
-                        )
-                    })?;
+                    let noarch: String = value.render(jinja, "noarch")?;
                     let noarch = match noarch.as_str() {
                         "python" => NoArchType::python(),
                         "generic" => NoArchType::generic(),

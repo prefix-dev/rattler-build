@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{Node, ScalarNode, SequenceNodeInternal},
+        custom_yaml::{HasSpan, Node, ScalarNode, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1,

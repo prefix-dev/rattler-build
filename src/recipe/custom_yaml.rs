@@ -5,6 +5,7 @@ use std::{fmt, hash::Hash, ops};
 
 use linked_hash_map::LinkedHashMap;
 use marked_yaml::types::MarkedScalarNode;
+use marked_yaml::Span;
 
 use crate::_partialerror;
 use crate::recipe::{
@@ -63,15 +64,6 @@ impl Node {
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 
-    /// Retrieve the Span from the contained Node
-    pub fn span(&self) -> &marked_yaml::Span {
-        match self {
-            Self::Mapping(map) => map.span(),
-            Self::Scalar(scalar) => scalar.span(),
-            Self::Sequence(seq) => seq.span(),
-        }
-    }
-
     pub fn is_mapping(&self) -> bool {
         matches!(self, Self::Mapping(_))
     }
@@ -106,6 +98,29 @@ impl Node {
             Node::Mapping(mmn) => Some(mmn),
             _ => None,
         }
+    }
+}
+
+/// A trait that defines that the implementer has an associated span.
+pub trait HasSpan {
+    fn span(&self) -> &marked_yaml::Span;
+}
+
+impl HasSpan for Node {
+    fn span(&self) -> &Span {
+        match self {
+            Self::Mapping(map) => map.span(),
+            Self::Scalar(scalar) => scalar.span(),
+            Self::Sequence(seq) => seq.span(),
+        }
+    }
+}
+
+impl<'i> TryFrom<&'i Node> for &'i ScalarNode {
+    type Error = ();
+
+    fn try_from(value: &'i Node) -> Result<Self, Self::Error> {
+        value.as_scalar().ok_or(())
     }
 }
 
@@ -195,10 +210,6 @@ impl ScalarNode {
         Self { span, value }
     }
 
-    pub fn span(&self) -> &marked_yaml::Span {
-        &self.span
-    }
-
     /// Treat the scalar node as a string
     ///
     /// Since scalars are always stringish, this is always safe.
@@ -227,6 +238,12 @@ impl ScalarNode {
             "false" | "False" | "FALSE" => Some(false),
             _ => None,
         }
+    }
+}
+
+impl HasSpan for ScalarNode {
+    fn span(&self) -> &Span {
+        &self.span
     }
 }
 
@@ -369,10 +386,6 @@ impl SequenceNode {
         Self { span, value }
     }
 
-    pub fn span(&self) -> &marked_yaml::Span {
-        &self.span
-    }
-
     /// Check if this sequence node is only conditional.
     ///
     /// This is convenient for places that accept if-selectors but don't accept simple sequence.
@@ -380,6 +393,12 @@ impl SequenceNode {
         self.value
             .iter()
             .all(|v| matches!(v, SequenceNodeInternal::Conditional(_)))
+    }
+}
+
+impl HasSpan for SequenceNode {
+    fn span(&self) -> &marked_yaml::Span {
+        &self.span
     }
 }
 
@@ -465,8 +484,10 @@ impl MappingNode {
     pub fn new(span: marked_yaml::Span, value: LinkedHashMap<ScalarNode, Node>) -> Self {
         Self { span, value }
     }
+}
 
-    pub fn span(&self) -> &marked_yaml::Span {
+impl HasSpan for MappingNode {
+    fn span(&self) -> &marked_yaml::Span {
         &self.span
     }
 }
@@ -710,5 +731,27 @@ impl fmt::Debug for IfSelector {
             .field("then", &self.then)
             .field("otherwise", &self.otherwise)
             .finish()
+    }
+}
+
+pub trait TryConvertNode<T> {
+    fn try_convert(&self, name: &str) -> Result<&T, PartialParsingError>;
+}
+
+impl<T> TryConvertNode<T> for T {
+    fn try_convert(&self, _: &str) -> Result<&T, PartialParsingError> {
+        Ok(self)
+    }
+}
+
+impl TryConvertNode<ScalarNode> for Node {
+    fn try_convert(&self, name: &str) -> Result<&ScalarNode, PartialParsingError> {
+        self.as_scalar().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a scalar value for {name}")
+            )
+        })
     }
 }
