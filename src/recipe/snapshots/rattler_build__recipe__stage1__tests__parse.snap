@@ -70,6 +70,33 @@ RawRecipe {
                             value: "${{ true if (win and vc14) }}",
                         },
                     ),
+                    ScalarNode {
+                        value: "script",
+                    }: Sequence(
+                        SequenceNode {
+                            value: [
+                                Conditional(
+                                    IfSelector {
+                                        cond: ScalarNode {
+                                            value: "win",
+                                        },
+                                        then: Scalar(
+                                            ScalarNode {
+                                                value: "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
+                                            },
+                                        ),
+                                        otherwise: Some(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install\n",
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
                 },
             },
         ),
