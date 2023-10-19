@@ -633,7 +633,13 @@ impl RunExports {
                             let deps = parse_dependency(value, jinja)?;
                             run_exports.weak_constrains = deps;
                         }
-                        _ => unreachable!("invalid field: {}", key.as_str()),
+                        _ => {
+                            return Err(_partialerror!(
+                                *key.span(),
+                                ErrorKind::Other,
+                                label = "Unknown key in run_exports. Should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`"
+                            ))
+                        }
                     }
                 }
             }

@@ -86,7 +86,11 @@ impl Test {
                         "requires" => test.requires = parse(value, jinja)?,
                         "source_files" => test.source_files = parse(value, jinja)?,
                         "files" => test.files = parse(value, jinja)?,
-                        _ => unreachable!("unimplemented field: {}", key.as_str()),
+                        _ => Err(_partialerror!(
+                            *key.span(),
+                            ErrorKind::Other,
+                            label = "Unknown key: expected one of `imports`, `commands`, `requires`, `source_files`, `files`"
+                        ))?
                     }
                 }
 

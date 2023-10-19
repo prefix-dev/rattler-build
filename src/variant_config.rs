@@ -3,6 +3,7 @@
 use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 
+use miette::Diagnostic;
 use rattler_build::recipe::stage2::Recipe;
 use serde::Deserialize;
 use serde::Serialize;
@@ -313,12 +314,13 @@ impl VariantKey {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Diagnostic)]
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
 
-    #[error("Recipe parsing failed: {0}")]
+    #[error(transparent)]
+    #[diagnostic(transparent)]
     RecipeParseError(#[from] rattler_build::recipe::error::ParsingError),
 }
 

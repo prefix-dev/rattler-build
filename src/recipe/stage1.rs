@@ -143,8 +143,6 @@ impl Package {
         package_key_span: marked_yaml::Span,
     ) -> Result<Self, PartialParsingError> {
         if let Some(package_node) = node.as_mapping() {
-            let package_span = *package_node.span();
-
             let mut name = None;
             let mut version = None;
 

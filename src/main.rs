@@ -130,17 +130,9 @@ async fn main() -> miette::Result<()> {
 
     tracing::info!("Starting the build process");
 
-    let result = match args.subcommand {
+    match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
-    };
-
-    match result {
-        Result::Ok(_) => Ok(()),
-        Result::Err(e) => {
-            tracing::error!("Error: {}", e);
-            Err(e)
-        }
     }
 }
 
@@ -230,9 +222,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let variant_config =
         VariantConfig::from_files(&args.variant_config, &selector_config).into_diagnostic()?;
 
-    let variants = variant_config
-        .find_variants(&recipe_text, &selector_config)
-        .expect("Could not compute variants");
+    let variants = variant_config.find_variants(&recipe_text, &selector_config)?;
 
     tracing::info!("Found variants:");
     for variant in &variants {

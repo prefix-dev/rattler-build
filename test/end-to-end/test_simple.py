@@ -120,3 +120,14 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert installer.read_text().strip() == "conda"
 
     check_info(pkg, expected=recipes / "toml" / "expected")
+
+def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "run_exports", tmp_path)
+    pkg = get_package(tmp_path, "run_exports_test")
+    expected_run_export = {
+        "weak": ["run_exports_test ==1.0.0 h60d57d3_0"]
+    }
+
+    assert (pkg / "info/run_exports.json").exists()
+    actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
+    assert actual_run_export == expected_run_export
