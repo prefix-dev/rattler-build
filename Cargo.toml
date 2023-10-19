@@ -68,6 +68,7 @@ thiserror = "1.0.49"
 tempfile = "3.8.0"
 chrono = "0.4.31"
 sha1 = "0.10.6"
+spdx = "0.10.2"
 git2 = { version = "0.18.1", features = ["vendored-openssl"] }
 fs_extra = "1.3.0"
 ignore = "0.4.20"

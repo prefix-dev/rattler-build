@@ -5,10 +5,14 @@
 
 use minijinja::Value;
 use serde::Serialize;
+use std::fmt::Display;
+use std::str::FromStr;
 
+use crate::recipe::custom_yaml::{ScalarNode, TryConvertNode};
 use crate::{
     _partialerror,
     recipe::{
+        custom_yaml::HasSpan,
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
         stage1::RawRecipe,
@@ -159,5 +163,60 @@ mod tests {
         let recipe = include_str!("../../examples/xtensor/recipe.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         dbg!(&recipe);
+    }
+}
+
+/// A trait to render a certain stage1 node into its final type.
+trait Render<T> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError>;
+}
+
+/// A jinja rendered string
+struct Rendered(String);
+
+impl Rendered {
+    // Parses this rendered value into another type.
+    pub fn parse<F: FromStr>(&self) -> Result<F, F::Err> {
+        FromStr::from_str(&self.0)
+    }
+}
+
+impl<N: TryConvertNode<ScalarNode> + HasSpan> Render<Rendered> for N {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Rendered, PartialParsingError> {
+        jinja
+            .render_str(self.try_convert(name)?.as_str())
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::JinjaRendering(err),
+                    label = format!("error rendering {name}")
+                )
+            })
+            .map(Rendered)
+    }
+}
+
+impl<N: TryConvertNode<ScalarNode> + HasSpan, T: FromStr> Render<T> for N
+where
+    T::Err: Display,
+{
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError> {
+        match Rendered::parse(&self.render(jinja, name)?) {
+            Ok(result) => Ok(result),
+            Err(e) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = e.to_string()
+            )),
+        }
+    }
+}
+
+impl<N: Render<T>, T: FromStr> Render<Option<T>> for Option<N> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Option<T>, PartialParsingError> {
+        match self {
+            None => Ok(None),
+            Some(node) => Ok(Some(node.render(jinja, name)?)),
+        }
     }
 }

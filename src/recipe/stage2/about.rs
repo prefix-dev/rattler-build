@@ -1,8 +1,13 @@
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
+use serde_with::{DeserializeFromStr, SerializeDisplay};
+use spdx::Expression;
 use url::Url;
 
+use crate::recipe::custom_yaml::HasSpan;
+use crate::recipe::stage2::Render;
 use crate::{
     _partialerror,
     recipe::{
@@ -19,7 +24,7 @@ pub struct About {
     homepage: Option<Url>,
     repository: Option<Url>,
     documentation: Option<Url>,
-    license: Option<String>,
+    license: Option<License>,
     license_family: Option<String>,
     license_files: Vec<String>,
     license_url: Option<Url>,
@@ -28,78 +33,56 @@ pub struct About {
     prelink_message: Option<String>,
 }
 
+/// A parsed SPDX license
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr)]
+pub struct License {
+    pub original: String,
+    pub expr: spdx::Expression,
+}
+
+impl PartialEq for License {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr
+    }
+}
+
+impl Display for License {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.original)
+    }
+}
+
+impl FromStr for License {
+    type Err = spdx::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(License {
+            original: s.to_owned(),
+            expr: Expression::parse(s)?,
+        })
+    }
+}
+
 impl About {
     pub(super) fn from_stage1(
         about: &stage1::About,
         jinja: &Jinja,
     ) -> Result<Self, PartialParsingError> {
-        let homepage = about
-            .homepage
-            .as_ref()
-            .and_then(|n| n.as_scalar())
-            .map(|s| jinja.render_str(s.as_str()))
-            .transpose()
-            .map_err(|err| {
-                _partialerror!(
-                    *about.homepage.as_ref().unwrap().span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering homepage"
-                )
-            })?
-            .map(|url| Url::from_str(&url).unwrap());
-        let repository = about
-            .repository
-            .as_ref()
-            .map(|s| jinja.render_str(s.as_str()))
-            .transpose()
-            .map_err(|err| {
-                _partialerror!(
-                    *about.repository.as_ref().unwrap().span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering repository"
-                )
-            })?
-            .map(|url| Url::from_str(url.as_str()).unwrap());
-        let documentation = about
-            .documentation
-            .as_ref()
-            .map(|s| jinja.render_str(s.as_str()))
-            .transpose()
-            .map_err(|err| {
-                _partialerror!(
-                    *about.repository.as_ref().unwrap().span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering repository"
-                )
-            })?
-            .map(|url| Url::from_str(url.as_str()).unwrap());
-        let license = about.license.as_ref().map(|s| s.as_str().to_owned());
-        let license_family = about.license_family.as_ref().map(|s| s.as_str().to_owned());
-        let license_url = about
-            .license_url
-            .as_ref()
-            .map(|s| s.as_str().to_owned())
-            .map(|url| Url::from_str(&url).unwrap());
+        let homepage = about.homepage.render(jinja, "homepage")?;
+        let repository = about.repository.render(jinja, "repository")?;
+        let documentation = about.documentation.render(jinja, "documentation")?;
+        let license = about.license.render(jinja, "license")?;
+        let license_family = about.license_family.render(jinja, "license_family")?;
+        let license_url = about.license_url.render(jinja, "license_url")?;
         let license_files = about
             .license_file
             .as_ref()
             .map(|node| parse_license_files(node, jinja))
             .transpose()?
             .unwrap_or_default();
-        let summary = about.summary.as_ref().map(|s| s.as_str().to_owned());
-        let description = about.description.as_ref().map(|s| s.as_str().to_owned());
-        let prelink_message = about
-            .prelink_message
-            .as_ref()
-            .map(|s| jinja.render_str(s.as_str()))
-            .transpose()
-            .map_err(|err| {
-                _partialerror!(
-                    *about.prelink_message.as_ref().unwrap().span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering prelink_message"
-                )
-            })?;
+        let summary = about.summary.render(jinja, "summary")?;
+        let description = about.description.render(jinja, "description")?;
+        let prelink_message = about.prelink_message.render(jinja, "prelink_message")?;
 
         Ok(Self {
             homepage,
@@ -131,8 +114,8 @@ impl About {
     }
 
     /// Get the license.
-    pub fn license(&self) -> Option<&str> {
-        self.license.as_deref()
+    pub fn license(&self) -> Option<&License> {
+        self.license.as_ref()
     }
 
     /// Get the license family.

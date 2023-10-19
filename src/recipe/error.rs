@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::{fmt, str::ParseBoolError};
 
 use miette::{Diagnostic, SourceOffset, SourceSpan};
@@ -14,15 +15,15 @@ pub struct ParsingError {
     pub src: String,
 
     /// Offset in chars of the error.
-    #[label("{}", label.unwrap_or("here"))]
+    #[label("{}", label.as_deref().unwrap_or("here"))]
     pub span: SourceSpan,
 
     /// Label text for this span. Defaults to `"here"`.
-    pub label: Option<&'static str>,
+    pub label: Option<Cow<'static, str>>,
 
     /// Suggestion for fixing the parser error.
     #[help]
-    pub help: Option<&'static str>,
+    pub help: Option<Cow<'static, str>>,
 
     // Specific error kind for the error.
     pub kind: ErrorKind,
@@ -101,10 +102,10 @@ pub struct PartialParsingError {
     pub span: marked_yaml::Span,
 
     /// Label text for this span. Defaults to `"here"`.
-    pub label: Option<&'static str>,
+    pub label: Option<Cow<'static, str>>,
 
     /// Suggestion for fixing the parser error.
-    pub help: Option<&'static str>,
+    pub help: Option<Cow<'static, str>>,
 
     // Specific error kind for the error.
     pub kind: ErrorKind,
@@ -176,7 +177,7 @@ macro_rules! _error {
         $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
-            label: Some($label),
+            label: Some($label.into()),
             help: None,
             kind: $kind,
         }
@@ -186,7 +187,7 @@ macro_rules! _error {
             src: $src.to_owned(),
             span: $span,
             label: None,
-            help: Some($help),
+            help: Some($help.into()),
             kind: $kind,
         }
     }};
@@ -200,8 +201,8 @@ macro_rules! _error {
         $crate::recipe::error::ParsingError {
             src: $src.to_owned(),
             span: $span,
-            label: Some($label),
-            help: Some($help),
+            label: Some($label.into()),
+            help: Some($help.into()),
             kind: $kind,
         }
     }};
@@ -222,7 +223,7 @@ macro_rules! _partialerror {
     ($span:expr, $kind:expr, label = $label:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
             span: $span,
-            label: Some($label),
+            label: Some($label.into()),
             help: None,
             kind: $kind,
         }
@@ -231,7 +232,7 @@ macro_rules! _partialerror {
         $crate::recipe::error::PartialParsingError {
             span: $span,
             label: None,
-            help: Some($help),
+            help: Some($help.into()),
             kind: $kind,
         }
     }};
@@ -244,8 +245,8 @@ macro_rules! _partialerror {
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
             span: $span,
-            label: Some($label),
-            help: Some($help),
+            label: Some($label.into()),
+            help: Some($help.into()),
             kind: $kind,
         }
     }};
@@ -257,12 +258,12 @@ pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Pars
         src,
         marker_to_span(src, marker(&err)),
         ErrorKind::YamlParsing(err),
-        label = match err {
+        label = Cow::Borrowed(match err {
             marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
             marked_yaml::LoadError::UnexpectedAnchor(_) => "unexpected anchor here",
             marked_yaml::LoadError::UnexpectedTag(_) => "unexpected tag here",
             _ => "here",
-        }
+        })
     )
 }
 

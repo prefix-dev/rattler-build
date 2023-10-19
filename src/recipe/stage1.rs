@@ -10,6 +10,7 @@ use super::{
     error::{marker_span_to_span, ErrorKind, ParsingError, PartialParsingError},
 };
 
+use crate::recipe::custom_yaml::HasSpan;
 use crate::{_error, _partialerror};
 
 /// This is the raw reprentation of a recipe, without any minijinja processing done.
