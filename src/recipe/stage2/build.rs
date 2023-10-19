@@ -65,10 +65,10 @@ impl Build {
         for (key, value) in node.iter() {
             match key.as_str() {
                 "number" => {
-                    build.number = key.render(jinja, "number")?;
+                    build.number = value.render(jinja, "number")?;
                 }
                 "string" => {
-                    build.string = Some(key.render(jinja, "string")?);
+                    build.string = Some(value.render(jinja, "string")?);
                 }
                 "skip" => build.skip = parse_skip(value, jinja)?,
                 "script" => build.script = parse_script(value, jinja)?,
