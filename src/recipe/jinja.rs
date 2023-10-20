@@ -174,6 +174,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: BTreeMap::new(),
+            hash: None,
         };
 
         let jinja = Jinja::new(options);
@@ -198,6 +199,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: BTreeMap::new(),
+            hash: None,
         };
 
         let jinja = Jinja::new(options);
@@ -214,6 +216,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
+            hash: None,
         };
         let jinja = Jinja::new(options);
 

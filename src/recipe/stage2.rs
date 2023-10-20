@@ -67,6 +67,7 @@ impl Recipe {
         if recipe.build.string.is_none() {
             recipe.build.string = Some(format!("{}_{}", default_pkg_hash, recipe.build.number));
         }
+
         Ok(recipe)
     }
 

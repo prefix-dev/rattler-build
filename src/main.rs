@@ -21,7 +21,7 @@ use rattler_build::{
     build::run_build,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     recipe::stage2::Recipe,
-    selectors::{flatten_selectors, SelectorConfig},
+    selectors::SelectorConfig,
     test::{self, TestConfiguration},
     tool_configuration,
 };
@@ -192,7 +192,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
-    let mut recipe_yaml: YamlValue =
+    let recipe_yaml: YamlValue =
         serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
 
     // get recipe.build.noarch value as NoArchType from serde_yaml
@@ -215,6 +215,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let selector_config = SelectorConfig {
         target_platform,
+        hash: None,
         build_platform: Platform::current(),
         variant: BTreeMap::new(),
     };
@@ -247,30 +248,10 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
         let selector_config = SelectorConfig {
             variant: variant.clone(),
+            hash: Some(hash.clone()),
             target_platform: selector_config.target_platform,
             build_platform: selector_config.build_platform,
         };
-
-        if let Some(flattened_recipe) = flatten_selectors(&mut recipe_yaml, &selector_config) {
-            recipe_yaml = flattened_recipe;
-        } else {
-            tracing::error!("Could not flatten selectors");
-        }
-
-        // let recipe = match render_recipe(&recipe_yaml, &variant, &hash) {
-        //     Result::Err(e) => {
-        //         match &e {
-        //             render::recipe::RecipeRenderError::InvalidYaml(inner) => {
-        //                 tracing::error!("Failed to parse recipe YAML: {}", inner.to_string());
-        //             }
-        //             render::recipe::RecipeRenderError::YamlNotMapping => {
-        //                 tracing::error!("{}", e);
-        //             }
-        //         }
-        //         return Err(e.into());
-        //     }
-        //     Result::Ok(r) => r,
-        // };
 
         let recipe = Recipe::from_yaml_with_default_hash_str(&recipe_text, &hash, selector_config)
             .map_err(|err| match err.kind() {

@@ -12,7 +12,7 @@ use serde_with::serde_as;
 use serde_with::OneOrMany;
 use thiserror::Error;
 
-use rattler_build::selectors::{flatten_toplevel, SelectorConfig};
+use rattler_build::selectors::SelectorConfig;
 
 use crate::used_variables::used_vars_from_expressions;
 
@@ -116,14 +116,10 @@ impl VariantConfig {
             let file = std::fs::File::open(filename)
                 .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
             let reader = std::io::BufReader::new(file);
-            let mut yaml_value = serde_yaml::from_reader(reader)
+            let config : VariantConfig = serde_yaml::from_reader(reader)
                 .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
 
-            if let Some(yaml_value) = flatten_toplevel(&mut yaml_value, selector_config) {
-                let config: VariantConfig = serde_yaml::from_value(yaml_value)
-                    .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
-                variant_configs.push(config);
-            }
+            variant_configs.push(config);
         }
 
         let mut final_config = VariantConfig::default();
@@ -364,6 +360,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: Default::default(),
+            hash: None,
         };
 
         let res = flatten_toplevel(&mut yaml, &selector_config);
@@ -373,6 +370,7 @@ mod tests {
             target_platform: Platform::Win64,
             build_platform: Platform::Win64,
             variant: Default::default(),
+            hash: None,
         };
 
         let res = flatten_toplevel(&mut yaml, &selector_config);
@@ -387,6 +385,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: Default::default(),
+            hash: None,
         };
 
         let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
