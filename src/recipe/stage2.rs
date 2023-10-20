@@ -171,11 +171,12 @@ impl Recipe {
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
 
         let mut package = None;
+        let mut source = Vec::new();
 
         for (key, value) in rendered_node.iter() {
             match key.as_str() {
                 "package" => package = Some(Package::from_rendered_node(value)?),
-                "source" => {}
+                "source" => source.extend(Source::from_rendered_node(value)?),
                 "build" => {}
                 "requirements" => {}
                 "test" => {}
@@ -200,7 +201,7 @@ impl Recipe {
                     label = "missing required key `package`"
                 )
             })?,
-            source: todo!(),
+            source,
             build: todo!(),
             requirements: todo!(),
             test: todo!(),

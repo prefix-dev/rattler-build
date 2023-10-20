@@ -6,7 +6,9 @@ use url::Url;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, Node, SequenceNodeInternal},
+        custom_yaml::{
+            HasSpan, Node, RenderedMappingNode, RenderedNode, SequenceNodeInternal, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, OldRender,
@@ -317,6 +319,59 @@ impl Source {
         Ok(sources)
     }
 
+    pub fn from_rendered_node(node: &RenderedNode) -> Result<Vec<Self>, PartialParsingError> {
+        let mut sources = Vec::new();
+
+        match node {
+            RenderedNode::Mapping(map) => {
+                // Common fields to all sources
+                let patches = map
+                    .get("patches")
+                    .map(parse_patches)
+                    .transpose()?
+                    .unwrap_or_default();
+
+                let folder = map
+                    .get("folder")
+                    .map(|node| node.try_convert("folder"))
+                    .transpose()?;
+
+                // Git source
+                if map.contains_key("git_url") {
+                    let git_src = GitSource::from_rendered_map(map, patches, folder)?;
+                    sources.push(Self::Git(git_src));
+                } else if map.contains_key("url") {
+                    let url_src = UrlSource::from_rendered_map(map, patches, folder)?;
+                    sources.push(Self::Url(url_src));
+                } else if map.contains_key("path") {
+                    let path_src = PathSource::from_rendered_map(map, patches, folder)?;
+                    sources.push(Self::Path(path_src));
+                } else {
+                    return Err(_partialerror!(
+                        *node.span(),
+                        ErrorKind::Other,
+                        label = "unknown source type"
+                    ));
+                }
+            }
+            RenderedNode::Sequence(seq) => {
+                for n in seq.iter() {
+                    sources.extend(Self::from_rendered_node(n)?)
+                }
+            }
+            RenderedNode::Null(_) => (),
+            RenderedNode::Scalar(s) => {
+                return Err(_partialerror!(
+                    *s.span(),
+                    ErrorKind::Other,
+                    label = "expected mapping or sequence"
+                ))
+            }
+        }
+
+        Ok(sources)
+    }
+
     /// Get the patches.
     pub fn patches(&self) -> &[PathBuf] {
         match self {
@@ -334,6 +389,32 @@ impl Source {
             Self::Path(path) => path.folder(),
         }
     }
+}
+
+fn parse_patches(node: &RenderedNode) -> Result<Vec<PathBuf>, PartialParsingError> {
+    let mut patches = Vec::new();
+
+    match node {
+        RenderedNode::Scalar(s) => {
+            let s = s.try_convert("patches")?;
+            patches.push(s);
+        }
+        RenderedNode::Sequence(seq) => {
+            for n in seq.iter() {
+                patches.extend(parse_patches(n)?)
+            }
+        }
+        RenderedNode::Null(_) => (),
+        RenderedNode::Mapping(map) => {
+            return Err(_partialerror!(
+                *map.span(),
+                ErrorKind::Other,
+                label = "expected scalar or sequence"
+            ))
+        }
+    }
+
+    Ok(patches)
 }
 
 /// Git source information.
@@ -368,6 +449,86 @@ impl GitSource {
             patches,
             folder,
         }
+    }
+
+    pub(super) fn from_rendered_map(
+        map: &RenderedMappingNode,
+        patches: Vec<PathBuf>,
+        folder: Option<PathBuf>,
+    ) -> Result<Self, PartialParsingError> {
+        // Error on invalid fields for git source
+        let invalid_field = map.keys().find(|k| {
+            matches!(
+                k.as_str(),
+                "git_url" | "git_rev" | "git_depth" | "patches" | "folder"
+            )
+        });
+
+        if let Some(invalid_field) = invalid_field {
+            return Err(_partialerror!(
+        *invalid_field.span(),
+        ErrorKind::InvalidField(invalid_field.as_str().to_owned().into()),
+        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches` and `folder`"
+    ));
+        }
+
+        // Ok to unwrap because we just checked if it exists in this map
+        let url = match map.get("git_url").unwrap().as_scalar() {
+            Some(s) => {
+                let url = Url::from_str(s.as_str());
+                match url {
+                    Ok(url) => GitUrl::Url(url),
+                    Err(err) => {
+                        tracing::warn!("invalid `git_url` `{}`: {err}", s.as_str());
+                        tracing::warn!("attempting to parse as path");
+                        let path = PathBuf::from(s.as_str());
+                        GitUrl::Path(path)
+                    }
+                }
+            }
+            None => {
+                return Err(_partialerror!(
+                    *map.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = "expected a string here"
+                ))
+            }
+        };
+
+        let rev = map
+            .get("git_rev")
+            .map(|node| match node.as_scalar() {
+                Some(rev) => Ok(rev.as_str()),
+                None => Err(_partialerror!(*node.span(), ErrorKind::ExpectedScalar)),
+            })
+            .transpose()?
+            .unwrap_or("HEAD")
+            .to_string();
+
+        let depth = map
+            .get("git_depth")
+            .map(|node| match node.as_scalar() {
+                Some(s) => {
+                    let depth = s.as_str();
+                    depth.parse::<i32>().map_err(|err| {
+                        _partialerror!(
+                            *s.span(),
+                            ErrorKind::from(err),
+                            label = "`git_depth` value must be a integer"
+                        )
+                    })
+                }
+                None => Err(_partialerror!(*node.span(), ErrorKind::ExpectedScalar)),
+            })
+            .transpose()?;
+
+        Ok(GitSource {
+            url,
+            rev,
+            depth,
+            patches,
+            folder,
+        })
     }
 
     /// Get the git url.
@@ -430,6 +591,74 @@ pub struct UrlSource {
 }
 
 impl UrlSource {
+    pub(super) fn from_rendered_map(
+        map: &RenderedMappingNode,
+        patches: Vec<PathBuf>,
+        folder: Option<PathBuf>,
+    ) -> Result<Self, PartialParsingError> {
+        let invalid_field = map
+            .keys()
+            .find(|k| matches!(k.as_str(), "url" | "sha256" | "md5" | "patches" | "folder"));
+
+        if let Some(invalid_field) = invalid_field {
+            return Err(_partialerror!(
+                *invalid_field.span(),
+                ErrorKind::InvalidField(invalid_field.as_str().to_owned().into()),
+                help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches` and `folder`"
+            ));
+        }
+
+        let url = map.get("url").ok_or_else(|| {
+            _partialerror!(
+                *map.span(),
+                ErrorKind::MissingField("url".into()),
+                help = "URL `source` must have a `url` field"
+            )
+        })?;
+
+        let url = url.try_convert("url")?;
+        let sha256 = map
+            .get("sha256")
+            .map(|sha256| {
+                let sha256_str: String = sha256.try_convert("sha256")?;
+                if sha256_str.len() != 64 {
+                    return Err(_partialerror!(
+                        *sha256.span(),
+                        ErrorKind::InvalidSha256,
+                        help = "sha256 checksums must be 64 characters long"
+                    ));
+                }
+                Ok(Checksum::Sha256(sha256_str))
+            })
+            .transpose()?;
+        let md5 = map
+            .get("md5")
+            .map(|md5| {
+                let md5_str: String = md5.try_convert("md5")?;
+                if md5_str.len() != 32 {
+                    return Err(_partialerror!(
+                        *md5.span(),
+                        ErrorKind::InvalidMd5,
+                        help = "md5 checksums must be 32 characters long"
+                    ));
+                }
+                Ok(Checksum::Md5(md5_str))
+            })
+            .transpose()?;
+        let checksums = match (sha256, md5) {
+            (None, None) => Vec::new(),
+            (Some(ck), None) | (None, Some(ck)) => vec![ck],
+            (Some(sha256), Some(md5)) => vec![sha256, md5],
+        };
+
+        Ok(UrlSource {
+            url,
+            checksums,
+            patches,
+            folder,
+        })
+    }
+
     /// Get the url.
     pub const fn url(&self) -> &Url {
         &self.url
@@ -477,6 +706,41 @@ pub struct PathSource {
 }
 
 impl PathSource {
+    pub(super) fn from_rendered_map(
+        map: &RenderedMappingNode,
+        patches: Vec<PathBuf>,
+        folder: Option<PathBuf>,
+    ) -> Result<Self, PartialParsingError> {
+        let invalid_field = map
+            .keys()
+            .find(|k| matches!(k.as_str(), "path" | "patches" | "folder"));
+
+        if let Some(invalid_field) = invalid_field {
+            return Err(_partialerror!(
+                *invalid_field.span(),
+                ErrorKind::InvalidField(invalid_field.as_str().to_owned().into()),
+                help = "valid fields for path `source` are `path`, `patches` and `folder`"
+            ));
+        }
+
+        let path = map
+            .get("path")
+            .ok_or_else(|| {
+                _partialerror!(
+                    *map.span(),
+                    ErrorKind::MissingField("path".into()),
+                    help = "path `source` must have a `path` field"
+                )
+            })?
+            .try_convert("path")?;
+
+        Ok(PathSource {
+            path,
+            patches,
+            folder,
+        })
+    }
+
     /// Get the path.
     pub const fn path(&self) -> &PathBuf {
         &self.path
