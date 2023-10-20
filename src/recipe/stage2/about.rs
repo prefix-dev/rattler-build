@@ -185,3 +185,43 @@ fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, Partia
         )),
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        assert_miette_snapshot,
+        recipe::{jinja::SelectorConfig, Recipe},
+    };
+
+    #[test]
+    fn invalid_url() {
+        let recipe = r#"
+        package:
+            name: test
+            version: 0.0.1
+
+        about:
+            homepage: license_urla.asda:://sdskd
+        "#;
+
+        let err = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap_err();
+
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn invalid_license() {
+        let recipe = r#"
+        package:
+            name: test
+            version: 0.0.1
+
+        about:
+            license: MIT/X derivate
+        "#;
+
+        let err = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap_err();
+
+        assert_miette_snapshot!(err);
+    }
+}
