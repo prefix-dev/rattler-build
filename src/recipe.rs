@@ -7,6 +7,11 @@ pub mod custom_yaml;
 pub mod error;
 pub mod jinja;
 
+/// A trait to render a certain stage1 node into its final type.
+pub(crate) trait Render<T> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, error::PartialParsingError>;
+}
+
 #[cfg(test)]
 #[cfg_attr(test, macro_export)]
 macro_rules! assert_miette_snapshot {

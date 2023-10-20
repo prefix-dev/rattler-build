@@ -13,6 +13,8 @@ use crate::recipe::{
     jinja::Jinja,
 };
 
+use super::Render;
+
 /// A marked new Conda Recipe YAML node
 ///
 /// This is a reinterpretation of the [`marked_yaml::Node`] type that is specific
@@ -43,6 +45,11 @@ pub enum Node {
     /// You can test if a node is a sequence, and retrieve it as one if you
     /// so wish.
     Sequence(SequenceNode),
+    /// A YAML null
+    ///
+    /// This is a special case of a scalar node, but is treated as its own
+    /// type here for convenience.
+    Null(ScalarNode),
 }
 
 impl Node {
@@ -101,6 +108,122 @@ impl Node {
     }
 }
 
+impl Render<Node> for Node {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        match self {
+            Node::Scalar(s) => s.render(jinja, name),
+            Node::Mapping(m) => m.render(jinja, name),
+            Node::Sequence(s) => s.render(jinja, name),
+            Node::Null(n) => Ok(Node::Null(n.clone())),
+        }
+    }
+}
+
+impl Render<Node> for ScalarNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::JinjaRendering(err),
+                label = format!("error rendering {name}: {}", self.as_str())
+            )
+        })?;
+
+        Ok(Node::from(ScalarNode::new(*self.span(), rendered)))
+    }
+}
+
+impl Render<Option<ScalarNode>> for ScalarNode {
+    fn render(
+        &self,
+        jinja: &Jinja,
+        name: &str,
+    ) -> Result<Option<ScalarNode>, super::error::PartialParsingError> {
+        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::JinjaRendering(err),
+                label = format!("error rendering {name}: {}", self.as_str())
+            )
+        })?;
+
+        if rendered.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(ScalarNode::new(*self.span(), rendered)))
+        }
+    }
+}
+
+impl Render<Node> for MappingNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let mut rendered = LinkedHashMap::new();
+
+        for (key, value) in self.iter() {
+            rendered.insert(
+                key.clone(),
+                value.render(jinja, &format!("{name} {}", key.as_str()))?,
+            );
+        }
+
+        let map = MappingNode::new(*self.span(), rendered);
+
+        Ok(Node::Mapping(map))
+    }
+}
+
+impl Render<Node> for SequenceNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let mut rendered = Vec::new();
+
+        for item in self.iter() {
+            rendered.push(item.render(jinja, name)?);
+        }
+
+        let seq = SequenceNode::new(*self.span(), rendered);
+        Ok(Node::Sequence(seq))
+    }
+}
+
+impl Render<Node> for SequenceNodeInternal {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        match self {
+            Self::Simple(n) => n.render(jinja, name),
+            Self::Conditional(if_sel) => {
+                let if_res = if_sel.process(jinja)?;
+                if let Some(if_res) = if_res {
+                    Ok(if_res.render(jinja, name)?)
+                } else {
+                    Ok(Node::Null(ScalarNode::new(*self.span(), "".to_owned())))
+                }
+            }
+        }
+    }
+}
+
+impl Render<SequenceNodeInternal> for SequenceNodeInternal {
+    fn render(
+        &self,
+        jinja: &Jinja,
+        name: &str,
+    ) -> Result<SequenceNodeInternal, PartialParsingError> {
+        match self {
+            Self::Simple(n) => Ok(Self::Simple(n.render(jinja, name)?)),
+            Self::Conditional(if_sel) => {
+                let if_res = if_sel.process(jinja)?;
+                if let Some(if_res) = if_res {
+                    Ok(Self::Simple(if_res.render(jinja, name)?))
+                } else {
+                    Ok(Self::Simple(Node::Null(ScalarNode::new(
+                        *self.span(),
+                        "".to_owned(),
+                    ))))
+                }
+            }
+        }
+    }
+}
+
 /// A trait that defines that the implementer has an associated span.
 pub trait HasSpan {
     fn span(&self) -> &marked_yaml::Span;
@@ -112,6 +235,7 @@ impl HasSpan for Node {
             Self::Mapping(map) => map.span(),
             Self::Scalar(scalar) => scalar.span(),
             Self::Sequence(seq) => seq.span(),
+            Self::Null(s) => s.span(),
         }
     }
 }
@@ -126,7 +250,10 @@ impl<'i> TryFrom<&'i Node> for &'i ScalarNode {
 
 impl From<ScalarNode> for Node {
     fn from(value: ScalarNode) -> Self {
-        Self::Scalar(value)
+        match value.as_str() {
+            "null" | "~" | "" => Self::Null(value),
+            _ => Self::Scalar(value),
+        }
     }
 }
 
@@ -156,13 +283,16 @@ impl From<LinkedHashMap<ScalarNode, Node>> for Node {
 
 impl From<String> for Node {
     fn from(value: String) -> Self {
-        Self::Scalar(ScalarNode::from(value))
+        Self::from(&*value)
     }
 }
 
 impl From<&str> for Node {
     fn from(value: &str) -> Self {
-        Self::Scalar(ScalarNode::from(value.to_owned()))
+        match value {
+            "null" | "~" | "" => Self::Null(ScalarNode::from(value)),
+            _ => Self::Scalar(ScalarNode::from(value)),
+        }
     }
 }
 
