@@ -10,6 +10,7 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1,
+        stage2::Render,
     },
 };
 
@@ -177,32 +178,15 @@ impl Source {
                     // Url source
                     let url = map.get("url").unwrap();
                     let url = match url.as_scalar() {
-                        Some(s) => {
-                            let url = s.as_str();
-                            let url = url.trim();
-                            let url = jinja.render_str(url).map_err(|err| {
-                                _partialerror!(
-                                    *s.span(),
-                                    ErrorKind::JinjaRendering(err),
-                                    label = "error rendering url"
-                                )
-                            })?;
-                            Url::from_str(&url).map_err(|_err| {
-                                _partialerror!(
-                                    *s.span(),
-                                    ErrorKind::Other,
-                                    label = "error parsing url"
-                                )
-                            })
-                        }
+                        Some(s) => s.render(jinja, "url")?,
                         _ => {
                             return Err(_partialerror!(
                                 *url.span(),
-                                ErrorKind::Other,
-                                label = "expected string"
+                                ErrorKind::ExpectedScalar,
+                                label = "expected string here"
                             ))
                         }
-                    }?;
+                    };
 
                     let is_sha256 = map.contains_key("sha256");
                     let is_md5 = map.contains_key("md5");

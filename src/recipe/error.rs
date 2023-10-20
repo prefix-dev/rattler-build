@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::{fmt, str::ParseBoolError};
+use std::{borrow::Cow, convert::Infallible, fmt, str::ParseBoolError};
 
 use miette::{Diagnostic, SourceOffset, SourceSpan};
 use thiserror::Error;
@@ -81,6 +80,18 @@ pub enum ErrorKind {
     #[diagnostic(code(error::stage2::if_selector_condition_not_bool))]
     IfSelectorConditionNotBool(#[from] ParseBoolError),
 
+    /// Error when processing URL
+    #[diagnostic(code(error::stage2::url_parsing))]
+    UrlParsing(#[from] url::ParseError),
+
+    /// Error when parsing a integer.
+    #[diagnostic(code(error::stage2::integer_parsing))]
+    IntegerParsing(#[from] std::num::ParseIntError),
+
+    /// Error when parsing a SPDX license.
+    #[diagnostic(code(error::stage2::spdx_parsing))]
+    SpdxParsing(#[from] spdx::ParseError),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -155,8 +166,19 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IfSelectorConditionNotBool(err) => {
                 write!(f, "Condition in `if` selector must be a boolean: {}", err)
             }
+            ErrorKind::UrlParsing(err) => write!(f, "Failed to parse URL: {}", err),
+            ErrorKind::IntegerParsing(err) => write!(f, "Failed to parse integer: {}", err),
+            ErrorKind::SpdxParsing(err) => {
+                write!(f, "Failed to parse SPDX license: {}", err.reason)
+            }
             ErrorKind::Other => write!(f, "An unspecified error occurred."),
         }
+    }
+}
+
+impl From<Infallible> for ErrorKind {
+    fn from(_: Infallible) -> Self {
+        Self::Other
     }
 }
 
@@ -337,8 +359,20 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
     let start = start.offset();
     let mut end = 0;
 
-    for (i, c) in src[start..].char_indices() {
-        if c.is_whitespace() {
+    let mut iter = src[start..].char_indices();
+
+    // FIXME: Implement `"`, `'` and `[` open and close detection.
+    while let Some((i, c)) = iter.next() {
+        if c == ':' {
+            if let Some((_, c)) = iter.next() {
+                if c == '\n' || c == '\r' || c == '\t' || c == ' ' {
+                    end += i;
+                    break;
+                }
+            }
+        }
+
+        if c == '\n' || c == '\r' || c == '\t' {
             end += i;
             break;
         }
