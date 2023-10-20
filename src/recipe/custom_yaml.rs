@@ -1,11 +1,13 @@
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
+use std::path::PathBuf;
 use std::{fmt, hash::Hash, ops};
 
 use linked_hash_map::LinkedHashMap;
 use marked_yaml::types::MarkedScalarNode;
 use marked_yaml::Span;
+use url::Url;
 
 use crate::_partialerror;
 use crate::recipe::{
@@ -868,22 +870,120 @@ impl fmt::Debug for IfSelector {
 }
 
 pub trait TryConvertNode<T> {
-    fn try_convert(&self, name: &str) -> Result<&T, PartialParsingError>;
+    fn try_convert(&self, name: &str) -> Result<T, PartialParsingError>;
 }
 
-impl<T> TryConvertNode<T> for T {
-    fn try_convert(&self, _: &str) -> Result<&T, PartialParsingError> {
-        Ok(self)
-    }
-}
-
-impl TryConvertNode<ScalarNode> for Node {
-    fn try_convert(&self, name: &str) -> Result<&ScalarNode, PartialParsingError> {
+impl<'a> TryConvertNode<&'a ScalarNode> for &'a Node {
+    fn try_convert(&self, name: &str) -> Result<&'a ScalarNode, PartialParsingError> {
         self.as_scalar().ok_or_else(|| {
             _partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedScalar,
-                label = format!("expected a scalar value for {name}")
+                label = format!("expected a scalar value for `{name}`")
+            )
+        })
+    }
+}
+
+impl<T: Clone> TryConvertNode<T> for T {
+    fn try_convert(&self, _: &str) -> Result<T, PartialParsingError> {
+        Ok(self.clone())
+    }
+}
+
+impl TryConvertNode<ScalarNode> for Node {
+    fn try_convert(&self, name: &str) -> Result<ScalarNode, PartialParsingError> {
+        self.as_scalar().cloned().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a scalar value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<String> for Node {
+    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map(|s| s.as_str().to_owned())
+    }
+}
+
+impl<'a> TryConvertNode<&'a RenderedScalarNode> for &'a RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<&'a RenderedScalarNode, PartialParsingError> {
+        self.as_scalar().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a scalar value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<String> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map(|s| s.as_str().to_owned())
+    }
+}
+
+impl TryConvertNode<PathBuf> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PathBuf, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PathBuf> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<PathBuf, PartialParsingError> {
+        Ok(PathBuf::from(self.as_str()))
+    }
+}
+
+impl TryConvertNode<Url> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Url> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
+        Url::parse(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("error parsing `{name}` as a URL")
             )
         })
     }

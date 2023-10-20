@@ -55,7 +55,8 @@ where
     ErrorKind: From<T::Err>,
 {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError> {
-        match Rendered::parse(&self.render(jinja, name)?) {
+        let rendered: Rendered = self.render(jinja, name)?;
+        match rendered.parse() {
             Ok(result) => Ok(result),
             Err(e) => Err(_partialerror!(*self.span(), ErrorKind::from(e),)),
         }
