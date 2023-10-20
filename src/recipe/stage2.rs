@@ -154,18 +154,6 @@ impl Recipe {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
-        dbg!(&recipe);
-    }
-}
-
 /// A trait to render a certain stage1 node into its final type.
 trait Render<T> {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError>;
@@ -218,5 +206,17 @@ impl<N: Render<T>, T: FromStr> Render<Option<T>> for Option<N> {
             None => Ok(None),
             Some(node) => Ok(Some(node.render(jinja, name)?)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        dbg!(&recipe);
     }
 }
