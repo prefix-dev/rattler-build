@@ -176,20 +176,11 @@ impl Source {
                 } else if map.contains_key("url") {
                     // Url source
                     let url = map.get("url").unwrap();
-                    let url = match url.as_scalar() {
-                        Some(s) => s.render(jinja, "url")?,
-                        _ => {
-                            return Err(_partialerror!(
-                                *url.span(),
-                                ErrorKind::ExpectedScalar,
-                                label = "expected string here"
-                            ))
-                        }
-                    };
+                    let url = url.render(jinja, "url")?;
 
                     let is_sha256 = map.contains_key("sha256");
                     let is_md5 = map.contains_key("md5");
-                    let checksum = match (is_sha256, is_md5) {
+                    let checksums = match (is_sha256, is_md5) {
                         // prefer sha256 if there is both
                         (true, _) => {
                             let sha256 = map.get("sha256").unwrap();
@@ -202,7 +193,7 @@ impl Source {
                                             label = "error rendering sha256"
                                         )
                                     })?;
-                                    Some(Checksum::Sha256(s))
+                                    vec![Checksum::Sha256(s)]
                                 }
                                 _ => {
                                     return Err(_partialerror!(
@@ -224,7 +215,7 @@ impl Source {
                                             label = "error rendering md5"
                                         )
                                     })?;
-                                    Some(Checksum::Md5(s))
+                                    vec![Checksum::Md5(s)]
                                 }
                                 _ => {
                                     return Err(_partialerror!(
@@ -235,7 +226,7 @@ impl Source {
                                 }
                             }
                         }
-                        (false, false) => None,
+                        (false, false) => vec![],
                     };
 
                     let file_name = map
@@ -261,7 +252,7 @@ impl Source {
 
                     sources.push(Self::Url(UrlSource {
                         url,
-                        checksum,
+                        checksums,
                         patches,
                         folder,
                         file_name,
@@ -429,7 +420,7 @@ pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     url: Url,
     /// Optionally a checksum to verify the downloaded file
-    checksum: Option<Checksum>,
+    checksums: Vec<Checksum>,
     /// Patches to apply to the source code
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
@@ -445,8 +436,8 @@ impl UrlSource {
     }
 
     /// Get the checksum of the URL source.
-    pub const fn checksum(&self) -> Option<&Checksum> {
-        self.checksum.as_ref()
+    pub fn checksums(&self) -> &[Checksum] {
+        self.checksums.as_slice()
     }
 
     /// Get the patches of the URL source.
