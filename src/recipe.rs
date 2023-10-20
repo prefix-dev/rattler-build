@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::str::FromStr;
 
 use crate::{_partialerror, recipe::error::ErrorKind};
 
@@ -52,16 +52,12 @@ impl<N: TryConvertNode<ScalarNode> + HasSpan> OldRender<Rendered> for N {
 
 impl<N: TryConvertNode<ScalarNode> + HasSpan, T: FromStr> OldRender<T> for N
 where
-    T::Err: fmt::Display,
+    ErrorKind: From<T::Err>,
 {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError> {
         match Rendered::parse(&self.render(jinja, name)?) {
             Ok(result) => Ok(result),
-            Err(e) => Err(_partialerror!(
-                *self.span(),
-                ErrorKind::Other,
-                label = e.to_string()
-            )),
+            Err(e) => Err(_partialerror!(*self.span(), ErrorKind::from(e),)),
         }
     }
 }

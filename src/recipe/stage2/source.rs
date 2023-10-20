@@ -9,8 +9,7 @@ use crate::{
         custom_yaml::{HasSpan, Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1,
-        stage2::Render,
+        stage1, OldRender,
     },
 };
 

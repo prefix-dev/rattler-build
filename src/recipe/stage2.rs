@@ -2,16 +2,13 @@
 //!
 //! This stage takes the [`RawRecipe`] from the first stage and parses it into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
-use std::str::FromStr;
-
 use minijinja::Value;
 use serde::Serialize;
 
-use crate::recipe::custom_yaml::{RenderedMappingNode, RenderedNode, ScalarNode, TryConvertNode};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, ScalarNode, TryConvertNode},
+        custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
         stage1::RawRecipe,
@@ -242,75 +239,6 @@ impl Recipe {
     /// Get the about information.
     pub const fn about(&self) -> &About {
         &self.about
-    }
-}
-
-/// A trait to render a certain stage1 node into its final type.
-trait Render<T> {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError>;
-}
-
-/// A jinja rendered string
-struct Rendered(String);
-
-impl Rendered {
-    // Parses this rendered value into another type.
-    pub fn parse<F: FromStr>(&self) -> Result<F, F::Err> {
-        FromStr::from_str(&self.0)
-    }
-}
-
-impl<N: TryConvertNode<ScalarNode> + HasSpan> Render<Rendered> for N {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Rendered, PartialParsingError> {
-        jinja
-            .render_str(self.try_convert(name)?.as_str())
-            .map_err(|err| {
-                _partialerror!(
-                    *self.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = format!("error rendering {name}")
-                )
-            })
-            .map(Rendered)
-    }
-}
-
-impl<N: TryConvertNode<ScalarNode> + HasSpan, T: FromStr> Render<T> for N
-where
-    ErrorKind: From<T::Err>,
-{
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError> {
-        match Rendered::parse(&self.render(jinja, name)?) {
-            Ok(result) => Ok(result),
-            Err(e) => Err(_partialerror!(*self.span(), ErrorKind::from(e),)),
-        }
-    }
-}
-
-// impl<N, T> Render<T> for N
-// where
-//     N: TryConvertNode<ScalarNode> + HasSpan,
-//     T: FromStr,
-//     T::Err: Display,
-// {
-//     fn render(&self, jinja: &Jinja, name: &str) -> Result<T, PartialParsingError> {
-//         match Rendered::parse(&self.render(jinja, name)?) {
-//             Ok(result) => Ok(result),
-//             Err(e) => Err(_partialerror!(
-//                 *self.span(),
-//                 ErrorKind::Other,
-//                 label = e.to_string()
-//             )),
-//         }
-//     }
-// }
-
-impl<N: Render<T>, T: FromStr> Render<Option<T>> for Option<N> {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Option<T>, PartialParsingError> {
-        match self {
-            None => Ok(None),
-            Some(node) => Ok(Some(node.render(jinja, name)?)),
-        }
     }
 }
 
