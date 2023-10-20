@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr, vec};
 
 use minijinja::Value;
 use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
@@ -655,8 +655,10 @@ impl RunExports {
 fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
-            let dep = Dependency::from_scalar(s, jinja)?;
-            Ok(vec![dep])
+            let dep = Dependency::from_scalar(s, jinja)?
+                .map(|d| vec![d])
+                .unwrap_or_default();
+            Ok(dep)
         }
         Node::Sequence(seq) => {
             let mut deps = Vec::new();
