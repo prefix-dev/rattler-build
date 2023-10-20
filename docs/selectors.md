@@ -4,7 +4,7 @@ Recipe and variant configuration files can utilize selectors to conditionally
 add, remove, or modify dependencies, configuration options, or even skip recipe
 execution based on specific conditions.
 
-Selectors are implemented using the `sel(condition): ... syntax`, which is a
+Selectors are implemented using a simple `if / then / else` map, which is a
 valid YAML dictionary. The condition is evaluated using `minijinja` and follows
 the same syntax as a Python expression.
 
@@ -16,8 +16,10 @@ win is true for Windows. Consider the following recipe executed on Linux:
 ```yaml
 requirements:
   host:
-    - sel(unix): unix-tool
-    - sel(win): win-tool
+    - if: unix
+      then: unix-tool
+    - if: win:
+      then: win-tool
 ```
 
 This will be evaluated as:
@@ -32,7 +34,8 @@ The line containing the Windows-specific configuration is removed. Multiple item
 
 ```yaml
 host:
-  - sel(linux):
+  - if: linux
+    then:
     - linux-tool-1
     - linux-tool-2
     - linux-tool-3
@@ -50,9 +53,9 @@ host:
 Other examples often found in the wild:
 
 ```yaml
-sel(build_platform != target_platform): ... # true if cross-platform build
-sel(osx and arm64): ... # true for apple silicon (osx-arm64)
-sel(linux and (aarch64 or ppc64le)): ... # true for linux ppc64le or linux-aarch64
+if: build_platform != target_platform ... # true if cross-platform build
+if: osx and arm64 ... # true for apple silicon (osx-arm64)
+if: linux and (aarch64 or ppc64le)) ... # true for linux ppc64le or linux-aarch64
 ```
 
 ### Available variables
@@ -81,9 +84,12 @@ variant version has a matching version. For example, if we have again a `python:
 3.8` variant, we could use the following tests:
 
 ```yaml
-sel(cmp(python, "3.8)): mydep   # true
-sel(cmp(python, ">=3.8)): mydep # true
-sel(cmp(python, "<3.8)): mydep  # false
+- if: cmp(python, "3.8"))    # true
+  then: mydep
+- if: cmp(python, ">=3.8"))  # true
+  then: mydep
+- if: cmp(python, "<3.8"))   # false
+  then: mydep
 ```
 
 This function eliminates the need to implement any python-special conda-build selectors (such

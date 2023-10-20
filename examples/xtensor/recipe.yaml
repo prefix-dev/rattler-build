@@ -8,9 +8,13 @@ package:
   version: ${{ version }}
 
 source:
-  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: ${{ sha256 }}
-
+  - if: not win
+    then:
+      - url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
+        sha256: ${{ sha256 }}
+    else:
+      - url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
+        sha256: a87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 build:
   number: 0
   # note: in the new recipe format, `skip` is a list of conditional expressions
