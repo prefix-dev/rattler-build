@@ -65,7 +65,7 @@ impl Default for SelectorConfig {
             build_platform: Platform::current(),
             hash: None,
             variant: Default::default(),
-    }
+        }
     }
 }
 

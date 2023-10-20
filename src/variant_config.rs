@@ -116,7 +116,7 @@ impl VariantConfig {
             let file = std::fs::File::open(filename)
                 .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
             let reader = std::io::BufReader::new(file);
-            let config : VariantConfig = serde_yaml::from_reader(reader)
+            let config: VariantConfig = serde_yaml::from_reader(reader)
                 .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
 
             variant_configs.push(config);
