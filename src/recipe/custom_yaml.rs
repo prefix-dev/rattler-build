@@ -13,6 +13,9 @@ use crate::recipe::{
     jinja::Jinja,
 };
 
+mod rendered;
+pub use rendered::{RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode};
+
 use super::Render;
 
 /// A marked new Conda Recipe YAML node
