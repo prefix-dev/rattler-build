@@ -577,25 +577,30 @@ fn copy_license_files(
             .collect::<Vec<&str>>();
         let use_gitignore = false;
 
-        let copied_files = crate::source::copy_dir(
+        let (copied_files_recipe_dir, any_include_matched_recipe_dir) = crate::source::copy_dir(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
             &include_globs,
             &exclude_globs,
             use_gitignore,
-        )?
-        .into_iter()
-        .chain({
-            crate::source::copy_dir(
-                &output.build_configuration.directories.work_dir,
-                &licenses_folder,
-                &include_globs,
-                &exclude_globs,
-                use_gitignore,
-            )?
+        )?;
+
+        let (copied_files_work_dir, any_include_matched_work_dir) = crate::source::copy_dir(
+            &output.build_configuration.directories.work_dir,
+            &licenses_folder,
+            &include_globs,
+            &exclude_globs,
+            use_gitignore,
+        )?;
+
+        let copied_files = copied_files_recipe_dir
             .into_iter()
-        })
-        .collect::<Vec<PathBuf>>();
+            .chain(copied_files_work_dir)
+            .collect::<Vec<PathBuf>>();
+
+        if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
+            tracing::warn!("No include glob matched for copying license files");
+        }
 
         if copied_files.is_empty() {
             tracing::warn!("No license files were copied");
