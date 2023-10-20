@@ -1,10 +1,10 @@
-import json
 import hashlib
+import json
 import os
+import platform
 from pathlib import Path
 from subprocess import CalledProcessError, check_output
 from typing import Any, Optional
-import platform
 
 import pytest
 from conda_package_handling.api import extract
@@ -67,6 +67,7 @@ def get_package(folder: Path, glob="*.tar.bz2"):
         glob = "**/" + glob
     package_path = next(folder.glob(glob))
     return package_path
+
 
 def get_extracted_package(folder: Path, glob="*.tar.bz2"):
     package_path = get_package(folder, glob)
@@ -137,7 +138,6 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert len(actual_run_export["weak"]) == 1
     x = actual_run_export["weak"][0]
     assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
-
 
 
 def host_subdir():

@@ -120,7 +120,7 @@ test:
     - if: unix
       then:
         - test -f ${PREFIX}/include/xtensor/xarray.hpp
-      else: 
+      else:
         - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
 
 about:
