@@ -63,10 +63,10 @@ context:
 
 package:
   name: zlib
-  version: '{{ version }}'
+  version: ${{ version }}
 
 source:
-  url: http://zlib.net/zlib-{{ version }}.tar.gz
+  url: http://zlib.net/zlib-${{ version }}.tar.gz
   sha256: b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30
 
 build:
@@ -74,10 +74,12 @@ build:
   number: 0
   script:
     # build script to install the package into the $PREFIX (host prefix)
-    sel(unix):
-      - ./configure --prefix=${PREFIX}
-      - make -j${CPU_COUNT}
-    sel(win):
+    - if: unix
+      then:
+      - ./configure --prefix=$PREFIX
+      - make -j$CPU_COUNT
+    - if: win
+      then:
       - cmake -G "Ninja" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%
       - ninja install
 
@@ -85,11 +87,15 @@ requirements:
   build:
     # compiler is a special function. Also note the quoting around `{{` - this is necessary
     # to make sure that we always have a valid YAML file.
-    - '{{ compiler("c") }}'
+    - ${{ compiler("c") }}
     # The following two dependencies are only needed on Windows, and thus conditionally selected
-    - sel(win): cmake
-    - sel(win): ninja
-    - sel(unix): make
+    - if: win
+      then:
+        - cmake
+        - ninja
+    - if: unix
+      then:
+        - make
 ```
 
 The sections of a recipe are:

@@ -84,29 +84,30 @@ context:
   version: "0.24.6"
 
 package:
-  name: "{{ name|lower }}"
-  version: "{{ version }}"
+  name: ${{ name|lower }}
+  version: ${{ version }}
 
 source:
-  url: https://github.com/xtensor-stack/xtensor/archive/{{ version }}.tar.gz
+  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
   sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 build:
   number: 0
   script:
-    - sel(unix): |
+    - if: unix
+      then: |
         cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
         make install
-    - sel(win): |
+      else: |
         cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
         nmake
         nmake install
 
 requirements:
   build:
-    - "{{ compiler('cxx') }}"
+    - ${{ compiler('cxx') }}
     - cmake
-    - sel(unix): make
+    - ${{ "make" if unix }}
   host:
     - xtl >=0.7,<0.8
   run:
@@ -116,8 +117,11 @@ requirements:
 
 test:
   commands:
-    - sel(unix): test -f ${PREFIX}/include/xtensor/xarray.hpp
-    - sel(win): if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+    - if: unix
+      then:
+        - test -f ${PREFIX}/include/xtensor/xarray.hpp
+      else:
+        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
 
 about:
   home: https://github.com/xtensor-stack/xtensor
@@ -137,10 +141,10 @@ context:
 
 package:
   name: rich
-  version: "{{ version }}"
+  version: ${{ version }}
 
 source:
-  - url: https://pypi.io/packages/source/r/rich/rich-{{ version }}.tar.gz
+  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
     sha256: dc84400a9d842b3a9c5ff74addd8eb798d155f36c1c91303888e0a66850d2a15
 
 build:
@@ -195,10 +199,10 @@ context:
 
 package:
   name: curl
-  version: "{{ version }}"
+  version: ${{ version }}
 
 source:
-  url: http://curl.haxx.se/download/curl-{{ version }}.tar.bz2
+  url: http://curl.haxx.se/download/curl-${{ version }}.tar.bz2
   sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
 
 build:
@@ -206,7 +210,7 @@ build:
 
 requirements:
   build:
-    - "{{ compiler('c') }}"
+    - ${{ compiler('c') }}
     - sel(win): cmake
     - sel(win): ninja
     - sel(unix): make
