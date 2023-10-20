@@ -6,8 +6,8 @@ expression: err
    ╭─[1:1]
  1 │ 
  2 │         package:
-   ·         ────┬───
-   ·             ╰── missing key `version`
+   ·         ───┬───
+   ·            ╰── missing key `version`
  3 │             name: test
    ╰────
 
