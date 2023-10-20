@@ -26,6 +26,7 @@ use rattler_package_streaming::write::{
 
 use crate::macos;
 use crate::metadata::Output;
+use crate::source::copy_dir;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -675,11 +676,53 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
         }
 
         if !test.files().is_empty() {
-            todo!("Test files is not yet implemented!");
+            let globs = test.files();
+            let include_globs = globs
+                .iter()
+                .filter(|glob| !glob.trim_start().starts_with('~'))
+                .map(AsRef::as_ref)
+                .collect::<Vec<&str>>();
+
+            let exclude_globs = globs
+                .iter()
+                .filter(|glob| glob.trim_start().starts_with('~'))
+                .map(AsRef::as_ref)
+                .collect::<Vec<&str>>();
+
+            let copied_files = copy_dir(
+                &output.build_configuration.directories.recipe_dir,
+                &test_folder,
+                &include_globs,
+                &exclude_globs,
+                true,
+            )?;
+
+            test_files.extend(copied_files.0);
         }
 
         if !test.source_files().is_empty() {
-            todo!("Test files is not yet implemented!");
+            let globs = test.source_files();
+            let include_globs = globs
+                .iter()
+                .filter(|glob| !glob.trim_start().starts_with('~'))
+                .map(AsRef::as_ref)
+                .collect::<Vec<&str>>();
+
+            let exclude_globs = globs
+                .iter()
+                .filter(|glob| glob.trim_start().starts_with('~'))
+                .map(AsRef::as_ref)
+                .collect::<Vec<&str>>();
+
+            let copied_files = copy_dir(
+                &output.build_configuration.directories.work_dir,
+                &test_folder,
+                &include_globs,
+                &exclude_globs,
+                true,
+            )?;
+
+            test_files.extend(copied_files.0);
         }
     }
 

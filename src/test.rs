@@ -49,7 +49,7 @@ enum Tests {
     Python(PathBuf),
 }
 
-fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
+fn run_in_environment(cmd: &str, cwd: &Path, environment: &Path) -> Result<(), TestError> {
     let current_path = std::env::var("PATH")
         .ok()
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
@@ -86,6 +86,7 @@ fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
 
     let mut cmd = std::process::Command::new("bash");
     cmd.arg(tmpfile_path);
+    cmd.current_dir(cwd);
 
     let status = cmd.status().unwrap();
 
@@ -97,7 +98,7 @@ fn run_in_environment(cmd: &str, environment: &Path) -> Result<(), TestError> {
 }
 
 impl Tests {
-    fn run(&self, environment: &Path) -> Result<(), TestError> {
+    fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
         match self {
             Tests::Commands(path) => {
                 let ext = path.extension().unwrap().to_str().unwrap();
@@ -106,6 +107,7 @@ impl Tests {
                         println!("Testing commands:");
                         run_in_environment(
                             &format!("cmd /c {}", path.to_string_lossy()),
+                            cwd,
                             environment,
                         )
                     }
@@ -113,6 +115,7 @@ impl Tests {
                         println!("Testing commands:");
                         run_in_environment(
                             &format!("bash -x {}", path.to_string_lossy()),
+                            cwd,
                             environment,
                         )
                     }
@@ -122,22 +125,26 @@ impl Tests {
             Tests::Python(path) => {
                 let imports = fs::read_to_string(path)?;
                 println!("Testing Python imports:\n{imports}");
-                run_in_environment(&format!("python {}", path.to_string_lossy()), environment)
+                run_in_environment(
+                    &format!("python {}", path.to_string_lossy()),
+                    cwd,
+                    environment,
+                )
             }
         }
     }
 }
 
-async fn tests_from_folder(pkg: &Path) -> Result<Vec<Tests>, TestError> {
+async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestError> {
     let mut tests = Vec::new();
 
     let test_folder = pkg.join("info").join("test");
 
     if !test_folder.exists() {
-        return Ok(tests);
+        return Ok((test_folder, tests));
     }
 
-    let mut read_dir = tokio::fs::read_dir(test_folder).await?;
+    let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
 
     while let Some(entry) = read_dir.next_entry().await? {
         let path = entry.path();
@@ -152,7 +159,7 @@ async fn tests_from_folder(pkg: &Path) -> Result<Vec<Tests>, TestError> {
         }
     }
 
-    Ok(tests)
+    Ok((test_folder, tests))
 }
 
 fn file_from_tar_bz2(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
@@ -310,10 +317,10 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let dir = cache_dir.join("pkgs").join(cache_key.to_string());
 
     tracing::info!("Collecting tests from {:?}", dir);
-    let tests = tests_from_folder(&dir).await?;
+    let (test_folder, tests) = tests_from_folder(&dir).await?;
 
     for test in tests {
-        test.run(&prefix)?;
+        test.run(&prefix, &test_folder)?;
     }
 
     tracing::info!(

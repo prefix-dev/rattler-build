@@ -239,11 +239,33 @@ impl Source {
                         (false, false) => None,
                     };
 
+                    let file_name = map
+                        .get("file_name")
+                        .map(|node| match node.as_scalar() {
+                            Some(s) => {
+                                let file_name = jinja.render_str(s.as_str()).map_err(|err| {
+                                    _partialerror!(
+                                        *s.span(),
+                                        ErrorKind::JinjaRendering(err),
+                                        label = "error rendering file_name"
+                                    )
+                                })?;
+                                Ok(file_name)
+                            }
+                            None => Err(_partialerror!(
+                                *node.span(),
+                                ErrorKind::Other,
+                                label = "expected scalar"
+                            )),
+                        })
+                        .transpose()?;
+
                     sources.push(Self::Url(UrlSource {
                         url,
                         checksum,
                         patches,
                         folder,
+                        file_name,
                     }))
                 } else if map.contains_key("path") {
                     // Path source
@@ -413,6 +435,8 @@ pub struct UrlSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     folder: Option<PathBuf>,
+    /// Optionally a file name to rename the downloaded file (does not apply to archives)
+    file_name: Option<String>,
 }
 
 impl UrlSource {
@@ -434,6 +458,11 @@ impl UrlSource {
     /// Get the folder of the URL source.
     pub const fn folder(&self) -> Option<&PathBuf> {
         self.folder.as_ref()
+    }
+
+    /// Get the file name of the URL source.
+    pub const fn file_name(&self) -> Option<&String> {
+        self.file_name.as_ref()
     }
 }
 
