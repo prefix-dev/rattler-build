@@ -164,8 +164,11 @@ impl Dependency {
     pub(super) fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialParsingError> {
         match node {
             Node::Scalar(s) => {
-                let dep = Self::from_scalar(s, jinja)?;
-                Ok(vec![dep])
+                let dep = Self::from_scalar(s, jinja)?
+                    .map(|d| vec![d])
+                    .unwrap_or_default();
+
+                Ok(dep)
             }
             Node::Sequence(seq) => {
                 let mut deps = Vec::new();
@@ -190,7 +193,10 @@ impl Dependency {
         }
     }
 
-    pub(super) fn from_scalar(s: &ScalarNode, jinja: &Jinja) -> Result<Self, PartialParsingError> {
+    pub(super) fn from_scalar(
+        s: &ScalarNode,
+        jinja: &Jinja,
+    ) -> Result<Option<Self>, PartialParsingError> {
         // compiler
         if s.as_str().contains("compiler(") {
             let compiler = jinja.render_str(s.as_str()).map_err(|err| {
@@ -200,7 +206,7 @@ impl Dependency {
                     label = "error rendering compiler"
                 )
             })?;
-            Ok(Self::Compiler(Compiler { compiler }))
+            Ok(Some(Self::Compiler(Compiler { compiler })))
         } else if s.as_str().contains("pin_subpackage(") {
             let pin_subpackage = jinja.render_str(s.as_str()).map_err(|err| {
                 _partialerror!(
@@ -216,7 +222,7 @@ impl Dependency {
                 .strip_prefix("__PIN_SUBPACKAGE ")
                 .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
             let pin_subpackage = Pin::from_internal_repr(internal_repr);
-            Ok(Self::PinSubpackage(PinSubpackage { pin_subpackage }))
+            Ok(Some(Self::PinSubpackage(PinSubpackage { pin_subpackage })))
         } else {
             let spec = jinja.render_str(s.as_str()).map_err(|err| {
                 _partialerror!(
@@ -225,10 +231,15 @@ impl Dependency {
                     label = "error rendering spec"
                 )
             })?;
+
+            if spec.is_empty() {
+                return Ok(None);
+            }
+
             let spec = MatchSpec::from_str(&spec).map_err(|_err| {
                 _partialerror!(*s.span(), ErrorKind::Other, label = "error parsing spec")
             })?;
-            Ok(Self::Spec(spec))
+            Ok(Some(Self::Spec(spec)))
         }
     }
 }
