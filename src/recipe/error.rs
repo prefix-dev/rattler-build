@@ -49,47 +49,63 @@ impl ParsingError {
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Error while parsing YAML.
-    #[diagnostic(code(error::stage1::yaml_parsing))]
+    #[diagnostic(code(error::yaml_parsing))]
     YamlParsing(#[from] marked_yaml::LoadError),
 
     /// Error when expected mapping but got something else.
-    #[diagnostic(code(error::stage1::expected_mapping))]
+    #[diagnostic(code(error::expected_mapping))]
     ExpectedMapping,
 
     /// Error when expected scalar but got something else.
-    #[diagnostic(code(error::stage1::expected_scalar))]
+    #[diagnostic(code(error::expected_scalar))]
     ExpectedScalar,
 
     /// Error when expected sequence but got something else.
-    #[diagnostic(code(error::stage1::expected_sequence))]
+    #[diagnostic(code(error::expected_sequence))]
     ExpectedSequence,
 
     /// Error when if-selector condition is not a scalar.
-    #[diagnostic(code(error::stage1::if_selector_condition_not_scalar))]
+    #[diagnostic(code(error::if_selector_condition_not_scalar))]
     IfSelectorConditionNotScalar,
 
     /// Error when if selector is missing a `then` field.
-    #[diagnostic(code(error::stage1::if_selector_missing_then))]
+    #[diagnostic(code(error::if_selector_missing_then))]
     IfSelectorMissingThen,
 
+    /// Error when invalid MD5 hash.
+    #[diagnostic(code(error::invalid_md5))]
+    InvalidMd5,
+
+    /// Error when invalid SHA256 hash.
+    #[diagnostic(code(error::invalid_sha256))]
+    InvalidSha256,
+
+    /// Error when there is a required missing field in a mapping.
+    #[diagnostic(code(error::missing_field))]
+    MissingField(Cow<'static, str>),
+
+    /// Error when there is a invalid field in a mapping.
+    #[diagnostic(code(error::invalid_field))]
+    InvalidField(Cow<'static, str>),
+
     /// Error rendering a Jinja expression.
-    #[diagnostic(code(error::stage2::jinja_rendering))]
+    #[diagnostic(code(error::jinja_rendering))]
     JinjaRendering(#[from] minijinja::Error),
 
     /// Error processing the condition of a if-selector.
-    #[diagnostic(code(error::stage2::if_selector_condition_not_bool))]
+    #[diagnostic(code(error::if_selector_condition_not_bool))]
     IfSelectorConditionNotBool(#[from] ParseBoolError),
 
     /// Error when processing URL
-    #[diagnostic(code(error::stage2::url_parsing))]
+    #[diagnostic(code(error::url_parsing))]
     UrlParsing(#[from] url::ParseError),
 
     /// Error when parsing a integer.
-    #[diagnostic(code(error::stage2::integer_parsing))]
+    #[diagnostic(code(error::integer_parsing))]
     IntegerParsing(#[from] std::num::ParseIntError),
 
     /// Error when parsing a SPDX license.
-    #[diagnostic(code(error::stage2::spdx_parsing))]
+    #[diagnostic(code(error::spdx_parsing))]
     SpdxParsing(#[from] spdx::ParseError),
 
     /// Generic unspecified error. If this is returned, the call site should
@@ -160,6 +176,10 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IfSelectorMissingThen => {
                 write!(f, "Missing `then` field in the `if` selector.")
             }
+            ErrorKind::InvalidMd5 => write!(f, "Invalid MD5 checksum."),
+            ErrorKind::InvalidSha256 => write!(f, "Invalid SHA256 checksum."),
+            ErrorKind::InvalidField(s) => write!(f, "Invalid field `{s}`."),
+            ErrorKind::MissingField(s) => write!(f, "Missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
                 write!(f, "Failed to render Jinja expression: {}", err.kind())
             }
