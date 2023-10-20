@@ -145,6 +145,7 @@ fn extract(
 /// # Return
 ///
 /// The returned `Vec<PathBuf>` contains the pathes of the copied files.
+/// The `bool` flag indicates whether any of the _include_ globs matched.
 /// If a directory is created in this function, the path to the directory is _not_ returned.
 pub(crate) fn copy_dir(
     from: &Path,
@@ -152,7 +153,7 @@ pub(crate) fn copy_dir(
     include_globs: &[&str],
     exclude_globs: &[&str],
     use_gitignore: bool,
-) -> Result<Vec<PathBuf>, SourceError> {
+) -> Result<(Vec<PathBuf>, bool), SourceError> {
     // Create the to path because we're going to copy the contents only
     create_all(to, true).unwrap();
 
@@ -184,7 +185,7 @@ pub(crate) fn copy_dir(
     let mut any_include_glob_matched = false;
     let exclude_globs = mkglobset(exclude_globs)?;
 
-    let result = WalkBuilder::new(from)
+    WalkBuilder::new(from)
         // disregard global gitignore
         .git_global(false)
         .git_ignore(use_gitignore)
@@ -250,13 +251,8 @@ pub(crate) fn copy_dir(
             }
         })
         .filter_map(|res| res.transpose())
-        .collect();
-
-    if !any_include_glob_matched {
-        tracing::warn!("No glob matched");
-    }
-
-    result
+        .collect::<Result<Vec<_>, _>>()
+        .map(|ps| (ps, any_include_glob_matched))
 }
 
 #[cfg(test)]
