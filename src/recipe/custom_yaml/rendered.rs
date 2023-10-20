@@ -568,7 +568,7 @@ impl Render<RenderedNode> for Node {
             Node::Sequence(s) => s.render(jinja, name),
             Node::Null(n) => Ok(RenderedNode::Null(RenderedScalarNode::new(
                 *n.span(),
-                n.value,
+                n.as_str().to_owned(),
             ))),
         }
     }
@@ -620,7 +620,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
 
 impl Render<RenderedNode> for MappingNode {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
-        let mut rendered = self.render(jinja, name)?;
+        let rendered = self.render(jinja, name)?;
 
         Ok(RenderedNode::Mapping(rendered))
     }
@@ -648,7 +648,7 @@ impl Render<RenderedMappingNode> for MappingNode {
 
 impl Render<RenderedNode> for SequenceNode {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
-        let mut rendered = self.render(jinja, name)?;
+        let rendered = self.render(jinja, name)?;
 
         Ok(RenderedNode::Sequence(rendered))
     }

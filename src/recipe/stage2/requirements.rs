@@ -9,7 +9,7 @@ use crate::{
         custom_yaml::{HasSpan, Node, ScalarNode, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1,
+        stage1, Render,
     },
     render::pin::Pin,
 };
@@ -190,6 +190,7 @@ impl Dependency {
                 ErrorKind::Other,
                 label = "expected scalar or sequence"
             )),
+            Node::Null(_) => Ok(vec![]),
         }
     }
 
@@ -208,13 +209,11 @@ impl Dependency {
             })?;
             Ok(Some(Self::Compiler(Compiler { compiler })))
         } else if s.as_str().contains("pin_subpackage(") {
-            let pin_subpackage = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering pin_subpackage"
-                )
-            })?;
+            let pin_subpackage: Option<ScalarNode> = s.render(jinja, "pin_subpackage")?;
+
+            let pin_subpackage = pin_subpackage
+                .map(|s| s.as_str().to_string())
+                .expect("pin_subpackage should never result in Null after rendering");
 
             // Panic should never happen from this strip unless the prefix magic for the pin
             // subpackage changes

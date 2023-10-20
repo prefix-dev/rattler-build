@@ -72,6 +72,7 @@ impl Test {
                     ErrorKind::Other,
                     label = "expected scalar or sequence"
                 )),
+                Node::Null(_) => Ok(vec![]),
             }
         }
 
@@ -97,7 +98,7 @@ impl Test {
                 Ok(test)
             }
             Node::Sequence(_) => todo!("Unimplemented: Sequence on Test"),
-            Node::Scalar(_) => Err(_partialerror!(
+            Node::Scalar(_) | Node::Null(_) => Err(_partialerror!(
                 *node.span(),
                 ErrorKind::Other,
                 label = "expected mapping"

@@ -33,36 +33,6 @@ pub struct About {
     prelink_message: Option<String>,
 }
 
-/// A parsed SPDX license
-#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr)]
-pub struct License {
-    pub original: String,
-    pub expr: spdx::Expression,
-}
-
-impl PartialEq for License {
-    fn eq(&self, other: &Self) -> bool {
-        self.expr == other.expr
-    }
-}
-
-impl Display for License {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.original)
-    }
-}
-
-impl FromStr for License {
-    type Err = spdx::ParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(License {
-            original: s.to_owned(),
-            expr: Expression::parse(s)?,
-        })
-    }
-}
-
 impl About {
     pub(super) fn from_stage1(
         about: &stage1::About,
@@ -149,6 +119,36 @@ impl About {
     }
 }
 
+/// A parsed SPDX license
+#[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr)]
+pub struct License {
+    pub original: String,
+    pub expr: spdx::Expression,
+}
+
+impl PartialEq for License {
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr
+    }
+}
+
+impl Display for License {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", &self.original)
+    }
+}
+
+impl FromStr for License {
+    type Err = spdx::ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(License {
+            original: s.to_owned(),
+            expr: Expression::parse(s)?,
+        })
+    }
+}
+
 fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
@@ -159,6 +159,11 @@ fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, Partia
                     label = "error rendering `script`"
                 )
             })?;
+
+            if script.is_empty() {
+                return Ok(Vec::new());
+            }
+
             Ok(vec![script])
         }
         Node::Sequence(seq) => {
@@ -183,6 +188,7 @@ fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, Partia
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 

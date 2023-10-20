@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::HasSpan,
+        custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, ScalarNode},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1,
+        stage1, Render,
     },
 };
 
@@ -25,13 +25,16 @@ impl Package {
         package: &stage1::Package,
         jinja: &Jinja,
     ) -> Result<Self, PartialParsingError> {
-        let name = jinja.render_str(package.name.as_str()).map_err(|err| {
-            _partialerror!(
+        let name: Option<ScalarNode> = package.name.render(jinja, "package name")?;
+
+        let Some(name) = name else {
+            return Err(_partialerror!(
                 *package.name.span(),
-                ErrorKind::JinjaRendering(err),
-                label = "error rendering package name"
-            )
-        })?;
+                ErrorKind::Other,
+                label = "package name is required"
+            ));
+        };
+
         let name = PackageName::from_str(name.as_str()).map_err(|_err| {
             _partialerror!(
                 *package.name.span(),
@@ -39,14 +42,73 @@ impl Package {
                 label = "error parsing package name"
             )
         })?;
-        let version = jinja.render_str(package.version.as_str()).map_err(|err| {
-            _partialerror!(
-                *package.name.span(),
-                ErrorKind::JinjaRendering(err),
-                label = "error rendering package version"
-            )
-        })?;
-        Ok(Package { name, version })
+
+        let version: Option<ScalarNode> = package.version.render(jinja, "package version")?;
+
+        let Some(version) = version else {
+            return Err(_partialerror!(
+                *package.version.span(),
+                ErrorKind::Other,
+                label = "package version is required"
+            ));
+        };
+
+        Ok(Package {
+            name,
+            version: version.to_string(),
+        })
+    }
+
+    pub(super) fn from_rendered_node(node: &RenderedNode) -> Result<Self, PartialParsingError> {
+        match node.as_mapping() {
+            Some(map) => {
+                let mut name = RenderedScalarNode::new_blank();
+                let mut version = "";
+
+                for (key, value) in map.iter() {
+                    match key.as_str() {
+                        "name" => {
+                            name = value
+                                .as_scalar()
+                                .cloned()
+                                .ok_or(_partialerror!(*value.span(), ErrorKind::ExpectedScalar))?
+                        }
+                        "version" => {
+                            version = value
+                                .as_scalar()
+                                .map(|s| s.as_str())
+                                .ok_or(_partialerror!(*value.span(), ErrorKind::ExpectedScalar))?
+                        }
+                        _ => {
+                            return Err(_partialerror!(
+                                *key.span(),
+                                ErrorKind::Other,
+                                label = "invalid field",
+                                help = "valid fields for `package` are `name` and `version`"
+                            ))
+                        }
+                    }
+                }
+
+                let name = PackageName::from_str(name.as_str()).map_err(|_err| {
+                    _partialerror!(
+                        *name.span(),
+                        ErrorKind::Other,
+                        label = "error parsing `package` field `name`"
+                    )
+                })?;
+
+                Ok(Package {
+                    name,
+                    version: version.to_string(),
+                })
+            }
+            None => Err(_partialerror!(
+                *node.span(),
+                ErrorKind::ExpectedMapping,
+                help = "package must be a mapping with `name` and `version` keys"
+            )),
+        }
     }
 
     /// Get the package name.

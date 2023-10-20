@@ -215,6 +215,7 @@ fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialParsingEr
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -250,6 +251,7 @@ fn parse_script(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsin
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -295,6 +297,7 @@ fn parse_entry_points(node: &Node, jinja: &Jinja) -> Result<Vec<EntryPoint>, Par
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -353,6 +356,7 @@ fn parse_ignore_run_exports(
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -507,6 +511,7 @@ fn parse_secrets(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsi
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -553,6 +558,7 @@ fn parse_passthrough(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialP
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }
 
@@ -613,6 +619,7 @@ impl RunExports {
                     }
                 }
             }
+            Node::Null(_) => (),
         }
         Ok(run_exports)
     }
@@ -680,5 +687,6 @@ fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, Parti
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
+        Node::Null(_) => Ok(vec![]),
     }
 }

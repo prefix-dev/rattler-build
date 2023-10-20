@@ -58,7 +58,7 @@ impl Source {
                             Ok(vec![PathBuf::from(s)])
                         }
                         Node::Sequence(_) => todo!(),
-                        Node::Mapping(_) => Err(_partialerror!(
+                        Node::Mapping(_) | Node::Null(_) => Err(_partialerror!(
                             *node.span(),
                             ErrorKind::Other,
                             label = "expected scalar or sequence"
@@ -315,11 +315,11 @@ impl Source {
                     }
                 }
             }
-            Node::Scalar(s) => {
+            Node::Scalar(s) | Node::Null(s) => {
                 return Err(_partialerror!(
                     *s.span(),
                     ErrorKind::Other,
-                    label = "expected mapping or sequence, got scalar"
+                    label = "expected mapping or sequence"
                 ))
             }
         }
