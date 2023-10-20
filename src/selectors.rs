@@ -8,6 +8,7 @@ use serde_yaml::Value as YamlValue;
 pub struct SelectorConfig {
     pub target_platform: Platform,
     pub build_platform: Platform,
+    pub hash: Option<String>,
     pub variant: BTreeMap<String, String>,
 }
 
@@ -41,6 +42,10 @@ impl SelectorConfig {
             Value::from_safe_string(self.build_platform.to_string()),
         );
 
+        if let Some(hash) = self.hash {
+            context.insert("hash".to_string(), Value::from_safe_string(hash));
+        }
+
         // for (key, v) in std::env::vars() {
         //     context.insert(key, Value::from_safe_string(v));
         // }
@@ -58,6 +63,7 @@ impl Default for SelectorConfig {
         Self {
             target_platform: Platform::current(),
             build_platform: Platform::current(),
+            hash: None,
             variant: Default::default(),
         }
     }
@@ -263,6 +269,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
+            hash: None,
             variant: Default::default(),
         };
         assert!(eval_selector("sel(unix)", &selector_config));
@@ -289,6 +296,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
+            hash: None,
             variant,
         };
 
@@ -329,6 +337,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
+            hash: None,
             variant: Default::default(),
         };
 

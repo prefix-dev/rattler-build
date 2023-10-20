@@ -1,0 +1,6 @@
+package:
+  name: pkg_hash
+  version: "1.0.0"
+
+build:
+  string: ${{ hash }}_my_pkg

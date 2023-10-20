@@ -1,8 +1,10 @@
 import json
+import hashlib
 import os
 from pathlib import Path
 from subprocess import CalledProcessError, check_output
 from typing import Any, Optional
+import platform
 
 import pytest
 from conda_package_handling.api import extract
@@ -64,7 +66,10 @@ def get_package(folder: Path, glob="*.tar.bz2"):
     if "/" not in glob:
         glob = "**/" + glob
     package_path = next(folder.glob(glob))
+    return package_path
 
+def get_extracted_package(folder: Path, glob="*.tar.bz2"):
+    package_path = get_package(folder, glob)
     extract_path = folder / "extract"
     extract(str(package_path), dest_dir=str(extract_path))
     return extract_path
@@ -72,7 +77,7 @@ def get_package(folder: Path, glob="*.tar.bz2"):
 
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "globtest", tmp_path)
-    pkg = get_package(tmp_path, "globtest")
+    pkg = get_extracted_package(tmp_path, "globtest")
     assert (pkg / "info/licenses/LICENSE").exists()
     # Random files we moved into the package license folder
     assert (pkg / "info/licenses/cmake/FindTBB.cmake").exists()
@@ -112,7 +117,7 @@ def check_info(folder: Path, expected: Path):
 
 def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "toml", tmp_path)
-    pkg = get_package(tmp_path, "toml")
+    pkg = get_extracted_package(tmp_path, "toml")
 
     assert (pkg / "info/licenses/LICENSE").exists()
     assert (pkg / "site-packages/toml-0.10.2.dist-info/INSTALLER").exists()
@@ -124,7 +129,7 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
 def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "run_exports", tmp_path)
-    pkg = get_package(tmp_path, "run_exports_test")
+    pkg = get_extracted_package(tmp_path, "run_exports_test")
 
     assert (pkg / "info/run_exports.json").exists()
     actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
@@ -132,3 +137,35 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert len(actual_run_export["weak"]) == 1
     x = actual_run_export["weak"][0]
     assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
+
+
+
+def host_subdir():
+    """return conda subdir based on current platform"""
+    plat = platform.system()
+    if plat == "Linux":
+        if platform.machine().endswith("aarch64"):
+            return "linux-aarch64"
+        return "linux-64"
+    elif plat == "Darwin":
+        if platform.machine().endswith("arm64"):
+            return "osx-arm64"
+        return "osx-64"
+    elif plat == "Windows":
+        return "win-64"
+    else:
+        raise RuntimeError("Unsupported platform")
+
+
+def variant_hash(variant):
+    hash_length = 7
+    m = hashlib.sha1()
+    m.update(json.dumps(variant, sort_keys=True).encode())
+    return f"h{m.hexdigest()[:hash_length]}"
+
+
+def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "pkg_hash", tmp_path)
+    pkg = get_package(tmp_path, "pkg_hash")
+    expected_hash = variant_hash({"target_platform": host_subdir()})
+    assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
