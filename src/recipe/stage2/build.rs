@@ -10,11 +10,11 @@ use crate::{
         custom_yaml::{HasSpan, MappingNode, Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1,
+        stage1, OldRender,
     },
 };
 
-use super::{Dependency, Render};
+use super::Dependency;
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.

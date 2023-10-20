@@ -1,20 +1,20 @@
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use std::{
+    fmt::{Display, Formatter},
+    str::FromStr,
+};
 
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 use spdx::Expression;
 use url::Url;
 
-use crate::recipe::custom_yaml::HasSpan;
-use crate::recipe::stage2::Render;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{Node, SequenceNodeInternal},
+        custom_yaml::{HasSpan, Node, SequenceNodeInternal},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
-        stage1,
+        stage1, OldRender,
     },
 };
 

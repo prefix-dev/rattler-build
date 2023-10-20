@@ -7,6 +7,7 @@ use std::str::FromStr;
 use minijinja::Value;
 use serde::Serialize;
 
+use crate::recipe::custom_yaml::{RenderedMappingNode, RenderedNode, ScalarNode, TryConvertNode};
 use crate::{
     _partialerror,
     recipe::{
@@ -14,6 +15,7 @@ use crate::{
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
         stage1::RawRecipe,
+        Render,
     },
     selectors::SelectorConfig,
 };
@@ -33,6 +35,8 @@ pub use self::{
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::Test,
 };
+
+use super::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize)]
@@ -120,6 +124,94 @@ impl Recipe {
             about,
             extra: (),
         })
+    }
+
+    /// WIP
+    pub fn from_node(
+        root_node: &Node,
+        jinja_opt: SelectorConfig,
+    ) -> Result<Vec<Self>, PartialParsingError> {
+        let mut jinja = Jinja::new(jinja_opt);
+
+        let root_node = root_node.as_mapping().ok_or_else(|| {
+            _partialerror!(
+                *root_node.span(),
+                ErrorKind::ExpectedMapping,
+                label = "expected mapping"
+            )
+        })?;
+
+        // add context values
+        if let Some(context) = root_node.get("context") {
+            let context = context.as_mapping().ok_or_else(|| {
+                _partialerror!(
+                    *context.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = "`context` mulst always be a mapping"
+                )
+            })?;
+
+            for (k, v) in context.iter() {
+                let val = v.as_scalar().ok_or_else(|| {
+                    _partialerror!(
+                        *v.span(),
+                        ErrorKind::ExpectedScalar,
+                        label = "`context` values must always be scalars"
+                    )
+                })?;
+                let rendered: Option<ScalarNode> =
+                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
+
+                if let Some(rendered) = rendered {
+                    jinja.context_mut().insert(
+                        k.as_str().to_owned(),
+                        Value::from_safe_string(rendered.as_str().to_string()),
+                    );
+                }
+            }
+        }
+
+        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
+
+        let mut package = None;
+
+        for (key, value) in rendered_node.iter() {
+            match key.as_str() {
+                "package" => package = Some(Package::from_rendered_node(value)?),
+                "source" => {}
+                "build" => {}
+                "requirements" => {}
+                "test" => {}
+                "about" => {}
+                "outputs" => {}
+                "context" => {}
+                invalid_key => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::Other,
+                        label = format!("invalid key `{invalid_key}`")
+                    ))
+                }
+            }
+        }
+
+        let _recipe = Recipe {
+            package: package.ok_or_else(|| {
+                _partialerror!(
+                    *root_node.span(),
+                    ErrorKind::Other,
+                    label = "missing required key `package`"
+                )
+            })?,
+            source: todo!(),
+            build: todo!(),
+            requirements: todo!(),
+            test: todo!(),
+            about: todo!(),
+            extra: todo!(),
+        };
+
+        todo!()
     }
 
     /// Get the package information.
