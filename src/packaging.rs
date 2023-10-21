@@ -26,7 +26,6 @@ use rattler_package_streaming::write::{
 
 use crate::macos;
 use crate::metadata::Output;
-use crate::source::copy_dir;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -566,37 +565,34 @@ fn copy_license_files(
             }
         }
 
-        let include_globs = license_globs
-            .iter()
-            .filter(|glob| !glob.trim_start().starts_with('~'))
-            .map(AsRef::as_ref)
-            .collect::<Vec<&str>>();
-        let exclude_globs = license_globs
-            .iter()
-            .filter(|glob| glob.trim_start().starts_with('~'))
-            .map(AsRef::as_ref)
-            .collect::<Vec<&str>>();
         let use_gitignore = false;
 
-        let (copied_files_recipe_dir, any_include_matched_recipe_dir) = crate::source::copy_dir(
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
-            &include_globs,
-            &exclude_globs,
-            use_gitignore,
-        )?;
+        )
+        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .use_gitignore(use_gitignore)
+        .run()?;
 
-        let (copied_files_work_dir, any_include_matched_work_dir) = crate::source::copy_dir(
+        let copied_files_recipe_dir = copy_dir.copied_pathes();
+        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
+
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
-            &include_globs,
-            &exclude_globs,
-            use_gitignore,
-        )?;
+        )
+        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .use_gitignore(use_gitignore)
+        .run()?;
+
+        let copied_files_work_dir = copy_dir.copied_pathes();
+        let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
 
         let copied_files = copied_files_recipe_dir
             .into_iter()
             .chain(copied_files_work_dir)
+            .map(PathBuf::from)
             .collect::<Vec<PathBuf>>();
 
         if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
@@ -689,15 +685,16 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
                 .map(AsRef::as_ref)
                 .collect::<Vec<&str>>();
 
-            let copied_files = copy_dir(
+            let copy_dir = crate::source::copy_dir::CopyDir::new(
                 &output.build_configuration.directories.recipe_dir,
                 &test_folder,
-                &include_globs,
-                &exclude_globs,
-                true,
-            )?;
+            )
+            .with_include_globs(include_globs)
+            .with_exclude_globs(exclude_globs)
+            .use_gitignore(true)
+            .run()?;
 
-            test_files.extend(copied_files.0);
+            test_files.extend(copy_dir.copied_pathes().iter().cloned());
         }
 
         if !test.source_files().is_empty() {
@@ -714,15 +711,16 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
                 .map(AsRef::as_ref)
                 .collect::<Vec<&str>>();
 
-            let copied_files = copy_dir(
+            let copy_dir = crate::source::copy_dir::CopyDir::new(
                 &output.build_configuration.directories.work_dir,
                 &test_folder,
-                &include_globs,
-                &exclude_globs,
-                true,
-            )?;
+            )
+            .with_include_globs(include_globs)
+            .with_exclude_globs(exclude_globs)
+            .use_gitignore(true)
+            .run()?;
 
-            test_files.extend(copied_files.0);
+            test_files.extend(copy_dir.copied_pathes().iter().cloned());
         }
     }
 
