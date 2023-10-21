@@ -943,6 +943,12 @@ impl TryConvertNode<String> for RenderedNode {
     }
 }
 
+impl TryConvertNode<String> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<String, PartialParsingError> {
+        Ok(self.as_str().to_owned())
+    }
+}
+
 impl TryConvertNode<PathBuf> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<PathBuf, PartialParsingError> {
         self.as_scalar()

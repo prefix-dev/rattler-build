@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode},
+        custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
         stage1::RawRecipe,
@@ -172,13 +172,14 @@ impl Recipe {
 
         let mut package = None;
         let mut source = Vec::new();
+        let mut requirements = Requirements::default();
 
         for (key, value) in rendered_node.iter() {
             match key.as_str() {
                 "package" => package = Some(Package::from_rendered_node(value)?),
                 "source" => source.extend(Source::from_rendered_node(value)?),
                 "build" => {}
-                "requirements" => {}
+                "requirements" => requirements = value.try_convert("requirements")?,
                 "test" => {}
                 "about" => {}
                 "outputs" => {}
@@ -186,8 +187,7 @@ impl Recipe {
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
-                        ErrorKind::Other,
-                        label = format!("invalid key `{invalid_key}`")
+                        ErrorKind::InvalidField(invalid_key.to_string().into()),
                     ))
                 }
             }
@@ -202,11 +202,11 @@ impl Recipe {
                 )
             })?,
             source,
+            requirements,
             build: todo!(),
-            requirements: todo!(),
             test: todo!(),
             about: todo!(),
-            extra: todo!(),
+            extra: (),
         };
 
         todo!()

@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, Node, ScalarNode, SequenceNodeInternal},
+        custom_yaml::{
+            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode, ScalarNode,
+            SequenceNodeInternal, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, Render,
@@ -117,6 +120,51 @@ impl Requirements {
             && self.host.is_empty()
             && self.run.is_empty()
             && self.run_constrained.is_empty()
+    }
+}
+
+impl TryConvertNode<Requirements> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Requirements, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expected a mapping for `{name}`")
+                )
+            })
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Requirements> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<Requirements, PartialParsingError> {
+        let mut build = Vec::new();
+        let mut host = Vec::new();
+        let mut run = Vec::new();
+        let mut run_constrained = Vec::new();
+
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "build" => build = value.try_convert("build")?,
+                "host" => host = value.try_convert("host")?,
+                "run" => run = value.try_convert("run")?,
+                "run_constrained" => run_constrained = value.try_convert("run_constrained")?,
+                invalid_key => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid_key.to_string().into()),
+                    ))
+                }
+            }
+        }
+
+        Ok(Requirements {
+            build,
+            host,
+            run,
+            run_constrained,
+        })
     }
 }
 
@@ -243,6 +291,55 @@ impl Dependency {
     }
 }
 
+impl TryConvertNode<Vec<Dependency>> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Vec<Dependency>, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => {
+                let dep: Dependency = s.try_convert(name)?;
+                Ok(vec![dep])
+            }
+            RenderedNode::Sequence(seq) => {
+                let mut deps = Vec::new();
+                for n in seq.iter() {
+                    let n_deps: Vec<_> = n.try_convert(name)?;
+                    deps.extend(n_deps);
+                }
+                Ok(deps)
+            }
+            RenderedNode::Mapping(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = "expected scalar or sequence"
+            )),
+            RenderedNode::Null(_) => Ok(vec![]),
+        }
+    }
+}
+
+impl TryConvertNode<Dependency> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<Dependency, PartialParsingError> {
+        // compiler
+        if self.contains("__COMPILER") {
+            let compiler = self.try_convert(name)?;
+            Ok(Dependency::Compiler(Compiler { compiler }))
+        } else if self.contains("__PIN_SUBPACKAGE") {
+            let pin_subpackage: String = self.try_convert(name)?;
+
+            // Panic should never happen from this strip unless the prefix magic for the pin
+            // subpackage changes
+            let internal_repr = pin_subpackage
+                .strip_prefix("__PIN_SUBPACKAGE ")
+                .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
+            let pin_subpackage = Pin::from_internal_repr(internal_repr);
+            Ok(Dependency::PinSubpackage(PinSubpackage { pin_subpackage }))
+        } else {
+            let spec = self.try_convert(name)?;
+
+            Ok(Dependency::Spec(spec))
+        }
+    }
+}
+
 impl<'de> Deserialize<'de> for Dependency {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -281,5 +378,31 @@ impl<'de> Deserialize<'de> for Dependency {
         }
 
         deserializer.deserialize_str(DependencyVisitor)
+    }
+}
+
+impl TryConvertNode<MatchSpec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<MatchSpec> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+        MatchSpec::from_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("error parsing `{name}` as a match spec")
+            )
+        })
     }
 }

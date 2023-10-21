@@ -108,6 +108,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::spdx_parsing))]
     SpdxParsing(#[from] spdx::ParseError),
 
+    /// Error when parsing a [`MatchSpec`](rattler_conda_types::MatchSpec).
+    #[diagnostic(code(error::match_spec_parsing))]
+    MatchSpecParsing(#[from] rattler_conda_types::ParseMatchSpecError),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -190,6 +194,9 @@ impl fmt::Display for ErrorKind {
             ErrorKind::IntegerParsing(err) => write!(f, "Failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
                 write!(f, "Failed to parse SPDX license: {}", err.reason)
+            }
+            ErrorKind::MatchSpecParsing(err) => {
+                write!(f, "Failed to parse match spec: {}", err)
             }
             ErrorKind::Other => write!(f, "An unspecified error occurred."),
         }
