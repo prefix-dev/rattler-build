@@ -917,6 +917,32 @@ impl TryConvertNode<String> for Node {
     }
 }
 
+impl TryConvertNode<i32> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<i32> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+        self.as_str().parse().map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("error parsing `{name}` as an integer")
+            )
+        })
+    }
+}
+
 impl<'a> TryConvertNode<&'a RenderedScalarNode> for &'a RenderedNode {
     fn try_convert(&self, name: &str) -> Result<&'a RenderedScalarNode, PartialParsingError> {
         self.as_scalar().ok_or_else(|| {

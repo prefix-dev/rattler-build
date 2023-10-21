@@ -177,7 +177,7 @@ impl Recipe {
         for (key, value) in rendered_node.iter() {
             match key.as_str() {
                 "package" => package = Some(Package::from_rendered_node(value)?),
-                "source" => source.extend(Source::from_rendered_node(value)?),
+                "source" => source = value.try_convert("source")?,
                 "build" => {}
                 "requirements" => requirements = value.try_convert("requirements")?,
                 "test" => {}
