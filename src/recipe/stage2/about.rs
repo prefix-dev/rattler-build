@@ -11,7 +11,10 @@ use url::Url;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, Node, SequenceNodeInternal},
+        custom_yaml::{
+            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode,
+            SequenceNodeInternal, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, OldRender,
@@ -119,6 +122,51 @@ impl About {
     }
 }
 
+impl TryConvertNode<About> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<About, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<About> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<About, PartialParsingError> {
+        let mut about = About::default();
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "homepage" | "home" => about.homepage = Some(value.try_convert("homepage")?),
+                "repository" | "dev_url" => {
+                    about.repository = Some(value.try_convert("repository")?)
+                }
+                "documentation" | "doc_url" => {
+                    about.documentation = Some(value.try_convert("documentation")?)
+                }
+                "license" => about.license = Some(value.try_convert("license")?),
+                "license_family" => {
+                    about.license_family = Some(value.try_convert("license_family")?)
+                }
+                "license_file" => about.license_files = value.try_convert("license_file")?,
+                "license_url" => about.license_url = Some(value.try_convert("license_url")?),
+                "summary" => about.summary = Some(value.try_convert("summary")?),
+                "description" => about.description = Some(value.try_convert("description")?),
+                "prelink_message" => {
+                    about.prelink_message = Some(value.try_convert("prelink_message")?)
+                }
+                invalid_key => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid_key.to_string().into()),
+                        help = format!("expected for `{name}` one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`")
+                    ))
+                }
+            }
+        }
+
+        Ok(about)
+    }
+}
+
 /// A parsed SPDX license
 #[derive(Debug, Clone, SerializeDisplay, DeserializeFromStr)]
 pub struct License {
@@ -146,6 +194,24 @@ impl FromStr for License {
             original: s.to_owned(),
             expr: Expression::parse(s)?,
         })
+    }
+}
+
+impl TryConvertNode<License> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<License, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar,))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<License> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<License, PartialParsingError> {
+        let original: String = self.try_convert(name)?;
+        let expr = Expression::parse(original.as_str())
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))?;
+
+        Ok(License { original, expr })
     }
 }
 

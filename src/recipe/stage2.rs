@@ -174,6 +174,7 @@ impl Recipe {
         let mut source = Vec::new();
         let mut requirements = Requirements::default();
         let mut test = Test::default();
+        let mut about = About::default();
 
         for (key, value) in rendered_node.iter() {
             match key.as_str() {
@@ -182,7 +183,7 @@ impl Recipe {
                 "build" => {}
                 "requirements" => requirements = value.try_convert("requirements")?,
                 "test" => test = value.try_convert("test")?,
-                "about" => {}
+                "about" => about = value.try_convert("about")?,
                 "outputs" => {}
                 "context" => {}
                 invalid_key => {
@@ -205,8 +206,8 @@ impl Recipe {
             source,
             requirements,
             test,
+            about,
             build: todo!(),
-            about: todo!(),
             extra: (),
         };
 
