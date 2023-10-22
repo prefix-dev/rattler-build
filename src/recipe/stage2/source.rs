@@ -929,7 +929,7 @@ impl PathSource {
 }
 
 impl TryConvertNode<PathSource> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<PathSource, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<PathSource, PartialParsingError> {
         let mut path = None;
         let mut patches = Vec::new();
         let mut folder = None;
@@ -937,7 +937,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         for (key, value) in self.iter() {
             match key.as_str() {
                 "path" => path = Some(value.try_convert("path")?),
-                "patches" => patches = parse_patches(value)?,
+                "patches" => patches = value.try_convert("patches")?,
                 "folder" => folder = Some(value.try_convert("folder")?),
                 invalid_key => {
                     return Err(_partialerror!(

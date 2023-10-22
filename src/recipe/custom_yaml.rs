@@ -1020,3 +1020,25 @@ impl TryConvertNode<Url> for RenderedScalarNode {
         })
     }
 }
+
+impl<T> TryConvertNode<Vec<T>> for RenderedNode
+where
+    RenderedNode: TryConvertNode<T>,
+    RenderedScalarNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => {
+                let item = s.try_convert(name)?;
+                Ok(vec![item])
+            }
+            RenderedNode::Sequence(seq) => seq.iter().map(|item| item.try_convert(name)).collect(),
+            RenderedNode::Null(_) => Ok(vec![]),
+            RenderedNode::Mapping(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = format!("expected scalar or sequence for {name}")
+            )),
+        }
+    }
+}

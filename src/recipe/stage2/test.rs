@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, Node, SequenceNodeInternal},
+        custom_yaml::{HasSpan, Node, RenderedNode, SequenceNodeInternal, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1,
@@ -134,5 +134,35 @@ impl Test {
     /// Check if there is not test commands to be run
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
+    }
+}
+
+impl TryConvertNode<Test> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Test, PartialParsingError> {
+        match self {
+            RenderedNode::Mapping(map) => {
+                let mut test = Test::default();
+
+                for (key, value) in map.iter() {
+                    match key.as_str() {
+                        "imports" => test.imports = value.try_convert("imports")?,
+                        "commands" => test.commands = value.try_convert("commands")?,
+                        "requires" => test.requires = value.try_convert("requires")?,
+                        "source_files" => test.source_files = value.try_convert("source_files")?,
+                        "files" => test.files = value.try_convert("files")?,
+                        invalid => Err(_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid.to_string().into()),
+                            help = format!("expected fields for {name} is one of `imports`, `commands`, `requires`, `source_files`, `files`")
+                        ))?
+                    }
+                }
+
+                Ok(test)
+            }
+            RenderedNode::Scalar(_) => todo!(),
+            RenderedNode::Sequence(_) => todo!(),
+            RenderedNode::Null(_) => todo!(),
+        }
     }
 }
