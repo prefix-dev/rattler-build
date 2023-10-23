@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 // use crate::metadata::GitUrl;
 use git2::{Cred, FetchOptions, ObjectType, RemoteCallbacks, Repository, ResetType};
 
-use crate::recipe::stage2::{GitSource, GitUrl};
+use crate::recipe::parser::{GitSource, GitUrl};
 
 // use super::super::metadata::GitSrc;
 use super::SourceError;
