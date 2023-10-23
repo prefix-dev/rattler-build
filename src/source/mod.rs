@@ -1,11 +1,11 @@
 use std::{
-    fs,
+    fs::{self, create_dir_all},
     path::{Path, PathBuf, StripPrefixError},
     process::Command,
     sync::Arc,
 };
 
-use fs_extra::dir::{create_all, CopyOptions};
+use fs_extra::dir::CopyOptions;
 use ignore::WalkBuilder;
 
 use crate::recipe::stage2::Source;
@@ -87,13 +87,33 @@ pub async fn fetch_sources(
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url());
                 let res = url_source::url_src(src, &cache_src, src.checksum().unwrap()).await?;
-                let dest_dir = if let Some(folder) = src.folder() {
+                let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
                 };
-                extract(&res, &dest_dir)?;
-                tracing::info!("Extracted to {:?}", work_dir);
+                const KNOWN_ARCHIVE_EXTENSIONS: [&str; 5] =
+                    ["tar", "tar.gz", "tar.xz", "tar.bz2", "zip"];
+                if KNOWN_ARCHIVE_EXTENSIONS.iter().any(|ext| {
+                    res.file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .ends_with(ext)
+                }) {
+                    extract(&res, &dest_dir)?;
+                    tracing::info!("Extracted to {:?}", dest_dir);
+                } else {
+                    if !dest_dir.exists() {
+                        fs::create_dir_all(&dest_dir)?;
+                    }
+                    if let Some(file_name) = src.file_name() {
+                        dest_dir = dest_dir.join(file_name);
+                    } else {
+                        dest_dir = dest_dir.join(res.file_name().unwrap());
+                    }
+                    fs::copy(&res, &dest_dir)?;
+                    tracing::info!("Downloaded to {:?}", dest_dir);
+                }
 
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
@@ -155,7 +175,7 @@ pub(crate) fn copy_dir(
     use_gitignore: bool,
 ) -> Result<(Vec<PathBuf>, bool), SourceError> {
     // Create the to path because we're going to copy the contents only
-    create_all(to, true).unwrap();
+    create_dir_all(to).unwrap();
 
     // Setup copy options, overwrite if needed, only copy the contents as we want to specify the dir name manually
     let mut options = CopyOptions::new();
@@ -230,10 +250,15 @@ pub(crate) fn copy_dir(
             let dest_path = to.join(stripped_path);
 
             if path.is_dir() {
-                create_all(&dest_path, true)
-                    .map(|_| None) // We do not return pathes to directories that are created
-                    .map_err(SourceError::FileSystemError)
+                Ok(None)
             } else {
+                // create dir if parent does not exist
+                if let Some(parent) = dest_path.parent() {
+                    if !parent.exists() {
+                        create_dir_all(parent)?;
+                    }
+                }
+
                 let file_options = fs_extra::file::CopyOptions {
                     overwrite: options.overwrite,
                     skip_exist: options.skip_exist,
@@ -242,7 +267,7 @@ pub(crate) fn copy_dir(
                 fs_extra::file::copy(path, &dest_path, &file_options)
                     .map_err(SourceError::FileSystemError)?;
 
-                tracing::debug!(
+                tracing::info!(
                     "Copied {} to {}",
                     path.to_string_lossy(),
                     dest_path.to_string_lossy()

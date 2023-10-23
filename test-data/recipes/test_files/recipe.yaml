@@ -1,0 +1,26 @@
+context:
+  name: test_files
+  version: 1.0.0
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+source:
+  - file_name: test.avi
+    url: https://github.com/opencv/opencv_extra/raw/master/testdata/highgui/video/VID00003-20100701-2204.avi
+    sha256: 78884f64b564a3b06dc6ee731ed33b60c6d8cd864cea07f21d94ba0f90c7b310
+
+test:
+  source_files:
+    - test.avi
+  files:
+    - test-file.txt
+    - test-folder/
+  commands:
+    - echo "test"
+    - test -f ./test.avi
+    - test -f ./test-file.txt
+    - test -d ./test-folder
+    - test -f ./test-folder/test-file-2.txt
+    - test -f ./test-folder/test-file-3.txt
