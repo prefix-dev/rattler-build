@@ -99,11 +99,11 @@ impl TryConvertNode<About> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
-                "homepage" | "home" => about.homepage = Some(value.try_convert(key_str)?),
-                "repository" | "dev_url" => {
+                "homepage" => about.homepage = Some(value.try_convert(key_str)?),
+                "repository" => {
                     about.repository = Some(value.try_convert(key_str)?)
                 }
-                "documentation" | "doc_url" => {
+                "documentation" => {
                     about.documentation = Some(value.try_convert(key_str)?)
                 }
                 "license" => about.license = Some(value.try_convert(key_str)?),
@@ -121,7 +121,7 @@ impl TryConvertNode<About> for RenderedMappingNode {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        help = format!("expected for `{name}` one of `homepage` (or `home`), `repository` (or `dev_url`), `documentation` (or `doc_url`), `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`")
+                        help = format!("expected for `{name}` one of `homepage`, `repository`, `documentation`, `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`")
                     ))
                 }
             }
