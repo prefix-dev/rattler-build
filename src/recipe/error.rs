@@ -161,16 +161,16 @@ impl fmt::Display for ErrorKind {
 
         match self {
             ErrorKind::YamlParsing(err) => {
-                write!(f, "Failed to parse YAML: ")?;
+                write!(f, "failed to parse YAML: ")?;
                 match err {
                     LoadError::TopLevelMustBeMapping(_) => {
-                        write!(f, "Top level must be a mapping.")
+                        write!(f, "top level must be a mapping.")
                     }
-                    LoadError::UnexpectedAnchor(_) => write!(f, "Unexpected definition of anchor."),
+                    LoadError::UnexpectedAnchor(_) => write!(f, "unexpected definition of anchor."),
                     LoadError::MappingKeyMustBeScalar(_) => {
-                        write!(f, "Keys in mappings must be scalar.")
+                        write!(f, "keys in mappings must be scalar.")
                     }
-                    LoadError::UnexpectedTag(_) => write!(f, "Unexpected use of YAML tag."),
+                    LoadError::UnexpectedTag(_) => write!(f, "unexpected use of YAML tag."),
                     LoadError::ScanError(_, e) => {
                         // e.description() is deprecated but it's the only way to get
                         // the exact info we want out of yaml-rust
@@ -179,40 +179,40 @@ impl fmt::Display for ErrorKind {
                     }
                 }
             }
-            ErrorKind::ExpectedMapping => write!(f, "Expected a mapping."),
-            ErrorKind::ExpectedScalar => write!(f, "Expected a scalar value."),
-            ErrorKind::ExpectedSequence => write!(f, "Expected a sequence."),
+            ErrorKind::ExpectedMapping => write!(f, "expected a mapping."),
+            ErrorKind::ExpectedScalar => write!(f, "expected a scalar value."),
+            ErrorKind::ExpectedSequence => write!(f, "expected a sequence."),
             ErrorKind::IfSelectorConditionNotScalar => {
-                write!(f, "Condition in `if` selector must be a scalar.")
+                write!(f, "condition in `if` selector must be a scalar.")
             }
             ErrorKind::IfSelectorMissingThen => {
-                write!(f, "Missing `then` field in the `if` selector.")
+                write!(f, "missing `then` field in the `if` selector.")
             }
-            ErrorKind::InvalidMd5 => write!(f, "Invalid MD5 checksum."),
-            ErrorKind::InvalidSha256 => write!(f, "Invalid SHA256 checksum."),
-            ErrorKind::InvalidField(s) => write!(f, "Invalid field `{s}`."),
-            ErrorKind::MissingField(s) => write!(f, "Missing field `{s}`"),
+            ErrorKind::InvalidMd5 => write!(f, "invalid MD5 checksum."),
+            ErrorKind::InvalidSha256 => write!(f, "invalid SHA256 checksum."),
+            ErrorKind::InvalidField(s) => write!(f, "invalid field `{s}`."),
+            ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
-                write!(f, "Failed to render Jinja expression: {}", err.kind())
+                write!(f, "failed to render Jinja expression: {}", err.kind())
             }
             ErrorKind::IfSelectorConditionNotBool(err) => {
-                write!(f, "Condition in `if` selector must be a boolean: {}", err)
+                write!(f, "condition in `if` selector must be a boolean: {}", err)
             }
-            ErrorKind::UrlParsing(err) => write!(f, "Failed to parse URL: {}", err),
-            ErrorKind::IntegerParsing(err) => write!(f, "Failed to parse integer: {}", err),
+            ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
+            ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
-                write!(f, "Failed to parse SPDX license: {}", err.reason)
+                write!(f, "failed to parse SPDX license: {}", err.reason)
             }
             ErrorKind::MatchSpecParsing(err) => {
-                write!(f, "Failed to parse match spec: {}", err)
+                write!(f, "failed to parse match spec: {}", err)
             }
             ErrorKind::PackageNameParsing(err) => {
-                write!(f, "Failed to parse package name: {}", err)
+                write!(f, "failed to parse package name: {}", err)
             }
             ErrorKind::EntryPointParsing(err) => {
-                write!(f, "Failed to parse entry point: {}", err)
+                write!(f, "failed to parse entry point: {}", err)
             }
-            ErrorKind::Other => write!(f, "An unspecified error occurred."),
+            ErrorKind::Other => write!(f, "an unspecified error occurred."),
         }
     }
 }
