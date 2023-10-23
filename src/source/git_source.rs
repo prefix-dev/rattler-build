@@ -142,7 +142,7 @@ mod tests {
     use git2::Repository;
 
     use crate::{
-        recipe::stage2::{GitSource, GitUrl},
+        recipe::parser::{GitSource, GitUrl},
         source::git_source::git_src,
     };
 
