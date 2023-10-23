@@ -47,12 +47,13 @@ impl TryConvertNode<Package> for RenderedMappingNode {
         let span = *self.span();
 
         for (key, value) in self.iter() {
-            match key.as_str() {
+            let key_str = key.as_str();
+            match key_str {
                 "name" => {
-                    name_val = Some(value.try_convert("name")?);
+                    name_val = Some(value.try_convert(key_str)?);
                 }
                 "version" => {
-                    version = Some(value.try_convert("version")?);
+                    version = Some(value.try_convert(key_str)?);
                 }
                 invalid => {
                     return Err(_partialerror!(
@@ -114,8 +115,6 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        assert!(recipe.is_err());
-
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }
@@ -130,8 +129,6 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        assert!(recipe.is_err());
-
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }

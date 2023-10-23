@@ -120,33 +120,32 @@ impl TryConvertNode<Build> for RenderedMappingNode {
         let mut build = Build::default();
 
         for (key, value) in self.iter() {
-            match key.as_str() {
+            let key_str = key.as_str();
+            match key_str {
                 "number" => {
-                    build.number = value.try_convert("number")?;
+                    build.number = value.try_convert(key_str)?;
                 }
                 "string" => {
-                    build.string = Some(value.try_convert("string")?);
+                    build.string = Some(value.try_convert(key_str)?);
                 }
                 "skip" => {
-                    let conds: Vec<bool> = value.try_convert("skip")?;
+                    let conds: Vec<bool> = value.try_convert(key_str)?;
 
                     build.skip = conds.iter().any(|&v| v);
                 }
-                "script" => build.script = value.try_convert("script")?,
-                "script_env" => build.script_env = value.try_convert("script_env")?,
+                "script" => build.script = value.try_convert(key_str)?,
+                "script_env" => build.script_env = value.try_convert(key_str)?,
                 "ignore_run_exports" => {
-                    build.ignore_run_exports = value.try_convert("ignore_run_exports")?;
+                    build.ignore_run_exports = value.try_convert(key_str)?;
                 }
                 "ignore_run_exports_from" => {
-                    // Abuse parse_ignore_run_exports since in structure they are the same
-                    // We may want to change this in the future for better error messages.
-                    build.ignore_run_exports_from = value.try_convert("ignore_run_exports_from")?;
+                    build.ignore_run_exports_from = value.try_convert(key_str)?;
                 }
                 "noarch" => {
-                    build.noarch = value.try_convert("noarch")?;
+                    build.noarch = value.try_convert(key_str)?;
                 }
                 "run_exports" => {
-                    build.run_exports = value.try_convert("run_exports")?;
+                    build.run_exports = value.try_convert(key_str)?;
                 }
                 "entry_points" => {
                     if let Some(NoArchKind::Generic) = build.noarch.kind() {
@@ -157,7 +156,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                         ));
                     }
 
-                    build.entry_points = value.try_convert("entry_points")?;
+                    build.entry_points = value.try_convert(key_str)?;
                 }
                 invalid => {
                     return Err(_partialerror!(
@@ -359,25 +358,25 @@ impl TryConvertNode<RunExports> for RenderedMappingNode {
         let mut run_exports = RunExports::default();
 
         for (key, value) in self.iter() {
-            match key.as_str() {
+            let key_str = key.as_str();
+            match key_str {
                 "noarch" => {
-                    let deps = value.try_convert("noarch")?;
-                    run_exports.noarch = deps;
+                    run_exports.noarch = value.try_convert(key_str)?;
                 }
                 "strong" => {
-                    let deps = value.try_convert("strong")?;
+                    let deps = value.try_convert(key_str)?;
                     run_exports.strong = deps;
                 }
                 "strong_constrains" => {
-                    let deps = value.try_convert("strong_constrains")?;
+                    let deps = value.try_convert(key_str)?;
                     run_exports.strong_constrains = deps;
                 }
                 "weak" => {
-                    let deps = value.try_convert("weak")?;
+                    let deps = value.try_convert(key_str)?;
                     run_exports.weak = deps;
                 }
                 "weak_constrains" => {
-                    let deps = value.try_convert("weak_constrains")?;
+                    let deps = value.try_convert(key_str)?;
                     run_exports.weak_constrains = deps;
                 }
                 invalid => {

@@ -133,13 +133,14 @@ impl Recipe {
         let mut about = About::default();
 
         for (key, value) in rendered_node.iter() {
-            match key.as_str() {
-                "package" => package = Some(value.try_convert("package")?),
-                "source" => source = value.try_convert("source")?,
-                "build" => build = value.try_convert("build")?,
-                "requirements" => requirements = value.try_convert("requirements")?,
-                "test" => test = value.try_convert("test")?,
-                "about" => about = value.try_convert("about")?,
+            let key_str = key.as_str();
+            match key_str {
+                "package" => package = Some(value.try_convert(key_str)?),
+                "source" => source = value.try_convert(key_str)?,
+                "build" => build = value.try_convert(key_str)?,
+                "requirements" => requirements = value.try_convert(key_str)?,
+                "test" => test = value.try_convert(key_str)?,
+                "about" => about = value.try_convert(key_str)?,
                 "outputs" => {}
                 "context" => {}
                 "extra" => {}

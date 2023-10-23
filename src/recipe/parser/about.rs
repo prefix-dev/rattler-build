@@ -97,24 +97,25 @@ impl TryConvertNode<About> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<About, PartialParsingError> {
         let mut about = About::default();
         for (key, value) in self.iter() {
-            match key.as_str() {
-                "homepage" | "home" => about.homepage = Some(value.try_convert("homepage")?),
+            let key_str = key.as_str();
+            match key_str {
+                "homepage" | "home" => about.homepage = Some(value.try_convert(key_str)?),
                 "repository" | "dev_url" => {
-                    about.repository = Some(value.try_convert("repository")?)
+                    about.repository = Some(value.try_convert(key_str)?)
                 }
                 "documentation" | "doc_url" => {
-                    about.documentation = Some(value.try_convert("documentation")?)
+                    about.documentation = Some(value.try_convert(key_str)?)
                 }
-                "license" => about.license = Some(value.try_convert("license")?),
+                "license" => about.license = Some(value.try_convert(key_str)?),
                 "license_family" => {
-                    about.license_family = Some(value.try_convert("license_family")?)
+                    about.license_family = Some(value.try_convert(key_str)?)
                 }
-                "license_file" => about.license_files = value.try_convert("license_file")?,
-                "license_url" => about.license_url = Some(value.try_convert("license_url")?),
-                "summary" => about.summary = Some(value.try_convert("summary")?),
-                "description" => about.description = Some(value.try_convert("description")?),
+                "license_file" => about.license_files = value.try_convert(key_str)?,
+                "license_url" => about.license_url = Some(value.try_convert(key_str)?),
+                "summary" => about.summary = Some(value.try_convert(key_str)?),
+                "description" => about.description = Some(value.try_convert(key_str)?),
                 "prelink_message" => {
-                    about.prelink_message = Some(value.try_convert("prelink_message")?)
+                    about.prelink_message = Some(value.try_convert(key_str)?)
                 }
                 invalid_key => {
                     return Err(_partialerror!(

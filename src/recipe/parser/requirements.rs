@@ -105,11 +105,12 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
         let mut run_constrained = Vec::new();
 
         for (key, value) in self.iter() {
-            match key.as_str() {
-                "build" => build = value.try_convert("build")?,
-                "host" => host = value.try_convert("host")?,
-                "run" => run = value.try_convert("run")?,
-                "run_constrained" => run_constrained = value.try_convert("run_constrained")?,
+            let key_str = key.as_str();
+            match key_str {
+                "build" => build = value.try_convert(key_str)?,
+                "host" => host = value.try_convert(key_str)?,
+                "run" => run = value.try_convert(key_str)?,
+                "run_constrained" => run_constrained = value.try_convert(key_str)?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
