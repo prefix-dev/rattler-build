@@ -1,0 +1,14 @@
+---
+source: src/recipe/stage2/package.rs
+expression: err
+---
+  × Parsing: Missing field `version`
+   ╭─[2:1]
+ 2 │         package:
+ 3 │             name: test
+   ·                 ───┬──
+   ·                    ╰── here
+ 4 │         
+   ╰────
+  help: the field `version` is required for `package`
+

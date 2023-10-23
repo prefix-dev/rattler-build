@@ -84,7 +84,7 @@ impl TryConvertNode<Package> for RenderedNode {
 impl TryConvertNode<Package> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
         let mut name_val = None;
-        let mut version = String::new();
+        let mut version = None;
 
         for (key, value) in self.iter() {
             match key.as_str() {
@@ -92,7 +92,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
                     name_val = Some(value.try_convert("name")?);
                 }
                 "version" => {
-                    version = value.try_convert("version")?;
+                    version = Some(value.try_convert("version")?);
                 }
                 invalid => {
                     return Err(_partialerror!(
@@ -104,13 +104,21 @@ impl TryConvertNode<Package> for RenderedMappingNode {
             }
         }
 
-        let name = name_val.ok_or_else(|| {
-            _partialerror!(
+        let Some(version) = version else {
+            return Err(_partialerror!(
                 *self.span(),
-                ErrorKind::Other,
-                label = format!("error parsing `{name}` field `name`")
-            )
-        })?;
+                ErrorKind::MissingField("version".into()),
+                help = format!("the field `version` is required for `{name}`")
+            ));
+        };
+
+        let Some(name) = name_val else {
+            return Err(_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("name".into()),
+                help = format!("the field `name` is required for `{name}`")
+            ));
+        };
 
         Ok(Package { name, version })
     }
@@ -128,5 +136,43 @@ impl TryConvertNode<PackageName> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<PackageName, PartialParsingError> {
         PackageName::from_str(self.as_str())
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        assert_miette_snapshot,
+        recipe::{jinja::SelectorConfig, Recipe},
+    };
+
+    #[test]
+    fn missing_fields() {
+        let raw_recipe = r#"
+        package:
+            name: test
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        assert!(recipe.is_err());
+
+        let err = recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn invalid_fields() {
+        let raw_recipe = r#"
+        package:
+            name: test
+            version: 0.1.0
+            invalid: "field"
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        assert!(recipe.is_err());
+
+        let err = recipe.unwrap_err();
+        assert_miette_snapshot!(err);
     }
 }

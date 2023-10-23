@@ -1,0 +1,14 @@
+---
+source: src/recipe/stage2.rs
+expression: err
+---
+  × Parsing: Expected a scalar value.
+   ╭─[2:1]
+ 2 │         context:
+ 3 │           key: ["not-scalar"]
+   ·                ───────┬──────
+   ·                       ╰── here
+ 4 │ 
+   ╰────
+  help: `context` values must always be scalars
+

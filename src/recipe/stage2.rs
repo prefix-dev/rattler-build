@@ -6,7 +6,7 @@ use minijinja::Value;
 use serde::Serialize;
 
 use crate::{
-    _partialerror,
+    _error, _partialerror,
     recipe::{
         custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -33,7 +33,7 @@ pub use self::{
     test::Test,
 };
 
-use super::custom_yaml::Node;
+use super::{custom_yaml::Node, error::marker_span_to_span};
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize)]
@@ -50,8 +50,15 @@ pub struct Recipe {
 impl Recipe {
     /// Build a recipe from a YAML string.
     pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
-        let raw = RawRecipe::from_yaml(yaml)?;
-        Self::from_raw(raw, jinja_opt).map_err(|err| ParsingError::from_partial(yaml, err))
+        let yaml_root = marked_yaml::parse_yaml(0, yaml)
+            .map_err(|err| super::error::load_error_handler(yaml, err))?;
+
+        let yaml_root = Node::try_from(yaml_root)
+            .map_err(|err| _error!(yaml, marker_span_to_span(yaml, err.span), err.kind))?;
+
+        Self::from_node(&yaml_root, jinja_opt)
+            .map(|mut v| v.remove(0)) // TODO: handle multiple recipe outputs
+            .map_err(|err| ParsingError::from_partial(yaml, err))
     }
 
     /// Build a recipe from a YAML string and use a given package hash string as default value.
@@ -144,7 +151,7 @@ impl Recipe {
                 _partialerror!(
                     *context.span(),
                     ErrorKind::ExpectedMapping,
-                    label = "`context` mulst always be a mapping"
+                    help = "`context` must always be a mapping"
                 )
             })?;
 
@@ -153,7 +160,7 @@ impl Recipe {
                     _partialerror!(
                         *v.span(),
                         ErrorKind::ExpectedScalar,
-                        label = "`context` values must always be scalars"
+                        help = "`context` values must always be scalars"
                     )
                 })?;
                 let rendered: Option<ScalarNode> =
@@ -170,6 +177,8 @@ impl Recipe {
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
 
+        // TODO: handle outputs to produce multiple recipes
+
         let mut package = None;
         let mut build = Build::default();
         let mut source = Vec::new();
@@ -179,7 +188,7 @@ impl Recipe {
 
         for (key, value) in rendered_node.iter() {
             match key.as_str() {
-                "package" => package = Some(Package::from_rendered_node(value)?),
+                "package" => package = Some(value.try_convert("package")?),
                 "source" => source = value.try_convert("source")?,
                 "build" => build = value.try_convert("build")?,
                 "requirements" => requirements = value.try_convert("requirements")?,
@@ -187,6 +196,7 @@ impl Recipe {
                 "about" => about = value.try_convert("about")?,
                 "outputs" => {}
                 "context" => {}
+                "extra" => {}
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -196,7 +206,7 @@ impl Recipe {
             }
         }
 
-        let _recipe = Recipe {
+        let recipe = Recipe {
             package: package.ok_or_else(|| {
                 _partialerror!(
                     *root_node.span(),
@@ -212,7 +222,7 @@ impl Recipe {
             extra: (),
         };
 
-        todo!()
+        Ok(vec![recipe])
     }
 
     /// Get the package information.
@@ -248,12 +258,50 @@ impl Recipe {
 
 #[cfg(test)]
 mod tests {
+    use crate::assert_miette_snapshot;
+
     use super::*;
 
     #[test]
     fn it_works() {
         let recipe = include_str!("../../examples/xtensor/recipe.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
-        dbg!(&recipe);
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
+        assert!(recipe.is_ok());
+        insta::assert_debug_snapshot!(recipe.unwrap());
+    }
+
+    #[test]
+    fn context_not_mapping() {
+        let raw_recipe = r#"
+        context: "not-mapping"
+
+        package:
+          name: test
+          version: 0.1.0
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        assert!(recipe.is_err());
+
+        let err = recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn context_value_not_scalar() {
+        let raw_recipe = r#"
+        context:
+          key: ["not-scalar"]
+
+        package:
+            name: test
+            version: 0.1.0
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        assert!(recipe.is_err());
+
+        let err = recipe.unwrap_err();
+        assert_miette_snapshot!(err);
     }
 }

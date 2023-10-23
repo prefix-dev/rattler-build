@@ -1,0 +1,14 @@
+---
+source: src/recipe/stage2/package.rs
+expression: err
+---
+  × Parsing: Invalid field `invalid`.
+   ╭─[4:1]
+ 4 │             version: 0.1.0
+ 5 │             invalid: "field"
+   ·             ───┬───
+   ·                ╰── here
+ 6 │         
+   ╰────
+  help: valid fields for `package` are `name` and `version`
+
