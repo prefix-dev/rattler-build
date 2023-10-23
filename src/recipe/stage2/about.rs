@@ -25,7 +25,6 @@ pub struct About {
     repository: Option<Url>,
     documentation: Option<Url>,
     license: Option<License>,
-    license_family: Option<String>,
     license_files: Vec<String>,
     license_url: Option<Url>,
     summary: Option<String>,

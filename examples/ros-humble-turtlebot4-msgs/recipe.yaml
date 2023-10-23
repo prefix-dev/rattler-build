@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 package:
   name: ros-humble-turtlebot4-msgs
   version: 1.0.3
@@ -14,7 +16,7 @@ build:
       else: build_ament_cmake.sh
   number: 3
 about:
-  home: https://www.ros.org/
+  homepage: https://www.ros.org/
   license: BSD-3-Clause
   summary: |
     Robot Operating System
