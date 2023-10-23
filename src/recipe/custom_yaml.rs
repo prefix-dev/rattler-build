@@ -1040,6 +1040,18 @@ impl TryConvertNode<PathBuf> for RenderedScalarNode {
     }
 }
 
+impl TryConvertNode<RenderedScalarNode> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<RenderedScalarNode, PartialParsingError> {
+        self.as_scalar().cloned().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                help = format!("expected a string value for `{name}`")
+            )
+        })
+    }
+}
+
 impl TryConvertNode<Url> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
         self.as_scalar()

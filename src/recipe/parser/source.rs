@@ -1,18 +1,21 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
     },
 };
 
 /// Source information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum Source {
     Git(GitSource),
@@ -229,7 +232,7 @@ impl fmt::Display for GitUrl {
 
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     url: Url,
@@ -279,33 +282,22 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut file_name = None;
 
         for (key, value) in self.iter() {
-            match key.as_str() {
-                "url" => url = Some(value.try_convert("url")?),
+            let key_str = key.as_str();
+            match key_str {
+                "url" => url = Some(value.try_convert(key_str)?),
                 "sha256" => {
-                    let sha256_str: String = value.try_convert("sha256")?;
-                    if sha256_str.len() != 64 {
-                        return Err(_partialerror!(
-                            *value.span(),
-                            ErrorKind::InvalidSha256,
-                            help = "`sha256` checksums must be 64 characters long"
-                        ));
-                    }
-                    checksums.push(Checksum::Sha256(sha256_str));
+                    let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
+                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidMd5))?;
+                    checksums.push(Checksum::Sha256(sha256_out));
                 }
                 "md5" => {
-                    let md5_str: String = value.try_convert("md5")?;
-                    if md5_str.len() != 32 {
-                        return Err(_partialerror!(
-                            *value.span(),
-                            ErrorKind::InvalidMd5,
-                            help = "`md5` checksums must be 32 characters long"
-                        ));
-                    }
-                    checksums.push(Checksum::Md5(md5_str));
+                    let md5_str: RenderedScalarNode = value.try_convert(key_str)?;
+                    let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| _partialerror!(*md5_str.span(), ErrorKind::InvalidMd5))?;
+                    checksums.push(Checksum::Md5(md5_out));
                 }
-                "file_name" => file_name = Some(value.try_convert("file_name")?),
-                "patches" => patches = value.try_convert("patches")?,
-                "folder" => folder = Some(value.try_convert("folder")?),
+                "file_name" => file_name = Some(value.try_convert(key_str)?),
+                "patches" => patches = value.try_convert(key_str)?,
+                "folder" => folder = Some(value.try_convert(key_str)?),
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -335,11 +327,19 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 }
 
 /// Checksum information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Checksum {
-    Sha256(String),
-    Md5(String),
+    Sha256(Sha256Hash),
+    Md5(Md5Hash),
+}
+
+impl Serialize for Checksum {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Checksum::Sha256(sha256) => hex::encode(sha256).to_lowercase().serialize(serializer),
+            Checksum::Md5(md5) => hex::encode(md5).to_lowercase().serialize(serializer),
+        }
+    }
 }
 
 /// A local path source. The source code will be copied to the `work`
