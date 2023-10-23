@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::recipe::parser::{Checksum, UrlSource};
-use rattler_digest::{compute_file_digest, Md5};
+use rattler_digest::compute_file_digest;
 
 use super::SourceError;
 
