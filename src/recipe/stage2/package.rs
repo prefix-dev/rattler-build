@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, ScalarNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, ScalarNode,
+            TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, Render,
@@ -59,58 +62,6 @@ impl Package {
         })
     }
 
-    pub(super) fn from_rendered_node(node: &RenderedNode) -> Result<Self, PartialParsingError> {
-        match node.as_mapping() {
-            Some(map) => {
-                let mut name = RenderedScalarNode::new_blank();
-                let mut version = "";
-
-                for (key, value) in map.iter() {
-                    match key.as_str() {
-                        "name" => {
-                            name = value
-                                .as_scalar()
-                                .cloned()
-                                .ok_or(_partialerror!(*value.span(), ErrorKind::ExpectedScalar))?
-                        }
-                        "version" => {
-                            version = value
-                                .as_scalar()
-                                .map(|s| s.as_str())
-                                .ok_or(_partialerror!(*value.span(), ErrorKind::ExpectedScalar))?
-                        }
-                        _ => {
-                            return Err(_partialerror!(
-                                *key.span(),
-                                ErrorKind::Other,
-                                label = "invalid field",
-                                help = "valid fields for `package` are `name` and `version`"
-                            ))
-                        }
-                    }
-                }
-
-                let name = PackageName::from_str(name.as_str()).map_err(|_err| {
-                    _partialerror!(
-                        *name.span(),
-                        ErrorKind::Other,
-                        label = "error parsing `package` field `name`"
-                    )
-                })?;
-
-                Ok(Package {
-                    name,
-                    version: version.to_string(),
-                })
-            }
-            None => Err(_partialerror!(
-                *node.span(),
-                ErrorKind::ExpectedMapping,
-                help = "package must be a mapping with `name` and `version` keys"
-            )),
-        }
-    }
-
     /// Get the package name.
     pub fn name(&self) -> &PackageName {
         &self.name
@@ -119,6 +70,49 @@ impl Package {
     /// Get the package version.
     pub fn version(&self) -> &str {
         &self.version
+    }
+}
+
+impl TryConvertNode<Package> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Package> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
+        let mut name_val = None;
+        let mut version = String::new();
+
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "name" => {
+                    name_val = Some(value.try_convert("name")?);
+                }
+                "version" => {
+                    version = value.try_convert("version")?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                        help = format!("valid fields for `{name}` are `name` and `version`")
+                    ))
+                }
+            }
+        }
+
+        let name = name_val.ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = format!("error parsing `{name}` field `name`")
+            )
+        })?;
+
+        Ok(Package { name, version })
     }
 }
 
@@ -131,7 +125,7 @@ impl TryConvertNode<PackageName> for RenderedNode {
 }
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<PackageName, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<PackageName, PartialParsingError> {
         PackageName::from_str(self.as_str())
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
     }

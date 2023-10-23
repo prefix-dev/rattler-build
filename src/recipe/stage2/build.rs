@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, str::FromStr, vec};
 
-use minijinja::Value;
 use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
 use serde::Serialize;
 
