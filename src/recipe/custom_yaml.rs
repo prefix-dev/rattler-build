@@ -973,7 +973,7 @@ impl TryConvertNode<u64> for RenderedNode {
 }
 
 impl TryConvertNode<u64> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<u64, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<u64, PartialParsingError> {
         self.as_str()
             .parse()
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
@@ -981,7 +981,7 @@ impl TryConvertNode<u64> for RenderedScalarNode {
 }
 
 impl TryConvertNode<i32> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<i32, PartialParsingError> {
         self.as_str()
             .parse()
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
@@ -1055,14 +1055,8 @@ impl TryConvertNode<Url> for RenderedNode {
 }
 
 impl TryConvertNode<Url> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
-        Url::parse(self.as_str()).map_err(|err| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::from(err),
-                label = format!("error parsing `{name}` as a URL")
-            )
-        })
+    fn try_convert(&self, _name: &str) -> Result<Url, PartialParsingError> {
+        Url::parse(self.as_str()).map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err)))
     }
 }
 
@@ -1077,7 +1071,13 @@ where
                 let item = s.try_convert(name)?;
                 Ok(vec![item])
             }
-            RenderedNode::Sequence(seq) => seq.iter().map(|item| item.try_convert(name)).collect(),
+            RenderedNode::Sequence(seq) => seq
+                .iter()
+                .map(|item| {
+                    // dbg!(&item);
+                    item.try_convert(name)
+                })
+                .collect(),
             RenderedNode::Null(_) => Ok(vec![]),
             RenderedNode::Mapping(_) => Err(_partialerror!(
                 *self.span(),

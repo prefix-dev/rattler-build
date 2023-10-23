@@ -663,7 +663,8 @@ impl Render<RenderedSequenceNode> for SequenceNode {
         let mut rendered = Vec::with_capacity(self.len());
 
         for item in self.iter() {
-            rendered.push(item.render(jinja, name)?);
+            let item: RenderedSequenceNode = item.render(jinja, name)?;
+            rendered.extend(item.iter().cloned());
         }
 
         let rendered = RenderedSequenceNode::new(*self.span(), rendered);
@@ -672,21 +673,47 @@ impl Render<RenderedSequenceNode> for SequenceNode {
     }
 }
 
-impl Render<RenderedNode> for SequenceNodeInternal {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+impl Render<RenderedSequenceNode> for SequenceNodeInternal {
+    fn render(
+        &self,
+        jinja: &Jinja,
+        name: &str,
+    ) -> Result<RenderedSequenceNode, crate::recipe::error::PartialParsingError> {
+        let mut rendered = Vec::new();
         match self {
-            SequenceNodeInternal::Simple(node) => node.render(jinja, name),
+            SequenceNodeInternal::Simple(node) => rendered.push(node.render(jinja, name)?),
             SequenceNodeInternal::Conditional(if_sel) => {
                 let if_res = if_sel.process(jinja)?;
                 if let Some(if_res) = if_res {
-                    if_res.render(jinja, name)
-                } else {
-                    Ok(RenderedNode::Null(RenderedScalarNode::new(
-                        *if_sel.span(),
-                        "".to_string(),
-                    )))
+                    let rend: RenderedNode = if_res.render(jinja, name)?;
+
+                    if let Some(rend) = rend.as_sequence() {
+                        rendered.extend(rend.iter().cloned());
+                    } else {
+                        rendered.push(rend);
+                    }
                 }
             }
         }
+        Ok(RenderedSequenceNode::from(rendered))
     }
 }
+
+// impl Render<RenderedNode> for SequenceNodeInternal {
+//     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+//         match self {
+//             SequenceNodeInternal::Simple(node) => node.render(jinja, name),
+//             SequenceNodeInternal::Conditional(if_sel) => {
+//                 let if_res = if_sel.process(jinja)?;
+//                 if let Some(if_res) = if_res {
+//                     if_res.render(jinja, name)
+//                 } else {
+//                     Ok(RenderedNode::Null(RenderedScalarNode::new(
+//                         *if_sel.span(),
+//                         "".to_string(),
+//                     )))
+//                 }
+//             }
+//         }
+//     }
+// }
