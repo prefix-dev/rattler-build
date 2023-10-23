@@ -7,7 +7,10 @@ use serde::Serialize;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, MappingNode, Node, SequenceNodeInternal},
+        custom_yaml::{
+            HasSpan, MappingNode, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode,
+            RenderedSequenceNode, SequenceNodeInternal, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, OldRender,
@@ -26,7 +29,7 @@ pub struct Build {
     /// It's possible to override this by setting it manually, but not recommended.
     pub(super) string: Option<String>,
     /// List of conditions under which to skip the build of the package.
-    pub(super) skip: Vec<Value>,
+    pub(super) skip: bool,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     pub(super) script: Vec<String>,
@@ -134,8 +137,8 @@ impl Build {
     }
 
     /// Get the skip conditions.
-    pub fn skip(&self) -> &[Value] {
-        self.skip.as_slice()
+    pub fn skip(&self) -> bool {
+        self.skip
     }
 
     /// Get the build script.
@@ -179,11 +182,76 @@ impl Build {
 
     /// Check if the build should be skipped.
     pub fn is_skip_build(&self) -> bool {
-        !self.skip.is_empty() && self.skip.iter().any(|v| v.is_true())
+        self.skip()
     }
 }
 
-fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialParsingError> {
+impl TryConvertNode<Build> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Build, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Build> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<Build, PartialParsingError> {
+        let mut build = Build::default();
+
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "number" => {
+                    build.number = value.try_convert("number")?;
+                }
+                "string" => {
+                    build.string = Some(value.try_convert("string")?);
+                }
+                "skip" => {
+                    let conds: Vec<bool> = value.try_convert("skip")?;
+
+                    build.skip = conds.iter().any(|&v| v);
+                }
+                "script" => build.script = value.try_convert("script")?,
+                "script_env" => build.script_env = value.try_convert("script_env")?,
+                "ignore_run_exports" => {
+                    build.ignore_run_exports = value.try_convert("ignore_run_exports")?;
+                }
+                "ignore_run_exports_from" => {
+                    // Abuse parse_ignore_run_exports since in structure they are the same
+                    // We may want to change this in the future for better error messages.
+                    build.ignore_run_exports_from = value.try_convert("ignore_run_exports_from")?;
+                }
+                "noarch" => {
+                    build.noarch = value.try_convert("noarch")?;
+                }
+                "run_exports" => {
+                    build.run_exports = value.try_convert("run_exports")?;
+                }
+                "entry_points" => {
+                    if let Some(NoArchKind::Generic) = build.noarch.kind() {
+                        return Err(_partialerror!(
+                            *key.span(),
+                            ErrorKind::Other,
+                            label = "`entry_points` are only allowed for `python` noarch packages"
+                        ));
+                    }
+
+                    build.entry_points = value.try_convert("entry_points")?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                    ))
+                }
+            }
+        }
+
+        Ok(build)
+    }
+}
+
+fn parse_skip(node: &Node, jinja: &Jinja) -> Result<bool, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
             let skip = jinja.eval(s.as_str()).map_err(|err| {
@@ -193,29 +261,29 @@ fn parse_skip(node: &Node, jinja: &Jinja) -> Result<Vec<Value>, PartialParsingEr
                     label = "error evaluating `skip` expression"
                 )
             })?;
-            Ok(vec![skip])
+            Ok(skip.is_true())
         }
         Node::Sequence(seq) => {
-            let mut skip = Vec::new();
+            let mut skip = Vec::with_capacity(seq.len());
             for inner in seq.iter() {
                 match inner {
-                    SequenceNodeInternal::Simple(n) => skip.extend(parse_skip(n, jinja)?),
+                    SequenceNodeInternal::Simple(n) => skip.push(parse_skip(n, jinja)?),
                     SequenceNodeInternal::Conditional(if_sel) => {
                         let if_res = if_sel.process(jinja)?;
                         if let Some(if_res) = if_res {
-                            skip.extend(parse_skip(&if_res, jinja)?)
+                            skip.push(parse_skip(&if_res, jinja)?)
                         }
                     }
                 }
             }
-            Ok(skip)
+            Ok(skip.iter().any(|&v| v))
         }
         Node::Mapping(_) => Err(_partialerror!(
             *node.span(),
             ErrorKind::Other,
             label = "expected scalar or sequence"
         )),
-        Node::Null(_) => Ok(vec![]),
+        Node::Null(_) => Ok(false),
     }
 }
 
@@ -442,6 +510,54 @@ impl ScriptEnv {
     }
 }
 
+impl TryConvertNode<ScriptEnv> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<ScriptEnv, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<ScriptEnv> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<ScriptEnv, PartialParsingError> {
+        let invalid = self
+            .keys()
+            .find(|k| matches!(k.as_str(), "env" | "passthrough" | "secrets"));
+
+        if let Some(invalid) = invalid {
+            return Err(_partialerror!(
+                *invalid.span(),
+                ErrorKind::InvalidField(invalid.to_string().into()),
+                help = format!("valid keys for {name} are `env`, `passthrough` or `secrets`")
+            ));
+        }
+
+        let env = self
+            .get("env")
+            .map(|node| node.try_convert("env"))
+            .transpose()?
+            .unwrap_or_default();
+
+        let passthrough = self
+            .get("passthrough")
+            .map(|node| node.try_convert("passthrough"))
+            .transpose()?
+            .unwrap_or_default();
+
+        let secrets = self
+            .get("secrets")
+            .map(|node| node.try_convert("secrets"))
+            .transpose()?
+            .unwrap_or_default();
+
+        Ok(ScriptEnv {
+            passthrough,
+            env,
+            secrets,
+        })
+    }
+}
+
 fn parse_env(node: &Node, jinja: &Jinja) -> Result<BTreeMap<String, String>, PartialParsingError> {
     if let Some(map) = node.as_mapping() {
         let mut env = BTreeMap::new();
@@ -659,6 +775,81 @@ impl RunExports {
     }
 }
 
+impl TryConvertNode<RunExports> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => s.try_convert(name),
+            RenderedNode::Sequence(seq) => seq.try_convert(name),
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Null(_) => Ok(RunExports::default()),
+        }
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        let dep = self.try_convert(name)?;
+        run_exports.weak.push(dep);
+
+        Ok(run_exports)
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        for node in self.iter() {
+            let deps = node.try_convert(name)?;
+            run_exports.weak = deps;
+        }
+
+        Ok(run_exports)
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        for (key, value) in self.iter() {
+            match key.as_str() {
+                "noarch" => {
+                    let deps = value.try_convert("noarch")?;
+                    run_exports.noarch = deps;
+                }
+                "strong" => {
+                    let deps = value.try_convert("strong")?;
+                    run_exports.strong = deps;
+                }
+                "strong_constrains" => {
+                    let deps = value.try_convert("strong_constrains")?;
+                    run_exports.strong_constrains = deps;
+                }
+                "weak" => {
+                    let deps = value.try_convert("weak")?;
+                    run_exports.weak = deps;
+                }
+                "weak_constrains" => {
+                    let deps = value.try_convert("weak_constrains")?;
+                    run_exports.weak_constrains = deps;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_owned().into()),
+                        help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
+                    ))
+                }
+            }
+        }
+
+        Ok(run_exports)
+    }
+}
+
 fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, PartialParsingError> {
     match node {
         Node::Scalar(s) => {
@@ -688,5 +879,46 @@ fn parse_dependency(node: &Node, jinja: &Jinja) -> Result<Vec<Dependency>, Parti
             label = "expected scalar or sequence"
         )),
         Node::Null(_) => Ok(vec![]),
+    }
+}
+
+impl TryConvertNode<NoArchType> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<NoArchType, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar,))?
+            .try_convert(name)
+    }
+}
+
+impl TryConvertNode<NoArchType> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<NoArchType, PartialParsingError> {
+        let noarch = self.as_str();
+        let noarch = match noarch {
+            "python" => NoArchType::python(),
+            "generic" => NoArchType::generic(),
+            invalid => {
+                return Err(_partialerror!(
+                    *self.span(),
+                    ErrorKind::InvalidField(invalid.to_owned().into()),
+                    help = format!("expected `python` or `generic` for {name}"),
+                ))
+            }
+        };
+        Ok(noarch)
+    }
+}
+
+impl TryConvertNode<EntryPoint> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<EntryPoint, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar))
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<EntryPoint> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<EntryPoint, PartialParsingError> {
+        EntryPoint::from_str(self.as_str())
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::EntryPointParsing(err),))
     }
 }

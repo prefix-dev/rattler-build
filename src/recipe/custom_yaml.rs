@@ -1,6 +1,7 @@
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::{fmt, hash::Hash, ops};
 
@@ -931,15 +932,59 @@ impl TryConvertNode<i32> for RenderedNode {
     }
 }
 
-impl TryConvertNode<i32> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
-        self.as_str().parse().map_err(|err| {
+impl TryConvertNode<bool> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<bool> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
+        self.as_bool().ok_or_else(|| {
             _partialerror!(
                 *self.span(),
-                ErrorKind::from(err),
-                label = format!("error parsing `{name}` as an integer")
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a boolean value for `{name}`")
             )
         })
+    }
+}
+
+impl TryConvertNode<u64> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<u64, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<u64> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<u64, PartialParsingError> {
+        self.as_str()
+            .parse()
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+    }
+}
+
+impl TryConvertNode<i32> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+        self.as_str()
+            .parse()
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
     }
 }
 
@@ -1040,5 +1085,41 @@ where
                 label = format!("expected scalar or sequence for {name}")
             )),
         }
+    }
+}
+
+impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedNode
+where
+    K: Ord,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    help = format!("expected a mapping for `{name}`")
+                )
+            })
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedMappingNode
+where
+    K: Ord,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+        let mut map = BTreeMap::new();
+        for (key, value) in self.iter() {
+            let key = key.try_convert(name)?;
+            let value = value.try_convert(name)?;
+            map.insert(key, value);
+        }
+        Ok(map)
     }
 }

@@ -171,6 +171,7 @@ impl Recipe {
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
 
         let mut package = None;
+        let mut build = Build::default();
         let mut source = Vec::new();
         let mut requirements = Requirements::default();
         let mut test = Test::default();
@@ -180,7 +181,7 @@ impl Recipe {
             match key.as_str() {
                 "package" => package = Some(Package::from_rendered_node(value)?),
                 "source" => source = value.try_convert("source")?,
-                "build" => {}
+                "build" => build = value.try_convert("build")?,
                 "requirements" => requirements = value.try_convert("requirements")?,
                 "test" => test = value.try_convert("test")?,
                 "about" => about = value.try_convert("about")?,
@@ -203,11 +204,11 @@ impl Recipe {
                     label = "missing required key `package`"
                 )
             })?,
+            build,
             source,
             requirements,
             test,
             about,
-            build: todo!(),
             extra: (),
         };
 

@@ -112,6 +112,14 @@ pub enum ErrorKind {
     #[diagnostic(code(error::match_spec_parsing))]
     MatchSpecParsing(#[from] rattler_conda_types::ParseMatchSpecError),
 
+    /// Error when parsing a [`PackageName`](rattler_conda_types::PackageName).
+    #[diagnostic(code(error::package_name_parsing))]
+    PackageNameParsing(#[from] rattler_conda_types::InvalidPackageNameError),
+
+    /// Error when parsing a [`EntryPoint`](rattler_conda_types::package::EntryPoint).
+    #[diagnostic(code(error::entry_point_parsing))]
+    EntryPointParsing(String),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -197,6 +205,12 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::MatchSpecParsing(err) => {
                 write!(f, "Failed to parse match spec: {}", err)
+            }
+            ErrorKind::PackageNameParsing(err) => {
+                write!(f, "Failed to parse package name: {}", err)
+            }
+            ErrorKind::EntryPointParsing(err) => {
+                write!(f, "Failed to parse entry point: {}", err)
             }
             ErrorKind::Other => write!(f, "An unspecified error occurred."),
         }

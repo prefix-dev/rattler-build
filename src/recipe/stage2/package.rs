@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, ScalarNode},
+        custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
         jinja::Jinja,
         stage1, Render,
@@ -119,5 +119,20 @@ impl Package {
     /// Get the package version.
     pub fn version(&self) -> &str {
         &self.version
+    }
+}
+
+impl TryConvertNode<PackageName> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PackageName, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar))
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PackageName> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<PackageName, PartialParsingError> {
+        PackageName::from_str(self.as_str())
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
     }
 }
