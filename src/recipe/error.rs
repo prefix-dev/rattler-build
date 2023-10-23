@@ -425,7 +425,7 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
 #[cfg(test)]
 mod tests {
 
-    use crate::{assert_miette_snapshot, recipe::stage1::RawRecipe};
+    use crate::{assert_miette_snapshot, recipe::Recipe};
 
     #[test]
     fn miette_output() {
@@ -437,7 +437,7 @@ mod tests {
                 name: test
                 version: 0.1.0
             "#;
-        let res = RawRecipe::from_yaml(fault_yaml);
+        let res = Recipe::from_yaml(fault_yaml, Default::default());
 
         if let Err(err) = res {
             assert_miette_snapshot!(err);

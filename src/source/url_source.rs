@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::recipe::stage2::{Checksum, UrlSource};
+use crate::recipe::parser::{Checksum, UrlSource};
 use rattler_digest::compute_file_digest;
 
 use super::SourceError;
@@ -121,7 +121,7 @@ pub(crate) async fn url_src(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recipe::stage2::Checksum;
+    use crate::recipe::parser::Checksum;
     use url::Url;
 
     #[test]

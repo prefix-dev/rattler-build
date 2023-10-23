@@ -7,12 +7,9 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode, ScalarNode,
-            SequenceNodeInternal, TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
-        jinja::Jinja,
-        stage1, Render,
     },
     render::pin::Pin,
 };
@@ -48,43 +45,6 @@ pub struct Requirements {
 }
 
 impl Requirements {
-    pub(super) fn from_stage1(
-        req: &stage1::Requirements,
-        jinja: &Jinja,
-    ) -> Result<Self, PartialParsingError> {
-        let build = req
-            .build
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let host = req
-            .host
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let run = req
-            .run
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let run_constrained = req
-            .run_constrained
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-
-        Ok(Self {
-            build,
-            host,
-            run,
-            run_constrained,
-        })
-    }
-
     /// Get the build requirements.
     pub fn build(&self) -> &[Dependency] {
         self.build.as_slice()
@@ -206,89 +166,6 @@ pub enum Dependency {
     Spec(MatchSpec),
     PinSubpackage(PinSubpackage),
     Compiler(Compiler),
-}
-
-impl Dependency {
-    pub(super) fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialParsingError> {
-        match node {
-            Node::Scalar(s) => {
-                let dep = Self::from_scalar(s, jinja)?
-                    .map(|d| vec![d])
-                    .unwrap_or_default();
-
-                Ok(dep)
-            }
-            Node::Sequence(seq) => {
-                let mut deps = Vec::new();
-                for inner in seq.iter() {
-                    match inner {
-                        SequenceNodeInternal::Simple(n) => deps.extend(Self::from_node(n, jinja)?),
-                        SequenceNodeInternal::Conditional(if_sel) => {
-                            let if_res = if_sel.process(jinja)?;
-                            if let Some(if_res) = if_res {
-                                deps.extend(Self::from_node(&if_res, jinja)?)
-                            }
-                        }
-                    }
-                }
-                Ok(deps)
-            }
-            Node::Mapping(_) => Err(_partialerror!(
-                *node.span(),
-                ErrorKind::Other,
-                label = "expected scalar or sequence"
-            )),
-            Node::Null(_) => Ok(vec![]),
-        }
-    }
-
-    pub(super) fn from_scalar(
-        s: &ScalarNode,
-        jinja: &Jinja,
-    ) -> Result<Option<Self>, PartialParsingError> {
-        // compiler
-        if s.as_str().contains("compiler(") {
-            let compiler = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering compiler"
-                )
-            })?;
-            Ok(Some(Self::Compiler(Compiler { compiler })))
-        } else if s.as_str().contains("pin_subpackage(") {
-            let pin_subpackage: Option<ScalarNode> = s.render(jinja, "pin_subpackage")?;
-
-            let pin_subpackage = pin_subpackage
-                .map(|s| s.as_str().to_string())
-                .expect("pin_subpackage should never result in Null after rendering");
-
-            // Panic should never happen from this strip unless the prefix magic for the pin
-            // subpackage changes
-            let internal_repr = pin_subpackage
-                .strip_prefix("__PIN_SUBPACKAGE ")
-                .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
-            let pin_subpackage = Pin::from_internal_repr(internal_repr);
-            Ok(Some(Self::PinSubpackage(PinSubpackage { pin_subpackage })))
-        } else {
-            let spec = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering spec"
-                )
-            })?;
-
-            if spec.is_empty() {
-                return Ok(None);
-            }
-
-            let spec = MatchSpec::from_str(&spec).map_err(|_err| {
-                _partialerror!(*s.span(), ErrorKind::Other, label = "error parsing spec")
-            })?;
-            Ok(Some(Self::Spec(spec)))
-        }
-    }
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {

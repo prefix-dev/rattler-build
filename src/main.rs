@@ -20,7 +20,7 @@ use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 use rattler_build::{
     build::run_build,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
-    recipe::stage2::Recipe,
+    recipe::parser::Recipe,
     selectors::SelectorConfig,
     test::{self, TestConfiguration},
     tool_configuration,

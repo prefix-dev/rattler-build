@@ -8,7 +8,7 @@ use std::{
 use fs_extra::dir::CopyOptions;
 use ignore::WalkBuilder;
 
-use crate::recipe::stage2::Source;
+use crate::recipe::parser::Source;
 
 #[cfg(feature = "git")]
 pub mod git_source;

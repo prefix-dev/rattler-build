@@ -6,10 +6,9 @@ use self::{
     custom_yaml::{HasSpan, ScalarNode, TryConvertNode},
     error::PartialParsingError,
 };
-pub use self::{error::ParsingError, jinja::Jinja, stage1::RawRecipe, stage2::Recipe};
+pub use self::{error::ParsingError, jinja::Jinja, parser::Recipe};
 
-pub mod stage1;
-pub mod stage2;
+pub mod parser;
 
 pub mod custom_yaml;
 pub mod error;

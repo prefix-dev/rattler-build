@@ -12,12 +12,9 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode,
-            SequenceNodeInternal, TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
-        jinja::Jinja,
-        stage1, OldRender,
     },
 };
 
@@ -37,40 +34,6 @@ pub struct About {
 }
 
 impl About {
-    pub(super) fn from_stage1(
-        about: &stage1::About,
-        jinja: &Jinja,
-    ) -> Result<Self, PartialParsingError> {
-        let homepage = about.homepage.render(jinja, "homepage")?;
-        let repository = about.repository.render(jinja, "repository")?;
-        let documentation = about.documentation.render(jinja, "documentation")?;
-        let license = about.license.render(jinja, "license")?;
-        let license_family = about.license_family.render(jinja, "license_family")?;
-        let license_url = about.license_url.render(jinja, "license_url")?;
-        let license_files = about
-            .license_file
-            .as_ref()
-            .map(|node| parse_license_files(node, jinja))
-            .transpose()?
-            .unwrap_or_default();
-        let summary = about.summary.render(jinja, "summary")?;
-        let description = about.description.render(jinja, "description")?;
-        let prelink_message = about.prelink_message.render(jinja, "prelink_message")?;
-
-        Ok(Self {
-            homepage,
-            repository,
-            documentation,
-            license,
-            license_family,
-            license_files,
-            license_url,
-            summary,
-            description,
-            prelink_message,
-        })
-    }
-
     /// Get the homepage.
     pub const fn homepage(&self) -> Option<&Url> {
         self.homepage.as_ref()
@@ -212,49 +175,6 @@ impl TryConvertNode<License> for RenderedScalarNode {
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))?;
 
         Ok(License { original, expr })
-    }
-}
-
-fn parse_license_files(node: &Node, jinja: &Jinja) -> Result<Vec<String>, PartialParsingError> {
-    match node {
-        Node::Scalar(s) => {
-            let script = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering `script`"
-                )
-            })?;
-
-            if script.is_empty() {
-                return Ok(Vec::new());
-            }
-
-            Ok(vec![script])
-        }
-        Node::Sequence(seq) => {
-            let mut scripts = Vec::new();
-            for inner in seq.iter() {
-                match inner {
-                    SequenceNodeInternal::Simple(n) => {
-                        scripts.extend(parse_license_files(n, jinja)?)
-                    }
-                    SequenceNodeInternal::Conditional(if_sel) => {
-                        let if_res = if_sel.process(jinja)?;
-                        if let Some(if_res) = if_res {
-                            scripts.extend(parse_license_files(&if_res, jinja)?)
-                        }
-                    }
-                }
-            }
-            Ok(scripts)
-        }
-        Node::Mapping(_) => Err(_partialerror!(
-            *node.span(),
-            ErrorKind::Other,
-            label = "expected scalar or sequence"
-        )),
-        Node::Null(_) => Ok(vec![]),
     }
 }
 

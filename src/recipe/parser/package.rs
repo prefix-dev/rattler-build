@@ -7,12 +7,9 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, ScalarNode,
-            TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
-        jinja::Jinja,
-        stage1, Render,
     },
 };
 
@@ -24,44 +21,6 @@ pub struct Package {
 }
 
 impl Package {
-    pub(super) fn from_stage1(
-        package: &stage1::Package,
-        jinja: &Jinja,
-    ) -> Result<Self, PartialParsingError> {
-        let name: Option<ScalarNode> = package.name.render(jinja, "package name")?;
-
-        let Some(name) = name else {
-            return Err(_partialerror!(
-                *package.name.span(),
-                ErrorKind::Other,
-                label = "package name is required"
-            ));
-        };
-
-        let name = PackageName::from_str(name.as_str()).map_err(|_err| {
-            _partialerror!(
-                *package.name.span(),
-                ErrorKind::Other,
-                label = "error parsing package name"
-            )
-        })?;
-
-        let version: Option<ScalarNode> = package.version.render(jinja, "package version")?;
-
-        let Some(version) = version else {
-            return Err(_partialerror!(
-                *package.version.span(),
-                ErrorKind::Other,
-                label = "package version is required"
-            ));
-        };
-
-        Ok(Package {
-            name,
-            version: version.to_string(),
-        })
-    }
-
     /// Get the package name.
     pub fn name(&self) -> &PackageName {
         &self.name
@@ -85,6 +44,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
         let mut name_val = None;
         let mut version = None;
+        let span = *self.span();
 
         for (key, value) in self.iter() {
             match key.as_str() {
@@ -106,7 +66,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
 
         let Some(version) = version else {
             return Err(_partialerror!(
-                *self.span(),
+                span,
                 ErrorKind::MissingField("version".into()),
                 help = format!("the field `version` is required for `{name}`")
             ));
@@ -114,7 +74,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
 
         let Some(name) = name_val else {
             return Err(_partialerror!(
-                *self.span(),
+                span,
                 ErrorKind::MissingField("name".into()),
                 help = format!("the field `name` is required for `{name}`")
             ));

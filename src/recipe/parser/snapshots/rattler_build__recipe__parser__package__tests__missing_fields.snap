@@ -1,5 +1,5 @@
 ---
-source: src/recipe/stage2/package.rs
+source: src/recipe/parser/package.rs
 expression: err
 ---
   × Parsing: Missing field `version`

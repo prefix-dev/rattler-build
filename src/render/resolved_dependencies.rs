@@ -19,7 +19,7 @@ use rattler_conda_types::{
 use thiserror::Error;
 
 use super::solver::create_environment;
-use crate::recipe::stage2::Dependency;
+use crate::recipe::parser::Dependency;
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]

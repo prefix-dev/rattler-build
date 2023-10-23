@@ -11,7 +11,6 @@ use crate::{
         custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
-        stage1::RawRecipe,
         Render,
     },
     selectors::SelectorConfig,
@@ -75,59 +74,6 @@ impl Recipe {
         }
 
         Ok(recipe)
-    }
-
-    /// Build a recipe from a [`RawRecipe`].
-    pub fn from_raw(
-        raw: RawRecipe,
-        jinja_opt: SelectorConfig,
-    ) -> Result<Self, PartialParsingError> {
-        // Init minijinja
-        let mut jinja = Jinja::new(jinja_opt);
-
-        for (k, v) in raw.context {
-            let rendered = jinja.render_str(v.as_str()).map_err(|err| {
-                _partialerror!(
-                    *v.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering context"
-                )
-            })?;
-
-            jinja
-                .context_mut()
-                .insert(k.as_str().to_owned(), Value::from_safe_string(rendered));
-        }
-
-        let package = Package::from_stage1(&raw.package, &jinja)?;
-        let source = Source::from_stage1(raw.source, &jinja)?;
-
-        let about = raw
-            .about
-            .as_ref()
-            .map(|about| About::from_stage1(about, &jinja))
-            .transpose()?
-            .unwrap_or_default();
-
-        let requirements = raw
-            .requirements
-            .as_ref()
-            .map(|req| Requirements::from_stage1(req, &jinja))
-            .transpose()?
-            .unwrap_or_default();
-
-        let build = Build::from_stage1(&raw.build, &jinja)?;
-        let test = Test::from_stage1(&raw.test, &jinja)?;
-
-        Ok(Self {
-            package,
-            source,
-            build,
-            requirements,
-            test,
-            about,
-            extra: (),
-        })
     }
 
     /// WIP
