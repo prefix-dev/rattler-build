@@ -76,7 +76,7 @@ impl Recipe {
         Ok(recipe)
     }
 
-    /// WIP
+    /// Create recipes from a YAML [`Node`] structure.
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
@@ -228,8 +228,6 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        assert!(recipe.is_err());
-
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }
@@ -246,8 +244,6 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        assert!(recipe.is_err());
-
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }

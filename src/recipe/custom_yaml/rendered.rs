@@ -18,7 +18,7 @@ use crate::{
 
 use super::{HasSpan, MappingNode, Node, ScalarNode, SequenceNode, SequenceNodeInternal};
 
-/// A marked new Conda Recipe YAML node
+/// A span-marked new Conda Recipe YAML node
 ///
 /// This is a reinterpretation of the [`marked_yaml::Node`] type that is specific
 /// for the first stage of the new Conda recipe format parser. This type handles
@@ -698,22 +698,3 @@ impl Render<RenderedSequenceNode> for SequenceNodeInternal {
         Ok(RenderedSequenceNode::from(rendered))
     }
 }
-
-// impl Render<RenderedNode> for SequenceNodeInternal {
-//     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
-//         match self {
-//             SequenceNodeInternal::Simple(node) => node.render(jinja, name),
-//             SequenceNodeInternal::Conditional(if_sel) => {
-//                 let if_res = if_sel.process(jinja)?;
-//                 if let Some(if_res) = if_res {
-//                     if_res.render(jinja, name)
-//                 } else {
-//                     Ok(RenderedNode::Null(RenderedScalarNode::new(
-//                         *if_sel.span(),
-//                         "".to_string(),
-//                     )))
-//                 }
-//             }
-//         }
-//     }
-// }
