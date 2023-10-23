@@ -235,6 +235,8 @@ pub struct UrlSource {
     url: Url,
     /// Optionally a checksum to verify the downloaded file
     checksums: Vec<Checksum>,
+    /// Optionally a file name to rename the downloaded file (does not apply to archives)
+    file_name: Option<String>,
     /// Patches to apply to the source code
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
@@ -261,6 +263,11 @@ impl UrlSource {
     pub const fn folder(&self) -> Option<&PathBuf> {
         self.folder.as_ref()
     }
+
+    /// Get the file name of the URL source.
+    pub const fn file_name(&self) -> Option<&String> {
+        self.file_name.as_ref()
+    }
 }
 
 impl TryConvertNode<UrlSource> for RenderedMappingNode {
@@ -269,6 +276,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut checksums = Vec::new();
         let mut patches = Vec::new();
         let mut folder = None;
+        let mut file_name = None;
 
         for (key, value) in self.iter() {
             match key.as_str() {
@@ -295,6 +303,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     }
                     checksums.push(Checksum::Md5(md5_str));
                 }
+                "file_name" => file_name = Some(value.try_convert("file_name")?),
                 "patches" => patches = value.try_convert("patches")?,
                 "folder" => folder = Some(value.try_convert("folder")?),
                 invalid_key => {
@@ -318,6 +327,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         Ok(UrlSource {
             url,
             checksums,
+            file_name,
             patches,
             folder,
         })

@@ -88,7 +88,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from URL: {}", src.url());
                 let res =
                     url_source::url_src(src, &cache_src, src.checksums().first().unwrap()).await?;
-                let dest_dir = if let Some(folder) = src.folder() {
+                let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
                     work_dir.to_path_buf()
