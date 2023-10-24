@@ -1,236 +1,18 @@
 //! All the metadata that makes up a recipe file
-use rattler_conda_types::package::{ArchiveType, EntryPoint};
-use rattler_conda_types::{NoArchType, PackageName, Platform};
+use std::{
+    collections::BTreeMap,
+    env,
+    fmt::{self, Display, Formatter},
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
-use serde_with::formats::PreferOne;
-use serde_with::serde_as;
-use serde_with::OneOrMany;
-use std::collections::BTreeMap;
-use std::env;
-use std::fmt::Display;
-use std::fmt::Formatter;
-use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
-use std::time::SystemTime;
-use std::time::UNIX_EPOCH;
-use url::Url;
 
-use crate::render::dependency_list::DependencyList;
 use crate::render::resolved_dependencies::FinalizedDependencies;
-
-/// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Requirements {
-    /// Requirements at _build_ time are requirements that can
-    /// be run on the machine that is executing the build script.
-    /// The environment will thus be resolved with the appropriate platform
-    /// that is currently running (e.g. on linux-64 it will be resolved with linux-64).
-    /// Typically things like compilers, build tools, etc. are installed here.
-    #[serde(default)]
-    pub build: DependencyList,
-    /// Requirements at _host_ time are requirements that the final executable is going
-    /// to _link_ against. The environment will be resolved with the target_platform
-    /// architecture (e.g. if you build _on_ linux-64 _for_ linux-aarch64, then the
-    /// host environment will be resolved with linux-aarch64).
-    ///
-    /// Typically things like libraries, headers, etc. are installed here.
-    #[serde(default)]
-    pub host: DependencyList,
-    /// Requirements at _run_ time are requirements that the final executable is going
-    /// to _run_ against. The environment will be resolved with the target_platform
-    /// at runtime.
-    #[serde(default)]
-    pub run: DependencyList,
-    /// Constrains are optional runtime requirements that are used to constrain the
-    /// environment that is resolved. They are not installed by default, but when
-    /// installed they will have to conform to the constrains specified here.
-    #[serde(default)]
-    pub run_constrained: DependencyList,
-}
-
-/// Run exports are applied to downstream packages that depend on this package.
-#[derive(Serialize, Debug, Default, Clone)]
-pub struct RunExports {
-    #[serde(default)]
-    pub noarch: DependencyList,
-    #[serde(default)]
-    pub strong: DependencyList,
-    #[serde(default)]
-    pub strong_constrains: DependencyList,
-    #[serde(default)]
-    pub weak: DependencyList,
-    #[serde(default)]
-    pub weak_constrains: DependencyList,
-}
-
-use serde::de::{self, Deserializer, MapAccess, SeqAccess, Visitor};
-use std::fmt;
-use std::str::FromStr;
-
-impl<'de> Deserialize<'de> for RunExports {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        enum RunExportsData {
-            Map(RunExports),
-            List(DependencyList),
-        }
-
-        struct RunExportsVisitor;
-
-        impl<'de> Visitor<'de> for RunExportsVisitor {
-            type Value = RunExportsData;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a list or a map")
-            }
-
-            fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut run_exports = RunExports::default();
-                while let Some(key) = access.next_key()? {
-                    match key {
-                        "strong" => run_exports.strong = access.next_value()?,
-                        "weak" => run_exports.weak = access.next_value()?,
-                        "weak_constrains" => run_exports.weak_constrains = access.next_value()?,
-                        "strong_constrains" => {
-                            run_exports.strong_constrains = access.next_value()?
-                        }
-                        "noarch" => run_exports.noarch = access.next_value()?,
-                        _ => (),
-                    }
-                }
-                Ok(RunExportsData::Map(run_exports))
-            }
-
-            fn visit_seq<S>(self, mut access: S) -> Result<Self::Value, S::Error>
-            where
-                S: SeqAccess<'de>,
-            {
-                let weak =
-                    Deserialize::deserialize(de::value::SeqAccessDeserializer::new(&mut access))?;
-                Ok(RunExportsData::List(weak))
-            }
-        }
-
-        let run_exports_data = deserializer.deserialize_any(RunExportsVisitor)?;
-
-        match run_exports_data {
-            RunExportsData::Map(run_exports) => Ok(run_exports),
-            RunExportsData::List(weak) => Ok(RunExports {
-                weak,
-                ..Default::default()
-            }),
-        }
-    }
-}
-
-/// Extra environment variables to set during the build script execution
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct ScriptEnv {
-    /// Environments variables to leak into the build environment from the host system.
-    /// During build time these variables are recorded and stored in the package output.
-    /// Use `secrets` for environment variables that should not be recorded.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub passthrough: Vec<String>,
-    /// Environment variables to set in the build environment.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty", default)]
-    pub env: BTreeMap<String, String>,
-    /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information. Use with care because this might make recipes no
-    /// longer reproducible on other machines.
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub secrets: Vec<String>,
-}
-
-impl ScriptEnv {
-    pub fn is_empty(&self) -> bool {
-        self.passthrough.is_empty() && self.env.is_empty() && self.secrets.is_empty()
-    }
-}
-
-/// The build options contain information about how to build the package and some additional
-/// metadata about the package.
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct BuildOptions {
-    /// The build number is a number that should be incremented every time the recipe is built.
-    #[serde(default)]
-    pub number: u64,
-    /// The build string is usually set automatically as the hash of the variant configuration.
-    /// It's possible to override this by setting it manually, but not recommended.
-    pub string: Option<String>,
-    /// The build script can be either a list of commands or a path to a script. By
-    /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
-    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
-    pub script: Option<Vec<String>>,
-    /// Environment variables to pass through or set in the script
-    #[serde(skip_serializing_if = "ScriptEnv::is_empty", default)]
-    pub script_env: ScriptEnv,
-    /// A recipe can choose to ignore certain run exports of its dependencies
-    pub ignore_run_exports: Option<Vec<PackageName>>,
-    /// A recipe can choose to ignore all run exports of coming from some packages
-    pub ignore_run_exports_from: Option<Vec<PackageName>>,
-    /// The recipe can specify a list of run exports that it provides
-    pub run_exports: Option<RunExports>,
-    /// A noarch package runs on any platform. It can be either a python package or a generic package.
-    #[serde(default = "NoArchType::default")]
-    pub noarch: NoArchType,
-    /// For a Python noarch package to have executables it is necessary to specify the python entry points.
-    /// These contain the name of the executable and the module + function that should be executed.
-    #[serde(default)]
-    pub entry_points: Vec<EntryPoint>,
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct About {
-    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
-    pub home: Option<Vec<Url>>,
-    pub license: Option<String>,
-    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
-    pub license_file: Option<Vec<String>>,
-    pub license_family: Option<String>,
-    pub summary: Option<String>,
-    pub description: Option<String>,
-    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
-    pub doc_url: Option<Vec<Url>>,
-    #[serde_as(as = "Option<OneOrMany<_, PreferOne>>")]
-    pub dev_url: Option<Vec<Url>>,
-}
-
-/// Define tests in your recipe that are executed after successfully building the package.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Test {
-    /// Try importing a python module as a sanity check
-    pub imports: Option<Vec<String>>,
-    /// Run a list of given commands
-    pub commands: Option<Vec<String>>,
-    /// Extra requirements to be installed at test time
-    pub requires: Option<Vec<String>>,
-    /// Extra files to be copied to the test environment from the source dir (can be globs)
-    pub source_files: Option<Vec<String>>,
-    /// Extra files to be copied to the test environment from the build dir (can be globs)
-    pub files: Option<Vec<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Recipe {
-    pub context: BTreeMap<String, serde_yaml::Value>,
-    pub name: String,
-    pub version: String,
-    pub source: Vec<Source>,
-    #[serde(default)]
-    pub build: BuildOptions,
-    #[serde(default)]
-    pub requirements: Requirements,
-    #[serde(default)]
-    pub about: About,
-}
 
 pub struct Metadata {
     pub name: String,
@@ -246,13 +28,6 @@ impl Default for Metadata {
             requirements: Vec::new(),
         }
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum Checksum {
-    Sha256(String),
-    Md5(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -274,74 +49,6 @@ impl Display for GitRev {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
-}
-
-/// Type of the git_url which can be a path and a URL, let serde figure it out.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum GitUrl {
-    Url(Url),
-    Path(PathBuf),
-}
-
-/// A git source
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct GitSrc {
-    /// Url to the git repository
-    pub git_url: GitUrl,
-
-    /// Optionally a revision to checkout, defaults to `HEAD`
-    #[serde(default)]
-    pub git_rev: GitRev,
-
-    /// Optionally a depth to clone the repository, defaults to `None`
-    pub git_depth: Option<i32>,
-
-    /// Optionally patches to apply to the source code
-    pub patches: Option<Vec<PathBuf>>,
-
-    /// Optionally a folder name under the `work` directory to place the source code
-    pub folder: Option<PathBuf>,
-}
-
-/// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
-/// will be extracted to the `work` (or `work/<folder>` directory).
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct UrlSrc {
-    /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
-    pub url: Url,
-
-    /// Optionally a checksum to verify the downloaded file
-    #[serde(flatten)]
-    pub checksum: Checksum,
-
-    /// Patches to apply to the source code
-    pub patches: Option<Vec<PathBuf>>,
-
-    /// Optionally a folder name under the `work` directory to place the source code
-    pub folder: Option<PathBuf>,
-}
-
-/// A local path source. The source code will be copied to the `work`
-/// (or `work/<folder>` directory).
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PathSrc {
-    /// Path to the local source code
-    pub path: PathBuf,
-
-    /// Patches to apply to the source code
-    pub patches: Option<Vec<PathBuf>>,
-
-    /// Optionally a folder name under the `work` directory to place the source code
-    pub folder: Option<PathBuf>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(untagged)]
-pub enum Source {
-    Git(GitSrc),
-    Url(UrlSrc),
-    Path(PathSrc),
 }
 
 /// Directories used during the build process
@@ -451,49 +158,10 @@ impl BuildConfiguration {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Package {
-    /// The name of the package
-    pub name: PackageName,
-    /// The version of the package
-    pub version: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageIdentifier {
     pub name: PackageName,
     pub version: String,
     pub build_string: String,
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RenderedRecipe {
-    /// Information about the package
-    pub package: Package,
-    /// The source section of the recipe
-    #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
-    #[serde(default)]
-    pub source: Vec<Source>,
-    /// The build section of the recipe
-    #[serde(default)]
-    pub build: BuildOptions,
-    /// The requirements section of the recipe
-    #[serde(default)]
-    pub requirements: Requirements,
-    /// The about section of the recipe
-    #[serde(default)]
-    pub about: About,
-    /// The test section of the recipe
-    pub test: Option<Test>,
-}
-
-impl fmt::Display for GitUrl {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            GitUrl::Url(url) => write!(f, "{}", url),
-            GitUrl::Path(path) => write!(f, "{:?}", path),
-        }
-    }
 }
 
 #[derive(Clone)]

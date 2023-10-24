@@ -6,7 +6,7 @@ use minijinja::Value;
 use serde::Serialize;
 
 use crate::{
-    _error, _partialerror,
+    _partialerror,
     recipe::{
         custom_yaml::{HasSpan, RenderedMappingNode, ScalarNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -32,7 +32,7 @@ pub use self::{
     test::Test,
 };
 
-use super::{custom_yaml::Node, error::marker_span_to_span};
+use super::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize)]
@@ -49,11 +49,7 @@ pub struct Recipe {
 impl Recipe {
     /// Build a recipe from a YAML string.
     pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
-        let yaml_root = marked_yaml::parse_yaml(0, yaml)
-            .map_err(|err| super::error::load_error_handler(yaml, err))?;
-
-        let yaml_root = Node::try_from(yaml_root)
-            .map_err(|err| _error!(yaml, marker_span_to_span(yaml, err.span), err.kind))?;
+        let yaml_root = Node::parse_yaml(0, yaml)?;
 
         Self::from_node(&yaml_root, jinja_opt)
             .map(|mut v| v.remove(0)) // TODO: handle multiple recipe outputs

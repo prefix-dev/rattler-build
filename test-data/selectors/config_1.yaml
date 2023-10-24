@@ -1,24 +1,32 @@
-sel(win):
-  cxx_compiler:
-  - vs2019
-  c_compiler:
-  - vs2019
+cxx_compiler:
+  - if: win
+    then: vs2019
+  - if: linux
+    then: super_gcc
 
-sel(linux):
-  cxx_compiler:
-  - super_gcc
-  c_compiler:
-  - super_g++
+c_compiler:
+  - if: win
+    then: vs2019
+  - if: linux
+    then: super_g++
 
-sel(unix):
-  unix_level: 1
+unix_level:
+  - if: unix
+    then: 1
 
 python:
-  - sel(unix): "3.7"
-  - sel(unix): "3.8"
-  - sel(win): "3.10"
+  - if: unix
+    then:
+      - "3.7"
+      - "3.8"
+  - if: win
+    then:
+      - "3.10"
 
 cplusplus:
-  - sel(unix): "10"
-  - sel(win): "100"
-  - sel(unix): "1000"
+  - if: unix
+    then:
+     - "10"
+     - "1000"
+  - if: win
+    then: "100"

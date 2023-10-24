@@ -1,19 +1,18 @@
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::{fmt, hash::Hash, ops};
+use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
 
 use linked_hash_map::LinkedHashMap;
-use marked_yaml::types::MarkedScalarNode;
-use marked_yaml::Span;
+use marked_yaml::{types::MarkedScalarNode, Span};
 use url::Url;
 
-use crate::_partialerror;
-use crate::recipe::{
-    error::{ErrorKind, ParsingError, PartialParsingError},
-    jinja::Jinja,
+use crate::{
+    _partialerror,
+    recipe::{
+        error::{ErrorKind, ParsingError, PartialParsingError},
+        jinja::Jinja,
+    },
 };
 
 mod rendered;
@@ -1097,6 +1096,15 @@ where
                 label = format!("expected scalar or sequence for {name}")
             )),
         }
+    }
+}
+
+impl<T> TryConvertNode<Vec<T>> for RenderedScalarNode
+where
+    RenderedScalarNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
+        self.try_convert(name).map(|v| vec![v])
     }
 }
 

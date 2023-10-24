@@ -24,17 +24,13 @@ use rattler_build::{
     selectors::SelectorConfig,
     test::{self, TestConfiguration},
     tool_configuration,
+    variant_config::VariantConfig,
 };
 
 mod console_utils;
 mod hash;
-mod used_variables;
-mod variant_config;
 
-use crate::{
-    console_utils::{IndicatifWriter, TracingFormatter},
-    variant_config::VariantConfig,
-};
+use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
 #[derive(Serialize, Deserialize, Debug)]
 struct RawRecipe {
