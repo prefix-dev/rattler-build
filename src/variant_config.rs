@@ -428,7 +428,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::selectors::{flatten_toplevel, SelectorConfig};
+    use crate::selectors::SelectorConfig;
     use rattler_conda_types::Platform;
     use rstest::rstest;
 
