@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, Node, ScalarNode, SequenceNodeInternal},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
-        jinja::Jinja,
-        stage1,
     },
     render::pin::Pin,
 };
@@ -45,43 +45,6 @@ pub struct Requirements {
 }
 
 impl Requirements {
-    pub(super) fn from_stage1(
-        req: &stage1::Requirements,
-        jinja: &Jinja,
-    ) -> Result<Self, PartialParsingError> {
-        let build = req
-            .build
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let host = req
-            .host
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let run = req
-            .run
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-        let run_constrained = req
-            .run_constrained
-            .as_ref()
-            .map(|node| Dependency::from_node(node, jinja))
-            .transpose()?
-            .unwrap_or(Vec::new());
-
-        Ok(Self {
-            build,
-            host,
-            run,
-            run_constrained,
-        })
-    }
-
     /// Get the build requirements.
     pub fn build(&self) -> &[Dependency] {
         self.build.as_slice()
@@ -117,6 +80,52 @@ impl Requirements {
             && self.host.is_empty()
             && self.run.is_empty()
             && self.run_constrained.is_empty()
+    }
+}
+
+impl TryConvertNode<Requirements> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Requirements, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expected a mapping for `{name}`")
+                )
+            })
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Requirements> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<Requirements, PartialParsingError> {
+        let mut build = Vec::new();
+        let mut host = Vec::new();
+        let mut run = Vec::new();
+        let mut run_constrained = Vec::new();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "build" => build = value.try_convert(key_str)?,
+                "host" => host = value.try_convert(key_str)?,
+                "run" => run = value.try_convert(key_str)?,
+                "run_constrained" => run_constrained = value.try_convert(key_str)?,
+                invalid_key => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid_key.to_string().into()),
+                    ))
+                }
+            }
+        }
+
+        Ok(Requirements {
+            build,
+            host,
+            run,
+            run_constrained,
+        })
     }
 }
 
@@ -160,61 +169,39 @@ pub enum Dependency {
     Compiler(Compiler),
 }
 
-impl Dependency {
-    pub(super) fn from_node(node: &Node, jinja: &Jinja) -> Result<Vec<Self>, PartialParsingError> {
-        match node {
-            Node::Scalar(s) => {
-                let dep = Self::from_scalar(s, jinja)?
-                    .map(|d| vec![d])
-                    .unwrap_or_default();
-
-                Ok(dep)
+impl TryConvertNode<Vec<Dependency>> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Vec<Dependency>, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => {
+                let dep: Dependency = s.try_convert(name)?;
+                Ok(vec![dep])
             }
-            Node::Sequence(seq) => {
+            RenderedNode::Sequence(seq) => {
                 let mut deps = Vec::new();
-                for inner in seq.iter() {
-                    match inner {
-                        SequenceNodeInternal::Simple(n) => deps.extend(Self::from_node(n, jinja)?),
-                        SequenceNodeInternal::Conditional(if_sel) => {
-                            let if_res = if_sel.process(jinja)?;
-                            if let Some(if_res) = if_res {
-                                deps.extend(Self::from_node(&if_res, jinja)?)
-                            }
-                        }
-                    }
+                for n in seq.iter() {
+                    let n_deps: Vec<_> = n.try_convert(name)?;
+                    deps.extend(n_deps);
                 }
                 Ok(deps)
             }
-            Node::Mapping(_) => Err(_partialerror!(
-                *node.span(),
+            RenderedNode::Mapping(_) => Err(_partialerror!(
+                *self.span(),
                 ErrorKind::Other,
                 label = "expected scalar or sequence"
             )),
+            RenderedNode::Null(_) => Ok(vec![]),
         }
     }
+}
 
-    pub(super) fn from_scalar(
-        s: &ScalarNode,
-        jinja: &Jinja,
-    ) -> Result<Option<Self>, PartialParsingError> {
+impl TryConvertNode<Dependency> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<Dependency, PartialParsingError> {
         // compiler
-        if s.as_str().contains("compiler(") {
-            let compiler = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering compiler"
-                )
-            })?;
-            Ok(Some(Self::Compiler(Compiler { compiler })))
-        } else if s.as_str().contains("pin_subpackage(") {
-            let pin_subpackage = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering pin_subpackage"
-                )
-            })?;
+        if self.contains("__COMPILER") {
+            let compiler = self.try_convert(name)?;
+            Ok(Dependency::Compiler(Compiler { compiler }))
+        } else if self.contains("__PIN_SUBPACKAGE") {
+            let pin_subpackage: String = self.try_convert(name)?;
 
             // Panic should never happen from this strip unless the prefix magic for the pin
             // subpackage changes
@@ -222,24 +209,11 @@ impl Dependency {
                 .strip_prefix("__PIN_SUBPACKAGE ")
                 .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
             let pin_subpackage = Pin::from_internal_repr(internal_repr);
-            Ok(Some(Self::PinSubpackage(PinSubpackage { pin_subpackage })))
+            Ok(Dependency::PinSubpackage(PinSubpackage { pin_subpackage }))
         } else {
-            let spec = jinja.render_str(s.as_str()).map_err(|err| {
-                _partialerror!(
-                    *s.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = "error rendering spec"
-                )
-            })?;
+            let spec = self.try_convert(name)?;
 
-            if spec.is_empty() {
-                return Ok(None);
-            }
-
-            let spec = MatchSpec::from_str(&spec).map_err(|_err| {
-                _partialerror!(*s.span(), ErrorKind::Other, label = "error parsing spec")
-            })?;
-            Ok(Some(Self::Spec(spec)))
+            Ok(Dependency::Spec(spec))
         }
     }
 }
@@ -282,5 +256,31 @@ impl<'de> Deserialize<'de> for Dependency {
         }
 
         deserializer.deserialize_str(DependencyVisitor)
+    }
+}
+
+impl TryConvertNode<MatchSpec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<MatchSpec> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+        MatchSpec::from_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("error parsing `{name}` as a match spec")
+            )
+        })
     }
 }

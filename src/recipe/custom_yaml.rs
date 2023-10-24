@@ -1,17 +1,25 @@
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
+use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::{fmt, hash::Hash, ops};
 
 use linked_hash_map::LinkedHashMap;
 use marked_yaml::types::MarkedScalarNode;
 use marked_yaml::Span;
+use url::Url;
 
 use crate::_partialerror;
 use crate::recipe::{
     error::{ErrorKind, ParsingError, PartialParsingError},
     jinja::Jinja,
 };
+
+mod rendered;
+pub use rendered::{RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode};
+
+use super::Render;
 
 /// A marked new Conda Recipe YAML node
 ///
@@ -43,6 +51,11 @@ pub enum Node {
     /// You can test if a node is a sequence, and retrieve it as one if you
     /// so wish.
     Sequence(SequenceNode),
+    /// A YAML null
+    ///
+    /// This is a special case of a scalar node, but is treated as its own
+    /// type here for convenience.
+    Null(ScalarNode),
 }
 
 impl Node {
@@ -101,6 +114,122 @@ impl Node {
     }
 }
 
+impl Render<Node> for Node {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        match self {
+            Node::Scalar(s) => s.render(jinja, name),
+            Node::Mapping(m) => m.render(jinja, name),
+            Node::Sequence(s) => s.render(jinja, name),
+            Node::Null(n) => Ok(Node::Null(n.clone())),
+        }
+    }
+}
+
+impl Render<Node> for ScalarNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::JinjaRendering(err),
+                label = format!("error rendering {name}: {}", self.as_str())
+            )
+        })?;
+
+        Ok(Node::from(ScalarNode::new(*self.span(), rendered)))
+    }
+}
+
+impl Render<Option<ScalarNode>> for ScalarNode {
+    fn render(
+        &self,
+        jinja: &Jinja,
+        name: &str,
+    ) -> Result<Option<ScalarNode>, super::error::PartialParsingError> {
+        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::JinjaRendering(err),
+                label = format!("error rendering {name}: {}", self.as_str())
+            )
+        })?;
+
+        if rendered.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(ScalarNode::new(*self.span(), rendered)))
+        }
+    }
+}
+
+impl Render<Node> for MappingNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let mut rendered = LinkedHashMap::new();
+
+        for (key, value) in self.iter() {
+            rendered.insert(
+                key.clone(),
+                value.render(jinja, &format!("{name} {}", key.as_str()))?,
+            );
+        }
+
+        let map = MappingNode::new(*self.span(), rendered);
+
+        Ok(Node::Mapping(map))
+    }
+}
+
+impl Render<Node> for SequenceNode {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        let mut rendered = Vec::new();
+
+        for item in self.iter() {
+            rendered.push(item.render(jinja, name)?);
+        }
+
+        let seq = SequenceNode::new(*self.span(), rendered);
+        Ok(Node::Sequence(seq))
+    }
+}
+
+impl Render<Node> for SequenceNodeInternal {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+        match self {
+            Self::Simple(n) => n.render(jinja, name),
+            Self::Conditional(if_sel) => {
+                let if_res = if_sel.process(jinja)?;
+                if let Some(if_res) = if_res {
+                    Ok(if_res.render(jinja, name)?)
+                } else {
+                    Ok(Node::Null(ScalarNode::new(*self.span(), "".to_owned())))
+                }
+            }
+        }
+    }
+}
+
+impl Render<SequenceNodeInternal> for SequenceNodeInternal {
+    fn render(
+        &self,
+        jinja: &Jinja,
+        name: &str,
+    ) -> Result<SequenceNodeInternal, PartialParsingError> {
+        match self {
+            Self::Simple(n) => Ok(Self::Simple(n.render(jinja, name)?)),
+            Self::Conditional(if_sel) => {
+                let if_res = if_sel.process(jinja)?;
+                if let Some(if_res) = if_res {
+                    Ok(Self::Simple(if_res.render(jinja, name)?))
+                } else {
+                    Ok(Self::Simple(Node::Null(ScalarNode::new(
+                        *self.span(),
+                        "".to_owned(),
+                    ))))
+                }
+            }
+        }
+    }
+}
+
 /// A trait that defines that the implementer has an associated span.
 pub trait HasSpan {
     fn span(&self) -> &marked_yaml::Span;
@@ -112,6 +241,7 @@ impl HasSpan for Node {
             Self::Mapping(map) => map.span(),
             Self::Scalar(scalar) => scalar.span(),
             Self::Sequence(seq) => seq.span(),
+            Self::Null(s) => s.span(),
         }
     }
 }
@@ -126,7 +256,10 @@ impl<'i> TryFrom<&'i Node> for &'i ScalarNode {
 
 impl From<ScalarNode> for Node {
     fn from(value: ScalarNode) -> Self {
-        Self::Scalar(value)
+        match value.as_str() {
+            "null" | "~" | "" => Self::Null(value),
+            _ => Self::Scalar(value),
+        }
     }
 }
 
@@ -156,13 +289,16 @@ impl From<LinkedHashMap<ScalarNode, Node>> for Node {
 
 impl From<String> for Node {
     fn from(value: String) -> Self {
-        Self::Scalar(ScalarNode::from(value))
+        Self::from(&*value)
     }
 }
 
 impl From<&str> for Node {
     fn from(value: &str) -> Self {
-        Self::Scalar(ScalarNode::from(value.to_owned()))
+        match value {
+            "null" | "~" | "" => Self::Null(ScalarNode::from(value)),
+            _ => Self::Scalar(ScalarNode::from(value)),
+        }
     }
 }
 
@@ -735,23 +871,267 @@ impl fmt::Debug for IfSelector {
 }
 
 pub trait TryConvertNode<T> {
-    fn try_convert(&self, name: &str) -> Result<&T, PartialParsingError>;
+    fn try_convert(&self, name: &str) -> Result<T, PartialParsingError>;
 }
 
-impl<T> TryConvertNode<T> for T {
-    fn try_convert(&self, _: &str) -> Result<&T, PartialParsingError> {
-        Ok(self)
-    }
-}
-
-impl TryConvertNode<ScalarNode> for Node {
-    fn try_convert(&self, name: &str) -> Result<&ScalarNode, PartialParsingError> {
+impl<'a> TryConvertNode<&'a ScalarNode> for &'a Node {
+    fn try_convert(&self, name: &str) -> Result<&'a ScalarNode, PartialParsingError> {
         self.as_scalar().ok_or_else(|| {
             _partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedScalar,
-                label = format!("expected a scalar value for {name}")
+                label = format!("expected a scalar value for `{name}`")
             )
         })
+    }
+}
+
+impl<T: Clone> TryConvertNode<T> for T {
+    fn try_convert(&self, _: &str) -> Result<T, PartialParsingError> {
+        Ok(self.clone())
+    }
+}
+
+impl TryConvertNode<ScalarNode> for Node {
+    fn try_convert(&self, name: &str) -> Result<ScalarNode, PartialParsingError> {
+        self.as_scalar().cloned().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a scalar value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<String> for Node {
+    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map(|s| s.as_str().to_owned())
+    }
+}
+
+impl TryConvertNode<i32> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<bool> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<bool> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
+        self.as_bool().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a boolean value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<u64> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<u64, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<u64> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<u64, PartialParsingError> {
+        self.as_str()
+            .parse()
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+    }
+}
+
+impl TryConvertNode<i32> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<i32, PartialParsingError> {
+        self.as_str()
+            .parse()
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+    }
+}
+
+impl<'a> TryConvertNode<&'a RenderedScalarNode> for &'a RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<&'a RenderedScalarNode, PartialParsingError> {
+        self.as_scalar().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = format!("expected a scalar value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<String> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map(|s| s.as_str().to_owned())
+    }
+}
+
+impl TryConvertNode<String> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<String, PartialParsingError> {
+        Ok(self.as_str().to_owned())
+    }
+}
+
+impl TryConvertNode<PathBuf> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PathBuf, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PathBuf> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<PathBuf, PartialParsingError> {
+        Ok(PathBuf::from(self.as_str()))
+    }
+}
+
+impl TryConvertNode<RenderedScalarNode> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<RenderedScalarNode, PartialParsingError> {
+        self.as_scalar().cloned().ok_or_else(|| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                help = format!("expected a string value for `{name}`")
+            )
+        })
+    }
+}
+
+impl TryConvertNode<Url> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Url> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<Url, PartialParsingError> {
+        Url::parse(self.as_str()).map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err)))
+    }
+}
+
+impl<T> TryConvertNode<Vec<T>> for RenderedNode
+where
+    RenderedNode: TryConvertNode<T>,
+    RenderedScalarNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => {
+                let item = s.try_convert(name)?;
+                Ok(vec![item])
+            }
+            RenderedNode::Sequence(seq) => seq
+                .iter()
+                .map(|item| {
+                    // dbg!(&item);
+                    item.try_convert(name)
+                })
+                .collect(),
+            RenderedNode::Null(_) => Ok(vec![]),
+            RenderedNode::Mapping(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = format!("expected scalar or sequence for {name}")
+            )),
+        }
+    }
+}
+
+impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedNode
+where
+    K: Ord,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    help = format!("expected a mapping for `{name}`")
+                )
+            })
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedMappingNode
+where
+    K: Ord,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+        let mut map = BTreeMap::new();
+        for (key, value) in self.iter() {
+            let key = key.try_convert(name)?;
+            let value = value.try_convert(name)?;
+            map.insert(key, value);
+        }
+        Ok(map)
     }
 }

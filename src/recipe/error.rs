@@ -49,48 +49,76 @@ impl ParsingError {
 #[non_exhaustive]
 pub enum ErrorKind {
     /// Error while parsing YAML.
-    #[diagnostic(code(error::stage1::yaml_parsing))]
+    #[diagnostic(code(error::yaml_parsing))]
     YamlParsing(#[from] marked_yaml::LoadError),
 
     /// Error when expected mapping but got something else.
-    #[diagnostic(code(error::stage1::expected_mapping))]
+    #[diagnostic(code(error::expected_mapping))]
     ExpectedMapping,
 
     /// Error when expected scalar but got something else.
-    #[diagnostic(code(error::stage1::expected_scalar))]
+    #[diagnostic(code(error::expected_scalar))]
     ExpectedScalar,
 
     /// Error when expected sequence but got something else.
-    #[diagnostic(code(error::stage1::expected_sequence))]
+    #[diagnostic(code(error::expected_sequence))]
     ExpectedSequence,
 
     /// Error when if-selector condition is not a scalar.
-    #[diagnostic(code(error::stage1::if_selector_condition_not_scalar))]
+    #[diagnostic(code(error::if_selector_condition_not_scalar))]
     IfSelectorConditionNotScalar,
 
     /// Error when if selector is missing a `then` field.
-    #[diagnostic(code(error::stage1::if_selector_missing_then))]
+    #[diagnostic(code(error::if_selector_missing_then))]
     IfSelectorMissingThen,
 
+    /// Error when invalid MD5 hash.
+    #[diagnostic(code(error::invalid_md5))]
+    InvalidMd5,
+
+    /// Error when invalid SHA256 hash.
+    #[diagnostic(code(error::invalid_sha256))]
+    InvalidSha256,
+
+    /// Error when there is a required missing field in a mapping.
+    #[diagnostic(code(error::missing_field))]
+    MissingField(Cow<'static, str>),
+
+    /// Error when there is a invalid field in a mapping.
+    #[diagnostic(code(error::invalid_field))]
+    InvalidField(Cow<'static, str>),
+
     /// Error rendering a Jinja expression.
-    #[diagnostic(code(error::stage2::jinja_rendering))]
+    #[diagnostic(code(error::jinja_rendering))]
     JinjaRendering(#[from] minijinja::Error),
 
     /// Error processing the condition of a if-selector.
-    #[diagnostic(code(error::stage2::if_selector_condition_not_bool))]
+    #[diagnostic(code(error::if_selector_condition_not_bool))]
     IfSelectorConditionNotBool(#[from] ParseBoolError),
 
     /// Error when processing URL
-    #[diagnostic(code(error::stage2::url_parsing))]
+    #[diagnostic(code(error::url_parsing))]
     UrlParsing(#[from] url::ParseError),
 
     /// Error when parsing a integer.
-    #[diagnostic(code(error::stage2::integer_parsing))]
+    #[diagnostic(code(error::integer_parsing))]
     IntegerParsing(#[from] std::num::ParseIntError),
 
     /// Error when parsing a SPDX license.
-    #[diagnostic(code(error::stage2::spdx_parsing))]
+    #[diagnostic(code(error::spdx_parsing))]
     SpdxParsing(#[from] spdx::ParseError),
+
+    /// Error when parsing a [`MatchSpec`](rattler_conda_types::MatchSpec).
+    #[diagnostic(code(error::match_spec_parsing))]
+    MatchSpecParsing(#[from] rattler_conda_types::ParseMatchSpecError),
+
+    /// Error when parsing a [`PackageName`](rattler_conda_types::PackageName).
+    #[diagnostic(code(error::package_name_parsing))]
+    PackageNameParsing(#[from] rattler_conda_types::InvalidPackageNameError),
+
+    /// Error when parsing a [`EntryPoint`](rattler_conda_types::package::EntryPoint).
+    #[diagnostic(code(error::entry_point_parsing))]
+    EntryPointParsing(String),
 
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
@@ -133,16 +161,16 @@ impl fmt::Display for ErrorKind {
 
         match self {
             ErrorKind::YamlParsing(err) => {
-                write!(f, "Failed to parse YAML: ")?;
+                write!(f, "failed to parse YAML: ")?;
                 match err {
                     LoadError::TopLevelMustBeMapping(_) => {
-                        write!(f, "Top level must be a mapping.")
+                        write!(f, "top level must be a mapping.")
                     }
-                    LoadError::UnexpectedAnchor(_) => write!(f, "Unexpected definition of anchor."),
+                    LoadError::UnexpectedAnchor(_) => write!(f, "unexpected definition of anchor."),
                     LoadError::MappingKeyMustBeScalar(_) => {
-                        write!(f, "Keys in mappings must be scalar.")
+                        write!(f, "keys in mappings must be scalar.")
                     }
-                    LoadError::UnexpectedTag(_) => write!(f, "Unexpected use of YAML tag."),
+                    LoadError::UnexpectedTag(_) => write!(f, "unexpected use of YAML tag."),
                     LoadError::ScanError(_, e) => {
                         // e.description() is deprecated but it's the only way to get
                         // the exact info we want out of yaml-rust
@@ -151,27 +179,40 @@ impl fmt::Display for ErrorKind {
                     }
                 }
             }
-            ErrorKind::ExpectedMapping => write!(f, "Expected a mapping."),
-            ErrorKind::ExpectedScalar => write!(f, "Expected a scalar value."),
-            ErrorKind::ExpectedSequence => write!(f, "Expected a sequence."),
+            ErrorKind::ExpectedMapping => write!(f, "expected a mapping."),
+            ErrorKind::ExpectedScalar => write!(f, "expected a scalar value."),
+            ErrorKind::ExpectedSequence => write!(f, "expected a sequence."),
             ErrorKind::IfSelectorConditionNotScalar => {
-                write!(f, "Condition in `if` selector must be a scalar.")
+                write!(f, "condition in `if` selector must be a scalar.")
             }
             ErrorKind::IfSelectorMissingThen => {
-                write!(f, "Missing `then` field in the `if` selector.")
+                write!(f, "missing `then` field in the `if` selector.")
             }
+            ErrorKind::InvalidMd5 => write!(f, "invalid MD5 checksum."),
+            ErrorKind::InvalidSha256 => write!(f, "invalid SHA256 checksum."),
+            ErrorKind::InvalidField(s) => write!(f, "invalid field `{s}`."),
+            ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
-                write!(f, "Failed to render Jinja expression: {}", err.kind())
+                write!(f, "failed to render Jinja expression: {}", err.kind())
             }
             ErrorKind::IfSelectorConditionNotBool(err) => {
-                write!(f, "Condition in `if` selector must be a boolean: {}", err)
+                write!(f, "condition in `if` selector must be a boolean: {}", err)
             }
-            ErrorKind::UrlParsing(err) => write!(f, "Failed to parse URL: {}", err),
-            ErrorKind::IntegerParsing(err) => write!(f, "Failed to parse integer: {}", err),
+            ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
+            ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
-                write!(f, "Failed to parse SPDX license: {}", err.reason)
+                write!(f, "failed to parse SPDX license: {}", err.reason)
             }
-            ErrorKind::Other => write!(f, "An unspecified error occurred."),
+            ErrorKind::MatchSpecParsing(err) => {
+                write!(f, "failed to parse match spec: {}", err)
+            }
+            ErrorKind::PackageNameParsing(err) => {
+                write!(f, "failed to parse package name: {}", err)
+            }
+            ErrorKind::EntryPointParsing(err) => {
+                write!(f, "failed to parse entry point: {}", err)
+            }
+            ErrorKind::Other => write!(f, "an unspecified error occurred."),
         }
     }
 }
@@ -384,7 +425,7 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
 #[cfg(test)]
 mod tests {
 
-    use crate::{assert_miette_snapshot, recipe::stage1::RawRecipe};
+    use crate::{assert_miette_snapshot, recipe::Recipe};
 
     #[test]
     fn miette_output() {
@@ -396,7 +437,7 @@ mod tests {
                 name: test
                 version: 0.1.0
             "#;
-        let res = RawRecipe::from_yaml(fault_yaml);
+        let res = Recipe::from_yaml(fault_yaml, Default::default());
 
         if let Err(err) = res {
             assert_miette_snapshot!(err);

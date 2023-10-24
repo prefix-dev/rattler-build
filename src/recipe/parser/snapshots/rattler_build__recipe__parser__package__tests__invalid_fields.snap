@@ -1,14 +1,14 @@
 ---
-source: src/recipe/stage1.rs
+source: src/recipe/parser/package.rs
 expression: err
 ---
-  × Parsing: An unspecified error occurred.
+  × Parsing: invalid field `invalid`.
    ╭─[4:1]
  4 │             version: 0.1.0
  5 │             invalid: "field"
    ·             ───┬───
-   ·                ╰── unexpected key
+   ·                ╰── here
  6 │         
    ╰────
-  help: expected one of `name` or `version`
+  help: valid fields for `package` are `name` and `version`
 

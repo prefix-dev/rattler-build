@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 
 use miette::Diagnostic;
-use rattler_build::recipe::stage2::Recipe;
+use rattler_build::recipe::parser::Recipe;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::formats::PreferOne;
@@ -231,7 +231,7 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
-        use rattler_build::recipe::stage2::Dependency;
+        use rattler_build::recipe::parser::Dependency;
 
         let mut used_variables = used_vars_from_expressions(recipe);
 

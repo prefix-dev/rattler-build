@@ -1,13 +1,14 @@
 ---
 source: src/recipe/error.rs
-expression: out
+expression: err
 ---
-  × Parsing: Expected a mapping.
+  × Parsing: expected a mapping.
    ╭─[2:1]
  2 │                 context:
  3 │ ╭─▶                 - a
  4 │ ├─▶                 - b
-   · ╰──── expected a mapping here
+   · ╰──── here
  5 │                 package:
    ╰────
+  help: `context` must always be a mapping
 

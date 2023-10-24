@@ -1,0 +1,14 @@
+---
+source: src/recipe/parser/package.rs
+expression: err
+---
+  × Parsing: missing field `version`
+   ╭─[2:1]
+ 2 │         package:
+ 3 │             name: test
+   ·                 ───┬──
+   ·                    ╰── here
+ 4 │         
+   ╰────
+  help: the field `version` is required for `package`
+

@@ -1,11 +1,15 @@
-pub use self::{error::ParsingError, jinja::Jinja, stage1::RawRecipe, stage2::Recipe};
+pub use self::{error::ParsingError, jinja::Jinja, parser::Recipe};
 
-pub mod stage1;
-pub mod stage2;
+pub mod parser;
 
 pub mod custom_yaml;
 pub mod error;
 pub mod jinja;
+
+/// A trait to render a certain stage1 node into its final type.
+pub(crate) trait Render<T> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, error::PartialParsingError>;
+}
 
 #[cfg(test)]
 #[cfg_attr(test, macro_export)]

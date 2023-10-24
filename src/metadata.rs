@@ -498,7 +498,7 @@ impl fmt::Display for GitUrl {
 
 #[derive(Clone)]
 pub struct Output {
-    pub recipe: crate::recipe::stage2::Recipe,
+    pub recipe: crate::recipe::parser::Recipe,
     pub build_configuration: BuildConfiguration,
     pub finalized_dependencies: Option<FinalizedDependencies>,
 }

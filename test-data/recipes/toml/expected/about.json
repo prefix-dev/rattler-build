@@ -4,6 +4,5 @@
   ],
   "home": "https://github.com/uiri/toml",
   "license": "MIT",
-  "license_family": "MIT",
   "summary": "Python lib for TOML."
 }

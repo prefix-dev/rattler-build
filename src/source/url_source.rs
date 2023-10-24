@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::recipe::stage2::{Checksum, UrlSource};
+use crate::recipe::parser::{Checksum, UrlSource};
 use rattler_digest::compute_file_digest;
 
 use super::SourceError;
@@ -15,11 +15,12 @@ fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
             let digest =
                 compute_file_digest::<sha2::Sha256>(path).expect("Could not compute SHA256");
             let computed_sha = hex::encode(digest);
-            if !computed_sha.eq(value) {
+            let checksum_sha = hex::encode(value);
+            if !computed_sha.eq(&checksum_sha) {
                 tracing::error!(
                     "SHA256 values of downloaded file not matching!\nDownloaded = {}, should be {}",
                     computed_sha,
-                    value
+                    checksum_sha
                 );
                 false
             } else {
@@ -63,8 +64,8 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> String {
     let filename = url.path_segments().unwrap().last().unwrap();
     let (stem, extension) = split_filename(filename);
     let checksum = match checksum {
-        Checksum::Sha256(value) => value,
-        Checksum::Md5(value) => value,
+        Checksum::Sha256(value) => hex::encode(value),
+        Checksum::Md5(value) => hex::encode(value),
     };
     format!("{}_{}{}", stem, &checksum[0..8], extension)
 }
@@ -121,7 +122,8 @@ pub(crate) async fn url_src(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recipe::stage2::Checksum;
+    use crate::recipe::parser::Checksum;
+    use sha2::Sha256;
     use url::Url;
 
     #[test]
@@ -148,19 +150,20 @@ mod tests {
 
     #[test]
     fn test_cache_name() {
-        let cases = vec![
+        let cases =
+            vec![
             (
                 "https://example.com/example.tar.gz",
-                Checksum::Sha256(
-                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef".to_string(),
-                ),
+                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
+                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                ).unwrap()),
                 "example_12345678.tar.gz",
             ),
             (
                 "https://github.com/mamba-org/mamba/archive/refs/tags/micromamba-12.23.12.tar.gz",
-                Checksum::Sha256(
-                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8".to_string(),
-                ),
+                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
+                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
+                ).unwrap()),
                 "micromamba-12.23.12_63fd8a1d.tar.gz",
             ),
         ];
