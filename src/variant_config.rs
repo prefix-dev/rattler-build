@@ -347,8 +347,10 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                     config.zip_keys = Some(zip_keys);
                 }
                 _ => {
-                    let variants = value.try_convert(key_str)?;
-                    config.variants.insert(key_str.to_string(), variants);
+                    let variants: Vec<_> = value.try_convert(key_str)?;
+                    if !variants.is_empty() {
+                        config.variants.insert(key_str.to_string(), variants);
+                    }
                 }
             }
         }
