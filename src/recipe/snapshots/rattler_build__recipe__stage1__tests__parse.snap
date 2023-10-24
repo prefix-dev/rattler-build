@@ -1,5 +1,6 @@
 ---
 source: src/recipe/stage1.rs
+assertion_line: 446
 expression: raw_recipe
 ---
 RawRecipe {
@@ -304,11 +305,7 @@ RawRecipe {
                     value: "BSD-3-Clause",
                 },
             ),
-            license_family: Some(
-                ScalarNode {
-                    value: "BSD",
-                },
-            ),
+            license_family: None,
             license_file: Some(
                 Scalar(
                     ScalarNode {

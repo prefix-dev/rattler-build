@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   name: xtensor
   version: 0.24.6
@@ -42,27 +44,26 @@ requirements:
 
 test:
   commands:
-  - if: unix or emscripten
-    then:
-      - test -d ${PREFIX}/include/xtensor
-      - test -f ${PREFIX}/include/xtensor/xarray.hpp
-      - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
-      - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
-  - if: win
-    then:
-      - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-      - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
-      - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+    - if: unix or emscripten
+      then:
+        - test -d ${PREFIX}/include/xtensor
+        - test -f ${PREFIX}/include/xtensor/xarray.hpp
+        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
+        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
+    - if: win
+      then:
+        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
+        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 about:
-  home: https://github.com/xtensor-stack/xtensor
+  homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause
-  license_family: BSD
   license_file: LICENSE
   summary: The C++ tensor algebra library
   description: Multi dimensional arrays with broadcasting and lazy computing
-  doc_url: https://xtensor.readthedocs.io
-  dev_url: https://github.com/xtensor-stack/xtensor
+  documentation: https://xtensor.readthedocs.io
+  repository: https://github.com/xtensor-stack/xtensor
 
 extra:
   recipe-maintainers:

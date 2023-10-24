@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   version: "0.11.9"
 
@@ -24,7 +26,7 @@ test:
     - cargo-upgrade --help
 
 about:
-  home: https://github.com/killercup/cargo-edit
+  homepage: https://github.com/killercup/cargo-edit
   license: MIT
   description: "A utility for managing cargo dependencies from the command line."
   summary: "A utility for managing cargo dependencies from the command line."
