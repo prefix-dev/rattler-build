@@ -6,7 +6,6 @@
     "python"
   ],
   "license": "MIT",
-  "license_family": "MIT",
   "name": "toml",
   "noarch": "python",
   "subdir": "noarch",
