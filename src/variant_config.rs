@@ -431,14 +431,13 @@ mod tests {
     use crate::selectors::{flatten_toplevel, SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
-    use serde_yaml::Value as YamlValue;
 
     #[rstest]
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
-        let mut yaml: YamlValue = serde_yaml::from_str(&yaml_file).unwrap();
+        let yaml_file = std::fs::read_to_string(dbg!(test_data_dir.join(filename))).unwrap();
+        let yaml = Node::parse_yaml(0, &yaml_file).unwrap();
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -446,8 +445,10 @@ mod tests {
             variant: Default::default(),
             hash: None,
         };
+        let jinja = Jinja::new(selector_config);
 
-        let res = flatten_toplevel(&mut yaml, &selector_config);
+        let res: RenderedNode = yaml.render(&jinja, "test1").unwrap();
+        let res: VariantConfig = res.try_convert("test1").unwrap();
         insta::assert_yaml_snapshot!(res);
 
         let selector_config = SelectorConfig {
@@ -456,8 +457,10 @@ mod tests {
             variant: Default::default(),
             hash: None,
         };
+        let jinja = Jinja::new(selector_config);
 
-        let res = flatten_toplevel(&mut yaml, &selector_config);
+        let res: RenderedNode = yaml.render(&jinja, "test2").unwrap();
+        let res: VariantConfig = res.try_convert("test2").unwrap();
         insta::assert_yaml_snapshot!(res);
     }
 
