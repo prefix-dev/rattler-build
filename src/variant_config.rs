@@ -1,25 +1,66 @@
 //! Functions to read and parse variant configuration files.
 
-use std::collections::{HashMap, HashSet};
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    path::PathBuf,
+};
 
 use miette::Diagnostic;
-use rattler_build::recipe::parser::Recipe;
-use serde::Deserialize;
-use serde::Serialize;
-use serde_with::formats::PreferOne;
-use serde_with::serde_as;
-use serde_with::OneOrMany;
+use serde::{Deserialize, Serialize};
+use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
 
-use rattler_build::selectors::SelectorConfig;
-
-use crate::used_variables::used_vars_from_expressions;
+use crate::{
+    _partialerror,
+    recipe::{
+        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
+        error::{ErrorKind, ParsingError, PartialParsingError},
+        parser::Recipe,
+        Jinja, Render,
+    },
+    selectors::SelectorConfig,
+    used_variables::used_vars_from_expressions,
+};
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
     pub max_pin: Option<String>,
     pub min_pin: Option<String>,
+}
+
+impl TryConvertNode<Pin> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Pin, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .and_then(|map| map.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Pin> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<Pin, PartialParsingError> {
+        let mut pin = Pin::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "max_pin" => {
+                    pin.max_pin = Some(value.try_convert(key_str)?);
+                }
+                "min_pin" => {
+                    pin.min_pin = Some(value.try_convert(key_str)?);
+                }
+                _ => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(key_str.to_string().into()),
+                        help = format!("Valid fields for {name} are: max_pin, min_pin")
+                    ))
+                }
+            }
+        }
+
+        Ok(pin)
+    }
 }
 
 #[serde_as]
@@ -33,13 +74,17 @@ pub struct VariantConfig {
     pub variants: BTreeMap<String, Vec<String>>,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Diagnostic)]
 pub enum VariantConfigError {
     #[error("Could not parse variant config file ({0}): {1}")]
     ParseError(PathBuf, serde_yaml::Error),
 
     #[error("Could not open file ({0}): {1}")]
     IOError(PathBuf, std::io::Error),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    NewParseError(#[from] ParsingError),
 }
 
 impl VariantConfig {
@@ -113,11 +158,16 @@ impl VariantConfig {
         let mut variant_configs = Vec::new();
 
         for filename in files {
-            let file = std::fs::File::open(filename)
+            let file = std::fs::read_to_string(filename)
                 .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
-            let reader = std::io::BufReader::new(file);
-            let config: VariantConfig = serde_yaml::from_reader(reader)
-                .map_err(|e| VariantConfigError::ParseError(filename.clone(), e))?;
+            let yaml_node = Node::parse_yaml(0, &file)?;
+            let jinja = Jinja::new(selector_config.clone());
+            let rendered_node: RenderedNode = yaml_node
+                .render(&jinja, filename.to_string_lossy().as_ref())
+                .map_err(|e| ParsingError::from_partial(&file, e))?;
+            let config: VariantConfig = rendered_node
+                .try_convert(filename.to_string_lossy().as_ref())
+                .map_err(|e| ParsingError::from_partial(&file, e))?;
 
             variant_configs.push(config);
         }
@@ -231,7 +281,7 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
-        use rattler_build::recipe::parser::Dependency;
+        use crate::recipe::parser::Dependency;
 
         let mut used_variables = used_vars_from_expressions(recipe);
 
@@ -270,6 +320,40 @@ impl VariantConfig {
         used_variables.insert("channel_targets".to_string());
 
         self.combinations(&used_variables)
+    }
+}
+
+impl TryConvertNode<VariantConfig> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<VariantConfig, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|map| map.try_convert(name))
+    }
+}
+
+impl TryConvertNode<VariantConfig> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<VariantConfig, PartialParsingError> {
+        let mut config = VariantConfig::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "pin_run_as_build" => {
+                    let pin_run_as_build = value.try_convert(key_str)?;
+                    config.pin_run_as_build = Some(pin_run_as_build);
+                }
+                "zip_keys" => {
+                    let zip_keys = value.try_convert(key_str)?;
+                    config.zip_keys = Some(zip_keys);
+                }
+                _ => {
+                    let variants = value.try_convert(key_str)?;
+                    config.variants.insert(key_str.to_string(), variants);
+                }
+            }
+        }
+
+        Ok(config)
     }
 }
 
@@ -317,7 +401,7 @@ pub enum VariantError {
 
     #[error(transparent)]
     #[diagnostic(transparent)]
-    RecipeParseError(#[from] rattler_build::recipe::error::ParsingError),
+    RecipeParseError(#[from] ParsingError),
 }
 
 fn find_combinations(
@@ -344,7 +428,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use rattler_build::selectors::{flatten_toplevel, SelectorConfig};
+    use crate::selectors::{flatten_toplevel, SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
     use serde_yaml::Value as YamlValue;
