@@ -1,8 +1,8 @@
 ---
-source: src/recipe/stage2/package.rs
+source: src/recipe/parser/package.rs
 expression: err
 ---
-  × Parsing: Invalid field `invalid`.
+  × Parsing: invalid field `invalid`.
    ╭─[4:1]
  4 │             version: 0.1.0
  5 │             invalid: "field"

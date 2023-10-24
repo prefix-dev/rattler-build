@@ -2,7 +2,7 @@
 source: src/recipe/parser/package.rs
 expression: err
 ---
-  × Parsing: Missing field `version`
+  × Parsing: missing field `version`
    ╭─[2:1]
  2 │         package:
  3 │             name: test

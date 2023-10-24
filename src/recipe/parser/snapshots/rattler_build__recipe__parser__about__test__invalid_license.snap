@@ -1,8 +1,8 @@
 ---
-source: src/recipe/stage2/about.rs
+source: src/recipe/parser/about.rs
 expression: err
 ---
-  × Parsing: Failed to parse SPDX license: invalid character(s)
+  × Parsing: failed to parse SPDX license: invalid character(s)
    ╭─[6:1]
  6 │         about:
  7 │             license: MIT/X derivate
