@@ -648,7 +648,14 @@ impl Render<RenderedMappingNode> for MappingNode {
 
 impl Render<RenderedNode> for SequenceNode {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
-        let rendered = self.render(jinja, name)?;
+        let rendered: RenderedSequenceNode = self.render(jinja, name)?;
+
+        if rendered.is_empty() {
+            return Ok(RenderedNode::Null(RenderedScalarNode::new(
+                *self.span(),
+                String::new(),
+            )));
+        }
 
         Ok(RenderedNode::Sequence(rendered))
     }
