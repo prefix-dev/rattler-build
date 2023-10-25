@@ -50,10 +50,10 @@ impl TryConvertNode<Package> for RenderedMappingNode {
             let key_str = key.as_str();
             match key_str {
                 "name" => {
-                    name_val = Some(value.try_convert(key_str)?);
+                    name_val = value.try_convert(key_str)?;
                 }
                 "version" => {
-                    version = Some(value.try_convert(key_str)?);
+                    version = value.try_convert(key_str)?;
                 }
                 invalid => {
                     return Err(_partialerror!(

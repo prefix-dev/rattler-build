@@ -126,7 +126,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     build.number = value.try_convert(key_str)?;
                 }
                 "string" => {
-                    build.string = Some(value.try_convert(key_str)?);
+                    build.string = value.try_convert(key_str)?;
                 }
                 "skip" => {
                     let conds: Vec<bool> = value.try_convert(key_str)?;
