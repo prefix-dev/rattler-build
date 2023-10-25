@@ -1097,6 +1097,14 @@ where
     RenderedNode: TryConvertNode<T>,
     RenderedScalarNode: TryConvertNode<T>,
 {
+    /// # Caveats
+    /// Converting the node into a vector may result in a empty vector if the node is null.
+    ///
+    /// If that is not the desired behavior, and you want to handle the case of a null node
+    /// differently, specify the result to be `Option<Vec<_>>` instead.
+    ///
+    /// Alternatively, you can also specify the result to be `Vec<Option<_>>` to handle the
+    /// case of a null node in other ways.
     fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
         match self {
             RenderedNode::Scalar(s) => {
