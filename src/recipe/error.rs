@@ -160,24 +160,23 @@ impl fmt::Display for ErrorKind {
         use std::error::Error;
 
         match self {
-            ErrorKind::YamlParsing(err) => {
-                write!(f, "failed to parse YAML: ")?;
-                match err {
-                    LoadError::TopLevelMustBeMapping(_) => {
-                        write!(f, "top level must be a mapping.")
-                    }
-                    LoadError::UnexpectedAnchor(_) => write!(f, "unexpected definition of anchor."),
-                    LoadError::MappingKeyMustBeScalar(_) => {
-                        write!(f, "keys in mappings must be scalar.")
-                    }
-                    LoadError::UnexpectedTag(_) => write!(f, "unexpected use of YAML tag."),
-                    LoadError::ScanError(_, e) => {
-                        // e.description() is deprecated but it's the only way to get
-                        // the exact info we want out of yaml-rust
+            ErrorKind::YamlParsing(LoadError::TopLevelMustBeMapping(_)) => {
+                write!(f, "failed to parse YAML: top level must be a mapping.")
+            }
+            ErrorKind::YamlParsing(LoadError::UnexpectedAnchor(_)) => {
+                write!(f, "failed to parse YAML: unexpected definition of anchor.")
+            }
+            ErrorKind::YamlParsing(LoadError::MappingKeyMustBeScalar(_)) => {
+                write!(f, "failed to parse YAML: keys in mappings must be scalar.")
+            }
+            ErrorKind::YamlParsing(LoadError::UnexpectedTag(_)) => {
+                write!(f, "failed to parse YAML: unexpected use of YAML tag.")
+            }
+            ErrorKind::YamlParsing(LoadError::ScanError(_, e)) => {
+                // e.description() is deprecated but it's the only way to get
+                // the exact info we want out of yaml-rust
 
-                        write!(f, "{}", e.description())
-                    }
-                }
+                write!(f, "failed to parse YAML: {}", e.description())
             }
             ErrorKind::ExpectedMapping => write!(f, "expected a mapping."),
             ErrorKind::ExpectedScalar => write!(f, "expected a scalar value."),
