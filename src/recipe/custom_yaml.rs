@@ -1071,6 +1071,27 @@ impl TryConvertNode<Url> for RenderedScalarNode {
     }
 }
 
+impl<T> TryConvertNode<Option<T>> for RenderedNode
+where
+    RenderedNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<Option<T>, PartialParsingError> {
+        match self {
+            RenderedNode::Null(_) => Ok(None),
+            _ => Ok(Some(self.try_convert(name)?)),
+        }
+    }
+}
+
+impl<T> TryConvertNode<Option<T>> for RenderedScalarNode
+where
+    RenderedScalarNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<Option<T>, PartialParsingError> {
+        self.try_convert(name).map(|v| Some(v))
+    }
+}
+
 impl<T> TryConvertNode<Vec<T>> for RenderedNode
 where
     RenderedNode: TryConvertNode<T>,
