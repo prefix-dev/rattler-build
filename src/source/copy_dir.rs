@@ -62,7 +62,7 @@ impl<'a> CopyDir<'a> {
             .partition(|g| g.trim_start().starts_with('~'));
 
         self.include_globs.extend(include_globs);
-        self.exclude_globs.extend(exclude_globs);
+        self.exclude_globs.extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
 
         self
     }
