@@ -99,23 +99,23 @@ impl TryConvertNode<About> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
-                "homepage" => about.homepage = Some(value.try_convert(key_str)?),
+                "homepage" => about.homepage = value.try_convert(key_str)?,
                 "repository" => {
-                    about.repository = Some(value.try_convert(key_str)?)
+                    about.repository = value.try_convert(key_str)?
                 }
                 "documentation" => {
-                    about.documentation = Some(value.try_convert(key_str)?)
+                    about.documentation = value.try_convert(key_str)?
                 }
-                "license" => about.license = Some(value.try_convert(key_str)?),
+                "license" => about.license = value.try_convert(key_str)?,
                 "license_family" => {
-                    about.license_family = Some(value.try_convert(key_str)?)
+                    about.license_family = value.try_convert(key_str)?
                 }
                 "license_file" => about.license_files = value.try_convert(key_str)?,
-                "license_url" => about.license_url = Some(value.try_convert(key_str)?),
-                "summary" => about.summary = Some(value.try_convert(key_str)?),
-                "description" => about.description = Some(value.try_convert(key_str)?),
+                "license_url" => about.license_url = value.try_convert(key_str)?,
+                "summary" => about.summary = value.try_convert(key_str)?,
+                "description" => about.description = value.try_convert(key_str)?,
                 "prelink_message" => {
-                    about.prelink_message = Some(value.try_convert(key_str)?)
+                    about.prelink_message = value.try_convert(key_str)?
                 }
                 invalid_key => {
                     return Err(_partialerror!(

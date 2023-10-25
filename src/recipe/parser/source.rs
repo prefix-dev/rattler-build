@@ -284,7 +284,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
-                "url" => url = Some(value.try_convert(key_str)?),
+                "url" => url = value.try_convert(key_str)?,
                 "sha256" => {
                     let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
                     let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidMd5))?;
@@ -295,9 +295,9 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| _partialerror!(*md5_str.span(), ErrorKind::InvalidMd5))?;
                     checksums.push(Checksum::Md5(md5_out));
                 }
-                "file_name" => file_name = Some(value.try_convert(key_str)?),
+                "file_name" => file_name = value.try_convert(key_str)?,
                 "patches" => patches = value.try_convert(key_str)?,
-                "folder" => folder = Some(value.try_convert(key_str)?),
+                "folder" => folder = value.try_convert(key_str)?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -379,9 +379,9 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
 
         for (key, value) in self.iter() {
             match key.as_str() {
-                "path" => path = Some(value.try_convert("path")?),
+                "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
-                "folder" => folder = Some(value.try_convert("folder")?),
+                "folder" => folder = value.try_convert("folder")?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),

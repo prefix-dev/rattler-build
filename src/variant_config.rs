@@ -44,10 +44,10 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
             let key_str = key.as_str();
             match key_str {
                 "max_pin" => {
-                    pin.max_pin = Some(value.try_convert(key_str)?);
+                    pin.max_pin = value.try_convert(key_str)?;
                 }
                 "min_pin" => {
-                    pin.min_pin = Some(value.try_convert(key_str)?);
+                    pin.min_pin = value.try_convert(key_str)?;
                 }
                 _ => {
                     return Err(_partialerror!(
@@ -339,16 +339,14 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
             let key_str = key.as_str();
             match key_str {
                 "pin_run_as_build" => {
-                    let pin_run_as_build = value.try_convert(key_str)?;
-                    config.pin_run_as_build = Some(pin_run_as_build);
+                    config.pin_run_as_build = value.try_convert(key_str)?;
                 }
                 "zip_keys" => {
-                    let zip_keys = value.try_convert(key_str)?;
-                    config.zip_keys = Some(zip_keys);
+                    config.zip_keys = value.try_convert(key_str)?;
                 }
                 _ => {
-                    let variants: Vec<_> = value.try_convert(key_str)?;
-                    if !variants.is_empty() {
+                    let variants: Option<Vec<_>> = value.try_convert(key_str)?;
+                    if let Some(variants) = variants {
                         config.variants.insert(key_str.to_string(), variants);
                     }
                 }
