@@ -18,6 +18,7 @@ use crate::{
 
 mod about;
 mod build;
+mod output;
 mod package;
 mod requirements;
 mod source;
@@ -26,7 +27,8 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, RunExports, ScriptEnv},
-    package::Package,
+    output::Output,
+    package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::Test,
@@ -128,6 +130,8 @@ impl Recipe {
         let mut test = Test::default();
         let mut about = About::default();
 
+        let mut outputs: Vec<Output> = Vec::new();
+
         for (key, value) in rendered_node.iter() {
             let key_str = key.as_str();
             match key_str {
@@ -137,7 +141,7 @@ impl Recipe {
                 "requirements" => requirements = value.try_convert(key_str)?,
                 "test" => test = value.try_convert(key_str)?,
                 "about" => about = value.try_convert(key_str)?,
-                "outputs" => {}
+                "outputs" => outputs = value.try_convert(key_str)?,
                 "context" => {}
                 "extra" => {}
                 invalid_key => {
@@ -147,6 +151,19 @@ impl Recipe {
                     ))
                 }
             }
+        }
+
+        if !outputs.is_empty() {
+            // TODO: If the outputs field is present, and all itens in the outputs list have the
+            // `package.name` and the `package.version` field set, then the `package` field in the
+            // root node is not mandatory.
+            //
+            // For each output, one Recipe should be generated.
+            // For each output, the generated Recipe inherits all other fields from the root node,
+            // except if it is defined in the output.
+            // If defined in the outputs, the field value from the output overrides the value from
+            // the root node.
+            todo!("Not implemented yet: outputs handling")
         }
 
         let recipe = Recipe {

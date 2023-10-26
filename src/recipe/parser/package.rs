@@ -86,6 +86,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
 }
 
 /// A package information used for [`Output`]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OutputPackage {
     name: PackageName,
     version: Option<String>,
