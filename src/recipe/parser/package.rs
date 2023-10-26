@@ -85,6 +85,69 @@ impl TryConvertNode<Package> for RenderedMappingNode {
     }
 }
 
+/// A package information used for [`Output`]
+pub struct OutputPackage {
+    name: PackageName,
+    version: Option<String>,
+}
+
+impl OutputPackage {
+    /// Get the package name.
+    pub fn name(&self) -> &PackageName {
+        &self.name
+    }
+
+    /// Get the package version.
+    pub fn version(&self) -> Option<&str> {
+        self.version.as_deref()
+    }
+}
+
+impl TryConvertNode<OutputPackage> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<OutputPackage, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<OutputPackage> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<OutputPackage, PartialParsingError> {
+        let mut name_val = None;
+        let mut version = None;
+        let span = *self.span();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "name" => {
+                    name_val = value.try_convert(key_str)?;
+                }
+                "version" => {
+                    version = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                        help = format!("valid fields for `{name}` are `name` and `version`")
+                    ))
+                }
+            }
+        }
+
+        let Some(name) = name_val else {
+            return Err(_partialerror!(
+                span,
+                ErrorKind::MissingField("name".into()),
+                help = format!("the field `name` is required for `{name}`")
+            ));
+        };
+
+        Ok(OutputPackage { name, version })
+    }
+}
+
 impl TryConvertNode<PackageName> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<PackageName, PartialParsingError> {
         self.as_scalar()
