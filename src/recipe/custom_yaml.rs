@@ -314,7 +314,7 @@ impl TryFrom<&marked_yaml::Node> for Node {
 
     fn try_from(value: &marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
-            marked_yaml::Node::Scalar(scalar) => Ok(Self::Scalar(scalar.into())),
+            marked_yaml::Node::Scalar(scalar) => Ok(Self::from(scalar.as_str())),
             marked_yaml::Node::Mapping(map) => {
                 Ok(Self::Mapping(MappingNode::try_from(map.clone())?))
             }
