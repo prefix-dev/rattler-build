@@ -1111,13 +1111,7 @@ where
                 let item = s.try_convert(name)?;
                 Ok(vec![item])
             }
-            RenderedNode::Sequence(seq) => seq
-                .iter()
-                .map(|item| {
-                    // dbg!(&item);
-                    item.try_convert(name)
-                })
-                .collect(),
+            RenderedNode::Sequence(seq) => seq.iter().map(|item| item.try_convert(name)).collect(),
             RenderedNode::Null(_) => Ok(vec![]),
             RenderedNode::Mapping(_) => Err(_partialerror!(
                 *self.span(),
