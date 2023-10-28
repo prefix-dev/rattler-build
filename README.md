@@ -35,6 +35,12 @@ works as a standalone binary.
 You can grab a prerelease version of `rattler-build` from the [Github
 Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
+Alternatively, you can install `rattler-build` via Homebrew:
+
+```
+brew install pavelzw/pavelzw/rattler-build
+```
+
 #### Dependencies
 
 Currently `rattler-build` needs some dependencies on the host system which are
