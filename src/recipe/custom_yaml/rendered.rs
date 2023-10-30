@@ -280,7 +280,7 @@ impl fmt::Debug for RenderedScalarNode {
     /// E.x.: `{:+?}` or `{:+#?}
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let include_span = f.sign_plus();
-        let mut debug = f.debug_struct("ScalarNode");
+        let mut debug = f.debug_struct("RenderedScalarNode");
         if include_span {
             debug.field("span", &self.span);
         }
@@ -456,7 +456,7 @@ impl fmt::Debug for RenderedSequenceNode {
     /// E.x.: `{:+?}` or `{:+#?}
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let include_span = f.sign_plus();
-        let mut debug = f.debug_struct("SequenceNode");
+        let mut debug = f.debug_struct("RenderedSequenceNode");
         if include_span {
             debug.field("span", &self.span);
         }
@@ -516,7 +516,7 @@ impl fmt::Debug for RenderedMappingNode {
     /// E.x.: `{:+?}` or `{:+#?}
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let include_span = f.sign_plus();
-        let mut debug = f.debug_struct("MappingNode");
+        let mut debug = f.debug_struct("RenderedMappingNode");
         if include_span {
             debug.field("span", &self.span);
         }
