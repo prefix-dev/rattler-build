@@ -16,6 +16,7 @@ use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
     MatchSpec, PackageName, Platform, RepoDataRecord, Version, VersionSpec,
 };
+use serde::Serialize;
 use thiserror::Error;
 
 use super::solver::create_environment;
@@ -23,7 +24,7 @@ use crate::recipe::parser::Dependency;
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
     /// from the variant config
@@ -78,7 +79,7 @@ impl DependencyInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FinalizedRunDependencies {
     pub depends: Vec<DependencyInfo>,
     pub constrains: Vec<DependencyInfo>,
@@ -86,7 +87,7 @@ pub struct FinalizedRunDependencies {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
     pub resolved: Vec<RepoDataRecord>,
@@ -175,7 +176,7 @@ impl Display for ResolvedDependencies {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FinalizedDependencies {
     pub build: Option<ResolvedDependencies>,
     pub host: Option<ResolvedDependencies>,

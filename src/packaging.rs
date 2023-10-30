@@ -725,6 +725,34 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
     Ok(test_files)
 }
 
+fn write_recipe_folder(
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let recipe_folder = tmp_dir_path.join("info/recipe/");
+    let recipe_dir = &output.build_configuration.directories.recipe_dir;
+
+    let (mut files, _) = copy_dir(recipe_dir, &recipe_folder, &[], &[], false)?;
+
+    // write the variant config to the appropriate file
+    let variant_config_file = recipe_folder.join("variant_config.yaml");
+    let mut variant_config = File::create(&variant_config_file)?;
+    variant_config.write_all(
+        serde_yaml::to_string(&output.build_configuration.variant)
+            .unwrap()
+            .as_bytes(),
+    )?;
+    files.push(variant_config_file);
+
+    // TODO(recipe): define how we want to render it exactly!
+    let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
+    let mut rendered_recipe = File::create(&rendered_recipe_file)?;
+    rendered_recipe.write_all(serde_yaml::to_string(&output).unwrap().as_bytes())?;
+    files.push(rendered_recipe_file);
+
+    Ok(files)
+}
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -836,6 +864,8 @@ pub fn package_conda(
         .write_all(serde_json::to_string_pretty(&output.build_configuration.variant)?.as_bytes())?;
 
     // TODO write recipe to info/recipe/ folder
+    let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
+    tmp_files.extend(recipe_files);
 
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
