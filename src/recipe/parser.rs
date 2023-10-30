@@ -119,7 +119,7 @@ impl Recipe {
             }
         }
 
-        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
+        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
 
         // TODO: handle outputs to produce multiple recipes
 
