@@ -95,6 +95,10 @@ struct BuildOpts {
     #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
     output_dir: PathBuf,
 
+    /// Don't use build id(timestamp) when creating build directory name. Defaults to `false`.
+    #[arg(long)]
+    no_build_id: bool,
+
     /// The package format to use for the build.
     /// Defaults to `.tar.bz2`.
     #[arg(long, default_value = "tar-bz2")]
@@ -310,6 +314,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                         name.as_normalized(),
                         &recipe_path,
                         &args.output_dir,
+                        args.no_build_id,
                     )
                     .into_diagnostic()?,
                     channels,

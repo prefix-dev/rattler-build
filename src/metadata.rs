@@ -70,11 +70,15 @@ pub struct Directories {
     pub output_dir: PathBuf,
 }
 
-fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
+fn setup_build_dir(name: &str, build_id: bool) -> Result<PathBuf, std::io::Error> {
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-    let dirname = format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis());
+    let dirname = if build_id {
+        format!("rattler-build_{}", name)
+    } else {
+        format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis())
+    };
     let path = env::temp_dir().join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
@@ -85,8 +89,9 @@ impl Directories {
         name: &str,
         recipe_path: &Path,
         output_dir: &Path,
+        build_id: bool,
     ) -> Result<Directories, std::io::Error> {
-        let build_dir = setup_build_dir(name).expect("Could not create build directory");
+        let build_dir = setup_build_dir(name, build_id).expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
         if !output_dir.exists() {
