@@ -67,6 +67,7 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn with_include_glob(mut self, include: &'a str) -> Self {
         self.include_globs.push(include);
         self
@@ -80,6 +81,7 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn with_exclude_glob(mut self, exclude: &'a str) -> Self {
         self.exclude_globs.push(exclude);
         self
@@ -98,11 +100,13 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn use_git_global(mut self, b: bool) -> Self {
         self.use_git_global = b;
         self
     }
 
+    #[allow(unused)]
     pub fn hidden(mut self, b: bool) -> Self {
         self.hidden = b;
         self
@@ -110,16 +114,19 @@ impl<'a> CopyDir<'a> {
 
     /// Setup copy options, overwrite if needed, only copy the contents as we want to specify the
     /// dir name manually
+    #[allow(unused)]
     pub fn with_copy_options(mut self, copy_options: CopyOptions) -> Self {
         self.copy_options = copy_options;
         self
     }
 
+    #[allow(unused)]
     pub fn overwrite(mut self, b: bool) -> Self {
         self.copy_options.overwrite = b;
         self
     }
 
+    #[allow(unused)]
     pub fn content_only(mut self, b: bool) -> Self {
         self.copy_options.content_only = b;
         self
@@ -264,6 +271,7 @@ impl<'a> CopyDirResult<'a> {
         self.include_globs.values().any(|m| m.get_matched())
     }
 
+    #[allow(unused)]
     pub fn exclude_globs(&self) -> &HashMap<Glob<'a>, Match> {
         &self.exclude_globs
     }
@@ -272,6 +280,7 @@ impl<'a> CopyDirResult<'a> {
         &mut self.exclude_globs
     }
 
+    #[allow(unused)]
     pub fn any_exclude_glob_matched(&self) -> bool {
         self.exclude_globs.values().any(|m| m.get_matched())
     }
