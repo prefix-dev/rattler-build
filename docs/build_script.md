@@ -13,7 +13,7 @@ cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh
 ```
 
 There are many environment variables defined for you to use in build.sh and
-build.bat. Please see [environment variables](./environment_vars.md) for more
+build.bat. Please see [environment variables](#environment-variables) for more
 information.
 
 `build.sh` and `build.bat` are optional. You can instead use the `build/script`

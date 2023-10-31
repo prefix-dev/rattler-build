@@ -10,8 +10,8 @@ By default, a conda package is a `tar.bz2` archive which contains
 * A collection of files that are installed directly into an install prefix.
 
 The format is identical across platforms and operating systems. During the
-install process, all files are extracted into the install prefix, with the
-exception of the ones in `info/`. Installing a conda package into an environment
+install process, all files are extracted into the install prefix, except the
+ones in `info/`. Installing a conda package into an environment
 is similar to executing the following commands:
 
 ```bash
@@ -103,7 +103,7 @@ each with the following keys:
 * `prefix_placeholder` - optional, string - the prefix placeholder string that
   is encoded in the text or binary file, and that is replaced at installation
   time. Note that this prefix placeholder uses `/` even on Windows.
-* `no_link` - bool, optional - whether or not this file should be linked or not
+* `no_link` - bool, optional - whether this file should be linked or not
   when installing the package, defaults false (linking the file from the cache
   into the environment)
 * `sha256` - string - the SHA256 hash of the file. For symbolic links it

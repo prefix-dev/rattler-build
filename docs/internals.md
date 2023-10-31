@@ -4,7 +4,7 @@
 
 Often, the most challenging aspect of building a package using `rattler-build`
 is making it relocatable. A relocatable package can be installed into any
-prefix, allowing it to be used outside of the environment in which it was built.
+prefix, allowing it to be used outside the environment in which it was built.
 This is in contrast to a non-relocatable package, which can only be utilized
 within its original build environment.
 
