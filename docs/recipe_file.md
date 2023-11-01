@@ -794,8 +794,8 @@ licenses require the license statement to be distributed with the package. The
 filename is relative to the source or recipe directory. The value can be a
 single filename or a YAML list for multiple license files. Values can also point
 to directories with license information. Directory entries must end with a `/`
-suffix (this is to lessen unintentional inclusion of non-license files; all of
-the directory's contents will be unconditionally and recursively added).
+suffix (this is to lessen unintentional inclusion of non-license files; all the
+directory's contents will be unconditionally and recursively added).
 
 ```yaml
 about:
@@ -918,7 +918,7 @@ build:
 
 **Note: not yet implemented**
 
-Pin compatible let's you pin a package based on the version retrieved from the
+Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
 
 E.g. if the variant specifies a pin for `numpy: 1.11`, one can use
