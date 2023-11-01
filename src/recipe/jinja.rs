@@ -97,13 +97,13 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
             let version = Version::from_str(version).map_err(|e| {
                 minijinja::Error::new(
                     minijinja::ErrorKind::CannotDeserialize,
-                    format!("Failed to deserialize `version`: {}", e.to_string()),
+                    format!("Failed to deserialize `version`: {}", e),
                 )
             })?;
             let version_spec = VersionSpec::from_str(spec).map_err(|e| {
                 minijinja::Error::new(
                     minijinja::ErrorKind::SyntaxError,
-                    format!("Bad syntax for `spec`: {}", e.to_string()),
+                    format!("Bad syntax for `spec`: {}", e),
                 )
             })?;
             Ok(version_spec.matches(&version))
