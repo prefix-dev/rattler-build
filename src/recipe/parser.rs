@@ -77,15 +77,12 @@ impl Recipe {
         root_node: &Node,
         jinja_opt: SelectorConfig,
     ) -> Result<Self, PartialParsingError> {
+        let hash = jinja_opt.hash.clone();
         let mut jinja = Jinja::new(jinja_opt);
 
-        let root_node = root_node.as_mapping().ok_or_else(|| {
-            _partialerror!(
-                *root_node.span(),
-                ErrorKind::ExpectedMapping,
-                label = "expected mapping"
-            )
-        })?;
+        let root_node = root_node
+            .as_mapping()
+            .ok_or_else(|| _partialerror!(*root_node.span(), ErrorKind::ExpectedMapping,))?;
 
         // add context values
         if let Some(context) = root_node.get("context") {
@@ -119,8 +116,6 @@ impl Recipe {
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
 
-        // TODO: handle outputs to produce multiple recipes
-
         let mut package = None;
         let mut build = Build::default();
         let mut source = Vec::new();
@@ -146,6 +141,13 @@ impl Recipe {
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
                     ))
                 }
+            }
+        }
+
+        // Add hash to build.string if it is not set
+        if build.string.is_none() {
+            if let Some(hash) = hash {
+                build.string = Some(format!("{}_{}", hash, build.number));
             }
         }
 
