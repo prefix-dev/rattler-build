@@ -171,7 +171,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             }
         }
     }
-    let mut recipe_path = recipe_path.unwrap();
+    let mut recipe_path = recipe_path.into_diagnostic()?;
 
     // If the recipe_path is a directory, look for "recipe.yaml" in the directory.
     if recipe_path.is_dir() {

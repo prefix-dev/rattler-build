@@ -127,9 +127,6 @@ impl Dylib {
 
         let exchange_dylib = |path: &Path| {
             if let Ok(relpath) = path.strip_prefix(prefix) {
-                let new_path = prefix.join(relpath);
-                let _diff_path =
-                    pathdiff::diff_paths(new_path, self.path.parent().unwrap()).unwrap();
                 let new_path = PathBuf::from(format!("@rpath/{}", relpath.to_string_lossy()));
                 Some(new_path)
             } else {

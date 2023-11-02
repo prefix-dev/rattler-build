@@ -240,8 +240,11 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // disabled as this results in .egg-info rather than
     // .dist-info directories being created, see gh-3094
     // set PIP_CACHE_DIR to a path in the work dir that does not exist.
-    let pip_cache = directories.work_dir.parent().unwrap().join("pip_cache");
-    insert!(vars, "PIP_CACHE_DIR", pip_cache.to_string_lossy());
+    if let Some(work_dir_parent) = directories.work_dir.parent() {
+        let pip_cache = work_dir_parent.join("pip_cache");
+        insert!(vars, "PIP_CACHE_DIR", pip_cache.to_string_lossy());
+    }
+
     // tell pip to not get anything from PyPI, please. We have everything we need
     // locally, and if we don't, it's a problem.
     insert!(vars, "PIP_NO_INDEX", "True");
