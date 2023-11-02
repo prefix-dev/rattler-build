@@ -27,7 +27,7 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, RunExports, ScriptEnv},
-    output::Output,
+    output::{find_outputs_from_src, Output},
     package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
@@ -53,9 +53,7 @@ impl Recipe {
     pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
         let yaml_root = Node::parse_yaml(0, yaml)?;
 
-        Self::from_node(&yaml_root, jinja_opt)
-            .map(|mut v| v.remove(0)) // TODO: handle multiple recipe outputs
-            .map_err(|err| ParsingError::from_partial(yaml, err))
+        Self::from_node(&yaml_root, jinja_opt).map_err(|err| ParsingError::from_partial(yaml, err))
     }
 
     /// Build a recipe from a YAML string and use a given package hash string as default value.
@@ -78,7 +76,7 @@ impl Recipe {
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
-    ) -> Result<Vec<Self>, PartialParsingError> {
+    ) -> Result<Self, PartialParsingError> {
         let mut jinja = Jinja::new(jinja_opt);
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
@@ -130,8 +128,6 @@ impl Recipe {
         let mut test = Test::default();
         let mut about = About::default();
 
-        let mut outputs: Vec<Output> = Vec::new();
-
         for (key, value) in rendered_node.iter() {
             let key_str = key.as_str();
             match key_str {
@@ -141,7 +137,7 @@ impl Recipe {
                 "requirements" => requirements = value.try_convert(key_str)?,
                 "test" => test = value.try_convert(key_str)?,
                 "about" => about = value.try_convert(key_str)?,
-                "outputs" => outputs = value.try_convert(key_str)?,
+                "outputs" => {}
                 "context" => {}
                 "extra" => {}
                 invalid_key => {
@@ -151,19 +147,6 @@ impl Recipe {
                     ))
                 }
             }
-        }
-
-        if !outputs.is_empty() {
-            // TODO: If the outputs field is present, and all itens in the outputs list have the
-            // `package.name` and the `package.version` field set, then the `package` field in the
-            // root node is not mandatory.
-            //
-            // For each output, one Recipe should be generated.
-            // For each output, the generated Recipe inherits all other fields from the root node,
-            // except if it is defined in the output.
-            // If defined in the outputs, the field value from the output overrides the value from
-            // the root node.
-            todo!("Not implemented yet: outputs handling")
         }
 
         let recipe = Recipe {
@@ -182,7 +165,7 @@ impl Recipe {
             extra: (),
         };
 
-        Ok(vec![recipe])
+        Ok(recipe)
     }
 
     /// Get the package information.

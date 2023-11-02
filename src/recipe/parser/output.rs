@@ -140,7 +140,7 @@ impl TryConvertNode<Output> for RenderedScalarNode {
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
 
-pub fn find_outputs(src: &str) -> Result<Vec<Node>, ParsingError> {
+pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
     let root_node = marked_yaml::parse_yaml(0, src)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
 
@@ -257,19 +257,4 @@ pub fn find_outputs(src: &str) -> Result<Vec<Node>, ParsingError> {
         res.push(recipe);
     }
     Ok(res)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_find_outputs() {
-        let src = include_str!("../../../../zlib.yaml");
-        let outputs = find_outputs(src).unwrap();
-
-        insta::assert_debug_snapshot!("1", outputs[0]);
-        insta::assert_debug_snapshot!("2", outputs[1]);
-        insta::assert_debug_snapshot!("3", outputs[2]);
-    }
 }
