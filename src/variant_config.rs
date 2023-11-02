@@ -22,6 +22,8 @@ use crate::{
     used_variables::used_vars_from_expressions,
 };
 
+type OutputVariantsTuple = (Node, Vec<BTreeMap<String, String>>);
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
     pub max_pin: Option<String>,
@@ -280,46 +282,57 @@ impl VariantConfig {
         &self,
         recipe: &str,
         selector_config: &SelectorConfig,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
-        use crate::recipe::parser::Dependency;
+    ) -> Result<Vec<OutputVariantsTuple>, VariantError> {
+        use crate::recipe::parser::{find_outputs_from_src, Dependency};
 
-        let mut used_variables = used_vars_from_expressions(recipe);
+        // First find all outputs from the recipe
+        let outputs = find_outputs_from_src(recipe)?;
 
-        // now render all selectors with the used variables
-        let combinations = self.combinations(&used_variables)?;
+        // Then find all used variables from the each output recipe
+        let mut recipes = Vec::with_capacity(outputs.len());
+        for output in outputs {
+            let mut used_variables = used_vars_from_expressions(recipe);
 
-        let recipe_parsed = Recipe::from_yaml(recipe, selector_config.clone())?;
-        for _ in combinations {
-            let requirements = recipe_parsed.requirements();
+            // now render all selectors with the used variables
+            let combinations = self.combinations(&used_variables)?;
 
-            // we do this in simple mode for now, but could later also do intersections
-            // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-            // says >=3.7 and then we only do 3.7-3.10)
-            requirements.all().for_each(|dep| match dep {
-                Dependency::Spec(spec) => {
-                    if let Some(name) = &spec.name {
-                        let val = name.as_normalized().to_owned();
+            let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
+                .map_err(|err| ParsingError::from_partial(recipe, err))?;
+
+            for _ in combinations {
+                let requirements = parsed_recipe.requirements();
+
+                // we do this in simple mode for now, but could later also do intersections
+                // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
+                // says >=3.7 and then we only do 3.7-3.10)
+                requirements.all().for_each(|dep| match dep {
+                    Dependency::Spec(spec) => {
+                        if let Some(name) = &spec.name {
+                            let val = name.as_normalized().to_owned();
+                            used_variables.insert(val);
+                        }
+                    }
+                    Dependency::PinSubpackage(pin_sub) => {
+                        let val = pin_sub.pin_value().name.as_normalized().to_owned();
                         used_variables.insert(val);
                     }
-                }
-                Dependency::PinSubpackage(pin_sub) => {
-                    let val = pin_sub.pin_value().name.as_normalized().to_owned();
-                    used_variables.insert(val);
-                }
-                Dependency::Compiler(_) => (),
-            })
+                    Dependency::Compiler(_) => (),
+                })
+            }
+
+            // special handling of CONDA_BUILD_SYSROOT
+            if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
+                used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+            }
+
+            // also always add `target_platform` and `channel_targets`
+            used_variables.insert("target_platform".to_string());
+            used_variables.insert("channel_targets".to_string());
+
+            recipes.push((output, self.combinations(&used_variables)?));
         }
 
-        // special handling of CONDA_BUILD_SYSROOT
-        if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
-            used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-        }
-
-        // also always add `target_platform` and `channel_targets`
-        used_variables.insert("target_platform".to_string());
-        used_variables.insert("channel_targets".to_string());
-
-        self.combinations(&used_variables)
+        Ok(recipes)
     }
 }
 

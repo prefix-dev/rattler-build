@@ -301,6 +301,13 @@ impl From<&str> for Node {
     }
 }
 
+impl From<&MarkedScalarNode> for Node {
+    fn from(value: &MarkedScalarNode) -> Self {
+        let scalar: ScalarNode = value.into();
+        scalar.into()
+    }
+}
+
 impl TryFrom<marked_yaml::Node> for Node {
     type Error = PartialParsingError;
 
@@ -314,7 +321,7 @@ impl TryFrom<&marked_yaml::Node> for Node {
 
     fn try_from(value: &marked_yaml::Node) -> Result<Self, Self::Error> {
         match value {
-            marked_yaml::Node::Scalar(scalar) => Ok(Self::Scalar(scalar.into())),
+            marked_yaml::Node::Scalar(scalar) => Ok(Self::from(scalar)),
             marked_yaml::Node::Mapping(map) => {
                 Ok(Self::Mapping(MappingNode::try_from(map.clone())?))
             }
@@ -1111,13 +1118,7 @@ where
                 let item = s.try_convert(name)?;
                 Ok(vec![item])
             }
-            RenderedNode::Sequence(seq) => seq
-                .iter()
-                .map(|item| {
-                    // dbg!(&item);
-                    item.try_convert(name)
-                })
-                .collect(),
+            RenderedNode::Sequence(seq) => seq.iter().map(|item| item.try_convert(name)).collect(),
             RenderedNode::Null(_) => Ok(vec![]),
             RenderedNode::Mapping(_) => Err(_partialerror!(
                 *self.span(),

@@ -18,6 +18,7 @@ use crate::{
 
 mod about;
 mod build;
+mod output;
 mod package;
 mod requirements;
 mod source;
@@ -26,7 +27,8 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, RunExports, ScriptEnv},
-    package::Package,
+    output::{find_outputs_from_src, Output},
+    package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::Test,
@@ -51,9 +53,7 @@ impl Recipe {
     pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
         let yaml_root = Node::parse_yaml(0, yaml)?;
 
-        Self::from_node(&yaml_root, jinja_opt)
-            .map(|mut v| v.remove(0)) // TODO: handle multiple recipe outputs
-            .map_err(|err| ParsingError::from_partial(yaml, err))
+        Self::from_node(&yaml_root, jinja_opt).map_err(|err| ParsingError::from_partial(yaml, err))
     }
 
     /// Build a recipe from a YAML string and use a given package hash string as default value.
@@ -76,16 +76,13 @@ impl Recipe {
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
-    ) -> Result<Vec<Self>, PartialParsingError> {
+    ) -> Result<Self, PartialParsingError> {
+        let hash = jinja_opt.hash.clone();
         let mut jinja = Jinja::new(jinja_opt);
 
-        let root_node = root_node.as_mapping().ok_or_else(|| {
-            _partialerror!(
-                *root_node.span(),
-                ErrorKind::ExpectedMapping,
-                label = "expected mapping"
-            )
-        })?;
+        let root_node = root_node
+            .as_mapping()
+            .ok_or_else(|| _partialerror!(*root_node.span(), ErrorKind::ExpectedMapping,))?;
 
         // add context values
         if let Some(context) = root_node.get("context") {
@@ -117,9 +114,7 @@ impl Recipe {
             }
         }
 
-        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "root")?;
-
-        // TODO: handle outputs to produce multiple recipes
+        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
 
         let mut package = None;
         let mut build = Build::default();
@@ -149,6 +144,13 @@ impl Recipe {
             }
         }
 
+        // Add hash to build.string if it is not set
+        if build.string.is_none() {
+            if let Some(hash) = hash {
+                build.string = Some(format!("{}_{}", hash, build.number));
+            }
+        }
+
         let recipe = Recipe {
             package: package.ok_or_else(|| {
                 _partialerror!(
@@ -165,7 +167,7 @@ impl Recipe {
             extra: (),
         };
 
-        Ok(vec![recipe])
+        Ok(recipe)
     }
 
     /// Get the package information.
