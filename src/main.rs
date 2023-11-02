@@ -222,15 +222,23 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let outputs_and_variants = variant_config.find_variants(&recipe_text, &selector_config)?;
 
     tracing::info!("Found variants:");
-    for (_, variants) in &outputs_and_variants {
+    for (output, variants) in &outputs_and_variants {
+        let package_name = output
+            .as_mapping()
+            .and_then(|m| m.get("package"))
+            .and_then(|v| v.as_mapping())
+            .and_then(|m| m.get("name"))
+            .and_then(|v| v.as_scalar())
+            .map(|s| s.as_str())
+            .unwrap_or("unknown");
         for variant in variants {
             let mut table = comfy_table::Table::new();
             table
                 .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
                 .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-                .set_header(vec!["Variant", "Version"]);
+                .set_header(vec!["Package", "Variant", "Version"]);
             for (key, value) in variant.iter() {
-                table.add_row(vec![key, value]);
+                table.add_row(vec![package_name, key, value]);
             }
             tracing::info!("{}\n", table);
         }
@@ -259,6 +267,12 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
                 tracing::info!("Variant: {:#?}", variant);
                 tracing::info!("Hash: {}", recipe.build().string().unwrap());
+                tracing::info!("Skip?: {}", recipe.build().skip());
+                continue;
+            }
+
+            if recipe.build().skip() {
+                tracing::info!("Skipping build for variant: {:#?}", variant);
                 continue;
             }
 
