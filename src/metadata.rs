@@ -286,21 +286,18 @@ mod tests {
 
     #[test]
     fn setup_build_dir_test() {
-        let temp_dir = std::env::temp_dir();
-        let temp_dir = temp_dir.to_str().unwrap();
-
         // without build_id (aka timestamp)
         let p1 = setup_build_dir("name", true, &Utc::now()).unwrap();
-        let ps1 = p1.to_str().unwrap();
-        assert!(ps1.eq(&format!("{temp_dir}rattler-build_name")));
-        _ = ps1;
+        let f1 = p1.file_name().unwrap();
+        assert!(f1.eq("rattler-build_name"));
         _ = std::fs::remove_dir_all(p1);
 
         // with build_id (aka timestamp)
-        let p2 = setup_build_dir("name", false, &Utc::now()).unwrap();
-        let ps2 = p2.to_str().unwrap();
-        assert!(ps2.starts_with(&format!("{temp_dir}rattler-build_name_")));
-        _ = ps2;
+        let timestamp = &Utc::now();
+        let p2 = setup_build_dir("name", false, &timestamp).unwrap();
+        let f2 = p2.file_name().unwrap().to_string_lossy();
+        let epoch = timestamp.timestamp();
+        assert!(f2.eq(&format!("rattler-build_name_{}", epoch.to_string())));
         _ = std::fs::remove_dir_all(p2);
     }
 }
