@@ -62,7 +62,8 @@ impl<'a> CopyDir<'a> {
             .partition(|g| g.trim_start().starts_with('~'));
 
         self.include_globs.extend(include_globs);
-        self.exclude_globs.extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
+        self.exclude_globs
+            .extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
 
         self
     }
@@ -149,7 +150,7 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.exclude_globs)?,
         };
 
-        let copied_pathes = WalkBuilder::new(self.from_path.to_path_buf())
+        let copied_pathes = WalkBuilder::new(self.from_path)
             // disregard global gitignore
             .git_global(self.use_git_global)
             .git_ignore(self.use_gitignore)
@@ -183,7 +184,7 @@ impl<'a> CopyDir<'a> {
                     components.iter().collect()
                 };
 
-                let include = result.include_globs().len() == 0;
+                let include = result.include_globs().is_empty();
 
                 let include = include
                     || result
@@ -286,7 +287,7 @@ impl<'a> CopyDirResult<'a> {
     }
 }
 
-fn make_glob_match_map<'a>(globs: Vec<&'a str>) -> Result<HashMap<Glob<'a>, Match>, SourceError> {
+fn make_glob_match_map(globs: Vec<&str>) -> Result<HashMap<Glob, Match>, SourceError> {
     globs
         .into_iter()
         .map(|gl| {
@@ -356,7 +357,7 @@ mod test {
         std::fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
 
         let dest_dir = tmp_dir_path.as_path().join("test_copy_dir_dest");
-        let copy_dir = super::CopyDir::new(&dir, &dest_dir)
+        let _copy_dir = super::CopyDir::new(&dir, &dest_dir)
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -367,7 +368,7 @@ mod test {
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
-        let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
+        let _copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
             .with_include_glob("*.txt")
             .use_gitignore(false)
             .run()
@@ -379,7 +380,7 @@ mod test {
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
-        let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
+        let _copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
             .with_exclude_glob("*.txt")
             .use_gitignore(false)
             .run()

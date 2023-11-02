@@ -590,7 +590,7 @@ fn copy_license_files(
         let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
 
         let copied_files = copied_files_recipe_dir
-            .into_iter()
+            .iter()
             .chain(copied_files_work_dir)
             .map(PathBuf::from)
             .collect::<Vec<PathBuf>>();
