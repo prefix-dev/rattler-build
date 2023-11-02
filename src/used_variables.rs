@@ -68,6 +68,9 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     if let Expr::Const(constant) = &call.args[0] {
                         variables.insert(format!("{}", &constant.value));
                     }
+                } else if function == "cdt" {
+                    variables.insert("cdt_name".into());
+                    variables.insert("cdt_arch".into());
                 }
             }
         }

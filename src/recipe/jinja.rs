@@ -18,7 +18,7 @@ pub struct Jinja<'a> {
 impl<'a> Jinja<'a> {
     /// Create a new Jinja instance with the given selector configuration.
     pub fn new(config: SelectorConfig) -> Self {
-        let env = set_jinja();
+        let env = set_jinja(&config);
         let context = config.into_context();
         Self { env, context }
     }
@@ -66,7 +66,7 @@ impl<'a> Jinja<'a> {
 impl Default for Jinja<'_> {
     fn default() -> Self {
         Self {
-            env: set_jinja(),
+            env: set_jinja(&SelectorConfig::default()),
             context: BTreeMap::new(),
         }
     }
@@ -78,7 +78,7 @@ impl<'a> Extend<(String, Value)> for Jinja<'a> {
     }
 }
 
-fn set_jinja() -> minijinja::Environment<'static> {
+fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     use rattler_conda_types::version_spec::VersionSpec;
     let mut env = minijinja::Environment::new();
     env.set_syntax(minijinja::Syntax {
@@ -94,13 +94,67 @@ fn set_jinja() -> minijinja::Environment<'static> {
     env.add_function("cmp", |a: &Value, spec: &str| {
         if let Some(version) = a.as_str() {
             // check if version matches spec
-            let version = Version::from_str(version).unwrap();
-            let version_spec = VersionSpec::from_str(spec).unwrap();
+            let version = Version::from_str(version).map_err(|e| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::CannotDeserialize,
+                    format!("Failed to deserialize `version`: {}", e),
+                )
+            })?;
+            let version_spec = VersionSpec::from_str(spec).map_err(|e| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::SyntaxError,
+                    format!("Bad syntax for `spec`: {}", e),
+                )
+            })?;
             Ok(version_spec.matches(&version))
         } else {
             // if a is undefined, we are currently searching for all variants and thus return true
             Ok(true)
         }
+    });
+
+    let SelectorConfig {
+        target_platform,
+        build_platform,
+        variant,
+        ..
+    } = config.clone();
+    env.add_function("cdt", move |package_name: String| {
+        use rattler_conda_types::Arch;
+        let arch = build_platform.arch().or_else(|| target_platform.arch());
+        let arch_str = arch.map(|arch| format!("{arch}"));
+
+        let cdt_arch = if let Some(s) = variant.get("cdt_arch") {
+            s.as_str()
+        } else {
+            match arch {
+                Some(Arch::X86) => "i686",
+                _ => arch_str
+                    .as_ref()
+                    .ok_or_else(|| {
+                        minijinja::Error::new(
+                            minijinja::ErrorKind::UndefinedError,
+                            "No target or build architecture provided.",
+                        )
+                    })?
+                    .as_str(),
+            }
+        };
+
+        let cdt_name = variant.get("cdt_name").map_or_else(
+            || match arch {
+                Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7",
+                _ => "cos6",
+            },
+            String::as_str,
+        );
+
+        let res = package_name.split_once(' ').map_or_else(
+            || format!("{package_name}-{cdt_name}-{cdt_arch}"),
+            |(name, ver_build)| format!("{name}-{cdt_name}-{cdt_arch} {ver_build}"),
+        );
+
+        Ok(res)
     });
 
     env.add_function("compiler", |lang: String| {
@@ -205,6 +259,122 @@ mod tests {
         let jinja = Jinja::new(options);
 
         assert!(jinja.eval("${{ true if win }}").expect("test 1").is_true());
+    }
+
+    #[test]
+    fn eval_cdt_x86_64() {
+        let variant = BTreeMap::new();
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name v0.1.2')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-x86_64 v0.1.2"
+        );
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-x86_64"
+        );
+    }
+
+    #[test]
+    fn eval_cdt_x86() {
+        let variant = BTreeMap::new();
+        let options = SelectorConfig {
+            target_platform: Platform::Linux32,
+            build_platform: Platform::Linux32,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name v0.1.2')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-i686 v0.1.2"
+        );
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-i686"
+        );
+    }
+
+    #[test]
+    fn eval_cdt_aarch64() {
+        let variant = BTreeMap::new();
+        let options = SelectorConfig {
+            target_platform: Platform::LinuxAarch64,
+            build_platform: Platform::LinuxAarch64,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name v0.1.2')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos7-aarch64 v0.1.2"
+        );
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos7-aarch64"
+        );
+    }
+
+    #[test]
+    fn eval_cdt_arm6() {
+        let variant = BTreeMap::new();
+        let options = SelectorConfig {
+            target_platform: Platform::LinuxArmV6l,
+            build_platform: Platform::LinuxArmV6l,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name v0.1.2')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-armv6l v0.1.2"
+        );
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-armv6l"
+        );
     }
 
     #[test]
