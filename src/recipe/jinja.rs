@@ -121,31 +121,29 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     } = config.clone();
     env.add_function("cdt", move |package_name: String| {
         use rattler_conda_types::Arch;
+        let arch = build_platform.arch().or_else(|| target_platform.arch());
+        let arch_str = arch.map(|arch| format!("{arch}"));
 
-        let arch = build_platform
-            .arch()
-            .or_else(|| target_platform.arch())
-            .ok_or_else(|| {
-                minijinja::Error::new(
-                    minijinja::ErrorKind::UndefinedError,
-                    "No target or build architecture provided.",
-                )
-            })?;
-
-        let arch_str = format!("{arch}");
-        let cdt_arch = match arch {
-            Arch::X86_64 => "x86_64",
-            Arch::Ppc64le => "ppc64le",
-            Arch::Ppc64 => "ppc64",
-            Arch::Aarch64 => "aarch64",
-            Arch::S390X => "s390x",
-            Arch::X86 => "i686",
-            _ => arch_str.as_str(),
+        let cdt_arch = if let Some(s) = variant.get("cdt_arch") {
+            s.as_str()
+        } else {
+            match arch {
+                Some(Arch::X86) => "i686",
+                _ => arch_str
+                    .as_ref()
+                    .ok_or_else(|| {
+                        minijinja::Error::new(
+                            minijinja::ErrorKind::UndefinedError,
+                            "No target or build architecture provided.",
+                        )
+                    })?
+                    .as_str(),
+            }
         };
 
-        let cdt_name = variant.get("cdt_name").map_or(
-            match arch {
-                Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64 => "cos7",
+        let cdt_name = variant.get("cdt_name").map_or_else(
+            || match arch {
+                Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7",
                 _ => "cos6",
             },
             String::as_str,
@@ -155,7 +153,6 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
             || format!("{package_name}-{cdt_name}-{cdt_arch}"),
             |(name, ver_build)| format!("{name}-{cdt_name}-{cdt_arch} {ver_build}"),
         );
-        tracing::info!("cdt: {res}");
 
         Ok(res)
     });
@@ -290,6 +287,35 @@ mod tests {
                 .to_string()
                 .as_str(),
             "package_name-cos6-x86_64"
+        );
+    }
+
+    #[test]
+    fn eval_cdt_x86() {
+        let variant = BTreeMap::new();
+        let options = SelectorConfig {
+            target_platform: Platform::Linux32,
+            build_platform: Platform::Linux32,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name v0.1.2')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-i686 v0.1.2"
+        );
+        assert_eq!(
+            jinja
+                .eval("cdt('package_name')")
+                .expect("test 1")
+                .to_string()
+                .as_str(),
+            "package_name-cos6-i686"
         );
     }
 
