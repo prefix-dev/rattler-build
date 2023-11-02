@@ -21,12 +21,11 @@ fn package_record_from_index_json<T: Read>(
     file: &Path,
     index_json_reader: &mut T,
 ) -> Result<PackageRecord, std::io::Error> {
-    let index = IndexJson::from_reader(index_json_reader).unwrap();
+    let index = IndexJson::from_reader(index_json_reader)?;
 
-    let sha256_result =
-        rattler_digest::compute_file_digest::<rattler_digest::Sha256>(file).unwrap();
-    let md5_result = rattler_digest::compute_file_digest::<rattler_digest::Md5>(file).unwrap();
-    let size = std::fs::metadata(file).unwrap().len();
+    let sha256_result = rattler_digest::compute_file_digest::<rattler_digest::Sha256>(file)?;
+    let md5_result = rattler_digest::compute_file_digest::<rattler_digest::Md5>(file)?;
+    let size = std::fs::metadata(file)?.len();
 
     let package_record = PackageRecord {
         name: index.name,
@@ -54,13 +53,13 @@ fn package_record_from_index_json<T: Read>(
 }
 
 fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    let reader = std::fs::File::open(file).unwrap();
+    let reader = std::fs::File::open(file)?;
     let mut archive = read::stream_tar_bz2(reader);
 
-    for entry in archive.entries().unwrap() {
-        let mut entry = entry.unwrap();
-        let path = entry.path().unwrap();
-        let path = path.to_str().unwrap();
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        let path = path.to_string_lossy();
         if path == "info/index.json" {
             return package_record_from_index_json(file, &mut entry);
         }
@@ -72,13 +71,13 @@ fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Er
 }
 
 fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Error> {
-    let reader = std::fs::File::open(file).unwrap();
+    let reader = std::fs::File::open(file)?;
     let mut archive = seek::stream_conda_info(reader).expect("Could not open conda file");
 
-    for entry in archive.entries().unwrap() {
-        let mut entry = entry.unwrap();
-        let path = entry.path().unwrap();
-        let path = path.to_str().unwrap();
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?;
+        let path = path.to_string_lossy();
         if path == "info/index.json" {
             return package_record_from_index_json(file, &mut entry);
         }
@@ -109,15 +108,18 @@ pub fn index(
     // find all subdirs
     let mut platforms = entries
         .iter()
-        .map(|(p, _)| {
+        .filter_map(|(p, _)| {
             p.parent()
-                .unwrap()
-                .file_name()
-                .unwrap()
-                .to_string_lossy()
-                .to_string()
+                .and_then(|parent| parent.file_name())
+                .and_then(|file_name| {
+                    let name = file_name.to_string_lossy().to_string();
+                    if name != "src_cache" {
+                        Some(name)
+                    } else {
+                        None
+                    }
+                })
         })
-        .filter(|p| p != "src_cache")
         .collect::<std::collections::HashSet<_>>();
 
     // Always create noarch subdir
@@ -131,7 +133,7 @@ pub fn index(
         let platform_str = target_platform.to_string();
         if !output_folder.join(&platform_str).exists() {
             std::fs::create_dir(output_folder.join(&platform_str))?;
-            platforms.insert(platform_str.parse().unwrap());
+            platforms.insert(platform_str);
         }
     }
 
@@ -160,10 +162,19 @@ pub fn index(
             version: Some(1),
         };
 
-        for (p, t) in entries
-            .iter()
-            .filter(|(p, _)| p.parent().unwrap().file_name().unwrap() == OsStr::new(&platform))
-        {
+        for (p, t) in entries.iter().filter_map(|(p, t)| {
+            p.parent().and_then(|parent| {
+                parent.file_name().and_then(|file_name| {
+                    if file_name == OsStr::new(&platform) {
+                        // If the file_name is the platform we're looking for, return Some((p, t))
+                        Some((p, t))
+                    } else {
+                        // Otherwise, we return None to filter out this item
+                        None
+                    }
+                })
+            })
+        }) {
             match t {
                 ArchiveType::TarBz2 => {
                     if let Ok(record) = package_record_from_tar_bz2(p) {
@@ -186,10 +197,7 @@ pub fn index(
             };
         }
         let out_file = output_folder.join(platform).join("repodata.json");
-        File::create(&out_file)
-            .unwrap()
-            .write_all(serde_json::to_string_pretty(&repodata).unwrap().as_bytes())
-            .unwrap();
+        File::create(&out_file)?.write_all(serde_json::to_string_pretty(&repodata)?.as_bytes())?;
     }
 
     Ok(())

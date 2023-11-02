@@ -76,8 +76,9 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
     ];
 
     for var in default_vars {
-        let val = std::env::var(var).unwrap_or_default();
-        vars.insert(var.to_string(), val);
+        if let Ok(val) = std::env::var(var) {
+            vars.insert(var.to_string(), val);
+        }
     }
 
     vars.insert(

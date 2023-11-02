@@ -34,7 +34,7 @@ requirements:
 
 about:
   homepage: http://curl.haxx.se/
-  license: MIT/X derivate (http://curl.haxx.se/docs/copyright.html)
+  license: curl
   license_file: COPYING
   summary: tool and library for transferring data with URL syntax
   description: |
