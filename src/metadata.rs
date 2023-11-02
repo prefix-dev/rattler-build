@@ -70,11 +70,11 @@ pub struct Directories {
     pub output_dir: PathBuf,
 }
 
-fn setup_build_dir(name: &str, build_id: bool) -> Result<PathBuf, std::io::Error> {
+fn setup_build_dir(name: &str, no_build_id: bool) -> Result<PathBuf, std::io::Error> {
     let now = SystemTime::now();
     let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-    let dirname = if build_id {
+    let dirname = if no_build_id {
         format!("rattler-build_{}", name)
     } else {
         format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis())
@@ -89,9 +89,10 @@ impl Directories {
         name: &str,
         recipe_path: &Path,
         output_dir: &Path,
-        build_id: bool,
+        no_build_id: bool,
     ) -> Result<Directories, std::io::Error> {
-        let build_dir = setup_build_dir(name, build_id).expect("Could not create build directory");
+        let build_dir =
+            setup_build_dir(name, no_build_id).expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
         if !output_dir.exists() {
@@ -272,5 +273,30 @@ impl Display for Output {
             }
         }
         writeln!(f, "\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setup_build_dir_test() {
+        let temp_dir = std::env::temp_dir();
+        let temp_dir = temp_dir.to_str().unwrap();
+
+        // without build_id (aka timestamp)
+        let p1 = setup_build_dir("name", true).unwrap();
+        let ps1 = p1.to_str().unwrap();
+        assert!(ps1.eq(&format!("{temp_dir}rattler-build_name")));
+        _ = ps1;
+        _ = std::fs::remove_dir_all(p1);
+
+        // with build_id (aka timestamp)
+        let p2 = setup_build_dir("name", false).unwrap();
+        let ps2 = p2.to_str().unwrap();
+        assert!(ps2.starts_with(&format!("{temp_dir}rattler-build_name_")));
+        _ = ps2;
+        _ = std::fs::remove_dir_all(p2);
     }
 }
