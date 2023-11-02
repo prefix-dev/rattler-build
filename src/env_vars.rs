@@ -301,6 +301,14 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         &output.build_configuration.variant,
     ));
 
+    // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
+    // this value will be taken from the previous package for rebuild purposes
+    let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
+    vars.insert(
+        "SOURCE_DATE_EPOCH".to_string(),
+        timestamp_epoch_secs.to_string(),
+    );
+
     // let vars: Vec<(String, String)> = vec![
     //     // build configuration
     //     // (s!("CONDA_BUILD_SYSROOT"), s!("")),
