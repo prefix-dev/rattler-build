@@ -298,6 +298,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 .clone()
                 .unwrap_or(vec!["conda-forge".to_string()]);
 
+            let timestamp = chrono::Utc::now();
             let output = rattler_build::metadata::Output {
                 recipe,
                 build_configuration: BuildConfiguration {
@@ -315,10 +316,11 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                         &recipe_path,
                         &args.output_dir,
                         args.no_build_id,
+                        &timestamp,
                     )
                     .into_diagnostic()?,
                     channels,
-                    timestamp: chrono::Utc::now(),
+                    timestamp,
                     subpackages,
                     package_format: match args.package_format {
                         PackageFormat::TarBz2 => ArchiveType::TarBz2,
