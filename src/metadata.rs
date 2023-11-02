@@ -6,9 +6,9 @@ use std::{
     fs,
     path::{Path, PathBuf},
     str::FromStr,
-    time::{SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{DateTime, Utc};
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
@@ -70,11 +70,18 @@ pub struct Directories {
     pub output_dir: PathBuf,
 }
 
-fn setup_build_dir(name: &str) -> Result<PathBuf, std::io::Error> {
-    let now = SystemTime::now();
-    let since_the_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
+fn setup_build_dir(
+    name: &str,
+    no_build_id: bool,
+    timestamp: &DateTime<Utc>,
+) -> Result<PathBuf, std::io::Error> {
+    let since_the_epoch = timestamp.timestamp();
 
-    let dirname = format!("rattler-build_{}_{:?}", name, since_the_epoch.as_millis());
+    let dirname = if no_build_id {
+        format!("rattler-build_{}", name)
+    } else {
+        format!("rattler-build_{}_{:?}", name, since_the_epoch)
+    };
     let path = env::temp_dir().join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
@@ -85,8 +92,11 @@ impl Directories {
         name: &str,
         recipe_path: &Path,
         output_dir: &Path,
+        no_build_id: bool,
+        timestamp: &DateTime<Utc>,
     ) -> Result<Directories, std::io::Error> {
-        let build_dir = setup_build_dir(name).expect("Could not create build directory");
+        let build_dir = setup_build_dir(name, no_build_id, timestamp)
+            .expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
         if !output_dir.exists() {
@@ -267,5 +277,27 @@ impl Display for Output {
             }
         }
         writeln!(f, "\n")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn setup_build_dir_test() {
+        // without build_id (aka timestamp)
+        let p1 = setup_build_dir("name", true, &Utc::now()).unwrap();
+        let f1 = p1.file_name().unwrap();
+        assert!(f1.eq("rattler-build_name"));
+        _ = std::fs::remove_dir_all(p1);
+
+        // with build_id (aka timestamp)
+        let timestamp = &Utc::now();
+        let p2 = setup_build_dir("name", false, &timestamp).unwrap();
+        let f2 = p2.file_name().unwrap().to_string_lossy();
+        let epoch = timestamp.timestamp();
+        assert!(f2.eq(&format!("rattler-build_name_{}", epoch.to_string())));
+        _ = std::fs::remove_dir_all(p2);
     }
 }
