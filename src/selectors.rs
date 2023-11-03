@@ -33,7 +33,7 @@ impl Object for Env {
                 let Some(arg) = args.next() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::MissingArgument,
-                        "`get` requires atleast one argument",
+                        "`get` requires at least one argument",
                     ));
                 };
                 let Some(key) = arg.as_str() else {
@@ -50,7 +50,7 @@ impl Object for Env {
                 let Some(arg) = args.next() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::MissingArgument,
-                        "`get_default` requires atleast two arguments",
+                        "`get_default` requires at least two arguments",
                     ));
                 };
                 let Some(key) = arg.as_str() else {
@@ -62,7 +62,7 @@ impl Object for Env {
                 let Some(arg) = args.next() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::MissingArgument,
-                        "`get_default` requires atleast two arguments",
+                        "`get_default` requires at least two arguments",
                     ));
                 };
                 let Some(default) = arg.as_str() else {
@@ -79,7 +79,7 @@ impl Object for Env {
                 let Some(arg) = args.next() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::MissingArgument,
-                        "`exists` requires atleast one argument",
+                        "`exists` requires at least one argument",
                     ));
                 };
                 let Some(key) = arg.as_str() else {
