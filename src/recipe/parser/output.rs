@@ -89,11 +89,31 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
             } else {
                 // deep merge
                 if DEEP_MERGE_KEYS.contains(&key.as_str()) {
-                    let output_value = output_map.get_mut(key).unwrap();
-                    let output_value_map = output_value.as_mapping_mut().unwrap();
+                    let output_map_span = *output_map.span();
+                    let output_value = output_map.get_mut(key).ok_or_else(|| {
+                        ParsingError::from_partial(
+                            src,
+                            _partialerror!(
+                                output_map_span,
+                                ErrorKind::MissingField(key.as_str().to_owned().into()),
+                            ),
+                        )
+                    })?;
+                    let output_value_span = *output_value.span();
+                    let output_value_map = output_value.as_mapping_mut().ok_or_else(|| {
+                        ParsingError::from_partial(
+                            src,
+                            _partialerror!(output_value_span, ErrorKind::ExpectedMapping,),
+                        )
+                    })?;
 
                     let mut root_value = value.clone();
-                    let root_value_map = root_value.as_mapping_mut().unwrap();
+                    let root_value_map = root_value.as_mapping_mut().ok_or_else(|| {
+                        ParsingError::from_partial(
+                            src,
+                            _partialerror!(*value.span(), ErrorKind::ExpectedMapping,),
+                        )
+                    })?;
 
                     for (key, value) in root_value_map.iter() {
                         if !root_value_map.contains_key(key) {

@@ -81,6 +81,8 @@ impl<'a> Extend<(String, Value)> for Jinja<'a> {
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     use rattler_conda_types::version_spec::VersionSpec;
     let mut env = minijinja::Environment::new();
+
+    // Ok to unwrap here because we know that the syntax is valid
     env.set_syntax(minijinja::Syntax {
         block_start: "{%".into(),
         block_end: "%}".into(),
