@@ -294,10 +294,10 @@ mod tests {
 
         // with build_id (aka timestamp)
         let timestamp = &Utc::now();
-        let p2 = setup_build_dir("name", false, &timestamp).unwrap();
+        let p2 = setup_build_dir("name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap().to_string_lossy();
         let epoch = timestamp.timestamp();
-        assert!(f2.eq(&format!("rattler-build_name_{}", epoch.to_string())));
+        assert!(f2.eq(&format!("rattler-build_name_{epoch}")));
         _ = std::fs::remove_dir_all(p2);
     }
 }

@@ -163,7 +163,7 @@ async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestErro
 }
 
 fn file_from_tar_bz2(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
-    let reader = std::fs::File::open(archive_path).unwrap();
+    let reader = std::fs::File::open(archive_path)?;
     let mut archive = rattler_package_streaming::read::stream_tar_bz2(reader);
 
     for entry in archive.entries()? {
@@ -182,7 +182,7 @@ fn file_from_tar_bz2(archive_path: &Path, find_path: &Path) -> Result<String, st
 }
 
 fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
-    let reader = std::fs::File::open(archive_path).unwrap();
+    let reader = std::fs::File::open(archive_path)?;
 
     let mut archive = if find_path.starts_with("info") {
         rattler_package_streaming::seek::stream_conda_info(reader)
