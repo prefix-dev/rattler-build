@@ -565,8 +565,6 @@ fn copy_license_files(
             }
         }
 
-        let use_gitignore = false;
-
         let copy_dir = crate::source::copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
