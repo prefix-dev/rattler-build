@@ -572,7 +572,7 @@ fn copy_license_files(
             &licenses_folder,
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
-        .use_gitignore(use_gitignore)
+        .use_gitignore(false)
         .run()?;
 
         let copied_files_recipe_dir = copy_dir.copied_pathes();
@@ -583,7 +583,7 @@ fn copy_license_files(
             &licenses_folder,
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
-        .use_gitignore(use_gitignore)
+        .use_gitignore(false)
         .run()?;
 
         let copied_files_work_dir = copy_dir.copied_pathes();

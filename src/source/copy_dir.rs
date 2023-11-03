@@ -57,14 +57,13 @@ impl<'a> CopyDir<'a> {
     where
         I: IntoIterator<Item = &'a str>,
     {
-        let (include_globs, exclude_globs): (Vec<_>, Vec<_>) = globs
+        let (exclude_globs, include_globs): (Vec<_>, Vec<_>) = globs
             .into_iter()
             .partition(|g| g.trim_start().starts_with('~'));
 
         self.include_globs.extend(include_globs);
         self.exclude_globs
             .extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
-
         self
     }
 
@@ -170,12 +169,10 @@ impl<'a> CopyDir<'a> {
                     .unwrap_or(false)
                 {
                     // if the dir is empty, check if we should create it anyways
-                    if !entry.path().read_dir().unwrap().next().is_none() {
+                    if entry.path().read_dir().unwrap().next().is_some()
+                        || !result.include_globs().is_empty()
+                    {
                         return None;
-                    } else {
-                        if !result.include_globs().is_empty() {
-                            return None;
-                        }
                     }
                 }
 
@@ -378,12 +375,12 @@ mod test {
             .run()
             .unwrap();
 
-        assert_eq!(dest_dir.exists(), true);
-        assert_eq!(dest_dir.is_dir(), true);
-        assert_eq!(dest_dir.join("test.txt").exists(), true);
-        assert_eq!(dest_dir.join("test_dir").exists(), true);
-        assert_eq!(dest_dir.join("test_dir").join("test.md").exists(), true);
-        assert_eq!(dest_dir.join("test_dir").join("test_dir2").exists(), true);
+        assert!(dest_dir.exists());
+        assert!(dest_dir.is_dir());
+        assert!(dest_dir.join("test.txt").exists());
+        assert!(dest_dir.join("test_dir").exists());
+        assert!(dest_dir.join("test_dir").join("test.md").exists());
+        assert!(dest_dir.join("test_dir").join("test_dir2").exists());
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
@@ -420,8 +417,8 @@ mod test {
         let dir = tmp_dir.path().join("test_copy_dir");
 
         fs::create_dir_all(&dir).unwrap();
-        File::create(&dir.join("test_1.txt")).unwrap();
-        File::create(&dir.join("test_2.rst")).unwrap();
+        File::create(dir.join("test_1.txt")).unwrap();
+        File::create(dir.join("test_2.rst")).unwrap();
 
         let dest_dir = tempfile::TempDir::new().unwrap();
 
@@ -436,6 +433,18 @@ mod test {
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
             .with_include_glob("test_copy_dir/")
             .with_exclude_glob("*.rst")
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+        assert_eq!(copy_dir.copied_pathes().len(), 1);
+        assert_eq!(
+            copy_dir.copied_pathes()[0],
+            dest_dir.path().join("test_copy_dir/test_1.txt")
+        );
+
+        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .with_include_glob("test_copy_dir/test_1.txt")
             .use_gitignore(false)
             .run()
             .unwrap();
