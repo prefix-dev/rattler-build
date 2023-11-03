@@ -1,8 +1,111 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::{value::Value, Environment};
+use minijinja::{
+    value::{Object, Value},
+    Environment,
+};
 use rattler_conda_types::{Platform, Version, VersionSpec};
 use serde_yaml::Value as YamlValue;
+
+#[derive(Debug)]
+struct Env;
+impl std::fmt::Display for Env {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Env")
+    }
+}
+
+impl Object for Env {
+    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
+        minijinja::value::ObjectKind::Plain
+    }
+
+    fn call_method(
+        &self,
+        state: &minijinja::State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, minijinja::Error> {
+        let _state = state;
+        match name {
+            "get" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`get` requires atleast one argument",
+                    ));
+                };
+                let Some(key) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`get` requires a string argument",
+                    ));
+                };
+                let ret = std::env::var(key).unwrap_or_default();
+                Ok(Value::from(ret))
+            }
+            "get_default" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`get_default` requires atleast two arguments",
+                    ));
+                };
+                let Some(key) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`get_default` requires string arguments",
+                    ));
+                };
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`get_default` requires atleast two arguments",
+                    ));
+                };
+                let Some(default) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`get_default` requires string arguments",
+                    ));
+                };
+                let ret = std::env::var(key).unwrap_or_else(|_| default.to_string());
+                Ok(Value::from(ret))
+            }
+            "exists" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`exists` requires atleast one argument",
+                    ));
+                };
+                let Some(key) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`exists` requires a string argument",
+                    ));
+                };
+                Ok(Value::from(std::env::var(key).is_ok()))
+            }
+            name => Err(minijinja::Error::new(
+                minijinja::ErrorKind::UnknownMethod,
+                format!("object has no method named {name}"),
+            )),
+        }
+    }
+
+    fn call(&self, state: &minijinja::State, args: &[Value]) -> Result<Value, minijinja::Error> {
+        let _state = state;
+        let _args = args;
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            "tried to call non callable object",
+        ))
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct SelectorConfig {
@@ -46,10 +149,7 @@ impl SelectorConfig {
             context.insert("hash".to_string(), Value::from_safe_string(hash));
         }
 
-        context.insert(
-            "environ".to_string(),
-            Value::from(std::env::vars().into_iter().collect::<BTreeMap<_, _>>()),
-        );
+        context.insert("env".to_string(), Value::from_object(Env));
 
         for (key, v) in self.variant {
             context.insert(key, Value::from_safe_string(v));
