@@ -27,7 +27,7 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, RunExports, ScriptEnv},
-    output::{find_outputs_from_src, Output},
+    output::find_outputs_from_src,
     package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
