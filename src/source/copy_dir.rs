@@ -169,7 +169,14 @@ impl<'a> CopyDir<'a> {
                     .map(|ft| ft.is_dir())
                     .unwrap_or(false)
                 {
-                    return None;
+                    // if the dir is empty, check if we should create it anyways
+                    if !entry.path().read_dir().unwrap().next().is_none() {
+                        return None;
+                    } else {
+                        if !result.include_globs().is_empty() {
+                            return None;
+                        }
+                    }
                 }
 
                 // We need to strip the path to the entry to make sure that the glob matches on relative paths
@@ -193,7 +200,7 @@ impl<'a> CopyDir<'a> {
                         .filter(|(_, m)| m.is_match(&stripped_path))
                         .map(|(_, g)| g.set_matched(true))
                         .count()
-                        == 0;
+                        != 0;
 
                 let include =
                     include || folders.clone().iter().any(|f| stripped_path.starts_with(f));
@@ -204,7 +211,7 @@ impl<'a> CopyDir<'a> {
                     .filter(|(_, m)| m.is_match(&stripped_path))
                     .map(|(_, g)| g.set_matched(true))
                     .count()
-                    == 0;
+                    != 0;
 
                 (include && !exclude).then_some(Ok(entry))
             })
@@ -216,7 +223,9 @@ impl<'a> CopyDir<'a> {
                 let dest_path = self.to_path.join(stripped_path);
 
                 if path.is_dir() {
-                    Ok(None)
+                    // create the empty dir
+                    create_dir_all(&dest_path)?;
+                    Ok(Some(dest_path))
                 } else {
                     // create dir if parent does not exist
                     if let Some(parent) = dest_path.parent() {
@@ -344,6 +353,8 @@ impl Match {
 
 #[cfg(test)]
 mod test {
+    use std::{collections::HashSet, fs, fs::File};
+
     #[test]
     fn test_copy_dir() {
         let tmp_dir = tempfile::TempDir::new().unwrap();
@@ -351,6 +362,11 @@ mod test {
         let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
         fs_extra::dir::create_all(&dir, true).unwrap();
+
+        // test.txt
+        // test_dir/test.md
+        // test_dir/test_dir2/
+
         std::fs::write(dir.join("test.txt"), "test").unwrap();
         std::fs::create_dir(dir.join("test_dir")).unwrap();
         std::fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
@@ -362,32 +378,71 @@ mod test {
             .run()
             .unwrap();
 
-        for entry in walkdir::WalkDir::new(dest_dir) {
-            tracing::info!("{}", entry.unwrap().path().display());
-        }
+        assert_eq!(dest_dir.exists(), true);
+        assert_eq!(dest_dir.is_dir(), true);
+        assert_eq!(dest_dir.join("test.txt").exists(), true);
+        assert_eq!(dest_dir.join("test_dir").exists(), true);
+        assert_eq!(dest_dir.join("test_dir").join("test.md").exists(), true);
+        assert_eq!(dest_dir.join("test_dir").join("test_dir2").exists(), true);
 
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
-        let _copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
+        let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
             .with_include_glob("*.txt")
             .use_gitignore(false)
             .run()
             .unwrap();
-        tracing::info!("---------------------");
-        for entry in walkdir::WalkDir::new(dest_dir_2) {
-            tracing::info!("{}", entry.unwrap().path().display());
-        }
 
-        let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
+        assert_eq!(copy_dir.copied_pathes().len(), 1);
+        assert_eq!(copy_dir.copied_pathes()[0], dest_dir_2.join("test.txt"));
+
+        let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
         // ignore all txt files
-        let _copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
+        let copy_dir = super::CopyDir::new(&dir, &dest_dir_3)
             .with_exclude_glob("*.txt")
             .use_gitignore(false)
             .run()
             .unwrap();
-        tracing::info!("---------------------");
-        for entry in walkdir::WalkDir::new(dest_dir_2) {
-            tracing::info!("{}", entry.unwrap().path().display());
-        }
+
+        assert_eq!(copy_dir.copied_pathes().len(), 2);
+        let expected = [
+            dest_dir_3.join("test_dir/test.md"),
+            dest_dir_3.join("test_dir/test_dir2"),
+        ];
+        let expected = expected.iter().collect::<HashSet<_>>();
+        let result = copy_dir.copied_pathes().iter().collect::<HashSet<_>>();
+        assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn copy_a_bunch_of_files() {
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+
+        fs::create_dir_all(&dir).unwrap();
+        File::create(&dir.join("test_1.txt")).unwrap();
+        File::create(&dir.join("test_2.rst")).unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+
+        let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .with_include_glob("test_copy_dir/")
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+        assert_eq!(copy_dir.copied_pathes().len(), 2);
+
+        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .with_include_glob("test_copy_dir/")
+            .with_exclude_glob("*.rst")
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+        assert_eq!(copy_dir.copied_pathes().len(), 1);
+        assert_eq!(
+            copy_dir.copied_pathes()[0],
+            dest_dir.path().join("test_copy_dir/test_1.txt")
+        );
     }
 }
