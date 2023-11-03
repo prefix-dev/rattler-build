@@ -46,9 +46,10 @@ impl SelectorConfig {
             context.insert("hash".to_string(), Value::from_safe_string(hash));
         }
 
-        // for (key, v) in std::env::vars() {
-        //     context.insert(key, Value::from_safe_string(v));
-        // }
+        context.insert(
+            "environ".to_string(),
+            Value::from(std::env::vars().into_iter().collect::<BTreeMap<_, _>>()),
+        );
 
         for (key, v) in self.variant {
             context.insert(key, Value::from_safe_string(v));
