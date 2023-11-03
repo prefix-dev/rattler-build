@@ -29,6 +29,7 @@ use rattler_build::{
 
 mod console_utils;
 mod hash;
+mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
@@ -46,6 +47,9 @@ enum SubCommands {
 
     /// Test a package
     Test(TestOpts),
+
+    /// Rebuild a package
+    Rebuild(RebuildOpts),
 }
 
 #[derive(Parser)]
@@ -133,6 +137,7 @@ async fn main() -> miette::Result<()> {
     match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
+        SubCommands::Rebuild(args) => rebuild_from_args(args).await,
     }
 }
 
@@ -333,6 +338,36 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             run_build(&output, tool_config.clone()).await?;
         }
     }
+
+    Ok(())
+}
+
+#[derive(Parser)]
+struct RebuildOpts {
+    /// The package file to rebuild
+    #[arg(short, long)]
+    package_file: PathBuf,
+}
+
+async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
+    println!("Rebuilding {}", args.package_file.to_string_lossy());
+    // we extract the recipe folder from the package file (info/recipe/*)
+    // and then run the rendered recipe with the same arguments as the original build
+    let archive = fs::File::open(&args.package_file).into_diagnostic()?;
+    let temp_folder = tempfile::tempdir().into_diagnostic()?;
+
+    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+
+    let temp_dir = temp_folder.into_path();
+
+    println!("Extracted recipe to: {:?}", temp_dir);
+
+    let mut rendered_recipe_file =
+        std::fs::File::open(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
+    let output: rattler_build::metadata::Output =
+        serde_yaml::from_reader(&mut rendered_recipe_file).unwrap();
+
+    println!("{}", output.build_configuration.build_platform);
 
     Ok(())
 }

@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Source information.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Source {
     Git(GitSource),
@@ -232,7 +232,7 @@ impl fmt::Display for GitUrl {
 
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     url: Url,
@@ -302,7 +302,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches` and `folder`"
+                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `folder`"
                     ))
                 }
             }
@@ -336,8 +336,34 @@ pub enum Checksum {
 impl Serialize for Checksum {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
-            Checksum::Sha256(sha256) => hex::encode(sha256).to_lowercase().serialize(serializer),
-            Checksum::Md5(md5) => hex::encode(md5).to_lowercase().serialize(serializer),
+            Checksum::Sha256(sha256) => {
+                format!("sha256:{}", hex::encode(sha256).to_lowercase()).serialize(serializer)
+            }
+            Checksum::Md5(md5) => {
+                format!("md5:{}", hex::encode(md5).to_lowercase()).serialize(serializer)
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Checksum {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        if s.starts_with("sha256:") {
+            let sha256 = &s[7..];
+            let sha256 = hex::decode(sha256).map_err(serde::de::Error::custom)?;
+            let sha256 = Sha256Hash::from_slice(&sha256);
+            Ok(Checksum::Sha256(sha256.clone()))
+        } else if s.starts_with("md5:") {
+            let md5 = &s[4..];
+            let md5 = hex::decode(md5).map_err(serde::de::Error::custom)?;
+            let md5 = Md5Hash::from_slice(&md5);
+            Ok(Checksum::Md5(md5.clone()))
+        } else {
+            Err(serde::de::Error::custom("invalid checksum"))
         }
     }
 }

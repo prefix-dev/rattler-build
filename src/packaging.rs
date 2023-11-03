@@ -732,8 +732,9 @@ fn write_recipe_folder(
     let recipe_folder = tmp_dir_path.join("info/recipe/");
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
 
-    let (mut files, _) = copy_dir(recipe_dir, &recipe_folder, &[], &[], false)?;
+    let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
 
+    let mut files = Vec::from(copy_result.copied_pathes());
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;

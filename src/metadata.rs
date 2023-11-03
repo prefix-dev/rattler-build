@@ -134,7 +134,7 @@ impl Directories {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
@@ -156,7 +156,6 @@ pub struct BuildConfiguration {
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
-    #[serde(skip_serializing, default)]
     /// Package format (.tar.bz2 or .conda)
     pub package_format: ArchiveType,
 }
@@ -175,7 +174,7 @@ pub struct PackageIdentifier {
     pub build_string: String,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
     pub recipe: crate::recipe::parser::Recipe,
     pub build_configuration: BuildConfiguration,

@@ -160,10 +160,8 @@ impl Compiler {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone)]
 pub enum Dependency {
-    #[serde(deserialize_with = "deserialize_match_spec")]
     Spec(MatchSpec),
     PinSubpackage(PinSubpackage),
     Compiler(Compiler),
@@ -256,6 +254,24 @@ impl<'de> Deserialize<'de> for Dependency {
         }
 
         deserializer.deserialize_str(DependencyVisitor)
+    }
+}
+
+impl Serialize for Dependency {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        match self {
+            Dependency::Spec(spec) => serializer.serialize_str(&spec.to_string()),
+            Dependency::PinSubpackage(pin) => serializer.serialize_str(&format!(
+                "__PIN_SUBPACKAGE {}",
+                pin.pin_subpackage.internal_repr()
+            )),
+            Dependency::Compiler(compiler) => {
+                serializer.serialize_str(&format!("__COMPILER {}", compiler.as_str()))
+            }
+        }
     }
 }
 
