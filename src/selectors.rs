@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr};
 
+use crate::recipe::jinja::Env;
+
 use minijinja::{value::Value, Environment};
 use rattler_conda_types::{Platform, Version, VersionSpec};
 use serde_yaml::Value as YamlValue;
@@ -46,9 +48,7 @@ impl SelectorConfig {
             context.insert("hash".to_string(), Value::from_safe_string(hash));
         }
 
-        // for (key, v) in std::env::vars() {
-        //     context.insert(key, Value::from_safe_string(v));
-        // }
+        context.insert("env".to_string(), Value::from_object(Env));
 
         for (key, v) in self.variant {
             context.insert(key, Value::from_safe_string(v));
