@@ -22,11 +22,10 @@ impl Object for Env {
 
     fn call_method(
         &self,
-        state: &minijinja::State,
+        _state: &minijinja::State,
         name: &str,
         args: &[Value],
     ) -> Result<Value, minijinja::Error> {
-        let _state = state;
         match name {
             "get" => {
                 let mut args = args.iter();
@@ -42,8 +41,13 @@ impl Object for Env {
                         "`get` requires a string argument",
                     ));
                 };
-                let ret = std::env::var(key).unwrap_or_default();
-                Ok(Value::from(ret))
+                match std::env::var(key) {
+                    Ok(r) => Ok(Value::from(r)),
+                    Err(e) => Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        e.to_string(),
+                    )),
+                }
             }
             "get_default" => {
                 let mut args = args.iter();
@@ -95,15 +99,6 @@ impl Object for Env {
                 format!("object has no method named {name}"),
             )),
         }
-    }
-
-    fn call(&self, state: &minijinja::State, args: &[Value]) -> Result<Value, minijinja::Error> {
-        let _state = state;
-        let _args = args;
-        Err(minijinja::Error::new(
-            minijinja::ErrorKind::InvalidOperation,
-            "tried to call non callable object",
-        ))
     }
 }
 
