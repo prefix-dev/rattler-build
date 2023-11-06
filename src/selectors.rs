@@ -35,6 +35,12 @@ impl Object for Env {
                         "`get` requires at least one argument",
                     ));
                 };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`get` only accepts one argument",
+                    ));
+                }
                 let Some(key) = arg.as_str() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
@@ -69,6 +75,12 @@ impl Object for Env {
                         "`get_default` requires at least two arguments",
                     ));
                 };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`get_default` only accepts two arguments",
+                    ));
+                }
                 let Some(default) = arg.as_str() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
@@ -86,6 +98,12 @@ impl Object for Env {
                         "`exists` requires at least one argument",
                     ));
                 };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`exists` only accepts one argument",
+                    ));
+                }
                 let Some(key) = arg.as_str() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
