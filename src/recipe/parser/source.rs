@@ -16,7 +16,6 @@ use crate::{
 
 /// Source information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(untagged)]
 pub enum Source {
     Git(GitSource),
     Url(UrlSource),

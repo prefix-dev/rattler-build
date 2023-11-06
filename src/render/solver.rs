@@ -178,6 +178,26 @@ pub async fn create_environment(
     // we need to apply to our environment to bring it up to date.
     let required_packages = wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
+    install_packages(
+        &required_packages,
+        target_platform,
+        target_prefix,
+        &cache_dir,
+        tool_configuration,
+    )
+    .await?;
+
+    Ok(required_packages)
+}
+
+pub async fn install_packages(
+    required_packages: &Vec<RepoDataRecord>,
+    target_platform: &Platform,
+    target_prefix: &Path,
+    cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> anyhow::Result<()> {
+    let installed_packages = vec![];
     // Construct a transaction to
     let transaction = Transaction::from_current_and_desired(
         installed_packages,
@@ -208,7 +228,7 @@ pub async fn create_environment(
         );
     }
 
-    Ok(required_packages)
+    Ok(())
 }
 
 /// Executes the transaction on the given environment.

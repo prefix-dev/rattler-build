@@ -141,22 +141,38 @@ impl PinSubpackage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compiler {
-    compiler: String,
+    pub language: String,
 }
 
 impl Compiler {
     /// Get the compiler value as a string slice.
     pub fn as_str(&self) -> &str {
-        &self.compiler
+        &self.language
     }
+}
 
-    /// Get the compiler value without the `__COMPILER` prefix.
-    pub fn without_prefix(&self) -> &str {
-        self.compiler
-            .strip_prefix("__COMPILER ")
-            .expect("compiler without prefix")
+impl Serialize for Compiler {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        format!("__COMPILER {}", self.language).serialize(serializer)
+    }
+}
+
+impl FromStr for Compiler {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.starts_with("__COMPILER ") {
+            Ok(Self {
+                language: s.to_string(),
+            })
+        } else {
+            Err(format!("compiler without prefix: {}", s))
+        }
     }
 }
 
@@ -196,8 +212,14 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<Dependency, PartialParsingError> {
         // compiler
         if self.contains("__COMPILER") {
-            let compiler = self.try_convert(name)?;
-            Ok(Dependency::Compiler(Compiler { compiler }))
+            let compiler: String = self.try_convert(name)?;
+            let language = compiler
+                .strip_prefix("__COMPILER ")
+                .expect("compiler without prefix");
+            // Panic should never happen from this strip unless the prefix magic for the compiler
+            Ok(Dependency::Compiler(Compiler {
+                language: language.to_string(),
+            }))
         } else if self.contains("__PIN_SUBPACKAGE") {
             let pin_subpackage: String = self.try_convert(name)?;
 
@@ -236,9 +258,9 @@ impl<'de> Deserialize<'de> for Dependency {
             where
                 E: serde::de::Error,
             {
-                if let Some(compiler) = value.strip_prefix("__COMPILER ") {
+                if let Some(compiler_language) = value.strip_prefix("__COMPILER ") {
                     Ok(Dependency::Compiler(Compiler {
-                        compiler: compiler.to_lowercase(),
+                        language: compiler_language.to_lowercase(),
                     }))
                 } else if let Some(pin) = value.strip_prefix("__PIN_SUBPACKAGE ") {
                     Ok(Dependency::PinSubpackage(PinSubpackage {
@@ -298,5 +320,43 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
                 label = format!("error parsing `{name}` as a match spec")
             )
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use requirements::{Dependency, Requirements};
+
+    use crate::recipe::parser::requirements;
+
+    /// test serialization and deserialization of Compiler
+    use super::Compiler;
+
+    #[test]
+    fn test_compiler_serde() {
+        let compiler = Compiler {
+            compiler: "gcc".to_string(),
+        };
+
+        let serialized = serde_yaml::to_string(&compiler).unwrap();
+        assert_eq!(serialized, "__COMPILER gcc\n");
+
+        let requirements = Requirements {
+            build: vec![Dependency::Compiler(compiler)],
+            host: vec![],
+            run: vec![],
+            run_constrained: vec![],
+        };
+
+        insta::assert_yaml_snapshot!(requirements);
+
+        let yaml = serde_yaml::to_string(&requirements).unwrap();
+        assert_eq!(
+            yaml,
+            "build:\n- __COMPILER gcc\nhost: []\nrun: []\nrun_constrained: []\n"
+        );
+
+        let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
+        insta::assert_yaml_snapshot!(deserialized);
     }
 }

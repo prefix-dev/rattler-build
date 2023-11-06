@@ -362,12 +362,23 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 
     println!("Extracted recipe to: {:?}", temp_dir);
 
-    let mut rendered_recipe_file =
-        std::fs::File::open(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
-    let output: rattler_build::metadata::Output =
-        serde_yaml::from_reader(&mut rendered_recipe_file).unwrap();
+    let rendered_recipe =
+        std::fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
+
+    let output: rattler_build::metadata::Output = serde_yaml::from_str(&rendered_recipe).unwrap();
 
     println!("{}", output.build_configuration.build_platform);
+
+    let tool_config = tool_configuration::Configuration {
+        client: AuthenticatedClient::default(),
+        multi_progress_indicator: MultiProgress::new(),
+    };
+
+    output
+        .build_configuration
+        .directories
+        .recreate_directories();
+    run_build(&output, tool_config.clone()).await?;
 
     Ok(())
 }

@@ -21,6 +21,7 @@ use thiserror::Error;
 
 use super::solver::create_environment;
 use crate::recipe::parser::Dependency;
+use crate::render::solver::install_packages;
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
@@ -253,14 +254,14 @@ pub fn apply_variant(
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("{}_compiler", compiler.without_prefix());
+                    let compiler_variant = format!("{}_compiler", compiler.language);
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
                             // defaults
                             if target_platform.is_linux() {
-                                let default_compiler = match compiler.without_prefix() {
+                                let default_compiler = match compiler.language.as_str() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -274,7 +275,7 @@ pub fn apply_variant(
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.without_prefix() {
+                                let default_compiler = match compiler.language.as_str() {
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -354,6 +355,40 @@ fn collect_run_exports_from_env(
         }
     }
     Ok(run_exports)
+}
+
+pub async fn install_environments(
+    output: &Output,
+    tool_configuration: tool_configuration::Configuration,
+) -> Result<(), ResolveError> {
+    let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
+    let pkgs_dir = cache_dir.join("pkgs");
+
+    let dependencies = output.finalized_dependencies.as_ref().unwrap();
+
+    if let Some(build_deps) = dependencies.build.as_ref() {
+        install_packages(
+            &build_deps.resolved,
+            &output.build_configuration.build_platform,
+            &output.build_configuration.directories.build_prefix,
+            &cache_dir,
+            &tool_configuration,
+        )
+        .await?;
+    }
+
+    if let Some(host_deps) = dependencies.host.as_ref() {
+        install_packages(
+            &host_deps.resolved,
+            &output.build_configuration.host_platform,
+            &output.build_configuration.directories.host_prefix,
+            &cache_dir,
+            &tool_configuration,
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 /// This function resolves the dependencies of a recipe.
