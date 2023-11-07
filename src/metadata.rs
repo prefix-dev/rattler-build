@@ -306,14 +306,15 @@ mod tests {
     #[test]
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
-        let p1 = setup_build_dir("name", true, &Utc::now()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let p1 = setup_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
         _ = std::fs::remove_dir_all(p1);
 
         // with build_id (aka timestamp)
         let timestamp = &Utc::now();
-        let p2 = setup_build_dir("name", false, timestamp).unwrap();
+        let p2 = setup_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap().to_string_lossy();
         let epoch = timestamp.timestamp();
         assert!(f2.eq(&format!("rattler-build_name_{epoch}")));
@@ -417,14 +418,14 @@ mod test {
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
         let recipe_1 = test_data_dir.join("rich_recipe.yaml");
 
-        let recipe = std::fs::read_to_string(recipe_1).unwrap();
+        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
 
-        let output: Output = serde_yaml::from_str(&recipe).unwrap();
-        assert_yaml_snapshot!(output);
+        let output_rich: Output = serde_yaml::from_str(&recipe_1).unwrap();
+        assert_yaml_snapshot!(output_rich);
 
         let recipe_2 = test_data_dir.join("curl_recipe.yaml");
-        let recipe = std::fs::read_to_string(recipe_2).unwrap();
-        let output: Output = serde_yaml::from_str(&recipe).unwrap();
-        assert_yaml_snapshot!(output);
+        let recipe_2 = std::fs::read_to_string(recipe_2).unwrap();
+        let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
+        assert_yaml_snapshot!(output_curl);
     }
 }
