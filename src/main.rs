@@ -256,6 +256,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: multi_progress,
+        no_clean: args.keep_build,
     };
 
     for (output, variants) in outputs_and_variants {
@@ -315,7 +316,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     build_platform: Platform::current(),
                     hash: hash::compute_buildstring(&variant, &noarch_type),
                     variant: variant.clone(),
-                    no_clean: args.keep_build,
                     directories: Directories::create(
                         name.as_normalized(),
                         &recipe_path,
@@ -364,11 +364,16 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     let rendered_recipe =
         std::fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
-    let output: rattler_build::metadata::Output = serde_yaml::from_str(&rendered_recipe).unwrap();
+    let mut output: rattler_build::metadata::Output =
+        serde_yaml::from_str(&rendered_recipe).unwrap();
+
+    // set recipe dir to the temp folder
+    output.build_configuration.directories.recipe_dir = temp_dir;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
+        no_clean: true,
     };
 
     output

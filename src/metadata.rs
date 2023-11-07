@@ -55,6 +55,7 @@ impl Display for GitRev {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directories {
     /// The directory where the recipe is located
+    #[serde(skip)]
     pub recipe_dir: PathBuf,
     /// The host prefix is the directory where host dependencies are installed
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
@@ -67,6 +68,7 @@ pub struct Directories {
     /// The parent directory of host, build and work directories
     pub build_dir: PathBuf,
     /// The output directory or local channel directory
+    #[serde(skip)]
     pub output_dir: PathBuf,
 }
 
@@ -158,8 +160,6 @@ pub struct BuildConfiguration {
     pub variant: BTreeMap<String, String>,
     /// THe computed hash of the variant
     pub hash: String,
-    /// Set to true if the build directories should be kept after the build
-    pub no_clean: bool,
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments
@@ -413,8 +413,7 @@ mod test {
         let recipe = std::fs::read_to_string(recipe_1).unwrap();
 
         let output: Output = serde_yaml::from_str(&recipe).unwrap();
-
-        // assert_yaml_snapshot!(output);
+        assert_yaml_snapshot!(output);
 
         let recipe_2 = test_data_dir.join("curl_recipe.yaml");
         let recipe = std::fs::read_to_string(recipe_2).unwrap();

@@ -183,14 +183,15 @@ pub async fn run_build(
         tracing::info!("Using finalized dependencies");
 
         // The output already has the finalized dependencies, so we can just use it as-is
-        install_environments(output, tool_configuration)
+        install_environments(output, tool_configuration.clone())
             .await
             .into_diagnostic()?;
         output.clone()
     } else {
-        let finalized_dependencies = resolve_dependencies(output, &channels, tool_configuration)
-            .await
-            .into_diagnostic()?;
+        let finalized_dependencies =
+            resolve_dependencies(output, &channels, tool_configuration.clone())
+                .await
+                .into_diagnostic()?;
 
         // The output with the resolved dependencies
         Output {
@@ -250,7 +251,7 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    if !output.build_configuration.no_clean {
+    if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
@@ -272,14 +273,14 @@ pub async fn run_build(
         &TestConfiguration {
             test_prefix: test_dir.clone(),
             target_platform: Some(output.build_configuration.target_platform),
-            keep_test_prefix: output.build_configuration.no_clean,
+            keep_test_prefix: tool_configuration.no_clean,
             channels,
         },
     )
     .await
     .into_diagnostic()?;
 
-    if !output.build_configuration.no_clean {
+    if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
