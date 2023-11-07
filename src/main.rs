@@ -373,7 +373,8 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
-    output.build_configuration.directories.output_dir = args.output_dir;
+    output.build_configuration.directories.output_dir =
+        fs::canonicalize(args.output_dir).into_diagnostic()?;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
