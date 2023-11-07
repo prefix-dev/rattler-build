@@ -6,7 +6,7 @@ recipe:
   - !Url
     url: https://pypi.io/packages/source/r/rich/rich-13.4.2.tar.gz
     checksums:
-    - sha256:d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
+    - !Sha256 d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
     file_name: null
     patches: []
     folder: null
@@ -79,14 +79,14 @@ build_configuration:
   no_clean: false
   directories:
     recipe_dir: /Users/wolfv/Programs/rattler-build/examples/rich
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699361852/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699361852/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699361852/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699361852
+    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
+    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/build_env
+    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/work
+    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410
     output_dir: /Users/wolfv/Programs/rattler-build/output
   channels:
   - conda-forge
-  timestamp: 2023-11-07T12:57:32.351232Z
+  timestamp: 2023-11-07T13:40:10.654557Z
   subpackages:
     rich:
       name: rich

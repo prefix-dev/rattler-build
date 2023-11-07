@@ -1,7 +1,8 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
-use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
+use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use url::Url;
 
 use crate::{
@@ -326,45 +327,12 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 }
 
 /// Checksum information.
-#[derive(Debug, Clone, PartialEq)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Checksum {
-    Sha256(Sha256Hash),
-    Md5(Md5Hash),
+    Sha256(#[serde_as(as = "SerializableHash::<rattler_digest::Sha256>")] Sha256Hash),
+    Md5(#[serde_as(as = "SerializableHash::<rattler_digest::Md5>")] Md5Hash),
 }
-
-impl Serialize for Checksum {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Checksum::Sha256(sha256) => {
-                format!("sha256:{}", hex::encode(sha256).to_lowercase()).serialize(serializer)
-            }
-            Checksum::Md5(md5) => {
-                format!("md5:{}", hex::encode(md5).to_lowercase()).serialize(serializer)
-            }
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Checksum {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        if let Some(sha256) = s.strip_prefix("sha256:") {
-            let sha256 = hex::decode(sha256).map_err(serde::de::Error::custom)?;
-            let sha256 = Sha256Hash::from_slice(&sha256);
-            Ok(Checksum::Sha256(*sha256))
-        } else if let Some(md5) = s.strip_prefix("md5:") {
-            let md5 = hex::decode(md5).map_err(serde::de::Error::custom)?;
-            let md5 = Md5Hash::from_slice(&md5);
-            Ok(Checksum::Md5(*md5))
-        } else {
-            Err(serde::de::Error::custom("invalid checksum"))
-        }
-    }
-}
-
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
