@@ -68,13 +68,13 @@ build_configuration:
     target_platform: osx-arm64
   hash: h60d57d3
   directories:
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152
+    host_prefix: /opt/bld/bld/rattler-build_curl_1699379147/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla
+    build_prefix: /opt/bld/bld/rattler-build_curl_1699379147/build_env
+    work_dir: /opt/bld/bld/rattler-build_curl_1699379147/work
+    build_dir: /opt/bld/bld/rattler-build_curl_1699379147
   channels:
   - conda-forge
-  timestamp: 2023-11-07T16:55:52.846254Z
+  timestamp: 2023-11-07T17:45:47.927145Z
   subpackages:
     curl:
       name: curl

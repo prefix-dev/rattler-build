@@ -77,13 +77,13 @@ build_configuration:
     target_platform: noarch
   hash: pyh4616a5c
   directories:
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596
+    host_prefix: /opt/bld/bld/rattler-build_rich_1699379073/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla
+    build_prefix: /opt/bld/bld/rattler-build_rich_1699379073/build_env
+    work_dir: /opt/bld/bld/rattler-build_rich_1699379073/work
+    build_dir: /opt/bld/bld/rattler-build_rich_1699379073
   channels:
   - conda-forge
-  timestamp: 2023-11-07T17:03:16.499570Z
+  timestamp: 2023-11-07T17:44:33.839426Z
   subpackages:
     rich:
       name: rich

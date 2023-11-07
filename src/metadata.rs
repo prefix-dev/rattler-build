@@ -1,7 +1,6 @@
 //! All the metadata that makes up a recipe file
 use std::{
     collections::BTreeMap,
-    env,
     fmt::{self, Display, Formatter},
     fs,
     path::{Path, PathBuf},
@@ -73,6 +72,7 @@ pub struct Directories {
 }
 
 fn setup_build_dir(
+    output_dir: &Path,
     name: &str,
     no_build_id: bool,
     timestamp: &DateTime<Utc>,
@@ -84,7 +84,7 @@ fn setup_build_dir(
     } else {
         format!("rattler-build_{}_{:?}", name, since_the_epoch)
     };
-    let path = env::temp_dir().join(dirname);
+    let path = output_dir.join("bld").join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
 }
@@ -97,12 +97,13 @@ impl Directories {
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
     ) -> Result<Directories, std::io::Error> {
-        let build_dir = setup_build_dir(name, no_build_id, timestamp)
+        let output_dir = fs::canonicalize(output_dir)?;
+        let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
         if !output_dir.exists() {
-            fs::create_dir(output_dir)?;
+            fs::create_dir(&output_dir)?;
         }
 
         let host_prefix = if cfg!(target_os = "windows") {
@@ -129,7 +130,7 @@ impl Directories {
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,
-            output_dir: fs::canonicalize(output_dir)?,
+            output_dir,
         };
 
         Ok(directories)
