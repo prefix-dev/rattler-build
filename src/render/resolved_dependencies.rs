@@ -22,28 +22,47 @@ use thiserror::Error;
 use super::solver::create_environment;
 use crate::recipe::parser::Dependency;
 use crate::render::solver::install_packages;
+use serde_with::{serde_as, DisplayFromStr};
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
+#[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
     /// from the variant config
-    Variant { spec: MatchSpec, variant: String },
+    Variant {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+        variant: String,
+    },
     /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-    Compiler { spec: MatchSpec },
+    Compiler {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
-    PinSubpackage { spec: MatchSpec },
+    PinSubpackage {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
-    PinCompatible { spec: MatchSpec },
+    PinCompatible {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special run_exports dependency from another package
     RunExports {
+        #[serde_as(as = "DisplayFromStr")]
         spec: MatchSpec,
         from: String,
         source_package: String,
     },
     /// This is a regular dependency of the package without any modifications
-    Raw { spec: MatchSpec },
+    Raw {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a transient dependency of the package, which is not a direct dependency
     /// of the package, but is a dependency of a dependency
     Transient,
