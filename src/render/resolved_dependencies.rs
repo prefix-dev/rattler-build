@@ -381,7 +381,6 @@ pub async fn install_environments(
     tool_configuration: tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
-    let pkgs_dir = cache_dir.join("pkgs");
 
     let dependencies = output.finalized_dependencies.as_ref().unwrap();
 

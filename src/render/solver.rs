@@ -205,14 +205,14 @@ pub async fn install_packages(
         *target_platform,
     )?;
 
-    print_as_table(&required_packages);
+    print_as_table(required_packages);
 
     if !transaction.operations.is_empty() {
         // Execute the operations that are returned by the solver.
         execute_transaction(
             transaction,
             target_prefix,
-            &cache_dir,
+            cache_dir,
             tool_configuration.client.clone(),
             tool_configuration.multi_progress_indicator.clone(),
         )

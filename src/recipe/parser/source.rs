@@ -351,16 +351,14 @@ impl<'de> Deserialize<'de> for Checksum {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        if s.starts_with("sha256:") {
-            let sha256 = &s[7..];
+        if let Some(sha256) = s.strip_prefix("sha256:") {
             let sha256 = hex::decode(sha256).map_err(serde::de::Error::custom)?;
             let sha256 = Sha256Hash::from_slice(&sha256);
-            Ok(Checksum::Sha256(sha256.clone()))
-        } else if s.starts_with("md5:") {
-            let md5 = &s[4..];
+            Ok(Checksum::Sha256(*sha256))
+        } else if let Some(md5) = s.strip_prefix("md5:") {
             let md5 = hex::decode(md5).map_err(serde::de::Error::custom)?;
             let md5 = Md5Hash::from_slice(&md5);
-            Ok(Checksum::Md5(md5.clone()))
+            Ok(Checksum::Md5(*md5))
         } else {
             Err(serde::de::Error::custom("invalid checksum"))
         }

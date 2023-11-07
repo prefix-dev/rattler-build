@@ -335,7 +335,7 @@ mod test {
     #[test]
     fn test_compiler_serde() {
         let compiler = Compiler {
-            compiler: "gcc".to_string(),
+            language: "gcc".to_string(),
         };
 
         let serialized = serde_yaml::to_string(&compiler).unwrap();

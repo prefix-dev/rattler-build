@@ -66,8 +66,6 @@ pub fn get_conda_build_script(
         script
     };
 
-    println!("Build script: {}", script);
-
     if cfg!(unix) {
         let build_env_script_path = directories.work_dir.join("build_env.sh");
         let preambel = format!(
@@ -169,7 +167,7 @@ pub async fn run_build(
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
-    println!("Sources: {:?}", output.recipe.sources());
+
     if !output.recipe.sources().is_empty() {
         fetch_sources(
             output.recipe.sources(),
@@ -185,7 +183,7 @@ pub async fn run_build(
         tracing::info!("Using finalized dependencies");
 
         // The output already has the finalized dependencies, so we can just use it as-is
-        install_environments(&output, tool_configuration)
+        install_environments(output, tool_configuration)
             .await
             .into_diagnostic()?;
         output.clone()

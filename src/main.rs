@@ -350,24 +350,21 @@ struct RebuildOpts {
 }
 
 async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
-    println!("Rebuilding {}", args.package_file.to_string_lossy());
+    tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original build
-    let archive = fs::File::open(&args.package_file).into_diagnostic()?;
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
     rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
 
     let temp_dir = temp_folder.into_path();
 
-    println!("Extracted recipe to: {:?}", temp_dir);
+    tracing::info!("Extracted recipe to: {:?}", temp_dir);
 
     let rendered_recipe =
         std::fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
     let output: rattler_build::metadata::Output = serde_yaml::from_str(&rendered_recipe).unwrap();
-
-    println!("{}", output.build_configuration.build_platform);
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
@@ -378,6 +375,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
         .build_configuration
         .directories
         .recreate_directories();
+
     run_build(&output, tool_config.clone()).await?;
 
     Ok(())
