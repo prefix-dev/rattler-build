@@ -250,9 +250,9 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    // if !output.build_configuration.no_clean {
-    //     fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
-    // }
+    if !output.build_configuration.no_clean {
+        fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
+    }
 
     index::index(
         &directories.output_dir,
