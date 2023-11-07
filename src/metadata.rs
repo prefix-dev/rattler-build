@@ -136,15 +136,21 @@ impl Directories {
     }
 
     /// create all directories
-    pub fn recreate_directories(&self) {
+    pub fn recreate_directories(&self) -> Result<(), std::io::Error> {
         if self.build_dir.exists() {
             fs::remove_dir_all(&self.build_dir).unwrap();
         }
 
-        fs::create_dir_all(&self.build_dir).unwrap();
-        fs::create_dir_all(&self.work_dir).unwrap();
-        fs::create_dir_all(&self.build_prefix).unwrap();
-        fs::create_dir_all(&self.host_prefix).unwrap();
+        if !self.output_dir.exists() {
+            fs::create_dir(&self.output_dir)?;
+        }
+
+        fs::create_dir_all(&self.build_dir)?;
+        fs::create_dir_all(&self.work_dir)?;
+        fs::create_dir_all(&self.build_prefix)?;
+        fs::create_dir_all(&self.host_prefix)?;
+
+        Ok(())
     }
 }
 

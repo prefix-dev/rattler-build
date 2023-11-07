@@ -76,17 +76,14 @@ build_configuration:
   variant:
     target_platform: noarch
   hash: pyh4616a5c
-  no_clean: false
   directories:
-    recipe_dir: /Users/wolfv/Programs/rattler-build/examples/rich
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699364410
-    output_dir: /Users/wolfv/Programs/rattler-build/output
+    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
+    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/build_env
+    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596/work
+    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_rich_1699376596
   channels:
   - conda-forge
-  timestamp: 2023-11-07T13:40:10.654557Z
+  timestamp: 2023-11-07T17:03:16.499570Z
   subpackages:
     rich:
       name: rich

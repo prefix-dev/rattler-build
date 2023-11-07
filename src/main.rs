@@ -347,6 +347,10 @@ struct RebuildOpts {
     /// The package file to rebuild
     #[arg(short, long)]
     package_file: PathBuf,
+
+    /// Output directory for build artifacts. Defaults to `./output`.
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
+    output_dir: PathBuf,
 }
 
 async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
@@ -369,6 +373,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
+    output.build_configuration.directories.output_dir = args.output_dir;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
@@ -379,7 +384,8 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     output
         .build_configuration
         .directories
-        .recreate_directories();
+        .recreate_directories()
+        .into_diagnostic()?;
 
     run_build(&output, tool_config.clone()).await?;
 

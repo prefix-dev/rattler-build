@@ -67,17 +67,14 @@ build_configuration:
   variant:
     target_platform: osx-arm64
   hash: h60d57d3
-  no_clean: false
   directories:
-    recipe_dir: /Users/wolfv/Programs/rattler-build/examples/curl
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713
-    output_dir: /Users/wolfv/Programs/rattler-build/output
+    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
+    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/build_env
+    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152/work
+    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699376152
   channels:
   - conda-forge
-  timestamp: 2023-11-07T13:45:13.846047Z
+  timestamp: 2023-11-07T16:55:52.846254Z
   subpackages:
     curl:
       name: curl
