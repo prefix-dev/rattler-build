@@ -10,7 +10,7 @@ recipe:
     - Url:
         url: "http://curl.haxx.se/download/curl-8.0.1.tar.bz2"
         checksums:
-          - "sha256:9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf"
+          - Sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
         file_name: ~
         patches: []
         folder: ~
@@ -72,14 +72,14 @@ build_configuration:
   no_clean: false
   directories:
     recipe_dir: /Users/wolfv/Programs/rattler-build/examples/curl
-    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699358280/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
-    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699358280/build_env
-    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699358280/work
-    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699358280
+    host_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeho
+    build_prefix: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/build_env
+    work_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713/work
+    build_dir: /var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/rattler-build_curl_1699364713
     output_dir: /Users/wolfv/Programs/rattler-build/output
   channels:
     - conda-forge
-  timestamp: "2023-11-07T11:58:00.986122Z"
+  timestamp: "2023-11-07T13:45:13.846047Z"
   subpackages:
     curl:
       name: curl
