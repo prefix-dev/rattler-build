@@ -107,27 +107,29 @@ fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
 }
 
 /// This finds all variables used in jinja or `if/then/else` expressions
-pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
+pub(crate) fn used_vars_from_recipe_node(
+    yaml_node: &Node,
+    recipe: &str,
+) -> Result<HashSet<String>, minijinja::Error> {
     let mut selectors = HashSet::new();
 
-    let yaml_node = Node::parse_yaml(0, recipe).unwrap();
-    find_all_selectors(&yaml_node, &mut selectors);
+    find_all_selectors(yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();
 
     for selector in selectors {
         let selector_tmpl = format!("{{{{ {} }}}}", selector);
-        let ast = parse(&selector_tmpl, "selector.yaml").unwrap();
+        let ast = parse(&selector_tmpl, "selector.yaml")?;
         extract_variables(&ast, &mut variables);
     }
 
     // parse recipe into AST
-    let template_ast = parse(recipe, "recipe.yaml").unwrap();
+    let template_ast = parse(recipe, "recipe.yaml")?;
 
     // extract all variables from the AST
     extract_variables(&template_ast, &mut variables);
 
-    variables
+    Ok(variables)
 }
 
 #[cfg(test)]
@@ -135,7 +137,7 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_used_vars_from_expressions() {
+    fn used_vars_from_recipe_node_works() {
         let recipe = r#"build:
             - if: llvm_variant > 10
               then: llvm >= 10
@@ -147,7 +149,8 @@ mod test {
             - "{{ pin_subpackage('abcdef') }}"
         "#;
 
-        let used_vars = used_vars_from_expressions(recipe);
+        let yaml_node = Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_recipe_node(&yaml_node, recipe).unwrap();
         assert!(used_vars.contains("llvm_variant"));
         assert!(used_vars.contains("linux"));
         assert!(used_vars.contains("osx"));

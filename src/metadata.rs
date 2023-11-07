@@ -1,6 +1,7 @@
 //! All the metadata that makes up a recipe file
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
+    env,
     fmt::{self, Display, Formatter},
     fs,
     path::{Path, PathBuf},
@@ -11,7 +12,10 @@ use chrono::{DateTime, Utc};
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
-use crate::render::resolved_dependencies::FinalizedDependencies;
+use crate::{
+    recipe::parser::Dependency,
+    render::resolved_dependencies::{apply_variant, FinalizedDependencies},
+};
 
 pub struct Metadata {
     pub name: String,
@@ -201,7 +205,7 @@ pub struct PackageIdentifier {
     pub build_string: String,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     pub recipe: crate::recipe::parser::Recipe,
     pub build_configuration: BuildConfiguration,
@@ -305,6 +309,240 @@ impl Display for Output {
         }
         writeln!(f, "\n")
     }
+}
+
+/// Helper enum to model the recursion inside `get_topological_order` as iteration, to support
+/// dependency graphs of arbitrary depth without causing stack overflows
+enum Action {
+    ResolveAndBuild(String),
+    Build(String),
+}
+
+/// Sorts the packages topologically
+///
+/// This function is deterministic, meaning that it will return the same result regardless of the
+/// order of `packages` and of the `depends` vector inside the records.
+///
+/// If cycles are encountered, and one of the packages in the cycle is noarch, the noarch package
+/// is sorted _after_ the other packages in the cycle. This is done to ensure that the noarch
+/// package is built last, so that it can be linked correctly (ie. compiled with Python if
+/// necessary).
+///
+/// Note that this function only works for packages with unique names.
+pub fn topological_sort(packages: Vec<Output>) -> Vec<Output> {
+    let roots = get_roots(&packages, None);
+
+    let mut all_packages = packages
+        .iter()
+        .map(|p| (p.name().as_normalized().to_owned(), p))
+        .collect::<BTreeMap<_, _>>();
+
+    // detect cycles
+    let mut visited = BTreeSet::new();
+    let mut stack = Vec::new();
+    let mut cycles = Vec::new();
+
+    for root in &roots {
+        if !visited.contains(root) {
+            if let Some(cycle) = find_cycles(root, &all_packages, &mut visited, &mut stack) {
+                cycles.push(cycle);
+            }
+        }
+    }
+
+    // print all cycles
+    for cycle in &cycles {
+        tracing::debug!("Found cycle: {:?}", cycle);
+    }
+
+    // Break cycles
+    let cycle_breaks = break_cycles(cycles, &all_packages);
+
+    // obtain the new roots (packages that are not dependencies of any other package)
+    // this is needed because breaking cycles can create new roots
+    let roots = get_roots(&packages, Some(&cycle_breaks));
+
+    get_topological_order(roots, &mut all_packages, &cycle_breaks)
+}
+
+fn get_roots(
+    packages: &[Output],
+    cycle_breaks: Option<&BTreeSet<(String, String)>>,
+) -> Vec<String> {
+    let all_packages: BTreeSet<_> = packages
+        .iter()
+        .map(|p| p.name().as_normalized().to_owned())
+        .collect();
+
+    let dependencies: BTreeSet<_> = packages
+        .iter()
+        .flat_map(|p| {
+            let dependencies: Vec<_> = p.recipe.requirements().all_build_time().cloned().collect();
+            let dependencies = apply_variant(&dependencies, &p.build_configuration).unwrap();
+
+            dependencies.into_iter().filter(|dep| {
+                let dep = dep.spec().name.as_ref().unwrap().as_normalized().to_owned();
+                // filter out circular dependencies
+                if let Some(cycle_breaks) = cycle_breaks {
+                    !cycle_breaks.contains(&(p.name().as_normalized().to_owned(), dep))
+                } else {
+                    true
+                }
+            })
+        })
+        .map(|dep| dep.spec().name.as_ref().unwrap().as_normalized().to_owned())
+        .collect();
+
+    all_packages.difference(&dependencies).cloned().collect()
+}
+
+/// Find cycles with DFS
+fn find_cycles(
+    node: &str,
+    packages: &BTreeMap<String, &Output>,
+    visited: &mut BTreeSet<String>,
+    stack: &mut Vec<String>,
+) -> Option<Vec<String>> {
+    visited.insert(node.to_string());
+    stack.push(node.to_string());
+
+    if let Some(package) = packages.get(node) {
+        let dependencies: Vec<_> = package
+            .recipe
+            .requirements()
+            .all_build_time()
+            .cloned()
+            .collect();
+        // let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
+        // .chain(package. .pins.iter().map(|x| &x.0));
+
+        for dependency in &dependencies {
+            let dep_name = match dependency {
+                Dependency::Spec(spec) => spec.name.as_ref().unwrap().as_normalized(),
+                Dependency::PinSubpackage(pin) => pin.pin_value().name.as_normalized(),
+                Dependency::Compiler(c) => c.without_prefix(),
+            };
+
+            if !visited.contains(dep_name) {
+                if let Some(cycle) = find_cycles(dep_name, packages, visited, stack) {
+                    return Some(cycle);
+                }
+            } else if stack.contains(&dep_name.to_string()) {
+                // Cycle detected. We clone the part of the stack that forms the cycle.
+                if let Some(pos) = stack.iter().position(|x| x == dep_name) {
+                    return Some(stack[pos..].to_vec());
+                }
+            }
+        }
+    }
+
+    stack.pop();
+    None
+}
+
+/// Breaks cycles by removing the edges that form them
+/// Edges from arch to noarch packages are removed to break the cycles.
+fn break_cycles(
+    cycles: Vec<Vec<String>>,
+    packages: &BTreeMap<String, &Output>,
+) -> BTreeSet<(String, String)> {
+    // we record the edges that we want to remove
+    let mut cycle_breaks = BTreeSet::default();
+
+    for cycle in cycles {
+        for i in 0..cycle.len() {
+            let pi1 = &cycle[i];
+            // Next package in cycle, wraps around
+            let pi2 = &cycle[(i + 1) % cycle.len()];
+
+            let p1 = &packages[pi1];
+            let p2 = &packages[pi2];
+
+            // prefer arch packages over noarch packages
+            let p1_noarch = p1.build_configuration.build_platform.arch().is_none();
+            let p2_noarch = p2.build_configuration.build_platform.arch().is_none();
+            if p1_noarch && !p2_noarch {
+                cycle_breaks.insert((pi1.clone(), pi2.clone()));
+                break;
+            } else if !p1_noarch && p2_noarch {
+                cycle_breaks.insert((pi2.clone(), pi1.clone()));
+                break;
+            }
+        }
+    }
+    tracing::debug!("Breaking cycle: {:?}", cycle_breaks);
+    cycle_breaks
+}
+
+/// Returns a vector containing the topological ordering of the packages, based on the provided
+/// roots
+fn get_topological_order(
+    mut roots: Vec<String>,
+    packages: &mut BTreeMap<String, &Output>,
+    cycle_breaks: &BTreeSet<(String, String)>,
+) -> Vec<Output> {
+    // Sorting makes this step deterministic (i.e. the same output is returned, regardless of the
+    // original order of the input)
+    roots.sort();
+
+    // Store the name of each package in `order` according to the graph's topological sort
+    let mut order = Vec::new();
+    let mut visited_packages = BTreeSet::default();
+    let mut stack: Vec<_> = roots.into_iter().map(Action::ResolveAndBuild).collect();
+    while let Some(action) = stack.pop() {
+        match action {
+            Action::Build(package_name) => {
+                order.push(package_name);
+            }
+            Action::ResolveAndBuild(package_name) => {
+                let already_visited = !visited_packages.insert(package_name.clone());
+                if already_visited {
+                    continue;
+                }
+
+                let mut deps = match &packages.get(package_name.as_str()) {
+                    Some(p) => p
+                        .recipe
+                        .requirements()
+                        .all_build_time()
+                        .map(|dep| match dep {
+                            Dependency::Spec(spec) => spec.name.as_ref().unwrap().as_normalized(),
+                            Dependency::PinSubpackage(pin) => pin.pin_value().name.as_normalized(),
+                            Dependency::Compiler(c) => c.without_prefix(),
+                        })
+                        .collect::<Vec<_>>(),
+                    None => {
+                        // This is a virtual package, so no real package was found for it
+                        continue;
+                    }
+                };
+
+                // Remove the edges that form cycles
+                deps.retain(|dep| !cycle_breaks.contains(&(package_name.clone(), dep.to_string())));
+
+                // Sorting makes this step deterministic (i.e. the same output is returned, regardless of the
+                // original order of the input)
+                deps.sort();
+
+                // Install dependencies, then ourselves (the order is reversed because of the stack)
+                stack.push(Action::Build(package_name));
+                stack.extend(
+                    deps.into_iter()
+                        .map(ToOwned::to_owned)
+                        .map(Action::ResolveAndBuild),
+                );
+            }
+        }
+    }
+
+    // Apply the order we just obtained
+    let mut output = Vec::with_capacity(order.len());
+    for name in order {
+        let package = packages.remove(&name).unwrap();
+        output.push(package.clone());
+    }
+
+    output
 }
 
 #[cfg(test)]

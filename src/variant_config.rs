@@ -19,7 +19,7 @@ use crate::{
         Jinja, Render,
     },
     selectors::SelectorConfig,
-    used_variables::used_vars_from_expressions,
+    used_variables::used_vars_from_recipe_node,
 };
 
 type OutputVariantsTuple = (Node, Vec<BTreeMap<String, String>>);
@@ -291,7 +291,7 @@ impl VariantConfig {
         // Then find all used variables from the each output recipe
         let mut recipes = Vec::with_capacity(outputs.len());
         for output in outputs {
-            let mut used_variables = used_vars_from_expressions(recipe);
+            let mut used_variables = used_vars_from_recipe_node(&output, recipe)?;
 
             // now render all selectors with the used variables
             let combinations = self.combinations(&used_variables)?;
@@ -412,6 +412,9 @@ pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
 
+    #[error("Failed to find used variables in recipe: {0}")]
+    UsedVariable(#[from] minijinja::Error),
+
     #[error(transparent)]
     #[diagnostic(transparent)]
     RecipeParseError(#[from] ParsingError),
@@ -449,7 +452,7 @@ mod tests {
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = std::fs::read_to_string(dbg!(test_data_dir.join(filename))).unwrap();
+        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let yaml = Node::parse_yaml(0, &yaml_file).unwrap();
 
         let selector_config = SelectorConfig {

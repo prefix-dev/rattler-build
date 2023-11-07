@@ -280,9 +280,11 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         no_clean: args.keep_build,
     };
 
-    for (output, variants) in outputs_and_variants {
+    let mut subpackages = BTreeMap::new();
+    let mut recipes = Vec::new();
+    for (output, variants) in &outputs_and_variants {
         for variant in variants {
-            let hash = hash::compute_buildstring(&variant, &noarch);
+            let hash = hash::compute_buildstring(variant, &noarch);
 
             let selector_config = SelectorConfig {
                 variant: variant.clone(),
@@ -291,7 +293,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 build_platform: selector_config.build_platform,
             };
 
-            let recipe = Recipe::from_node(&output, selector_config)
+            let recipe = Recipe::from_node(output, selector_config)
                 .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
 
             if args.render_only {
@@ -303,11 +305,14 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             }
 
             if recipe.build().skip() {
-                tracing::info!("Skipping build for variant: {:#?}", variant);
+                tracing::info!(
+                    "Skipping build for package variant: {:#?} {:#?}",
+                    recipe.package(),
+                    variant
+                );
                 continue;
             }
 
-            let mut subpackages = BTreeMap::new();
             subpackages.insert(
                 recipe.package().name().clone(),
                 PackageIdentifier {
@@ -317,48 +322,62 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 },
             );
 
-            let noarch_type = *recipe.build().noarch();
-            let name = recipe.package().name().clone();
-            // Add the channels from the args and by default always conda-forge
-            let channels = args
-                .channel
-                .clone()
-                .unwrap_or(vec!["conda-forge".to_string()]);
-
-            let timestamp = chrono::Utc::now();
-            let output = rattler_build::metadata::Output {
-                recipe,
-                build_configuration: BuildConfiguration {
-                    target_platform,
-                    host_platform: match target_platform {
-                        Platform::NoArch => Platform::current(),
-                        _ => target_platform,
-                    },
-                    build_platform: Platform::current(),
-                    hash: hash::compute_buildstring(&variant, &noarch_type),
-                    variant: variant.clone(),
-                    directories: Directories::create(
-                        name.as_normalized(),
-                        &recipe_path,
-                        &args.common.output_dir,
-                        args.no_build_id,
-                        &timestamp,
-                    )
-                    .into_diagnostic()?,
-                    channels,
-                    timestamp,
-                    subpackages,
-                    package_format: match args.package_format {
-                        PackageFormat::TarBz2 => ArchiveType::TarBz2,
-                        PackageFormat::Conda => ArchiveType::Conda,
-                    },
-                    store_recipe: !args.no_include_recipe,
-                },
-                finalized_dependencies: None,
-            };
-
-            run_build(&output, tool_config.clone()).await?;
+            recipes.push((recipe, variant.clone()));
         }
+    }
+
+    let mut outputs = Vec::with_capacity(recipes.len());
+    for (recipe, variant) in recipes {
+        let noarch_type = *recipe.build().noarch();
+        let name = recipe.package().name().clone();
+        // Add the channels from the args and by default always conda-forge
+        let channels = args
+            .channel
+            .clone()
+            .unwrap_or(vec!["conda-forge".to_string()]);
+
+        let timestamp = chrono::Utc::now();
+        let output = rattler_build::metadata::Output {
+            recipe,
+            build_configuration: BuildConfiguration {
+                target_platform,
+                host_platform: match target_platform {
+                    Platform::NoArch => Platform::current(),
+                    _ => target_platform,
+                },
+                build_platform: Platform::current(),
+                hash: hash::compute_buildstring(&variant, &noarch_type),
+                variant: variant.clone(),
+                no_clean: args.keep_build,
+                directories: Directories::create(
+                    name.as_normalized(),
+                    &recipe_path,
+                    &args.output_dir,
+                    args.no_build_id,
+                    &timestamp,
+                )
+                .into_diagnostic()?,
+                channels,
+                timestamp,
+                subpackages: subpackages.clone(),
+                package_format: match args.package_format {
+                    PackageFormat::TarBz2 => ArchiveType::TarBz2,
+                    PackageFormat::Conda => ArchiveType::Conda,
+                },
+            },
+            finalized_dependencies: None,
+        };
+
+        outputs.push(output);
+    }
+
+    // Topological sort of the outputs
+    let outputs = rattler_build::metadata::topological_sort(outputs);
+
+    // Now build in the
+    for output in outputs {
+        tracing::info!("Building package: {}", output.identifier());
+        run_build(&output, tool_config.clone()).await?;
     }
 
     Ok(())
