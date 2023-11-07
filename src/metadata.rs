@@ -409,7 +409,8 @@ mod test {
         let yaml3 = std::fs::read_to_string(test_data_dir.join("dependencies.yaml")).unwrap();
         let parsed_yaml3: resolved_dependencies::ResolvedDependencies =
             serde_yaml::from_str(&yaml3).unwrap();
-        // assert_eq!(resolved_dependencies.specs[0], resolved_dependencies2.specs[0]);
+
+        assert_eq!("pip", parsed_yaml3.specs[0].render());
     }
 
     #[test]
