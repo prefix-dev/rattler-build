@@ -273,14 +273,14 @@ pub fn apply_variant(
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("{}_compiler", compiler.language);
+                    let compiler_variant = format!("{}_compiler", compiler.language());
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
                             // defaults
                             if target_platform.is_linux() {
-                                let default_compiler = match compiler.language.as_str() {
+                                let default_compiler = match compiler.language() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -288,13 +288,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.language.as_str() {
+                                let default_compiler = match compiler.language() {
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -302,13 +302,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_windows() {
-                                let default_compiler = match compiler.as_str() {
+                                let default_compiler = match compiler.language() {
                                     // note with conda-build, these are dependent on the python version
                                     // we could also check the variant for the python version here!
                                     "c" => "vs2017".to_string(),
@@ -318,7 +318,7 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
@@ -326,7 +326,7 @@ pub fn apply_variant(
                             } else {
                                 panic!(
                                     "Could not find compiler ({}) configuration for platform: {target_platform}",
-                                    compiler.as_str(),
+                                    compiler.language(),
                                 )
                             }
                         });

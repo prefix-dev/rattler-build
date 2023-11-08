@@ -143,12 +143,12 @@ impl PinSubpackage {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compiler {
-    pub language: String,
+    language: String,
 }
 
 impl Compiler {
-    /// Get the compiler value as a string slice.
-    pub fn as_str(&self) -> &str {
+    /// Get the compiler value as a string.
+    pub fn language(&self) -> &str {
         &self.language
     }
 }
@@ -166,9 +166,9 @@ impl FromStr for Compiler {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.starts_with("__COMPILER ") {
+        if let Some(lang) = s.strip_prefix("__COMPILER ") {
             Ok(Self {
-                language: s.to_string(),
+                language: lang.into(),
             })
         } else {
             Err(format!("compiler without prefix: {}", s))
@@ -291,7 +291,7 @@ impl Serialize for Dependency {
                 pin.pin_subpackage.internal_repr()
             )),
             Dependency::Compiler(compiler) => {
-                serializer.serialize_str(&format!("__COMPILER {}", compiler.as_str()))
+                serializer.serialize_str(&format!("__COMPILER {}", compiler.language()))
             }
         }
     }
