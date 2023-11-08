@@ -29,6 +29,7 @@ use rattler_build::{
 
 mod console_utils;
 mod hash;
+mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
@@ -46,6 +47,9 @@ enum SubCommands {
 
     /// Test a package
     Test(TestOpts),
+
+    /// Rebuild a package
+    Rebuild(RebuildOpts),
 }
 
 #[derive(Parser)]
@@ -133,6 +137,7 @@ async fn main() -> miette::Result<()> {
     match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
+        SubCommands::Rebuild(args) => rebuild_from_args(args).await,
     }
 }
 
@@ -251,6 +256,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: multi_progress,
+        no_clean: args.keep_build,
     };
 
     for (output, variants) in outputs_and_variants {
@@ -310,7 +316,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     build_platform: Platform::current(),
                     hash: hash::compute_buildstring(&variant, &noarch_type),
                     variant: variant.clone(),
-                    no_clean: args.keep_build,
                     directories: Directories::create(
                         name.as_normalized(),
                         &recipe_path,
@@ -333,6 +338,57 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             run_build(&output, tool_config.clone()).await?;
         }
     }
+
+    Ok(())
+}
+
+#[derive(Parser)]
+struct RebuildOpts {
+    /// The package file to rebuild
+    #[arg(short, long)]
+    package_file: PathBuf,
+
+    /// Output directory for build artifacts. Defaults to `./output`.
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
+    output_dir: PathBuf,
+}
+
+async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
+    tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
+    // we extract the recipe folder from the package file (info/recipe/*)
+    // and then run the rendered recipe with the same arguments as the original build
+    let temp_folder = tempfile::tempdir().into_diagnostic()?;
+
+    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+
+    let temp_dir = temp_folder.into_path();
+
+    tracing::info!("Extracted recipe to: {:?}", temp_dir);
+
+    let rendered_recipe =
+        std::fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
+
+    let mut output: rattler_build::metadata::Output =
+        serde_yaml::from_str(&rendered_recipe).unwrap();
+
+    // set recipe dir to the temp folder
+    output.build_configuration.directories.recipe_dir = temp_dir;
+    output.build_configuration.directories.output_dir =
+        fs::canonicalize(args.output_dir).into_diagnostic()?;
+
+    let tool_config = tool_configuration::Configuration {
+        client: AuthenticatedClient::default(),
+        multi_progress_indicator: MultiProgress::new(),
+        no_clean: true,
+    };
+
+    output
+        .build_configuration
+        .directories
+        .recreate_directories()
+        .into_diagnostic()?;
+
+    run_build(&output, tool_config.clone()).await?;
 
     Ok(())
 }

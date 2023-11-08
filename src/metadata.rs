@@ -1,7 +1,6 @@
 //! All the metadata that makes up a recipe file
 use std::{
     collections::BTreeMap,
-    env,
     fmt::{self, Display, Formatter},
     fs,
     path::{Path, PathBuf},
@@ -52,9 +51,10 @@ impl Display for GitRev {
 }
 
 /// Directories used during the build process
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Directories {
     /// The directory where the recipe is located
+    #[serde(skip)]
     pub recipe_dir: PathBuf,
     /// The host prefix is the directory where host dependencies are installed
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
@@ -67,10 +67,12 @@ pub struct Directories {
     /// The parent directory of host, build and work directories
     pub build_dir: PathBuf,
     /// The output directory or local channel directory
+    #[serde(skip)]
     pub output_dir: PathBuf,
 }
 
 fn setup_build_dir(
+    output_dir: &Path,
     name: &str,
     no_build_id: bool,
     timestamp: &DateTime<Utc>,
@@ -82,7 +84,7 @@ fn setup_build_dir(
     } else {
         format!("rattler-build_{}_{:?}", name, since_the_epoch)
     };
-    let path = env::temp_dir().join(dirname);
+    let path = output_dir.join("bld").join(dirname);
     fs::create_dir_all(path.join("work"))?;
     Ok(path)
 }
@@ -95,13 +97,14 @@ impl Directories {
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
     ) -> Result<Directories, std::io::Error> {
-        let build_dir = setup_build_dir(name, no_build_id, timestamp)
-            .expect("Could not create build directory");
-        let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
-
         if !output_dir.exists() {
             fs::create_dir(output_dir)?;
         }
+        let output_dir = fs::canonicalize(output_dir)?;
+
+        let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
+            .expect("Could not create build directory");
+        let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
 
         let host_prefix = if cfg!(target_os = "windows") {
             build_dir.join("h_env")
@@ -127,14 +130,32 @@ impl Directories {
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,
-            output_dir: fs::canonicalize(output_dir)?,
+            output_dir,
         };
 
         Ok(directories)
     }
+
+    /// create all directories
+    pub fn recreate_directories(&self) -> Result<(), std::io::Error> {
+        if self.build_dir.exists() {
+            fs::remove_dir_all(&self.build_dir).unwrap();
+        }
+
+        if !self.output_dir.exists() {
+            fs::create_dir(&self.output_dir)?;
+        }
+
+        fs::create_dir_all(&self.build_dir)?;
+        fs::create_dir_all(&self.work_dir)?;
+        fs::create_dir_all(&self.build_prefix)?;
+        fs::create_dir_all(&self.host_prefix)?;
+
+        Ok(())
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
@@ -146,8 +167,6 @@ pub struct BuildConfiguration {
     pub variant: BTreeMap<String, String>,
     /// THe computed hash of the variant
     pub hash: String,
-    /// Set to true if the build directories should be kept after the build
-    pub no_clean: bool,
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments
@@ -174,7 +193,7 @@ pub struct PackageIdentifier {
     pub build_string: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
     pub recipe: crate::recipe::parser::Recipe,
     pub build_configuration: BuildConfiguration,
@@ -287,17 +306,129 @@ mod tests {
     #[test]
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
-        let p1 = setup_build_dir("name", true, &Utc::now()).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let p1 = setup_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
         _ = std::fs::remove_dir_all(p1);
 
         // with build_id (aka timestamp)
         let timestamp = &Utc::now();
-        let p2 = setup_build_dir("name", false, timestamp).unwrap();
+        let p2 = setup_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap().to_string_lossy();
         let epoch = timestamp.timestamp();
         assert!(f2.eq(&format!("rattler-build_name_{epoch}")));
         _ = std::fs::remove_dir_all(p2);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use chrono::TimeZone;
+    use insta::assert_yaml_snapshot;
+    use rattler_conda_types::{
+        MatchSpec, NoArchType, PackageName, PackageRecord, RepoDataRecord, VersionWithSource,
+    };
+    use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use url::Url;
+
+    use crate::render::resolved_dependencies::{self, DependencyInfo};
+
+    use super::{Directories, Output};
+
+    #[test]
+    fn test_directories_yaml_rendering() {
+        let tempdir = tempfile::tempdir().unwrap();
+
+        let directories = Directories::create(
+            "name",
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
+            false,
+            &chrono::Utc::now(),
+        )
+        .unwrap();
+
+        // test yaml roundtrip
+        let yaml = serde_yaml::to_string(&directories).unwrap();
+        let directories2: Directories = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(directories.build_dir, directories2.build_dir);
+        assert_eq!(directories.build_prefix, directories2.build_prefix);
+        assert_eq!(directories.host_prefix, directories2.host_prefix);
+    }
+
+    #[test]
+    fn test_resolved_dependencies_rendering() {
+        let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
+            specs: vec![DependencyInfo::Raw {
+                spec: MatchSpec::from_str("python 3.12.* h12332").unwrap(),
+            }],
+            resolved: vec![RepoDataRecord {
+                package_record: PackageRecord {
+                    arch: Some("x86_64".into()),
+                    build: "h123".into(),
+                    build_number: 0,
+                    constrains: vec![],
+                    depends: vec![],
+                    features: None,
+                    legacy_bz2_md5: None,
+                    legacy_bz2_size: None,
+                    license: Some("MIT".into()),
+                    license_family: None,
+                    md5: parse_digest_from_hex::<Md5>("68b329da9893e34099c7d8ad5cb9c940"),
+                    name: PackageName::from_str("test").unwrap(),
+                    noarch: NoArchType::none(),
+                    platform: Some("linux".into()),
+                    sha256: parse_digest_from_hex::<Sha256>(
+                        "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+                    ),
+                    size: Some(123123),
+                    subdir: "linux-64".into(),
+                    timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
+                    track_features: vec![],
+                    version: VersionWithSource::from_str("1.2.3").unwrap(),
+                },
+                file_name: "test-1.2.3-h123.tar.bz2".into(),
+                url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
+                    .unwrap(),
+                channel: "test".into(),
+            }],
+            run_exports: Default::default(),
+        };
+
+        // test yaml roundtrip
+        assert_yaml_snapshot!(resolved_dependencies);
+        let yaml = serde_yaml::to_string(&resolved_dependencies).unwrap();
+        let resolved_dependencies2: resolved_dependencies::ResolvedDependencies =
+            serde_yaml::from_str(&yaml).unwrap();
+        let yaml2 = serde_yaml::to_string(&resolved_dependencies2).unwrap();
+        assert_eq!(yaml, yaml2);
+
+        let test_data_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let yaml3 = std::fs::read_to_string(test_data_dir.join("dependencies.yaml")).unwrap();
+        let parsed_yaml3: resolved_dependencies::ResolvedDependencies =
+            serde_yaml::from_str(&yaml3).unwrap();
+
+        assert_eq!("pip", parsed_yaml3.specs[0].render());
+    }
+
+    #[test]
+    fn read_full_recipe() {
+        let test_data_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let recipe_1 = test_data_dir.join("rich_recipe.yaml");
+
+        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
+
+        let output_rich: Output = serde_yaml::from_str(&recipe_1).unwrap();
+        assert_yaml_snapshot!(output_rich);
+
+        let recipe_2 = test_data_dir.join("curl_recipe.yaml");
+        let recipe_2 = std::fs::read_to_string(recipe_2).unwrap();
+        let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
+        assert_yaml_snapshot!(output_curl);
     }
 }

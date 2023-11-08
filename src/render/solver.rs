@@ -145,7 +145,7 @@ pub async fn create_environment(
     // Get the package names from the matchspecs so we can only load the package records that we need.
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
     let repodatas = wrap_in_progress("parsing repodata", move || {
-        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
+        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None, true)
     })?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
@@ -178,6 +178,26 @@ pub async fn create_environment(
     // we need to apply to our environment to bring it up to date.
     let required_packages = wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
+    install_packages(
+        &required_packages,
+        target_platform,
+        target_prefix,
+        &cache_dir,
+        tool_configuration,
+    )
+    .await?;
+
+    Ok(required_packages)
+}
+
+pub async fn install_packages(
+    required_packages: &Vec<RepoDataRecord>,
+    target_platform: &Platform,
+    target_prefix: &Path,
+    cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> anyhow::Result<()> {
+    let installed_packages = vec![];
     // Construct a transaction to
     let transaction = Transaction::from_current_and_desired(
         installed_packages,
@@ -185,14 +205,14 @@ pub async fn create_environment(
         *target_platform,
     )?;
 
-    print_as_table(&required_packages);
+    print_as_table(required_packages);
 
     if !transaction.operations.is_empty() {
         // Execute the operations that are returned by the solver.
         execute_transaction(
             transaction,
             target_prefix,
-            &cache_dir,
+            cache_dir,
             tool_configuration.client.clone(),
             tool_configuration.multi_progress_indicator.clone(),
         )
@@ -208,7 +228,7 @@ pub async fn create_environment(
         );
     }
 
-    Ok(required_packages)
+    Ok(())
 }
 
 /// Executes the transaction on the given environment.

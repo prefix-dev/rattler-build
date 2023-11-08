@@ -13,6 +13,9 @@ pub struct Configuration {
 
     /// The authenticated reqwest download client to use
     pub client: AuthenticatedClient,
+
+    /// Set this to true if you want to keep the build folder after the build is done
+    pub no_clean: bool,
 }
 
 impl Default for Configuration {
@@ -29,6 +32,7 @@ impl Default for Configuration {
                     &PathBuf::from("~/.rattler"),
                 ),
             ),
+            no_clean: false,
         }
     }
 }
