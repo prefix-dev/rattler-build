@@ -97,14 +97,14 @@ impl Directories {
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
     ) -> Result<Directories, std::io::Error> {
+        if !output_dir.exists() {
+            fs::create_dir(output_dir)?;
+        }
         let output_dir = fs::canonicalize(output_dir)?;
+
         let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
         let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
-
-        if !output_dir.exists() {
-            fs::create_dir(&output_dir)?;
-        }
 
         let host_prefix = if cfg!(target_os = "windows") {
             build_dir.join("h_env")
@@ -340,10 +340,12 @@ mod test {
 
     #[test]
     fn test_directories_yaml_rendering() {
+        let tempdir = tempfile::tempdir().unwrap();
+
         let directories = Directories::create(
             "name",
-            &std::path::PathBuf::from("recipe"),
-            &std::path::PathBuf::from("output"),
+            &tempdir.path().join("recipe"),
+            &tempdir.path().join("output"),
             false,
             &chrono::Utc::now(),
         )
