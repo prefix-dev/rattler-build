@@ -65,10 +65,7 @@ pub async fn fetch_sources(
                 #[cfg(feature = "git")]
                 {
                     tracing::info!("Fetching source from GIT: {}", _src.url());
-                    let result = match git_source::git_src(_src, &cache_src, recipe_dir) {
-                        Ok(path) => path,
-                        Err(e) => return Err(e),
-                    };
+                    let result = git_source::git_src(_src, &cache_src, recipe_dir)?;
                     let dest_dir = if let Some(folder) = _src.folder() {
                         work_dir.join(folder)
                     } else {
