@@ -1,0 +1,10 @@
+---
+source: src/recipe/parser/requirements.rs
+expression: requirements
+---
+build:
+  - __COMPILER gcc
+host: []
+run: []
+run_constrained: []
+
