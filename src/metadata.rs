@@ -237,6 +237,14 @@ impl Output {
             self.build_string()
         )
     }
+
+    /// Retrieve a iterator over all the dependencies of this output
+    pub fn dependencies(&self) -> impl Iterator<Item = &Dependency> {
+        self.recipe
+            .requirements()
+            .all_build_time()
+            .chain(self.recipe.build().run_exports().all())
+    }
 }
 
 impl Display for Output {
@@ -393,7 +401,7 @@ fn get_roots(
     let dependencies: BTreeSet<_> = packages
         .iter()
         .flat_map(|p| {
-            let dependencies: Vec<_> = p.recipe.requirements().all_build_time().cloned().collect();
+            let dependencies: Vec<_> = p.dependencies().cloned().collect();
             let dependencies = apply_variant(&dependencies, &p.build_configuration).unwrap();
 
             dependencies
@@ -430,12 +438,7 @@ fn find_cycles(
     stack.push(node.clone());
 
     if let Some(package) = packages.get(node) {
-        let dependencies: Vec<_> = package
-            .recipe
-            .requirements()
-            .all_build_time()
-            .cloned()
-            .collect();
+        let dependencies: Vec<_> = package.dependencies().cloned().collect();
         let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
         let dependencies = dependencies.into_iter().map(|dep| {
             let name = dep.spec().name.clone().unwrap();
@@ -528,8 +531,7 @@ fn get_topological_order(
 
                 let mut deps: Vec<_> = match &packages.get(&package_name) {
                     Some(p) => {
-                        let dependencies: Vec<_> =
-                            p.recipe.requirements().all_build_time().cloned().collect();
+                        let dependencies: Vec<_> = p.dependencies().cloned().collect();
                         let dependencies =
                             apply_variant(&dependencies, &p.build_configuration).unwrap();
                         dependencies

@@ -316,6 +316,16 @@ impl RunExports {
     pub fn weak_constrains(&self) -> &[Dependency] {
         self.weak_constrains.as_slice()
     }
+
+    pub fn all(&self) -> impl Iterator<Item = &Dependency> {
+        self.noarch
+            .iter()
+            .chain(self.strong.iter())
+            .chain(self.strong_constrains.iter())
+            .chain(self.weak.iter())
+            .chain(self.weak_constrains.iter())
+            .chain(self.noarch.iter())
+    }
 }
 
 impl TryConvertNode<RunExports> for RenderedNode {

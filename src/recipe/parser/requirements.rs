@@ -67,10 +67,7 @@ impl Requirements {
 
     /// Get all requirements at build time in one iterator.
     pub fn all_build_time(&self) -> impl Iterator<Item = &Dependency> {
-        self.build
-            .iter()
-            .chain(self.host.iter())
-            .chain(self.run_constrained.iter())
+        self.build.iter().chain(self.host.iter())
     }
 
     /// Get all requirements in one iterator.
