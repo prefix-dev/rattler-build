@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Requirements {
     /// Requirements at _build_ time are requirements that can
     /// be run on the machine that is executing the build script.
@@ -67,7 +67,10 @@ impl Requirements {
 
     /// Get all requirements at build time in one iterator.
     pub fn all_build_time(&self) -> impl Iterator<Item = &Dependency> {
-        self.build.iter().chain(self.host.iter())
+        self.build
+            .iter()
+            .chain(self.host.iter())
+            .chain(self.run_constrained.iter())
     }
 
     /// Get all requirements in one iterator.
@@ -134,7 +137,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct PinSubpackage {
     pin_subpackage: Pin,
 }
@@ -146,7 +149,7 @@ impl PinSubpackage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Compiler {
     language: String,
 }
@@ -181,7 +184,8 @@ impl FromStr for Compiler {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[serde(untagged)]
 pub enum Dependency {
     Spec(MatchSpec),
     PinSubpackage(PinSubpackage),
