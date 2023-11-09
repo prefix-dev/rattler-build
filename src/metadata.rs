@@ -177,6 +177,8 @@ pub struct BuildConfiguration {
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub package_format: ArchiveType,
+    /// Wether to store the recipe and build instructions in the final package or not
+    pub store_recipe: bool,
 }
 
 impl BuildConfiguration {
