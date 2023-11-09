@@ -861,7 +861,7 @@ available environment variables \<env-vars\>.
 Jinja templates are evaluated during the build process. To retrieve a fully
 rendered `recipe.yaml`, use the commands/boa-render command.
 
-#### Additional Jinja2 functionality in Boa
+#### Additional Jinja2 functionality in rattler-build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
 available during the conda-build process: `pin_compatible`, `pin_subpackage`,
@@ -934,6 +934,22 @@ requirements:
     - ${{ pin_compatible('numpy', min_pin='x.x', max_pin='x') }}
 ```
 
+#### The env Jinja functions
+
+You can access the current environment variables using the `env` object in Jinja.
+
+There are three functions:
+
+- `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
+- `env.get_default("ENV_VAR", "undefined")` will insert the value of "ENV_VAR" into the recipe or, if "ENV_VAR" is not defined, the specified default value (in this case "undefined")
+- `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set to any value
+
+This can be used for some light templating, e.g.
+
+```yaml
+build:
+  string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
+```
 
 Preprocessing selectors
 -----------------------
