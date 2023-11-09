@@ -2958,8 +2958,8 @@ name = "rust-tests"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "itertools",
  "rattler_package_streaming 0.11.0 (git+https://github.com/mamba-org/rattler.git)",
- "rstest",
  "serde_json",
  "sha1",
 ]
