@@ -7,8 +7,9 @@ use std::{
 use crate::recipe::parser::Source;
 
 pub mod copy_dir;
-#[cfg(feature = "git")]
+// #[cfg(feature = "git")]
 pub mod git_source;
+pub mod host_git_source;
 pub mod patch;
 pub mod url_source;
 
@@ -38,6 +39,9 @@ pub enum SourceError {
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
+    #[error("Failed to run git command: {0}")]
+    GitError(String),
+
     #[cfg(feature = "git")]
     #[error("Failed to run git command: {0}")]
     GitError(#[from] git2::Error),
@@ -61,14 +65,16 @@ pub async fn fetch_sources(
 
     for src in sources {
         match &src {
-            Source::Git(_src) => {
-                #[cfg(feature = "git")]
+            Source::Git(src) => {
+                // we don't seem to notify user if this is run unnecessarily 
+                // #[cfg(feature = "git")]
                 {
-                    tracing::info!("Fetching source from GIT: {}", _src.url());
-                    let result = match git_source::git_src(_src, &cache_src, recipe_dir) {
-                        Ok(path) => path,
-                        Err(e) => return Err(e),
-                    };
+                    tracing::info!("Fetching source from GIT: {}", src.url());
+                    let result = git_source::git_src(src, &cache_src, recipe_dir)?;
+                    // let result = match git_source::git_src(src, &cache_src, recipe_dir) {
+                    //     Ok(path) => path,
+                    //     Err(e) => return Err(e),
+                    // };
                     let dest_dir = if let Some(folder) = _src.folder() {
                         work_dir.join(folder)
                     } else {
@@ -82,6 +88,7 @@ pub async fn fetch_sources(
                         patch::apply_patches(_src.patches(), work_dir, recipe_dir)?;
                     }
                 }
+               tracing::info!("Fetching source from git repo: {}", src); 
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url());
