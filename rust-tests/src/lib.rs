@@ -302,11 +302,11 @@ mod tests {
                     assert!(c["path_type"] == p["path_type"]);
                     if p["_path"]
                         .as_str()
-                        .map(|s| s.contains("dist-info"))
+                        .map(|s| !s.contains("dist-info"))
                         .unwrap_or_default()
                     {
                         // TODO: figure out why this is not the same b/w expected and cmp
-                        // assert!(c["sha256"] == p["sha256"]);
+                        assert!(c["sha256"] == p["sha256"]);
                         assert!(c["size_in_bytes"] == p["size_in_bytes"]);
                     }
                 }
