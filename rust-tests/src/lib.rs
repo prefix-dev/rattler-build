@@ -1,13 +1,12 @@
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
     use rattler_package_streaming::read::extract_tar_bz2;
     use std::{
         collections::HashMap,
         ffi::OsStr,
         fs::File,
         path::{Path, PathBuf},
-        process::{Command, Output, Stdio},
+        process::{Command, Output},
     };
 
     enum RattlerBuild {
@@ -116,11 +115,10 @@ mod tests {
     }
     impl Drop for WithTemp {
         /// delete temp dir after the fact
-        /// consider removing when debugging tests
         fn drop(&mut self) {
-            self.0.exists().then(|| {
-                // _ = std::fs::remove_dir_all(&self.0);
-            });
+            // self.0.exists().then_some({
+            //     _ = std::fs::remove_dir_all(&self.0);
+            // });
         }
     }
 
@@ -206,7 +204,7 @@ mod tests {
         if !glob_str.ends_with("tar.bz2") {
             glob_str.push_str("*.tar.bz2");
         }
-        if !glob_str.contains("/") {
+        if !glob_str.contains('/') {
             glob_str = "**/".to_string() + glob_str.as_str();
         }
         let path = std::env::current_dir().unwrap();
@@ -309,10 +307,8 @@ mod tests {
                         assert!(c["size_in_bytes"] == p["size_in_bytes"]);
                     }
                 }
-            } else {
-                if actual.ne(&cmp) {
-                    panic!("Expected {f} to be {cmp:?} but was {actual:?}");
-                }
+            } else if actual.ne(&cmp) {
+                panic!("Expected {f} to be {cmp:?} but was {actual:?}");
             }
         }
     }
