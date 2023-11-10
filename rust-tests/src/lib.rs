@@ -123,7 +123,7 @@ mod tests {
     }
 
     /// doesn't correctly handle spaces within argument of args escape all spaces
-    fn shx<'a>(src: impl AsRef<str>) -> Option<String> {
+    fn shx(src: impl AsRef<str>) -> Option<String> {
         let (prog, args) = src.as_ref().split_once(' ')?;
         Command::new(prog)
             .args(args.split(' '))

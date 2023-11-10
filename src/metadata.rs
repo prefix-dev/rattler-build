@@ -1,7 +1,6 @@
 //! All the metadata that makes up a recipe file
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env,
     fmt::{self, Display, Formatter},
     fs,
     path::{Path, PathBuf},
