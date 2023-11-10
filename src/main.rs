@@ -348,11 +348,10 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 build_platform: Platform::current(),
                 hash: hash::compute_buildstring(&variant, &noarch_type),
                 variant: variant.clone(),
-                no_clean: args.keep_build,
                 directories: Directories::create(
                     name.as_normalized(),
                     &recipe_path,
-                    &args.output_dir,
+                    &args.common.output_dir,
                     args.no_build_id,
                     &timestamp,
                 )
@@ -364,6 +363,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     PackageFormat::TarBz2 => ArchiveType::TarBz2,
                     PackageFormat::Conda => ArchiveType::Conda,
                 },
+                store_recipe: !args.no_include_recipe,
             },
             finalized_dependencies: None,
         };

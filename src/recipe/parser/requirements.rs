@@ -158,15 +158,6 @@ impl Compiler {
     }
 }
 
-impl Serialize for Compiler {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        format!("__COMPILER {}", self.language).serialize(serializer)
-    }
-}
-
 impl FromStr for Compiler {
     type Err = String;
 
@@ -282,24 +273,6 @@ impl<'de> Deserialize<'de> for Dependency {
         }
 
         deserializer.deserialize_str(DependencyVisitor)
-    }
-}
-
-impl Serialize for Dependency {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        match self {
-            Dependency::Spec(spec) => serializer.serialize_str(&spec.to_string()),
-            Dependency::PinSubpackage(pin) => serializer.serialize_str(&format!(
-                "__PIN_SUBPACKAGE {}",
-                pin.pin_subpackage.internal_repr()
-            )),
-            Dependency::Compiler(compiler) => {
-                serializer.serialize_str(&format!("__COMPILER {}", compiler.language()))
-            }
-        }
     }
 }
 

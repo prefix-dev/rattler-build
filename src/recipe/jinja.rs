@@ -515,7 +515,7 @@ mod tests {
         assert!(!jinja.eval("cmp(python, '>3.5,<3.7')").expect("test 6").is_true());
     }
 
-    fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn() -> ()) {
+    fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn()) {
         if let Ok(old_value) = std::env::var(key.as_ref()) {
             std::env::set_var(key.as_ref(), value.as_ref());
             f();
