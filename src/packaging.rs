@@ -864,9 +864,10 @@ pub fn package_conda(
     variant_config
         .write_all(serde_json::to_string_pretty(&output.build_configuration.variant)?.as_bytes())?;
 
-    // TODO write recipe to info/recipe/ folder
-    let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
-    tmp_files.extend(recipe_files);
+    if output.build_configuration.store_recipe {
+        let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
+        tmp_files.extend(recipe_files);
+    }
 
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);

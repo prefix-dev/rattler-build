@@ -68,6 +68,14 @@ enum PackageFormat {
     Conda,
 }
 
+/// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
+#[derive(Parser)]
+struct CommonOpts {
+    /// Output directory for build artifacts. Defaults to `./output`.
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
+    output_dir: PathBuf,
+}
+
 #[derive(Parser)]
 struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
@@ -95,10 +103,6 @@ struct BuildOpts {
     #[arg(long)]
     keep_build: bool,
 
-    /// Output directory for build artifacts. Defaults to `./output`.
-    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
-    output_dir: PathBuf,
-
     /// Don't use build id(timestamp) when creating build directory name. Defaults to `false`.
     #[arg(long)]
     no_build_id: bool,
@@ -107,6 +111,13 @@ struct BuildOpts {
     /// Defaults to `.tar.bz2`.
     #[arg(long, default_value = "tar-bz2")]
     package_format: PackageFormat,
+
+    /// Do not store the recipe in the final package
+    #[arg(long)]
+    no_include_recipe: bool,
+
+    #[clap(flatten)]
+    common: CommonOpts,
 }
 
 #[derive(Parser)]
@@ -114,6 +125,16 @@ struct TestOpts {
     /// The package file to test
     #[arg(short, long)]
     package_file: PathBuf,
+}
+
+#[derive(Parser)]
+struct RebuildOpts {
+    /// The package file to rebuild
+    #[arg(short, long)]
+    package_file: PathBuf,
+
+    #[clap(flatten)]
+    common: CommonOpts,
 }
 
 #[tokio::main]
@@ -319,7 +340,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     directories: Directories::create(
                         name.as_normalized(),
                         &recipe_path,
-                        &args.output_dir,
+                        &args.common.output_dir,
                         args.no_build_id,
                         &timestamp,
                     )
@@ -331,6 +352,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                         PackageFormat::TarBz2 => ArchiveType::TarBz2,
                         PackageFormat::Conda => ArchiveType::Conda,
                     },
+                    store_recipe: !args.no_include_recipe,
                 },
                 finalized_dependencies: None,
             };
@@ -340,17 +362,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     }
 
     Ok(())
-}
-
-#[derive(Parser)]
-struct RebuildOpts {
-    /// The package file to rebuild
-    #[arg(short, long)]
-    package_file: PathBuf,
-
-    /// Output directory for build artifacts. Defaults to `./output`.
-    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
-    output_dir: PathBuf,
 }
 
 async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
@@ -374,7 +385,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
     output.build_configuration.directories.output_dir =
-        fs::canonicalize(args.output_dir).into_diagnostic()?;
+        fs::canonicalize(args.common.output_dir).into_diagnostic()?;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
