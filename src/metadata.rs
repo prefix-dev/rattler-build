@@ -237,12 +237,9 @@ impl Output {
         )
     }
 
-    /// Retrieve a iterator over all the dependencies of this output
+    /// Retrieve a iterator over all the build dependencies of this output
     pub fn dependencies(&self) -> impl Iterator<Item = &Dependency> {
-        self.recipe
-            .requirements()
-            .all_build_time()
-            .chain(self.recipe.build().run_exports().all())
+        self.recipe.requirements().all_build_time()
     }
 }
 

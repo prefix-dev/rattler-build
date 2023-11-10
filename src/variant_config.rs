@@ -301,6 +301,7 @@ impl VariantConfig {
 
             for _ in combinations {
                 let requirements = parsed_recipe.requirements();
+                let run_exports = parsed_recipe.build().run_exports();
 
                 // we do this in simple mode for now, but could later also do intersections
                 // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
@@ -317,7 +318,22 @@ impl VariantConfig {
                         used_variables.insert(val);
                     }
                     Dependency::Compiler(_) => (),
-                })
+                });
+
+                // We add all run exports that are `pin_subpackages` with `exact=true` in the
+                // variant for unique identification of the output.
+                run_exports.all().for_each(|dep| match dep {
+                    Dependency::Spec(_) => (),
+                    Dependency::PinSubpackage(pin_sub) => {
+                        let pin = pin_sub.pin_value();
+
+                        if pin.exact {
+                            let val = pin.name.as_normalized().to_owned();
+                            used_variables.insert(val);
+                        }
+                    }
+                    Dependency::Compiler(_) => (),
+                });
             }
 
             // special handling of CONDA_BUILD_SYSROOT
