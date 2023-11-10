@@ -6,7 +6,7 @@ mod tests {
         ffi::OsStr,
         fs::File,
         path::{Path, PathBuf},
-        process::{Command, Output},
+        process::{Command, Output}, sync::{Mutex, Arc},
     };
 
     enum RattlerBuild {
@@ -113,15 +113,6 @@ mod tests {
             WithTemp(value)
         }
     }
-    impl Drop for WithTemp {
-        /// delete temp dir after the fact
-        fn drop(&mut self) {
-            // self.0.exists().then_some({
-            //     _ = std::fs::remove_dir_all(&self.0);
-            // });
-        }
-    }
-
     /// doesn't correctly handle spaces within argument of args escape all spaces
     fn shx<'a>(src: impl AsRef<str>) -> Option<String> {
         let (prog, args) = src.as_ref().split_once(' ')?;
@@ -132,14 +123,19 @@ mod tests {
             .and_then(|o| String::from_utf8(o.stdout).ok())
     }
 
-    fn tmp() -> WithTemp {
-        for i in 0.. {
-            let p = std::env::temp_dir().join(format!("{i}"));
-            if p.exists() {
-                continue;
+    #[allow(unreachable_code)]
+    fn tmp() -> PathBuf {
+        static N: Mutex<u64> = Mutex::new(0); 
+        loop {
+            if let Ok(mut k) = N.lock() {
+                let p = std::env::temp_dir().join(format!("{}", k));
+                *k += 1;
+                if p.exists() {
+                    continue;
+                }
+                return p;
             }
-            return p.into();
-        }
+        } 
         unreachable!("above is an infinite loop")
     }
     fn rattler() -> RattlerBuild {
@@ -186,10 +182,10 @@ mod tests {
         let recipes = recipes();
         let tmp = tmp();
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes.join("run_exports"), tmp.as_dir(), None);
+            rattler().build::<_, _, &str>(recipes.join("run_exports"), &tmp, None);
         // ensure rattler build succeeded
         assert!(rattler_build.is_ok());
-        let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
+        let pkg = get_extracted_package(&tmp, "run_exports_test");
         assert!(pkg.join("info/run_exports.json").exists());
         let actual_run_export: HashMap<String, Vec<String>> =
             serde_json::from_slice(&std::fs::read(pkg.join("info/run_exports.json")).unwrap())
@@ -240,9 +236,9 @@ mod tests {
     fn test_pkg_hash() {
         let tmp = tmp();
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("pkg_hash"), tmp.as_dir(), None);
+            rattler().build::<_, _, &str>(recipes().join("pkg_hash"), &tmp, None);
         assert!(rattler_build.is_ok());
-        let pkg = get_package(tmp.as_dir(), "pkg_hash".to_string());
+        let pkg = get_package(&tmp, "pkg_hash".to_string());
         // yes this was broken because in rust default formatting for map does include that one space in the middle!
         let expected_hash = variant_hash(format!("{{\"target_platform\": \"{}\"}}", host_subdir()));
         let pkg_hash = format!("pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2");
@@ -254,9 +250,9 @@ mod tests {
     fn test_license_glob() {
         let tmp = tmp();
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("globtest"), tmp.as_dir(), None);
+            rattler().build::<_, _, &str>(recipes().join("globtest"), &tmp, None);
         assert!(rattler_build.is_ok());
-        let pkg = get_extracted_package(tmp.as_dir(), "globtest");
+        let pkg = get_extracted_package(&tmp, "globtest");
         assert!(pkg.join("info/licenses/LICENSE").exists());
         assert!(pkg.join("info/licenses/cmake/FindTBB.cmake").exists());
         assert!(pkg.join("info/licenses/docs/ghp_environment.yml").exists());
@@ -317,9 +313,9 @@ mod tests {
     fn test_python_noarch() {
         let tmp = tmp();
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("toml"), tmp.as_dir(), None);
+            rattler().build::<_, _, &str>(recipes().join("toml"), &tmp, None);
         assert!(rattler_build.is_ok());
-        let pkg = get_extracted_package(tmp.as_dir(), "toml");
+        let pkg = get_extracted_package(&tmp, "toml");
         assert!(pkg.join("info/licenses/LICENSE").exists());
         let installer = pkg.join("site-packages/toml-0.10.2.dist-info/INSTALLER");
         assert!(installer.exists());
