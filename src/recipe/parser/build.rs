@@ -43,6 +43,8 @@ pub struct Build {
     /// For a Python noarch package to have executables it is necessary to specify the python entry points.
     /// These contain the name of the executable and the module + function that should be executed.
     pub(super) entry_points: Vec<EntryPoint>,
+    /// Variant key config blabla
+    pub(super) variant_keys: VariantKeysConfig,
     // TODO: Add and parse the rest of the fields
 }
 
@@ -431,5 +433,59 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<EntryPoint, PartialParsingError> {
         EntryPoint::from_str(self.as_str())
             .map_err(|err| _partialerror!(*self.span(), ErrorKind::EntryPointParsing(err),))
+    }
+}
+
+struct VariantKeysConfig {
+    pub(super) force_keys: Vec<String>,
+    pub(super) ignore_keys: Vec<String>,
+}
+
+impl VariantKeysConfig {
+    pub fn force_keys(&self) -> &[String] {
+        self.force_keys.as_slice()
+    }
+
+    pub fn ignore_keys(&self) -> &[String] {
+        self.ignore_keys.as_slice()
+    }
+}
+
+impl TryConvertNode<VariantKeysConfig> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<VariantKeysConfig, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<VariantKeysConfig> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<VariantKeysConfig, PartialParsingError> {
+        let mut force_keys = Vec::new();
+        let mut ignore_keys = Vec::new();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "force_keys" => {
+                    force_keys = value.try_convert(key_str)?;
+                }
+                "ignore_keys" => {
+                    ignore_keys = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_owned().into()),
+                        help = format!("fields for {key_str} should be one of: `force_keys` or `ignore_keys`")
+                    ))
+                }
+            }
+        }
+
+        Ok(VariantKeysConfig {
+            force_keys,
+            ignore_keys,
+        })
     }
 }

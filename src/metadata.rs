@@ -161,6 +161,14 @@ fn default_true() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+struct VariantKeysConfig {
+    /// Keys to forcibly use in the variant definition and resulting hash
+    force_keys: Option<Vec<String>>,
+    /// Keys to ignore in the variant definition and resulting hash
+    ignore_keys: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
@@ -182,6 +190,8 @@ pub struct BuildConfiguration {
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub package_format: ArchiveType,
+    /// Additional configuration for the variant keys
+    pub variant_keys: VariantKeysConfig,
     /// Wether to store the recipe and build instructions in the final package or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
