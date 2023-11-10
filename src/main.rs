@@ -301,7 +301,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 tracing::info!("Variant: {:#?}", variant);
                 tracing::info!("Hash: {}", recipe.build().string().unwrap());
                 tracing::info!("Skip?: {}", recipe.build().skip());
-                continue;
             }
 
             if recipe.build().skip() {
@@ -376,8 +375,10 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     // Now build in the
     for output in outputs {
-        tracing::info!("Building package: {}", output.identifier());
-        run_build(&output, tool_config.clone()).await?;
+        if !args.render_only {
+            tracing::info!("Building package: {}", output.identifier());
+            run_build(&output, tool_config.clone()).await?;
+        }
     }
 
     Ok(())
