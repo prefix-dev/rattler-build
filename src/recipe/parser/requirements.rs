@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Requirements {
     /// Requirements at _build_ time are requirements that can
     /// be run on the machine that is executing the build script.
@@ -134,7 +134,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinSubpackage {
     pin_subpackage: Pin,
 }
@@ -172,7 +172,7 @@ impl FromStr for Compiler {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(untagged)]
 pub enum Dependency {
     Spec(MatchSpec),
