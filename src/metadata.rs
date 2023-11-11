@@ -517,7 +517,15 @@ fn get_topological_order(
     let mut order = Vec::new();
     let mut visited_packages = BTreeSet::default();
     let mut stack: Vec<_> = roots.into_iter().map(Action::ResolveAndBuild).collect();
+    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+    tracing::debug!("Stack: {stack:#?}");
+    tracing::debug!("Order: {order:#?}");
+    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
     while let Some(action) = stack.pop() {
+        tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+        tracing::debug!("Stack: {stack:#?}");
+        tracing::debug!("Order: {order:#?}");
+        tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
         match action {
             Action::Build(package_name) => {
                 order.push(package_name);
@@ -563,6 +571,10 @@ fn get_topological_order(
             }
         }
     }
+    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+    tracing::debug!("Stack: {stack:#?}");
+    tracing::debug!("Order: {order:#?}");
+    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
     // Apply the order we just obtained
     let mut output = Vec::with_capacity(order.len());
