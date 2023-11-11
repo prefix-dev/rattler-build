@@ -237,8 +237,13 @@ impl Output {
         )
     }
 
-    /// Retrieve a iterator over all the build dependencies of this output
+    /// Retrieve a iterator over all the dependencies of this output
     pub fn dependencies(&self) -> impl Iterator<Item = &Dependency> {
+        self.recipe.requirements().all()
+    }
+
+    /// Retrieve a iterator over all the build dependencies of this output
+    pub fn build_dependencies(&self) -> impl Iterator<Item = &Dependency> {
         self.recipe.requirements().all_build_time()
     }
 }
@@ -333,6 +338,7 @@ impl Output {
 
 /// Helper enum to model the recursion inside `get_topological_order` as iteration, to support
 /// dependency graphs of arbitrary depth without causing stack overflows
+#[derive(Debug, Clone)]
 enum Action {
     ResolveAndBuild(PackageMeta),
     Build(PackageMeta),
@@ -356,8 +362,6 @@ pub fn topological_sort(packages: Vec<Output>) -> Vec<Output> {
         .iter()
         .map(|p| (p.package_meta(), p))
         .collect::<BTreeMap<_, _>>();
-
-    dbg!(&all_packages.len());
 
     // detect cycles
     let mut visited = BTreeSet::new();
@@ -384,7 +388,6 @@ pub fn topological_sort(packages: Vec<Output>) -> Vec<Output> {
     // this is needed because breaking cycles can create new roots
     let roots = get_roots(&packages, Some(&cycle_breaks));
 
-
     get_topological_order(roots, &mut all_packages, &cycle_breaks)
 }
 
@@ -397,7 +400,7 @@ fn get_roots(
     let dependencies: BTreeSet<_> = packages
         .iter()
         .flat_map(|p| {
-            let dependencies: Vec<_> = p.dependencies().cloned().collect();
+            let dependencies: Vec<_> = p.build_dependencies().cloned().collect();
             let dependencies = apply_variant(&dependencies, &p.build_configuration).unwrap();
 
             dependencies
@@ -527,7 +530,7 @@ fn get_topological_order(
 
                 let mut deps: Vec<_> = match &packages.get(&package_name) {
                     Some(p) => {
-                        let dependencies: Vec<_> = p.dependencies().cloned().collect();
+                        let dependencies: Vec<_> = p.build_dependencies().cloned().collect();
                         let dependencies =
                             apply_variant(&dependencies, &p.build_configuration).unwrap();
                         dependencies
