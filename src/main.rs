@@ -297,7 +297,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
 
             if args.render_only {
-                tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
+                // tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
                 tracing::info!("Variant: {:#?}", variant);
                 tracing::info!("Hash: {}", recipe.build().string().unwrap());
                 tracing::info!("Skip?: {}\n", recipe.build().skip());
@@ -371,13 +371,15 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     }
 
     // Topological sort of the outputs
-    let outputs = rattler_build::metadata::topological_sort(outputs);
+    let outputs = rattler_build::metadata::topological_sort(outputs).into_diagnostic()?;
 
     // Now build in the
     for output in outputs {
         if !args.render_only {
             tracing::info!("Building package: {}", output.identifier());
             run_build(&output, tool_config.clone()).await?;
+        } else {
+            tracing::info!("Rendering recipe: {}", output.identifier());
         }
     }
 

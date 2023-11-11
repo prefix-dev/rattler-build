@@ -8,6 +8,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
@@ -344,6 +345,12 @@ enum Action {
     Build(PackageMeta),
 }
 
+#[derive(thiserror::Error, Debug, Clone)]
+pub enum TopologicalSortError {
+    #[error("Cyclic dependency detected: {0:?}")]
+    CyclicDependency(Vec<String>),
+}
+
 /// Sorts the packages topologically
 ///
 /// This function is deterministic, meaning that it will return the same result regardless of the
@@ -355,8 +362,8 @@ enum Action {
 /// necessary).
 ///
 /// Note that this function only works for packages with unique names.
-pub fn topological_sort(packages: Vec<Output>) -> Vec<Output> {
-    let roots = get_roots(&packages, None);
+pub fn topological_sort(packages: Vec<Output>) -> Result<Vec<Output>, TopologicalSortError> {
+    let roots = get_leafs(&packages);
 
     let mut all_packages = packages
         .iter()
@@ -376,26 +383,22 @@ pub fn topological_sort(packages: Vec<Output>) -> Vec<Output> {
         }
     }
 
-    // print all cycles
-    for cycle in &cycles {
-        tracing::debug!("Found cycle: {:?}", cycle);
+    if let Some(cycle) = cycles.first() {
+        tracing::error!("Found cycle: {:?}", cycle);
+        let cycle_as_string = cycle
+            .iter()
+            .map(|x| x.name.as_normalized().to_string())
+            .collect::<Vec<String>>();
+        return Err(TopologicalSortError::CyclicDependency(cycle_as_string));
     }
 
-    // Break cycles
-    let cycle_breaks = break_cycles(cycles, &all_packages);
-
-    // obtain the new roots (packages that are not dependencies of any other package)
-    // this is needed because breaking cycles can create new roots
-    let roots = get_roots(&packages, Some(&cycle_breaks));
-
-    get_topological_order(roots, &mut all_packages, &cycle_breaks)
+    Ok(get_topological_order(roots, &mut all_packages))
 }
 
-fn get_roots(
-    packages: &[Output],
-    cycle_breaks: Option<&BTreeSet<(PackageMeta, PackageMeta)>>,
-) -> Vec<PackageMeta> {
-    let all_packages: BTreeSet<_> = packages.iter().map(|p| p.package_meta()).collect();
+
+/// Obtain the leaf packages (outermost packages) from a list of packages
+fn get_leafs(packages: &[Output]) -> Vec<PackageMeta> {
+    let mut all_packages: BTreeSet<_> = packages.iter().map(|p| p.package_meta()).collect();
 
     let dependencies: BTreeSet<_> = packages
         .iter()
@@ -405,25 +408,12 @@ fn get_roots(
 
             dependencies
                 .into_iter()
-                .map(|dep| {
-                    let name = dep.spec().name.clone().unwrap();
-                    PackageMeta {
-                        name,
-                        variant: p.build_configuration.variant.clone(),
-                    }
-                })
-                .filter(|dep| {
-                    // filter out circular dependencies
-                    if let Some(cycle_breaks) = cycle_breaks {
-                        !cycle_breaks.contains(&(p.package_meta(), dep.clone()))
-                    } else {
-                        true
-                    }
-                })
+                .map(|dep| dep.spec().name.clone().unwrap())
         })
         .collect();
 
-    all_packages.difference(&dependencies).cloned().collect()
+    all_packages.retain(|p| !dependencies.contains(&p.name));
+    all_packages.into_iter().collect()
 }
 
 /// Find cycles with DFS
@@ -439,16 +429,7 @@ fn find_cycles(
     if let Some(package) = packages.get(node) {
         let dependencies: Vec<_> = package.dependencies().cloned().collect();
         let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
-        let dependencies = dependencies.into_iter().map(|dep| {
-            let name = dep.spec().name.clone().unwrap();
-            PackageMeta {
-                name,
-                variant: package.build_configuration.variant.clone(),
-            }
-        });
-
-        // let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
-        // .chain(package. .pins.iter().map(|x| &x.0));
+        let dependencies = dependencies.into_iter().map(|dep| {dep.spec().name});
 
         for dependency in dependencies {
             if !visited.contains(&dependency) {
@@ -468,38 +449,27 @@ fn find_cycles(
     None
 }
 
-/// Breaks cycles by removing the edges that form them
-/// Edges from arch to noarch packages are removed to break the cycles.
-fn break_cycles(
-    cycles: Vec<Vec<PackageMeta>>,
-    packages: &BTreeMap<PackageMeta, &Output>,
-) -> BTreeSet<(PackageMeta, PackageMeta)> {
-    // we record the edges that we want to remove
-    let mut cycle_breaks = BTreeSet::default();
-
-    for cycle in cycles {
-        for i in 0..cycle.len() {
-            let pi1 = &cycle[i];
-            // Next package in cycle, wraps around
-            let pi2 = &cycle[(i + 1) % cycle.len()];
-
-            let p1 = &packages[pi1];
-            let p2 = &packages[pi2];
-
-            // prefer arch packages over noarch packages
-            let p1_noarch = p1.build_configuration.build_platform.arch().is_none();
-            let p2_noarch = p2.build_configuration.build_platform.arch().is_none();
-            if p1_noarch && !p2_noarch {
-                cycle_breaks.insert((pi1.clone(), pi2.clone()));
-                break;
-            } else if !p1_noarch && p2_noarch {
-                cycle_breaks.insert((pi2.clone(), pi1.clone()));
-                break;
+fn find_dependency(
+    name: PackageName,
+    variant: &BTreeMap<String, String>,
+    packages: &mut BTreeMap<PackageMeta, &Output>,
+) -> Option<PackageMeta> {
+    let candidates = packages.iter().filter(|(k, _)| k.name == name);
+    // compute overlap in variant config and sort by overlap, select highest overlap
+    candidates
+        .sorted_by_key(|(k, _)| {
+            let mut overlap = 0;
+            for (k, v) in &k.variant {
+                if let Some(v2) = variant.get(k) {
+                    if v == v2 {
+                        overlap += 1;
+                    }
+                }
             }
-        }
-    }
-    tracing::debug!("Breaking cycle: {:?}", cycle_breaks);
-    cycle_breaks
+            overlap
+        })
+        .last()
+        .map(|(k, _)| k.clone())
 }
 
 /// Returns a vector containing the topological ordering of the packages, based on the provided
@@ -507,25 +477,18 @@ fn break_cycles(
 fn get_topological_order(
     mut roots: Vec<PackageMeta>,
     packages: &mut BTreeMap<PackageMeta, &Output>,
-    cycle_breaks: &BTreeSet<(PackageMeta, PackageMeta)>,
 ) -> Vec<Output> {
     // Sorting makes this step deterministic (i.e. the same output is returned, regardless of the
     // original order of the input)
+    println!("Roots: {:#?}", roots);
     roots.sort();
 
     // Store the name of each package in `order` according to the graph's topological sort
     let mut order = Vec::new();
     let mut visited_packages = BTreeSet::default();
     let mut stack: Vec<_> = roots.into_iter().map(Action::ResolveAndBuild).collect();
-    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-    tracing::debug!("Stack: {stack:#?}");
-    tracing::debug!("Order: {order:#?}");
-    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
+
     while let Some(action) = stack.pop() {
-        tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-        tracing::debug!("Stack: {stack:#?}");
-        tracing::debug!("Order: {order:#?}");
-        tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
         match action {
             Action::Build(package_name) => {
                 order.push(package_name);
@@ -541,25 +504,17 @@ fn get_topological_order(
                         let dependencies: Vec<_> = p.build_dependencies().cloned().collect();
                         let dependencies =
                             apply_variant(&dependencies, &p.build_configuration).unwrap();
+
                         dependencies
                             .into_iter()
-                            .map(|dep| {
+                            .filter_map(|dep| {
                                 let name = dep.spec().name.clone().unwrap();
-                                PackageMeta {
-                                    name,
-                                    variant: p.build_configuration.variant.clone(),
-                                }
+                                find_dependency(name, &package_name.variant, packages)
                             })
                             .collect()
                     }
-                    None => {
-                        // This is a virtual package, so no real package was found for it
-                        continue;
-                    }
+                    None => Default::default(),
                 };
-
-                // Remove the edges that form cycles
-                deps.retain(|dep| !cycle_breaks.contains(&(package_name.clone(), dep.clone())));
 
                 // Sorting makes this step deterministic (i.e. the same output is returned, regardless of the
                 // original order of the input)
@@ -571,15 +526,16 @@ fn get_topological_order(
             }
         }
     }
-    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
-    tracing::debug!("Stack: {stack:#?}");
-    tracing::debug!("Order: {order:#?}");
-    tracing::debug!("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ");
 
     // Apply the order we just obtained
     let mut output = Vec::with_capacity(order.len());
     for name in order {
-        let package = packages.remove(&name).unwrap();
+        if let Some(package) = packages.remove(&name) {
+            output.push(package.clone());
+        }
+    }
+    // push remaining packages
+    for package in packages.values_mut() {
         output.push(package.clone());
     }
 
