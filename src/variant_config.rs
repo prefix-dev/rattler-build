@@ -89,6 +89,13 @@ pub enum VariantConfigError {
     NewParseError(#[from] ParsingError),
 }
 
+#[derive(Debug)]
+pub struct RecipeWithVariant {
+    pub recipe: Node,
+    pub variant: HashSet<String>,
+    pub pin_exact: HashSet<String>,
+}
+
 impl VariantConfig {
     /// This function loads multiple variant configuration files and merges them into a single
     /// configuration. The configuration files are loaded in the order they are provided in the
@@ -299,42 +306,44 @@ impl VariantConfig {
             let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
-            for _ in combinations {
-                let requirements = parsed_recipe.requirements();
-                let run_exports = parsed_recipe.build().run_exports();
-
-                // we do this in simple mode for now, but could later also do intersections
-                // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-                // says >=3.7 and then we only do 3.7-3.10)
-                requirements.all().for_each(|dep| match dep {
-                    Dependency::Spec(spec) => {
-                        if let Some(name) = &spec.name {
-                            let val = name.as_normalized().to_owned();
-                            used_variables.insert(val);
-                        }
-                    }
-                    Dependency::PinSubpackage(pin_sub) => {
-                        let val = pin_sub.pin_value().name.as_normalized().to_owned();
+            let requirements = parsed_recipe.requirements();
+            let run_exports = parsed_recipe.build().run_exports();
+            let mut exact_pins = HashSet::new();
+            // we do this in simple mode for now, but could later also do intersections
+            // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
+            // says >=3.7 and then we only do 3.7-3.10)
+            requirements.all().for_each(|dep| match dep {
+                Dependency::Spec(spec) => {
+                    if let Some(name) = &spec.name {
+                        let val = name.as_normalized().to_owned();
                         used_variables.insert(val);
                     }
-                    Dependency::Compiler(_) => (),
-                });
-
-                // We add all run exports that are `pin_subpackages` with `exact=true` in the
-                // variant for unique identification of the output.
-                run_exports.all().for_each(|dep| match dep {
-                    Dependency::Spec(_) => (),
-                    Dependency::PinSubpackage(pin_sub) => {
-                        let pin = pin_sub.pin_value();
-
-                        if pin.exact {
-                            let val = pin.name.as_normalized().to_owned();
-                            used_variables.insert(val);
-                        }
+                }
+                Dependency::PinSubpackage(pin_sub) => {
+                    let val = pin_sub.pin_value().name.as_normalized().to_owned();
+                    used_variables.insert(val.clone());
+                    if pin_sub.pin_value().exact {
+                        exact_pins.insert(val);
                     }
-                    Dependency::Compiler(_) => (),
-                });
-            }
+                }
+                Dependency::Compiler(_) => (),
+            });
+
+            // We add all run exports that are `pin_subpackages` with `exact=true` in the
+            // variant for unique identification of the output.
+            run_exports.all().for_each(|dep| match dep {
+                Dependency::Spec(_) => (),
+                Dependency::PinSubpackage(pin_sub) => {
+                    let pin = pin_sub.pin_value();
+
+                    if pin.exact {
+                        let val = pin.name.as_normalized().to_owned();
+                        used_variables.insert(val.clone());
+                        exact_pins.insert(val);
+                    }
+                }
+                Dependency::Compiler(_) => (),
+            });
 
             // special handling of CONDA_BUILD_SYSROOT
             if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
@@ -345,6 +354,13 @@ impl VariantConfig {
             used_variables.insert("target_platform".to_string());
             used_variables.insert("channel_targets".to_string());
 
+            let recipe_with_variants = RecipeWithVariant {
+                recipe: output.clone(),
+                variant: used_variables.clone(),
+                pin_exact: exact_pins,
+            };
+
+            println!("recipe_with_variants: {:#?}", recipe_with_variants);
             recipes.push((output, self.combinations(&used_variables)?));
         }
 

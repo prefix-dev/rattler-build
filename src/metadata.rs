@@ -426,24 +426,24 @@ fn find_cycles(
     visited.insert(node.clone());
     stack.push(node.clone());
 
-    if let Some(package) = packages.get(node) {
-        let dependencies: Vec<_> = package.dependencies().cloned().collect();
-        let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
-        let dependencies = dependencies.into_iter().map(|dep| {dep.spec().name});
+    // if let Some(package) = packages.get(node) {
+    //     let dependencies: Vec<_> = package.dependencies().cloned().collect();
+    //     let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
+    //     let dependencies = dependencies.into_iter().map(|dep| {dep.spec().name});
 
-        for dependency in dependencies {
-            if !visited.contains(&dependency) {
-                if let Some(cycle) = find_cycles(&dependency, packages, visited, stack) {
-                    return Some(cycle);
-                }
-            } else if stack.contains(&dependency) {
-                // Cycle detected. We clone the part of the stack that forms the cycle.
-                if let Some(pos) = stack.iter().position(|x| x == &dependency) {
-                    return Some(stack[pos..].to_vec());
-                }
-            }
-        }
-    }
+    //     for dependency in dependencies {
+    //         if !visited.contains(&dependency) {
+    //             if let Some(cycle) = find_cycles(&dependency, packages, visited, stack) {
+    //                 return Some(cycle);
+    //             }
+    //         } else if stack.contains(&dependency) {
+    //             // Cycle detected. We clone the part of the stack that forms the cycle.
+    //             if let Some(pos) = stack.iter().position(|x| x == &dependency) {
+    //                 return Some(stack[pos..].to_vec());
+    //             }
+    //         }
+    //     }
+    // }
 
     stack.pop();
     None
