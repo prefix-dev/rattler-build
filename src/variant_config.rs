@@ -341,6 +341,10 @@ impl VariantConfig {
             for used_var in used_vars {
                 if outputs_map.contains_key(used_var) {
                     let defining_output_node_index = *node_indices.get(used_var).unwrap();
+                    // self referencing is possible, but not a cycle
+                    if defining_output_node_index == output_node_index {
+                        continue;
+                    }
                     graph.add_edge(defining_output_node_index, output_node_index, ());
                 }
             }
@@ -409,10 +413,19 @@ impl VariantConfig {
         }
         // remove all existing outputs from all_variables
         let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
-        let all_variables = all_variables
+        let mut all_variables = all_variables
             .difference(&output_names)
             .cloned()
             .collect::<HashSet<_>>();
+
+        // special handling of CONDA_BUILD_SYSROOT
+        if all_variables.contains("c_compiler") || all_variables.contains("cxx_compiler") {
+            all_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+        }
+
+        // also always add `target_platform` and `channel_targets`
+        all_variables.insert("target_platform".to_string());
+        all_variables.insert("channel_targets".to_string());
 
         println!("All build dependencies: {:?}", all_variables);
 
@@ -461,8 +474,6 @@ impl VariantConfig {
                         let val = pin.name.as_normalized().to_owned();
                         if pin.exact {
                             exact_pins.insert(val);
-                        } else {
-                            used_variables.insert(val);
                         }
                     }
                     // Be explicit about the other cases, so we can add them later
@@ -505,12 +516,6 @@ impl VariantConfig {
 
                 // compute hash for the recipe
                 let hash = compute_buildstring(&used_filtered, parsed_recipe.build().noarch());
-
-                println!(
-                    "{}: variant: {:?}",
-                    parsed_recipe.package().name().as_normalized(),
-                    used_filtered
-                );
 
                 other_recipes.insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
