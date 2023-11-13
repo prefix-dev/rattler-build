@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -11,18 +10,21 @@ use crate::recipe::parser::{GitSource, GitUrl};
 
 use super::SourceError;
 
-// git clone file://C:/Users/user/../repo
 type RepoPath<'a> = &'a Path;
 
 pub fn fetch_repo<'a>(repo_path: RepoPath<'a>, refspecs: &[String]) -> Result<(), SourceError> {
     // might break on some platforms due to auth and ssh
     // especially ssh with password
     let refspecs_str = refspecs.into_iter().join(" ");
+    let cd = std::env::current_dir().ok();
+    _ = std::env::set_current_dir(repo_path);
     let output = Command::new("git")
         .args(["fetch", "origin", refspecs_str.as_str()])
         .output()
-        .map_err(|err| SourceError::ValidationFailed)?;
-
+        .map_err(|_err| SourceError::ValidationFailed)?;
+    // TODO(swarnimarun): get rid of assert
+    assert!(output.status.success());
+    _ = cd.map(|cd| std::env::set_current_dir(cd));
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
@@ -42,7 +44,7 @@ pub fn git_src(
     // ---
     // note: rust on windows handles some of these
 
-    println!(
+    tracing::info!(
         "git src:\n\tsource: {:?}\n\tcache_dir: {}\n\trecipe_dir: {}",
         source,
         cache_dir.display(),
@@ -55,7 +57,7 @@ pub fn git_src(
             .join(path)
             .canonicalize()?
             .file_name()
-            .unwrap()
+            .ok_or_else(|| SourceError::GitErrorStr("Failed to parse "))?
             .to_string_lossy()
             .to_string(),
     };
@@ -70,26 +72,23 @@ pub fn git_src(
             if cache_path.exists() {
                 fetch_repo(&cache_path, &[source.rev().to_string()])?;
             } else {
-                // TODO: Make configure the clone more so git_depth is also used.
-                if source.depth().is_some() {
-                    tracing::warn!("No git depth implemented yet, will continue with full clone");
+                let mut command = Command::new("git");
+                command.args([
+                    "clone",
+                    "--recursive",
+                    source.url().to_string().as_str(),
+                    cache_path.to_str().unwrap(),
+                ]);
+                if let Some(depth) = source.depth() {
+                    command.args(["--depth", depth.to_string().as_str()]);
                 }
-
-                let out = Command::new("git")
-                    .args([
-                        "clone",
-                        "--recursive",
-                        source.url().to_string().as_str(),
-                        cache_path.to_str().unwrap(),
-                    ])
+                let output = command
                     .output()
-                    .unwrap();
-                if !out.status.success() {
-                    return Err(SourceError::GitError(
-                        "failed to execute command".to_string(),
-                    ));
+                    .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
+                if !output.status.success() {
+                    return Err(SourceError::GitErrorStr("Git clone failed for source"));
                 }
-                if source.rev() == "HEAD" {
+                if source.rev() == "HEAD" || source.rev().trim().is_empty() {
                     // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                     return Ok(PathBuf::from(&cache_path));
                 }
@@ -103,33 +102,31 @@ pub fn git_src(
                     return Err(SourceError::FileSystemError(remove_error));
                 }
             }
-
-            // TODO(swarnim): remove unwrap
-            let path = std::fs::canonicalize(path).unwrap();
+            let path = std::fs::canonicalize(path).map_err(|e| {
+                tracing::error!("Path not found on system: {}", e);
+                SourceError::GitError(format!("{}: Path not found on system", e.to_string()))
+            })?;
 
             let mut command = Command::new("git");
-            let s = format!("{}/.git", path.display());
             command
                 .arg("clone")
                 .arg("--recursive")
-                .arg(format!("file://{}/.git", s).as_str())
+                .arg(format!("file://{}/.git", path.display()).as_str())
                 .arg(cache_path.as_os_str());
-            let output = command.output().unwrap();
-            // .map_err(|_| SourceError::ValidationFailed)?;
-            assert!(
-                output.status.success(),
-                "command: {:#?}\nstdout: {}\nstderr: {}",
-                command,
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-            // if !out.status.success() {
-            //     return Err(SourceError::GitError(
-            //         "failed to execute clone from file".to_string(),
-            //     ));
-            // }
+            if let Some(depth) = source.depth() {
+                command.args(["--depth", depth.to_string().as_str()]);
+            }
+            let output = command
+                .output()
+                .map_err(|_| SourceError::ValidationFailed)?;
+            if !output.status.success() {
+                tracing::error!("Command failed: {:?}", command);
+                return Err(SourceError::GitErrorStr(
+                    "failed to execute clone from file",
+                ));
+            }
 
-            if source.rev() == "HEAD" {
+            if source.rev() == "HEAD" || source.rev().trim().is_empty() {
                 // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                 return Ok(PathBuf::from(&cache_path));
             }
@@ -143,43 +140,40 @@ pub fn git_src(
         .current_dir(&cache_path)
         .args(["rev-parse", source.rev()])
         .output()
-        .map_err(|_| SourceError::GitError("git rev-parse failed".to_string()))?;
-    assert!(
-        output.status.success(),
-        "stdout: {}\nstderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+        .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
+    if !output.status.success() {
+        tracing::error!("Command failed: \"git\" \"rev-parse\" \"{}\"", source.rev());
+        return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
+    }
     let ref_git = String::from_utf8(output.stdout)
-        .map_err(|_| SourceError::GitError("failed to parse git rev".to_string()))?;
-    println!("cache_path = {}", cache_path.display());
+        .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?;
+    tracing::info!("cache_path = {}", cache_path.display());
+
     let mut command = Command::new("git");
     command
         .current_dir(&cache_path)
         .arg("checkout")
         .arg(ref_git.as_str().trim());
+
     let output = command
         .output()
-        .map_err(|_| SourceError::GitError("git checkout".to_string()))?;
-    assert!(
-        output.status.success(),
-        "command: {:#?}\nstdout: {}\nstderr: {}",
-        command,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+        .map_err(|_| SourceError::GitErrorStr("failed to execute git checkout"))?;
+
+    if !output.status.success() {
+        tracing::error!("Command failed: {:?}", command);
+        return Err(SourceError::GitErrorStr("failed to checkout for ref"));
+    }
 
     let output = Command::new("git")
         .current_dir(&cache_path)
         .args(["reset", "--hard"])
         .output()
-        .map_err(|_| SourceError::GitError("git reset --hard".to_string()))?;
-    assert!(
-        output.status.success(),
-        "stdout: {}\nstderr: {}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+        .map_err(|_| SourceError::GitErrorStr("failed to execute git reset"))?;
+
+    if !output.status.success() {
+        tracing::error!("Command failed: \"git\" \"reset\" \"--hard\"");
+        return Err(SourceError::GitErrorStr("failed to git reset"));
+    }
 
     tracing::info!("Checked out reference: '{}'", &source.rev());
 

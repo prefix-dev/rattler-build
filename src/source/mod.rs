@@ -7,8 +7,6 @@ use std::{
 use crate::recipe::parser::Source;
 
 pub mod copy_dir;
-// #[cfg(feature = "git")]
-// pub mod git_source;
 pub mod host_git_source;
 pub mod patch;
 pub mod url_source;
@@ -42,6 +40,9 @@ pub enum SourceError {
     #[error("Failed to run git command: {0}")]
     GitError(String),
 
+    #[error("Failed to run git command: {0}")]
+    GitErrorStr(&'static str),
+
     #[cfg(feature = "git")]
     #[error("Failed to run git command: {0}")]
     GitError(#[from] git2::Error),
@@ -66,9 +67,8 @@ pub async fn fetch_sources(
     for src in sources {
         match &src {
             Source::Git(src) => {
-                // we don't seem to notify user if this is run unnecessarily 
-                tracing::info!("Fetching source from git repo: {}", src.url()); 
-                let result = host_git_source::git_src(src, &cache_src, recipe_dir)?; 
+                tracing::info!("Fetching source from git repo: {}", src.url());
+                let result = host_git_source::git_src(src, &cache_src, recipe_dir)?;
                 let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
