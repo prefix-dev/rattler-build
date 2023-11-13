@@ -2437,6 +2437,7 @@ dependencies = [
  "goblin",
  "hex",
  "ignore",
+ "indexmap 2.1.0",
  "indicatif",
  "insta",
  "itertools",

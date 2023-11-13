@@ -383,7 +383,7 @@ impl VariantConfig {
             all_build_dependencies.extend(build_time_requirements);
         }
 
-        let all_build_dependencies = all_build_dependencies
+        let mut all_variables = all_build_dependencies
             .iter()
             .filter_map(|dep| match dep {
                 Dependency::Spec(spec) => {
@@ -401,8 +401,18 @@ impl VariantConfig {
             })
             .collect::<HashSet<_>>();
 
-        println!("All build dependencies: {:?}", all_build_dependencies);
+        // also add all used variables from the outputs
+        for (_, (_, _, used_vars)) in outputs_map.iter() {
+            all_variables.extend(used_vars.clone());
+        }
+        // remove all existing outputs from all_variables
+        let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
+        let all_variables = all_variables.difference(&output_names).cloned().collect::<HashSet<_>>();
 
+        println!("All build dependencies: {:?}", all_variables);
+
+        let combinations = self.combinations(&all_variables)?;
+        println!("Combinations: {:?}", combinations);
         // Then find all used variables from the each output recipe
         // let mut variants = Vec::new();
 
