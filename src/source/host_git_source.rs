@@ -45,11 +45,17 @@ pub fn git_src(
     // note: rust on windows handles some of these
 
     tracing::info!(
-        "git src:\n\tsource: {:?}\n\tcache_dir: {}\n\trecipe_dir: {}",
+        "git source: ({:?}) cache_dir: ({}) recipe_dir: ({})",
         source,
         cache_dir.display(),
         recipe_dir.display()
     );
+
+    // TODO: handle reporting for unavailability of git better, or perhaps pointing to git binary manually?
+    // currently a solution is to provide a `git` early in PATH with,
+    // ```bash
+    // export PATH="/path/to/git:$PATH"
+    // ```
 
     let filename = match &source.url() {
         GitUrl::Url(url) => url.path_segments().unwrap().last().unwrap().to_string(),
@@ -175,9 +181,38 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
+    // TODO(swarnimarun): does this need to be handled!
+    let _lfs_success = git_lfs_pull()?;
+
     tracing::info!("Checked out reference: '{}'", &source.rev());
 
     Ok(cache_path)
+}
+
+fn git_lfs_pull() -> Result<bool, SourceError> {
+    // verify lfs install
+    let mut command = Command::new("git");
+    command.args(["lfs", "install"]);
+    let output = command
+        .output()
+        .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
+    if !output.status.success() {
+        tracing::error!("`git lfs install` failed!");
+        return Ok(false);
+    }
+
+    // git lfs pull
+    let mut command = Command::new("git");
+    command.args(["lfs", "pull"]);
+    let output = command
+        .output()
+        .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
+    if !output.status.success() {
+        tracing::error!("`git lfs pull` failed!");
+        return Ok(false);
+    }
+
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -193,6 +228,20 @@ mod tests {
     fn test_host_git_source() {
         let cache_dir = std::env::temp_dir().join("rattler-build-test-git-source");
         let cases = vec![
+            (
+                GitSource::create(
+                    GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
+                    ),
+                    "main".to_owned(),
+                    None,
+                    vec![],
+                    None,
+                ),
+                "rattler-build",
+            ),
             (
                 GitSource::create(
                     GitUrl::Url(
@@ -221,20 +270,6 @@ mod tests {
                 ),
                 "rattler-build",
             ),
-            // (
-            //     GitSrc {
-            //         git_rev: GitRev::from_str("main").unwrap(),
-            //         git_depth: None,
-            //         patches: None,
-            //         git_url: GitUrl::Url(
-            //             "https://github.com/prefix-dev/rattler-build"
-            //                 .parse()
-            //                 .unwrap(),
-            //         ),
-            //         folder: None,
-            //     },
-            //     "rattler-build",
-            // ),
             (
                 GitSource::create(
                     GitUrl::Path("../rattler-build".parse().unwrap()),
