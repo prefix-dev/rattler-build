@@ -425,7 +425,6 @@ pub fn topological_sort(packages: Vec<Output>) -> Result<Vec<Output>, Topologica
     Ok(get_topological_order(roots, &mut all_packages))
 }
 
-
 /// Obtain the leaf packages (outermost packages) from a list of packages
 fn get_leafs(packages: &[Output]) -> Vec<PackageMeta> {
     let mut all_packages: BTreeSet<_> = packages.iter().map(|p| p.package_meta()).collect();
@@ -459,14 +458,20 @@ fn find_cycles(
     if let Some(package) = packages.get(node) {
         let dependencies: Vec<_> = package.dependencies().cloned().collect();
         let dependencies = apply_variant(&dependencies, &package.build_configuration).unwrap();
-        let dependencies = dependencies.into_iter().map(|dep| {dep.spec().name});
+        let dependencies = dependencies
+            .into_iter()
+            .flat_map(|dep| dep.spec().name.clone());
 
         for dependency in dependencies {
             if !visited.contains(&dependency) {
+                let dependency = PackageMeta {
+                    name: dependency,
+                    variant: package.build_configuration.variant.clone(),
+                };
                 if let Some(cycle) = find_cycles(&dependency, packages, visited, stack) {
                     return Some(cycle);
                 }
-            } else if stack.contains(&dependency) {
+            } else if stack.iter().any(|p| p == &dependency) {
                 // Cycle detected. We clone the part of the stack that forms the cycle.
                 if let Some(pos) = stack.iter().position(|x| x == &dependency) {
                     return Some(stack[pos..].to_vec());
