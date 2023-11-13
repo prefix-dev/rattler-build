@@ -6,6 +6,7 @@ use std::{
 };
 
 use miette::Diagnostic;
+use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
@@ -21,6 +22,7 @@ use crate::{
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
 };
+use petgraph::{algo::toposort, graph::DiGraph};
 
 type OutputVariantsTuple = (Node, Vec<BTreeMap<String, String>>);
 
@@ -87,6 +89,13 @@ pub enum VariantConfigError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     NewParseError(#[from] ParsingError),
+}
+
+struct RecipeWithVariant {
+    pub recipe: Node,
+    pub variant: BTreeMap<String, String>,
+    pub used_vars: HashSet<String>,
+    pub exact_pins: HashSet<String>,
 }
 
 impl VariantConfig {
@@ -278,6 +287,8 @@ impl VariantConfig {
 
     /// This finds all used variables in any dependency declarations, build, host, and run sections.
     /// As well as any used variables from Jinja functions to calculate the variants of this recipe.
+    ///
+    /// We also split the recipe into multiple outputs and topologically sort them (as well as deduplicate)
     pub fn find_variants(
         &self,
         recipe: &str,
@@ -288,51 +299,196 @@ impl VariantConfig {
         // First find all outputs from the recipe
         let outputs = find_outputs_from_src(recipe)?;
 
-        // Then find all used variables from the each output recipe
-        let mut recipes = Vec::with_capacity(outputs.len());
-        for output in outputs {
-            let mut used_variables = used_vars_from_expressions(recipe);
+        let mut outputs_map = HashMap::new();
+        // sort the outputs by topological order
+        for o in outputs.iter() {
+            // for the topological sort we only take into account `pin_subpackage` expressions
+            // in the recipe which are captured by the `used vars`
+            let used_vars = used_vars_from_expressions(&o);
+            let parsed_recipe = Recipe::from_node(&o, selector_config.clone())
+                .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
-            // now render all selectors with the used variables
-            let combinations = self.combinations(&used_variables)?;
+            if let Some(_) = outputs_map.insert(
+                parsed_recipe.package().name().as_normalized().to_string(),
+                (o, used_vars),
+            ) {
+                return Err(VariantError::DuplicateOutputs(
+                    parsed_recipe.package().name().as_normalized().to_string(),
+                ));
+            }
+        }
+
+        // now topologically sort the outputs and find cycles
+        let mut outputs = Vec::new();
+
+        // Create an empty directed graph
+        let mut graph = DiGraph::<_, ()>::new();
+
+        // Create a map from output names to node indices
+        let mut node_indices = HashMap::new();
+
+        // Add a node for each output
+        for (output, _) in &outputs_map {
+            let node_index = graph.add_node(output.clone());
+            node_indices.insert(output.clone(), node_index);
+        }
+
+        // Add an edge for each pair of outputs where one uses a variable defined by the other
+        for (output, (_, used_vars)) in &outputs_map {
+            let output_node_index = *node_indices.get(output).unwrap();
+            for used_var in used_vars {
+                if outputs_map.contains_key(used_var) {
+                    let defining_output_node_index = *node_indices.get(used_var).unwrap();
+                    graph.add_edge(defining_output_node_index, output_node_index, ());
+                }
+            }
+        }
+        // Perform a topological sort
+        match toposort(&graph, None) {
+            Ok(sorted_node_indices) => {
+                // Replace the original list of outputs with the sorted list
+                outputs = sorted_node_indices
+                    .into_iter()
+                    .map(|node_index| graph[node_index].clone())
+                    .collect();
+            }
+            Err(err) => {
+                // There is a cycle in the graph
+                return Err(VariantError::CycleInRecipeOutputs(
+                    graph[err.node_id()].clone(),
+                ));
+            }
+        }
+
+        println!("Sorted outputs: {:?}", outputs);
+
+        // sort the outputs map by the topological order
+        let outputs_map = outputs
+            .iter()
+            .enumerate()
+            .map(|(idx, name)| {
+                let (node, used_vars) = outputs_map[name].clone();
+                (idx, (name, node, used_vars))
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        let mut all_build_dependencies = Vec::new();
+        for (_, (name, output, used_vars)) in outputs_map.iter() {
+            println!("Output: {}: {:?}", name, used_vars);
 
             let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
-            for _ in combinations {
-                let requirements = parsed_recipe.requirements();
-
-                // we do this in simple mode for now, but could later also do intersections
-                // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-                // says >=3.7 and then we only do 3.7-3.10)
-                requirements.all().for_each(|dep| match dep {
-                    Dependency::Spec(spec) => {
-                        if let Some(name) = &spec.name {
-                            let val = name.as_normalized().to_owned();
-                            used_variables.insert(val);
-                        }
-                    }
-                    Dependency::PinSubpackage(pin_sub) => {
-                        let val = pin_sub.pin_value().name.as_normalized().to_owned();
-                        used_variables.insert(val);
-                    }
-                    Dependency::Compiler(_) => (),
-                })
-            }
-
-            // special handling of CONDA_BUILD_SYSROOT
-            if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler") {
-                used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-            }
-
-            // also always add `target_platform` and `channel_targets`
-            used_variables.insert("target_platform".to_string());
-            used_variables.insert("channel_targets".to_string());
-
-            recipes.push((output, self.combinations(&used_variables)?));
+            let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
+            all_build_dependencies.extend(build_time_requirements);
         }
 
-        Ok(recipes)
+        let all_build_dependencies = all_build_dependencies
+            .iter()
+            .filter_map(|dep| match dep {
+                Dependency::Spec(spec) => {
+                    // filter all matchspecs that override the version or build
+                    let is_simple = spec.version.is_none() && spec.build.is_none();
+                    if is_simple && spec.name.is_some() {
+                        spec.name
+                            .as_ref()
+                            .and_then(|name| name.as_normalized().to_string().into())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .collect::<HashSet<_>>();
+
+        println!("All build dependencies: {:?}", all_build_dependencies);
+
+        // Then find all used variables from the each output recipe
+        // let mut variants = Vec::new();
+
+        // for output in outputs {
+        //     let mut used_variables = used_vars_from_expressions(&output);
+
+        //     // special handling of CONDA_BUILD_SYSROOT
+        //     if used_variables.contains("c_compiler") ||
+        //         used_variables.contains("cxx_compiler") {
+        //         used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+        //     }
+
+        //     // also always add `target_platform` and `channel_targets`
+        //     used_variables.insert("target_platform".to_string());
+        //     used_variables.insert("channel_targets".to_string());
+
+        //     // now render all selectors with the used variables
+        //     let combinations = self.combinations(&used_variables)?;
+
+        //     for c in combinations {
+        //         let selector_config_with_variant = selector_config.new_with_variant(c.clone());
+
+        //         let mut recipe_with_variant = RecipeWithVariant {
+        //             recipe: output.clone(),
+        //             variant: c.clone(),
+        //             used_vars: used_variables.clone(),
+        //             exact_pins: HashSet::new(),
+        //         };
+
+        //         let parsed_recipe = Recipe::from_node(&output, selector_config_with_variant)
+        //             .map_err(|err| ParsingError::from_partial(recipe, err))?;
+
+        //         let requirements = parsed_recipe.requirements();
+
+        //         // we do this in simple mode for now, but could later also do intersections
+        //         // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
+        //         // says >=3.7 and then we only do 3.7-3.10)
+        //         requirements
+        //             .build
+        //             .iter()
+        //             .chain(requirements.host.iter())
+        //             .for_each(|dep| match dep {
+        //                 Dependency::Spec(spec) => {
+        //                     if let Some(name) = &spec.name {
+        //                         let val = name.as_normalized().to_owned();
+        //                         recipe_with_variant.used_vars.insert(val);
+        //                     }
+        //                 }
+        //                 Dependency::PinSubpackage(pin_sub) => {
+        //                     let pin = pin_sub.pin_value();
+        //                     let val = pin.name.as_normalized().to_owned();
+        //                     if pin.exact {
+        //                         recipe_with_variant.exact_pins.insert(val);
+        //                     } else {
+        //                         recipe_with_variant.used_vars.insert(val);
+        //                     }
+        //                 }
+        //                 // Be explicit about the other cases, so we can add them later
+        //                 Dependency::Compiler(_) => (),
+        //             });
+
+        //         requirements.run.iter()
+        //             .chain(requirements.run_constrained.iter())
+        //             .chain(parsed_recipe.build().run_exports().all())
+        //             .for_each(|dep| match dep {
+        //                 Dependency::PinSubpackage(pin_sub) => {
+        //                     let pin = pin_sub.pin_value();
+        //                     let val = pin.name.as_normalized().to_owned();
+        //                     if pin.exact {
+        //                         recipe_with_variant.exact_pins.insert(val);
+        //                     } else {
+        //                         recipe_with_variant.used_vars.insert(val);
+        //                     }
+        //                 },
+        //                 _ => ()
+        //             });
+
+        //         println!("{}: variant: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.variant);
+        //         println!("{}: extra used vars: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.used_vars);
+        //         println!("{}: exact pins: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.exact_pins);
+
+        //         variants.push(recipe_with_variant);
+        //     }
+        // }
+
+        Ok(vec![])
     }
 }
 
@@ -415,6 +571,12 @@ pub enum VariantError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     RecipeParseError(#[from] ParsingError),
+
+    #[error("Duplicate outputs: {0}")]
+    DuplicateOutputs(String),
+
+    #[error("Found a cycle in the recipe outputs: {0}")]
+    CycleInRecipeOutputs(String),
 }
 
 fn find_combinations(

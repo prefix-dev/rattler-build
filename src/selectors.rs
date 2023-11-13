@@ -56,6 +56,13 @@ impl SelectorConfig {
 
         context
     }
+
+    pub fn new_with_variant(&self, variant: BTreeMap<String, String>) -> Self {
+        Self {
+            variant,
+            ..self.clone()
+        }
+    }
 }
 
 impl Default for SelectorConfig {

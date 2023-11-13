@@ -292,6 +292,15 @@ impl RunExports {
             && self.weak_constrains.is_empty()
     }
 
+    pub fn all(&self) -> impl Iterator<Item = &Dependency> {
+        self.noarch
+            .iter()
+            .chain(self.strong.iter())
+            .chain(self.strong_constrains.iter())
+            .chain(self.weak.iter())
+            .chain(self.weak_constrains.iter())
+    }
+
     /// Get the noarch run exports.
     pub fn noarch(&self) -> &[Dependency] {
         self.noarch.as_slice()
