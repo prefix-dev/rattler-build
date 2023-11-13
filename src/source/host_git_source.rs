@@ -12,10 +12,10 @@ use super::SourceError;
 
 type RepoPath<'a> = &'a Path;
 
-pub fn fetch_repo<'a>(repo_path: RepoPath<'a>, refspecs: &[String]) -> Result<(), SourceError> {
+pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), SourceError> {
     // might break on some platforms due to auth and ssh
     // especially ssh with password
-    let refspecs_str = refspecs.into_iter().join(" ");
+    let refspecs_str = refspecs.iter().join(" ");
     let cd = std::env::current_dir().ok();
     _ = std::env::set_current_dir(repo_path);
     let output = Command::new("git")
@@ -24,7 +24,7 @@ pub fn fetch_repo<'a>(repo_path: RepoPath<'a>, refspecs: &[String]) -> Result<()
         .map_err(|_err| SourceError::ValidationFailed)?;
     // TODO(swarnimarun): get rid of assert
     assert!(output.status.success());
-    _ = cd.map(|cd| std::env::set_current_dir(cd));
+    _ = cd.map(std::env::set_current_dir);
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
@@ -104,7 +104,7 @@ pub fn git_src(
             }
             let path = std::fs::canonicalize(path).map_err(|e| {
                 tracing::error!("Path not found on system: {}", e);
-                SourceError::GitError(format!("{}: Path not found on system", e.to_string()))
+                SourceError::GitError(format!("{}: Path not found on system", e))
             })?;
 
             let mut command = Command::new("git");
