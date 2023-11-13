@@ -2382,8 +2382,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "471ae55a1f1479c4f3624e768cd57ff19633450cb02a72b605be52ce36d30beb"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2481,8 +2480,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fedba16c1306586771235f430fe9d39c65837231e1fd7c40b4a6ef3d6e7419c0"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "chrono",
  "fxhash",
@@ -2510,8 +2508,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ba0c817d1dc9a34eb2a8c558756f6a3debb0751607af5c932405c6030f3a2e2"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "blake2",
  "digest",
@@ -2526,8 +2523,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01e09cc8e9f90e4c6a6d4159039820277201c57e822e5984c3f8680b5ae3da4f"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "quote",
  "syn 2.0.38",
@@ -2536,8 +2532,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c168c9fb22fd34c33d1a0f3a2edd07e1957cc27c5a4c42d7af638d0d80c58201"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2556,8 +2551,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd805f177bf7fa04135c778e10fb41b379a5d43cbcaac4c1ff0a9daa9afc0838"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "bzip2",
  "chrono",
@@ -2580,8 +2574,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d4e511f039c29984f3f6e81c4364c1ed39bc4b1d17ef5227baabf2f82766ce6"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2619,8 +2612,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fcbc1a2c3786639b2ce3f1dc6a93b478f60badea41dfb655aec7a361ccc145f"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.1.0",
@@ -2637,8 +2629,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0961c67e7e86cf3c183191d464ab3c6d0d2ff2cd3f2436be4221d8f6559ef045"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2657,8 +2648,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "045eebda0ff7d83904a41c74be8865668b3b6695e131855515f338f787b145b8"
+source = "git+https://github.com/mamba-org/rattler?branch=main#b66d75344e0fccdbaf73d24a7628d17a7b42c3e7"
 dependencies = [
  "cfg-if",
  "libloading",
@@ -2891,6 +2881,17 @@ dependencies = [
  "rustc_version",
  "syn 2.0.38",
  "unicode-ident",
+]
+
+[[package]]
+name = "rust-tests"
+version = "0.1.0"
+dependencies = [
+ "glob",
+ "itertools",
+ "rattler_package_streaming",
+ "serde_json",
+ "sha1",
 ]
 
 [[package]]

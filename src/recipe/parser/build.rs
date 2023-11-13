@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, str::FromStr};
 
 use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     _partialerror,
@@ -18,7 +18,7 @@ use super::Dependency;
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Build {
     /// The build number is a number that should be incremented every time the recipe is built.
     pub(super) number: u64,
@@ -172,7 +172,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
 }
 
 /// Extra environment variables to set during the build script execution
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ScriptEnv {
     /// Environments variables to leak into the build environment from the host system.
     /// During build time these variables are recorded and stored in the package output.
@@ -268,7 +268,7 @@ impl TryConvertNode<ScriptEnv> for RenderedMappingNode {
 }
 
 /// Run exports are applied to downstream packages that depend on this package.
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports are the only ones looked at when building noarch packages.
     pub(super) noarch: Vec<Dependency>,

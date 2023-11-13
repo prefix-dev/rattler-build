@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     _partialerror,
@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// Define tests in your recipe that are executed after successfully building the package.
-#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Test {
     /// Try importing a python module as a sanity check
     imports: Vec<String>,

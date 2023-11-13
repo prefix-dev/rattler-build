@@ -16,7 +16,7 @@ use rattler_shell::shell;
 use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
-use crate::render::resolved_dependencies::resolve_dependencies;
+use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
 use crate::test::TestConfiguration;
 use crate::{index, test, tool_configuration};
@@ -179,15 +179,26 @@ pub async fn run_build(
         .into_diagnostic()?;
     }
 
-    let finalized_dependencies = resolve_dependencies(output, &channels, tool_configuration)
-        .await
-        .into_diagnostic()?;
+    let output = if output.finalized_dependencies.is_some() {
+        tracing::info!("Using finalized dependencies");
 
-    // The output with the resolved dependencies
-    let output = Output {
-        finalized_dependencies: Some(finalized_dependencies),
-        recipe: output.recipe.clone(),
-        build_configuration: output.build_configuration.clone(),
+        // The output already has the finalized dependencies, so we can just use it as-is
+        install_environments(output, tool_configuration.clone())
+            .await
+            .into_diagnostic()?;
+        output.clone()
+    } else {
+        let finalized_dependencies =
+            resolve_dependencies(output, &channels, tool_configuration.clone())
+                .await
+                .into_diagnostic()?;
+
+        // The output with the resolved dependencies
+        Output {
+            finalized_dependencies: Some(finalized_dependencies),
+            recipe: output.recipe.clone(),
+            build_configuration: output.build_configuration.clone(),
+        }
     };
 
     let build_script = get_conda_build_script(&output, directories).into_diagnostic()?;
@@ -240,7 +251,7 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    if !output.build_configuration.no_clean {
+    if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
@@ -262,14 +273,14 @@ pub async fn run_build(
         &TestConfiguration {
             test_prefix: test_dir.clone(),
             target_platform: Some(output.build_configuration.target_platform),
-            keep_test_prefix: output.build_configuration.no_clean,
+            keep_test_prefix: tool_configuration.no_clean,
             channels,
         },
     )
     .await
     .into_diagnostic()?;
 
-    if !output.build_configuration.no_clean {
+    if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 

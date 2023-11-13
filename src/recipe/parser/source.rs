@@ -1,7 +1,8 @@
 use std::{fmt, path::PathBuf, str::FromStr};
 
-use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash};
+use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use url::Url;
 
 use crate::{
@@ -15,8 +16,7 @@ use crate::{
 };
 
 /// Source information.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Source {
     Git(GitSource),
     Url(UrlSource),
@@ -232,7 +232,7 @@ impl fmt::Display for GitUrl {
 
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     url: Url,
@@ -302,7 +302,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches` and `folder`"
+                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `folder`"
                     ))
                 }
             }
@@ -327,21 +327,12 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 }
 
 /// Checksum information.
-#[derive(Debug, Clone, PartialEq)]
+#[serde_as]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Checksum {
-    Sha256(Sha256Hash),
-    Md5(Md5Hash),
+    Sha256(#[serde_as(as = "SerializableHash::<rattler_digest::Sha256>")] Sha256Hash),
+    Md5(#[serde_as(as = "SerializableHash::<rattler_digest::Md5>")] Md5Hash),
 }
-
-impl Serialize for Checksum {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self {
-            Checksum::Sha256(sha256) => hex::encode(sha256).to_lowercase().serialize(serializer),
-            Checksum::Md5(md5) => hex::encode(md5).to_lowercase().serialize(serializer),
-        }
-    }
-}
-
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

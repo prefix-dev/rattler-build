@@ -16,32 +16,53 @@ use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
     MatchSpec, PackageName, Platform, RepoDataRecord, Version, VersionSpec,
 };
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::solver::create_environment;
 use crate::recipe::parser::Dependency;
+use crate::render::solver::install_packages;
+use serde_with::{serde_as, DisplayFromStr};
 
 /// A enum to keep track of where a given Dependency comes from
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
     /// from the variant config
-    Variant { spec: MatchSpec, variant: String },
+    Variant {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+        variant: String,
+    },
     /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-    Compiler { spec: MatchSpec },
+    Compiler {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
-    PinSubpackage { spec: MatchSpec },
+    PinSubpackage {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
-    PinCompatible { spec: MatchSpec },
+    PinCompatible {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a special run_exports dependency from another package
     RunExports {
+        #[serde_as(as = "DisplayFromStr")]
         spec: MatchSpec,
         from: String,
         source_package: String,
     },
     /// This is a regular dependency of the package without any modifications
-    Raw { spec: MatchSpec },
+    Raw {
+        #[serde_as(as = "DisplayFromStr")]
+        spec: MatchSpec,
+    },
     /// This is a transient dependency of the package, which is not a direct dependency
     /// of the package, but is a dependency of a dependency
     Transient,
@@ -78,7 +99,7 @@ impl DependencyInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizedRunDependencies {
     pub depends: Vec<DependencyInfo>,
     pub constrains: Vec<DependencyInfo>,
@@ -86,7 +107,7 @@ pub struct FinalizedRunDependencies {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
     pub resolved: Vec<RepoDataRecord>,
@@ -175,7 +196,7 @@ impl Display for ResolvedDependencies {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizedDependencies {
     pub build: Option<ResolvedDependencies>,
     pub host: Option<ResolvedDependencies>,
@@ -252,14 +273,14 @@ pub fn apply_variant(
                         panic!("Noarch packages cannot have compilers");
                     }
 
-                    let compiler_variant = format!("{}_compiler", compiler.without_prefix());
+                    let compiler_variant = format!("{}_compiler", compiler.language());
                     let compiler_name = variant
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
                             // defaults
                             if target_platform.is_linux() {
-                                let default_compiler = match compiler.without_prefix() {
+                                let default_compiler = match compiler.language() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -267,13 +288,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.without_prefix() {
+                                let default_compiler = match compiler.language() {
                                     "c" => "clang".to_string(),
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
@@ -281,13 +302,13 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
                                 default_compiler
                             } else if target_platform.is_windows() {
-                                let default_compiler = match compiler.as_str() {
+                                let default_compiler = match compiler.language() {
                                     // note with conda-build, these are dependent on the python version
                                     // we could also check the variant for the python version here!
                                     "c" => "vs2017".to_string(),
@@ -297,7 +318,7 @@ pub fn apply_variant(
                                     _ => {
                                         panic!(
                                             "No default value for compiler: {}",
-                                            compiler.as_str()
+                                            compiler.language()
                                         )
                                     }
                                 };
@@ -305,7 +326,7 @@ pub fn apply_variant(
                             } else {
                                 panic!(
                                     "Could not find compiler ({}) configuration for platform: {target_platform}",
-                                    compiler.as_str(),
+                                    compiler.language(),
                                 )
                             }
                         });
@@ -353,6 +374,39 @@ fn collect_run_exports_from_env(
         }
     }
     Ok(run_exports)
+}
+
+pub async fn install_environments(
+    output: &Output,
+    tool_configuration: tool_configuration::Configuration,
+) -> Result<(), ResolveError> {
+    let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
+
+    let dependencies = output.finalized_dependencies.as_ref().unwrap();
+
+    if let Some(build_deps) = dependencies.build.as_ref() {
+        install_packages(
+            &build_deps.resolved,
+            &output.build_configuration.build_platform,
+            &output.build_configuration.directories.build_prefix,
+            &cache_dir,
+            &tool_configuration,
+        )
+        .await?;
+    }
+
+    if let Some(host_deps) = dependencies.host.as_ref() {
+        install_packages(
+            &host_deps.resolved,
+            &output.build_configuration.host_platform,
+            &output.build_configuration.directories.host_prefix,
+            &cache_dir,
+            &tool_configuration,
+        )
+        .await?;
+    }
+
+    Ok(())
 }
 
 /// This function resolves the dependencies of a recipe.

@@ -299,6 +299,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let global_configuration = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
+        no_clean: config.keep_test_prefix,
     };
 
     println!("Creating test environment in {:?}", prefix);

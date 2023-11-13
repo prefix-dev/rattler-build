@@ -3,7 +3,7 @@
 //! This stage takes the [`RawRecipe`] from the first stage and parses it into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use minijinja::Value;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     _partialerror,
@@ -37,7 +37,7 @@ pub use self::{
 use super::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
     package: Package,
     source: Vec<Source>,

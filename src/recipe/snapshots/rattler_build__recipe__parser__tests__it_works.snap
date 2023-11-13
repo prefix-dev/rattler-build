@@ -102,7 +102,7 @@ Recipe {
         build: [
             Compiler(
                 Compiler {
-                    compiler: "__COMPILER cxx",
+                    language: "cxx",
                 },
             ),
             Spec(
