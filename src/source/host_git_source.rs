@@ -23,7 +23,7 @@ pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), Source
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
     // TODO(swarnimarun): get rid of assert
-    assert!(output.status.success());
+    assert!(output.status.success(), "{:#?}", output);
     _ = cd.map(std::env::set_current_dir);
     tracing::debug!("Repository fetched successfully!");
     Ok(())
@@ -58,12 +58,14 @@ pub fn git_src(
     // ```
 
     let filename = match &source.url() {
-        GitUrl::Url(url) => url.path_segments().unwrap().last().unwrap().to_string(),
+        GitUrl::Url(url) => (|| Some(url.path_segments()?.last()?.to_string()))()
+            .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
         GitUrl::Path(path) => recipe_dir
             .join(path)
             .canonicalize()?
             .file_name()
-            .ok_or_else(|| SourceError::GitErrorStr("Failed to parse "))?
+            // canonicalized paths shouldn't end with ..
+            .unwrap()
             .to_string_lossy()
             .to_string(),
     };
@@ -108,16 +110,18 @@ pub fn git_src(
                     return Err(SourceError::FileSystemError(remove_error));
                 }
             }
-            let path = std::fs::canonicalize(path).map_err(|e| {
+            // git doesn't support UNC paths, hence we can't use std::fs::canonicalize
+            let path = dunce::canonicalize(path).map_err(|e| {
                 tracing::error!("Path not found on system: {}", e);
                 SourceError::GitError(format!("{}: Path not found on system", e))
             })?;
 
+            let path = path.to_string_lossy();
             let mut command = Command::new("git");
             command
                 .arg("clone")
                 .arg("--recursive")
-                .arg(format!("file://{}/.git", path.display()).as_str())
+                .arg(format!("file://{}/.git", path).as_str())
                 .arg(cache_path.as_os_str());
             if let Some(depth) = source.depth() {
                 command.args(["--depth", depth.to_string().as_str()]);
@@ -217,16 +221,16 @@ fn git_lfs_pull() -> Result<bool, SourceError> {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-
     use crate::{
         recipe::parser::{GitSource, GitUrl},
         source::host_git_source::git_src,
     };
 
+    #[tracing_test::traced_test]
     #[test]
     fn test_host_git_source() {
-        let cache_dir = std::env::temp_dir().join("rattler-build-test-git-source");
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
         let cases = vec![
             (
                 GitSource::create(
@@ -285,7 +289,9 @@ mod tests {
             let path = git_src(
                 &source,
                 cache_dir.as_ref(),
-                env::current_dir().unwrap().as_ref(),
+                // TODO: this test assumes current dir is the root folder of the project which may
+                // not be necessary for local runs.
+                std::env::current_dir().unwrap().as_ref(),
             )
             .unwrap();
             assert_eq!(
