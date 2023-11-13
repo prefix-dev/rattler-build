@@ -327,6 +327,36 @@ struct PackageMeta {
     variant: BTreeMap<String, String>,
 }
 
+impl PartialEq<PackageName> for PackageMeta {
+    fn eq(&self, other: &PackageName) -> bool {
+        self.name == *other
+    }
+}
+
+impl PartialEq<PackageMeta> for PackageName {
+    fn eq(&self, other: &PackageMeta) -> bool {
+        *self == other.name
+    }
+}
+
+impl PartialOrd<PackageName> for PackageMeta {
+    fn partial_cmp(&self, other: &PackageName) -> Option<std::cmp::Ordering> {
+        Some(self.name.cmp(other))
+    }
+}
+
+impl PartialOrd<PackageMeta> for PackageName {
+    fn partial_cmp(&self, other: &PackageMeta) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(&other.name))
+    }
+}
+
+impl borrow::Borrow<PackageName> for PackageMeta {
+    fn borrow(&self) -> &PackageName {
+        &self.name
+    }
+}
+
 impl Output {
     /// Returns the package metadata for this output
     fn package_meta(&self) -> PackageMeta {
