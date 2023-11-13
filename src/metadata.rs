@@ -1,4 +1,5 @@
 //! All the metadata that makes up a recipe file
+use core::borrow;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{self, Display, Formatter},
@@ -536,7 +537,7 @@ fn get_topological_order(
 
                 let mut deps: Vec<_> = match &packages.get(&package_name) {
                     Some(p) => {
-                        let dependencies: Vec<_> = p.build_dependencies().cloned().collect();
+                        let dependencies: Vec<_> = p.dependencies().cloned().collect();
                         let dependencies =
                             apply_variant(&dependencies, &p.build_configuration).unwrap();
 
