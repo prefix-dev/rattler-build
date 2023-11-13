@@ -19,6 +19,7 @@ use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
 use rattler_build::{
     build::run_build,
+    hash::compute_buildstring,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
@@ -28,7 +29,6 @@ use rattler_build::{
 };
 
 mod console_utils;
-mod hash;
 mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
@@ -282,7 +282,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     for (output, variants) in outputs_and_variants {
         for variant in variants {
-            let hash = hash::compute_buildstring(&variant, &noarch);
+            let hash = compute_buildstring(&variant, &noarch);
 
             let selector_config = SelectorConfig {
                 variant: variant.clone(),
@@ -335,7 +335,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                         _ => target_platform,
                     },
                     build_platform: Platform::current(),
-                    hash: hash::compute_buildstring(&variant, &noarch_type),
+                    hash: compute_buildstring(&variant, &noarch_type),
                     variant: variant.clone(),
                     directories: Directories::create(
                         name.as_normalized(),

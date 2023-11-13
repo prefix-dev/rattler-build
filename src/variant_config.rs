@@ -5,6 +5,7 @@ use std::{
     path::PathBuf,
 };
 
+use indexmap::{IndexMap, IndexSet};
 use miette::Diagnostic;
 use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
@@ -13,6 +14,7 @@ use thiserror::Error;
 
 use crate::{
     _partialerror,
+    hash::compute_buildstring,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -373,7 +375,7 @@ impl VariantConfig {
             .collect::<BTreeMap<_, _>>();
 
         let mut all_build_dependencies = Vec::new();
-        for (_, (name, output, used_vars)) in outputs_map.iter() {
+        for (_, (name, output, used_vars)) in outputs_map.clone().iter() {
             println!("Output: {}: {:?}", name, used_vars);
 
             let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
@@ -407,96 +409,127 @@ impl VariantConfig {
         }
         // remove all existing outputs from all_variables
         let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
-        let all_variables = all_variables.difference(&output_names).cloned().collect::<HashSet<_>>();
+        let all_variables = all_variables
+            .difference(&output_names)
+            .cloned()
+            .collect::<HashSet<_>>();
 
         println!("All build dependencies: {:?}", all_variables);
 
         let combinations = self.combinations(&all_variables)?;
         println!("Combinations: {:?}", combinations);
+
         // Then find all used variables from the each output recipe
         // let mut variants = Vec::new();
+        let mut recipes = IndexSet::new();
+        for combination in combinations {
+            let mut other_recipes =
+                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
 
-        // for output in outputs {
-        //     let mut used_variables = used_vars_from_expressions(&output);
+            for (_, (name, output, used_vars)) in outputs_map.iter() {
+                let mut used_variables = used_vars.clone();
+                let mut exact_pins = HashSet::new();
 
-        //     // special handling of CONDA_BUILD_SYSROOT
-        //     if used_variables.contains("c_compiler") ||
-        //         used_variables.contains("cxx_compiler") {
-        //         used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-        //     }
+                // special handling of CONDA_BUILD_SYSROOT
+                if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler")
+                {
+                    used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+                }
 
-        //     // also always add `target_platform` and `channel_targets`
-        //     used_variables.insert("target_platform".to_string());
-        //     used_variables.insert("channel_targets".to_string());
+                // also always add `target_platform` and `channel_targets`
+                used_variables.insert("target_platform".to_string());
+                used_variables.insert("channel_targets".to_string());
 
-        //     // now render all selectors with the used variables
-        //     let combinations = self.combinations(&used_variables)?;
+                let selector_config_with_variant =
+                    selector_config.new_with_variant(combination.clone());
 
-        //     for c in combinations {
-        //         let selector_config_with_variant = selector_config.new_with_variant(c.clone());
+                let parsed_recipe = Recipe::from_node(&output, selector_config_with_variant)
+                    .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
-        //         let mut recipe_with_variant = RecipeWithVariant {
-        //             recipe: output.clone(),
-        //             variant: c.clone(),
-        //             used_vars: used_variables.clone(),
-        //             exact_pins: HashSet::new(),
-        //         };
+                // find the variables that were actually used in the recipe and that count towards the hash
+                let requirements = parsed_recipe.requirements();
 
-        //         let parsed_recipe = Recipe::from_node(&output, selector_config_with_variant)
-        //             .map_err(|err| ParsingError::from_partial(recipe, err))?;
+                requirements.build_time().for_each(|dep| match dep {
+                    Dependency::Spec(spec) => {
+                        if let Some(name) = &spec.name {
+                            let val = name.as_normalized().to_owned();
+                            used_variables.insert(val);
+                        }
+                    }
+                    Dependency::PinSubpackage(pin_sub) => {
+                        let pin = pin_sub.pin_value();
+                        let val = pin.name.as_normalized().to_owned();
+                        if pin.exact {
+                            exact_pins.insert(val);
+                        } else {
+                            used_variables.insert(val);
+                        }
+                    }
+                    // Be explicit about the other cases, so we can add them later
+                    Dependency::Compiler(_) => (),
+                });
 
-        //         let requirements = parsed_recipe.requirements();
+                // actually used vars
+                let mut used_filtered = combination
+                    .clone()
+                    .into_iter()
+                    .filter(|(k, _)| used_variables.contains(k))
+                    .collect::<BTreeMap<_, _>>();
 
-        //         // we do this in simple mode for now, but could later also do intersections
-        //         // with the real matchspec (e.g. build variants for python 3.1-3.10, but recipe
-        //         // says >=3.7 and then we only do 3.7-3.10)
-        //         requirements
-        //             .build
-        //             .iter()
-        //             .chain(requirements.host.iter())
-        //             .for_each(|dep| match dep {
-        //                 Dependency::Spec(spec) => {
-        //                     if let Some(name) = &spec.name {
-        //                         let val = name.as_normalized().to_owned();
-        //                         recipe_with_variant.used_vars.insert(val);
-        //                     }
-        //                 }
-        //                 Dependency::PinSubpackage(pin_sub) => {
-        //                     let pin = pin_sub.pin_value();
-        //                     let val = pin.name.as_normalized().to_owned();
-        //                     if pin.exact {
-        //                         recipe_with_variant.exact_pins.insert(val);
-        //                     } else {
-        //                         recipe_with_variant.used_vars.insert(val);
-        //                     }
-        //                 }
-        //                 // Be explicit about the other cases, so we can add them later
-        //                 Dependency::Compiler(_) => (),
-        //             });
+                // exact pins
+                used_filtered.extend(exact_pins.into_iter().map(|k| {
+                    (
+                        k.clone(),
+                        format!("{} {}", other_recipes[&k].0, other_recipes[&k].1),
+                    )
+                }));
 
-        //         requirements.run.iter()
-        //             .chain(requirements.run_constrained.iter())
-        //             .chain(parsed_recipe.build().run_exports().all())
-        //             .for_each(|dep| match dep {
-        //                 Dependency::PinSubpackage(pin_sub) => {
-        //                     let pin = pin_sub.pin_value();
-        //                     let val = pin.name.as_normalized().to_owned();
-        //                     if pin.exact {
-        //                         recipe_with_variant.exact_pins.insert(val);
-        //                     } else {
-        //                         recipe_with_variant.used_vars.insert(val);
-        //                     }
-        //                 },
-        //                 _ => ()
-        //             });
+                requirements
+                    .run
+                    .iter()
+                    .chain(requirements.run_constrained.iter())
+                    .chain(parsed_recipe.build().run_exports().all())
+                    .for_each(|dep| match dep {
+                        Dependency::PinSubpackage(pin_sub) => {
+                            let pin = pin_sub.pin_value();
+                            if pin.exact {
+                                let val = pin.name.as_normalized().to_owned();
+                                used_filtered.insert(
+                                    val.clone(),
+                                    format!("{} {}", other_recipes[&val].0, other_recipes[&val].1),
+                                );
+                            }
+                        }
+                        _ => (),
+                    });
 
-        //         println!("{}: variant: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.variant);
-        //         println!("{}: extra used vars: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.used_vars);
-        //         println!("{}: exact pins: {:?}", parsed_recipe.package().name().as_normalized(), recipe_with_variant.exact_pins);
+                // compute hash for the recipe
+                let hash = compute_buildstring(&used_filtered, parsed_recipe.build().noarch());
 
-        //         variants.push(recipe_with_variant);
-        //     }
-        // }
+                println!(
+                    "{}: variant: {:?}",
+                    parsed_recipe.package().name().as_normalized(),
+                    used_filtered
+                );
+
+                other_recipes.insert(
+                    parsed_recipe.package().name().as_normalized().to_string(),
+                    (
+                        parsed_recipe.package().version().to_string(),
+                        hash.clone(),
+                        used_filtered.clone(),
+                    ),
+                );
+
+                let version = parsed_recipe.package().version().to_string();
+
+                recipes.insert((name, version, hash, output, used_filtered));
+            }
+        }
+
+        for r in recipes.iter() {
+            println!("Recipe: {} {} {} {:?}", r.0, r.1, r.2, r.4);
+        }
 
         Ok(vec![])
     }
