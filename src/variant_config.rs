@@ -503,10 +503,15 @@ impl VariantConfig {
                             let pin = pin_sub.pin_value();
                             if pin.exact {
                                 let val = pin.name.as_normalized().to_owned();
-                                used_filtered.insert(
-                                    val.clone(),
-                                    format!("{} {}", other_recipes[&val].0, other_recipes[&val].1),
-                                );
+                                if val != **name {
+                                    used_filtered.insert(
+                                        val.clone(),
+                                        format!(
+                                            "{} {}",
+                                            other_recipes[&val].0, other_recipes[&val].1
+                                        ),
+                                    );
+                                }
                             }
                         }
                     });
