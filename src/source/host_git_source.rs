@@ -175,14 +175,12 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
-    if git_lfs_required(&cache_path) {
-        if !git_lfs_pull()? {
-            // failed to do lfs pull, likely lfs not installed
-            // TODO: should we consider erroring out?
-            // return Err(SourceError::GitErrorStr(
-            //     "failed to perform lfs pull, possibly git-lfs not installed",
-            // ));
-        }
+    if git_lfs_required(&cache_path) && !git_lfs_pull()? {
+        // failed to do lfs pull, likely lfs not installed
+        // TODO: should we consider erroring out?
+        // return Err(SourceError::GitErrorStr(
+        //     "failed to perform lfs pull, possibly git-lfs not installed",
+        // ));
     }
 
     tracing::info!("Checked out reference: '{}'", &source.rev());

@@ -326,4 +326,18 @@ mod tests {
         assert_eq!(std::fs::read_to_string(installer).unwrap().trim(), "conda");
         check_info(pkg, recipes().join("toml/expected"));
     }
+
+    #[test]
+    fn test_git_source() {
+        let tmp = tmp();
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("llamacpp"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        let pkg = get_extracted_package(tmp.as_dir(), "llama.cpp");
+        // this is to ensure that the clone happens correctly
+        let license = pkg.join("info/licenses/LICENSE");
+        assert!(license.exists());
+        let src = std::fs::read_to_string(license).unwrap();
+        assert!(src.contains(" Georgi "));
+    }
 }
