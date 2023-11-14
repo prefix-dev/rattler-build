@@ -183,7 +183,7 @@ pub struct BuildConfiguration {
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub package_format: ArchiveType,
-    /// Wether to store the recipe and build instructions in the final package or not
+    /// Whether to store the recipe and build instructions in the final package or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
 }

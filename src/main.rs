@@ -117,6 +117,10 @@ struct BuildOpts {
     #[arg(long)]
     no_include_recipe: bool,
 
+    /// Do not run tests after building
+    #[arg(long, default_value = "false")]
+    no_test: bool,
+
     #[clap(flatten)]
     common: CommonOpts,
 }
@@ -133,6 +137,10 @@ struct RebuildOpts {
     /// The package file to rebuild
     #[arg(short, long)]
     package_file: PathBuf,
+
+    /// Do not run tests after building
+    #[arg(long, default_value = "false")]
+    no_test: bool,
 
     #[clap(flatten)]
     common: CommonOpts,
@@ -279,6 +287,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         client: AuthenticatedClient::default(),
         multi_progress_indicator: multi_progress,
         no_clean: args.keep_build,
+        no_test: args.no_test,
     };
 
     for (output, variants) in outputs_and_variants {
@@ -392,6 +401,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
         no_clean: true,
+        no_test: args.no_test,
     };
 
     output

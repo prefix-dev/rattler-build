@@ -16,6 +16,9 @@ pub struct Configuration {
 
     /// Set this to true if you want to keep the build folder after the build is done
     pub no_clean: bool,
+
+    /// Whether to skip the test phase
+    pub no_test: bool,
 }
 
 impl Default for Configuration {
@@ -33,6 +36,7 @@ impl Default for Configuration {
                 ),
             ),
             no_clean: false,
+            no_test: false,
         }
     }
 }
