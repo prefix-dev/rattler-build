@@ -116,7 +116,7 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
                     })?;
 
                     for (key, value) in root_value_map.iter() {
-                        if !root_value_map.contains_key(key) {
+                        if !output_value_map.contains_key(key) {
                             output_value_map.insert(key.clone(), value.clone());
                         }
                     }

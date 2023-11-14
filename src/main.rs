@@ -273,6 +273,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         no_clean: args.keep_build,
     };
 
+    let mut subpackages = BTreeMap::new();
     for (_, _, _, output, variant) in outputs_and_variants {
         let hash = compute_buildstring(&variant, &noarch);
 
@@ -299,7 +300,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             continue;
         }
 
-        let mut subpackages = BTreeMap::new();
         subpackages.insert(
             recipe.package().name().clone(),
             PackageIdentifier {
@@ -339,7 +339,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 .into_diagnostic()?,
                 channels,
                 timestamp,
-                subpackages,
+                subpackages: subpackages.clone(),
                 package_format: match args.package_format {
                     PackageFormat::TarBz2 => ArchiveType::TarBz2,
                     PackageFormat::Conda => ArchiveType::Conda,
