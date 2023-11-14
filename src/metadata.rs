@@ -8,6 +8,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use dunce::canonicalize;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
@@ -100,7 +101,7 @@ impl Directories {
         if !output_dir.exists() {
             fs::create_dir(output_dir)?;
         }
-        let output_dir = fs::canonicalize(output_dir)?;
+        let output_dir = canonicalize(output_dir)?;
 
         let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");

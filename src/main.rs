@@ -3,6 +3,7 @@
 use clap::{arg, crate_version, Parser};
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+use dunce::canonicalize;
 use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
@@ -163,9 +164,9 @@ async fn main() -> miette::Result<()> {
 }
 
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
-    let package_file = fs::canonicalize(args.package_file).into_diagnostic()?;
+    let package_file = canonicalize(args.package_file).into_diagnostic()?;
     let test_options = TestConfiguration {
-        test_prefix: fs::canonicalize(PathBuf::from("test-prefix")).into_diagnostic()?,
+        test_prefix: canonicalize(PathBuf::from("test-prefix")).into_diagnostic()?,
         target_platform: Some(Platform::current()),
         keep_test_prefix: false,
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
@@ -177,7 +178,7 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
 }
 
 async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> miette::Result<()> {
-    let recipe_path = fs::canonicalize(&args.recipe);
+    let recipe_path = canonicalize(&args.recipe);
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
@@ -375,7 +376,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
     output.build_configuration.directories.output_dir =
-        fs::canonicalize(args.common.output_dir).into_diagnostic()?;
+        canonicalize(args.common.output_dir).into_diagnostic()?;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
