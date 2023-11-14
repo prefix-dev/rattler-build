@@ -16,15 +16,19 @@ pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), Source
     // might break on some platforms due to auth and ssh
     // especially ssh with password
     let refspecs_str = refspecs.iter().join(" ");
-    let cd = std::env::current_dir().ok();
+    let cd = std::env::current_dir();
     _ = std::env::set_current_dir(repo_path);
     let output = Command::new("git")
         .args(["fetch", "origin", refspecs_str.as_str()])
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
-    // TODO(swarnimarun): get rid of assert
-    assert!(output.status.success(), "{:#?}", output);
     _ = cd.map(std::env::set_current_dir);
+    if !output.status.success() {
+        tracing::debug!("Repository fetch for refs {:?} failed!", refspecs);
+        return Err(SourceError::GitErrorStr(
+            "failed to git fetch refs from origin",
+        ));
+    }
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
@@ -175,12 +179,9 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
-    if git_lfs_required(&cache_path) && !git_lfs_pull()? {
-        // failed to do lfs pull, likely lfs not installed
-        // TODO: should we consider erroring out?
-        // return Err(SourceError::GitErrorStr(
-        //     "failed to perform lfs pull, possibly git-lfs not installed",
-        // ));
+    if git_lfs_required(&cache_path) {
+        // only do lfs pull if needed!
+        git_lfs_pull()?;
     }
 
     tracing::info!("Checked out reference: '{}'", &source.rev());
@@ -208,7 +209,7 @@ fn git_lfs_required(repo_path: RepoPath) -> bool {
         .any(|s| s.lines().any(|l| l.contains("lfs")))
 }
 
-fn git_lfs_pull() -> Result<bool, SourceError> {
+fn git_lfs_pull() -> Result<(), SourceError> {
     // verify lfs install
     let mut command = Command::new("git");
     command.args(["lfs", "install"]);
@@ -217,7 +218,9 @@ fn git_lfs_pull() -> Result<bool, SourceError> {
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
     if !output.status.success() {
         tracing::error!("`git lfs install` failed!");
-        return Ok(false);
+        return Err(SourceError::GitErrorStr(
+            "git-lfs not installed, but required",
+        ));
     }
 
     // git lfs pull
@@ -228,10 +231,10 @@ fn git_lfs_pull() -> Result<bool, SourceError> {
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
     if !output.status.success() {
         tracing::error!("`git lfs pull` failed!");
-        return Ok(false);
+        return Ok(());
     }
 
-    Ok(true)
+    Ok(())
 }
 
 #[cfg(test)]
