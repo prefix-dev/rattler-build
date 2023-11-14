@@ -26,7 +26,7 @@ use crate::{
 };
 use petgraph::{algo::toposort, graph::DiGraph};
 
-type OutputVariantsTuple = (Node, Vec<BTreeMap<String, String>>);
+type OutputVariantsTuple = (String, String, String, Node, BTreeMap<String, String>);
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
@@ -295,7 +295,7 @@ impl VariantConfig {
         &self,
         recipe: &str,
         selector_config: &SelectorConfig,
-    ) -> Result<Vec<OutputVariantsTuple>, VariantError> {
+    ) -> Result<IndexSet<OutputVariantsTuple>, VariantError> {
         use crate::recipe::parser::{find_outputs_from_src, Dependency};
 
         // First find all outputs from the recipe
@@ -303,17 +303,20 @@ impl VariantConfig {
 
         let mut outputs_map = HashMap::new();
         // sort the outputs by topological order
-        for o in outputs.iter() {
+        for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
             // in the recipe which are captured by the `used vars`
-            let used_vars = used_vars_from_expressions(&o);
-            let parsed_recipe = Recipe::from_node(&o, selector_config.clone())
+            let used_vars = used_vars_from_expressions(output);
+            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
-            if let Some(_) = outputs_map.insert(
-                parsed_recipe.package().name().as_normalized().to_string(),
-                (o, used_vars),
-            ) {
+            if outputs_map
+                .insert(
+                    parsed_recipe.package().name().as_normalized().to_string(),
+                    (output, used_vars),
+                )
+                .is_some()
+            {
                 return Err(VariantError::DuplicateOutputs(
                     parsed_recipe.package().name().as_normalized().to_string(),
                 ));
@@ -330,7 +333,7 @@ impl VariantConfig {
         let mut node_indices = HashMap::new();
 
         // Add a node for each output
-        for (output, _) in &outputs_map {
+        for output in outputs_map.keys() {
             let node_index = graph.add_node(output.clone());
             node_indices.insert(output.clone(), node_index);
         }
@@ -382,7 +385,7 @@ impl VariantConfig {
         for (_, (name, output, used_vars)) in outputs_map.clone().iter() {
             println!("Output: {}: {:?}", name, used_vars);
 
-            let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
+            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
             let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
@@ -413,6 +416,10 @@ impl VariantConfig {
         }
         // remove all existing outputs from all_variables
         let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
+        let all_variables = all_variables
+            .difference(&output_names)
+            .cloned()
+            .collect::<HashSet<_>>();
         let mut all_variables = all_variables
             .difference(&output_names)
             .cloned()
@@ -456,7 +463,7 @@ impl VariantConfig {
                 let selector_config_with_variant =
                     selector_config.new_with_variant(combination.clone());
 
-                let parsed_recipe = Recipe::from_node(&output, selector_config_with_variant)
+                let parsed_recipe = Recipe::from_node(output, selector_config_with_variant)
                     .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
@@ -500,8 +507,8 @@ impl VariantConfig {
                     .iter()
                     .chain(requirements.run_constrained.iter())
                     .chain(parsed_recipe.build().run_exports().all())
-                    .for_each(|dep| match dep {
-                        Dependency::PinSubpackage(pin_sub) => {
+                    .for_each(|dep| {
+                        if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();
                             if pin.exact {
                                 let val = pin.name.as_normalized().to_owned();
@@ -511,7 +518,6 @@ impl VariantConfig {
                                 );
                             }
                         }
-                        _ => (),
                     });
 
                 // compute hash for the recipe
@@ -536,7 +542,10 @@ impl VariantConfig {
             println!("Recipe: {} {} {} {:?}", r.0, r.1, r.2, r.4);
         }
 
-        Ok(vec![])
+        Ok(recipes
+            .into_iter()
+            .map(|(&r1, r2, r3, &r4, r5)| (r1.clone(), r2, r3, r4.clone(), r5))
+            .collect::<IndexSet<_>>())
     }
 }
 
