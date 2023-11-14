@@ -152,7 +152,7 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) {
 pub(crate) fn used_vars_from_expressions(yaml_node: &Node) -> HashSet<String> {
     let mut selectors = HashSet::new();
 
-    find_all_selectors(&yaml_node, &mut selectors);
+    find_all_selectors(yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();
 
@@ -163,7 +163,7 @@ pub(crate) fn used_vars_from_expressions(yaml_node: &Node) -> HashSet<String> {
     }
 
     // parse recipe into AST
-    find_jinja(&yaml_node, &mut variables);
+    find_jinja(yaml_node, &mut variables);
 
     variables
 }
@@ -185,7 +185,8 @@ mod test {
             - "{{ pin_subpackage('abcdef') }}"
         "#;
 
-        let used_vars = used_vars_from_expressions(recipe);
+        let recipe = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe);
         assert!(used_vars.contains("llvm_variant"));
         assert!(used_vars.contains("linux"));
         assert!(used_vars.contains("osx"));

@@ -5,9 +5,8 @@ use std::{
     path::PathBuf,
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use miette::Diagnostic;
-use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
@@ -91,13 +90,6 @@ pub enum VariantConfigError {
     #[error(transparent)]
     #[diagnostic(transparent)]
     NewParseError(#[from] ParsingError),
-}
-
-struct RecipeWithVariant {
-    pub recipe: Node,
-    pub variant: BTreeMap<String, String>,
-    pub used_vars: HashSet<String>,
-    pub exact_pins: HashSet<String>,
 }
 
 impl VariantConfig {
@@ -324,7 +316,6 @@ impl VariantConfig {
         }
 
         // now topologically sort the outputs and find cycles
-        let mut outputs = Vec::new();
 
         // Create an empty directed graph
         let mut graph = DiGraph::<_, ()>::new();
@@ -353,13 +344,13 @@ impl VariantConfig {
             }
         }
         // Perform a topological sort
-        match toposort(&graph, None) {
+        let outputs: Vec<_> = match toposort(&graph, None) {
             Ok(sorted_node_indices) => {
                 // Replace the original list of outputs with the sorted list
-                outputs = sorted_node_indices
+                sorted_node_indices
                     .into_iter()
                     .map(|node_index| graph[node_index].clone())
-                    .collect();
+                    .collect()
             }
             Err(err) => {
                 // There is a cycle in the graph
@@ -367,7 +358,7 @@ impl VariantConfig {
                     graph[err.node_id()].clone(),
                 ));
             }
-        }
+        };
 
         println!("Sorted outputs: {:?}", outputs);
 
