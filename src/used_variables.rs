@@ -181,8 +181,8 @@ mod test {
               then: linux-gcc
             - if: osx
               then: osx-clang
-            - "{{ compiler('c') }}"
-            - "{{ pin_subpackage('abcdef') }}"
+            - ${{ compiler('c') }}
+            - ${{ pin_subpackage('abcdef') }}
         "#;
 
         let recipe = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
