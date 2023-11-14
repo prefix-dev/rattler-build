@@ -14,6 +14,7 @@ use std::{
     str::FromStr,
 };
 
+use dunce::canonicalize;
 use indicatif::MultiProgress;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
@@ -294,7 +295,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
     dependencies.push(match_spec);
 
-    let prefix = std::fs::canonicalize(&config.test_prefix).unwrap();
+    let prefix = canonicalize(&config.test_prefix).unwrap();
 
     let global_configuration = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
