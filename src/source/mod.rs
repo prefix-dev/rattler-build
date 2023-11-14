@@ -7,8 +7,7 @@ use std::{
 use crate::recipe::parser::Source;
 
 pub mod copy_dir;
-#[cfg(feature = "git")]
-pub mod git_source;
+pub mod host_git_source;
 pub mod patch;
 pub mod url_source;
 
@@ -38,6 +37,12 @@ pub enum SourceError {
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
 
+    #[error("Failed to run git command: {0}")]
+    GitError(String),
+
+    #[error("Failed to run git command: {0}")]
+    GitErrorStr(&'static str),
+
     #[cfg(feature = "git")]
     #[error("Failed to run git command: {0}")]
     GitError(#[from] git2::Error),
@@ -61,23 +66,19 @@ pub async fn fetch_sources(
 
     for src in sources {
         match &src {
-            Source::Git(_src) => {
-                #[cfg(feature = "git")]
-                {
-                    tracing::info!("Fetching source from GIT: {}", _src.url());
-                    let result = git_source::git_src(_src, &cache_src, recipe_dir)?;
-                    let dest_dir = if let Some(folder) = _src.folder() {
-                        work_dir.join(folder)
-                    } else {
-                        work_dir.to_path_buf()
-                    };
-                    crate::source::copy_dir::CopyDir::new(&result, &dest_dir)
-                        .use_gitignore(false)
-                        .run()?;
-
-                    if !_src.patches().is_empty() {
-                        patch::apply_patches(_src.patches(), work_dir, recipe_dir)?;
-                    }
+            Source::Git(src) => {
+                tracing::info!("Fetching source from git repo: {}", src.url());
+                let result = host_git_source::git_src(src, &cache_src, recipe_dir)?;
+                let dest_dir = if let Some(folder) = src.folder() {
+                    work_dir.join(folder)
+                } else {
+                    work_dir.to_path_buf()
+                };
+                crate::source::copy_dir::CopyDir::new(&result, &dest_dir)
+                    .use_gitignore(false)
+                    .run()?;
+                if !src.patches().is_empty() {
+                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
