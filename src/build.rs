@@ -266,19 +266,23 @@ pub async fn run_build(
 
     tracing::info!("{}", output);
 
-    tracing::info!("Running tests");
+    if tool_configuration.no_test {
+        tracing::info!("Skipping tests");
+    } else {
+        tracing::info!("Running tests");
 
-    test::run_test(
-        &result,
-        &TestConfiguration {
-            test_prefix: test_dir.clone(),
-            target_platform: Some(output.build_configuration.target_platform),
-            keep_test_prefix: tool_configuration.no_clean,
-            channels,
-        },
-    )
-    .await
-    .into_diagnostic()?;
+        test::run_test(
+            &result,
+            &TestConfiguration {
+                test_prefix: test_dir.clone(),
+                target_platform: Some(output.build_configuration.target_platform),
+                keep_test_prefix: tool_configuration.no_clean,
+                channels,
+            },
+        )
+        .await
+        .into_diagnostic()?;
+    }
 
     if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;

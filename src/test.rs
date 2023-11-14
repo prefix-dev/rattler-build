@@ -301,6 +301,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         client: AuthenticatedClient::default(),
         multi_progress_indicator: MultiProgress::new(),
         no_clean: config.keep_test_prefix,
+        no_test: false,
     };
 
     println!("Creating test environment in {:?}", prefix);
