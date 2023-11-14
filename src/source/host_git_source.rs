@@ -34,16 +34,6 @@ pub fn git_src(
     cache_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<PathBuf, SourceError> {
-    // on windows there exist some path conversion issue, conda seems to have a solution for it, check
-    // it out
-    // figure out more: https://github.com/conda/conda-build/blob/c71c4abee1c85f5a36733c461f224941ab3ebbd1/conda_build/source.py#L38C1-L39C59
-    // ---
-    // tool used: https://cygwin.com/cygwin-ug-net/cygpath.html
-    // to windows path: cygpath -w unix_path
-    // to unix path: cyppath -u win_path
-    // ---
-    // note: rust on windows handles some of these
-
     tracing::info!(
         "git source: ({:?}) cache_dir: ({}) recipe_dir: ({})",
         source,
@@ -185,12 +175,39 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
-    // TODO(swarnimarun): does this need to be handled!
-    let _lfs_success = git_lfs_pull()?;
+    if git_lfs_required(&cache_path) {
+        if !git_lfs_pull()? {
+            // failed to do lfs pull, likely lfs not installed
+            // TODO: should we consider erroring out?
+            // return Err(SourceError::GitErrorStr(
+            //     "failed to perform lfs pull, possibly git-lfs not installed",
+            // ));
+        }
+    }
 
     tracing::info!("Checked out reference: '{}'", &source.rev());
 
     Ok(cache_path)
+}
+
+// TODO: we can use parallelization and work splitting for much faster search
+// not sure if it's required though
+fn git_lfs_required(repo_path: RepoPath) -> bool {
+    // scan `**/.gitattributes`
+    walkdir::WalkDir::new(repo_path)
+        .follow_links(false)
+        .into_iter()
+        .filter_entry(|d| {
+            // ignore .git folder (or folders in case of submodules)
+            (d.file_type().is_dir() && !d.file_name().to_string_lossy().contains(".git"))
+                || d.file_name()
+                    .to_string_lossy()
+                    .starts_with(".gitattributes")
+        })
+        .filter_map(|d| d.ok())
+        .filter(|d| d.file_type().is_file())
+        .filter_map(|d| std::fs::read_to_string(d.path()).ok())
+        .any(|s| s.lines().any(|l| l.contains("lfs")))
 }
 
 fn git_lfs_pull() -> Result<bool, SourceError> {
