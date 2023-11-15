@@ -145,7 +145,7 @@ pub async fn create_environment(
     // Get the package names from the matchspecs so we can only load the package records that we need.
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
     let repodatas = wrap_in_progress("parsing repodata", move || {
-        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None, true)
+        SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
     })?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
