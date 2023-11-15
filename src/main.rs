@@ -175,7 +175,7 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     fs::create_dir_all(&test_prefix).into_diagnostic()?;
 
     let test_options = TestConfiguration {
-        test_prefix: test_prefix,
+        test_prefix,
         target_platform: Some(Platform::current()),
         keep_test_prefix: false,
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
