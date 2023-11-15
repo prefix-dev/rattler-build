@@ -372,8 +372,7 @@ impl VariantConfig {
 
         let mut all_build_dependencies = Vec::new();
         for (_, (_, output, _)) in outputs_map.iter() {
-
-            let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
+            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
             let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
