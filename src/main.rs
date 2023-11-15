@@ -8,6 +8,7 @@ use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
@@ -25,6 +26,7 @@ use rattler_build::{
     selectors::SelectorConfig,
     test::{self, TestConfiguration},
     tool_configuration,
+    tracing_secrets::SecretFilterLayer,
     variant_config::VariantConfig,
 };
 
@@ -147,10 +149,13 @@ struct RebuildOpts {
 }
 
 #[tokio::main]
-async fn main() -> miette::Result<()> {
+async fn main() {
     let args = App::parse();
 
     let multi_progress = MultiProgress::new();
+
+    let regex = Regex::new(r"mypass").unwrap();
+    let secret_filter_layer = SecretFilterLayer::new(regex);
 
     // Setup tracing subscriber
     tracing_subscriber::registry()
@@ -160,15 +165,27 @@ async fn main() -> miette::Result<()> {
                 .with_writer(IndicatifWriter::new(multi_progress.clone()))
                 .event_format(TracingFormatter),
         )
+        .with(secret_filter_layer)
         .init();
 
     tracing::info!("Starting the build process");
+    tracing::info!("Trying to leak my secret mypass jahaj mypass kjsadkjakdjaskjk mypass");
 
-    match args.subcommand {
+    let res = match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
         SubCommands::Rebuild(args) => rebuild_from_args(args).await,
-    }
+    };
+
+    match res {
+        Ok(_) => {
+            tracing::info!("Build process finished successfully");
+        }
+        Err(err) => {
+            tracing::error!("{:?}", err);
+            std::process::exit(1);
+        }
+    };
 }
 
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {

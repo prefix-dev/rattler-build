@@ -3,7 +3,7 @@ use std::io;
 use tracing_core::{Event, Subscriber};
 use tracing_subscriber::{
     fmt::{
-        format::{self, Format},
+        format::{self, Format, Writer},
         FmtContext, FormatEvent, FormatFields, MakeWriter,
     },
     registry::LookupSpan,
@@ -52,14 +52,28 @@ where
         event: &Event<'_>,
     ) -> std::fmt::Result {
         let metadata = event.metadata();
+
+        let mut buffer = String::new();
+        let mut custom_writer = Writer::new(&mut buffer);
+        // Needs support in tracing
+        // custom_writer.with_ansi(true);
+
         if *metadata.level() == tracing_core::metadata::Level::INFO
             && metadata.target().starts_with("rattler_build")
         {
-            ctx.format_fields(writer.by_ref(), event)?;
-            writeln!(writer)
+            ctx.format_fields(custom_writer.by_ref(), event)?;
         } else {
             let default_format = Format::default();
-            default_format.format_event(ctx, writer, event)
+            default_format.format_event(ctx, custom_writer, event)?;
         }
+
+        filter_secrets(&mut buffer);
+        writer.write_str(&buffer)
     }
+}
+
+fn filter_secrets(buffer: &mut String) {
+    // regex for conda tokens in URL /t/...
+    let rex = regex::Regex::new(r"(/t/)([a-zA-Z0-9\-]{20,})").unwrap();
+    *buffer = rex.replace_all(&buffer, "$1<token>").to_string();
 }

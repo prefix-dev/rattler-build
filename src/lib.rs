@@ -6,6 +6,7 @@ pub mod selectors;
 pub mod source;
 pub mod test;
 pub mod tool_configuration;
+pub mod tracing_secrets;
 pub mod used_variables;
 pub mod variant_config;
 
