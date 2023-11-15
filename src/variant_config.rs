@@ -360,8 +360,6 @@ impl VariantConfig {
             }
         };
 
-        println!("Sorted outputs: {:?}", outputs);
-
         // sort the outputs map by the topological order
         let outputs_map = outputs
             .iter()
@@ -374,7 +372,6 @@ impl VariantConfig {
 
         let mut all_build_dependencies = Vec::new();
         for (_, (name, output, used_vars)) in outputs_map.clone().iter() {
-            println!("Output: {}: {:?}", name, used_vars);
 
             let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
@@ -425,10 +422,7 @@ impl VariantConfig {
         all_variables.insert("target_platform".to_string());
         all_variables.insert("channel_targets".to_string());
 
-        println!("All build dependencies: {:?}", all_variables);
-
         let combinations = self.combinations(&all_variables)?;
-        println!("Combinations: {:?}", combinations);
 
         // Then find all used variables from the each output recipe
         // let mut variants = Vec::new();
@@ -532,10 +526,6 @@ impl VariantConfig {
 
                 recipes.insert((name, version, hash, output, used_filtered));
             }
-        }
-
-        for r in recipes.iter() {
-            println!("Recipe: {} {} {} {:?}", r.0, r.1, r.2, r.4);
         }
 
         Ok(recipes
