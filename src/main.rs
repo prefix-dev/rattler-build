@@ -162,8 +162,6 @@ async fn main() -> miette::Result<()> {
         )
         .init();
 
-    tracing::info!("Starting the build process");
-
     match args.subcommand {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
@@ -173,15 +171,20 @@ async fn main() -> miette::Result<()> {
 
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
+    let test_prefix = PathBuf::from("test-prefix");
+    fs::create_dir_all(&test_prefix).into_diagnostic()?;
+
     let test_options = TestConfiguration {
-        test_prefix: canonicalize(PathBuf::from("test-prefix")).into_diagnostic()?,
+        test_prefix: test_prefix,
         target_platform: Some(Platform::current()),
         keep_test_prefix: false,
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
     };
+
     test::run_test(&package_file, &test_options)
         .await
         .into_diagnostic()?;
+
     Ok(())
 }
 

@@ -45,6 +45,18 @@ pub enum TestError {
 
     #[error("Failed to setup test environment: {0}")]
     TestEnvironementActivation(#[from] ActivationError),
+
+    #[error("Failed to parse JSON from test files: {0}")]
+    TestJSONParseError(#[from] serde_json::Error),
+
+    #[error("Failed to parse MatchSpec from test files: {0}")]
+    TestMatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
+
+    #[error("Missing package file name")]
+    MissingPackageFileName,
+
+    #[error("Archive type not supported")]
+    ArchiveTypeNotSupported,
 }
 
 #[derive(Debug)]
@@ -254,14 +266,23 @@ pub struct TestConfiguration {
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
-    let tmp_repo = tempfile::tempdir().unwrap();
+    let tmp_repo = tempfile::tempdir()?;
     let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
-    std::fs::create_dir_all(&subdir).unwrap();
-    std::fs::copy(package_file, subdir.join(package_file.file_name().unwrap())).unwrap();
+    std::fs::create_dir_all(&subdir)?;
 
-    let archive_type = ArchiveType::try_from(package_file).unwrap();
+    std::fs::copy(
+        package_file,
+        subdir.join(
+            package_file
+                .file_name()
+                .ok_or(TestError::MissingPackageFileName)?,
+        ),
+    )?;
+
+    let archive_type =
+        ArchiveType::try_from(package_file).ok_or(TestError::ArchiveTypeNotSupported)?;
     let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
     let test_dependencies = match archive_type {
         ArchiveType::TarBz2 => file_from_tar_bz2(package_file, &test_dep_json),
@@ -270,11 +291,11 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     let mut dependencies: Vec<MatchSpec> = match test_dependencies {
         Ok(contents) => {
-            let test_deps: Vec<String> = serde_json::from_str(&contents).unwrap();
+            let test_deps: Vec<String> = serde_json::from_str(&contents)?;
             test_deps
                 .iter()
-                .map(|s| MatchSpec::from_str(s).unwrap())
-                .collect()
+                .map(|s| MatchSpec::from_str(s))
+                .collect::<Result<Vec<_>, _>>()?
         }
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {
@@ -286,9 +307,9 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     };
 
     // index the temporary channel
-    index::index(tmp_repo.path(), Some(&target_platform)).unwrap();
+    index::index(tmp_repo.path(), Some(&target_platform))?;
 
-    let cache_dir = rattler::default_cache_dir().unwrap();
+    let cache_dir = rattler::default_cache_dir()?;
 
     let pkg = ArchiveIdentifier::try_from_path(package_file).ok_or(TestError::TestFailed)?;
 
@@ -306,7 +327,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
     dependencies.push(match_spec);
 
-    let prefix = canonicalize(&config.test_prefix).unwrap();
+    let prefix = canonicalize(&config.test_prefix)?;
 
     let global_configuration = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
@@ -342,7 +363,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         console::style(console::Emoji("✔", "")).green()
     );
 
-    fs::remove_dir_all(prefix).unwrap();
+    fs::remove_dir_all(prefix)?;
 
     Ok(())
 }
