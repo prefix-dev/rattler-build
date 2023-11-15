@@ -32,7 +32,7 @@ jobs:
                 cache: true
             # build in release mode so that it's reasonably fast to run the tests
             - run: cargo build --release
-            - run:
+            - run: |
                 cd rust-tests
                 cargo test
             - run: pixi run end_to_end_test
