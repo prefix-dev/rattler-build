@@ -1,0 +1,19 @@
+package:
+  name: test-execution-fail
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "Hello World" > $PREFIX/test-execution.txt
+      else:
+        - echo "Hello World" > %PREFIX%\test-execution.txt
+
+test:
+  commands:
+    - if: unix
+      then: 
+        - test -f $PREFIX/fail.txt
+      else:
+        - if not exist %PREFIX%\fail.txt (exit 1)
