@@ -208,17 +208,17 @@ impl VariantConfig {
             for zip in zip_keys {
                 let mut prev_len = None;
                 for key in zip {
-                    let value = self.variants.get(key);
-                    if value.is_none() {
-                        return Err(VariantError::InvalidZipKeyLength(key.to_string()));
-                    }
-                    let len = value.unwrap().len();
+                    let value = match self.variants.get(key) {
+                        None => return Err(VariantError::InvalidZipKeyLength(key.to_string())),
+                        Some(value) => value,
+                    };
+
                     if let Some(l) = prev_len {
-                        if l != len {
+                        if l != value.len() {
                             return Err(VariantError::InvalidZipKeyLength(key.to_string()));
                         }
                     }
-                    prev_len = Some(len);
+                    prev_len = Some(value.len());
                 }
             }
         }
@@ -371,9 +371,9 @@ impl VariantConfig {
             .collect::<BTreeMap<_, _>>();
 
         let mut all_build_dependencies = Vec::new();
-        for (_, (name, output, used_vars)) in outputs_map.clone().iter() {
+        for (_, (_, output, _)) in outputs_map.iter() {
 
-            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
+            let parsed_recipe = Recipe::from_node(&output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
             let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
