@@ -287,7 +287,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                 "url" => url = value.try_convert(key_str)?,
                 "sha256" => {
                     let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
-                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidMd5))?;
+                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256))?;
                     checksums.push(Checksum::Sha256(sha256_out));
                 }
                 "md5" => {
