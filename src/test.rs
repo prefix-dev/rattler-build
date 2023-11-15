@@ -104,11 +104,19 @@ fn run_in_environment(
 
     let tmpfile_path = tmpfile.into_temp_path();
     let executable = shell.executable();
-
-    let status = std::process::Command::new(executable)
-        .arg(&tmpfile_path)
-        .current_dir(cwd)
-        .status()?;
+    let status = match shell {
+        ShellEnum::Bash(_) => std::process::Command::new(executable)
+            .arg(&tmpfile_path)
+            .current_dir(cwd)
+            .status()?,
+        ShellEnum::CmdExe(_) => std::process::Command::new(executable)
+            .arg("/d")
+            .arg("/c")
+            .arg(&tmpfile_path)
+            .current_dir(cwd)
+            .status()?,
+        _ => todo!("No shells implemented beyond cmd.exe and bash"),
+    };
 
     if !status.success() {
         return Err(TestError::TestFailed);
