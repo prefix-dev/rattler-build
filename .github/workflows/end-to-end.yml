@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         os: ["ubuntu-latest", "windows-latest"]
+      fail-fast: false
 
     name: Run tests
     runs-on: ${{ matrix.os }}
@@ -36,5 +37,5 @@ jobs:
           cache: true
       # build in release mode so that it's reasonably fast to run the tests
       - run: cargo build --release
-      - run: cargo test -p rust-tests
+      - run: cargo test -p rust-tests -- --test-threads 1
       # - run: pixi run end_to_end_test
