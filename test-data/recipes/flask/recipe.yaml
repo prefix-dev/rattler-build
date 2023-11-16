@@ -1,0 +1,68 @@
+# Recipe licensed under BSD3 license from conda-forge
+# Original recipe here: https://github.com/conda-forge/flask-feedstock/blob/main/recipe/meta.yaml
+
+context:
+  name: flask
+  version: 3.0.0
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  url: https://pypi.io/packages/source/${{ name[0] }}/${{ name }}/flask-${{ version }}.tar.gz
+  sha256: cfadcdb638b609361d29ec22360d6070a77d7463dcb3ab08d2c2f2f168845f58
+
+build:
+  number: 0
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+  entry_points:
+    - flask = flask.cli:main
+  noarch: python
+
+requirements:
+  host:
+    - python >=3.8
+    - flit-core <4
+    - pip
+  run:
+    - python >=3.8
+    - werkzeug >=3.0.0
+    - jinja2 >=3.1.2
+    - itsdangerous >=2.1.2
+    - click >=8.1.3
+    - importlib-metadata >=3.6.0
+    - blinker >=1.6.2
+
+test:
+  requires:
+    - pip
+  imports:
+    - flask
+    - flask.json
+  commands:
+    - flask --help
+    - pip check
+
+about:
+  homepage: https://palletsprojects.com/p/flask
+  license: BSD-3-Clause
+  license_family: BSD
+  license_file: LICENSE.rst
+  summary: A simple framework for building complex web applications.
+  description: |
+    Flask is a lightweight [WSGI](https://wsgi.readthedocs.io/) web application framework. It is designed
+    to make getting started quick and easy, with the ability to scale up to
+    complex applications. It began as a simple wrapper around [Werkzeug](https://werkzeug.palletsprojects.com/)
+    and [Jinja](https://jinja.palletsprojects.com/) and has become one of the most popular Python web
+    application frameworks.
+    Flask offers suggestions, but doesn't enforce any dependencies or
+    project layout. It is up to the developer to choose the tools and
+    libraries they want to use. There are many extensions provided by the
+    community that make adding new functionality easy.
+  documentation: https://flask.palletsprojects.com/
+  repository: https://github.com/pallets/flask/
+
+extra:
+  recipe-maintainers:
+    - mygithubusername
