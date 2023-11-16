@@ -101,6 +101,8 @@ pub struct GitSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     folder: Option<PathBuf>,
+    /// Optionally request the lfs pull in git source
+    lfs: bool,
 }
 
 impl GitSource {
@@ -111,6 +113,7 @@ impl GitSource {
         depth: Option<i32>,
         patches: Vec<PathBuf>,
         folder: Option<PathBuf>,
+        lfs: bool,
     ) -> Self {
         Self {
             url,
@@ -118,6 +121,7 @@ impl GitSource {
             depth,
             patches,
             folder,
+            lfs,
         }
     }
 
@@ -145,6 +149,11 @@ impl GitSource {
     pub const fn folder(&self) -> Option<&PathBuf> {
         self.folder.as_ref()
     }
+
+    /// Get true if source requires lfs.
+    pub const fn lfs(&self) -> bool {
+        self.lfs
+    }
 }
 
 impl TryConvertNode<GitSource> for RenderedMappingNode {
@@ -154,6 +163,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut depth = None;
         let mut patches = Vec::new();
         let mut folder = None;
+        let mut lfs = false;
 
         for (k, v) in self.iter() {
             match k.as_str() {
@@ -170,7 +180,6 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                         }
                     }
                 }
-
                 "git_rev" => {
                     rev = Some(v.try_convert("git_rev")?);
                 }
@@ -183,11 +192,14 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 "folder" => {
                     folder = Some(v.try_convert("folder")?);
                 }
+                "lfs" => {
+                    lfs = v.try_convert("lfs")?;
+                }
                 _ => {
                     return Err(_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches` and `folder`"
+                        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches`, `lfs` and `folder`"
                     ))
                 }
             }
@@ -209,6 +221,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             depth,
             patches,
             folder,
+            lfs,
         })
     }
 }

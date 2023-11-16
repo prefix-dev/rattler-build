@@ -179,7 +179,7 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
-    if git_lfs_required(&cache_path) {
+    if source.lfs() || git_lfs_required(&cache_path) {
         // only do lfs pull if needed!
         git_lfs_pull()?;
     }
@@ -261,6 +261,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -275,6 +276,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -289,6 +291,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -299,6 +302,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
