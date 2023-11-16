@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+package:
+  name: blib
+  version: 0.1.0
+
+outputs:
+  - package:
+      name: bla

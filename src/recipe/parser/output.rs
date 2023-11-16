@@ -12,6 +12,7 @@ use crate::{
 };
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
+static ALLOWED_KEYS: [&str; 6] = ["recipe", "source", "build", "outputs", "about", "extra"];
 
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
     let root_node = marked_yaml::parse_yaml(0, src)
@@ -50,8 +51,21 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
                 src,
                 _partialerror!(
                     *key.span(),
-                    ErrorKind::InvalidField("package".to_string().into()),
+                    ErrorKind::InvalidField("requirements".to_string().into()),
                     help = "multi-output recipes cannot have a top-level requirements field. Move `requirements` inside the individual output."
+                ),
+            ));
+        }
+    }
+
+    for key in root_map.keys() {
+        if !ALLOWED_KEYS.contains(&key.as_str()) {
+            return Err(ParsingError::from_partial(
+                src,
+                _partialerror!(
+                    *key.span(),
+                    ErrorKind::InvalidField(key.as_str().to_string().into()),
+                    help = format!("invalid key ({}) in root node", key.as_str())
                 ),
             ));
         }
@@ -179,4 +193,43 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
         res.push(recipe);
     }
     Ok(res)
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+
+    use crate::{assert_miette_snapshot, recipe::{Recipe, jinja::SelectorConfig}};
+
+    use super::*;
+
+    #[test]
+    fn recipe_schema_error() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_and_package.yaml");
+        let src = std::fs::read_to_string(yaml_file).unwrap();
+        assert_miette_snapshot!(find_outputs_from_src(&src).unwrap_err());
+
+        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_and_requirements.yaml");
+        let src = std::fs::read_to_string(yaml_file).unwrap();
+        assert_miette_snapshot!(find_outputs_from_src(&src).unwrap_err());
+
+        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_missing_version.yaml");
+        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let nodes = find_outputs_from_src(&src).unwrap();
+        let parsed_recipe = Recipe::from_node(&nodes[0], SelectorConfig::default()).map_err(|err| ParsingError::from_partial(&src, err));
+        assert_miette_snapshot!(parsed_recipe.unwrap_err());
+
+        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_extra_keys.yaml");
+        let src = std::fs::read_to_string(yaml_file).unwrap();
+        assert_miette_snapshot!(find_outputs_from_src(&src).unwrap_err());
+    }
+
+    #[test]
+    fn recipe_outputs_merging() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_merging.yaml");
+        let src = std::fs::read_to_string(yaml_file).unwrap();
+        assert_debug_snapshot!(find_outputs_from_src(&src).unwrap());
+    }
 }

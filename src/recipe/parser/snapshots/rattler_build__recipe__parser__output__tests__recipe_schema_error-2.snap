@@ -1,0 +1,15 @@
+---
+source: src/recipe/parser/output.rs
+expression: find_outputs_from_src(&src).unwrap_err()
+---
+  × Parsing: invalid field `requirements`.
+   ╭─[4:1]
+ 4 │ 
+ 5 │ requirements:
+   · ──────┬─────
+   ·       ╰── here
+ 6 │   host:
+   ╰────
+  help: multi-output recipes cannot have a top-level requirements field.
+        Move `requirements` inside the individual output.
+
