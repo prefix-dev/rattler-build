@@ -86,7 +86,7 @@ mod tests {
 
         #[cfg(target_os = "linux")]
         #[cfg(not(target_arch = "aarch64"))]
-        return "linux-aarch64";
+        return "linux-64";
 
         #[cfg(target_os = "macos")]
         #[cfg(not(target_arch = "aarch64"))]
