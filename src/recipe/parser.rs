@@ -212,7 +212,10 @@ mod tests {
         let recipe = include_str!("../../examples/xtensor/recipe.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
         assert!(recipe.is_ok());
+        #[cfg(target_family = "unix")]
         insta::assert_debug_snapshot!(recipe.unwrap());
+        #[cfg(target_family = "windows")]
+        insta::assert_debug_snapshot!("recipe_windows", recipe.unwrap());
     }
 
     #[test]
