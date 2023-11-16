@@ -142,21 +142,11 @@ impl Tests {
                 match (Platform::current().is_windows(), ext) {
                     (true, "bat") => {
                         tracing::info!("Testing commands:");
-                        run_in_environment(
-                            default_shell,
-                            contents,
-                            cwd,
-                            environment,
-                        )
+                        run_in_environment(default_shell, contents, cwd, environment)
                     }
                     (false, "sh") => {
                         tracing::info!("Testing commands:");
-                        run_in_environment(
-                            default_shell,
-                            contents,
-                            cwd,
-                            environment,
-                        )
+                        run_in_environment(default_shell, contents, cwd, environment)
                     }
                     _ => Ok(()),
                 }
