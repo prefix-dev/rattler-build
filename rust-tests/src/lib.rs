@@ -377,7 +377,7 @@ mod tests {
 
     #[test]
     fn test_noarch_flask() {
-        let tmp = tmp();
+        let tmp = tmp("test_noarch_flask");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("flask"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
