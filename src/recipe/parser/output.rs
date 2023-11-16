@@ -199,7 +199,10 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
 mod tests {
     use insta::assert_debug_snapshot;
 
-    use crate::{assert_miette_snapshot, recipe::{Recipe, jinja::SelectorConfig}};
+    use crate::{
+        assert_miette_snapshot,
+        recipe::{jinja::SelectorConfig, Recipe},
+    };
 
     use super::*;
 
@@ -210,14 +213,16 @@ mod tests {
         let src = std::fs::read_to_string(yaml_file).unwrap();
         assert_miette_snapshot!(find_outputs_from_src(&src).unwrap_err());
 
-        let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_and_requirements.yaml");
+        let yaml_file =
+            test_data_dir.join("recipes/test-parsing/recipe_outputs_and_requirements.yaml");
         let src = std::fs::read_to_string(yaml_file).unwrap();
         assert_miette_snapshot!(find_outputs_from_src(&src).unwrap_err());
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_missing_version.yaml");
         let src = std::fs::read_to_string(yaml_file).unwrap();
         let nodes = find_outputs_from_src(&src).unwrap();
-        let parsed_recipe = Recipe::from_node(&nodes[0], SelectorConfig::default()).map_err(|err| ParsingError::from_partial(&src, err));
+        let parsed_recipe = Recipe::from_node(&nodes[0], SelectorConfig::default())
+            .map_err(|err| ParsingError::from_partial(&src, err));
         assert_miette_snapshot!(parsed_recipe.unwrap_err());
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_extra_keys.yaml");
