@@ -1,0 +1,6 @@
+recipe:
+  name: blib
+
+outputs:
+  - package:
+      name: bla

@@ -127,12 +127,19 @@ impl Recipe {
             let key_str = key.as_str();
             match key_str {
                 "package" => package = Some(value.try_convert(key_str)?),
+                "recipe" => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField("recipe".to_string().into()),
+                        help =
+                            "The recipe field is only allowed in conjunction with multiple outputs"
+                    ))
+                }
                 "source" => source = value.try_convert(key_str)?,
                 "build" => build = value.try_convert(key_str)?,
                 "requirements" => requirements = value.try_convert(key_str)?,
                 "test" => test = value.try_convert(key_str)?,
                 "about" => about = value.try_convert(key_str)?,
-                "outputs" => {}
                 "context" => {}
                 "extra" => {}
                 invalid_key => {

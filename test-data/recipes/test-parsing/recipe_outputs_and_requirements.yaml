@@ -1,0 +1,11 @@
+recipe:
+  name: blib
+  version: 0.1.0
+
+requirements:
+  host:
+    - bla
+
+outputs:
+  - package:
+      name: bla

@@ -369,8 +369,12 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
                 let end = SourceOffset::from_location(src, m_end.line(), m_end.column() - 1);
 
                 let mut end_offset = end.offset();
-                while src[end_offset..].chars().next().unwrap().is_whitespace() {
-                    end_offset -= 1;
+                while let Some(c) = src[end_offset..].chars().next() {
+                    if c.is_whitespace() {
+                        end_offset -= 1;
+                    } else {
+                        break;
+                    }
                 }
 
                 end_offset - start.offset() + 1

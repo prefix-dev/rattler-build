@@ -1,0 +1,313 @@
+---
+source: src/recipe/parser/output.rs
+expression: find_outputs_from_src(&src).unwrap()
+---
+[
+    Mapping(
+        MappingNode {
+            value: {
+                ScalarNode {
+                    value: "package",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "name",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "testlib",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "version",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "0.1.0",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "build",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "number",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "0",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "requirements",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "host",
+                            }: Sequence(
+                                SequenceNode {
+                                    value: [
+                                        Simple(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "bla",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "about",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "homepage",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "http://www.example.com",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "license",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "BSD-3-Clause",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "license_file",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "LICENSE",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "summary",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "blabla",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "description",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "long blabla",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "documentation",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "http://docs.example.com",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "repository",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "https://github.com/example/test",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "extra",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "recipe-maintainers",
+                            }: Sequence(
+                                SequenceNode {
+                                    value: [
+                                        Simple(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "some-maintainer",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    },
+                ),
+            },
+        },
+    ),
+    Mapping(
+        MappingNode {
+            value: {
+                ScalarNode {
+                    value: "package",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "name",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "superlib",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "version",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "0.10.0",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "build",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "script",
+                            }: Sequence(
+                                SequenceNode {
+                                    value: [
+                                        Simple(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "test 1234",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                },
+                            ),
+                            ScalarNode {
+                                value: "number",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "1234",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "requirements",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "host",
+                            }: Sequence(
+                                SequenceNode {
+                                    value: [
+                                        Simple(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "abc",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "about",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "homepage",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "http://www.example.com",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "license",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "BSD-3-Clause",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "license_file",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "LICENSE",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "summary",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "blabla",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "description",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "long blabla",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "documentation",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "http://docs.example.com",
+                                },
+                            ),
+                            ScalarNode {
+                                value: "repository",
+                            }: Scalar(
+                                ScalarNode {
+                                    value: "https://github.com/example/test",
+                                },
+                            ),
+                        },
+                    },
+                ),
+                ScalarNode {
+                    value: "extra",
+                }: Mapping(
+                    MappingNode {
+                        value: {
+                            ScalarNode {
+                                value: "recipe-maintainers",
+                            }: Sequence(
+                                SequenceNode {
+                                    value: [
+                                        Simple(
+                                            Scalar(
+                                                ScalarNode {
+                                                    value: "some-maintainer",
+                                                },
+                                            ),
+                                        ),
+                                    ],
+                                },
+                            ),
+                        },
+                    },
+                ),
+            },
+        },
+    ),
+]
