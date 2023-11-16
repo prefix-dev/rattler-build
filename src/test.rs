@@ -95,14 +95,17 @@ fn run_in_environment(
     let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
 
     let os_vars = env_vars::os_vars(environment, &Platform::current());
-    for var in os_vars {
-        additional_script.set_env_var(&var.0, &var.1);
+    for (key, val) in os_vars {
+        if key == "PATH" {
+            continue;
+        }
+        additional_script.set_env_var(&key, &val);
     }
 
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
 
-    writeln!(tmpfile, "{}", script.script)?;
     writeln!(tmpfile, "{}", additional_script.contents)?;
+    writeln!(tmpfile, "{}", script.script)?;
     writeln!(tmpfile, "{}", cmd)?;
 
     let tmpfile_path = tmpfile.into_temp_path();
@@ -134,13 +137,14 @@ impl Tests {
 
         match self {
             Tests::Commands(path) => {
+                let contents = fs::read_to_string(path)?;
                 let ext = path.extension().unwrap().to_str().unwrap();
                 match (Platform::current().is_windows(), ext) {
                     (true, "bat") => {
                         tracing::info!("Testing commands:");
                         run_in_environment(
                             default_shell,
-                            format!("cmd /c {}", path.to_string_lossy()),
+                            contents,
                             cwd,
                             environment,
                         )
@@ -149,7 +153,7 @@ impl Tests {
                         tracing::info!("Testing commands:");
                         run_in_environment(
                             default_shell,
-                            format!("bash -x {}", path.to_string_lossy()),
+                            contents,
                             cwd,
                             environment,
                         )

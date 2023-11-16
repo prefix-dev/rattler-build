@@ -374,4 +374,27 @@ mod tests {
         assert!(rattler_build.is_ok());
         assert!(rattler_build.unwrap().status.code().unwrap() == 1);
     }
+
+    #[test]
+    fn test_noarch_flask() {
+        let tmp = tmp();
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("flask"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+
+        let pkg = get_extracted_package(tmp.as_dir(), "flask");
+        // this is to ensure that the clone happens correctly
+        let license = pkg.join("info/licenses/LICENSE.rst");
+        assert!(license.exists());
+
+        assert!(pkg.join("info/test/run_test.sh").exists());
+        assert!(pkg.join("info/test/run_test.bat").exists());
+        assert!(pkg.join("info/test/run_test.py").exists());
+        assert!(pkg.join("info/test/test_time_dependencies.json").exists());
+        // make sure that the entry point does not exist
+        assert!(!pkg.join("python-scripts/flask").exists());
+
+        assert!(pkg.join("info/link.json").exists())
+    }
 }

@@ -653,17 +653,22 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
         }
 
         if !test.commands().is_empty() {
-            let test_file = if output.build_configuration.target_platform.is_windows() {
-                test_folder.join("run_test.bat")
-            } else {
-                test_folder.join("run_test.sh")
-            };
-
-            let mut file = File::create(&test_file)?;
-            for el in test.commands() {
-                writeln!(file, "{}\n", el)?;
+            let mut command_files = vec![];
+            let target_platform = &output.build_configuration.target_platform;
+            if target_platform.is_windows() || target_platform == &Platform::NoArch {
+                command_files.push(test_folder.join("run_test.bat"));
             }
-            test_files.push(test_file);
+            if target_platform.is_unix() || target_platform == &Platform::NoArch {
+                command_files.push(test_folder.join("run_test.sh"));
+            }
+
+            for cf in command_files {
+                let mut file = File::create(&cf)?;
+                for el in test.commands() {
+                    writeln!(file, "{}\n", el)?;
+                }
+                test_files.push(cf);
+            }
         }
 
         if !test.requires().is_empty() {
@@ -781,6 +786,7 @@ pub fn package_conda(
 
     let mut tmp_files = HashSet::new();
     for f in new_files {
+        let stripped = f.strip_prefix(prefix)?;
         // temporary measure to remove pyc files that are not supposed to be there
         if filter_pyc(f, new_files) {
             continue;
@@ -788,8 +794,8 @@ pub fn package_conda(
 
         if output.recipe.build().noarch().is_python() {
             // we need to remove files in bin/ that are registered as entry points
-            if f.starts_with("bin") {
-                if let Some(name) = f.file_name() {
+            if stripped.starts_with("bin") {
+                if let Some(name) = stripped.file_name() {
                     if output
                         .recipe
                         .build()
@@ -802,8 +808,8 @@ pub fn package_conda(
                 }
             }
             // Windows
-            else if f.starts_with("Scripts") {
-                if let Some(name) = f.file_name() {
+            else if stripped.starts_with("Scripts") {
+                if let Some(name) = stripped.file_name() {
                     if output.recipe.build().entry_points().iter().any(|ep| {
                         format!("{}.exe", ep.command) == name.to_string_lossy()
                             || format!("{}-script.py", ep.command) == name.to_string_lossy()
@@ -889,7 +895,9 @@ pub fn package_conda(
     tracing::info!("\nFiles in package:\n");
     tmp_files
         .iter()
-        .map(|x| x.strip_prefix(tmp_dir_path).unwrap())
+        .map(|x| x.strip_prefix(tmp_dir_path))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
         .sorted()
         .for_each(|f| tracing::info!("  - {}", f.to_string_lossy()));
 
