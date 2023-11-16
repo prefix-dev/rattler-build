@@ -20,6 +20,7 @@ use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
 
 use rattler_build::{
     build::run_build,
+    hash::compute_buildstring,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
@@ -29,7 +30,6 @@ use rattler_build::{
 };
 
 mod console_utils;
-mod hash;
 mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
@@ -260,27 +260,19 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let outputs_and_variants = variant_config.find_variants(&recipe_text, &selector_config)?;
 
-    tracing::info!("Found variants:");
-    for (output, variants) in &outputs_and_variants {
-        let package_name = output
-            .as_mapping()
-            .and_then(|m| m.get("package"))
-            .and_then(|v| v.as_mapping())
-            .and_then(|m| m.get("name"))
-            .and_then(|v| v.as_scalar())
-            .map(|s| s.as_str())
-            .unwrap_or("unknown");
-        for variant in variants {
-            let mut table = comfy_table::Table::new();
-            table
-                .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-                .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-                .set_header(vec!["Package", "Variant", "Version"]);
-            for (key, value) in variant.iter() {
-                table.add_row(vec![package_name, key, value]);
-            }
-            tracing::info!("{}\n", table);
+    tracing::info!("Found variants:\n");
+    for (name, version, hash, _, variant) in &outputs_and_variants {
+        tracing::info!("{name}-{version}-{hash}");
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
+            .set_header(vec!["Variant", "Version"]);
+        for (key, value) in variant.iter() {
+            table.add_row(vec![key, value]);
         }
+        tracing::info!("{}\n", table);
     }
 
     let tool_config = tool_configuration::Configuration {
@@ -290,85 +282,83 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         no_test: args.no_test,
     };
 
-    for (output, variants) in outputs_and_variants {
-        for variant in variants {
-            let hash = hash::compute_buildstring(&variant, &noarch);
+    let mut subpackages = BTreeMap::new();
+    for (_, _, _, output, variant) in outputs_and_variants {
+        let hash = compute_buildstring(&variant, &noarch);
 
-            let selector_config = SelectorConfig {
-                variant: variant.clone(),
-                hash: Some(hash.clone()),
-                target_platform: selector_config.target_platform,
-                build_platform: selector_config.build_platform,
-            };
+        let selector_config = SelectorConfig {
+            variant: variant.clone(),
+            hash: Some(hash.clone()),
+            target_platform: selector_config.target_platform,
+            build_platform: selector_config.build_platform,
+        };
 
-            let recipe = Recipe::from_node(&output, selector_config)
-                .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
+        let recipe = Recipe::from_node(&output, selector_config)
+            .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
 
-            if args.render_only {
-                tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
-                tracing::info!("Variant: {:#?}", variant);
-                tracing::info!("Hash: {}", recipe.build().string().unwrap());
-                tracing::info!("Skip?: {}", recipe.build().skip());
-                continue;
-            }
-
-            if recipe.build().skip() {
-                tracing::info!("Skipping build for variant: {:#?}", variant);
-                continue;
-            }
-
-            let mut subpackages = BTreeMap::new();
-            subpackages.insert(
-                recipe.package().name().clone(),
-                PackageIdentifier {
-                    name: recipe.package().name().clone(),
-                    version: recipe.package().version().to_owned(),
-                    build_string: recipe.build().string().unwrap().to_owned(),
-                },
-            );
-
-            let noarch_type = *recipe.build().noarch();
-            let name = recipe.package().name().clone();
-            // Add the channels from the args and by default always conda-forge
-            let channels = args
-                .channel
-                .clone()
-                .unwrap_or(vec!["conda-forge".to_string()]);
-
-            let timestamp = chrono::Utc::now();
-            let output = rattler_build::metadata::Output {
-                recipe,
-                build_configuration: BuildConfiguration {
-                    target_platform,
-                    host_platform: match target_platform {
-                        Platform::NoArch => Platform::current(),
-                        _ => target_platform,
-                    },
-                    build_platform: Platform::current(),
-                    hash: hash::compute_buildstring(&variant, &noarch_type),
-                    variant: variant.clone(),
-                    directories: Directories::create(
-                        name.as_normalized(),
-                        &recipe_path,
-                        &args.common.output_dir,
-                        args.no_build_id,
-                        &timestamp,
-                    )
-                    .into_diagnostic()?,
-                    channels,
-                    timestamp,
-                    subpackages,
-                    package_format: match args.package_format {
-                        PackageFormat::TarBz2 => ArchiveType::TarBz2,
-                        PackageFormat::Conda => ArchiveType::Conda,
-                    },
-                    store_recipe: !args.no_include_recipe,
-                },
-                finalized_dependencies: None,
-            };
-
-            run_build(&output, tool_config.clone()).await?;
+        if args.render_only {
+            // tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
+            tracing::info!("Variant: {:#?}", variant);
+            tracing::info!("Hash: {}", recipe.build().string().unwrap());
+            tracing::info!("Skip?: {}\n", recipe.build().skip());
+            continue;
         }
+
+        if recipe.build().skip() {
+            tracing::info!("Skipping build for variant: {:#?}", variant);
+            continue;
+        }
+
+        subpackages.insert(
+            recipe.package().name().clone(),
+            PackageIdentifier {
+                name: recipe.package().name().clone(),
+                version: recipe.package().version().to_owned(),
+                build_string: recipe.build().string().unwrap().to_owned(),
+            },
+        );
+
+        let noarch_type = *recipe.build().noarch();
+        let name = recipe.package().name().clone();
+        // Add the channels from the args and by default always conda-forge
+        let channels = args
+            .channel
+            .clone()
+            .unwrap_or(vec!["conda-forge".to_string()]);
+
+        let timestamp = chrono::Utc::now();
+        let output = rattler_build::metadata::Output {
+            recipe,
+            build_configuration: BuildConfiguration {
+                target_platform,
+                host_platform: match target_platform {
+                    Platform::NoArch => Platform::current(),
+                    _ => target_platform,
+                },
+                build_platform: Platform::current(),
+                hash: compute_buildstring(&variant, &noarch_type),
+                variant: variant.clone(),
+                directories: Directories::create(
+                    name.as_normalized(),
+                    &recipe_path,
+                    &args.common.output_dir,
+                    args.no_build_id,
+                    &timestamp,
+                )
+                .into_diagnostic()?,
+                channels,
+                timestamp,
+                subpackages: subpackages.clone(),
+                package_format: match args.package_format {
+                    PackageFormat::TarBz2 => ArchiveType::TarBz2,
+                    PackageFormat::Conda => ArchiveType::Conda,
+                },
+                store_recipe: !args.no_include_recipe,
+            },
+            finalized_dependencies: None,
+        };
+
+        run_build(&output, tool_config.clone()).await?;
     }
 
     Ok(())

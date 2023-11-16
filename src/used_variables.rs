@@ -71,6 +71,10 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
+                } else if function == "cmp" {
+                    if let Expr::Const(constant) = &call.args[0] {
+                        variables.insert(constant.value.to_string());
+                    }
                 }
             }
         }
@@ -106,12 +110,49 @@ fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
     }
 }
 
+// find all scalar nodes and Jinja expressions
+fn find_jinja(node: &Node, variables: &mut HashSet<String>) {
+    use crate::recipe::custom_yaml::SequenceNodeInternal;
+
+    match node {
+        Node::Mapping(map) => {
+            for (_, value) in map.iter() {
+                find_jinja(value, variables);
+            }
+        }
+        Node::Sequence(seq) => {
+            for item in seq.iter() {
+                match item {
+                    SequenceNodeInternal::Simple(node) => find_jinja(node, variables),
+                    SequenceNodeInternal::Conditional(if_sel) => {
+                        if if_sel.cond().contains("${{") {
+                            let ast = parse(if_sel.cond(), "jinja.yaml").unwrap();
+                            extract_variables(&ast, variables);
+                        }
+
+                        find_jinja(if_sel.then(), variables);
+                        if let Some(otherwise) = if_sel.otherwise() {
+                            find_jinja(otherwise, variables);
+                        }
+                    }
+                }
+            }
+        }
+        Node::Scalar(scalar) => {
+            if scalar.contains("${{") {
+                let ast = parse(scalar, "jinja.yaml").unwrap();
+                extract_variables(&ast, variables);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// This finds all variables used in jinja or `if/then/else` expressions
-pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
+pub(crate) fn used_vars_from_expressions(yaml_node: &Node) -> HashSet<String> {
     let mut selectors = HashSet::new();
 
-    let yaml_node = Node::parse_yaml(0, recipe).unwrap();
-    find_all_selectors(&yaml_node, &mut selectors);
+    find_all_selectors(yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();
 
@@ -122,10 +163,7 @@ pub(crate) fn used_vars_from_expressions(recipe: &str) -> HashSet<String> {
     }
 
     // parse recipe into AST
-    let template_ast = parse(recipe, "recipe.yaml").unwrap();
-
-    // extract all variables from the AST
-    extract_variables(&template_ast, &mut variables);
+    find_jinja(yaml_node, &mut variables);
 
     variables
 }
@@ -143,11 +181,12 @@ mod test {
               then: linux-gcc
             - if: osx
               then: osx-clang
-            - "{{ compiler('c') }}"
-            - "{{ pin_subpackage('abcdef') }}"
+            - ${{ compiler('c') }}
+            - ${{ pin_subpackage('abcdef') }}
         "#;
 
-        let used_vars = used_vars_from_expressions(recipe);
+        let recipe = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe);
         assert!(used_vars.contains("llvm_variant"));
         assert!(used_vars.contains("linux"));
         assert!(used_vars.contains("osx"));
