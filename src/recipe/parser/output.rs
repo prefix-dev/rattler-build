@@ -28,6 +28,35 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
         )
     })?;
 
+    if root_map.contains_key("outputs") {
+        if root_map.contains_key("package") {
+            let key = root_map.keys().find(|k| k.as_str() == "package").unwrap();
+            return Err(ParsingError::from_partial(
+                src,
+                _partialerror!(
+                    *key.span(),
+                    ErrorKind::InvalidField("package".to_string().into()),
+                    help = "recipe cannot have both `outputs` and `package` fields. Rename `package` to `recipe` or remove `outputs`"
+                ),
+            ));
+        }
+
+        if root_map.contains_key("requirements") {
+            let key = root_map
+                .keys()
+                .find(|k| k.as_str() == "requirements")
+                .unwrap();
+            return Err(ParsingError::from_partial(
+                src,
+                _partialerror!(
+                    *key.span(),
+                    ErrorKind::InvalidField("package".to_string().into()),
+                    help = "multi-output recipes cannot have a top-level requirements field. Move `requirements` inside the individual output."
+                ),
+            ));
+        }
+    }
+
     let Some(outputs) = root_map.get("outputs") else {
         let recipe =
             Node::try_from(root_node).map_err(|err| ParsingError::from_partial(src, err))?;
@@ -78,7 +107,7 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
                 _partialerror!(
                     *output.span(),
                     ErrorKind::ExpectedMapping,
-                    help = "`outputs` must always be a mapping"
+                    help = "individual `output` must always be a mapping"
                 ),
             )
         })?;
