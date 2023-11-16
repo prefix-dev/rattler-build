@@ -65,7 +65,7 @@ mod tests {
             let mut command = self._get_command();
             if matches!(self, RattlerBuild::WithCargo(_)) {
                 // cargo runs with quite (-q) to ensure we don't mix any additional output from our side
-                command.args(["run", "-q", "-p", "rattler-build", "--"]);
+                command.args(["run", "--release", "-q", "-p", "rattler-build", "--"]);
             };
             command.args(args);
             // command.stderr(Stdio::inherit()).stdout(Stdio::inherit());
