@@ -18,9 +18,7 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('c') }}
     - cmake
-
 about:
   homepage: https://github.com/ggerganov/llama.cpp
   license: MIT

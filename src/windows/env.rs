@@ -8,6 +8,7 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
         Platform::Win64 => "amd64",
         // TODO: Is this correct?
         Platform::WinArm64 => "arm64",
+        Platform::NoArch => "noarch",
         _ => panic!("Non windows platform passed to windows env vars"),
     };
 

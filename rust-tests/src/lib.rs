@@ -5,7 +5,7 @@ mod tests {
         collections::HashMap,
         ffi::OsStr,
         fs::File,
-        path::{Path, PathBuf},
+        path::{Component, Path, PathBuf},
         process::{Command, Output},
     };
 
@@ -132,9 +132,11 @@ mod tests {
             .and_then(|o| String::from_utf8(o.stdout).ok())
     }
 
-    fn tmp() -> WithTemp {
+    fn tmp(s: impl AsRef<str>) -> WithTemp {
+        let path = std::env::temp_dir().join(s.as_ref());
+        _ = std::fs::create_dir_all(&path);
         for i in 0.. {
-            let p = std::env::temp_dir().join(format!("{i}"));
+            let p = path.join(format!("{i}"));
             if p.exists() {
                 continue;
             }
@@ -165,7 +167,12 @@ mod tests {
         let help_test = rattler()
             .with_args(["help"])
             .map(|out| out.stdout)
-            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
+            .map(|s| {
+                #[cfg(target_family = "unix")]
+                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
+                #[cfg(target_family = "windows")]
+                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
+            })
             .unwrap();
         assert!(help_test);
     }
@@ -176,7 +183,12 @@ mod tests {
             // no heap allocations happen here, ideally!
             .with_args(Vec::<&str>::new())
             .map(|out| out.stderr)
-            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
+            .map(|s| {
+                #[cfg(target_family = "unix")]
+                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
+                #[cfg(target_family = "windows")]
+                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
+            })
             .unwrap();
         assert!(help_test);
     }
@@ -184,7 +196,7 @@ mod tests {
     #[test]
     fn test_run_exports() {
         let recipes = recipes();
-        let tmp = tmp();
+        let tmp = tmp("test_run_exports");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes.join("run_exports"), tmp.as_dir(), None);
         // ensure rattler build succeeded
@@ -238,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_pkg_hash() {
-        let tmp = tmp();
+        let tmp = tmp("test_pkg_hash");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("pkg_hash"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
@@ -252,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_license_glob() {
-        let tmp = tmp();
+        let tmp = tmp("test_license_glob");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("globtest"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
@@ -296,12 +308,14 @@ mod tests {
                 for (i, p) in act_arr.iter().enumerate() {
                     let c = cmp_arr[i].as_object().unwrap();
                     let p = p.as_object().unwrap();
-                    assert!(c["_path"] == p["_path"]);
+                    let cpath = PathBuf::from(c["_path"].as_str().unwrap());
+                    let ppath = PathBuf::from(p["_path"].as_str().unwrap());
+                    assert!(cpath == ppath);
                     assert!(c["path_type"] == p["path_type"]);
-                    if p["_path"]
-                        .as_str()
-                        .map(|s| !s.contains("dist-info"))
-                        .unwrap_or_default()
+                    if ppath
+                        .components()
+                        .find(|s| s.eq(&Component::Normal("dist-info".as_ref())))
+                        .is_some()
                     {
                         assert!(c["sha256"] == p["sha256"]);
                         assert!(c["size_in_bytes"] == p["size_in_bytes"]);
@@ -315,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_python_noarch() {
-        let tmp = tmp();
+        let tmp = tmp("test_python_noarch");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("toml"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
@@ -329,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_git_source() {
-        let tmp = tmp();
+        let tmp = tmp("test_git_source");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("llamacpp"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
@@ -343,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_test_execution() {
-        let tmp = tmp();
+        let tmp = tmp("test_test_execution");
         let rattler_build = rattler().build::<_, _, &str>(
             recipes().join("test-execution/recipe-test-succeed.yaml"),
             tmp.as_dir(),
