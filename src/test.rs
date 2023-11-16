@@ -87,7 +87,10 @@ fn run_in_environment(
     let activator = Activator::from_path(environment, shell.clone(), Platform::current())?;
     let script = activator.activation(av)?;
 
-    let mut tmpfile = tempfile::NamedTempFile::new()?;
+    let mut tmpfile = tempfile::Builder::new()
+        .prefix("rattler-test-")
+        .suffix(&format!(".{}", shell.extension()))
+        .tempfile()?;
 
     let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
 
