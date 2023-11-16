@@ -140,7 +140,6 @@ impl Recipe {
                 "requirements" => requirements = value.try_convert(key_str)?,
                 "test" => test = value.try_convert(key_str)?,
                 "about" => about = value.try_convert(key_str)?,
-                "outputs" => {}
                 "context" => {}
                 "extra" => {}
                 invalid_key => {

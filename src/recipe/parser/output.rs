@@ -12,7 +12,9 @@ use crate::{
 };
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
-static ALLOWED_KEYS: [&str; 6] = ["recipe", "source", "build", "outputs", "about", "extra"];
+static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 7] = [
+    "context", "recipe", "source", "build", "outputs", "about", "extra",
+];
 
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
     let root_node = marked_yaml::parse_yaml(0, src)
@@ -56,18 +58,18 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
                 ),
             ));
         }
-    }
 
-    for key in root_map.keys() {
-        if !ALLOWED_KEYS.contains(&key.as_str()) {
-            return Err(ParsingError::from_partial(
-                src,
-                _partialerror!(
-                    *key.span(),
-                    ErrorKind::InvalidField(key.as_str().to_string().into()),
-                    help = format!("invalid key ({}) in root node", key.as_str())
-                ),
-            ));
+        for key in root_map.keys() {
+            if !ALLOWED_KEYS_MULTI_OUTPUTS.contains(&key.as_str()) {
+                return Err(ParsingError::from_partial(
+                    src,
+                    _partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(key.as_str().to_string().into()),
+                        help = format!("invalid key ({}) in root node", key.as_str())
+                    ),
+                ));
+            }
         }
     }
 
