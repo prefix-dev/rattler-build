@@ -1,35 +1,42 @@
 on:
-    push:
-        branches: [ main ]
-    pull_request:
+  push:
+    branches: [main]
+  pull_request:
 
 name: End-to-End testing
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
-    RUST_LOG: info
-    RUST_BACKTRACE: 1
-    RUSTFLAGS: "-D warnings"
-    CARGO_TERM_COLOR: always
+  RUST_LOG: info
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  CARGO_TERM_COLOR: always
 
 jobs:
-    run_tests:
-        name: Run tests
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout source code
-              uses: actions/checkout@v4
-            - uses: Swatinem/rust-cache@v2
-            - uses: dtolnay/rust-toolchain@master
-              with:
-                toolchain: 1.70.0
-            - uses: prefix-dev/setup-pixi@v0.4.1
-              with:
-                pixi-version: v0.5.0
-                cache: true
-            # build in release mode so that it's reasonably fast to run the tests
-            - run: cargo build --release
-            - run: pixi run end_to_end_test
+  run_tests:
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"]
+
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.70.0
+      - uses: prefix-dev/setup-pixi@v0.4.1
+        with:
+          pixi-version: v0.5.0
+          cache: true
+      # build in release mode so that it's reasonably fast to run the tests
+      - run: cargo build --release
+      - run: |
+          cd rust-tests
+          cargo test
+      - run: pixi run end_to_end_test

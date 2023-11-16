@@ -86,7 +86,7 @@ mod tests {
 
         #[cfg(target_os = "linux")]
         #[cfg(not(target_arch = "aarch64"))]
-        return "linux-aarch64";
+        return "linux-64";
 
         #[cfg(target_os = "macos")]
         #[cfg(not(target_arch = "aarch64"))]
@@ -339,5 +339,25 @@ mod tests {
         assert!(license.exists());
         let src = std::fs::read_to_string(license).unwrap();
         assert!(src.contains(" Georgi "));
+    }
+
+    #[test]
+    fn test_test_execution() {
+        let tmp = tmp();
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("test-execution/recipe-test-succeed.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("test-execution/recipe-test-fail.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.code().unwrap() == 1);
     }
 }

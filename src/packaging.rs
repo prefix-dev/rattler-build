@@ -653,7 +653,12 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
         }
 
         if !test.commands().is_empty() {
-            let test_file = test_folder.join("run_test.sh");
+            let test_file = if output.build_configuration.target_platform.is_windows() {
+                test_folder.join("run_test.bat")
+            } else {
+                test_folder.join("run_test.sh")
+            };
+
             let mut file = File::create(&test_file)?;
             for el in test.commands() {
                 writeln!(file, "{}\n", el)?;

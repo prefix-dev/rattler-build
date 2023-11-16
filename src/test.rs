@@ -8,7 +8,7 @@
 //! * `files` - check if a list of files exist
 
 use std::{
-    fs::{self, File},
+    fs::{self},
     io::{Read, Write},
     path::{Path, PathBuf},
     str::FromStr,
@@ -23,8 +23,8 @@ use rattler_conda_types::{
 };
 use rattler_networking::AuthenticatedClient;
 use rattler_shell::{
-    activation::{ActivationVariables, Activator},
-    shell,
+    activation::{ActivationError, ActivationVariables, Activator},
+    shell::{Shell, ShellEnum, ShellScript},
 };
 
 use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
@@ -40,8 +40,23 @@ pub enum TestError {
     #[error("Failed to parse MatchSpec: {0}")]
     MatchSpecParse(String),
 
-    #[error("Failed to setup test environment:")]
+    #[error("Failed to setup test environment: {0}")]
     TestEnvironmentSetup(#[from] anyhow::Error),
+
+    #[error("Failed to setup test environment: {0}")]
+    TestEnvironementActivation(#[from] ActivationError),
+
+    #[error("Failed to parse JSON from test files: {0}")]
+    TestJSONParseError(#[from] serde_json::Error),
+
+    #[error("Failed to parse MatchSpec from test files: {0}")]
+    TestMatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
+
+    #[error("Missing package file name")]
+    MissingPackageFileName,
+
+    #[error("Archive type not supported")]
+    ArchiveTypeNotSupported,
 }
 
 #[derive(Debug)]
@@ -50,7 +65,12 @@ enum Tests {
     Python(PathBuf),
 }
 
-fn run_in_environment(cmd: &str, cwd: &Path, environment: &Path) -> Result<(), TestError> {
+fn run_in_environment(
+    shell: ShellEnum,
+    cmd: String,
+    cwd: &Path,
+    environment: &Path,
+) -> Result<(), TestError> {
     let current_path = std::env::var("PATH")
         .ok()
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
@@ -64,32 +84,42 @@ fn run_in_environment(cmd: &str, cwd: &Path, environment: &Path) -> Result<(), T
         path_modification_behaviour: Default::default(),
     };
 
-    let activator = Activator::from_path(environment, shell::Bash, Platform::current()).unwrap();
-    let script = activator.activation(av).unwrap();
+    let activator = Activator::from_path(environment, shell.clone(), Platform::current())?;
+    let script = activator.activation(av)?;
 
-    let tmpfile = tempfile::NamedTempFile::new().unwrap();
-    let tmpfile_path = tmpfile.path();
+    let mut tmpfile = tempfile::Builder::new()
+        .prefix("rattler-test-")
+        .suffix(&format!(".{}", shell.extension()))
+        .tempfile()?;
 
-    let mut out_script = File::create(tmpfile_path).unwrap();
+    let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
+
     let os_vars = env_vars::os_vars(environment, &Platform::current());
-
     for var in os_vars {
-        writeln!(out_script, "export {}=\"{}\"", var.0, var.1)?;
+        additional_script.set_env_var(&var.0, &var.1);
     }
 
-    writeln!(out_script, "{}", script.script)?;
-    writeln!(
-        out_script,
-        "export PREFIX={}",
-        environment.to_string_lossy()
-    )?;
-    writeln!(out_script, "{}", cmd)?;
+    additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
 
-    let mut cmd = std::process::Command::new("bash");
-    cmd.arg(tmpfile_path);
-    cmd.current_dir(cwd);
+    writeln!(tmpfile, "{}", script.script)?;
+    writeln!(tmpfile, "{}", additional_script.contents)?;
+    writeln!(tmpfile, "{}", cmd)?;
 
-    let status = cmd.status().unwrap();
+    let tmpfile_path = tmpfile.into_temp_path();
+    let executable = shell.executable();
+    let status = match shell {
+        ShellEnum::Bash(_) => std::process::Command::new(executable)
+            .arg(&tmpfile_path)
+            .current_dir(cwd)
+            .status()?,
+        ShellEnum::CmdExe(_) => std::process::Command::new(executable)
+            .arg("/d")
+            .arg("/c")
+            .arg(&tmpfile_path)
+            .current_dir(cwd)
+            .status()?,
+        _ => todo!("No shells implemented beyond cmd.exe and bash"),
+    };
 
     if !status.success() {
         return Err(TestError::TestFailed);
@@ -100,22 +130,26 @@ fn run_in_environment(cmd: &str, cwd: &Path, environment: &Path) -> Result<(), T
 
 impl Tests {
     fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
+        let default_shell = ShellEnum::default();
+
         match self {
             Tests::Commands(path) => {
                 let ext = path.extension().unwrap().to_str().unwrap();
                 match (Platform::current().is_windows(), ext) {
                     (true, "bat") => {
-                        println!("Testing commands:");
+                        tracing::info!("Testing commands:");
                         run_in_environment(
-                            &format!("cmd /c {}", path.to_string_lossy()),
+                            default_shell,
+                            format!("cmd /c {}", path.to_string_lossy()),
                             cwd,
                             environment,
                         )
                     }
                     (false, "sh") => {
-                        println!("Testing commands:");
+                        tracing::info!("Testing commands:");
                         run_in_environment(
-                            &format!("bash -x {}", path.to_string_lossy()),
+                            default_shell,
+                            format!("bash -x {}", path.to_string_lossy()),
                             cwd,
                             environment,
                         )
@@ -125,9 +159,10 @@ impl Tests {
             }
             Tests::Python(path) => {
                 let imports = fs::read_to_string(path)?;
-                println!("Testing Python imports:\n{imports}");
+                tracing::info!("Testing Python imports:\n{imports}");
                 run_in_environment(
-                    &format!("python {}", path.to_string_lossy()),
+                    default_shell,
+                    format!("python {}", path.to_string_lossy()),
                     cwd,
                     environment,
                 )
@@ -243,14 +278,23 @@ pub struct TestConfiguration {
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
-    let tmp_repo = tempfile::tempdir().unwrap();
+    let tmp_repo = tempfile::tempdir()?;
     let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
-    std::fs::create_dir_all(&subdir).unwrap();
-    std::fs::copy(package_file, subdir.join(package_file.file_name().unwrap())).unwrap();
+    std::fs::create_dir_all(&subdir)?;
 
-    let archive_type = ArchiveType::try_from(package_file).unwrap();
+    std::fs::copy(
+        package_file,
+        subdir.join(
+            package_file
+                .file_name()
+                .ok_or(TestError::MissingPackageFileName)?,
+        ),
+    )?;
+
+    let archive_type =
+        ArchiveType::try_from(package_file).ok_or(TestError::ArchiveTypeNotSupported)?;
     let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
     let test_dependencies = match archive_type {
         ArchiveType::TarBz2 => file_from_tar_bz2(package_file, &test_dep_json),
@@ -259,11 +303,11 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     let mut dependencies: Vec<MatchSpec> = match test_dependencies {
         Ok(contents) => {
-            let test_deps: Vec<String> = serde_json::from_str(&contents).unwrap();
+            let test_deps: Vec<String> = serde_json::from_str(&contents)?;
             test_deps
                 .iter()
-                .map(|s| MatchSpec::from_str(s).unwrap())
-                .collect()
+                .map(|s| MatchSpec::from_str(s))
+                .collect::<Result<Vec<_>, _>>()?
         }
         Err(error) => {
             if error.kind() == std::io::ErrorKind::NotFound {
@@ -275,9 +319,9 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     };
 
     // index the temporary channel
-    index::index(tmp_repo.path(), Some(&target_platform)).unwrap();
+    index::index(tmp_repo.path(), Some(&target_platform))?;
 
-    let cache_dir = rattler::default_cache_dir().unwrap();
+    let cache_dir = rattler::default_cache_dir()?;
 
     let pkg = ArchiveIdentifier::try_from_path(package_file).ok_or(TestError::TestFailed)?;
 
@@ -286,7 +330,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
 
     if package_folder.exists() {
-        println!("Removing previously cached package {:?}", package_folder);
+        tracing::info!("Removing previously cached package {:?}", package_folder);
         fs::remove_dir_all(package_folder)?;
     }
 
@@ -295,7 +339,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
     dependencies.push(match_spec);
 
-    let prefix = canonicalize(&config.test_prefix).unwrap();
+    let prefix = canonicalize(&config.test_prefix)?;
 
     let global_configuration = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
@@ -304,7 +348,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         no_test: false,
     };
 
-    println!("Creating test environment in {:?}", prefix);
+    tracing::info!("Creating test environment in {:?}", prefix);
 
     create_environment(
         &dependencies,
@@ -331,7 +375,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         console::style(console::Emoji("✔", "")).green()
     );
 
-    fs::remove_dir_all(prefix).unwrap();
+    fs::remove_dir_all(prefix)?;
 
     Ok(())
 }
