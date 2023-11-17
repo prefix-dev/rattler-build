@@ -425,6 +425,14 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
     end
 }
 
+pub(crate) fn jinja_error_to_label(err: &minijinja::Error) -> String {
+    if let Some(ref detail) = err.detail() {
+        format!("{}: {}", err.kind(), detail)
+    } else {
+        format!("{}", err.kind())
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
