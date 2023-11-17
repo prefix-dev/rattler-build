@@ -72,8 +72,8 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "cmp" {
-                    if let Expr::Const(constant) = &call.args[0] {
-                        variables.insert(constant.value.to_string());
+                    if let Expr::Var(var) = &call.args[0] {
+                        variables.insert(var.id.to_string());
                     }
                 }
             }
@@ -111,28 +111,28 @@ fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
 }
 
 // find all scalar nodes and Jinja expressions
-fn find_jinja(node: &Node, variables: &mut HashSet<String>) {
+fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), minijinja::Error> {
     use crate::recipe::custom_yaml::SequenceNodeInternal;
 
     match node {
         Node::Mapping(map) => {
             for (_, value) in map.iter() {
-                find_jinja(value, variables);
+                find_jinja(value, variables)?;
             }
         }
         Node::Sequence(seq) => {
             for item in seq.iter() {
                 match item {
-                    SequenceNodeInternal::Simple(node) => find_jinja(node, variables),
+                    SequenceNodeInternal::Simple(node) => find_jinja(node, variables)?,
                     SequenceNodeInternal::Conditional(if_sel) => {
-                        if if_sel.cond().contains("${{") {
-                            let ast = parse(if_sel.cond(), "jinja.yaml").unwrap();
-                            extract_variables(&ast, variables);
-                        }
+                        // we need to convert the if condition to a Jinja expression to parse it
+                        let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
+                        let ast = parse(&as_jinja_expr, "jinja.yaml")?;
+                        extract_variables(&ast, variables);
 
-                        find_jinja(if_sel.then(), variables);
+                        find_jinja(if_sel.then(), variables)?;
                         if let Some(otherwise) = if_sel.otherwise() {
-                            find_jinja(otherwise, variables);
+                            find_jinja(otherwise, variables)?;
                         }
                     }
                 }
@@ -140,16 +140,20 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) {
         }
         Node::Scalar(scalar) => {
             if scalar.contains("${{") {
-                let ast = parse(scalar, "jinja.yaml").unwrap();
+                let ast = parse(scalar, "jinja.yaml")?;
                 extract_variables(&ast, variables);
             }
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 /// This finds all variables used in jinja or `if/then/else` expressions
-pub(crate) fn used_vars_from_expressions(yaml_node: &Node) -> HashSet<String> {
+pub(crate) fn used_vars_from_expressions(
+    yaml_node: &Node,
+) -> Result<HashSet<String>, minijinja::Error> {
     let mut selectors = HashSet::new();
 
     find_all_selectors(yaml_node, &mut selectors);
@@ -158,14 +162,14 @@ pub(crate) fn used_vars_from_expressions(yaml_node: &Node) -> HashSet<String> {
 
     for selector in selectors {
         let selector_tmpl = format!("{{{{ {} }}}}", selector);
-        let ast = parse(&selector_tmpl, "selector.yaml").unwrap();
+        let ast = parse(&selector_tmpl, "selector.yaml")?;
         extract_variables(&ast, &mut variables);
     }
 
     // parse recipe into AST
-    find_jinja(yaml_node, &mut variables);
+    find_jinja(yaml_node, &mut variables)?;
 
-    variables
+    Ok(variables)
 }
 
 #[cfg(test)]
@@ -186,7 +190,7 @@ mod test {
         "#;
 
         let recipe = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
-        let used_vars = used_vars_from_expressions(&recipe);
+        let used_vars = used_vars_from_expressions(&recipe).unwrap();
         assert!(used_vars.contains("llvm_variant"));
         assert!(used_vars.contains("linux"));
         assert!(used_vars.contains("osx"));
