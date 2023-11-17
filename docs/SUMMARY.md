@@ -10,3 +10,5 @@
 - [Variants](./variants.md)
 - [Package specification](./package_spec.md)
 - [Internals](./internals.md)
+- [Compilers and cross compilation](./compilers.md)
+- [Automatic recipe linting](./automatic_linting.md)

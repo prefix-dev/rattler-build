@@ -13,7 +13,7 @@ build:
 test:
   commands:
     - if: unix
-      then: 
+      then:
         - test -f $PREFIX/test-execution.txt
       else:
         - if not exist %PREFIX%\test-execution.txt (exit 1)
