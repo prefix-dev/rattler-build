@@ -10,7 +10,7 @@ use url::Url;
 use crate::{
     _partialerror,
     recipe::{
-        error::{ErrorKind, ParsingError, PartialParsingError},
+        error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
     },
 };
@@ -125,12 +125,12 @@ impl Render<Node> for Node {
 }
 
 impl Render<Node> for ScalarNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, PartialParsingError> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
             _partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
-                label = format!("error rendering {name}: {}", self.as_str())
+                label = jinja_error_to_label(&err)
             )
         })?;
 
@@ -142,13 +142,13 @@ impl Render<Option<ScalarNode>> for ScalarNode {
     fn render(
         &self,
         jinja: &Jinja,
-        name: &str,
+        _name: &str,
     ) -> Result<Option<ScalarNode>, super::error::PartialParsingError> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
             _partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
-                label = format!("error rendering {name}: {}", self.as_str())
+                label = jinja_error_to_label(&err)
             )
         })?;
 

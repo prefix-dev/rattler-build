@@ -10,7 +10,7 @@ use marked_yaml::Span;
 use crate::{
     _partialerror,
     recipe::{
-        error::{ErrorKind, ParsingError, PartialParsingError},
+        error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
         Render,
     },
@@ -589,7 +589,7 @@ impl Render<RenderedNode> for ScalarNode {
                 _partialerror!(
                     *self.span(),
                     ErrorKind::JinjaRendering(err),
-                    label = format!("error rendering {name}")
+                    label = jinja_error_to_label(&err),
                 )
             })?;
 
@@ -601,7 +601,7 @@ impl Render<RenderedNode> for ScalarNode {
             _partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
-                label = format!("error rendering {name}")
+                label = jinja_error_to_label(&err),
             )
         })?;
 
@@ -619,13 +619,13 @@ impl Render<Option<RenderedNode>> for ScalarNode {
     fn render(
         &self,
         jinja: &Jinja,
-        name: &str,
+        _name: &str,
     ) -> Result<Option<RenderedNode>, PartialParsingError> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
             _partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
-                label = format!("error rendering {name}")
+                label = format!("Rendering error: {}", err.kind())
             )
         })?;
 

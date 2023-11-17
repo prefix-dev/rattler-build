@@ -402,7 +402,6 @@ pub(super) fn marker_to_offset(src: &str, mark: marked_yaml::Marker) -> SourceOf
 pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
     let start = start.offset();
     let mut end = 0;
-
     let mut iter = src[start..].char_indices();
 
     // FIXME: Implement `"`, `'` and `[` open and close detection.
@@ -422,7 +421,20 @@ pub(super) fn find_length(src: &str, start: SourceOffset) -> usize {
         }
     }
 
+    // When we didn't find an "end" character it means we reached the end of the string.
+    if end == 0 {
+        end = src.len() - start;
+    }
+
     end
+}
+
+pub(crate) fn jinja_error_to_label(err: &minijinja::Error) -> String {
+    if let Some(ref detail) = err.detail() {
+        format!("{}: {}", err.kind(), detail)
+    } else {
+        format!("{}", err.kind())
+    }
 }
 
 #[cfg(test)]

@@ -255,4 +255,12 @@ mod tests {
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
     }
+
+    #[test]
+    fn jinja_error() {
+        let recipe = include_str!("../../test-data/recipes/test-parsing/recipe_jinja_error.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
+        let err = recipe.unwrap_err();
+        assert_miette_snapshot!(err);
+    }
 }
