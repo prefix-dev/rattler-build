@@ -29,7 +29,7 @@ test:
     - mypkg.subpkg
 
   # additional requirements at test time (only in the target platform architecture)
-  requirements:
+  requires:
     - pip
 
   # Extra files to be copied to the test directory from the build dir (can be globs)
