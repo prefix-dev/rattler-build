@@ -72,8 +72,16 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "cmp" {
-                    if let Expr::Const(constant) = &call.args[0] {
-                        variables.insert(constant.value.to_string());
+                    match &call.args[0] {
+                        // TODO should we allow only "test" vs test in cmp, 
+                        // e.g. `cmp("test", "0.8")` vs `cmp(test, "0.8")`
+                        Expr::Const(constant) => {
+                            variables.insert(constant.value.to_string());
+                        }
+                        Expr::Var(var) => {
+                            variables.insert(var.id.to_string());
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -125,10 +133,10 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) {
                 match item {
                     SequenceNodeInternal::Simple(node) => find_jinja(node, variables),
                     SequenceNodeInternal::Conditional(if_sel) => {
-                        if if_sel.cond().contains("${{") {
-                            let ast = parse(if_sel.cond(), "jinja.yaml").unwrap();
-                            extract_variables(&ast, variables);
-                        }
+                        // we need to convert the if condition to a Jinja expression to parse it
+                        let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
+                        let ast = parse(&as_jinja_expr, "jinja.yaml").unwrap();
+                        extract_variables(&ast, variables);
 
                         find_jinja(if_sel.then(), variables);
                         if let Some(otherwise) = if_sel.otherwise() {
