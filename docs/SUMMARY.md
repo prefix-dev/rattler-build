@@ -12,3 +12,5 @@
 - [Internals](./internals.md)
 - [Compilers and cross compilation](./compilers.md)
 - [Automatic recipe linting](./automatic_linting.md)
+- [Testing packages](./testing.md)
+- [Reproducible builds with `rebuild`](./rebuild.md)
