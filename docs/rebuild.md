@@ -15,7 +15,7 @@ rattler-build rebuild ./mypkg-0.1.0-h60d57d3_0.tar.bz2
 
 The recipe is "rendered" and stored into the package. The way the recipe is
 rendered is subject to change. For the moment, the rendered recipe is stored as
-`info/rendered_recipe.yaml` file. It includes the exact package versions that
+`info/recipe/rendered_recipe.yaml` file. It includes the exact package versions that
 were used at build time. When rebuilding, we use the package resolutions from
 the rendered recipe, and execute the same build script as the original package.
 
