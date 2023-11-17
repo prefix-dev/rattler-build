@@ -179,34 +179,14 @@ pub fn git_src(
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
-    if git_lfs_required(&cache_path) {
-        // only do lfs pull if needed!
+    // only do lfs pull if a requirement!
+    if source.lfs() {
         git_lfs_pull()?;
     }
 
     tracing::info!("Checked out reference: '{}'", &source.rev());
 
     Ok(cache_path)
-}
-
-// TODO: we can use parallelization and work splitting for much faster search
-// not sure if it's required though
-fn git_lfs_required(repo_path: RepoPath) -> bool {
-    // scan `**/.gitattributes`
-    walkdir::WalkDir::new(repo_path)
-        .follow_links(false)
-        .into_iter()
-        .filter_entry(|d| {
-            // ignore .git folder (or folders in case of submodules)
-            (d.file_type().is_dir() && !d.file_name().to_string_lossy().contains(".git"))
-                || d.file_name()
-                    .to_string_lossy()
-                    .starts_with(".gitattributes")
-        })
-        .filter_map(|d| d.ok())
-        .filter(|d| d.file_type().is_file())
-        .filter_map(|d| std::fs::read_to_string(d.path()).ok())
-        .any(|s| s.lines().any(|l| l.contains("lfs")))
 }
 
 fn git_lfs_pull() -> Result<(), SourceError> {
@@ -217,7 +197,6 @@ fn git_lfs_pull() -> Result<(), SourceError> {
         .output()
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
     if !output.status.success() {
-        tracing::error!("`git lfs install` failed!");
         return Err(SourceError::GitErrorStr(
             "git-lfs not installed, but required",
         ));
@@ -230,8 +209,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
         .output()
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
     if !output.status.success() {
-        tracing::error!("`git lfs pull` failed!");
-        return Ok(());
+        return Err(SourceError::GitErrorStr("`git lfs pull` failed!"));
     }
 
     Ok(())
@@ -261,6 +239,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -275,6 +254,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -289,6 +269,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
@@ -299,6 +280,7 @@ mod tests {
                     None,
                     vec![],
                     None,
+                    false,
                 ),
                 "rattler-build",
             ),
