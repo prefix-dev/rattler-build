@@ -34,13 +34,6 @@ mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
-#[derive(Serialize, Deserialize, Debug)]
-struct RawRecipe {
-    context: BTreeMap<String, serde_yaml::Value>,
-    #[serde(flatten)]
-    recipe: BTreeMap<String, serde_yaml::Value>,
-}
-
 #[derive(Parser)]
 enum SubCommands {
     /// Build a package
