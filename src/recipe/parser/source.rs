@@ -346,6 +346,14 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
             )
         })?;
 
+        if md5.is_none() && sha256.is_none() {
+            return Err(_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("sha256 or md5".into()),
+                help = "URL `source` must have a `sha256` or `md5` checksum field"
+            ));
+        }
+
         Ok(UrlSource {
             url,
             md5,
