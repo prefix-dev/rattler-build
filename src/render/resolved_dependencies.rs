@@ -612,3 +612,23 @@ pub async fn resolve_dependencies(
         run: run_specs,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    // test rendering of DependencyInfo
+    use super::*;
+
+    #[test]
+    fn test_dependency_info_render() {
+        let dep_info = vec![DependencyInfo::Variant {
+            spec: MatchSpec::from_str("foo").unwrap(),
+            variant: "bar".to_string(),
+        },
+        DependencyInfo::Compiler {
+            spec: MatchSpec::from_str("foo").unwrap(),
+        },
+        ];
+        let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
+        insta::assert_snapshot!(yaml_str);
+    }
+}
