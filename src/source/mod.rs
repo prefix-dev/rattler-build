@@ -54,6 +54,9 @@ pub enum SourceError {
 
     #[error("Failed to parse glob pattern")]
     Glob(#[from] globset::Error),
+
+    #[error("No checksum found for url: {0}")]
+    NoChecksum(url::Url),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -85,14 +88,7 @@ pub async fn fetch_sources(
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url());
-                let res = url_source::url_src(
-                    src,
-                    &cache_src,
-                    src.checksums()
-                        .first()
-                        .ok_or(SourceError::UnknownErrorStr("Checksums not provided"))?,
-                )
-                .await?;
+                let res = url_source::url_src(src, &cache_src).await?;
                 let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {

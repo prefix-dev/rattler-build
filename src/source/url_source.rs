@@ -70,11 +70,16 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
     Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
 }
 
-pub(crate) async fn url_src(
-    source: &UrlSource,
-    cache_dir: &Path,
-    checksum: &Checksum,
-) -> Result<PathBuf, SourceError> {
+pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<PathBuf, SourceError> {
+    // convert sha256 or md5 to Checksum
+    let checksum = if let Some(sha256) = source.sha256() {
+        Checksum::Sha256(*sha256)
+    } else if let Some(md5) = source.md5() {
+        Checksum::Md5(*md5)
+    } else {
+        return Err(SourceError::NoChecksum(source.url().clone()));
+    };
+
     if source.url().scheme() == "file" {
         let local_path = source.url().to_file_path().map_err(|_| {
             SourceError::Io(std::io::Error::new(
@@ -85,22 +90,27 @@ pub(crate) async fn url_src(
         if !local_path.is_file() {
             return Err(SourceError::FileNotFound);
         }
-        if validate_checksum(&local_path, checksum) {
-            tracing::info!("Using local source file.");
-            return Ok(local_path);
-        } else {
-            tracing::error!("Checksum validation failed!");
-            return Err(SourceError::ValidationFailed);
+
+        if let Some(sha256) = source.sha256() {
+            if !validate_checksum(&local_path, &Checksum::Sha256(*sha256)) {
+                return Err(SourceError::ValidationFailed);
+            }
+        } else if let Some(md5) = source.md5() {
+            if !validate_checksum(&local_path, &Checksum::Md5(*md5)) {
+                return Err(SourceError::ValidationFailed);
+            }
         }
+        tracing::info!("Using local source file.");
+        return Ok(local_path);
     }
 
-    let cache_name = PathBuf::from(cache_name_from_url(source.url(), checksum).ok_or(
+    let cache_name = PathBuf::from(cache_name_from_url(source.url(), &checksum).ok_or(
         SourceError::UnknownErrorStr("Failed to build cache name from url"),
     )?);
     let cache_name = cache_dir.join(cache_name);
 
     let metadata = fs::metadata(&cache_name);
-    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, checksum) {
+    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, &checksum) {
         tracing::info!("Found valid source cache file.");
         return Ok(cache_name.clone());
     }
@@ -112,7 +122,7 @@ pub(crate) async fn url_src(
     let mut content = Cursor::new(response.bytes().await?);
     std::io::copy(&mut content, &mut file)?;
 
-    if !validate_checksum(&cache_name, checksum) {
+    if !validate_checksum(&cache_name, &checksum) {
         tracing::error!("Checksum validation failed!");
         fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);

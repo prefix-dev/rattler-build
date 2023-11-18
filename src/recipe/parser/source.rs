@@ -17,6 +17,7 @@ use crate::{
 
 /// Source information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Source {
     Git(GitSource),
     Url(UrlSource),
@@ -245,12 +246,22 @@ impl fmt::Display for GitUrl {
 
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     url: Url,
-    /// Optionally a checksum to verify the downloaded file
-    checksums: Vec<Checksum>,
+
+    /// Optionally a sha256 checksum to verify the downloaded file
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<rattler_digest::Sha256>>")]
+    sha256: Option<Sha256Hash>,
+
+    /// Optionally a md5 checksum to verify the downloaded file
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<rattler_digest::Md5>>")]
+    md5: Option<Md5Hash>,
+
     /// Optionally a file name to rename the downloaded file (does not apply to archives)
     file_name: Option<String>,
     /// Patches to apply to the source code
@@ -265,9 +276,14 @@ impl UrlSource {
         &self.url
     }
 
-    /// Get the checksum of the URL source.
-    pub fn checksums(&self) -> &[Checksum] {
-        self.checksums.as_slice()
+    /// Get the SHA256 checksum of the URL source.
+    pub fn sha256(&self) -> Option<&Sha256Hash> {
+        self.sha256.as_ref()
+    }
+
+    /// Get the MD5 checksum of the URL source.
+    pub fn md5(&self) -> Option<&Md5Hash> {
+        self.md5.as_ref()
     }
 
     /// Get the patches of the URL source.
@@ -289,7 +305,8 @@ impl UrlSource {
 impl TryConvertNode<UrlSource> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<UrlSource, PartialParsingError> {
         let mut url = None;
-        let mut checksums = Vec::new();
+        let mut sha256 = None;
+        let mut md5 = None;
         let mut patches = Vec::new();
         let mut folder = None;
         let mut file_name = None;
@@ -301,12 +318,12 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                 "sha256" => {
                     let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
                     let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256))?;
-                    checksums.push(Checksum::Sha256(sha256_out));
+                    sha256 = Some(sha256_out);
                 }
                 "md5" => {
                     let md5_str: RenderedScalarNode = value.try_convert(key_str)?;
                     let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| _partialerror!(*md5_str.span(), ErrorKind::InvalidMd5))?;
-                    checksums.push(Checksum::Md5(md5_out));
+                    md5 = Some(md5_out);
                 }
                 "file_name" => file_name = value.try_convert(key_str)?,
                 "patches" => patches = value.try_convert(key_str)?,
@@ -331,7 +348,8 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 
         Ok(UrlSource {
             url,
-            checksums,
+            md5,
+            sha256,
             file_name,
             patches,
             folder,
