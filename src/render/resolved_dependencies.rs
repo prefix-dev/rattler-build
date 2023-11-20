@@ -632,8 +632,12 @@ mod tests {
             DependencyInfo::Compiler {
                 spec: MatchSpec::from_str("foo").unwrap(),
             },
-            DependencyInfo::PinSubpackage { spec: MatchSpec::from_str("baz").unwrap() },
-            DependencyInfo::PinCompatible { spec: MatchSpec::from_str("bat").unwrap() },
+            DependencyInfo::PinSubpackage {
+                spec: MatchSpec::from_str("baz").unwrap(),
+            },
+            DependencyInfo::PinCompatible {
+                spec: MatchSpec::from_str("bat").unwrap(),
+            },
         ];
         let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
         insta::assert_snapshot!(yaml_str);
