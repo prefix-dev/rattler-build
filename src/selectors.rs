@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, str::FromStr};
 
-use crate::recipe::jinja::Env;
+use crate::{recipe::jinja::Env, variant_config::VariantError};
 
 use minijinja::{value::Value, Environment};
 use rattler_conda_types::{Platform, Version, VersionSpec};
@@ -76,14 +76,27 @@ impl Default for SelectorConfig {
     }
 }
 
-pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorConfig) -> bool {
+pub fn eval_selector<S: Into<String>>(
+    selector: S,
+    selector_config: &SelectorConfig,
+) -> Result<bool, VariantError> {
     let mut env = Environment::new();
 
     env.add_function("cmp", |a: &Value, spec: &str| {
         if let Some(version) = a.as_str() {
             // check if version matches spec
-            let version = Version::from_str(version).unwrap();
-            let version_spec = VersionSpec::from_str(spec).unwrap();
+            let version = Version::from_str(version).map_err(|_| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "bad version provided for cmp",
+                )
+            })?;
+            let version_spec = VersionSpec::from_str(spec).map_err(|_| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "bad version spec provided for cmp",
+                )
+            })?;
             Ok(version_spec.matches(&version))
         } else {
             // if a is undefined, we are currently searching for all variants and thus return true
@@ -99,10 +112,10 @@ pub fn eval_selector<S: Into<String>>(selector: S, selector_config: &SelectorCon
         .and_then(|selector| selector.strip_suffix(')'))
         .expect("Could not strip sel( ... ). Check your brackets.");
 
-    let expr = env.compile_expression(selector).unwrap();
+    let expr = env.compile_expression(selector)?;
     let ctx = selector_config.clone().into_context();
-    let result = expr.eval(ctx).unwrap();
-    result.is_true()
+    let result = expr.eval(ctx)?;
+    Ok(result.is_true())
 }
 
 /// Flatten a YAML value, returning a new value with selectors evaluated and removed.
@@ -153,7 +166,7 @@ pub fn flatten_selectors(
     }
 
     if val.is_mapping() {
-        let only_selectors = val.as_mapping().unwrap().iter().all(|(k, _)| {
+        let only_selectors = val.as_mapping()?.iter().all(|(k, _)| {
             if let YamlValue::String(key) = k {
                 key.starts_with("sel(")
             } else {
@@ -162,9 +175,9 @@ pub fn flatten_selectors(
         });
 
         if only_selectors {
-            for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
+            for (k, v) in val.as_mapping_mut()?.iter_mut() {
                 if let YamlValue::String(key) = k {
-                    if eval_selector(key, selector_config) {
+                    if eval_selector(key, selector_config).ok()? {
                         return flatten_selectors(v, selector_config);
                     }
                 }
@@ -172,7 +185,7 @@ pub fn flatten_selectors(
             return None;
         }
 
-        for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
+        for (k, v) in val.as_mapping_mut()?.iter_mut() {
             if let YamlValue::String(key) = k {
                 if key.starts_with("sel(") {
                     panic!(
@@ -188,28 +201,21 @@ pub fn flatten_selectors(
 
     if val.is_sequence() {
         let new_val: Vec<YamlValue> = val
-            .as_sequence_mut()
-            .unwrap()
+            .as_sequence_mut()?
             .iter_mut()
             .filter_map(|el| flatten_selectors(el, selector_config))
             .collect();
 
         // This does not yet work for lists of list with selectors (it flattens them)
         // This is relevant for zip_keys, which is a list of lists of strings.
-        if new_val.iter().ne(val.as_sequence().unwrap().iter()) {
+        if new_val.iter().ne(val.as_sequence()?.iter()) {
             // flatten down list of lists
             let new_val = new_val
                 .into_iter()
-                .flat_map(|el| {
-                    if el.is_sequence() {
-                        el.as_sequence().unwrap().clone()
-                    } else {
-                        vec![el]
-                    }
-                })
+                .flat_map(|el| el.as_sequence().cloned().unwrap_or_else(|| vec![el]))
                 .collect::<Vec<_>>();
 
-            return Some(serde_yaml::to_value(new_val).unwrap());
+            return serde_yaml::to_value(new_val).ok();
         }
 
         return Some(val.clone());
@@ -246,7 +252,7 @@ pub fn flatten_toplevel(
         for (k, v) in val.as_mapping_mut().unwrap().iter_mut() {
             if let YamlValue::String(key) = k {
                 if key.starts_with("sel(") {
-                    if eval_selector(key, selector_config) {
+                    if eval_selector(key, selector_config).ok()? {
                         if let Some(inner_map) = flatten_selectors(v, selector_config) {
                             for (k, v) in inner_map.as_mapping().unwrap().iter() {
                                 new_val.insert(k.as_str().unwrap().to_string(), v.clone());
@@ -279,21 +285,15 @@ mod tests {
             hash: None,
             variant: Default::default(),
         };
-        assert!(eval_selector("sel(unix)", &selector_config));
-        assert!(!eval_selector("sel(win)", &selector_config));
-        assert!(!eval_selector("sel(osx)", &selector_config));
-        assert!(eval_selector("sel(unix and not win)", &selector_config));
-        assert!(!eval_selector("sel(unix and not linux)", &selector_config));
-        assert!(eval_selector(
-            "sel((unix and not osx) or win)",
-            &selector_config
-        ));
-        assert!(eval_selector(
-            "sel((unix and not osx) or win or osx)",
-            &selector_config
-        ));
-        assert!(eval_selector("sel(linux and x86_64)", &selector_config));
-        assert!(!eval_selector("sel(linux and aarch64)", &selector_config));
+        assert!(eval_selector("sel(unix)", &selector_config).unwrap());
+        assert!(!eval_selector("sel(win)", &selector_config).unwrap());
+        assert!(!eval_selector("sel(osx)", &selector_config).unwrap());
+        assert!(eval_selector("sel(unix and not win)", &selector_config).unwrap());
+        assert!(!eval_selector("sel(unix and not linux)", &selector_config).unwrap());
+        assert!(eval_selector("sel((unix and not osx) or win)", &selector_config).unwrap());
+        assert!(eval_selector("sel((unix and not osx) or win or osx)", &selector_config).unwrap());
+        assert!(eval_selector("sel(linux and x86_64)", &selector_config).unwrap());
+        assert!(!eval_selector("sel(linux and aarch64)", &selector_config).unwrap());
     }
 
     #[test]
@@ -307,22 +307,13 @@ mod tests {
             variant,
         };
 
-        assert!(eval_selector("sel(cmp(python, '==3.7'))", &selector_config));
-        assert!(eval_selector("sel(cmp(python, '>=3.7'))", &selector_config));
-        assert!(eval_selector(
-            "sel(cmp(python, '>=3.7,<3.9'))",
-            &selector_config
-        ));
+        assert!(eval_selector("sel(cmp(python, '==3.7'))", &selector_config).unwrap());
+        assert!(eval_selector("sel(cmp(python, '>=3.7'))", &selector_config).unwrap());
+        assert!(eval_selector("sel(cmp(python, '>=3.7,<3.9'))", &selector_config).unwrap());
 
-        assert!(!eval_selector(
-            "sel(cmp(python, '!=3.7'))",
-            &selector_config
-        ));
-        assert!(!eval_selector("sel(cmp(python, '<3.7'))", &selector_config));
-        assert!(!eval_selector(
-            "sel(cmp(python, '>3.5,<3.7'))",
-            &selector_config
-        ));
+        assert!(!eval_selector("sel(cmp(python, '!=3.7'))", &selector_config).unwrap());
+        assert!(!eval_selector("sel(cmp(python, '<3.7'))", &selector_config).unwrap());
+        assert!(!eval_selector("sel(cmp(python, '>3.5,<3.7'))", &selector_config).unwrap());
     }
 
     macro_rules! set_snapshot_suffix {

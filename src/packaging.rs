@@ -30,6 +30,9 @@ use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
+    #[error("Failed to build glob from pattern")]
+    GlobError(#[from] globset::Error),
+
     #[error("Dependencies are not yet finalized / resolved")]
     DependenciesNotFinalized,
 

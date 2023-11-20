@@ -89,7 +89,7 @@ impl Pin {
         let min_pin = self
             .min_pin
             .clone()
-            .unwrap_or(PinExpression("x.x.x.x.x.x".to_string()));
+            .unwrap_or_else(|| PinExpression("x.x.x.x.x.x".to_string()));
         // number of digits in pin expression
         let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
         if pin_digits == 0 {
@@ -107,7 +107,7 @@ impl Pin {
         let max_pin = self
             .max_pin
             .clone()
-            .unwrap_or(PinExpression("x".to_string()));
+            .unwrap_or_else(|| PinExpression("x".to_string()));
 
         // number of digits in pin expression
         let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
@@ -129,7 +129,7 @@ impl Pin {
         // increment last digit
         let last = pin
             .pop()
-            .unwrap_or("0".to_string())
+            .unwrap_or_else(|| "0".to_string())
             .parse::<u64>()
             .map_err(|_| PinError::CouldNotPin(version_str.clone()))?
             + 1;

@@ -7,6 +7,7 @@ use std::{
 
 use indexmap::IndexSet;
 use miette::Diagnostic;
+use rattler_conda_types::ParseVersionError;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
@@ -323,6 +324,7 @@ impl VariantConfig {
         // Create a map from output names to node indices
         let mut node_indices = HashMap::new();
 
+        // TODO: this code can be improved in general
         // Add a node for each output
         for output in outputs_map.keys() {
             let node_index = graph.add_node(output.clone());
@@ -331,10 +333,14 @@ impl VariantConfig {
 
         // Add an edge for each pair of outputs where one uses a variable defined by the other
         for (output, (_, used_vars)) in &outputs_map {
-            let output_node_index = *node_indices.get(output).unwrap();
+            let output_node_index = *node_indices
+                .get(output)
+                .expect("unreachable, we insert keys in the loop above");
             for used_var in used_vars {
                 if outputs_map.contains_key(used_var) {
-                    let defining_output_node_index = *node_indices.get(used_var).unwrap();
+                    let defining_output_node_index = *node_indices
+                        .get(used_var)
+                        .expect("unreachable, we insert keys in the loop above");
                     // self referencing is possible, but not a cycle
                     if defining_output_node_index == output_node_index {
                         continue;
@@ -609,6 +615,9 @@ impl VariantKey {
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
+
+    #[error("Failed to parse version: {0}")]
+    RecipeParseVersionError(#[from] ParseVersionError),
 
     #[error(transparent)]
     #[diagnostic(transparent)]

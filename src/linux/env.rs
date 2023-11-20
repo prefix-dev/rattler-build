@@ -23,35 +23,36 @@ pub fn default_env_vars(prefix: &Path) -> HashMap<String, String> {
     // contains other QEMU env vars.
     vars.insert(
         "CFLAGS".to_string(),
-        std::env::var("CFLAGS").unwrap_or("".to_string()),
+        std::env::var("CFLAGS").unwrap_or_default(),
     );
     vars.insert(
         "CXXFLAGS".to_string(),
-        std::env::var("CXXFLAGS").unwrap_or("".to_string()),
+        std::env::var("CXXFLAGS").unwrap_or_default(),
     );
     vars.insert(
         "LDFLAGS".to_string(),
-        std::env::var("LDFLAGS").unwrap_or("".to_string()),
+        std::env::var("LDFLAGS").unwrap_or_default(),
     );
     vars.insert(
         "QEMU_LD_PREFIX".to_string(),
-        std::env::var("QEMU_LD_PREFIX").unwrap_or("".to_string()),
+        std::env::var("QEMU_LD_PREFIX").unwrap_or_default(),
     );
     vars.insert(
         "QEMU_UNAME".to_string(),
-        std::env::var("QEMU_UNAME").unwrap_or("".to_string()),
+        std::env::var("QEMU_UNAME").unwrap_or_default(),
     );
     vars.insert(
         "DEJAGNU".to_string(),
-        std::env::var("DEJAGNU").unwrap_or("".to_string()),
+        std::env::var("DEJAGNU").unwrap_or_default(),
     );
     vars.insert(
         "DISPLAY".to_string(),
-        std::env::var("DISPLAY").unwrap_or("".to_string()),
+        std::env::var("DISPLAY").unwrap_or_default(),
     );
     vars.insert(
         "LD_RUN_PATH".to_string(),
-        std::env::var("LD_RUN_PATH").unwrap_or(prefix.join("lib").to_string_lossy().to_string()),
+        std::env::var("LD_RUN_PATH")
+            .unwrap_or_else(|_| prefix.join("lib").to_string_lossy().to_string()),
     );
     vars.insert(
         "BUILD".to_string(),

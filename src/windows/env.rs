@@ -84,7 +84,7 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
 
     vars.insert(
         "BUILD".to_string(),
-        std::env::var("BUILD").unwrap_or(format!("{}-pc-windows-{}", win_arch, win_msvc)),
+        std::env::var("BUILD").unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
     );
 
     // TODO
