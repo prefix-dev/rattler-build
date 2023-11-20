@@ -12,9 +12,10 @@ use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
 
+use crate::recipe::parser::{find_outputs_from_src, Dependency};
 use crate::{
     _partialerror,
-    hash::{compute_buildstring, HashInfo},
+    hash::compute_buildstring,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -26,7 +27,7 @@ use crate::{
 };
 use petgraph::{algo::toposort, graph::DiGraph};
 
-type OutputVariantsTuple = (String, String, HashInfo, Node, BTreeMap<String, String>);
+type OutputVariantsTuple = (String, String, String, Node, BTreeMap<String, String>);
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
@@ -289,8 +290,6 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<OutputVariantsTuple>, VariantError> {
-        use crate::recipe::parser::{find_outputs_from_src, Dependency};
-
         // First find all outputs from the recipe
         let outputs = find_outputs_from_src(recipe)?;
 
@@ -349,6 +348,7 @@ impl VariantConfig {
                 }
             }
         }
+
         // Perform a topological sort
         let outputs: Vec<_> = match toposort(&graph, None) {
             Ok(sorted_node_indices) => {
@@ -434,7 +434,7 @@ impl VariantConfig {
         let mut recipes = IndexSet::new();
         for combination in combinations {
             let mut other_recipes =
-                HashMap::<String, (String, HashInfo, BTreeMap<String, String>)>::new();
+                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
 
             for (_, (name, output, used_vars)) in outputs_map.iter() {
                 let mut used_variables = used_vars.clone();
@@ -453,7 +453,7 @@ impl VariantConfig {
                 let selector_config_with_variant =
                     selector_config.new_with_variant(combination.clone());
 
-                let parsed_recipe = Recipe::from_node(output, selector_config_with_variant)
+                let parsed_recipe = Recipe::from_node(output, selector_config_with_variant.clone())
                     .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
@@ -517,19 +517,37 @@ impl VariantConfig {
 
                 // compute hash for the recipe
                 let hash = compute_buildstring(&used_filtered, parsed_recipe.build().noarch());
+                // TODO(wolf) can we make this computation better by having some nice API on Output?
+                // get the real build string from the recipe
+                let selector_config_with_hash = SelectorConfig {
+                    hash: Some(hash.clone()),
+                    ..selector_config_with_variant
+                };
+                let parsed_recipe = Recipe::from_node(output, selector_config_with_hash)
+                    .map_err(|err| ParsingError::from_partial(recipe, err))?;
+
+                let build_string = parsed_recipe
+                    .build()
+                    .string()
+                    .unwrap_or(&hash.to_string())
+                    .to_string();
 
                 other_recipes.insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
                     (
                         parsed_recipe.package().version().to_string(),
-                        hash.clone(),
+                        parsed_recipe
+                            .build()
+                            .string()
+                            .unwrap_or(&hash.to_string())
+                            .to_string(),
                         used_filtered.clone(),
                     ),
                 );
 
                 let version = parsed_recipe.package().version().to_string();
 
-                recipes.insert((name, version, hash, output, used_filtered));
+                recipes.insert((name, version, build_string, output, used_filtered));
             }
         }
 

@@ -82,7 +82,7 @@ outputs:
         - build_mamba.sh
         # - ${{ "build_mamba.sh" if unix }}
         # - ${{ "build_mamba.bat" if win }}
-      string: py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
+      string: py_sup${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
       run_exports:
         - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
       ignore_run_exports:
