@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::recipe::jinja::Env;
+use crate::{hash::HashInfo, recipe::jinja::Env};
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
@@ -9,7 +9,7 @@ use rattler_conda_types::Platform;
 pub struct SelectorConfig {
     pub target_platform: Platform,
     pub build_platform: Platform,
-    pub hash: Option<String>,
+    pub hash: Option<HashInfo>,
     pub variant: BTreeMap<String, String>,
 }
 
@@ -44,7 +44,7 @@ impl SelectorConfig {
         );
 
         if let Some(hash) = self.hash {
-            context.insert("hash".to_string(), Value::from_safe_string(hash));
+            context.insert("hash".to_string(), Value::from_safe_string(hash.hash));
         }
 
         context.insert("env".to_string(), Value::from_object(Env));

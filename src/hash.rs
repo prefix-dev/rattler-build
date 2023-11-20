@@ -2,7 +2,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use rattler_conda_types::NoArchType;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use sha1::{Digest, Sha1};
 
@@ -132,14 +132,50 @@ fn hash_variant(variant: &BTreeMap<String, String>) -> String {
 
     const HASH_LENGTH: usize = 7;
 
-    let res = format!("h{:x}", result);
-    res[..HASH_LENGTH + 1].to_string()
+    let res = format!("{:x}", result);
+    res[..HASH_LENGTH].to_string()
 }
 
-pub fn compute_buildstring(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+pub struct HashInfo {
+    pub hash: String,
+    pub hash_prefix: String,
+}
+
+impl std::fmt::Display for HashInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}h{}", self.hash_prefix, self.hash)
+    }
+}
+
+impl Serialize for HashInfo {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for HashInfo {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let s = String::deserialize(deserializer)?;
+        // split at `h` and take the first part
+        if let Some((hash_prefix, hash)) = s.split_once('h') {
+            return Ok(HashInfo {
+                hash: hash.to_string(),
+                hash_prefix: hash_prefix.to_string(),
+            });
+        }
+
+        Err(serde::de::Error::custom(format!(
+            "Failed to deserialize hash: {}",
+            s
+        )))
+    }
+}
+
+pub fn compute_buildstring(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> HashInfo {
     let hash_prefix = compute_hash_prefix(variant, noarch);
     let hash = hash_variant(variant);
-    format!("{}{}", hash_prefix, hash)
+    HashInfo { hash, hash_prefix }
 }
 
 #[cfg(test)]
@@ -167,6 +203,6 @@ mod tests {
         input.insert("c_compiler_version".to_string(), "14".to_string());
 
         let build_string_from_output = compute_buildstring(&input, &NoArchType::none());
-        assert_eq!(build_string_from_output, "py311h507f6e9");
+        assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");
     }
 }

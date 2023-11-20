@@ -14,7 +14,7 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, PackageName, Platform, RepoDataRecord, Version, VersionSpec,
+    MatchSpec, PackageName, Platform, RepoDataRecord, StringMatcher, Version, VersionSpec,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -241,10 +241,13 @@ pub fn apply_variant(
                                     spec = version.clone();
                                 }
 
+                                // we split at whitespace to separate into version and build
+                                let mut splitter = spec.split_whitespace();
+                                let version_spec = splitter.next().map(|s| VersionSpec::from_str(s).expect("Could not parse version spec from variant"));
+                                let build_spec = splitter.next().map(|s| StringMatcher::from_str(s).expect("Could not parse build spec from variant"));
                                 let final_spec = MatchSpec {
-                                    version: Some(
-                                        VersionSpec::from_str(&spec).expect("Invalid version spec"),
-                                    ),
+                                    version: version_spec,
+                                    build: build_spec,
                                     ..m
                                 };
                                 return DependencyInfo::Variant {

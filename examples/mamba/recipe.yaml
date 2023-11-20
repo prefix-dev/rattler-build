@@ -4,6 +4,7 @@ context:
   libmambapy_version: "1.5.3"
   mamba_version: "1.5.3"
   release: "2023.10.30"
+  build_number: 2
   # libmamba_version_split: ${{ libmamba_version.split('.') }}
 
 recipe:
@@ -14,7 +15,7 @@ source:
   sha256: 36d617de5971ad2b4460f5446bee7622f33cf3a8a079df8f97bc24e9a5873071
 
 build:
-  number: 2
+  number: ${{ build_number }}
 
 outputs:
   - package:
@@ -81,7 +82,7 @@ outputs:
         - build_mamba.sh
         # - ${{ "build_mamba.sh" if unix }}
         # - ${{ "build_mamba.bat" if win }}
-      string: py${{ CONDA_PY }}h${{ PKG_HASH }}_${{ PKG_BUILDNUM }}
+      string: py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
       run_exports:
         - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
       ignore_run_exports:
@@ -129,7 +130,7 @@ outputs:
         - build_mamba.sh
         # - ${{ "build_mamba.sh" if unix }}
         # - ${{ "build_mamba.bat" if win }}
-      string: py${{ python }}h${{ PKG_HASH }}_${{ PKG_BUILDNUM }}
+      string: py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
       entry_points:
         - mamba = mamba.mamba:main
     requirements:
@@ -155,15 +156,22 @@ outputs:
         - pip
       commands:
         - mamba --help
-        - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1)  # [win]
-        - test -f ${PREFIX}/etc/profile.d/mamba.sh  # [linux]
-        # these tests work when run on win, but for some reason not during conda build
-        - mamba create -n test_py2 python=2.7 --dry-run  # [linux]
-        - mamba install xtensor xsimd -c conda-forge --dry-run  # [linux and x86_64]
         # for some reason tqdm doesn't have a proper colorama dependency so pip check fails
         # but that's completely unrelated to mamba
         - python -c "import mamba._version; assert mamba._version.__version__ == '${{ mamba_version }}'"
-        - test -f ${PREFIX}/condabin/mamba  # [unix]
+
+        - if: win
+          then:
+            - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1)  # [win]
+        - if: linux
+          then:
+            - test -f ${PREFIX}/etc/profile.d/mamba.sh
+            # these tests work when run on win, but for some reason not during conda build
+            - mamba create -n test_py2 python=2.7 --dry-run
+            - mamba install xtensor xsimd -c conda-forge --dry-run
+        - if: unix
+          then:
+            - test -f ${PREFIX}/condabin/mamba
 
 about:
   homepage: https://github.com/mamba-org/mamba

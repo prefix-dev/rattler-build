@@ -7,7 +7,7 @@ if [[ $PKG_NAME == "mamba" ]]; then
     ln -s $PREFIX/bin/mamba $PREFIX/condabin/mamba
 
     exit 0
-fi 
+fi
 
 rm -rf build
 mkdir build

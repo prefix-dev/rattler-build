@@ -298,6 +298,11 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
         if args.render_only {
             // tracing::info!("{}", serde_yaml::to_string(&recipe).unwrap());
+            tracing::info!(
+                "Name: {} {}",
+                recipe.package().name().as_normalized(),
+                recipe.package().version()
+            );
             tracing::info!("Variant: {:#?}", variant);
             tracing::info!("Hash: {}", recipe.build().string().unwrap());
             tracing::info!("Skip?: {}\n", recipe.build().skip());

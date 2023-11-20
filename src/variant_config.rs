@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use crate::{
     _partialerror,
-    hash::compute_buildstring,
+    hash::{compute_buildstring, HashInfo},
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -26,7 +26,7 @@ use crate::{
 };
 use petgraph::{algo::toposort, graph::DiGraph};
 
-type OutputVariantsTuple = (String, String, String, Node, BTreeMap<String, String>);
+type OutputVariantsTuple = (String, String, HashInfo, Node, BTreeMap<String, String>);
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Pin {
@@ -434,7 +434,7 @@ impl VariantConfig {
         let mut recipes = IndexSet::new();
         for combination in combinations {
             let mut other_recipes =
-                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
+                HashMap::<String, (String, HashInfo, BTreeMap<String, String>)>::new();
 
             for (_, (name, output, used_vars)) in outputs_map.iter() {
                 let mut used_variables = used_vars.clone();
