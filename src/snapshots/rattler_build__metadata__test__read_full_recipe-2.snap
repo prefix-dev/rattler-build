@@ -86,16 +86,16 @@ build_configuration:
 finalized_dependencies:
   build:
     specs:
-      - Compiler:
-          spec: clang_osx-arm64
-      - Raw:
-          spec: make
-      - Raw:
-          spec: perl
-      - Raw:
-          spec: pkg-config
-      - Raw:
-          spec: libtool
+      - source: compiler
+        spec: clang_osx-arm64
+      - source: raw
+        spec: make
+      - source: raw
+        spec: perl
+      - source: raw
+        spec: pkg-config
+      - source: raw
+        spec: libtool
     resolved:
       - build: he57ea6c_1
         build_number: 1
