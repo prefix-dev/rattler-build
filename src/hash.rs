@@ -158,7 +158,7 @@ impl<'de> Deserialize<'de> for HashInfo {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         // split at `h` and take the first part
-        if let Some((hash_prefix, hash)) = s.split_once('h') {
+        if let Some((hash_prefix, hash)) = s.rsplit_once('h') {
             return Ok(HashInfo {
                 hash: hash.to_string(),
                 hash_prefix: hash_prefix.to_string(),
