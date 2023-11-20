@@ -58,8 +58,7 @@ pub fn git_src(
             .join(path)
             .canonicalize()?
             .file_name()
-            // canonicalized paths shouldn't end with ..
-            .unwrap()
+            .expect("unreachable, canonicalized paths shouldn't end with ..")
             .to_string_lossy()
             .to_string(),
     };
@@ -75,12 +74,8 @@ pub fn git_src(
                 fetch_repo(&cache_path, &[source.rev().to_string()])?;
             } else {
                 let mut command = Command::new("git");
-                command.args([
-                    "clone",
-                    "--recursive",
-                    source.url().to_string().as_str(),
-                    cache_path.to_str().unwrap(),
-                ]);
+                command.args(["clone", "--recursive", source.url().to_string().as_str()]);
+                command.arg(cache_path.as_os_str());
                 if let Some(depth) = source.depth() {
                     command.args(["--depth", depth.to_string().as_str()]);
                 }

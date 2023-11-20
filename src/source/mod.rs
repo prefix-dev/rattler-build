@@ -43,9 +43,11 @@ pub enum SourceError {
     #[error("Failed to run git command: {0}")]
     GitErrorStr(&'static str),
 
-    #[cfg(feature = "git")]
-    #[error("Failed to run git command: {0}")]
-    GitError(#[from] git2::Error),
+    #[error("{0}")]
+    UnknownError(String),
+
+    #[error("{0}")]
+    UnknownErrorStr(&'static str),
 
     #[error("Could not walk dir")]
     IgnoreError(#[from] ignore::Error),
@@ -83,8 +85,14 @@ pub async fn fetch_sources(
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url());
-                let res =
-                    url_source::url_src(src, &cache_src, src.checksums().first().unwrap()).await?;
+                let res = url_source::url_src(
+                    src,
+                    &cache_src,
+                    src.checksums()
+                        .first()
+                        .ok_or(SourceError::UnknownErrorStr("Checksums not provided"))?,
+                )
+                .await?;
                 let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
@@ -107,7 +115,12 @@ pub async fn fetch_sources(
                     if let Some(file_name) = src.file_name() {
                         dest_dir = dest_dir.join(file_name);
                     } else {
-                        dest_dir = dest_dir.join(res.file_name().unwrap());
+                        dest_dir = dest_dir.join(res.file_name().ok_or_else(|| {
+                            SourceError::UnknownError(format!(
+                                "Failed to get filename for `{}`",
+                                res.display()
+                            ))
+                        })?);
                     }
                     fs::copy(&res, &dest_dir)?;
                     tracing::info!("Downloaded to {:?}", dest_dir);

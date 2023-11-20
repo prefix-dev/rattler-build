@@ -134,7 +134,7 @@ impl<'a> CopyDir<'a> {
 
     pub fn run(self) -> Result<CopyDirResult<'a>, SourceError> {
         // Create the to path because we're going to copy the contents only
-        create_dir_all(self.to_path).unwrap();
+        create_dir_all(self.to_path)?;
 
         let (folders, globs) = self
             .include_globs
@@ -169,7 +169,7 @@ impl<'a> CopyDir<'a> {
                     .unwrap_or(false)
                 {
                     // if the dir is empty, check if we should create it anyways
-                    if entry.path().read_dir().unwrap().next().is_some()
+                    if entry.path().read_dir().ok()?.next().is_some()
                         || !result.include_globs().is_empty()
                     {
                         return None;

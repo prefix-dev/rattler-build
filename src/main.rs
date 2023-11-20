@@ -332,7 +332,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         let channels = args
             .channel
             .clone()
-            .unwrap_or(vec!["conda-forge".to_string()]);
+            .unwrap_or_else(|| vec!["conda-forge".to_string()]);
 
         let timestamp = chrono::Utc::now();
         let output = rattler_build::metadata::Output {
