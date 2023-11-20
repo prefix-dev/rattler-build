@@ -8,7 +8,6 @@ use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
 use rattler_networking::AuthenticatedClient;
-use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::{
     collections::BTreeMap,
@@ -33,13 +32,6 @@ mod console_utils;
 mod rebuild;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
-
-#[derive(Serialize, Deserialize, Debug)]
-struct RawRecipe {
-    context: BTreeMap<String, serde_yaml::Value>,
-    #[serde(flatten)]
-    recipe: BTreeMap<String, serde_yaml::Value>,
-}
 
 #[derive(Parser)]
 enum SubCommands {
