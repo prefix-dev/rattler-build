@@ -49,9 +49,8 @@ The recipe spec has the following parts:
 - [x] `build`: defines how to build the recipe and what build number to use
 - [x] `requirements`: defines requirements of the top-level package
 - [x] `test`: defines tests for the top-level package
-- [ ] `outputs`: not yet implemented in rattler-build – a recipe can have
-  multiple outputs. Each output can and should have a `package`, `requirements`
-  and `test` section
+- [x] `outputs`: a recipe can have multiple outputs. Each output can and should
+  have a `package`, `requirements` and `test` section
 
 <!--
 Spec reference
@@ -378,11 +377,10 @@ build:
   noarch: python
 ```
 
-> ***Note***: At the time of this writing, `noarch` packages should not make use of
-> preprocess-selectors: `noarch` packages are built with the
-> directives which evaluate to `true` in the platform it is built on,
-> which probably will result in incorrect/incomplete installation in
-> other platforms.
+> ***Note***: At the time of this writing, `noarch` packages should not make use
+> of preprocess-selectors: `noarch` packages are built with the directives which
+> evaluate to `true` in the platform it is built on, which probably will result
+> in incorrect/incomplete installation in other platforms.
 
 <!--
 ### Include build recipe
@@ -646,52 +644,57 @@ test:
 ```
 -->
 
-<!--
 Outputs section
 ---------------
 
-Explicitly specifies packaging steps. This section supports multiple
-outputs, as well as different package output types. The format is a list
-of mappings. Build strings for subpackages are determined by their
-runtime dependencies.
+Explicitly specifies packaging steps. This section supports multiple outputs, as
+well as different package output types. The format is a list of mappings.
+
+When using multiple outputs, certain top-level keys are "forbidden": `package`
+and `requirements`. Instead of `package`, a top-level `recipe` key can be
+defined. The `recipe.name` is ignored but the `recipe.version` key is used as
+default version for each output. Other "top-level" keys are merged into each
+output (for example, the `about` section) to avoid repetition. Each output is a
+complete recipe, and can have its own `build`, `requirements`, and `test`
+sections.
 
 ```yaml
+recipe:
+  # the recipe name is ignored
+  name: some
+  version: 1.0
+
 outputs:
   - package:
+      # version is taken from recipe.version (1.0)
       name: some-subpackage
-      version: 1.0
+
   - package:
       name: some-other-subpackage
       version: 2.0
 ```
 
-Scripts that create or move files into the build prefix can be any kind
-of script. Known script types need only specify the script name.
-Currently the list of recognized extensions is `py, bat, ps1`, and `sh`.
+Each output acts like an independent recipe and can have their own `script`,
+`build_number`, and so on.
 
 ```yaml
 outputs:
-  - name: subpackage-name
+  - package:
+      name: subpackage-name
     build:
       script: install-subpackage.sh
 ```
 
-For scripts that move or create files, a fresh copy of the working
-directory is provided at the start of each script execution. This
-ensures that results between scripts are independent of one another.
-You should take care of not packaging the same files twice.
+Each output is built independently. You should take care of not packaging the
+same files twice.
 
 ### Subpackage requirements
 
-Like a top-level recipe, a subpackage may have zero or more dependencies
-listed as build, host or run requirements.
+Like a top-level recipe, a subpackage may have zero or more dependencies listed
+as build, host or run requirements.
 
-The dependencies listed as subpackage build requirements are available
-only during the packaging phase of that subpackage.
-
-A subpackage does not automatically inherit any dependencies from its
-top-level recipe, so any build or run requirements needed by the
-subpackage must be explicitly specified.
+The dependencies listed as subpackage build requirements are available only
+during the packaging phase of that subpackage.
 
 ```yaml
 outputs:
@@ -704,82 +707,44 @@ outputs:
         - some-dep
 ```
 
-You can also impose runtime dependencies whenever a given (sub)package
-is installed as a build dependency. For example, if we had an
-overarching "compilers" package, and within that, had `gcc` and `libgcc`
-outputs, we could force recipes that use GCC to include a matching
-libgcc runtime requirement:
+You can also use the `pin_subpackage` function to pin another output from the
+same recipe.
 
 ```yaml
 outputs:
   - package:
-      name: gcc
-    build:
-      run_exports:
-        - libgcc 2.*
+      name: libtest
   - package:
-      name: libgcc
-```
-
-See the run\_exports section for additional information.
-
-### Subpackage tests
-
-You can test subpackages independently of the top-level package.
-Independent test script files for each separate package are specified
-under the subpackage's test section. These files support the same
-formats as the top-level `run_test.*` scripts, which are .py, .pl, .bat,
-and .sh. These may be extended to support other script types in the
-future.
-
-```yaml
-outputs:
-  - package:
-      name: subpackage-name
-    test:
-      script: some-other-script.py
-```
-
-By default, the `run_test.*` scripts apply only to the top-level
-package. To apply them also to subpackages, list them explicitly in the
-script section:
-
-```yaml
-outputs:
-  - package:
-      name: subpackage-name
-    test:
-      script: run_test.py
-```
-
-Test requirements for subpackages are not supported. Instead, subpackage
-tests install their runtime requirements---but not the run requirements
-for the top-level package---and the test-time requirements of the
-top-level package.
-
-EXAMPLE: In this example, the test for `subpackage-name` installs
-`some-test-dep` and `subpackage-run-req`, but not
-`some-top-level-run-req`.
-
-```yaml
-requirements:
-  run:
-    - some-top-level-run-req
-
-test:
-  requires:
-    - some-test-dep
-
-outputs:
-  - name: subpackage-name
+      name: test
     requirements:
-      run:
-        - subpackage-run-req
-    test:
-      script: run_test.py
+      build:
+        - ${{ pin_subpackage('libtest', max_pin='x.x') }}
 ```
 
--->
+The outputs are topologically sorted by the dependency graph which is taking the
+`pin_subpackage` invocations into account. When using `pin_subpackage(name,
+exact=True)` a special behavior is used where the `name` package is injected as
+a "variant" and the variant matrix is expanded appropriately. For example, when
+you have the following situation, with a `variant_config.yaml` file that
+contains `openssl: [1, 3]`:
+
+```yaml
+outputs:
+  - package:
+      name: libtest
+    requirements:
+      host:
+        - openssl
+  - package:
+      name: test
+    requirements:
+      build:
+        - ${{ pin_subpackage('libtest', exact=True) }}
+```
+
+Due to the variant config file, this will build two versions of `libtest`. We
+will also build two versions of `test`, one that depends on `libtest (openssl
+1)` and one that depends on `libtest (openssl 3)`.
 
 About section
 -------------
@@ -789,10 +754,14 @@ the package server.
 
 ```yaml
 about:
-  home: https://github.com/ilanschnell/bsdiff4
+  homepage: https://example.com/bsdiff4
   license: BSD
   license_file: LICENSE
   summary: binary diff and patch using the BSDIFF4-format
+  description: |
+    Long description of bsdiff4 ...
+  repository: https://github.com/ilanschnell/bsdiff4
+  documentation: https://docs.com
 ```
 
 ### License file
@@ -853,8 +822,9 @@ Jinja has built-in support for some common string manipulations.
 
 In rattler-build, complex Jinja is completely disallowed as we try to produce
 YAML that is valid at all times. So you should not use any `{% if ... %}` or
-similar Jinja constructs that produce invalid yaml. Furthermore, instead of plain
-double curly brackets Jinja statements need to be prefixed by `$`, e.g. `${{ ... }}`:
+similar Jinja constructs that produce invalid yaml. Furthermore, instead of
+plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
+`${{ ... }}`:
 
 ```yaml
 package:
@@ -944,13 +914,17 @@ requirements:
 
 #### The env Jinja functions
 
-You can access the current environment variables using the `env` object in Jinja.
+You can access the current environment variables using the `env` object in
+Jinja.
 
 There are three functions:
 
 - `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
-- `env.get_default("ENV_VAR", "undefined")` will insert the value of "ENV_VAR" into the recipe or, if "ENV_VAR" is not defined, the specified default value (in this case "undefined")
-- `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set to any value
+- `env.get_default("ENV_VAR", "undefined")` will insert the value of "ENV_VAR"
+  into the recipe or, if "ENV_VAR" is not defined, the specified default value
+  (in this case "undefined")
+- `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
+  to any value
 
 This can be used for some light templating, e.g.
 

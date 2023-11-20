@@ -72,8 +72,8 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "cmp" {
-                    if let Expr::Const(constant) = &call.args[0] {
-                        variables.insert(constant.value.to_string());
+                    if let Expr::Var(var) = &call.args[0] {
+                        variables.insert(var.id.to_string());
                     }
                 }
             }
@@ -125,10 +125,10 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), miniji
                 match item {
                     SequenceNodeInternal::Simple(node) => find_jinja(node, variables)?,
                     SequenceNodeInternal::Conditional(if_sel) => {
-                        if if_sel.cond().contains("${{") {
-                            let ast = parse(if_sel.cond(), "jinja.yaml")?;
-                            extract_variables(&ast, variables);
-                        }
+                        // we need to convert the if condition to a Jinja expression to parse it
+                        let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
+                        let ast = parse(&as_jinja_expr, "jinja.yaml")?;
+                        extract_variables(&ast, variables);
 
                         find_jinja(if_sel.then(), variables)?;
                         if let Some(otherwise) = if_sel.otherwise() {
