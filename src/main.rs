@@ -16,7 +16,12 @@ use std::{
     path::PathBuf,
     str::{self, FromStr},
 };
-use tracing_subscriber::{filter::Directive, fmt, prelude::*, EnvFilter};
+use tracing_subscriber::{
+    filter::{Directive, ParseError},
+    fmt,
+    prelude::*,
+    EnvFilter,
+};
 
 use rattler_build::{
     build::run_build,
@@ -154,7 +159,7 @@ async fn main() -> miette::Result<()> {
 
     // Setup tracing subscriber
     tracing_subscriber::registry()
-        .with(get_default_env_filter(args.verbose.log_level_filter()))
+        .with(get_default_env_filter(args.verbose.log_level_filter()).into_diagnostic()?)
         .with(
             fmt::layer()
                 .with_writer(IndicatifWriter::new(multi_progress.clone()))
@@ -409,16 +414,18 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 }
 
 /// Constructs a default [`EnvFilter`] that is used when the user did not specify a custom RUST_LOG.
-pub fn get_default_env_filter(verbose: clap_verbosity_flag::LevelFilter) -> EnvFilter {
+pub fn get_default_env_filter(
+    verbose: clap_verbosity_flag::LevelFilter,
+) -> Result<EnvFilter, ParseError> {
     let mut result = EnvFilter::new("rattler_build=info");
 
     if verbose >= clap_verbosity_flag::LevelFilter::Trace {
-        result = result.add_directive(Directive::from_str("resolvo=info").unwrap());
-        result = result.add_directive(Directive::from_str("rattler=info").unwrap());
+        result = result.add_directive(Directive::from_str("resolvo=info")?);
+        result = result.add_directive(Directive::from_str("rattler=info")?);
     } else {
-        result = result.add_directive(Directive::from_str("resolvo=warn").unwrap());
-        result = result.add_directive(Directive::from_str("rattler=warn").unwrap());
+        result = result.add_directive(Directive::from_str("resolvo=warn")?);
+        result = result.add_directive(Directive::from_str("rattler=warn")?);
     }
 
-    result
+    Ok(result)
 }

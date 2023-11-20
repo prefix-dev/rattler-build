@@ -298,7 +298,7 @@ impl VariantConfig {
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
             // in the recipe which are captured by the `used vars`
-            let used_vars = used_vars_from_expressions(output);
+            let used_vars = used_vars_from_expressions(output)?;
             let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
@@ -607,6 +607,9 @@ impl VariantKey {
 
 #[derive(Error, Debug, Diagnostic)]
 pub enum VariantError {
+    #[error(transparent)]
+    VariantParseError(#[from] minijinja::Error),
+
     #[error("Zip key elements do not all have same length: {0}")]
     InvalidZipKeyLength(String),
 

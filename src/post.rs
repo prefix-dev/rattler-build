@@ -14,7 +14,7 @@ use std::{
 
 use rattler_conda_types::{PackageName, Platform};
 
-use crate::{linux::link::SharedObject, macos::link::Dylib};
+use crate::{linux::link::SharedObject, macos::link::Dylib, packaging::PackagingError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RelinkError {
@@ -90,10 +90,8 @@ pub fn python(
     name: &PackageName,
     version: &str,
     paths: &HashSet<PathBuf>,
-) -> Result<(), std::io::Error> {
-    let metadata_glob = globset::Glob::new("**/*.dist-info/METADATA")
-        .unwrap()
-        .compile_matcher();
+) -> Result<(), PackagingError> {
+    let metadata_glob = globset::Glob::new("**/*.dist-info/METADATA")?.compile_matcher();
 
     if let Some(p) = paths.iter().find(|p| metadata_glob.is_match(p)) {
         // unwraps are OK because we already globbed
@@ -114,9 +112,7 @@ pub fn python(
         }
     }
 
-    let glob = globset::Glob::new("**/*.dist-info/INSTALLER")
-        .unwrap()
-        .compile_matcher();
+    let glob = globset::Glob::new("**/*.dist-info/INSTALLER")?.compile_matcher();
     for p in paths {
         if glob.is_match(p) {
             fs::write(p, "conda\n")?;
