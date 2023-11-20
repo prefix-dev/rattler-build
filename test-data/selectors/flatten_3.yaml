@@ -1,5 +1,0 @@
-build:
-  script:
-    sel(win): bld_ament_cmake.bat
-    sel(unix): build_ament_cmake.sh
-  number: 3
