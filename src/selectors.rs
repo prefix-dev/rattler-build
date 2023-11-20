@@ -199,10 +199,10 @@ pub fn flatten_selectors(
             // flatten down list of lists
             let new_val = new_val
                 .into_iter()
-                .map(|el| el.as_sequence().cloned().unwrap_or_else(|| vec![el]))
+                .flat_map(|el| el.as_sequence().cloned().unwrap_or_else(|| vec![el]))
                 .collect::<Vec<_>>();
 
-            return Some(serde_yaml::to_value(new_val).ok()?);
+            return serde_yaml::to_value(new_val).ok();
         }
 
         return Some(val.clone());
