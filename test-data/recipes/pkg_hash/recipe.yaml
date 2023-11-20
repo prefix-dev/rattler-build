@@ -5,4 +5,4 @@ package:
   version: "1.0.0"
 
 build:
-  string: ${{ hash }}_my_pkg
+  string: h${{ hash }}_my_pkg
