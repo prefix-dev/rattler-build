@@ -1,9 +1,9 @@
 specs:
-  - !Raw
+  - source: raw
     spec: pip
-  - !Raw
+  - source: raw
     spec: poetry-core >=1.0.0
-  - !Raw
+  - source: raw
     spec: python ==3.10
 resolved:
   - build: h43b31ca_3_cpython

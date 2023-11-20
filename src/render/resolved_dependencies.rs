@@ -28,6 +28,7 @@ use serde_with::{serde_as, DisplayFromStr};
 #[allow(dead_code)]
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "source", rename_all = "snake_case")]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
     /// from the variant config
@@ -52,7 +53,7 @@ pub enum DependencyInfo {
         spec: MatchSpec,
     },
     /// This is a special run_exports dependency from another package
-    RunExports {
+    RunExport {
         #[serde_as(as = "DisplayFromStr")]
         spec: MatchSpec,
         from: String,
@@ -76,7 +77,7 @@ impl DependencyInfo {
             DependencyInfo::Compiler { spec } => spec,
             DependencyInfo::PinSubpackage { spec } => spec,
             DependencyInfo::PinCompatible { spec } => spec,
-            DependencyInfo::RunExports { spec, .. } => spec,
+            DependencyInfo::RunExport { spec, .. } => spec,
             DependencyInfo::Raw { spec } => spec,
             DependencyInfo::Transient => panic!("Cannot get spec from transient dependency"),
         }
@@ -88,7 +89,7 @@ impl DependencyInfo {
             DependencyInfo::Compiler { spec } => format!("{} (C)", spec),
             DependencyInfo::PinSubpackage { spec } => format!("{} (PS)", spec),
             DependencyInfo::PinCompatible { spec } => format!("{} (PC)", spec),
-            DependencyInfo::RunExports {
+            DependencyInfo::RunExport {
                 spec,
                 from,
                 source_package,
@@ -478,7 +479,7 @@ pub async fn resolve_dependencies(
         let mut cloned = Vec::new();
         for spec in specs {
             let spec = MatchSpec::from_str(spec).expect("...");
-            let dep = DependencyInfo::RunExports {
+            let dep = DependencyInfo::RunExport {
                 spec,
                 from: env.to_string(),
                 source_package: name.as_normalized().to_string(),
@@ -620,15 +621,30 @@ mod tests {
 
     #[test]
     fn test_dependency_info_render() {
-        let dep_info = vec![DependencyInfo::Variant {
-            spec: MatchSpec::from_str("foo").unwrap(),
-            variant: "bar".to_string(),
-        },
-        DependencyInfo::Compiler {
-            spec: MatchSpec::from_str("foo").unwrap(),
-        },
+        let dep_info = vec![
+            DependencyInfo::Raw {
+                spec: MatchSpec::from_str("xyz").unwrap(),
+            },
+            DependencyInfo::Variant {
+                spec: MatchSpec::from_str("foo").unwrap(),
+                variant: "bar".to_string(),
+            },
+            DependencyInfo::Compiler {
+                spec: MatchSpec::from_str("foo").unwrap(),
+            },
+            DependencyInfo::PinSubpackage { spec: MatchSpec::from_str("baz").unwrap() },
+            DependencyInfo::PinCompatible { spec: MatchSpec::from_str("bat").unwrap() },
         ];
         let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
         insta::assert_snapshot!(yaml_str);
+
+        // test deserialize
+        let dep_info: Vec<DependencyInfo> = serde_yaml::from_str(&yaml_str).unwrap();
+        assert_eq!(dep_info.len(), 5);
+        assert!(matches!(dep_info[0], DependencyInfo::Raw { .. }));
+        assert!(matches!(dep_info[1], DependencyInfo::Variant { .. }));
+        assert!(matches!(dep_info[2], DependencyInfo::Compiler { .. }));
+        assert!(matches!(dep_info[3], DependencyInfo::PinSubpackage { .. }));
+        assert!(matches!(dep_info[4], DependencyInfo::PinCompatible { .. }));
     }
 }
