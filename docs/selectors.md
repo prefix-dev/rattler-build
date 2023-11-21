@@ -30,7 +30,8 @@ requirements:
     - unix-tool
 ```
 
-The line containing the Windows-specific configuration is removed. Multiple items can also be selected, such as:
+The line containing the Windows-specific configuration is removed. Multiple
+items can also be selected, such as:
 
 ```yaml
 host:
@@ -60,7 +61,8 @@ if: linux and (aarch64 or ppc64le)) ... # true for linux ppc64le or linux-aarch6
 
 ### Available variables
 
-The following variables are available during the initial rendering and afterward:
+The following variables are available during the initial rendering and
+afterward:
 
 | Variable                      | Description                                                                                      |
 | ----------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -74,7 +76,7 @@ The following variables are available during the initial rendering and afterward
 
 After the initial phase, when the variant configuration is selected, the variant
 values are also available in selectors. For example, if the build uses `python:
-3.8` as variant, we can use `sel(python == "3.8")` to enable a dependency only
+3.8` as variant, we can use `if: python == "3.8"` to enable a dependency only
 when the Python version is 3.8.
 
 ### The `cmp` function
@@ -92,8 +94,8 @@ variant version has a matching version. For example, if we have again a `python:
   then: mydep
 ```
 
-This function eliminates the need to implement any python-special conda-build selectors (such
-as `py3k`, `py38`, etc.) or the `py` and `npy` integers.
+This function eliminates the need to implement any python-special conda-build
+selectors (such as `py3k`, `py38`, etc.) or the `py` and `npy` integers.
 
 Please note that during the _initial_ phase of rendering we do not know the
 variant, and thus the `cmp` condition always evaluates to true.
