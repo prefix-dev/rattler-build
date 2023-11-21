@@ -66,6 +66,7 @@ impl Formatter for PythonFormatter {
     }
 }
 
+// TODO merge with the jinja function that we have for this
 fn short_version_from_spec(input: &str, length: u32) -> String {
     let mut parts = input.split('.');
     let mut result = String::new();
@@ -75,65 +76,6 @@ fn short_version_from_spec(input: &str, length: u32) -> String {
         }
     }
     result
-}
-
-fn compute_hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
-    if noarch.is_python() {
-        return "py".to_string();
-    }
-
-    let mut map: HashMap<String, String> = HashMap::new();
-
-    for (variant_key, version_spec) in variant.iter() {
-        let prefix = match variant_key.as_str() {
-            "numpy" => "np",
-            "python" => "py",
-            "perl" => "pl",
-            "lua" => "lua",
-            "r" => "r",
-            _ => continue,
-        };
-
-        let version_length = match prefix {
-            "pl" => 3,
-            _ => 2,
-        };
-
-        map.insert(
-            prefix.to_string(),
-            short_version_from_spec(version_spec, version_length),
-        );
-    }
-
-    let order = vec!["np", "py", "pl", "lua", "r", "mro"];
-    let mut result = String::new();
-    for key in order {
-        if let Some(value) = map.get(key) {
-            result.push_str(format!("{}{}", key, value).as_str());
-        }
-    }
-    result
-}
-
-fn hash_variant(variant: &BTreeMap<String, String>) -> String {
-    let mut buf = Vec::new();
-    let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
-
-    // BTree has sorted keys, which is important for hashing
-    variant
-        .serialize(&mut ser)
-        .expect("Failed to serialize input");
-
-    let string = String::from_utf8(buf).expect("Failed to convert to string");
-
-    let mut hasher = Sha1::new();
-    hasher.update(string.as_bytes());
-    let result = hasher.finalize();
-
-    const HASH_LENGTH: usize = 7;
-
-    let res = format!("{:x}", result);
-    res[..HASH_LENGTH].to_string()
 }
 
 /// The hash info for a given variant
@@ -176,11 +118,73 @@ impl<'de> Deserialize<'de> for HashInfo {
     }
 }
 
-/// Compute the build string for a given variant
-pub fn compute_hash_info(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> HashInfo {
-    let hash_prefix = compute_hash_prefix(variant, noarch);
-    let hash = hash_variant(variant);
-    HashInfo { hash, hash_prefix }
+impl HashInfo {
+    fn hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
+        if noarch.is_python() {
+            return "py".to_string();
+        }
+
+        let mut map: HashMap<String, String> = HashMap::new();
+
+        for (variant_key, version_spec) in variant.iter() {
+            let prefix = match variant_key.as_str() {
+                "numpy" => "np",
+                "python" => "py",
+                "perl" => "pl",
+                "lua" => "lua",
+                "r" => "r",
+                _ => continue,
+            };
+
+            let version_length = match prefix {
+                "pl" => 3,
+                _ => 2,
+            };
+
+            map.insert(
+                prefix.to_string(),
+                short_version_from_spec(version_spec, version_length),
+            );
+        }
+
+        let order = vec!["np", "py", "pl", "lua", "r", "mro"];
+        let mut result = String::new();
+        for key in order {
+            if let Some(value) = map.get(key) {
+                result.push_str(format!("{}{}", key, value).as_str());
+            }
+        }
+        result
+    }
+
+    fn hash_variant(variant: &BTreeMap<String, String>) -> String {
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
+
+        // BTree has sorted keys, which is important for hashing
+        variant
+            .serialize(&mut ser)
+            .expect("Failed to serialize input");
+
+        let string = String::from_utf8(buf).expect("Failed to convert to string");
+
+        let mut hasher = Sha1::new();
+        hasher.update(string.as_bytes());
+        let result = hasher.finalize();
+
+        const HASH_LENGTH: usize = 7;
+
+        let res = format!("{:x}", result);
+        res[..HASH_LENGTH].to_string()
+    }
+
+    /// Compute the build string for a given variant
+    pub fn from_variant(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> Self {
+        Self {
+            hash: Self::hash_variant(variant),
+            hash_prefix: Self::hash_prefix(variant, noarch),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -207,7 +211,7 @@ mod tests {
         input.insert("python".to_string(), "3.11.* *_cpython".to_string());
         input.insert("c_compiler_version".to_string(), "14".to_string());
 
-        let build_string_from_output = compute_hash_info(&input, &NoArchType::none());
+        let build_string_from_output = HashInfo::from_variant(&input, &NoArchType::none());
         assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");
     }
 }

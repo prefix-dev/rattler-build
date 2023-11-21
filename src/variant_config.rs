@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::recipe::parser::{find_outputs_from_src, Dependency};
 use crate::{
     _partialerror,
-    hash::compute_hash_info,
+    hash::HashInfo,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -588,7 +588,7 @@ impl VariantConfig {
                     });
 
                 // compute hash for the recipe
-                let hash = compute_hash_info(&used_filtered, parsed_recipe.build().noarch());
+                let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
                 // TODO(wolf) can we make this computation better by having some nice API on Output?
                 // get the real build string from the recipe
                 let selector_config_with_hash = SelectorConfig {
