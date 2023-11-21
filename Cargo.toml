@@ -18,7 +18,7 @@ native-tls = ['reqwest/native-tls', 'rattler/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 
 [dependencies]
-serde = { version = "1.0.192", features = ["derive"] }
+serde = { version = "1.0.193", features = ["derive"] }
 serde_yaml = "0.9.27"
 rattler = { version = "0.12.2", default-features = false }
 rattler_conda_types = { version = "0.12.2", default-features = false }
