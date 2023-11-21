@@ -95,8 +95,12 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     .unwrap();
 
     env.add_function("cmp", |a: &Value, spec: &str| {
-        if let Some(version) = a.as_str() {
+        if let Some(variant) = a.as_str() {
             // check if version matches spec
+            let (version, _) = variant.split_once(' ').unwrap_or((variant, ""));
+            // remove trailing .* or *
+            let version = version.trim_end_matches(".*").trim_end_matches('*');
+
             let version = Version::from_str(version).map_err(|e| {
                 minijinja::Error::new(
                     minijinja::ErrorKind::CannotDeserialize,
@@ -507,6 +511,28 @@ mod tests {
     #[rustfmt::skip]
     fn eval_cmp() {
         let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7".to_string())]);
+
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant,
+            hash: None,
+        };
+        let jinja = Jinja::new(options);
+
+        assert!(jinja.eval("cmp(python, '==3.7')").expect("test 1").is_true());
+        assert!(jinja.eval("cmp(python, '>=3.7')").expect("test 2").is_true());
+        assert!(jinja.eval("cmp(python, '>=3.7,<3.9')").expect("test 3").is_true());
+
+        assert!(!jinja.eval("cmp(python, '!=3.7')").expect("test 4").is_true());
+        assert!(!jinja.eval("cmp(python, '<3.7')").expect("test 5").is_true());
+        assert!(!jinja.eval("cmp(python, '>3.5,<3.7')").expect("test 6").is_true());
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn eval_complicated_cmp() {
+        let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7.* *_cpython".to_string())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
