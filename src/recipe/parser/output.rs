@@ -16,6 +16,7 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 7] = [
     "context", "recipe", "source", "build", "outputs", "about", "extra",
 ];
 
+/// Retrieve all outputs from the recipe source (YAML)
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
     let root_node = marked_yaml::parse_yaml(0, src)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;

@@ -14,22 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{hash::HashInfo, render::resolved_dependencies::FinalizedDependencies};
 
-pub struct Metadata {
-    pub name: String,
-    pub version: String,
-    pub requirements: Vec<String>,
-}
-
-impl Default for Metadata {
-    fn default() -> Self {
-        Self {
-            name: String::from(""),
-            version: String::from("0.0.0"),
-            requirements: Vec::new(),
-        }
-    }
-}
-
+/// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
 
@@ -91,6 +76,7 @@ fn setup_build_dir(
 }
 
 impl Directories {
+    /// Create all directories needed for the building of a package
     pub fn create(
         name: &str,
         recipe_path: &Path,
@@ -161,6 +147,7 @@ fn default_true() -> bool {
     true
 }
 
+/// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
@@ -195,17 +182,27 @@ impl BuildConfiguration {
     }
 }
 
+/// A package identifier
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PackageIdentifier {
+    /// The name of the package
     pub name: PackageName,
+    /// The version of the package
     pub version: String,
+    /// The build string of the package
     pub build_string: String,
 }
 
+/// A output. This is the central element that is passed to the `run_build` function
+/// and fully specifies all the options and settings to run the build.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
+    /// The rendered recipe that is used to build this output
     pub recipe: crate::recipe::parser::Recipe,
+    /// The build configuration for this output (e.g. target_platform, channels, and other settings)
     pub build_configuration: BuildConfiguration,
+    /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
+    /// During the `run_build` functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
 }
 

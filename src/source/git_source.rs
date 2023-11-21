@@ -1,3 +1,5 @@
+//! This module contains the implementation of the fetching of `GitSource` struct.
+
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -12,6 +14,7 @@ use super::SourceError;
 
 type RepoPath<'a> = &'a Path;
 
+/// Fetch the given repository using the host `git` executable.
 pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), SourceError> {
     // might break on some platforms due to auth and ssh
     // especially ssh with password
@@ -33,6 +36,7 @@ pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), Source
     Ok(())
 }
 
+/// Fetch the git repository specified by the given source and place it in the cache directory.
 pub fn git_src(
     source: &GitSource,
     cache_dir: &Path,
@@ -214,7 +218,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 mod tests {
     use crate::{
         recipe::parser::{GitSource, GitUrl},
-        source::host_git_source::git_src,
+        source::git_source::git_src,
     };
 
     #[tracing_test::traced_test]

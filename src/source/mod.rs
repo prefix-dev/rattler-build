@@ -1,3 +1,5 @@
+//! Module for fetching sources and applying patches
+
 use std::{
     fs,
     path::{Path, StripPrefixError},
@@ -7,10 +9,11 @@ use std::{
 use crate::recipe::parser::Source;
 
 pub mod copy_dir;
-pub mod host_git_source;
+pub mod git_source;
 pub mod patch;
 pub mod url_source;
 
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum SourceError {
     #[error("IO Error: {0}")]
@@ -73,7 +76,7 @@ pub async fn fetch_sources(
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from git repo: {}", src.url());
-                let result = host_git_source::git_src(src, &cache_src, recipe_dir)?;
+                let result = git_source::git_src(src, &cache_src, recipe_dir)?;
                 let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {

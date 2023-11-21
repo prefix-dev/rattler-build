@@ -15,7 +15,7 @@ use thiserror::Error;
 use crate::recipe::parser::{find_outputs_from_src, Dependency};
 use crate::{
     _partialerror,
-    hash::compute_buildstring,
+    hash::compute_hash_info,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -30,8 +30,11 @@ use petgraph::{algo::toposort, graph::DiGraph};
 type OutputVariantsTuple = (String, String, String, Node, BTreeMap<String, String>);
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+/// Represents a pin configuration for a package.
 pub struct Pin {
+    /// The maximum pin (a string like "x.x.x").
     pub max_pin: Option<String>,
+    /// The minimum pin (a string like "x.x.x").
     pub min_pin: Option<String>,
 }
 
@@ -72,15 +75,75 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 
 #[serde_as]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+/// The variant configuration.
+/// This is usually loaded from a YAML file and contains a mapping of package names to a list of
+/// versions. Each version represents a variant of the package. The variant configuration is
+/// used to create a build matrix for a recipe.
+///
+/// Example:
+///
+/// ```yaml
+/// python:
+/// - "3.10"
+/// - "3.11"
+/// ```
+///
+/// If you depend on Python in your recipe, this will create two variants of your recipe:
+///
+/// ```txt
+/// [python=3.10]
+/// and
+/// [python=3.11]
+/// ```
+///
+///
+/// The variant configuration also contains a list of "zip keys". These are keys that are zipped
+/// together to create a list of variants. For example, if the variant configuration contains the
+/// following zip keys:
+///
+/// ```yaml
+/// zip_keys:
+/// - [python, compiler]
+/// ```
+///
+/// and the following variants:
+///
+/// ```yaml
+/// python:
+/// - "3.9"
+/// - "3.8"
+/// compiler:
+/// - gcc
+/// - clang
+///
+/// ```
+///
+/// the following variants will be selected:
+///
+/// ```txt
+/// [python=3.9, compiler=gcc]
+/// and
+/// [python=3.8, compiler=clang]
+/// ```
+///
+/// It's also possible to specify additional pins in the variant configuration. These pins are
+/// currently ignored.
 pub struct VariantConfig {
+    /// Pin run dependencies by using the versions from the build dependencies (and applying the pin).
+    /// This is currently ignored (TODO)
     pub pin_run_as_build: Option<BTreeMap<String, Pin>>,
+
+    /// The zip keys are used to "zip" together variants to create specific combinations.
     pub zip_keys: Option<Vec<Vec<String>>>,
 
+    /// The variants are a mapping of package names to a list of versions. Each version represents
+    /// a variant for the build matrix.
     #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
     #[serde(flatten)]
     pub variants: BTreeMap<String, Vec<String>>,
 }
 
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error, Diagnostic)]
 pub enum VariantConfigError {
     #[error("Could not parse variant config file ({0}): {1}")]
@@ -227,6 +290,8 @@ impl VariantConfig {
         Ok(())
     }
 
+    /// This function returns all possible combinations of variants for the given set of used
+    /// variables.
     pub fn combinations(
         &self,
         used_vars: &HashSet<String>,
@@ -281,10 +346,17 @@ impl VariantConfig {
         Ok(result)
     }
 
-    /// This finds all used variables in any dependency declarations, build, host, and run sections.
-    /// As well as any used variables from Jinja functions to calculate the variants of this recipe.
+    /// This function finds all used variables in a recipe and expands the recipe to the full
+    /// build matrix based on the variant configuration (loaded in the `SelectorConfig`).
     ///
-    /// We also split the recipe into multiple outputs and topologically sort them (as well as deduplicate)
+    /// The result is a topologically sorted list of tuples. Each tuple contains the following
+    /// elements:
+    ///
+    /// 1. The name of the package.
+    /// 2. The version of the package.
+    /// 3. The build string of the package.
+    /// 4. The recipe node.
+    /// 5. The used variant config.
     pub fn find_variants(
         &self,
         recipe: &str,
@@ -516,7 +588,7 @@ impl VariantConfig {
                     });
 
                 // compute hash for the recipe
-                let hash = compute_buildstring(&used_filtered, parsed_recipe.build().noarch());
+                let hash = compute_hash_info(&used_filtered, parsed_recipe.build().noarch());
                 // TODO(wolf) can we make this computation better by having some nice API on Output?
                 // get the real build string from the recipe
                 let selector_config_with_hash = SelectorConfig {
@@ -629,6 +701,7 @@ impl VariantKey {
     }
 }
 
+#[allow(missing_docs)]
 #[derive(Error, Debug, Diagnostic)]
 pub enum VariantError {
     #[error("Zip key elements do not all have same length: {0}")]

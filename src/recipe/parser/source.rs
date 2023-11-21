@@ -1,3 +1,5 @@
+//! Parse the source section of a recipe
+
 use std::{fmt, path::PathBuf, str::FromStr};
 
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
@@ -19,8 +21,11 @@ use crate::{
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Source {
+    /// Git source pointing to a Git repository to retrieve the source from
     Git(GitSource),
+    /// Url source pointing to a tarball or similar to retrieve the source from
     Url(UrlSource),
+    /// Path source pointing to a local file or directory to retrieve the source from
     Path(PathSource),
 }
 
@@ -227,11 +232,13 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
     }
 }
 
-/// git url
+/// A Git repository URL or a local path to a Git repository
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GitUrl {
+    /// A remote Git repository URL
     Url(Url),
+    /// A local path to a Git repository
     Path(PathBuf),
 }
 
@@ -369,7 +376,9 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 #[serde_as]
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Checksum {
+    /// A SHA256 checksum
     Sha256(#[serde_as(as = "SerializableHash::<rattler_digest::Sha256>")] Sha256Hash),
+    /// A MD5 checksum
     Md5(#[serde_as(as = "SerializableHash::<rattler_digest::Md5>")] Md5Hash),
 }
 /// A local path source. The source code will be copied to the `work`

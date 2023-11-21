@@ -29,6 +29,7 @@ use rattler_shell::{
 
 use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 
+#[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
     #[error("failed to run test")]
@@ -236,6 +237,7 @@ fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std:
     ))
 }
 
+/// The configuration for a test
 #[derive(Default, Debug)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)

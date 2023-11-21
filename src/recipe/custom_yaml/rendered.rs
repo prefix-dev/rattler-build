@@ -1,9 +1,10 @@
+#![allow(missing_docs)]
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
 use std::{fmt, hash::Hash, ops};
 
-use linked_hash_map::LinkedHashMap;
+use indexmap::IndexMap;
 use marked_yaml::types::MarkedScalarNode;
 use marked_yaml::Span;
 
@@ -154,8 +155,8 @@ impl From<Vec<RenderedNode>> for RenderedNode {
     }
 }
 
-impl From<LinkedHashMap<RenderedScalarNode, RenderedNode>> for RenderedNode {
-    fn from(value: LinkedHashMap<RenderedScalarNode, RenderedNode>) -> Self {
+impl From<IndexMap<RenderedScalarNode, RenderedNode>> for RenderedNode {
+    fn from(value: IndexMap<RenderedScalarNode, RenderedNode>) -> Self {
         Self::Mapping(RenderedMappingNode::from(value))
     }
 }
@@ -471,21 +472,18 @@ impl fmt::Debug for RenderedSequenceNode {
 ///
 /// Because ther is an example that on the `context` key-value definition, a later
 /// key was defined as a jinja string using previous values, we need to care about
-/// insertion order we use [`LinkedHashMap`] for this.
+/// insertion order we use [`IndexMap`] for this.
 ///
 /// **NOTE**: Nodes are considered equal even if they don't come from the same
 /// place.  *i.e. their spans are ignored for equality and hashing*
 #[derive(Clone)]
 pub struct RenderedMappingNode {
     span: marked_yaml::Span,
-    value: LinkedHashMap<RenderedScalarNode, RenderedNode>,
+    value: IndexMap<RenderedScalarNode, RenderedNode>,
 }
 
 impl RenderedMappingNode {
-    pub fn new(
-        span: marked_yaml::Span,
-        value: LinkedHashMap<RenderedScalarNode, RenderedNode>,
-    ) -> Self {
+    pub fn new(span: marked_yaml::Span, value: IndexMap<RenderedScalarNode, RenderedNode>) -> Self {
         Self { span, value }
     }
 }
@@ -506,7 +504,8 @@ impl Eq for RenderedMappingNode {}
 
 impl Hash for RenderedMappingNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.value.hash(state);
+        self.value.keys().for_each(|k| k.hash(state));
+        state.finish();
     }
 }
 
@@ -524,8 +523,8 @@ impl fmt::Debug for RenderedMappingNode {
     }
 }
 
-impl From<LinkedHashMap<RenderedScalarNode, RenderedNode>> for RenderedMappingNode {
-    fn from(value: LinkedHashMap<RenderedScalarNode, RenderedNode>) -> Self {
+impl From<IndexMap<RenderedScalarNode, RenderedNode>> for RenderedMappingNode {
+    fn from(value: IndexMap<RenderedScalarNode, RenderedNode>) -> Self {
         Self::new(marked_yaml::Span::new_blank(), value)
     }
 }
@@ -534,7 +533,7 @@ impl TryFrom<marked_yaml::types::MarkedMappingNode> for RenderedMappingNode {
     type Error = PartialParsingError;
 
     fn try_from(value: marked_yaml::types::MarkedMappingNode) -> Result<Self, Self::Error> {
-        let val: Result<LinkedHashMap<_, _>, _> = value
+        let val: Result<IndexMap<_, _>, _> = value
             .iter()
             .map(|(key, value)| match RenderedNode::try_from(value) {
                 Ok(v) => Ok((key.into(), v)),
@@ -547,7 +546,7 @@ impl TryFrom<marked_yaml::types::MarkedMappingNode> for RenderedMappingNode {
 }
 
 impl ops::Deref for RenderedMappingNode {
-    type Target = LinkedHashMap<RenderedScalarNode, RenderedNode>;
+    type Target = IndexMap<RenderedScalarNode, RenderedNode>;
 
     fn deref(&self) -> &Self::Target {
         &self.value
@@ -653,7 +652,7 @@ impl Render<RenderedMappingNode> for MappingNode {
         jinja: &Jinja,
         name: &str,
     ) -> Result<RenderedMappingNode, PartialParsingError> {
-        let mut rendered = LinkedHashMap::new();
+        let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
             let key = RenderedScalarNode::new(*key.span(), key.as_str().to_owned());

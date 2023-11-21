@@ -292,6 +292,7 @@ impl RunExports {
             && self.weak_constrains.is_empty()
     }
 
+    /// Get all run exports from all configurations
     pub fn all(&self) -> impl Iterator<Item = &Dependency> {
         self.noarch
             .iter()

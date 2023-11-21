@@ -59,7 +59,6 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 marked-yaml = { git = "https://github.com/GrayJack/marked-data.git", branch = "expand", package = "marked-yaml" }
 miette = { version = "5.10.0", features = ["fancy"] }
-linked-hash-map = "0.5.6"
 num_cpus = "1.16.0"
 goblin = "0.7.1"
 scroll = "0.11.0"

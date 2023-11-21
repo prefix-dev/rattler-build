@@ -2436,7 +2436,6 @@ dependencies = [
  "indicatif",
  "insta",
  "itertools 0.12.0",
- "linked-hash-map",
  "marked-yaml",
  "miette",
  "minijinja",
