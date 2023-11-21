@@ -61,7 +61,7 @@ pub enum PinError {
     #[error("Could not create MatchSpec Pin: {0}")]
     MatchSpec(#[from] std::io::Error),
 
-    #[error("Could not parse version for pinning (element not a number?) {0}")]
+    #[error("Could not parse version for pinning (element not a number?): {0}")]
     CouldNotPin(String),
 
     #[error("max_pin or min_pin expression is empty string. Needs to be at least `x`")]

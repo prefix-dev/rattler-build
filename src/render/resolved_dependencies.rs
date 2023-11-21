@@ -12,6 +12,7 @@ use crate::{
 };
 use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
+use rattler_conda_types::version_spec::ParseVersionSpecError;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
     MatchSpec, PackageName, Platform, RepoDataRecord, StringMatcher, Version, VersionSpec,
@@ -19,7 +20,7 @@ use rattler_conda_types::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::solver::create_environment;
+use super::{pin::PinError, solver::create_environment};
 use crate::recipe::parser::Dependency;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
@@ -64,9 +65,6 @@ pub enum DependencyInfo {
         #[serde_as(as = "DisplayFromStr")]
         spec: MatchSpec,
     },
-    /// This is a transient dependency of the package, which is not a direct dependency
-    /// of the package, but is a dependency of a dependency
-    Transient,
 }
 
 impl DependencyInfo {
@@ -79,7 +77,6 @@ impl DependencyInfo {
             DependencyInfo::PinCompatible { spec } => spec,
             DependencyInfo::RunExport { spec, .. } => spec,
             DependencyInfo::Raw { spec } => spec,
-            DependencyInfo::Transient => panic!("Cannot get spec from transient dependency"),
         }
     }
 
@@ -95,7 +92,6 @@ impl DependencyInfo {
                 source_package,
             } => format!("{} (RE of [{}: {}])", spec, from, source_package),
             DependencyInfo::Raw { spec } => spec.to_string(),
-            DependencyInfo::Transient => "transient".to_string(),
         }
     }
 }
@@ -120,7 +116,7 @@ fn short_channel(channel: &str) -> String {
         channel
             .rsplit('/')
             .find(|s| !s.is_empty())
-            .unwrap()
+            .unwrap_or_default()
             .to_string()
     } else {
         channel.to_string()
@@ -147,17 +143,17 @@ impl Display for ResolvedDependencies {
                     .specs
                     .iter()
                     .find(|s| s.spec().name.as_ref() == Some(&r.package_record.name));
+
                 if let Some(s) = spec {
-                    (r, s)
+                    (r, Some(s))
                 } else {
-                    (r, &DependencyInfo::Transient)
+                    (r, None)
                 }
             })
             .collect::<Vec<_>>();
 
-        let (mut explicit, mut transient): (Vec<_>, Vec<_>) = resolved_w_specs
-            .into_iter()
-            .partition(|(_, s)| !matches!(s, DependencyInfo::Transient));
+        let (mut explicit, mut transient): (Vec<_>, Vec<_>) =
+            resolved_w_specs.into_iter().partition(|(_, s)| s.is_none());
 
         explicit.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
         transient.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
@@ -165,7 +161,9 @@ impl Display for ResolvedDependencies {
         for (record, dep_info) in &explicit {
             table.add_row(vec![
                 record.package_record.name.as_normalized().to_string(),
-                dep_info.render(),
+                dep_info
+                    .expect("partition contains only values with Some")
+                    .render(),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
                 short_channel(&record.channel),
@@ -208,6 +206,27 @@ pub struct FinalizedDependencies {
 pub enum ResolveError {
     #[error("Failed to resolve dependencies: {0}")]
     DependencyResolutionError(#[from] anyhow::Error),
+
+    #[error("Could not collect run exports: {0}")]
+    CouldNotCollectRunExports(std::io::Error),
+
+    #[error("Could not parse version spec: {0}")]
+    VersionSpecParseError(#[from] ParseVersionSpecError),
+
+    #[error("Could not parse version: {0}")]
+    VersionParseError(#[from] rattler_conda_types::ParseVersionError),
+
+    #[error("Could not parse match spec: {0}")]
+    MatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
+
+    #[error("Could not apply pin: {0}")]
+    PinApplyError(#[from] PinError),
+
+    #[error("Could not apply pin. The following subpackage is not available: {0:?}")]
+    SubpackageNotFound(PackageName),
+
+    #[error("Compiler configuration error: {0}")]
+    CompilerError(String),
 }
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
@@ -220,7 +239,7 @@ pub fn apply_variant(
     let subpackages = &build_configuration.subpackages;
     let target_platform = &build_configuration.target_platform;
 
-    let applied = raw_specs
+    raw_specs
         .iter()
         .map(|s| {
             match s {
@@ -243,38 +262,36 @@ pub fn apply_variant(
 
                                 // we split at whitespace to separate into version and build
                                 let mut splitter = spec.split_whitespace();
-                                let version_spec = splitter.next().map(|s| VersionSpec::from_str(s).expect("Could not parse version spec from variant"));
-                                let build_spec = splitter.next().map(|s| StringMatcher::from_str(s).expect("Could not parse build spec from variant"));
+                                let version_spec = splitter.next().map(VersionSpec::from_str).transpose()?;
+                                let build_spec = splitter.next().map(StringMatcher::from_str).transpose().expect("Could not parse string matcher spec");
                                 let final_spec = MatchSpec {
                                     version: version_spec,
                                     build: build_spec,
                                     ..m
                                 };
-                                return DependencyInfo::Variant {
+                                return Ok(DependencyInfo::Variant {
                                     spec: final_spec,
                                     variant: version.clone(),
-                                };
+                                });
                             }
                         }
                     }
-                    DependencyInfo::Raw { spec: m }
+                    Ok(DependencyInfo::Raw { spec: m })
                 }
                 Dependency::PinSubpackage(pin) => {
                     let name = &pin.pin_value().name;
-                    let subpackage = subpackages.get(name).expect("Invalid subpackage");
+                    let subpackage = subpackages.get(name).ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
                     let pinned = pin
                         .pin_value()
                         .apply(
-                            &Version::from_str(&subpackage.version)
-                                .expect("could not parse version"),
+                            &Version::from_str(&subpackage.version)?,
                             &subpackage.build_string,
-                        )
-                        .expect("could not apply pin");
-                    DependencyInfo::PinSubpackage { spec: pinned }
+                        )?;
+                    Ok(DependencyInfo::PinSubpackage { spec: pinned })
                 }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
-                        panic!("Noarch packages cannot have compilers");
+                        return Err(ResolveError::CompilerError("Noarch packages cannot have compilers".to_string()))
                     }
 
                     let compiler_variant = format!("{}_compiler", compiler.language());
@@ -282,19 +299,13 @@ pub fn apply_variant(
                         .get(&compiler_variant)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| {
-                            // defaults
                             if target_platform.is_linux() {
                                 let default_compiler = match compiler.language() {
                                     "c" => "gcc".to_string(),
                                     "cxx" => "gxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
                                     "rust" => "rust".to_string(),
-                                    _ => {
-                                        panic!(
-                                            "No default value for compiler: {}",
-                                            compiler.language()
-                                        )
-                                    }
+                                    _ => "".to_string()
                                 };
                                 default_compiler
                             } else if target_platform.is_osx() {
@@ -303,12 +314,7 @@ pub fn apply_variant(
                                     "cxx" => "clangxx".to_string(),
                                     "fortran" => "gfortran".to_string(),
                                     "rust" => "rust".to_string(),
-                                    _ => {
-                                        panic!(
-                                            "No default value for compiler: {}",
-                                            compiler.language()
-                                        )
-                                    }
+                                    _ => "".to_string()
                                 };
                                 default_compiler
                             } else if target_platform.is_windows() {
@@ -319,21 +325,18 @@ pub fn apply_variant(
                                     "cxx" => "vs2017".to_string(),
                                     "fortran" => "gfortran".to_string(),
                                     "rust" => "rust".to_string(),
-                                    _ => {
-                                        panic!(
-                                            "No default value for compiler: {}",
-                                            compiler.language()
-                                        )
-                                    }
+                                    _ => "".to_string()
                                 };
                                 default_compiler
                             } else {
-                                panic!(
-                                    "Could not find compiler ({}) configuration for platform: {target_platform}",
-                                    compiler.language(),
-                                )
+                                "".to_string()
                             }
                         });
+
+                    if compiler_name.is_empty() {
+                        return Err(ResolveError::CompilerError(
+                            format!("Could not find compiler for {}. Configure {}_compiler in your variant config file for {target_platform}.", compiler.language(), compiler.language())));
+                    }
 
                     let compiler_version_variant = format!("{}_version", compiler_variant);
                     let compiler_version = variant.get(&compiler_version_variant);
@@ -347,16 +350,13 @@ pub fn apply_variant(
                         format!("{}_{}", compiler_name, target_platform)
                     };
 
-                    DependencyInfo::Compiler {
-                        spec: MatchSpec::from_str(&final_compiler)
-                            .expect("Could not parse compiler"),
-                    }
+                    Ok(DependencyInfo::Compiler {
+                        spec: MatchSpec::from_str(&final_compiler)?,
+                    })
                 }
             }
         })
-        .collect::<Vec<_>>();
-
-    Ok(applied)
+        .collect()
 }
 
 fn collect_run_exports_from_env(
@@ -459,7 +459,7 @@ pub async fn resolve_dependencies(
                 res
             }
         })
-        .expect("Could not find run exports");
+        .map_err(ResolveError::CouldNotCollectRunExports)?;
 
         Some(ResolvedDependencies {
             specs,
@@ -481,7 +481,7 @@ pub async fn resolve_dependencies(
      -> Result<Vec<DependencyInfo>, ResolveError> {
         let mut cloned = Vec::new();
         for spec in specs {
-            let spec = MatchSpec::from_str(spec).expect("...");
+            let spec = MatchSpec::from_str(spec)?;
             let dep = DependencyInfo::RunExport {
                 spec,
                 from: env.to_string(),
@@ -517,7 +517,7 @@ pub async fn resolve_dependencies(
                 .iter()
                 .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
         })
-        .expect("Could not find run exports");
+        .map_err(ResolveError::CouldNotCollectRunExports)?;
 
         Some(ResolvedDependencies {
             specs,
