@@ -1,3 +1,4 @@
+//! Functions for applying patches to a work directory.
 use std::{
     path::{Path, PathBuf},
     process::Command,

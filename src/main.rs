@@ -24,7 +24,7 @@ use tracing_subscriber::{
 
 use rattler_build::{
     build::run_build,
-    hash::compute_buildstring,
+    hash::compute_hash_info,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
@@ -284,7 +284,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let mut subpackages = BTreeMap::new();
     for (_, _, _, output, variant) in outputs_and_variants {
-        let hash = compute_buildstring(&variant, &noarch);
+        let hash = compute_hash_info(&variant, &noarch);
 
         let selector_config = SelectorConfig {
             variant: variant.clone(),
@@ -341,7 +341,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     _ => target_platform,
                 },
                 build_platform: Platform::current(),
-                hash: compute_buildstring(&variant, &noarch_type),
+                hash: compute_hash_info(&variant, &noarch_type),
                 variant: variant.clone(),
                 directories: Directories::create(
                     name.as_normalized(),

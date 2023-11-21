@@ -1,3 +1,5 @@
+//! This module contains the implementation of the fetching for a `UrlSource` struct.
+
 use std::{
     fs,
     io::Cursor,

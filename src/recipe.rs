@@ -1,3 +1,5 @@
+//! The recipe module contains all the logic to parse a recipe file.
+
 pub use self::{error::ParsingError, jinja::Jinja, parser::Recipe};
 
 pub mod parser;

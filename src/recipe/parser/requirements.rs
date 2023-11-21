@@ -1,3 +1,5 @@
+//! Parsing for the requirements section of the recipe.
+
 use std::{fmt, str::FromStr};
 
 use rattler_conda_types::MatchSpec;
@@ -65,6 +67,7 @@ impl Requirements {
         self.run_constrained.as_slice()
     }
 
+    /// Get all requirements at build time (combines build and host requirements)
     pub fn build_time(&self) -> impl Iterator<Item = &Dependency> {
         self.build.iter().chain(self.host.iter())
     }
@@ -133,8 +136,12 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
     }
 }
 
+/// A pin subpackage is a special kind of dependency that is used to depend on
+/// another output (subpackage) of the same recipe. The pin is used to specify
+/// the version range to pin the subpackage to.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinSubpackage {
+    /// The pin value.
     pin_subpackage: Pin,
 }
 
@@ -145,13 +152,20 @@ impl PinSubpackage {
     }
 }
 
+/// A compiler is a special kind of dependency that, when rendered, has
+/// some additional information about the target_platform attached.
+///
+/// For example, a c-compiler will resolve to the variant key `c_compiler`.
+/// If that value is `gcc`, the rendered compiler will read `gcc_linux-64` because
+/// it is always resolved with the target_platform.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Compiler {
+    /// The language such as c, cxx, rust, etc.
     language: String,
 }
 
 impl Compiler {
-    /// Get the compiler value as a string.
+    /// Get the language value as a string.
     pub fn language(&self) -> &str {
         &self.language
     }
@@ -180,10 +194,14 @@ impl FromStr for Compiler {
     }
 }
 
+/// A combination of all possible dependencies.
 #[derive(Debug, Clone)]
 pub enum Dependency {
+    /// A regular matchspec
     Spec(MatchSpec),
+    /// A pin_subpackage dependency
     PinSubpackage(PinSubpackage),
+    /// A compiler dependency
     Compiler(Compiler),
 }
 

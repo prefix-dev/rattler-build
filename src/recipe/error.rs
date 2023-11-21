@@ -1,3 +1,5 @@
+//! Error types for the recipe parser.
+
 use std::{borrow::Cow, convert::Infallible, fmt, str::ParseBoolError};
 
 use miette::{Diagnostic, SourceOffset, SourceSpan};
@@ -9,7 +11,7 @@ use thiserror::Error;
 #[derive(Debug, Error, Diagnostic)]
 #[error("Parsing: {kind}")]
 pub struct ParsingError {
-    // Source string of the recipe.
+    /// Source string of the recipe.
     #[source_code]
     pub src: String,
 
@@ -24,11 +26,12 @@ pub struct ParsingError {
     #[help]
     pub help: Option<Cow<'static, str>>,
 
-    // Specific error kind for the error.
+    /// Specific error kind for the error.
     pub kind: ErrorKind,
 }
 
 impl ParsingError {
+    /// Turn a [`PartialParsingError`] into a [`ParsingError`] by adding the source string.
     pub fn from_partial(src: &str, err: PartialParsingError) -> Self {
         Self {
             src: src.to_owned(),
@@ -39,6 +42,7 @@ impl ParsingError {
         }
     }
 
+    /// Get the [`ErrorKind`] of the error.
     pub fn kind(&self) -> &ErrorKind {
         &self.kind
     }
@@ -146,7 +150,7 @@ pub struct PartialParsingError {
     /// Suggestion for fixing the parser error.
     pub help: Option<Cow<'static, str>>,
 
-    // Specific error kind for the error.
+    /// Specific error kind for the error.
     pub kind: ErrorKind,
 }
 

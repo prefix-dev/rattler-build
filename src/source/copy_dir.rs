@@ -1,3 +1,4 @@
+//! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
     collections::HashMap,
     fs::create_dir_all,

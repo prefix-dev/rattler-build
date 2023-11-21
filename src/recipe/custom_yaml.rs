@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
 
-use linked_hash_map::LinkedHashMap;
+use indexmap::IndexMap;
 use marked_yaml::{types::MarkedScalarNode, Span};
 use url::Url;
 
@@ -76,14 +76,17 @@ impl Node {
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 
+    /// Check if this node is a mapping
     pub fn is_mapping(&self) -> bool {
         matches!(self, Self::Mapping(_))
     }
 
+    /// Check if this node is a scalar
     pub fn is_scalar(&self) -> bool {
         matches!(self, Self::Scalar(_))
     }
 
+    /// Check if this node is a sequence
     pub fn is_sequence(&self) -> bool {
         matches!(self, Self::Sequence(_))
     }
@@ -162,7 +165,7 @@ impl Render<Option<ScalarNode>> for ScalarNode {
 
 impl Render<Node> for MappingNode {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
-        let mut rendered = LinkedHashMap::new();
+        let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
             rendered.insert(
@@ -231,6 +234,7 @@ impl Render<SequenceNodeInternal> for SequenceNodeInternal {
 
 /// A trait that defines that the implementer has an associated span.
 pub trait HasSpan {
+    /// Get the span of the implementer
     fn span(&self) -> &marked_yaml::Span;
 }
 
@@ -280,8 +284,8 @@ impl From<Vec<SequenceNodeInternal>> for Node {
     }
 }
 
-impl From<LinkedHashMap<ScalarNode, Node>> for Node {
-    fn from(value: LinkedHashMap<ScalarNode, Node>) -> Self {
+impl From<IndexMap<ScalarNode, Node>> for Node {
+    fn from(value: IndexMap<ScalarNode, Node>) -> Self {
         Self::Mapping(MappingNode::from(value))
     }
 }
@@ -348,6 +352,7 @@ pub struct ScalarNode {
 }
 
 impl ScalarNode {
+    /// Create a new scalar node with a span
     pub fn new(span: marked_yaml::Span, value: String) -> Self {
         Self { span, value }
     }
@@ -524,6 +529,7 @@ pub struct SequenceNode {
 }
 
 impl SequenceNode {
+    /// Create a new sequence node with a span
     pub fn new(span: marked_yaml::Span, value: Vec<SequenceNodeInternal>) -> Self {
         Self { span, value }
     }
@@ -612,18 +618,19 @@ impl fmt::Debug for SequenceNode {
 ///
 /// Because ther is an example that on the `context` key-value definition, a later
 /// key was defined as a jinja string using previous values, we need to care about
-/// insertion order we use [`LinkedHashMap`] for this.
+/// insertion order we use [`IndexMap`] for this.
 ///
 /// **NOTE**: Nodes are considered equal even if they don't come from the same
 /// place.  *i.e. their spans are ignored for equality and hashing*
 #[derive(Clone)]
 pub struct MappingNode {
     span: marked_yaml::Span,
-    value: LinkedHashMap<ScalarNode, Node>,
+    value: IndexMap<ScalarNode, Node>,
 }
 
 impl MappingNode {
-    pub fn new(span: marked_yaml::Span, value: LinkedHashMap<ScalarNode, Node>) -> Self {
+    /// Create a new mapping node with a span
+    pub fn new(span: marked_yaml::Span, value: IndexMap<ScalarNode, Node>) -> Self {
         Self { span, value }
     }
 }
@@ -644,7 +651,8 @@ impl Eq for MappingNode {}
 
 impl Hash for MappingNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.value.hash(state);
+        self.value.keys().for_each(|k| k.hash(state));
+        state.finish();
     }
 }
 
@@ -662,8 +670,8 @@ impl fmt::Debug for MappingNode {
     }
 }
 
-impl From<LinkedHashMap<ScalarNode, Node>> for MappingNode {
-    fn from(value: LinkedHashMap<ScalarNode, Node>) -> Self {
+impl From<IndexMap<ScalarNode, Node>> for MappingNode {
+    fn from(value: IndexMap<ScalarNode, Node>) -> Self {
         Self::new(marked_yaml::Span::new_blank(), value)
     }
 }
@@ -672,7 +680,7 @@ impl TryFrom<marked_yaml::types::MarkedMappingNode> for MappingNode {
     type Error = PartialParsingError;
 
     fn try_from(value: marked_yaml::types::MarkedMappingNode) -> Result<Self, Self::Error> {
-        let val: Result<LinkedHashMap<_, _>, _> = value
+        let val: Result<IndexMap<_, _>, _> = value
             .iter()
             .map(|(key, value)| match Node::try_from(value) {
                 Ok(v) => Ok((key.into(), v)),
@@ -685,7 +693,7 @@ impl TryFrom<marked_yaml::types::MarkedMappingNode> for MappingNode {
 }
 
 impl ops::Deref for MappingNode {
-    type Target = LinkedHashMap<ScalarNode, Node>;
+    type Target = IndexMap<ScalarNode, Node>;
 
     fn deref(&self) -> &Self::Target {
         &self.value
@@ -708,6 +716,7 @@ pub enum SequenceNodeInternal {
 }
 
 impl SequenceNodeInternal {
+    /// Get the span of the entire sequence node
     pub fn span(&self) -> &marked_yaml::Span {
         match self {
             Self::Simple(node) => node.span(),
@@ -789,6 +798,7 @@ pub struct IfSelector {
 }
 
 impl IfSelector {
+    /// Create a new if / then / else (otherwise) selector
     pub fn new(
         cond: ScalarNode,
         then: Node,
@@ -818,6 +828,7 @@ impl IfSelector {
         self.otherwise.as_ref()
     }
 
+    /// Get the span of the entire if / then / else map
     pub fn span(&self) -> &marked_yaml::Span {
         &self.span
     }
@@ -876,7 +887,9 @@ impl fmt::Debug for IfSelector {
     }
 }
 
+/// A trait that defines that the implementer can be converted from a node.
 pub trait TryConvertNode<T> {
+    /// Try to convert the implementer from a node.
     fn try_convert(&self, name: &str) -> Result<T, PartialParsingError>;
 }
 

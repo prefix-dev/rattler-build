@@ -1,4 +1,4 @@
-//! Compute the build string for a given variant
+//! Compute the build string / hash info for a given variant
 use std::collections::{BTreeMap, HashMap};
 
 use rattler_conda_types::NoArchType;
@@ -136,9 +136,13 @@ fn hash_variant(variant: &BTreeMap<String, String>) -> String {
     res[..HASH_LENGTH].to_string()
 }
 
+/// The hash info for a given variant
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct HashInfo {
+    /// The hash (first 7 letters of the sha1sum)
     pub hash: String,
+
+    /// The hash prefix (e.g. `py38` or `np111`)
     pub hash_prefix: String,
 }
 
@@ -172,7 +176,8 @@ impl<'de> Deserialize<'de> for HashInfo {
     }
 }
 
-pub fn compute_buildstring(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> HashInfo {
+/// Compute the build string for a given variant
+pub fn compute_hash_info(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> HashInfo {
     let hash_prefix = compute_hash_prefix(variant, noarch);
     let hash = hash_variant(variant);
     HashInfo { hash, hash_prefix }
@@ -202,7 +207,7 @@ mod tests {
         input.insert("python".to_string(), "3.11.* *_cpython".to_string());
         input.insert("c_compiler_version".to_string(), "14".to_string());
 
-        let build_string_from_output = compute_buildstring(&input, &NoArchType::none());
+        let build_string_from_output = compute_hash_info(&input, &NoArchType::none());
         assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");
     }
 }

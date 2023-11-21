@@ -1,3 +1,4 @@
+//! Evaluate pin expressions and apply them to resolved dependencies
 use std::{
     fmt::{Display, Formatter},
     str::FromStr,

@@ -1,3 +1,5 @@
+//! Contains the selector config, which is used to render the recipe.
+
 use std::collections::BTreeMap;
 
 use crate::{hash::HashInfo, recipe::jinja::Env};
@@ -5,15 +7,21 @@ use crate::{hash::HashInfo, recipe::jinja::Env};
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
 
+/// The selector config is used to render the recipe.
 #[derive(Clone, Debug)]
 pub struct SelectorConfig {
+    /// The target platform to render for
     pub target_platform: Platform,
+    /// The build platform to render for
     pub build_platform: Platform,
+    /// The hash, if available
     pub hash: Option<HashInfo>,
+    /// The variant config
     pub variant: BTreeMap<String, String>,
 }
 
 impl SelectorConfig {
+    /// Turn this selector config into a context for jinja rendering
     pub fn into_context(self) -> BTreeMap<String, Value> {
         let mut context = BTreeMap::new();
 
@@ -56,6 +64,7 @@ impl SelectorConfig {
         context
     }
 
+    /// Create a new selector config from an existing one, replacing the variant
     pub fn new_with_variant(&self, variant: BTreeMap<String, String>) -> Self {
         Self {
             variant,
