@@ -1,0 +1,52 @@
+---
+source: src/recipe/parser.rs
+expression: recipe
+---
+package:
+  name: blib
+  version: 0.1.0
+source: []
+build:
+  number: 0
+  string: ~
+  skip: false
+  script:
+    - test succeeded
+  script_env:
+    passthrough: []
+    env: {}
+    secrets: []
+  ignore_run_exports: []
+  ignore_run_exports_from: []
+  run_exports:
+    noarch: []
+    strong: []
+    strong_constrains: []
+    weak: []
+    weak_constrains: []
+  noarch: false
+  entry_points: []
+requirements:
+  build: []
+  host: []
+  run: []
+  run_constrained: []
+test:
+  imports: []
+  commands: []
+  requires: []
+  source_files: []
+  files: []
+about:
+  homepage: ~
+  repository: ~
+  documentation: ~
+  license: ~
+  license_family: ~
+  license_files: []
+  license_url: ~
+  summary: ~
+  description: ~
+  prelink_message: ~
+extra: ~
+

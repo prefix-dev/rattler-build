@@ -23,9 +23,8 @@ outputs:
       version: ${{ libmamba_version }}
     build:
       script:
-        - build_mamba.sh
-        # - ${{ "build_mamba.sh" if unix }}
-        # - ${{ "build_mamba.bat" if win }}
+        - ${{ "build_mamba.sh" if unix }}
+        - ${{ "build_mamba.bat" if win }}
       run_exports:
         - ${{ pin_subpackage('libmamba', max_pin='x.x') }}
       ignore_run_exports:
@@ -79,9 +78,8 @@ outputs:
       version: ${{ libmambapy_version }}
     build:
       script:
-        - build_mamba.sh
-        # - ${{ "build_mamba.sh" if unix }}
-        # - ${{ "build_mamba.bat" if win }}
+        - ${{ "build_mamba.sh" if unix }}
+        - ${{ "build_mamba.bat" if win }}
       string: py_sup${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
       run_exports:
         - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
@@ -127,9 +125,8 @@ outputs:
       version: ${{ mamba_version }}
     build:
       script:
-        - build_mamba.sh
-        # - ${{ "build_mamba.sh" if unix }}
-        # - ${{ "build_mamba.bat" if win }}
+        - ${{ "build_mamba.sh" if unix }}
+        - ${{ "build_mamba.bat" if win }}
       string: py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
       entry_points:
         - mamba = mamba.mamba:main
