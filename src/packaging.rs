@@ -860,6 +860,10 @@ pub fn package_conda(
     index_json.write_all(create_index_json(output)?.as_bytes())?;
     tmp_files.insert(info_folder.join("index.json"));
 
+    let mut hash_input_json = File::create(info_folder.join("hash_input.json"))?;
+    hash_input_json.write_all(output.build_configuration.hash.hash_input.as_bytes())?;
+    tmp_files.insert(info_folder.join("hash_input.json"));
+
     let mut about_json = File::create(info_folder.join("about.json"))?;
     about_json.write_all(create_about_json(output)?.as_bytes())?;
     tmp_files.insert(info_folder.join("about.json"));

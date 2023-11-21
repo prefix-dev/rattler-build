@@ -79,10 +79,13 @@ fn short_version_from_spec(input: &str, length: u32) -> String {
 }
 
 /// The hash info for a given variant
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct HashInfo {
     /// The hash (first 7 letters of the sha1sum)
     pub hash: String,
+
+    /// The exact input that was used to compute the hash
+    pub hash_input: String,
 
     /// The hash prefix (e.g. `py38` or `np111`)
     pub hash_prefix: String,
@@ -91,30 +94,6 @@ pub struct HashInfo {
 impl std::fmt::Display for HashInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}h{}", self.hash_prefix, self.hash)
-    }
-}
-
-impl Serialize for HashInfo {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self.to_string().as_str())
-    }
-}
-
-impl<'de> Deserialize<'de> for HashInfo {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let s = String::deserialize(deserializer)?;
-        // split at `h` and take the first part
-        if let Some((hash_prefix, hash)) = s.rsplit_once('h') {
-            return Ok(HashInfo {
-                hash: hash.to_string(),
-                hash_prefix: hash_prefix.to_string(),
-            });
-        }
-
-        Err(serde::de::Error::custom(format!(
-            "Failed to deserialize hash: {}",
-            s
-        )))
     }
 }
 
@@ -157,7 +136,7 @@ impl HashInfo {
         result
     }
 
-    fn hash_variant(variant: &BTreeMap<String, String>) -> String {
+    fn hash_variant(variant: &BTreeMap<String, String>) -> (String, String) {
         let mut buf = Vec::new();
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
 
@@ -175,13 +154,15 @@ impl HashInfo {
         const HASH_LENGTH: usize = 7;
 
         let res = format!("{:x}", result);
-        res[..HASH_LENGTH].to_string()
+        (res[..HASH_LENGTH].to_string(), string)
     }
 
     /// Compute the build string for a given variant
     pub fn from_variant(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> Self {
+        let (hash, hash_input) = Self::hash_variant(variant);
         Self {
-            hash: Self::hash_variant(variant),
+            hash,
+            hash_input,
             hash_prefix: Self::hash_prefix(variant, noarch),
         }
     }
