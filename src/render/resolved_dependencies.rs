@@ -153,7 +153,7 @@ impl Display for ResolvedDependencies {
             .collect::<Vec<_>>();
 
         let (mut explicit, mut transient): (Vec<_>, Vec<_>) =
-            resolved_w_specs.into_iter().partition(|(_, s)| s.is_none());
+            resolved_w_specs.into_iter().partition(|(_, s)| s.is_some());
 
         explicit.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
         transient.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
