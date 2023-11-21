@@ -72,15 +72,18 @@ build_configuration:
   build_platform: osx-arm64
   variant:
     target_platform: noarch
-  hash: pyh4616a5c
+  hash:
+    hash: 4616a5c
+    hash_input: "{\"target_platform\": \"noarch\"}"
+    hash_prefix: py
   directories:
-    host_prefix: /opt/bld/bld/rattler-build_rich_1699379073/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_pla
-    build_prefix: /opt/bld/bld/rattler-build_rich_1699379073/build_env
-    work_dir: /opt/bld/bld/rattler-build_rich_1699379073/work
-    build_dir: /opt/bld/bld/rattler-build_rich_1699379073
+    host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
+    build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/build_env
+    work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/work
+    build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439
   channels:
     - conda-forge
-  timestamp: "2023-11-07T17:44:33.839426Z"
+  timestamp: "2023-11-21T13:30:39.246259Z"
   subpackages:
     rich:
       name: rich
@@ -319,15 +322,15 @@ finalized_dependencies:
         build_number: 0
         depends: []
         license: ISC
-        md5: e1b99ac4dbcee71a71682996f67f7965
+        md5: c01da7c77cfcba2107174e25c1d47384
         name: ca-certificates
-        sha256: b220c001b0c1448a47cc49b42a622e06a540ec60b3f7a1e057fca1f37ce515e4
-        size: 149918
+        sha256: 75f4762a55f7e9453a603c967d549bfa0a7a9669d502d103cb6fbf8c86d993c6
+        size: 154444
         subdir: osx-arm64
-        timestamp: 1690026385821
-        version: 2023.7.22
-        fn: ca-certificates-2023.7.22-hf0a4a13_0.conda
-        url: "https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2023.7.22-hf0a4a13_0.conda"
+        timestamp: 1700280972188
+        version: 2023.11.17
+        fn: ca-certificates-2023.11.17-hf0a4a13_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2023.11.17-hf0a4a13_0.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
       - build: pyhd8ed1ab_0
         build_number: 0
