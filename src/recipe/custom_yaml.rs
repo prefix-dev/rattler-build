@@ -911,32 +911,6 @@ impl<T: Clone> TryConvertNode<T> for T {
     }
 }
 
-impl TryConvertNode<ScalarNode> for Node {
-    fn try_convert(&self, name: &str) -> Result<ScalarNode, PartialParsingError> {
-        self.as_scalar().cloned().ok_or_else(|| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::ExpectedScalar,
-                label = format!("expected a scalar value for `{name}`")
-            )
-        })
-    }
-}
-
-impl TryConvertNode<String> for Node {
-    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
-        self.as_scalar()
-            .ok_or_else(|| {
-                _partialerror!(
-                    *self.span(),
-                    ErrorKind::ExpectedScalar,
-                    label = format!("expected a string value for `{name}`")
-                )
-            })
-            .map(|s| s.as_str().to_owned())
-    }
-}
-
 impl TryConvertNode<i32> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
         self.as_scalar()

@@ -210,6 +210,8 @@ impl Recipe {
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_yaml_snapshot;
+
     use crate::assert_miette_snapshot;
 
     use super::*;
@@ -262,5 +264,12 @@ mod tests {
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
         let err = recipe.unwrap_err();
         assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn jinja_sequence() {
+        let recipe = include_str!("../../test-data/recipes/test-parsing/recipe_inline_jinja.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        assert_yaml_snapshot!(recipe);
     }
 }

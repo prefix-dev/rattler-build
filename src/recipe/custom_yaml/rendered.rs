@@ -603,7 +603,6 @@ impl Render<RenderedNode> for ScalarNode {
                 label = jinja_error_to_label(&err),
             )
         })?;
-
         let rendered = RenderedScalarNode::new(*self.span(), rendered);
 
         if rendered.is_empty() {
@@ -722,6 +721,10 @@ impl Render<RenderedSequenceNode> for SequenceNodeInternal {
                 }
             }
         }
+
+        // filter out all null values
+        rendered.retain(|item| !matches!(item, RenderedNode::Null(_)));
+
         Ok(RenderedSequenceNode::from(rendered))
     }
 }
