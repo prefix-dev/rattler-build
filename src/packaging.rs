@@ -267,7 +267,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .depends
             .iter()
-            .map(|d| d.spec().to_string())
+            .map(|dep| dep.spec().to_string())
             .collect(),
         constrains: output
             .finalized_dependencies
@@ -276,7 +276,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .run
             .constrains
             .iter()
-            .map(|d| d.spec().to_string())
+            .map(|dep| dep.spec().to_string())
             .collect(),
         noarch: *recipe.build().noarch(),
         track_features: vec![],

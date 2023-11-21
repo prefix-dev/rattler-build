@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 /// A macOS dylib (Mach-O)
 pub struct Dylib {
@@ -150,10 +151,26 @@ impl Dylib {
 
         if modified {
             install_name_tool(&self.path, &changes)?;
+            codesign(&self.path)?;
         }
 
         Ok(())
     }
+}
+
+fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
+    tracing::info!("codesigning {:?}", path);
+    Command::new("codesign")
+        .arg("-f")
+        .arg("-s")
+        .arg("-")
+        .arg(path)
+        .output()
+        .map(|_| ())
+        .map_err(|e| {
+            tracing::error!("codesign failed: {}", e);
+            e
+        })
 }
 
 /// Changes to apply to a dylib

@@ -12,7 +12,7 @@ use dunce::canonicalize;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
-use crate::render::resolved_dependencies::FinalizedDependencies;
+use crate::{hash::HashInfo, render::resolved_dependencies::FinalizedDependencies};
 
 pub struct Metadata {
     pub name: String,
@@ -172,7 +172,7 @@ pub struct BuildConfiguration {
     /// The selected variant for this build
     pub variant: BTreeMap<String, String>,
     /// THe computed hash of the variant
-    pub hash: String,
+    pub hash: HashInfo,
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments

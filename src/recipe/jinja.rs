@@ -215,6 +215,16 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         ))
     });
 
+    env.add_filter("version_to_buildstring", |s: String| {
+        // we first split the string by whitespace and take the first part
+        let s = s.split_whitespace().next().unwrap_or(&s);
+        // we then split the string by . and take the first two parts
+        let mut parts = s.split('.');
+        let major = parts.next().unwrap_or("");
+        let minor = parts.next().unwrap_or("");
+        format!("{}{}", major, minor)
+    });
+
     env
 }
 
