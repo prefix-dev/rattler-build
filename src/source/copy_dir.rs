@@ -237,8 +237,18 @@ impl<'a> CopyDir<'a> {
                         skip_exist: self.copy_options.skip_exist,
                         buffer_size: self.copy_options.buffer_size,
                     };
-                    fs_extra::file::copy(path, &dest_path, &file_options)
-                        .map_err(SourceError::FileSystemError)?;
+
+                    // if file is a symlink, copy it as a symlink
+                    if path.is_symlink() {
+                        let link_target = std::fs::read_link(path)?;
+                        #[cfg(unix)]
+                        std::os::unix::fs::symlink(link_target, &dest_path)?;
+                        #[cfg(windows)]
+                        std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+                    } else {
+                        fs_extra::file::copy(path, &dest_path, &file_options)
+                            .map_err(SourceError::FileSystemError)?;
+                    }
 
                     tracing::info!(
                         "Copied {} to {}",
@@ -351,7 +361,7 @@ impl Match {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, fs, fs::File};
+    use std::{collections::HashSet, fs, fs::File, path::PathBuf};
 
     #[test]
     fn test_copy_dir() {
@@ -453,6 +463,43 @@ mod test {
         assert_eq!(
             copy_dir.copied_pathes()[0],
             dest_dir.path().join("test_copy_dir/test_1.txt")
+        );
+    }
+
+    #[test]
+    fn copydir_with_broken_symlink() {
+        if cfg!(windows) {
+            // check if we have permissions to create symlinks
+            let tmp_dir = tempfile::TempDir::new().unwrap();
+            let broken_symlink = tmp_dir.path().join("random_symlink");
+            #[cfg(windows)]
+            if std::os::windows::fs::symlink_file("does_not_exist", &broken_symlink).is_err() {
+                return;
+            }
+        }
+
+        let tmp_dir = tempfile::TempDir::new().unwrap();
+        let dir = tmp_dir.path().join("test_copy_dir");
+
+        fs::create_dir_all(&dir).unwrap();
+        File::create(dir.join("test_1.txt")).unwrap();
+        File::create(dir.join("test_2.rst")).unwrap();
+
+        let broken_symlink = tmp_dir.path().join("broken_symlink");
+        std::os::unix::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
+
+        let dest_dir = tempfile::TempDir::new().unwrap();
+
+        let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
+            .use_gitignore(false)
+            .run()
+            .unwrap();
+        assert_eq!(copy_dir.copied_pathes().len(), 3);
+
+        let broken_symlink_dest = dest_dir.path().join("test_copy_dir/broken_symlink");
+        assert_eq!(
+            std::fs::read_link(&broken_symlink_dest).unwrap(),
+            std::path::PathBuf::from("/does/not/exist")
         );
     }
 }
