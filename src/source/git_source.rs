@@ -64,7 +64,7 @@ pub fn git_src(
 
     if (source.rev().is_empty() || source.rev().eq("HEAD"))
         // depth == -1, fetches the entire git history
-        && source.depth().map(|s| s == -1).unwrap_or_default()
+        && source.depth().map(|s| s != -1).unwrap_or_default()
     {
         return Err(SourceError::GitErrorStr(
             "use of `git_rev` with `git_depth` is invalid",
