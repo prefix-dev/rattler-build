@@ -171,6 +171,19 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut folder = None;
         let mut lfs = false;
 
+        // TODO: is there a better place for this error?
+        // raising the error during parsing allows us to suggest fixes in future
+        // in case we build linting functionality on top
+        if self.contains_key("git_rev") {
+            if let Some((k, _)) = self.get_key_value("git_depth") {
+                return Err(_partialerror!(
+                    *k.span(),
+                    ErrorKind::InvalidField(k.as_str().to_owned().into()),
+                    help = "use of `git_depth` with `git_rev` is invalid"
+                ));
+            }
+        }
+
         for (k, v) in self.iter() {
             match k.as_str() {
                 "git_url" => {

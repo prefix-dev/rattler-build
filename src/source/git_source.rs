@@ -49,11 +49,27 @@ pub fn git_src(
         recipe_dir.display()
     );
 
-    // TODO: handle reporting for unavailability of git better, or perhaps pointing to git binary manually?
-    // currently a solution is to provide a `git` early in PATH with,
-    // ```bash
-    // export PATH="/path/to/git:$PATH"
-    // ```
+    // test if git is available locally as we fetch the git from PATH,
+    // user can always override git path
+    if !Command::new("git")
+        .arg("--version")
+        .output()?
+        .status
+        .success()
+    {
+        return Err(SourceError::GitErrorStr(
+            "`git` command not found in `PATH`",
+        ));
+    }
+
+    if (source.rev().is_empty() || source.rev().eq("HEAD"))
+        // depth == -1, fetches the entire git history
+        && source.depth().map(|s| s != -1).unwrap_or_default()
+    {
+        return Err(SourceError::GitErrorStr(
+            "use of `git_rev` with `git_depth` is invalid",
+        ));
+    }
 
     let filename = match &source.url() {
         GitUrl::Url(url) => (|| Some(url.path_segments()?.last()?.to_string()))()
