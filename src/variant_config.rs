@@ -583,7 +583,7 @@ impl VariantConfig {
                             used_filtered.insert(p.clone(), format!("{} {}", version, build));
                         }
                         None => {
-                            return Err(VariantError::MissingOutput(p.into()));
+                            return Err(VariantError::MissingOutput(p));
                         }
                     }
                 }
