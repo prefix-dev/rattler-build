@@ -564,9 +564,15 @@ pub async fn resolve_dependencies(
 
     // Propagate run exports from host env to run env
     if let Some(host_env) = &host_env {
+        println!("Run exports: {:?}", &host_env.run_exports);
+        println!(
+            "Taret platform: {:?}",
+            &output.build_configuration.target_platform
+        );
         match output.build_configuration.target_platform {
             Platform::NoArch => {
                 for (name, rex) in &host_env.run_exports {
+                    println!("Run exports: {:?}", &rex);
                     run_specs
                         .depends
                         .extend(clone_specs(name, "host", &rex.noarch)?);
@@ -593,6 +599,7 @@ pub async fn resolve_dependencies(
 
     // We also have to propagate the _strong_ run exports of the build environment to the run environment
     if let Some(build_env) = &build_env {
+        println!("Run exports: {:?}", &build_env.run_exports);
         match output.build_configuration.target_platform {
             Platform::NoArch => {}
             _ => {
