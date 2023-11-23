@@ -326,7 +326,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             .unwrap_or_else(|| vec!["conda-forge".to_string()]);
 
         let timestamp = chrono::Utc::now();
-        println!("Target platform: {:?}", discovered_output.target_platform);
+
         let output = rattler_build::metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {

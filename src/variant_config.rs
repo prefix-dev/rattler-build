@@ -638,9 +638,6 @@ impl VariantConfig {
                 );
 
                 let version = parsed_recipe.package().version().to_string();
-                // (name, version, build_string, output, used_filtered));
-                println!("Target platform: {:?}", target_platform);
-                println!("Used vars: {:?}", used_filtered);
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,
