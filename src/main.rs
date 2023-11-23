@@ -331,7 +331,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: host_platform,
+                host_platform,
                 build_platform: Platform::current(),
                 hash,
                 variant: discovered_output.used_vars.clone(),

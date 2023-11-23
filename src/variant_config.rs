@@ -390,7 +390,6 @@ impl VariantConfig {
             } else {
                 Platform::NoArch
             };
-
             if outputs_map
                 .insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
@@ -539,6 +538,10 @@ impl VariantConfig {
                 used_variables.insert("target_platform".to_string());
                 used_variables.insert("channel_targets".to_string());
 
+                let mut combination = combination.clone();
+                // we need to overwrite the target_platform in case of `noarch`.
+                combination.insert("target_platform".to_string(), target_platform.to_string());
+
                 let selector_config_with_variant =
                     selector_config.new_with_variant(combination.clone(), target_platform.clone());
 
@@ -636,6 +639,8 @@ impl VariantConfig {
 
                 let version = parsed_recipe.package().version().to_string();
                 // (name, version, build_string, output, used_filtered));
+                println!("Target platform: {:?}", target_platform);
+                println!("Used vars: {:?}", used_filtered);
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,
