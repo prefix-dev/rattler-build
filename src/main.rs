@@ -11,6 +11,7 @@ use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_networking::AuthenticatedClient;
 use std::{
     collections::BTreeMap,
+    env::current_dir,
     path::PathBuf,
     str::{self, FromStr},
 };
@@ -69,8 +70,8 @@ enum PackageFormat {
 #[derive(Parser)]
 struct CommonOpts {
     /// Output directory for build artifacts. Defaults to `./output`.
-    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
-    output_dir: PathBuf,
+    #[clap(long, env = "CONDA_BLD_PATH")]
+    output_dir: Option<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -224,6 +225,20 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         }
     }
 
+    let output_dir = args
+        .common
+        .output_dir
+        .unwrap_or(current_dir().into_diagnostic()?.join("output"));
+    if output_dir.starts_with(
+        recipe_path
+            .parent()
+            .expect("Could not get parent of recipe"),
+    ) {
+        return Err(miette::miette!(
+            "The output directory cannot be in the recipe directory.\nThe current output directory is: {}\nSelect a different output directory with the --output-dir option or set the CONDA_BLD_PATH environment variable"
+        , output_dir.to_string_lossy()));
+    }
+
     let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
     let host_platform = if let Some(target_platform) = args.target_platform {
@@ -338,7 +353,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 directories: Directories::create(
                     name.as_normalized(),
                     &recipe_path,
-                    &args.common.output_dir,
+                    &output_dir,
                     args.no_build_id,
                     &timestamp,
                 )
@@ -383,9 +398,14 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     output.build_configuration.directories.recipe_dir = temp_dir;
 
     // create output dir and set it in the config
-    fs::create_dir_all(&args.common.output_dir).into_diagnostic()?;
+    let output_dir = args
+        .common
+        .output_dir
+        .unwrap_or(current_dir().into_diagnostic()?.join("output"));
+
+    fs::create_dir_all(&output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
-        canonicalize(args.common.output_dir).into_diagnostic()?;
+        canonicalize(output_dir).into_diagnostic()?;
 
     let tool_config = tool_configuration::Configuration {
         client: AuthenticatedClient::default(),
