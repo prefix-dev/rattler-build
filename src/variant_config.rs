@@ -386,7 +386,7 @@ impl VariantConfig {
             let noarch_type = parsed_recipe.build().noarch();
 
             let target_platform = if noarch_type.is_none() {
-                selector_config.target_platform.clone()
+                selector_config.target_platform
             } else {
                 Platform::NoArch
             };
@@ -543,7 +543,7 @@ impl VariantConfig {
                 combination.insert("target_platform".to_string(), target_platform.to_string());
 
                 let selector_config_with_variant =
-                    selector_config.new_with_variant(combination.clone(), target_platform.clone());
+                    selector_config.new_with_variant(combination.clone(), *target_platform);
 
                 let parsed_recipe = Recipe::from_node(output, selector_config_with_variant.clone())
                     .map_err(|err| ParsingError::from_partial(recipe, err))?;
@@ -645,8 +645,8 @@ impl VariantConfig {
                     name: name.to_string(),
                     version,
                     build_string,
-                    noarch_type: parsed_recipe.build().noarch().clone(),
-                    target_platform: target_platform.clone(),
+                    noarch_type: *parsed_recipe.build().noarch(),
+                    target_platform: *target_platform,
                     node: (*output).to_owned(),
                     used_vars: used_filtered,
                 });
