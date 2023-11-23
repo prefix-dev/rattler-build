@@ -7,7 +7,7 @@ use std::{
 
 use indexmap::IndexSet;
 use miette::Diagnostic;
-use rattler_conda_types::ParseVersionError;
+use rattler_conda_types::{NoArchType, ParseVersionError, Platform};
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
@@ -27,7 +27,17 @@ use crate::{
 };
 use petgraph::{algo::toposort, graph::DiGraph};
 
-type OutputVariantsTuple = (String, String, String, Node, BTreeMap<String, String>);
+#[allow(missing_docs)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct DiscoveredOutput {
+    pub name: String,
+    pub version: String,
+    pub build_string: String,
+    pub noarch_type: NoArchType,
+    pub target_platform: Platform,
+    pub node: Node,
+    pub used_vars: BTreeMap<String, String>,
+}
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// Represents a pin configuration for a package.
@@ -361,7 +371,7 @@ impl VariantConfig {
         &self,
         recipe: &str,
         selector_config: &SelectorConfig,
-    ) -> Result<IndexSet<OutputVariantsTuple>, VariantError> {
+    ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
         // First find all outputs from the recipe
         let outputs = find_outputs_from_src(recipe)?;
 
@@ -373,11 +383,17 @@ impl VariantConfig {
             let used_vars = used_vars_from_expressions(output)?;
             let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
+            let noarch_type = parsed_recipe.build().noarch();
 
+            let target_platform = if noarch_type.is_none() {
+                selector_config.target_platform
+            } else {
+                Platform::NoArch
+            };
             if outputs_map
                 .insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
-                    (output, used_vars),
+                    (output, used_vars, target_platform),
                 )
                 .is_some()
             {
@@ -403,7 +419,7 @@ impl VariantConfig {
         }
 
         // Add an edge for each pair of outputs where one uses a variable defined by the other
-        for (output, (_, used_vars)) in &outputs_map {
+        for (output, (_, used_vars, _)) in &outputs_map {
             let output_node_index = *node_indices
                 .get(output)
                 .expect("unreachable, we insert keys in the loop above");
@@ -443,13 +459,13 @@ impl VariantConfig {
             .iter()
             .enumerate()
             .map(|(idx, name)| {
-                let (node, used_vars) = outputs_map[name].clone();
-                (idx, (name, node, used_vars))
+                let (node, used_vars, target_platform) = outputs_map[name].clone();
+                (idx, (name, node, used_vars, target_platform))
             })
             .collect::<BTreeMap<_, _>>();
 
         let mut all_build_dependencies = Vec::new();
-        for (_, (_, output, _)) in outputs_map.iter() {
+        for (_, (_, output, _, _)) in outputs_map.iter() {
             let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
 
@@ -476,7 +492,7 @@ impl VariantConfig {
             .collect::<HashSet<_>>();
 
         // also add all used variables from the outputs
-        for (_, (_, _, used_vars)) in outputs_map.iter() {
+        for (_, (_, _, used_vars, _)) in outputs_map.iter() {
             all_variables.extend(used_vars.clone());
         }
         // remove all existing outputs from all_variables
@@ -508,7 +524,7 @@ impl VariantConfig {
             let mut other_recipes =
                 HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
 
-            for (_, (name, output, used_vars)) in outputs_map.iter() {
+            for (_, (name, output, used_vars, target_platform)) in outputs_map.iter() {
                 let mut used_variables = used_vars.clone();
                 let mut exact_pins = HashSet::new();
 
@@ -522,8 +538,12 @@ impl VariantConfig {
                 used_variables.insert("target_platform".to_string());
                 used_variables.insert("channel_targets".to_string());
 
+                let mut combination = combination.clone();
+                // we need to overwrite the target_platform in case of `noarch`.
+                combination.insert("target_platform".to_string(), target_platform.to_string());
+
                 let selector_config_with_variant =
-                    selector_config.new_with_variant(combination.clone());
+                    selector_config.new_with_variant(combination.clone(), *target_platform);
 
                 let parsed_recipe = Recipe::from_node(output, selector_config_with_variant.clone())
                     .map_err(|err| ParsingError::from_partial(recipe, err))?;
@@ -618,15 +638,18 @@ impl VariantConfig {
                 );
 
                 let version = parsed_recipe.package().version().to_string();
-
-                recipes.insert((name, version, build_string, output, used_filtered));
+                recipes.insert(DiscoveredOutput {
+                    name: name.to_string(),
+                    version,
+                    build_string,
+                    noarch_type: *parsed_recipe.build().noarch(),
+                    target_platform: *target_platform,
+                    node: (*output).to_owned(),
+                    used_vars: used_filtered,
+                });
             }
         }
-
-        Ok(recipes
-            .into_iter()
-            .map(|(&r1, r2, r3, &r4, r5)| (r1.clone(), r2, r3, r4.clone(), r5))
-            .collect::<IndexSet<_>>())
+        Ok(recipes)
     }
 }
 

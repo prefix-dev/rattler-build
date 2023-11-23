@@ -7,9 +7,8 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
-use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
+use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_networking::AuthenticatedClient;
-use serde_yaml::Value as YamlValue;
 use std::{
     collections::BTreeMap,
     path::PathBuf,
@@ -227,21 +226,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
 
     let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
-    let recipe_yaml: YamlValue =
-        serde_yaml::from_str(&recipe_text).expect("Could not parse yaml file");
-
-    // get recipe.build.noarch value as NoArchType from serde_yaml
-    let noarch = recipe_yaml
-        .get("build")
-        .and_then(|v| v.get("noarch"))
-        .map(|v| serde_yaml::from_value::<NoArchType>(v.clone()))
-        .transpose()
-        .into_diagnostic()?
-        .unwrap_or_else(NoArchType::none);
-
-    let target_platform = if !noarch.is_none() {
-        Platform::NoArch
-    } else if let Some(target_platform) = args.target_platform {
+    let host_platform = if let Some(target_platform) = args.target_platform {
         Platform::from_str(&target_platform).into_diagnostic()?
     } else {
         tracing::info!("No target platform specified, using current platform");
@@ -249,7 +234,8 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     };
 
     let selector_config = SelectorConfig {
-        target_platform,
+        // We ignore noarch here
+        target_platform: host_platform,
         hash: None,
         build_platform: Platform::current(),
         variant: BTreeMap::new(),
@@ -261,15 +247,20 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let outputs_and_variants = variant_config.find_variants(&recipe_text, &selector_config)?;
 
     tracing::info!("Found variants:\n");
-    for (name, version, hash, _, variant) in &outputs_and_variants {
-        tracing::info!("{name}-{version}-{hash}");
+    for discovered_output in &outputs_and_variants {
+        tracing::info!(
+            "{}-{}-{}",
+            discovered_output.name,
+            discovered_output.version,
+            discovered_output.build_string
+        );
 
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
             .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
             .set_header(vec!["Variant", "Version"]);
-        for (key, value) in variant.iter() {
+        for (key, value) in discovered_output.used_vars.iter() {
             table.add_row(vec![key, value]);
         }
         tracing::info!("{}\n", table);
@@ -283,17 +274,18 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     };
 
     let mut subpackages = BTreeMap::new();
-    for (_, _, _, output, variant) in outputs_and_variants {
-        let hash = HashInfo::from_variant(&variant, &noarch);
+    for discovered_output in outputs_and_variants {
+        let hash =
+            HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
 
         let selector_config = SelectorConfig {
-            variant: variant.clone(),
+            variant: discovered_output.used_vars.clone(),
             hash: Some(hash.clone()),
             target_platform: selector_config.target_platform,
             build_platform: selector_config.build_platform,
         };
 
-        let recipe = Recipe::from_node(&output, selector_config)
+        let recipe = Recipe::from_node(&discovered_output.node, selector_config)
             .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
 
         if args.render_only {
@@ -303,14 +295,17 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 recipe.package().name().as_normalized(),
                 recipe.package().version()
             );
-            tracing::info!("Variant: {:#?}", variant);
+            tracing::info!("Variant: {:#?}", discovered_output.used_vars);
             tracing::info!("Hash: {}", recipe.build().string().unwrap());
             tracing::info!("Skip?: {}\n", recipe.build().skip());
             continue;
         }
 
         if recipe.build().skip() {
-            tracing::info!("Skipping build for variant: {:#?}", variant);
+            tracing::info!(
+                "Skipping build for variant: {:#?}",
+                discovered_output.used_vars
+            );
             continue;
         }
 
@@ -323,7 +318,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             },
         );
 
-        let noarch_type = *recipe.build().noarch();
         let name = recipe.package().name().clone();
         // Add the channels from the args and by default always conda-forge
         let channels = args
@@ -332,17 +326,15 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             .unwrap_or_else(|| vec!["conda-forge".to_string()]);
 
         let timestamp = chrono::Utc::now();
+
         let output = rattler_build::metadata::Output {
             recipe,
             build_configuration: BuildConfiguration {
-                target_platform,
-                host_platform: match target_platform {
-                    Platform::NoArch => Platform::current(),
-                    _ => target_platform,
-                },
+                target_platform: discovered_output.target_platform,
+                host_platform,
                 build_platform: Platform::current(),
-                hash: HashInfo::from_variant(&variant, &noarch_type),
-                variant: variant.clone(),
+                hash,
+                variant: discovered_output.used_vars.clone(),
                 directories: Directories::create(
                     name.as_normalized(),
                     &recipe_path,

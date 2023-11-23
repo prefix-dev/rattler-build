@@ -488,7 +488,7 @@ mod test {
 
         let broken_symlink = tmp_dir.path().join("broken_symlink");
         #[cfg(unix)]
-        std::os::unix::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
+        std::os::unix::fs::symlink("/does/not/exist", broken_symlink).unwrap();
         #[cfg(windows)]
         std::os::windows::fs::symlink_file("/does/not/exist", &broken_symlink).unwrap();
 
@@ -502,7 +502,7 @@ mod test {
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
         assert_eq!(
-            std::fs::read_link(&broken_symlink_dest).unwrap(),
+            std::fs::read_link(broken_symlink_dest).unwrap(),
             std::path::PathBuf::from("/does/not/exist")
         );
     }

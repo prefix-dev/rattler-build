@@ -65,9 +65,14 @@ impl SelectorConfig {
     }
 
     /// Create a new selector config from an existing one, replacing the variant
-    pub fn new_with_variant(&self, variant: BTreeMap<String, String>) -> Self {
+    pub fn new_with_variant(
+        &self,
+        variant: BTreeMap<String, String>,
+        target_platform: Platform,
+    ) -> Self {
         Self {
             variant,
+            target_platform,
             ..self.clone()
         }
     }
