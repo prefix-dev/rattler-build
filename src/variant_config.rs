@@ -577,12 +577,16 @@ impl VariantConfig {
                     .collect::<BTreeMap<_, _>>();
 
                 // exact pins
-                used_filtered.extend(exact_pins.into_iter().map(|k| {
-                    (
-                        k.clone(),
-                        format!("{} {}", other_recipes[&k].0, other_recipes[&k].1),
-                    )
-                }));
+                for p in exact_pins {
+                    match other_recipes.get(&p) {
+                        Some((version, build, _)) => {
+                            used_filtered.insert(p.clone(), format!("{} {}", version, build));
+                        }
+                        None => {
+                            return Err(VariantError::MissingOutput(p.into()));
+                        }
+                    }
+                }
 
                 requirements
                     .run
