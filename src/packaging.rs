@@ -1,7 +1,8 @@
+use fs_err as fs;
+use fs_err::File;
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::{fs, fs::File};
 
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::OsStrExt;

@@ -2,13 +2,13 @@
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
-    fs,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use chrono::{DateTime, Utc};
 use dunce::canonicalize;
+use fs_err as fs;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
