@@ -589,23 +589,29 @@ impl VariantConfig {
                     .iter()
                     .chain(requirements.run_constrained.iter())
                     .chain(parsed_recipe.build().run_exports().all())
-                    .for_each(|dep| {
+                    .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();
                             if pin.exact {
-                                let val = pin.name.as_normalized().to_owned();
-                                if val != **name {
-                                    used_filtered.insert(
-                                        val.clone(),
-                                        format!(
-                                            "{} {}",
-                                            other_recipes[&val].0, other_recipes[&val].1
-                                        ),
-                                    );
+                                let val = pin.name.as_normalized();
+                                if val != *name {
+                                    // if other_recipes does not contain val, throw an error
+                                    match other_recipes.get(val) {
+                                        Some((version, build, _)) => {
+                                            used_filtered.insert(
+                                                val.to_owned(),
+                                                format!("{} {}", version, build),
+                                            );
+                                        }
+                                        None => {
+                                            return Err(VariantError::MissingOutput(val.into()));
+                                        }
+                                    }
                                 }
                             }
                         }
-                    });
+                        Ok(())
+                    })?;
 
                 // compute hash for the recipe
                 let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
@@ -739,6 +745,9 @@ pub enum VariantError {
 
     #[error("Duplicate outputs: {0}")]
     DuplicateOutputs(String),
+
+    #[error("Missing output: {0} (used in pin_subpackage)")]
+    MissingOutput(String),
 
     #[error("Found a cycle in the recipe outputs: {0}")]
     CycleInRecipeOutputs(String),
