@@ -9,8 +9,8 @@ use rattler_conda_types::RepoData;
 use rattler_package_streaming::read;
 use rattler_package_streaming::seek;
 
+use fs_err::File;
 use std::ffi::OsStr;
-use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;

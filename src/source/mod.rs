@@ -1,12 +1,12 @@
 //! Module for fetching sources and applying patches
 
 use std::{
-    fs,
     path::{Path, StripPrefixError},
     process::Command,
 };
 
 use crate::recipe::parser::Source;
+use fs_err as fs;
 
 pub mod copy_dir;
 pub mod git_source;

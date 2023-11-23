@@ -2,10 +2,11 @@
 
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::fs::File;
+
 use std::io::{BufRead, BufReader, Write};
 
-use std::fs;
+use fs_err as fs;
+use fs_err::File;
 use std::process::{Command, Stdio};
 use std::{io::Read, path::PathBuf};
 

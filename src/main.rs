@@ -4,6 +4,7 @@ use clap::{arg, crate_version, Parser};
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use dunce::canonicalize;
+use fs_err as fs;
 use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, NoArchType, Platform};
@@ -11,7 +12,6 @@ use rattler_networking::AuthenticatedClient;
 use serde_yaml::Value as YamlValue;
 use std::{
     collections::BTreeMap,
-    fs,
     path::PathBuf,
     str::{self, FromStr},
 };
@@ -382,13 +382,16 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     tracing::info!("Extracted recipe to: {:?}", temp_dir);
 
     let rendered_recipe =
-        std::fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
+        fs::read_to_string(temp_dir.join("rendered_recipe.yaml")).into_diagnostic()?;
 
     let mut output: rattler_build::metadata::Output =
         serde_yaml::from_str(&rendered_recipe).unwrap();
 
     // set recipe dir to the temp folder
     output.build_configuration.directories.recipe_dir = temp_dir;
+
+    // create output dir and set it in the config
+    fs::create_dir_all(&args.common.output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
         canonicalize(args.common.output_dir).into_diagnostic()?;
 

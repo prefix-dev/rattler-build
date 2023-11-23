@@ -1,10 +1,11 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
     collections::HashMap,
-    fs::create_dir_all,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+use fs_err::create_dir_all;
 
 use fs_extra::dir::CopyOptions;
 use ignore::WalkBuilder;
@@ -361,7 +362,7 @@ impl Match {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, fs, fs::File, path::PathBuf};
+    use std::{collections::HashSet, fs, fs::File};
 
     #[test]
     fn test_copy_dir() {
@@ -468,11 +469,11 @@ mod test {
 
     #[test]
     fn copydir_with_broken_symlink() {
-        if cfg!(windows) {
+        #[cfg(windows)]
+        {
             // check if we have permissions to create symlinks
             let tmp_dir = tempfile::TempDir::new().unwrap();
             let broken_symlink = tmp_dir.path().join("random_symlink");
-            #[cfg(windows)]
             if std::os::windows::fs::symlink_file("does_not_exist", &broken_symlink).is_err() {
                 return;
             }
@@ -486,7 +487,10 @@ mod test {
         File::create(dir.join("test_2.rst")).unwrap();
 
         let broken_symlink = tmp_dir.path().join("broken_symlink");
+        #[cfg(unix)]
         std::os::unix::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink("/does/not/exist", &broken_symlink).unwrap();
 
         let dest_dir = tempfile::TempDir::new().unwrap();
 
