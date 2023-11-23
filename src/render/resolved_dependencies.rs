@@ -219,6 +219,9 @@ pub enum ResolveError {
     #[error("Could not parse match spec: {0}")]
     MatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
 
+    #[error("Could not parse build string matcher: {0}")]
+    StringMatcherParseError(#[from] rattler_conda_types::StringMatcherParseError),
+
     #[error("Could not apply pin: {0}")]
     PinApplyError(#[from] PinError),
 
@@ -263,7 +266,7 @@ pub fn apply_variant(
                                 // we split at whitespace to separate into version and build
                                 let mut splitter = spec.split_whitespace();
                                 let version_spec = splitter.next().map(VersionSpec::from_str).transpose()?;
-                                let build_spec = splitter.next().map(StringMatcher::from_str).transpose().expect("Could not parse string matcher spec");
+                                let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
                                 let final_spec = MatchSpec {
                                     version: version_spec,
                                     build: build_spec,
