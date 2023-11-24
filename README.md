@@ -1,5 +1,5 @@
 <h1>
-  <a href="https://https://github.com/prefix-dev/rattler-build/">
+  <a href="https://github.com/prefix-dev/rattler-build/">
     <img alt="banner" src="https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg">
   </a>
 </h1>
