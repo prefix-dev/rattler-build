@@ -158,11 +158,11 @@ fn extract(
 ) -> Result<std::process::Output, std::io::Error> {
     let output = Command::new("tar")
         .arg("-xf")
-        .arg(String::from(archive.to_string_lossy()))
+        .arg(archive.as_os_str())
         .arg("--preserve-permissions")
         .arg("--strip-components=1")
         .arg("-C")
-        .arg(String::from(target_directory.to_string_lossy()))
+        .arg(target_directory.as_os_str())
         .output();
 
     output
