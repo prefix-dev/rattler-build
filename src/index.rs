@@ -55,12 +55,10 @@ fn package_record_from_index_json<T: Read>(
 fn package_record_from_tar_bz2(file: &Path) -> Result<PackageRecord, std::io::Error> {
     let reader = std::fs::File::open(file)?;
     let mut archive = read::stream_tar_bz2(reader);
-
-    for entry in archive.entries()? {
-        let mut entry = entry?;
+    for entry in archive.entries()?.flatten() {
+        let mut entry = entry;
         let path = entry.path()?;
-        let path = path.to_string_lossy();
-        if path == "info/index.json" {
+        if path.as_os_str().eq("info/index.json") {
             return package_record_from_index_json(file, &mut entry);
         }
     }
@@ -74,11 +72,10 @@ fn package_record_from_conda(file: &Path) -> Result<PackageRecord, std::io::Erro
     let reader = std::fs::File::open(file)?;
     let mut archive = seek::stream_conda_info(reader).expect("Could not open conda file");
 
-    for entry in archive.entries()? {
-        let mut entry = entry?;
+    for entry in archive.entries()?.flatten() {
+        let mut entry = entry;
         let path = entry.path()?;
-        let path = path.to_string_lossy();
-        if path == "info/index.json" {
+        if path.as_os_str().eq("info/index.json") {
             return package_record_from_index_json(file, &mut entry);
         }
     }
@@ -175,26 +172,17 @@ pub fn index(
                 })
             })
         }) {
-            match t {
-                ArchiveType::TarBz2 => {
-                    if let Ok(record) = package_record_from_tar_bz2(p) {
-                        repodata
-                            .packages
-                            .insert(p.file_name().unwrap().to_string_lossy().into(), record);
-                    } else {
-                        tracing::info!("Could not read package record from {:?}", p);
-                    }
-                }
-                ArchiveType::Conda => {
-                    if let Ok(record) = package_record_from_conda(p) {
-                        repodata
-                            .conda_packages
-                            .insert(p.file_name().unwrap().to_string_lossy().to_string(), record);
-                    } else {
-                        tracing::info!("Could not read package record from {:?}", p);
-                    }
-                }
+            let record = match t {
+                ArchiveType::TarBz2 => package_record_from_tar_bz2(p),
+                ArchiveType::Conda => package_record_from_conda(p),
             };
+            let (Ok(record), Some(file_name)) = (record, p.file_name()) else {
+                tracing::info!("Could not read package record from {:?}", p);
+                continue;
+            };
+            repodata
+                .conda_packages
+                .insert(file_name.to_string_lossy().to_string(), record);
         }
         let out_file = output_folder.join(platform).join("repodata.json");
         File::create(&out_file)?.write_all(serde_json::to_string_pretty(&repodata)?.as_bytes())?;
@@ -203,13 +191,4 @@ pub fn index(
     Ok(())
 }
 
-#[cfg(test)]
-mod test {
-
-    #[test]
-    fn test_index() {
-        // let output_folder = PathBuf::from("/Users/wolfv/Programs/roar/output");
-        // let target_platform = "osx-64";
-        // index(&output_folder, Some(target_platform)).unwrap();
-    }
-}
+// TODO: write proper unit tests for above functions
