@@ -1,9 +1,13 @@
+use std::backtrace;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, PartialParsingError},
     },
 };
@@ -21,6 +25,94 @@ pub struct Test {
     source_files: Vec<String>,
     /// Extra files to be copied to the test environment from the build dir (can be globs)
     files: Vec<String>,
+    /// TODO: use a better name: All new test section
+    package_contents: PackageContent,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PackageContent {
+    /// file paths, direct and/or globs
+    files: Vec<String>,
+    /// checks existence of package init in env python site packages dir
+    /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
+    site_packages: Vec<String>,
+    /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
+    bins: Vec<String>,
+    /// check for dynamic or static library file path
+    libs: Vec<String>,
+    /// check if include path contains the file, direct or glob?
+    includes: Vec<String>,
+}
+
+impl PackageContent {
+    /// Get the package files.
+    pub fn files(&self) -> &[String] {
+        &self.files
+    }
+
+    /// Get the site_packages.
+    pub fn site_packages(&self) -> &[String] {
+        &self.site_packages
+    }
+
+    /// Get the binaries.
+    pub fn bins(&self) -> &[String] {
+        &self.bins
+    }
+
+    /// Get the libraries.
+    pub fn libs(&self) -> &[String] {
+        &self.libs
+    }
+
+    /// Get the includes.
+    pub fn includes(&self) -> &[String] {
+        &self.includes
+    }
+}
+
+impl TryConvertNode<PackageContent> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PackageContent, PartialParsingError> {
+        match self {
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => {
+                Err(_partialerror!(*self.span(), ErrorKind::ExpectedMapping,))?
+            }
+            RenderedNode::Null(_) => Ok(PackageContent::default()),
+        }
+    }
+}
+
+impl TryConvertNode<PackageContent> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<PackageContent, PartialParsingError> {
+        let mut files = vec![];
+        let mut site_packages = vec![];
+        let mut libs = vec![];
+        let mut bins = vec![];
+        let mut includes = vec![];
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "files" => files = value.try_convert(key_str)?,
+                "site_packages" => site_packages = value.try_convert(key_str)?,
+                "libs" => libs = value.try_convert(key_str)?,
+                "bins" => bins = value.try_convert(key_str)?,
+                "includes" => includes = value.try_convert(key_str)?,
+                invalid => Err(_partialerror!(
+                    *key.span(),
+                    ErrorKind::InvalidField(invalid.to_string().into()),
+                    help = format!("expected fields for {name} is one of `files`, `site_packages`, `libs`, `bins`, `includes`")
+                ))?
+            }
+        }
+        Ok(PackageContent {
+            files,
+            site_packages,
+            bins,
+            libs,
+            includes,
+        })
+    }
 }
 
 impl Test {
@@ -75,6 +167,7 @@ impl TryConvertNode<Test> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
+                "package_contents" => test.package_contents = value.try_convert(key_str)?,
                 "imports" => test.imports = value.try_convert(key_str)?,
                 "commands" => test.commands = value.try_convert(key_str)?,
                 "requires" => test.requires = value.try_convert(key_str)?,
