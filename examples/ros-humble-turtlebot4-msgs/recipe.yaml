@@ -8,6 +8,7 @@ source:
   git_url: https://github.com/ros2-gbp/turtlebot4-release.git
   git_rev: release/humble/turtlebot4_msgs/1.0.3-1
   folder: ros-humble-turtlebot4-msgs/src/work
+  use_gitignore: true
 
 build:
   script:
