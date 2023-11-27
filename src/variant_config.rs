@@ -755,8 +755,6 @@ pub enum VariantError {
 
     #[error("Found a cycle in the recipe outputs: {0}")]
     CycleInRecipeOutputs(String),
-    // #[error("Could not parse a Jinja expression: {0}")]
-    // JinjaParseError(#[from] minijinja::Error),
 }
 
 fn find_combinations(
