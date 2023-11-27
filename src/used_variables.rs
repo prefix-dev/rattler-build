@@ -16,7 +16,10 @@ use minijinja::machinery::{
     parse,
 };
 
-use crate::recipe::custom_yaml::Node;
+use crate::recipe::{
+    custom_yaml::{HasSpan, Node, ScalarNode},
+    ParsingError,
+};
 
 /// Extract all variables from a jinja statement
 fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
@@ -83,7 +86,7 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
 }
 
 /// This recursively finds all `if/then/else` expressions in a YAML node
-fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
+fn find_all_selectors<'a>(node: &'a Node, selectors: &mut HashSet<&'a ScalarNode>) {
     use crate::recipe::custom_yaml::SequenceNodeInternal;
 
     match node {
@@ -97,7 +100,7 @@ fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
                 match item {
                     SequenceNodeInternal::Simple(node) => find_all_selectors(node, selectors),
                     SequenceNodeInternal::Conditional(if_sel) => {
-                        selectors.insert(if_sel.cond().as_str().to_owned());
+                        selectors.insert(if_sel.cond());
                         find_all_selectors(if_sel.then(), selectors);
                         if let Some(otherwise) = if_sel.otherwise() {
                             find_all_selectors(otherwise, selectors);
@@ -111,7 +114,7 @@ fn find_all_selectors(node: &Node, selectors: &mut HashSet<String>) {
 }
 
 // find all scalar nodes and Jinja expressions
-fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), minijinja::Error> {
+fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), ParsingError> {
     use crate::recipe::custom_yaml::SequenceNodeInternal;
 
     match node {
@@ -127,7 +130,16 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), miniji
                     SequenceNodeInternal::Conditional(if_sel) => {
                         // we need to convert the if condition to a Jinja expression to parse it
                         let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
-                        let ast = parse(&as_jinja_expr, "jinja.yaml")?;
+                        let ast = parse(&as_jinja_expr, "jinja.yaml").map_err(|e| {
+                            crate::recipe::ParsingError::from_partial(
+                                &if_sel.cond().as_str(),
+                                crate::_partialerror!(
+                                    *if_sel.span(),
+                                    crate::recipe::error::ErrorKind::from(e),
+                                    label = "failed to parse as jinja expression"
+                                ),
+                            )
+                        })?;
                         extract_variables(&ast, variables);
 
                         find_jinja(if_sel.then(), variables)?;
@@ -140,7 +152,16 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), miniji
         }
         Node::Scalar(scalar) => {
             if scalar.contains("${{") {
-                let ast = parse(scalar, "jinja.yaml")?;
+                let ast = parse(scalar, "jinja.yaml").map_err(|e| {
+                    crate::recipe::ParsingError::from_partial(
+                        scalar.as_str(),
+                        crate::_partialerror!(
+                            *scalar.span(),
+                            crate::recipe::error::ErrorKind::from(e),
+                            label = "failed to parse as jinja expression"
+                        ),
+                    )
+                })?;
                 extract_variables(&ast, variables);
             }
         }
@@ -153,7 +174,8 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), miniji
 /// This finds all variables used in jinja or `if/then/else` expressions
 pub(crate) fn used_vars_from_expressions(
     yaml_node: &Node,
-) -> Result<HashSet<String>, minijinja::Error> {
+    src: &str,
+) -> Result<HashSet<String>, ParsingError> {
     let mut selectors = HashSet::new();
 
     find_all_selectors(yaml_node, &mut selectors);
@@ -161,8 +183,17 @@ pub(crate) fn used_vars_from_expressions(
     let mut variables = HashSet::new();
 
     for selector in selectors {
-        let selector_tmpl = format!("{{{{ {} }}}}", selector);
-        let ast = parse(&selector_tmpl, "selector.yaml")?;
+        let selector_tmpl = format!("{{{{ {} }}}}", selector.as_str());
+        let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| -> ParsingError {
+            crate::recipe::ParsingError::from_partial(
+                src,
+                crate::_partialerror!(
+                    *selector.span(),
+                    crate::recipe::error::ErrorKind::from(e),
+                    label = "failed to parse as jinja expression"
+                ),
+            )
+        })?;
         extract_variables(&ast, &mut variables);
     }
 
@@ -189,8 +220,8 @@ mod test {
             - ${{ pin_subpackage('abcdef') }}
         "#;
 
-        let recipe = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
-        let used_vars = used_vars_from_expressions(&recipe).unwrap();
+        let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe_node, recipe).unwrap();
         assert!(used_vars.contains("llvm_variant"));
         assert!(used_vars.contains("linux"));
         assert!(used_vars.contains("osx"));
