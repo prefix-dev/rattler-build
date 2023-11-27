@@ -22,7 +22,7 @@ pub struct Test {
     /// Extra files to be copied to the test environment from the build dir (can be globs)
     files: Vec<String>,
     /// <!-- TODO: use a better name: --> All new test section
-    package_contents: PackageContent,
+    package_contents: Option<PackageContent>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -114,8 +114,8 @@ impl TryConvertNode<PackageContent> for RenderedMappingNode {
 
 impl Test {
     /// Get package content.
-    pub fn package_content(&self) -> &PackageContent {
-        &self.package_contents
+    pub fn package_content(&self) -> Option<&PackageContent> {
+        self.package_contents.as_ref()
     }
 
     /// Get the imports.

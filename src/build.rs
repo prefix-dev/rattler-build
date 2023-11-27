@@ -284,9 +284,11 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-        test::run_package_content_tests(output.recipe.test().package_content())
-            .await
-            .into_diagnostic()?;
+        if let Some(package_contents) = output.recipe.test().package_content() {
+            test::run_package_content_tests(package_contents)
+                .await
+                .into_diagnostic()?;
+        }
     }
 
     if !tool_configuration.no_clean {
