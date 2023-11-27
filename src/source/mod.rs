@@ -83,7 +83,7 @@ pub async fn fetch_sources(
                     work_dir.to_path_buf()
                 };
                 crate::source::copy_dir::CopyDir::new(&result, &dest_dir)
-                    .use_gitignore(false)
+                    .use_gitignore(src.use_gitignore())
                     .run()?;
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
@@ -139,7 +139,7 @@ pub async fn fetch_sources(
                     work_dir.to_path_buf()
                 };
                 let _ = copy_dir::CopyDir::new(&src_path, &dest_dir)
-                    .use_gitignore(true)
+                    .use_gitignore(src.use_gitignore())
                     .run()?;
 
                 if !src.patches().is_empty() {

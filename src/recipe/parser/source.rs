@@ -109,6 +109,8 @@ pub struct GitSource {
     folder: Option<PathBuf>,
     /// Optionally request the lfs pull in git source
     lfs: bool,
+    /// Whether to use the `.gitignore` file in the source directory, defaults to `false`.
+    use_gitignore: bool,
 }
 
 impl GitSource {
@@ -120,6 +122,7 @@ impl GitSource {
         patches: Vec<PathBuf>,
         folder: Option<PathBuf>,
         lfs: bool,
+        use_gitignore: bool,
     ) -> Self {
         Self {
             url,
@@ -128,6 +131,7 @@ impl GitSource {
             patches,
             folder,
             lfs,
+            use_gitignore,
         }
     }
 
@@ -160,6 +164,11 @@ impl GitSource {
     pub const fn lfs(&self) -> bool {
         self.lfs
     }
+
+    /// Whether to use the `.gitignore` file in the source directory. Defaults to `false`.
+    pub const fn use_gitignore(&self) -> bool {
+        self.use_gitignore
+    }
 }
 
 impl TryConvertNode<GitSource> for RenderedMappingNode {
@@ -170,6 +179,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut patches = Vec::new();
         let mut folder = None;
         let mut lfs = false;
+        let mut use_gitignore = false;
 
         // TODO: is there a better place for this error?
         // raising the error during parsing allows us to suggest fixes in future
@@ -214,11 +224,14 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 "lfs" => {
                     lfs = v.try_convert("lfs")?;
                 }
+                "use_gitignore" => {
+                    use_gitignore = v.try_convert("use_gitignore")?;
+                }
                 _ => {
                     return Err(_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches`, `lfs` and `folder`"
+                        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches`, `lfs`, `folder` and `use_gitignore`"
                     ))
                 }
             }
@@ -241,6 +254,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             patches,
             folder,
             lfs,
+            use_gitignore,
         })
     }
 }
@@ -352,7 +366,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `folder`"
+                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name`, `folder` and `use_gitignore`"
                     ))
                 }
             }
@@ -404,6 +418,8 @@ pub struct PathSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     folder: Option<PathBuf>,
+    /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
+    use_gitignore: bool,
 }
 
 impl PathSource {
@@ -421,6 +437,11 @@ impl PathSource {
     pub const fn folder(&self) -> Option<&PathBuf> {
         self.folder.as_ref()
     }
+
+    /// Whether to use the `.gitignore` file in the source directory.
+    pub const fn use_gitignore(&self) -> bool {
+        self.use_gitignore
+    }
 }
 
 impl TryConvertNode<PathSource> for RenderedMappingNode {
@@ -428,12 +449,14 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut path = None;
         let mut patches = Vec::new();
         let mut folder = None;
+        let mut use_gitignore = true;
 
         for (key, value) in self.iter() {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
                 "folder" => folder = value.try_convert("folder")?,
+                "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -456,6 +479,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             path,
             patches,
             folder,
+            use_gitignore,
         })
     }
 }
