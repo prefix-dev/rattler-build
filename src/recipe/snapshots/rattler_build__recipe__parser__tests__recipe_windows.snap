@@ -1,6 +1,5 @@
 ---
 source: src/recipe/parser.rs
-assertion_line: 218
 expression: recipe.unwrap()
 ---
 Recipe {
@@ -259,6 +258,7 @@ Recipe {
         requires: [],
         source_files: [],
         files: [],
+        package_contents: None,
     },
     about: About {
         homepage: Some(
