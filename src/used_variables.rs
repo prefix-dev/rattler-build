@@ -114,25 +114,25 @@ fn find_all_selectors<'a>(node: &'a Node, selectors: &mut HashSet<&'a ScalarNode
 }
 
 // find all scalar nodes and Jinja expressions
-fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), ParsingError> {
+fn find_jinja(node: &Node, src: &str, variables: &mut HashSet<String>) -> Result<(), ParsingError> {
     use crate::recipe::custom_yaml::SequenceNodeInternal;
 
     match node {
         Node::Mapping(map) => {
             for (_, value) in map.iter() {
-                find_jinja(value, variables)?;
+                find_jinja(value, src, variables)?;
             }
         }
         Node::Sequence(seq) => {
             for item in seq.iter() {
                 match item {
-                    SequenceNodeInternal::Simple(node) => find_jinja(node, variables)?,
+                    SequenceNodeInternal::Simple(node) => find_jinja(node, src, variables)?,
                     SequenceNodeInternal::Conditional(if_sel) => {
                         // we need to convert the if condition to a Jinja expression to parse it
                         let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
                         let ast = parse(&as_jinja_expr, "jinja.yaml").map_err(|e| {
                             crate::recipe::ParsingError::from_partial(
-                                &if_sel.cond().as_str(),
+                                src,
                                 crate::_partialerror!(
                                     *if_sel.span(),
                                     crate::recipe::error::ErrorKind::from(e),
@@ -142,9 +142,9 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), Parsin
                         })?;
                         extract_variables(&ast, variables);
 
-                        find_jinja(if_sel.then(), variables)?;
+                        find_jinja(if_sel.then(), src, variables)?;
                         if let Some(otherwise) = if_sel.otherwise() {
-                            find_jinja(otherwise, variables)?;
+                            find_jinja(otherwise, src, variables)?;
                         }
                     }
                 }
@@ -154,7 +154,7 @@ fn find_jinja(node: &Node, variables: &mut HashSet<String>) -> Result<(), Parsin
             if scalar.contains("${{") {
                 let ast = parse(scalar, "jinja.yaml").map_err(|e| {
                     crate::recipe::ParsingError::from_partial(
-                        scalar.as_str(),
+                        src,
                         crate::_partialerror!(
                             *scalar.span(),
                             crate::recipe::error::ErrorKind::from(e),
@@ -198,7 +198,7 @@ pub(crate) fn used_vars_from_expressions(
     }
 
     // parse recipe into AST
-    find_jinja(yaml_node, &mut variables)?;
+    find_jinja(yaml_node, src, &mut variables)?;
 
     Ok(variables)
 }
