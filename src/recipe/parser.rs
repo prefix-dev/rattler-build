@@ -31,7 +31,7 @@ pub use self::{
     package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
-    test::Test,
+    test::{PackageContent, Test},
 };
 
 use super::custom_yaml::Node;

@@ -1,13 +1,9 @@
-use std::backtrace;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
-        },
+        custom_yaml::{HasSpan, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
     },
 };
@@ -25,11 +21,12 @@ pub struct Test {
     source_files: Vec<String>,
     /// Extra files to be copied to the test environment from the build dir (can be globs)
     files: Vec<String>,
-    /// TODO: use a better name: All new test section
+    /// <!-- TODO: use a better name: --> All new test section
     package_contents: PackageContent,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+/// PackageContent
 pub struct PackageContent {
     /// file paths, direct and/or globs
     files: Vec<String>,
@@ -116,6 +113,11 @@ impl TryConvertNode<PackageContent> for RenderedMappingNode {
 }
 
 impl Test {
+    /// Get package content.
+    pub fn package_content(&self) -> &PackageContent {
+        &self.package_contents
+    }
+
     /// Get the imports.
     pub fn imports(&self) -> &[String] {
         self.imports.as_slice()

@@ -26,12 +26,25 @@ use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
     shell::{Shell, ShellEnum, ShellScript},
 };
+use walkdir::WalkDir;
 
 use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
+    #[error("Failed package content tests: {0}")]
+    PackageContentTestFailed(String),
+
+    #[error("Failed package content tests: {0}")]
+    PackageContentTestFailedStr(&'static str),
+
+    #[error("Failed to get environment `PREFIX` variable")]
+    PrefixEnvironmentVariableNotFound,
+
+    #[error("Failed to build glob from pattern")]
+    GlobError(#[from] globset::Error),
+
     #[error("failed to run test")]
     TestFailed,
 
@@ -373,5 +386,118 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     fs::remove_dir_all(prefix)?;
 
+    Ok(())
+}
+
+/// <!-- TODO: better desc. --> Run package content tests.
+/// # Arguments
+///
+/// * `package_content` : The package content test format struct ref.
+///
+/// # Returns
+///
+/// * `Ok(())` if the test was successful
+/// * `Err(TestError::TestFailed)` if the test failed
+pub async fn run_package_content_tests(
+    package_content: &crate::recipe::parser::PackageContent,
+) -> Result<(), TestError> {
+    let prefix_path = PathBuf::from(
+        std::env::var_os("PREFIX").ok_or(TestError::PrefixEnvironmentVariableNotFound)?,
+    );
+    // check for files in $PREFIX or %PREFIX%
+    let mut gsb = globset::GlobSetBuilder::new();
+    for file_path in package_content.files() {
+        gsb.add(globset::Glob::new(file_path)?);
+    }
+    let matcher = gsb.build()?;
+    if !matcher.is_empty() {
+        let files = WalkDir::new(&prefix_path)
+            .follow_links(false)
+            .same_file_system(true)
+            .contents_first(true)
+            .into_iter()
+            .filter_entry(|direntry| matcher.is_match(direntry.path()))
+            .flatten()
+            .count();
+        if files == 0 {
+            return Err(TestError::PackageContentTestFailedStr(
+                "Atleast one of the `files` not found in `PREFIX` path.",
+            ));
+        }
+    }
+    // TODO: site_packages
+
+    // binaries
+    let bin_path = if cfg!(target_family = "windows") {
+        prefix_path.join("/Library/bin")
+    } else {
+        prefix_path.join("/bin")
+    };
+    for bin in package_content.bins() {
+        let executable = bin_path.join(bin);
+        if executable.exists() {
+            continue;
+        }
+        if cfg!(target_family = "windows") {
+            let executable_with_exe = bin_path.join(format!("{}{}", bin, ".exe"));
+            if executable_with_exe.exists() {
+                continue;
+            }
+        }
+        return Err(TestError::PackageContentTestFailed(format!(
+            "Binary `{}` not found in binary path.",
+            bin
+        )));
+    }
+
+    // libraries
+    let lib_path = if cfg!(target_family = "windows") {
+        prefix_path.join("/Library")
+    } else {
+        prefix_path.join("/lib")
+    };
+    for lib in package_content.libs() {
+        if cfg!(target_os = "windows") {
+            let lib_dy = lib_path.join("lib").join(format!("{}{}", lib, ".dll"));
+            let lib_static = lib_path.join("bin").join(format!("{}{}", lib, ".lib"));
+            if lib_dy.exists() || lib_static.exists() {
+                continue;
+            }
+        } else if cfg!(target_os = "macos") {
+            let lib_dy = lib_path.join(format!("{}{}", lib, ".dylib"));
+            let lib_static = lib_path.join(format!("{}{}", lib, ".a"));
+            if lib_dy.exists() || lib_static.exists() {
+                continue;
+            }
+        } else if cfg!(target_family = "unix") {
+            let lib_dy = lib_path.join(format!("{}{}", lib, ".so"));
+            let lib_static = lib_path.join(format!("{}{}", lib, ".a"));
+            if lib_dy.exists() || lib_static.exists() {
+                continue;
+            }
+        } else {
+            return Err(TestError::PackageContentTestFailedStr("OS not supported."));
+        }
+        return Err(TestError::PackageContentTestFailed(format!(
+            "Library `{}` not found in static or dynamic lib path.",
+            lib
+        )));
+    }
+    // includes
+    let include_path = if cfg!(target_family = "windows") {
+        prefix_path.join("/Library/include")
+    } else {
+        prefix_path.join("/include")
+    };
+    for include in package_content.includes() {
+        let include_path = include_path.join(include);
+        if include_path.exists() {
+            continue;
+        }
+        return Err(TestError::PackageContentTestFailed(format!(
+            "Include file `{}` not found in include path.",
+            include
+        )));
+    }
     Ok(())
 }
