@@ -395,6 +395,7 @@ mod test {
                     timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
+                    purls: Default::default(),
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
