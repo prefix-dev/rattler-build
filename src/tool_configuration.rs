@@ -19,6 +19,12 @@ pub struct Configuration {
 
     /// Whether to skip the test phase
     pub no_test: bool,
+
+    /// Whether to use zstd
+    pub use_zstd: bool,
+
+    /// Whether to use bzip2
+    pub use_bz2: bool,
 }
 
 impl Default for Configuration {
@@ -37,6 +43,8 @@ impl Default for Configuration {
             ),
             no_clean: false,
             no_test: false,
+            use_zstd: true,
+            use_bz2: true,
         }
     }
 }
