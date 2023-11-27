@@ -73,12 +73,12 @@ struct CommonOpts {
     #[clap(long, env = "CONDA_BLD_PATH")]
     output_dir: Option<PathBuf>,
 
-    /// Whether to use zstd
-    #[clap(long, env = "RATTLER_ZSTD", default_value = "true")]
+    /// Enable support for repodata.json.zst
+    #[clap(long, env = "RATTLER_ZSTD", default_value = "true", hide = true)]
     use_zstd: bool,
 
-    /// Whether to use bzip2
-    #[clap(long, env = "RATTLER_BZ2", default_value = "true")]
+    /// Enable support for repodata.json.bz2
+    #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
 }
 
