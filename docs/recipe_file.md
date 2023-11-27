@@ -192,12 +192,10 @@ source:
   git_rev: 1.1.4
   git_depth: -1 # Defaults to -1/not shallow
   lfs: true # defaults to false
-  use_gitignore: true # defaults to false
 ```
 
 Note: `git_rev` may not be available within commit depth range, consider avoiding use of both simultaneously.
 
-If you specify `use_gitignore: true`, then only the files that are ignored by git will be copied to the work directory after the clone.
 When you want to use git-lfs, you need to set `lfs: true`. This will also pull the lfs files from the repository.
 
 #### Source from hg
