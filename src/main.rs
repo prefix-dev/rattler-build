@@ -72,6 +72,14 @@ struct CommonOpts {
     /// Output directory for build artifacts. Defaults to `./output`.
     #[clap(long, env = "CONDA_BLD_PATH")]
     output_dir: Option<PathBuf>,
+
+    /// Enable support for repodata.json.zst
+    #[clap(long, env = "RATTLER_ZSTD", default_value = "true", hide = true)]
+    use_zstd: bool,
+
+    /// Enable support for repodata.json.bz2
+    #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
+    use_bz2: bool,
 }
 
 #[derive(Parser)]
@@ -286,6 +294,8 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         multi_progress_indicator: multi_progress,
         no_clean: args.keep_build,
         no_test: args.no_test,
+        use_zstd: args.common.use_zstd,
+        use_bz2: args.common.use_bz2,
     };
 
     let mut subpackages = BTreeMap::new();
@@ -412,6 +422,8 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
         multi_progress_indicator: MultiProgress::new(),
         no_clean: true,
         no_test: args.no_test,
+        use_zstd: args.common.use_zstd,
+        use_bz2: args.common.use_bz2,
     };
 
     output
