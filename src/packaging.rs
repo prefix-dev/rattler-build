@@ -228,9 +228,6 @@ fn create_paths_json(
             });
         }
     }
-    println!("Done processing paths");
-
-    println!("{:?}", paths_json.paths.len());
 
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
@@ -857,11 +854,11 @@ pub fn package_conda(
 
     let info_folder = tmp_dir_path.join("info");
     fs::create_dir_all(&info_folder)?;
-    println!("Creating paths.json file");
+
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
     paths_json.write_all(create_paths_json(&tmp_files, tmp_dir_path, prefix)?.as_bytes())?;
     tmp_files.insert(info_folder.join("paths.json"));
-    println!("Done");
+
     let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
     tmp_files.insert(info_folder.join("index.json"));
