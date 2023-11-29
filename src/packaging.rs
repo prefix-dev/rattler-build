@@ -31,8 +31,14 @@ use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
+    #[error("Serde error: {0}")]
+    SerdeError(#[from] serde_yaml::Error),
+
     #[error("Failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
+
+    #[error("Build String is not yet set")]
+    BuildStringNotSet,
 
     #[error("Dependencies are not yet finalized / resolved")]
     DependenciesNotFinalized,
@@ -253,7 +259,10 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
     let index_json = IndexJson {
         name: output.name().clone(),
         version: output.version().parse()?,
-        build: output.build_string().to_string(),
+        build: output
+            .build_string()
+            .ok_or(PackagingError::BuildStringNotSet)?
+            .to_string(),
         build_number: recipe.build().number(),
         arch,
         platform,
@@ -263,8 +272,8 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         timestamp: Some(output.build_configuration.timestamp),
         depends: output
             .finalized_dependencies
-            .clone()
-            .unwrap()
+            .as_ref()
+            .ok_or(PackagingError::DependenciesNotFinalized)?
             .run
             .depends
             .iter()
@@ -272,8 +281,8 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .collect(),
         constrains: output
             .finalized_dependencies
-            .clone()
-            .unwrap()
+            .as_ref()
+            .ok_or(PackagingError::DependenciesNotFinalized)?
             .run
             .constrains
             .iter()
@@ -327,7 +336,7 @@ fn create_run_exports_json(output: &Output) -> Result<Option<String>, PackagingE
     if let Some(run_exports) = &output
         .finalized_dependencies
         .as_ref()
-        .unwrap()
+        .ok_or(PackagingError::DependenciesNotFinalized)?
         .run
         .run_exports
     {
@@ -433,9 +442,10 @@ fn write_to_dest(
             // on Windows, if the file ends with -script.py, remove the -script.py suffix
             if let Some(Component::Normal(name)) = new_parts.last_mut() {
                 if let Some(name_str) = name.to_str() {
-                    if target_platform.is_windows() && name_str.ends_with("-script.py") {
-                        let new_name = name_str.strip_suffix("-script.py").unwrap();
-                        *name = new_name.as_ref();
+                    if target_platform.is_windows() {
+                        if let Some(stripped_suffix) = name_str.strip_suffix("-script.py") {
+                            *name = stripped_suffix.as_ref();
+                        }
                     }
                 }
             }
@@ -621,7 +631,11 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
                 // replace two last dots with .py
                 // these paths look like .../__pycache__/file_dependency.cpython-311.pyc
                 // where the `file_dependency.py` path would be found in the parent directory from __pycache__
-                let stem = path.file_name().unwrap().to_string_lossy().to_string();
+                let stem = path
+                    .file_name()
+                    .expect("unreachable as extension doesn't exist without filename")
+                    .to_string_lossy()
+                    .to_string();
                 let py_stem = stem.rsplitn(3, '.').last().unwrap_or_default();
                 if let Some(pp) = parent.parent() {
                     pp.join(format!("{}.py", py_stem))
@@ -752,17 +766,14 @@ fn write_recipe_folder(
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;
-    variant_config.write_all(
-        serde_yaml::to_string(&output.build_configuration.variant)
-            .unwrap()
-            .as_bytes(),
-    )?;
+    variant_config
+        .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
     // TODO(recipe): define how we want to render it exactly!
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
-    rendered_recipe.write_all(serde_yaml::to_string(&output).unwrap().as_bytes())?;
+    rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
     files.push(rendered_recipe_file);
 
     Ok(files)
@@ -915,7 +926,9 @@ pub fn package_conda(
 
     fs::create_dir_all(&output_folder)?;
 
-    let identifier = output.identifier();
+    let identifier = output
+        .identifier()
+        .ok_or(PackagingError::BuildStringNotSet)?;
     let out_path = output_folder.join(format!("{}{}", identifier, package_format.extension()));
     let file = File::create(&out_path)?;
 

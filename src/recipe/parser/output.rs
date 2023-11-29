@@ -34,7 +34,10 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
 
     if root_map.contains_key("outputs") {
         if root_map.contains_key("package") {
-            let key = root_map.keys().find(|k| k.as_str() == "package").unwrap();
+            let key = root_map
+                .keys()
+                .find(|k| k.as_str() == "package")
+                .expect("unreachable we preemptively check for if contains");
             return Err(ParsingError::from_partial(
                 src,
                 _partialerror!(
@@ -49,7 +52,7 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
             let key = root_map
                 .keys()
                 .find(|k| k.as_str() == "requirements")
-                .unwrap();
+                .expect("unreachable we preemptively check for if contains");
             return Err(ParsingError::from_partial(
                 src,
                 _partialerror!(
