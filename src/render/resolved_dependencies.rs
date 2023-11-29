@@ -12,11 +12,11 @@ use crate::{
 };
 use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::version_spec::ParseVersionSpecError;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
     MatchSpec, PackageName, Platform, RepoDataRecord, StringMatcher, Version, VersionSpec,
 };
+use rattler_conda_types::{version_spec::ParseVersionSpecError, PackageRecord};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -26,7 +26,6 @@ use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
 
 /// A enum to keep track of where a given Dependency comes from
-#[allow(dead_code)]
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "source", rename_all = "snake_case")]
@@ -103,7 +102,6 @@ pub struct FinalizedRunDependencies {
     pub run_exports: Option<RunExportsJson>,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResolvedDependencies {
     pub specs: Vec<DependencyInfo>,
@@ -240,6 +238,7 @@ pub enum ResolveError {
 pub fn apply_variant(
     raw_specs: &[Dependency],
     build_configuration: &BuildConfiguration,
+    compatibility_specs: &HashMap<PackageName, PackageRecord>,
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
     let subpackages = &build_configuration.subpackages;
@@ -294,6 +293,19 @@ pub fn apply_variant(
                             &subpackage.build_string,
                         )?;
                     Ok(DependencyInfo::PinSubpackage { spec: pinned })
+                }
+                Dependency::PinCompatible(pin) => {
+                    let name = &pin.pin_value().name;
+                    let pin_package = compatibility_specs.get(name)
+                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+
+                    let pinned = pin
+                        .pin_value()
+                        .apply(
+                            &pin_package.version,
+                            &pin_package.build,
+                        )?;
+                    Ok(DependencyInfo::PinCompatible { spec: pinned })
                 }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
@@ -440,9 +452,14 @@ pub async fn resolve_dependencies(
     let pkgs_dir = cache_dir.join("pkgs");
 
     let reqs = &output.recipe.requirements();
+    let mut compatibility_specs = HashMap::new();
 
     let build_env = if !reqs.build.is_empty() {
-        let specs = apply_variant(reqs.build(), &output.build_configuration)?;
+        let specs = apply_variant(
+            reqs.build(),
+            &output.build_configuration,
+            &compatibility_specs,
+        )?;
 
         let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
@@ -470,6 +487,10 @@ pub async fn resolve_dependencies(
         })
         .map_err(ResolveError::CouldNotCollectRunExports)?;
 
+        env.iter().for_each(|r| {
+            compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
+        });
+
         Some(ResolvedDependencies {
             specs,
             resolved: env,
@@ -482,7 +503,11 @@ pub async fn resolve_dependencies(
     };
 
     // host env
-    let mut specs = apply_variant(reqs.host(), &output.build_configuration)?;
+    let mut specs = apply_variant(
+        reqs.host(),
+        &output.build_configuration,
+        &compatibility_specs,
+    )?;
 
     let clone_specs = |name: &PackageName,
                        env: &str,
@@ -528,6 +553,10 @@ pub async fn resolve_dependencies(
         })
         .map_err(ResolveError::CouldNotCollectRunExports)?;
 
+        env.iter().for_each(|r| {
+            compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
+        });
+
         Some(ResolvedDependencies {
             specs,
             resolved: env,
@@ -539,12 +568,20 @@ pub async fn resolve_dependencies(
         None
     };
 
-    let depends = apply_variant(&reqs.run, &output.build_configuration)?;
+    let depends = apply_variant(&reqs.run, &output.build_configuration, &compatibility_specs)?;
 
-    let constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
+    let constrains = apply_variant(
+        &reqs.run_constrained,
+        &output.build_configuration,
+        &compatibility_specs,
+    )?;
 
     let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
-        let rendered = apply_variant(run_export, &output.build_configuration)?;
+        let rendered = apply_variant(
+            run_export,
+            &output.build_configuration,
+            &compatibility_specs,
+        )?;
         Ok(rendered
             .iter()
             .map(|dep| dep.spec().to_string())

@@ -1,10 +1,10 @@
 //! Module for types and functions related to miniJinja setup for recipes.
-//!
+
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
 use minijinja::{Environment, Value};
-use rattler_conda_types::Version;
+use rattler_conda_types::{PackageName, Version};
 
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
@@ -77,6 +77,59 @@ impl<'a> Extend<(String, Value)> for Jinja<'a> {
     fn extend<T: IntoIterator<Item = (String, Value)>>(&mut self, iter: T) {
         self.context.extend(iter);
     }
+}
+
+fn jinja_pin_function(
+    name: String,
+    kwargs: Option<Value>,
+    internal_repr: &str,
+) -> Result<String, minijinja::Error> {
+    let name = PackageName::try_from(name).map_err(|e| {
+        minijinja::Error::new(
+            minijinja::ErrorKind::SyntaxError,
+            format!("Invalid package name in pin_subpackage: {}", e),
+        )
+    })?;
+
+    // we translate the compiler into a YAML string
+    let mut pin_subpackage = Pin {
+        name,
+        max_pin: None,
+        min_pin: None,
+        exact: false,
+    };
+
+    let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
+        PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Invalid pin expression: {}", e),
+            )
+        })
+    };
+
+    if let Some(kwargs) = kwargs {
+        let max_pin = kwargs.get_attr("max_pin")?;
+        if max_pin != minijinja::value::Value::UNDEFINED {
+            let pin_expr = pin_expr_from_value(&max_pin)?;
+            pin_subpackage.max_pin = Some(pin_expr);
+        }
+        let min = kwargs.get_attr("min_pin")?;
+        if min != minijinja::value::Value::UNDEFINED {
+            let pin_expr = pin_expr_from_value(&min)?;
+            pin_subpackage.min_pin = Some(pin_expr);
+        }
+        let exact = kwargs.get_attr("exact")?;
+        if exact != minijinja::value::Value::UNDEFINED {
+            pin_subpackage.exact = exact.is_true();
+        }
+    }
+
+    Ok(format!(
+        "{} {}",
+        internal_repr,
+        pin_subpackage.internal_repr()
+    ))
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
@@ -170,53 +223,11 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {
-        use rattler_conda_types::PackageName;
+        jinja_pin_function(name, kwargs, "__PIN_SUBPACKAGE")
+    });
 
-        let name = PackageName::try_from(name).map_err(|e| {
-            minijinja::Error::new(
-                minijinja::ErrorKind::SyntaxError,
-                format!("Invalid package name in pin_subpackage: {}", e),
-            )
-        })?;
-
-        // we translate the compiler into a YAML string
-        let mut pin_subpackage = Pin {
-            name,
-            max_pin: None,
-            min_pin: None,
-            exact: false,
-        };
-
-        let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
-            PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
-                minijinja::Error::new(
-                    minijinja::ErrorKind::SyntaxError,
-                    format!("Invalid pin expression: {}", e),
-                )
-            })
-        };
-
-        if let Some(kwargs) = kwargs {
-            let max_pin = kwargs.get_attr("max_pin")?;
-            if max_pin != minijinja::value::Value::UNDEFINED {
-                let pin_expr = pin_expr_from_value(&max_pin)?;
-                pin_subpackage.max_pin = Some(pin_expr);
-            }
-            let min = kwargs.get_attr("min_pin")?;
-            if min != minijinja::value::Value::UNDEFINED {
-                let pin_expr = pin_expr_from_value(&min)?;
-                pin_subpackage.min_pin = Some(pin_expr);
-            }
-            let exact = kwargs.get_attr("exact")?;
-            if exact != minijinja::value::Value::UNDEFINED {
-                pin_subpackage.exact = exact.is_true();
-            }
-        }
-
-        Ok(format!(
-            "__PIN_SUBPACKAGE {}",
-            pin_subpackage.internal_repr()
-        ))
+    env.add_function("pin_compatible", |name: String, kwargs: Option<Value>| {
+        jinja_pin_function(name, kwargs, "__PIN_COMPATIBLE")
     });
 
     env.add_filter("version_to_buildstring", |s: String| {
