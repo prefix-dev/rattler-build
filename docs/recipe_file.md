@@ -30,8 +30,8 @@ The reason for a new spec are:
 - no full Jinja2 support: no conditional or `{% set ...` support, only string
   interpolation. Variables can be set in the toplevel "context" which is valid
   YAML
-- Jinja string interpolation needs to be quoted at the beginning of a string,
-  e.g. `- "{{ version }}"` in order for it to be valid YAML
+- Jinja string interpolation needs to be preceded by a dollar sign at the beginning of a string,
+  e.g. `- ${{ version }}` in order for it to be valid YAML
 - Selectors use a YAML dictionary style (vs. comments in conda-build). Instead of `- somepkg  #[osx]` 
   we use
    ```yaml
