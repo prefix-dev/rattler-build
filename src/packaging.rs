@@ -171,7 +171,6 @@ fn create_paths_json(
     };
 
     for p in itertools::sorted(paths) {
-        println!("Processing path: {:?}", p);
         let meta = fs::symlink_metadata(p)?;
 
         let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
@@ -191,21 +190,18 @@ fn create_paths_json(
 
         if meta.is_dir() {
             // check if dir is empty, and only then add it to paths.json
-            // TODO figure out under which conditions we should add empty dirs to paths.json
-            // let mut entries = fs::read_dir(p)?;
-            // if entries.next().is_none() {
-            //     let path_entry = PathsEntry {
-            //         sha256: None,
-            //         relative_path,
-            //         path_type: PathType::Directory,
-            //         // TODO put this away?
-            //         file_mode: FileMode::Binary,
-            //         prefix_placeholder: None,
-            //         no_link: false,
-            //         size_in_bytes: None,
-            //     };
-            //     paths_json.paths.push(path_entry);
-            // }
+            let mut entries = fs::read_dir(p)?;
+            if entries.next().is_none() {
+                let path_entry = PathsEntry {
+                    sha256: None,
+                    relative_path,
+                    path_type: PathType::Directory,
+                    prefix_placeholder: None,
+                    no_link: false,
+                    size_in_bytes: None,
+                };
+                paths_json.paths.push(path_entry);
+            }
         } else if meta.is_file() {
             let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
 
