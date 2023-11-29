@@ -123,7 +123,7 @@ fn create_prefix_placeholder(
         }
     }
     // read first 1024 bytes to determine file type
-    let mut file = File::open(file_path)?;
+    let mut file = File::open(file_path).expect("bingbing");
     let mut buffer = [0; 1024];
     let n = file.read(&mut buffer)?;
     let buffer = &buffer[..n];
@@ -132,25 +132,29 @@ fn create_prefix_placeholder(
     let mut has_prefix = None;
 
     let file_mode = if content_type.is_text() {
-        if contains_prefix_text(file_path, prefix)? {
-            has_prefix = Some(prefix.to_path_buf());
+        match contains_prefix_text(file_path, prefix) {
+            Ok(true) => {
+                has_prefix = Some(prefix.to_path_buf());
+                FileMode::Text
+            }
+            Ok(false) => FileMode::Text,
+            Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
+                FileMode::Binary
+            }
+            Err(e) => return Err(e),
         }
-        FileMode::Text
     } else {
-        if contains_prefix_binary(file_path, prefix)? {
-            has_prefix = Some(prefix.to_path_buf());
-        }
         FileMode::Binary
     };
 
-    if let Some(prefix_placeholder) = has_prefix {
-        Ok(Some(PrefixPlaceholder {
-            file_mode,
-            placeholder: prefix_placeholder.to_string_lossy().to_string(),
-        }))
-    } else {
-        Ok(None)
+    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, prefix)? {
+        has_prefix = Some(prefix.to_path_buf());
     }
+
+    Ok(has_prefix.map(|prefix_placeholder| PrefixPlaceholder {
+        file_mode,
+        placeholder: prefix_placeholder.to_string_lossy().to_string(),
+    }))
 }
 
 /// Create a `paths.json` file for the given paths.
@@ -167,6 +171,7 @@ fn create_paths_json(
     };
 
     for p in itertools::sorted(paths) {
+        println!("Processing path: {:?}", p);
         let meta = fs::symlink_metadata(p)?;
 
         let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
@@ -227,6 +232,10 @@ fn create_paths_json(
             });
         }
     }
+    println!("Done processing paths");
+
+    println!("{:?}", paths_json.paths.len());
+
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
 
@@ -852,11 +861,11 @@ pub fn package_conda(
 
     let info_folder = tmp_dir_path.join("info");
     fs::create_dir_all(&info_folder)?;
-
+    println!("Creating paths.json file");
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
     paths_json.write_all(create_paths_json(&tmp_files, tmp_dir_path, prefix)?.as_bytes())?;
     tmp_files.insert(info_folder.join("paths.json"));
-
+    println!("Done");
     let mut index_json = File::create(info_folder.join("index.json"))?;
     index_json.write_all(create_index_json(output)?.as_bytes())?;
     tmp_files.insert(info_folder.join("index.json"));
