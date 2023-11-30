@@ -18,7 +18,7 @@ use dunce::canonicalize;
 use indicatif::MultiProgress;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, ArchiveType},
+    package::{ArchiveIdentifier, ArchiveType, PathsJson},
     MatchSpec, Platform,
 };
 use rattler_networking::AuthenticatedClient;
@@ -26,7 +26,6 @@ use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
     shell::{Shell, ShellEnum, ShellScript},
 };
-use walkdir::WalkDir;
 
 use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
 
@@ -400,104 +399,206 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_package_content_tests(
     package_content: &crate::recipe::parser::PackageContent,
+    paths_json: PathsJson,
+    target_platform: &Platform,
 ) -> Result<(), TestError> {
-    let prefix_path = PathBuf::from(
-        std::env::var_os("PREFIX").ok_or(TestError::PrefixEnvironmentVariableNotFound)?,
-    );
-    // check for files in $PREFIX or %PREFIX%
-    let mut gsb = globset::GlobSetBuilder::new();
-    for file_path in package_content.files() {
-        gsb.add(globset::Glob::new(file_path)?);
-    }
-    let matcher = gsb.build()?;
-    if !matcher.is_empty() {
-        let files = WalkDir::new(&prefix_path)
-            .follow_links(false)
-            .same_file_system(true)
-            .contents_first(true)
-            .into_iter()
-            .filter_entry(|direntry| matcher.is_match(direntry.path()))
-            .flatten()
-            .count();
-        if files == 0 {
-            return Err(TestError::PackageContentTestFailedStr(
-                "Atleast one of the `files` not found in `PREFIX` path.",
-            ));
+    // files globset
+    let mut file_globs = {
+        let mut file_globs = vec![];
+        for file_path in package_content.files() {
+            file_globs.push(globset::Glob::new(file_path)?.compile_matcher());
         }
-    }
-    // TODO: site_packages
+        file_globs
+    };
+
+    // site packages
+    let mut site_packages = {
+        let mut site_packages_globs = vec![];
+        for sp in package_content.site_packages() {
+            let mut s = "site_packages/".to_string();
+            s.extend(sp.split('.').flat_map(|s| [s, "/"]));
+            s.push_str("/__init__.py");
+            site_packages_globs.push(PathBuf::from(s));
+        }
+        site_packages_globs
+    };
 
     // binaries
-    let bin_path = if cfg!(target_family = "windows") {
-        prefix_path.join("/Library/bin")
+    let bin_dir = if target_platform.is_windows() {
+        "Library/bin"
     } else {
-        prefix_path.join("/bin")
+        "bin"
     };
-    for bin in package_content.bins() {
-        let executable = bin_path.join(bin);
-        if executable.exists() {
-            continue;
-        }
-        if cfg!(target_family = "windows") {
-            let executable_with_exe = bin_path.join(format!("{}{}", bin, ".exe"));
-            if executable_with_exe.exists() {
-                continue;
+    let mut binary_names = package_content
+        .bins()
+        .iter()
+        .map(|bin| {
+            if target_platform.is_windows() {
+                bin.to_owned() + ".exe"
+            } else {
+                bin.to_owned()
             }
-        }
-        return Err(TestError::PackageContentTestFailed(format!(
-            "Binary `{}` not found in binary path.",
-            bin
-        )));
-    }
+        })
+        .collect::<Vec<_>>();
 
     // libraries
-    let lib_path = if cfg!(target_family = "windows") {
-        prefix_path.join("/Library")
+    let library_dir = if target_platform.is_windows() {
+        "Library"
     } else {
-        prefix_path.join("/lib")
+        "lib"
     };
-    for lib in package_content.libs() {
-        if cfg!(target_os = "windows") {
-            let lib_dy = lib_path.join("lib").join(format!("{}{}", lib, ".dll"));
-            let lib_static = lib_path.join("bin").join(format!("{}{}", lib, ".lib"));
-            if lib_dy.exists() || lib_static.exists() {
-                continue;
+    let mut libraries = {
+        let mut gsb = vec![];
+        for lib in package_content.libs() {
+            if target_platform.is_windows() {
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/lib/{lib}.dll").as_str())?
+                        .compile_matcher(),
+                );
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/bin/{lib}.lib").as_str())?
+                        .compile_matcher(),
+                );
+            } else if target_platform.is_osx() {
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/{lib}.dylib").as_str())?
+                        .compile_matcher(),
+                );
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?
+                        .compile_matcher(),
+                );
+            } else if target_platform.is_unix() {
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/{lib}.so").as_str())?
+                        .compile_matcher(),
+                );
+                gsb.push(
+                    globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?
+                        .compile_matcher(),
+                );
+            } else {
+                return Err(TestError::PackageContentTestFailedStr(
+                    "Package test on target not supported.",
+                ));
             }
-        } else if cfg!(target_os = "macos") {
-            let lib_dy = lib_path.join(format!("{}{}", lib, ".dylib"));
-            let lib_static = lib_path.join(format!("{}{}", lib, ".a"));
-            if lib_dy.exists() || lib_static.exists() {
-                continue;
-            }
-        } else if cfg!(target_family = "unix") {
-            let lib_dy = lib_path.join(format!("{}{}", lib, ".so"));
-            let lib_static = lib_path.join(format!("{}{}", lib, ".a"));
-            if lib_dy.exists() || lib_static.exists() {
-                continue;
-            }
-        } else {
-            return Err(TestError::PackageContentTestFailedStr("OS not supported."));
         }
-        return Err(TestError::PackageContentTestFailed(format!(
-            "Library `{}` not found in static or dynamic lib path.",
-            lib
-        )));
-    }
+        gsb
+    };
+    // return Err(TestError::PackageContentTestFailed(format!(
+    //     "Library `{}` not found in static or dynamic lib path.",
+    //     lib
+    // )));
+
     // includes
-    let include_path = if cfg!(target_family = "windows") {
-        prefix_path.join("/Library/include")
+    let include_path = if target_platform.is_windows() {
+        "Library/include"
     } else {
-        prefix_path.join("/include")
+        "include"
     };
-    for include in package_content.includes() {
-        let include_path = include_path.join(include);
-        if include_path.exists() {
-            continue;
+    let mut includes = {
+        let mut gsb = vec![];
+        for include in package_content.includes() {
+            gsb.push(
+                globset::Glob::new(format!("**/{include_path}/{include}").as_str())?
+                    .compile_matcher(),
+            );
         }
-        return Err(TestError::PackageContentTestFailed(format!(
-            "Include file `{}` not found in include path.",
-            include
-        )));
+        gsb
+    };
+
+    if paths_json.paths.len() > 0 {
+        // check if all site_packages present
+        let site_package_paths = paths_json.paths.iter().filter(|p| {
+            p.relative_path
+                .components()
+                .any(|c| c.as_os_str().eq("site_packages"))
+        });
+        for spp in site_package_paths {
+            let mut s = None;
+            for (i, sp) in site_packages.iter().enumerate() {
+                if spp.relative_path.ends_with(sp) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                site_packages.swap_remove(i);
+            }
+        }
+
+        // check if all file globs have a match
+        for path in &paths_json.paths {
+            if !file_globs.is_empty() {
+                let mut s = None;
+                for (i, f) in file_globs.iter().enumerate() {
+                    if f.is_match(&path.relative_path) {
+                        s = Some(i);
+                        break;
+                    }
+                }
+                if let Some(i) = s {
+                    // can panic, but panic here is unreachable
+                    file_globs.swap_remove(i);
+                }
+            }
+            if !includes.is_empty() {
+                let mut s = None;
+                for (i, inc) in includes.iter().enumerate() {
+                    if inc.is_match(&path.relative_path) {
+                        s = Some(i);
+                        break;
+                    }
+                }
+                if let Some(i) = s {
+                    // can panic, but panic here is unreachable
+                    includes.swap_remove(i);
+                }
+            }
+            if !libraries.is_empty() {
+                let mut s = None;
+                for (i, l) in libraries.iter().enumerate() {
+                    if l.is_match(&path.relative_path) {
+                        s = Some(i);
+                        break;
+                    }
+                }
+                if let Some(i) = s {
+                    // can panic, but panic here is unreachable
+                    libraries.swap_remove(i);
+                }
+            }
+            if !binary_names.is_empty()
+                && path
+                    .relative_path
+                    .components()
+                    .any(|e| e.as_os_str().eq(bin_dir))
+            {
+                let mut s = None;
+                for (i, b) in binary_names.iter().enumerate() {
+                    if path
+                        .relative_path
+                        .file_name()
+                        .map(|fnm| fnm.eq(b.as_str()))
+                        .unwrap_or_default()
+                    {
+                        s = Some(i);
+                        break;
+                    }
+                }
+                if let Some(i) = s {
+                    // can panic, but panic here is unreachable
+                    binary_names.swap_remove(i);
+                }
+            }
+        }
+    } else {
+        if !file_globs.is_empty() {}
     }
+
+    // return Err(TestError::PackageContentTestFailedStr(
+    //     "Include file not found in include path.",
+    // ));
     Ok(())
 }

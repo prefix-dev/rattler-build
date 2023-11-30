@@ -243,7 +243,7 @@ pub async fn run_build(
         .cloned()
         .collect::<HashSet<_>>();
 
-    let result = package_conda(
+    let (result, paths_json) = package_conda(
         &output,
         &difference,
         &directories.host_prefix,
@@ -251,6 +251,16 @@ pub async fn run_build(
         output.build_configuration.package_format,
     )
     .into_diagnostic()?;
+
+    if let Some(package_content) = output.recipe.test().package_content() {
+        test::run_package_content_tests(
+            package_content,
+            paths_json,
+            &output.build_configuration.target_platform,
+        )
+        .await
+        .into_diagnostic()?;
+    }
 
     if !tool_configuration.no_clean {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
@@ -283,12 +293,6 @@ pub async fn run_build(
         )
         .await
         .into_diagnostic()?;
-
-        if let Some(package_contents) = output.recipe.test().package_content() {
-            test::run_package_content_tests(package_contents)
-                .await
-                .into_diagnostic()?;
-        }
     }
 
     if !tool_configuration.no_clean {
