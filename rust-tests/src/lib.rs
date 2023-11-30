@@ -68,8 +68,11 @@ mod tests {
                 command.args(["run", "--release", "-q", "-p", "rattler-build", "--"]);
             };
             command.args(args);
-            // command.stderr(Stdio::inherit()).stdout(Stdio::inherit());
             // this makes it easy to debug issues, consider using --nocapture to get output with test
+            // command
+            //     .stderr(std::process::Stdio::inherit())
+            //     .stdout(std::process::Stdio::inherit());
+            // use itertools::Itertools;
             // println!(
             //     "{} {}",
             //     command.get_program().to_string_lossy(),

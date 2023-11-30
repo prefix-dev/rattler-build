@@ -139,13 +139,12 @@ impl Tests {
         match self {
             Tests::Commands(path) => {
                 let contents = fs::read_to_string(path)?;
-                if Platform::current().is_windows() && path.is_file() && path.ends_with(".bat") {
+                let is_path_ext =
+                    |ext: &str| path.extension().map(|s| s.eq(ext)).unwrap_or_default();
+                if Platform::current().is_windows() && is_path_ext("bat") {
                     tracing::info!("Testing commands:");
                     run_in_environment(default_shell, contents, cwd, environment)
-                } else if !Platform::current().is_windows()
-                    && path.is_file()
-                    && path.ends_with(".sh")
-                {
+                } else if Platform::current().is_unix() && is_path_ext("sh") {
                     tracing::info!("Testing commands:");
                     run_in_environment(default_shell, contents, cwd, environment)
                 } else {
@@ -185,13 +184,12 @@ async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestErro
         let Some(file_name) = path.file_name() else {
             continue;
         };
-        match (
-            file_name.eq("rust_test.sh") || file_name.eq("rust_test.bat"),
-            file_name.eq("rust_test.py"),
-        ) {
-            (true, _) => tests.push(Tests::Commands(path)),
-            (_, true) => tests.push(Tests::Python(path)),
-            (false, false) => {}
+        if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
+            println!("test {}", file_name.to_string_lossy());
+            tests.push(Tests::Commands(path));
+        } else if file_name.eq("run_test.py") {
+            println!("test {}", file_name.to_string_lossy());
+            tests.push(Tests::Python(path));
         }
     }
 
