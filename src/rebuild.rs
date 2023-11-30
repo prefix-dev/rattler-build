@@ -13,8 +13,8 @@ fn folder_from_tar_bz2(
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
-        if path.starts_with(find_path) {
-            let dest_file = dest_folder.join(path.strip_prefix(find_path).unwrap());
+        if let Ok(stripped_path) = path.strip_prefix(find_path) {
+            let dest_file = dest_folder.join(stripped_path);
             if let Some(parent_folder) = dest_file.parent() {
                 if !parent_folder.exists() {
                     std::fs::create_dir_all(parent_folder)?;
@@ -44,8 +44,8 @@ fn folder_from_conda(
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
-        if path.starts_with(find_path) {
-            let dest_file = dest_folder.join(path.strip_prefix(find_path).unwrap());
+        if let Ok(stripped_path) = path.strip_prefix(find_path) {
+            let dest_file = dest_folder.join(stripped_path);
             if let Some(parent_folder) = dest_file.parent() {
                 if !parent_folder.exists() {
                     std::fs::create_dir_all(parent_folder)?;
@@ -59,7 +59,12 @@ fn folder_from_conda(
 }
 
 pub(crate) fn extract_recipe(package: &Path, dest_folder: &Path) -> Result<(), std::io::Error> {
-    let archive_type = ArchiveType::try_from(package).unwrap();
+    let archive_type = ArchiveType::try_from(package).ok_or_else(|| {
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "package does not point to valid archive",
+        )
+    })?;
     let path = PathBuf::from("info/recipe");
     match archive_type {
         ArchiveType::TarBz2 => folder_from_tar_bz2(package, &path, dest_folder)?,

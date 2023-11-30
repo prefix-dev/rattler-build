@@ -76,19 +76,3 @@ impl Dll {
         })
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn test_dll() {
-//         let path = PathBuf::from(
-//             "/Users/wolfv/Downloads/libmamba-0.24.0-h81a967f_1/Library/bin/libmamba.dll",
-//         );
-//         let dll = Dll::new(&path).unwrap();
-//         tracing::info!("{:?}", dll);
-//         // assert_eq!(dll.path, PathBuf::from("C:\\Windows\\System32\\kernel32.dll"));
-//         // assert_eq!(dll.imports.len(), 0);
-//     }
-// }

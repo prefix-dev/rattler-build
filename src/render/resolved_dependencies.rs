@@ -204,6 +204,9 @@ pub struct FinalizedDependencies {
 
 #[derive(Error, Debug)]
 pub enum ResolveError {
+    #[error("Failed to get finalized dependencies")]
+    FinalizedDependencyNotFound,
+
     #[error("Failed to resolve dependencies: {0}")]
     DependencyResolutionError(#[from] anyhow::Error),
 
@@ -389,7 +392,10 @@ pub async fn install_environments(
 ) -> Result<(), ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
 
-    let dependencies = output.finalized_dependencies.as_ref().unwrap();
+    let dependencies = output
+        .finalized_dependencies
+        .as_ref()
+        .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
     if let Some(build_deps) = dependencies.build.as_ref() {
         install_packages(
@@ -537,23 +543,23 @@ pub async fn resolve_dependencies(
 
     let constrains = apply_variant(&reqs.run_constrained, &output.build_configuration)?;
 
-    let render_run_exports = |run_export: &[Dependency]| -> Vec<String> {
-        let rendered = apply_variant(run_export, &output.build_configuration).unwrap();
-        rendered
+    let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
+        let rendered = apply_variant(run_export, &output.build_configuration)?;
+        Ok(rendered
             .iter()
             .map(|dep| dep.spec().to_string())
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>())
     };
 
     let run_exports = output.recipe.build().run_exports();
 
     let run_exports = if !run_exports.is_empty() {
         Some(RunExportsJson {
-            strong: render_run_exports(run_exports.strong()),
-            weak: render_run_exports(run_exports.weak()),
-            noarch: render_run_exports(run_exports.noarch()),
-            strong_constrains: render_run_exports(run_exports.strong_constrains()),
-            weak_constrains: render_run_exports(run_exports.weak_constrains()),
+            strong: render_run_exports(run_exports.strong())?,
+            weak: render_run_exports(run_exports.weak())?,
+            noarch: render_run_exports(run_exports.noarch())?,
+            strong_constrains: render_run_exports(run_exports.strong_constrains())?,
+            weak_constrains: render_run_exports(run_exports.weak_constrains())?,
         })
     } else {
         None

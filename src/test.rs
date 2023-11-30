@@ -139,17 +139,16 @@ impl Tests {
         match self {
             Tests::Commands(path) => {
                 let contents = fs::read_to_string(path)?;
-                let ext = path.extension().unwrap().to_str().unwrap();
-                match (Platform::current().is_windows(), ext) {
-                    (true, "bat") => {
-                        tracing::info!("Testing commands:");
-                        run_in_environment(default_shell, contents, cwd, environment)
-                    }
-                    (false, "sh") => {
-                        tracing::info!("Testing commands:");
-                        run_in_environment(default_shell, contents, cwd, environment)
-                    }
-                    _ => Ok(()),
+                let is_path_ext =
+                    |ext: &str| path.extension().map(|s| s.eq(ext)).unwrap_or_default();
+                if Platform::current().is_windows() && is_path_ext("bat") {
+                    tracing::info!("Testing commands:");
+                    run_in_environment(default_shell, contents, cwd, environment)
+                } else if Platform::current().is_unix() && is_path_ext("sh") {
+                    tracing::info!("Testing commands:");
+                    run_in_environment(default_shell, contents, cwd, environment)
+                } else {
+                    Ok(())
                 }
             }
             Tests::Python(path) => {
@@ -182,11 +181,15 @@ async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestErro
         if path.is_dir() {
             continue;
         }
-        let file_name = path.file_name().unwrap().to_str().unwrap();
-        match file_name {
-            "run_test.sh" | "run_test.bat" => tests.push(Tests::Commands(path)),
-            "run_test.py" => tests.push(Tests::Python(path)),
-            _ => {}
+        let Some(file_name) = path.file_name() else {
+            continue;
+        };
+        if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
+            println!("test {}", file_name.to_string_lossy());
+            tests.push(Tests::Commands(path));
+        } else if file_name.eq("run_test.py") {
+            println!("test {}", file_name.to_string_lossy());
+            tests.push(Tests::Python(path));
         }
     }
 

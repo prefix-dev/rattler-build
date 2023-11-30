@@ -2,7 +2,7 @@ use anyhow::Context;
 use comfy_table::Table;
 use futures::{stream, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 
-use indicatif::{HumanBytes, ProgressBar, ProgressState, ProgressStyle};
+use indicatif::{style::TemplateError, HumanBytes, ProgressBar, ProgressState, ProgressStyle};
 use rattler::{
     install::{link_package, InstallDriver, InstallOptions, Transaction, TransactionOperation},
     package_cache::PackageCache,
@@ -44,7 +44,7 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
                 .channel
                 .rsplit('/')
                 .find(|s| !s.is_empty())
-                .unwrap()
+                .expect("yep will crash if ")
                 .to_string()
         } else {
             package.channel.to_string()
@@ -146,7 +146,7 @@ pub async fn create_environment(
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
     let repodatas = wrap_in_progress("parsing repodata", move || {
         SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
-    })?;
+    })??;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
     // system. Some packages depend on these virtual packages to indicate compatibility with the
@@ -158,7 +158,7 @@ pub async fn create_environment(
                 .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
                 .collect::<Vec<_>>()
         })
-    })?;
+    })??;
 
     // Now that we parsed and downloaded all information, construct the packaging problem that we
     // need to solve. We do this by constructing a `SolverProblem`. This encapsulates all the
@@ -176,7 +176,7 @@ pub async fn create_environment(
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
     // we need to apply to our environment to bring it up to date.
-    let required_packages = wrap_in_progress("solving", move || Solver.solve(solver_task))?;
+    let required_packages = wrap_in_progress("solving", move || Solver.solve(solver_task))??;
 
     install_packages(
         &required_packages,
@@ -261,7 +261,7 @@ async fn execute_transaction(
     let download_pb = if total_packages_to_download > 0 {
         let pb = multi_progress.add(
             indicatif::ProgressBar::new(total_packages_to_download as u64)
-                .with_style(default_progress_style())
+                .with_style(default_progress_style()?)
                 .with_finish(indicatif::ProgressFinish::WithMessage("Done!".into()))
                 .with_prefix("downloading"),
         );
@@ -275,7 +275,7 @@ async fn execute_transaction(
     let total_operations = transaction.operations.len();
     let link_pb = multi_progress.add(
         indicatif::ProgressBar::new(total_operations as u64)
-            .with_style(default_progress_style())
+            .with_style(default_progress_style()?)
             .with_finish(indicatif::ProgressFinish::WithMessage("Done!".into()))
             .with_prefix("linking"),
     );
@@ -352,7 +352,7 @@ async fn execute_operation(
             if let Some(pb) = download_pb {
                 pb.inc(1);
                 if pb.length() == Some(pb.position()) {
-                    pb.set_style(finished_progress_style());
+                    pb.set_style(finished_progress_style()?);
                 }
             }
 
@@ -381,7 +381,7 @@ async fn execute_operation(
     // Increment the link progress bar since we finished a step!
     link_pb.inc(1);
     if link_pb.length() == Some(link_pb.position()) {
-        link_pb.set_style(finished_progress_style());
+        link_pb.set_style(finished_progress_style()?);
     }
 
     Ok(())
@@ -490,14 +490,17 @@ async fn remove_package_from_environment(
 }
 
 /// Displays a spinner with the given message while running the specified function to completion.
-fn wrap_in_progress<T, F: FnOnce() -> T>(msg: impl Into<Cow<'static, str>>, func: F) -> T {
+fn wrap_in_progress<T, F: FnOnce() -> T>(
+    msg: impl Into<Cow<'static, str>>,
+    func: F,
+) -> Result<T, TemplateError> {
     let pb = ProgressBar::new_spinner();
     pb.enable_steady_tick(Duration::from_millis(100));
-    pb.set_style(long_running_progress_style());
+    pb.set_style(long_running_progress_style()?);
     pb.set_message(msg);
     let result = func();
     pb.finish_and_clear();
-    result
+    Ok(result)
 }
 
 /// Given a channel and platform, download and cache the `repodata.json` for it. This function
@@ -515,7 +518,7 @@ async fn fetch_repo_data_records_with_progress(
         indicatif::ProgressBar::new(1)
             .with_finish(indicatif::ProgressFinish::AndLeave)
             .with_prefix(format!("{}/{platform}", friendly_channel_name(&channel)))
-            .with_style(default_bytes_style()),
+            .with_style(default_bytes_style()?),
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
 
@@ -539,11 +542,11 @@ async fn fetch_repo_data_records_with_progress(
     let result = match result {
         Err(e) => {
             if matches!(e, FetchRepoDataError::NotFound(_)) && allow_not_found {
-                progress_bar.set_style(errored_progress_style());
+                progress_bar.set_style(errored_progress_style()?);
                 progress_bar.finish_with_message("Not Found");
                 return Ok(None);
             }
-            progress_bar.set_style(errored_progress_style());
+            progress_bar.set_style(errored_progress_style()?);
             progress_bar.finish_with_message("404 not found");
             return Err(e.into());
         }
@@ -551,7 +554,7 @@ async fn fetch_repo_data_records_with_progress(
     };
 
     // Notify that we are deserializing
-    progress_bar.set_style(deserializing_progress_style());
+    progress_bar.set_style(deserializing_progress_style()?);
     progress_bar.set_message("Deserializing..");
 
     // Deserialize the data. This is a hefty blocking operation so we spawn it as a tokio blocking
@@ -567,12 +570,12 @@ async fn fetch_repo_data_records_with_progress(
                 result.cache_result,
                 CacheResult::CacheHit | CacheResult::CacheHitAfterFetch
             );
-            progress_bar.set_style(finished_progress_style());
+            progress_bar.set_style(finished_progress_style()?);
             progress_bar.finish_with_message(if is_cache_hit { "Using cache" } else { "Done" });
             Ok(Some(repodata))
         }
         Ok(Err(err)) => {
-            progress_bar.set_style(errored_progress_style());
+            progress_bar.set_style(errored_progress_style()?);
             progress_bar.finish_with_message(format!("Error: {:?}", err));
             Err(err.into())
         }
@@ -581,7 +584,7 @@ async fn fetch_repo_data_records_with_progress(
                 std::panic::resume_unwind(panic);
             }
             Err(_) => {
-                progress_bar.set_style(errored_progress_style());
+                progress_bar.set_style(errored_progress_style()?);
                 progress_bar.finish_with_message("Canceled...");
                 // Since the task was cancelled most likely the whole async stack is being cancelled.
                 Err(anyhow::anyhow!("canceled"))
@@ -600,61 +603,61 @@ fn friendly_channel_name(channel: &Channel) -> String {
 }
 
 /// Returns the style to use for a progressbar that is currently in progress.
-fn default_bytes_style() -> indicatif::ProgressStyle {
-    indicatif::ProgressStyle::default_bar()
-        .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {bytes:>8} @ {smoothed_bytes_per_sec:8}").unwrap()
-        .progress_chars("━━╾─")
-        .with_key(
-            "smoothed_bytes_per_sec",
-            |s: &ProgressState, w: &mut dyn Write| match (s.pos(), s.elapsed().as_millis()) {
-                (pos, elapsed_ms) if elapsed_ms > 0 => {
-                    write!(w, "{}/s", HumanBytes((pos as f64 * 1000_f64 / elapsed_ms as f64) as u64)).unwrap()
-                }
-                _ => write!(w, "-").unwrap(),
-            },
-        )
+fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    Ok(indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {bytes:>8} @ {smoothed_bytes_per_sec:8}")?
+            .progress_chars("━━╾─")
+            .with_key(
+                "smoothed_bytes_per_sec",
+                |s: &ProgressState, w: &mut dyn Write| match (s.pos(), s.elapsed().as_millis()) {
+                    (pos, elapsed_ms) if elapsed_ms > 0 => {
+                        // TODO: log with tracing?
+                        _ = write!(w, "{}/s", HumanBytes((pos as f64 * 1000_f64 / elapsed_ms as f64) as u64));
+                    }
+                    _ => {
+                        _ = write!(w, "-");
+                    },
+                },
+            ))
 }
 
 /// Returns the style to use for a progressbar that is currently in progress.
-fn default_progress_style() -> indicatif::ProgressStyle {
-    indicatif::ProgressStyle::default_bar()
-        .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {pos:>7}/{len:7}").unwrap()
-        .progress_chars("━━╾─")
+fn default_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    Ok(indicatif::ProgressStyle::default_bar()
+            .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {pos:>7}/{len:7}")?
+            .progress_chars("━━╾─"))
 }
 
 /// Returns the style to use for a progressbar that is in Deserializing state.
-fn deserializing_progress_style() -> indicatif::ProgressStyle {
-    indicatif::ProgressStyle::default_bar()
-        .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] {wide_msg}")
-        .unwrap()
-        .progress_chars("━━╾─")
+fn deserializing_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    Ok(indicatif::ProgressStyle::default_bar()
+        .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] {wide_msg}")?
+        .progress_chars("━━╾─"))
 }
 
 /// Returns the style to use for a progressbar that is finished.
-fn finished_progress_style() -> indicatif::ProgressStyle {
-    indicatif::ProgressStyle::default_bar()
+fn finished_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    Ok(indicatif::ProgressStyle::default_bar()
         .template(&format!(
             "{} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold}}",
             console::style(console::Emoji("✔", " ")).green()
-        ))
-        .unwrap()
-        .progress_chars("━━╾─")
+        ))?
+        .progress_chars("━━╾─"))
 }
 
 /// Returns the style to use for a progressbar that is in error state.
-fn errored_progress_style() -> indicatif::ProgressStyle {
-    indicatif::ProgressStyle::default_bar()
+fn errored_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    Ok(indicatif::ProgressStyle::default_bar()
         .template(&format!(
             "{} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.red}}",
             console::style(console::Emoji("❌", " ")).red()
-        ))
-        .unwrap()
-        .progress_chars("━━╾─")
+        ))?
+        .progress_chars("━━╾─"))
 }
 
 /// Returns the style to use for a progressbar that is indeterminate and simply shows a spinner.
-fn long_running_progress_style() -> indicatif::ProgressStyle {
-    ProgressStyle::with_template("{spinner:.green} {msg}").unwrap()
+fn long_running_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+    ProgressStyle::with_template("{spinner:.green} {msg}")
 }
 
 /// Scans the conda-meta directory of an environment and returns all the [`PrefixRecord`]s found in
