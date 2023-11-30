@@ -138,25 +138,29 @@ fn create_prefix_placeholder(
     let mut has_prefix = None;
 
     let file_mode = if content_type.is_text() {
-        if contains_prefix_text(file_path, prefix)? {
-            has_prefix = Some(prefix.to_path_buf());
+        match contains_prefix_text(file_path, prefix) {
+            Ok(true) => {
+                has_prefix = Some(prefix.to_path_buf());
+                FileMode::Text
+            }
+            Ok(false) => FileMode::Text,
+            Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
+                FileMode::Binary
+            }
+            Err(e) => return Err(e),
         }
-        FileMode::Text
     } else {
-        if contains_prefix_binary(file_path, prefix)? {
-            has_prefix = Some(prefix.to_path_buf());
-        }
         FileMode::Binary
     };
 
-    if let Some(prefix_placeholder) = has_prefix {
-        Ok(Some(PrefixPlaceholder {
-            file_mode,
-            placeholder: prefix_placeholder.to_string_lossy().to_string(),
-        }))
-    } else {
-        Ok(None)
+    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, prefix)? {
+        has_prefix = Some(prefix.to_path_buf());
     }
+
+    Ok(has_prefix.map(|prefix_placeholder| PrefixPlaceholder {
+        file_mode,
+        placeholder: prefix_placeholder.to_string_lossy().to_string(),
+    }))
 }
 
 /// Create a `paths.json` file for the given paths.
@@ -192,21 +196,18 @@ fn create_paths_json(
 
         if meta.is_dir() {
             // check if dir is empty, and only then add it to paths.json
-            // TODO figure out under which conditions we should add empty dirs to paths.json
-            // let mut entries = fs::read_dir(p)?;
-            // if entries.next().is_none() {
-            //     let path_entry = PathsEntry {
-            //         sha256: None,
-            //         relative_path,
-            //         path_type: PathType::Directory,
-            //         // TODO put this away?
-            //         file_mode: FileMode::Binary,
-            //         prefix_placeholder: None,
-            //         no_link: false,
-            //         size_in_bytes: None,
-            //     };
-            //     paths_json.paths.push(path_entry);
-            // }
+            let mut entries = fs::read_dir(p)?;
+            if entries.next().is_none() {
+                let path_entry = PathsEntry {
+                    sha256: None,
+                    relative_path,
+                    path_type: PathType::Directory,
+                    prefix_placeholder: None,
+                    no_link: false,
+                    size_in_bytes: None,
+                };
+                paths_json.paths.push(path_entry);
+            }
         } else if meta.is_file() {
             let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
 
@@ -233,6 +234,7 @@ fn create_paths_json(
             });
         }
     }
+
     Ok(serde_json::to_string_pretty(&paths_json)?)
 }
 
@@ -956,4 +958,18 @@ pub fn package_conda(
     }
 
     Ok(out_path)
+}
+
+#[cfg(test)]
+mod test {
+    use super::create_prefix_placeholder;
+
+    #[test]
+    fn detect_prefix() {
+        let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test-data/binary_files/binary_file_fallback");
+        let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        create_prefix_placeholder(&test_data, &prefix).unwrap();
+    }
 }
