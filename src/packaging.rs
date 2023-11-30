@@ -123,7 +123,7 @@ fn create_prefix_placeholder(
         }
     }
     // read first 1024 bytes to determine file type
-    let mut file = File::open(file_path).expect("bingbing");
+    let mut file = File::open(file_path)?;
     let mut buffer = [0; 1024];
     let n = file.read(&mut buffer)?;
     let buffer = &buffer[..n];
@@ -945,4 +945,18 @@ pub fn package_conda(
     }
 
     Ok(out_path)
+}
+
+#[cfg(test)]
+mod test {
+    use super::create_prefix_placeholder;
+
+    #[test]
+    fn detect_prefix() {
+        let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test-data/binary_files/binary_file_fallback");
+        let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        create_prefix_placeholder(&test_data, &prefix).unwrap();
+    }
 }
