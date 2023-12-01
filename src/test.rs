@@ -492,84 +492,82 @@ pub async fn run_package_content_tests(
         ));
     }
 
-    if paths_json.paths.len() > 0 {
-        for path in &paths_json.paths {
-            // check if all site_packages present
-            if !site_packages.is_empty() && site_package_path.is_match(&path.relative_path) {
-                let mut s = None;
-                for (i, sp) in site_packages.iter().enumerate() {
-                    // this checks for exact component level match
-                    if path.relative_path.ends_with(&sp.1) {
-                        s = Some(i);
-                        break;
-                    }
-                }
-                if let Some(i) = s {
-                    // can panic, but panic here is unreachable
-                    site_packages.swap_remove(i);
+    for path in &paths_json.paths {
+        // check if all site_packages present
+        if !site_packages.is_empty() && site_package_path.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, sp) in site_packages.iter().enumerate() {
+                // this checks for exact component level match
+                if path.relative_path.ends_with(&sp.1) {
+                    s = Some(i);
+                    break;
                 }
             }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                site_packages.swap_remove(i);
+            }
+        }
 
-            // check if all file globs have a match
-            if !file_globs.is_empty() {
-                let mut s = None;
-                for (i, (_, fm)) in file_globs.iter().enumerate() {
-                    if fm.is_match(&path.relative_path) {
-                        s = Some(i);
-                        break;
-                    }
-                }
-                if let Some(i) = s {
-                    // can panic, but panic here is unreachable
-                    file_globs.swap_remove(i);
+        // check if all file globs have a match
+        if !file_globs.is_empty() {
+            let mut s = None;
+            for (i, (_, fm)) in file_globs.iter().enumerate() {
+                if fm.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
                 }
             }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                file_globs.swap_remove(i);
+            }
+        }
 
-            // check if all includes have a match
-            if !includes.is_empty() && include_path.is_match(&path.relative_path) {
-                let mut s = None;
-                for (i, inc) in includes.iter().enumerate() {
-                    if inc.1.is_match(&path.relative_path) {
-                        s = Some(i);
-                        break;
-                    }
-                }
-                if let Some(i) = s {
-                    // can panic, but panic here is unreachable
-                    includes.swap_remove(i);
+        // check if all includes have a match
+        if !includes.is_empty() && include_path.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, inc) in includes.iter().enumerate() {
+                if inc.1.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
                 }
             }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                includes.swap_remove(i);
+            }
+        }
 
-            // check if for all all, either a static or dynamic library have a match
-            if !libraries.is_empty() {
-                let mut s = None;
-                for (i, l) in libraries.iter().enumerate() {
-                    if l.1.is_match(&path.relative_path) || l.2.is_match(&path.relative_path) {
-                        s = Some(i);
-                        break;
-                    }
-                }
-                if let Some(i) = s {
-                    // can panic, but panic here is unreachable
-                    libraries.swap_remove(i);
+        // check if for all all, either a static or dynamic library have a match
+        if !libraries.is_empty() {
+            let mut s = None;
+            for (i, l) in libraries.iter().enumerate() {
+                if l.1.is_match(&path.relative_path) || l.2.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
                 }
             }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                libraries.swap_remove(i);
+            }
+        }
 
-            // check if all binaries have a match
-            if !binary_names.is_empty() && binary_dir.is_match(&path.relative_path) {
-                let mut s = None;
-                for (i, b) in binary_names.iter().enumerate() {
-                    // the matches component-wise as b is single level,
-                    // it just matches the last component
-                    if path.relative_path.ends_with(b) {
-                        s = Some(i);
-                        break;
-                    }
+        // check if all binaries have a match
+        if !binary_names.is_empty() && binary_dir.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, b) in binary_names.iter().enumerate() {
+                // the matches component-wise as b is single level,
+                // it just matches the last component
+                if path.relative_path.ends_with(b) {
+                    s = Some(i);
+                    break;
                 }
-                if let Some(i) = s {
-                    // can panic, but panic here is unreachable
-                    binary_names.swap_remove(i);
-                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                binary_names.swap_remove(i);
             }
         }
     }
