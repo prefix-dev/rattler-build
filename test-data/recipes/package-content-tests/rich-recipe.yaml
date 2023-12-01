@@ -1,0 +1,55 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  version: "13.4.2"
+
+package:
+  name: "rich"
+  version: ${{ version }}
+
+source:
+  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+    sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
+
+build:
+  # Thanks to `noarch: python` this package works on all platforms
+  noarch: python
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - pip
+    - poetry-core >=1.0.0
+    - python 3.10
+  run:
+    # sync with normalized deps from poetry-generated setup.py
+    - markdown-it-py >=2.2.0
+    - pygments >=2.13.0,<3.0.0
+    - python 3.10
+    - typing_extensions >=4.0.0,<5.0.0
+
+test:
+  imports:
+    - rich
+  commands:
+    - pip check
+  requires:
+    - pip
+  package_contents:
+    site_packages:
+      - rich
+
+about:
+  homepage: https://github.com/Textualize/rich
+  license: MIT
+  license_file: LICENSE
+  summary: Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal
+  description: |
+    Rich is a Python library for rich text and beautiful formatting in the terminal.
+
+    The Rich API makes it easy to add color and style to terminal output. Rich
+    can also render pretty tables, progress bars, markdown, syntax highlighted
+    source code, tracebacks, and more — out of the box.
+  documentation: https://rich.readthedocs.io
+  repository: https://github.com/Textualize/rich

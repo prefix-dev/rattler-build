@@ -68,8 +68,11 @@ mod tests {
                 command.args(["run", "--release", "-q", "-p", "rattler-build", "--"]);
             };
             command.args(args);
-            // command.stderr(Stdio::inherit()).stdout(Stdio::inherit());
             // this makes it easy to debug issues, consider using --nocapture to get output with test
+            // command
+            //     .stderr(std::process::Stdio::inherit())
+            //     .stdout(std::process::Stdio::inherit());
+            // use itertools::Itertools;
             // println!(
             //     "{} {}",
             //     command.get_program().to_string_lossy(),
@@ -353,6 +356,41 @@ mod tests {
         assert!(license.exists());
         let src = std::fs::read_to_string(license).unwrap();
         assert!(src.contains(" Georgi "));
+    }
+
+    #[test]
+    fn test_package_content_test_execution() {
+        let tmp = tmp("test_package_content_test_execution");
+        // let rattler_build = rattler().build::<_, _, &str>(
+        //     recipes().join("package-content-tests/rich-recipe.yaml"),
+        //     tmp.as_dir(),
+        //     None,
+        // );
+        // assert!(rattler_build.is_ok());
+        // assert!(rattler_build.unwrap().status.success());
+
+        // let rattler_build = rattler().build( recipes().join("package-content-tests/llama-recipe.yaml"),
+        //     tmp.as_dir(),
+        //     Some(recipes().join("package-content-tests/variant-config.yaml")),
+        // );
+        // assert!(rattler_build.is_ok());
+        // assert!(rattler_build.unwrap().status.success());
+
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("package-content-tests/recipe-test-succeed.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("package-content-tests/recipe-test-fail.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.code().unwrap() == 1);
     }
 
     #[test]
