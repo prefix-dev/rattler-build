@@ -97,6 +97,9 @@ pub async fn fetch_sources(
                 } else {
                     work_dir.to_path_buf()
                 };
+                // Create folder if it doesn't exist
+                fs::create_dir_all(&dest_dir)?;
+
                 const KNOWN_ARCHIVE_EXTENSIONS: [&str; 5] =
                     ["tar", "tar.gz", "tar.xz", "tar.bz2", "zip"];
                 if KNOWN_ARCHIVE_EXTENSIONS.iter().any(|ext| {
