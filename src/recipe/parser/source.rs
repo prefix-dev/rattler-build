@@ -404,6 +404,8 @@ pub struct PathSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     folder: Option<PathBuf>,
+    /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
+    use_gitignore: bool,
 }
 
 impl PathSource {
@@ -421,6 +423,11 @@ impl PathSource {
     pub const fn folder(&self) -> Option<&PathBuf> {
         self.folder.as_ref()
     }
+
+    /// Whether to use the `.gitignore` file in the source directory.
+    pub const fn use_gitignore(&self) -> bool {
+        self.use_gitignore
+    }
 }
 
 impl TryConvertNode<PathSource> for RenderedMappingNode {
@@ -428,17 +435,19 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut path = None;
         let mut patches = Vec::new();
         let mut folder = None;
+        let mut use_gitignore = true;
 
         for (key, value) in self.iter() {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
                 "folder" => folder = value.try_convert("folder")?,
+                "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        help = "valid fields for path `source` are `path`, `patches` and `folder`"
+                        help = "valid fields for path `source` are `path`, `patches`, `folder` and `use_gitignore`"
                     ))
                 }
             }
@@ -456,6 +465,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             path,
             patches,
             folder,
+            use_gitignore,
         })
     }
 }

@@ -30,8 +30,8 @@ The reason for a new spec are:
 - no full Jinja2 support: no conditional or `{% set ...` support, only string
   interpolation. Variables can be set in the toplevel "context" which is valid
   YAML
-- Jinja string interpolation needs to be quoted at the beginning of a string,
-  e.g. `- "{{ version }}"` in order for it to be valid YAML
+- Jinja string interpolation needs to be preceded by a dollar sign at the beginning of a string,
+  e.g. `- ${{ version }}` in order for it to be valid YAML
 - Selectors use a YAML dictionary style (vs. comments in conda-build). Instead of `- somepkg  #[osx]` 
   we use
    ```yaml
@@ -184,16 +184,19 @@ source:
   git_depth: -1 # Defaults to -1/not shallow
 ```
 
-The git_url can also be a relative path to the recipe directory.
+The `git_url` can also be a relative path to the recipe directory.
 
 ```yaml
 source:
   git_url: ../../bsdiff4/.git
   git_rev: 1.1.4
   git_depth: -1 # Defaults to -1/not shallow
+  lfs: true # defaults to false
 ```
 
-Note: `git_rev` may not be available within commit depth range, consider avoiding use of both simultaneously.  
+Note: `git_rev` may not be available within commit depth range, consider avoiding use of both simultaneously.
+
+When you want to use git-lfs, you need to set `lfs: true`. This will also pull the lfs files from the repository.
 
 #### Source from hg
 
@@ -224,16 +227,18 @@ source is copied to the work directory before building.
 ```yaml
   source:
     path: ../src
+    use_gitignore: false # (defaults to true)
 ```
 
 If the local path is a git or svn repository, you get the corresponding
 environment variables defined in your build environment. The only practical
-difference between git_url or hg_url and path as source arguments is that
-git_url and hg_url would be clones of a repository, while path would be a copy
+difference between `git_url` or `hg_url` and path as source arguments is that
+`git_url` and `hg_url` would be clones of a repository, while path would be a copy
 of the repository. Using path allows you to build packages with unstaged and
-uncommitted changes in the working directory. git_url can build only up to the
+uncommitted changes in the working directory. `git_url` can build only up to the
 latest commit.
-
+By default, all files in the local path that are ignored by git are also ignored by rattler-build.
+You can disable this behavior by setting `use_gitignore` to `false`.
 
 #### Patches
 

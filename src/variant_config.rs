@@ -380,7 +380,7 @@ impl VariantConfig {
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
             // in the recipe which are captured by the `used vars`
-            let used_vars = used_vars_from_expressions(output)?;
+            let used_vars = used_vars_from_expressions(output, recipe)?;
             let parsed_recipe = Recipe::from_node(output, selector_config.clone())
                 .map_err(|err| ParsingError::from_partial(recipe, err))?;
             let noarch_type = parsed_recipe.build().noarch();
@@ -755,9 +755,6 @@ pub enum VariantError {
 
     #[error("Found a cycle in the recipe outputs: {0}")]
     CycleInRecipeOutputs(String),
-
-    #[error("Could not parse a Jinja expression: {0}")]
-    JinjaParseError(#[from] minijinja::Error),
 }
 
 fn find_combinations(

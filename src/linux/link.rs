@@ -21,6 +21,12 @@ pub struct SharedObject {
 
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
+    #[error("non-absolute or non-normalized base path")]
+    PathDiffFailed,
+
+    #[error("failed to get parent directory")]
+    NoParentDir,
+
     #[error("failed to run patchelf")]
     PatchElfFailed,
 
@@ -80,12 +86,13 @@ impl SharedObject {
         let mut final_rpath = Vec::new();
 
         for rpath in rpaths.iter().chain(runpaths.iter()) {
-            if rpath.starts_with(encoded_prefix) {
-                let rel = rpath.strip_prefix(encoded_prefix)?;
+            if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
-
-                let relative_path =
-                    pathdiff::diff_paths(new_rpath, self.path.parent().unwrap()).unwrap();
+                let relative_path = pathdiff::diff_paths(
+                    new_rpath,
+                    self.path.parent().ok_or(RelinkError::NoParentDir)?,
+                )
+                .ok_or(RelinkError::PathDiffFailed)?;
                 tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
                 final_rpath.push(PathBuf::from(format!(
                     "$ORIGIN/{}",

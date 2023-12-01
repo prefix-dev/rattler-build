@@ -92,7 +92,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         comment_start: "#{{".into(),
         comment_end: "}}#".into(),
     })
-    .unwrap();
+    .expect("is tested to be correct");
 
     env.add_function("cmp", |a: &Value, spec: &str| {
         if let Some(variant) = a.as_str() {

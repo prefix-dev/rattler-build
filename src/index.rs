@@ -48,6 +48,7 @@ fn package_record_from_index_json<T: Read>(
         timestamp: index.timestamp,
         legacy_bz2_md5: None,
         legacy_bz2_size: None,
+        purls: Default::default(),
     };
     Ok(package_record)
 }

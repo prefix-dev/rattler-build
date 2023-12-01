@@ -139,7 +139,7 @@ pub async fn fetch_sources(
                     work_dir.to_path_buf()
                 };
                 let _ = copy_dir::CopyDir::new(&src_path, &dest_dir)
-                    .use_gitignore(true)
+                    .use_gitignore(src.use_gitignore())
                     .run()?;
 
                 if !src.patches().is_empty() {

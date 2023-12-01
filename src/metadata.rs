@@ -91,7 +91,12 @@ impl Directories {
 
         let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
-        let recipe_dir = recipe_path.parent().unwrap().to_path_buf();
+        let recipe_dir = recipe_path
+            .parent()
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::NotFound, "Parent directory not found")
+            })?
+            .to_path_buf();
 
         let host_prefix = if cfg!(target_os = "windows") {
             build_dir.join("h_env")
@@ -126,7 +131,7 @@ impl Directories {
     /// create all directories
     pub fn recreate_directories(&self) -> Result<(), std::io::Error> {
         if self.build_dir.exists() {
-            fs::remove_dir_all(&self.build_dir).unwrap();
+            fs::remove_dir_all(&self.build_dir)?;
         }
 
         if !self.output_dir.exists() {
@@ -218,18 +223,18 @@ impl Output {
     }
 
     /// The build string is usually set automatically as the hash of the variant configuration.
-    pub fn build_string(&self) -> &str {
-        self.recipe.build().string().as_ref().unwrap()
+    pub fn build_string(&self) -> Option<&str> {
+        self.recipe.build().string()
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
-    pub fn identifier(&self) -> String {
-        format!(
+    pub fn identifier(&self) -> Option<String> {
+        Some(format!(
             "{}-{}-{}",
             self.name().as_normalized(),
             self.version(),
-            self.build_string()
-        )
+            self.build_string()?
+        ))
     }
 }
 
@@ -240,7 +245,7 @@ impl Display for Output {
             "\nOutput: {}-{}-{}\n",
             self.name().as_normalized(),
             self.version(),
-            self.build_string()
+            self.build_string().unwrap_or("{build-string-not-set}")
         )?;
 
         // make a table of the variant configuration
@@ -395,6 +400,7 @@ mod test {
                     timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
+                    purls: Default::default(),
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

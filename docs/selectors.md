@@ -18,7 +18,7 @@ requirements:
   host:
     - if: unix
       then: unix-tool
-    - if: win:
+    - if: win
       then: win-tool
 ```
 
@@ -86,11 +86,11 @@ variant version has a matching version. For example, if we have again a `python:
 3.8` variant, we could use the following tests:
 
 ```yaml
-- if: cmp(python, "3.8"))    # true
+- if: cmp(python, "3.8")    # true
   then: mydep
-- if: cmp(python, ">=3.8"))  # true
+- if: cmp(python, ">=3.8")  # true
   then: mydep
-- if: cmp(python, "<3.8"))   # false
+- if: cmp(python, "<3.8")   # false
   then: mydep
 ```
 
