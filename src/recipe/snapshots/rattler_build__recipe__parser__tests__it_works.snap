@@ -278,6 +278,7 @@ Recipe {
         requires: [],
         source_files: [],
         files: [],
+        package_contents: None,
     },
     about: About {
         homepage: Some(

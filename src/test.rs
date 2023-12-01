@@ -18,7 +18,7 @@ use dunce::canonicalize;
 use indicatif::MultiProgress;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, ArchiveType},
+    package::{ArchiveIdentifier, ArchiveType, PathsJson},
     MatchSpec, Platform,
 };
 use rattler_networking::AuthenticatedClient;
@@ -32,6 +32,18 @@ use crate::{env_vars, index, render::solver::create_environment, tool_configurat
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
+    #[error("Failed package content tests: {0}")]
+    PackageContentTestFailed(String),
+
+    #[error("Failed package content tests: {0}")]
+    PackageContentTestFailedStr(&'static str),
+
+    #[error("Failed to get environment `PREFIX` variable")]
+    PrefixEnvironmentVariableNotFound,
+
+    #[error("Failed to build glob from pattern")]
+    GlobError(#[from] globset::Error),
+
     #[error("failed to run test")]
     TestFailed,
 
@@ -377,4 +389,240 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     fs::remove_dir_all(prefix)?;
 
     Ok(())
+}
+
+/// <!-- TODO: better desc. --> Run package content tests.
+/// # Arguments
+///
+/// * `package_content` : The package content test format struct ref.
+///
+/// # Returns
+///
+/// * `Ok(())` if the test was successful
+/// * `Err(TestError::TestFailed)` if the test failed
+pub async fn run_package_content_tests(
+    package_content: &crate::recipe::parser::PackageContent,
+    paths_json: PathsJson,
+    target_platform: &Platform,
+) -> Result<(), TestError> {
+    // files globset
+    let mut file_globs = vec![];
+    for file_path in package_content.files() {
+        file_globs.push((file_path, globset::Glob::new(file_path)?.compile_matcher()));
+    }
+
+    // site packages
+    let site_package_path = globset::Glob::new("**/site-packages/**")?.compile_matcher();
+    let mut site_packages = vec![];
+    for sp in package_content.site_packages() {
+        let mut s = String::new();
+        s.extend(sp.split('.').flat_map(|s| [s, "/"]));
+        s.push_str("/__init__.py");
+        site_packages.push((sp, s));
+    }
+
+    // binaries
+    let binary_dir = if target_platform.is_windows() {
+        "**/Library/bin/**"
+    } else {
+        "**/bin/**"
+    };
+    let binary_dir = globset::Glob::new(binary_dir)?.compile_matcher();
+    let mut binary_names = package_content
+        .bins()
+        .iter()
+        .map(|bin| {
+            if target_platform.is_windows() {
+                bin.to_owned() + ".exe"
+            } else {
+                bin.to_owned()
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // libraries
+    let library_dir = if target_platform.is_windows() {
+        "Library"
+    } else {
+        "lib"
+    };
+    let mut libraries = vec![];
+    for lib in package_content.libs() {
+        if target_platform.is_windows() {
+            libraries.push((
+                lib,
+                globset::Glob::new(format!("**/{library_dir}/lib/{lib}.dll").as_str())?
+                    .compile_matcher(),
+                globset::Glob::new(format!("**/{library_dir}/bin/{lib}.lib").as_str())?
+                    .compile_matcher(),
+            ));
+        } else if target_platform.is_osx() {
+            libraries.push((
+                lib,
+                globset::Glob::new(format!("**/{library_dir}/{lib}.dylib").as_str())?
+                    .compile_matcher(),
+                globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?.compile_matcher(),
+            ));
+        } else if target_platform.is_unix() {
+            libraries.push((
+                lib,
+                globset::Glob::new(format!("**/{library_dir}/{lib}.so").as_str())?
+                    .compile_matcher(),
+                globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?.compile_matcher(),
+            ));
+        } else {
+            return Err(TestError::PackageContentTestFailedStr(
+                "Package test on target not supported.",
+            ));
+        }
+    }
+
+    // includes
+    let include_path = if target_platform.is_windows() {
+        "**/Library/include/**"
+    } else {
+        "**/include/**"
+    };
+    let include_path = globset::Glob::new(include_path)?.compile_matcher();
+    let mut includes = vec![];
+    for include in package_content.includes() {
+        includes.push((
+            include,
+            globset::Glob::new(include.as_str())?.compile_matcher(),
+        ));
+    }
+
+    for path in &paths_json.paths {
+        // check if all site_packages present
+        if !site_packages.is_empty() && site_package_path.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, sp) in site_packages.iter().enumerate() {
+                // this checks for exact component level match
+                if path.relative_path.ends_with(&sp.1) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                site_packages.swap_remove(i);
+            }
+        }
+
+        // check if all file globs have a match
+        if !file_globs.is_empty() {
+            let mut s = None;
+            for (i, (_, fm)) in file_globs.iter().enumerate() {
+                if fm.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                file_globs.swap_remove(i);
+            }
+        }
+
+        // check if all includes have a match
+        if !includes.is_empty() && include_path.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, inc) in includes.iter().enumerate() {
+                if inc.1.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                includes.swap_remove(i);
+            }
+        }
+
+        // check if for all all, either a static or dynamic library have a match
+        if !libraries.is_empty() {
+            let mut s = None;
+            for (i, l) in libraries.iter().enumerate() {
+                if l.1.is_match(&path.relative_path) || l.2.is_match(&path.relative_path) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                libraries.swap_remove(i);
+            }
+        }
+
+        // check if all binaries have a match
+        if !binary_names.is_empty() && binary_dir.is_match(&path.relative_path) {
+            let mut s = None;
+            for (i, b) in binary_names.iter().enumerate() {
+                // the matches component-wise as b is single level,
+                // it just matches the last component
+                if path.relative_path.ends_with(b) {
+                    s = Some(i);
+                    break;
+                }
+            }
+            if let Some(i) = s {
+                // can panic, but panic here is unreachable
+                binary_names.swap_remove(i);
+            }
+        }
+    }
+    let mut error = String::new();
+    if !file_globs.is_empty() {
+        error.push_str(&format!(
+            "Some file glob matches not found in package contents.\n{:?}",
+            file_globs
+                .into_iter()
+                .map(|s| s.0)
+                .collect::<Vec<&String>>()
+        ));
+    }
+    if !site_packages.is_empty() {
+        if !error.is_empty() {
+            error.push('\n');
+        }
+        error.push_str(&format!(
+            "Some site packages not found in package contents.\n{:?}",
+            site_packages
+                .into_iter()
+                .map(|s| s.0)
+                .collect::<Vec<&String>>()
+        ));
+    }
+    if !includes.is_empty() {
+        if !error.is_empty() {
+            error.push('\n');
+        }
+        error.push_str(&format!(
+            "Some includes not found in package contents.\n{:?}",
+            includes.into_iter().map(|s| s.0).collect::<Vec<&String>>()
+        ));
+    }
+    if !libraries.is_empty() {
+        if !error.is_empty() {
+            error.push('\n');
+        }
+        error.push_str(&format!(
+            "Some libraries not found in package contents.\n{:?}",
+            libraries.into_iter().map(|s| s.0).collect::<Vec<&String>>()
+        ));
+    }
+    if !binary_names.is_empty() {
+        if !error.is_empty() {
+            error.push('\n');
+        }
+        error.push_str(&format!(
+            "Some binaries not found in package contents.\n{:?}",
+            binary_names
+        ));
+    }
+    if error.is_empty() {
+        Ok(())
+    } else {
+        Err(TestError::PackageContentTestFailed(error))
+    }
 }

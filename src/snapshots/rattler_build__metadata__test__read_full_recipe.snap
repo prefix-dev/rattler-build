@@ -53,6 +53,7 @@ recipe:
       - pip
     source_files: []
     files: []
+    package_contents: ~
   about:
     homepage: "https://github.com/Textualize/rich"
     repository: "https://github.com/Textualize/rich"

@@ -47,6 +47,7 @@ recipe:
     requires: []
     source_files: []
     files: []
+    package_contents: ~
   about:
     homepage: "http://curl.haxx.se/"
     repository: "https://github.com/curl/curl"

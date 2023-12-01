@@ -359,6 +359,41 @@ mod tests {
     }
 
     #[test]
+    fn test_package_content_test_execution() {
+        let tmp = tmp("test_package_content_test_execution");
+        // let rattler_build = rattler().build::<_, _, &str>(
+        //     recipes().join("package-content-tests/rich-recipe.yaml"),
+        //     tmp.as_dir(),
+        //     None,
+        // );
+        // assert!(rattler_build.is_ok());
+        // assert!(rattler_build.unwrap().status.success());
+
+        // let rattler_build = rattler().build( recipes().join("package-content-tests/llama-recipe.yaml"),
+        //     tmp.as_dir(),
+        //     Some(recipes().join("package-content-tests/variant-config.yaml")),
+        // );
+        // assert!(rattler_build.is_ok());
+        // assert!(rattler_build.unwrap().status.success());
+
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("package-content-tests/recipe-test-succeed.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+
+        let rattler_build = rattler().build::<_, _, &str>(
+            recipes().join("package-content-tests/recipe-test-fail.yaml"),
+            tmp.as_dir(),
+            None,
+        );
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.code().unwrap() == 1);
+    }
+
+    #[test]
     fn test_test_execution() {
         let tmp = tmp("test_test_execution");
         let rattler_build = rattler().build::<_, _, &str>(

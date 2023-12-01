@@ -163,15 +163,15 @@ fn create_prefix_placeholder(
     }))
 }
 
-/// Create a `paths.json` file for the given paths.
+/// Create a `paths.json` file structure for the given paths.
 /// Paths should be given as absolute paths under the `path_prefix` directory.
 /// This function will also determine if the file is binary or text, and if it contains the prefix.
 fn create_paths_json(
     paths: &HashSet<PathBuf>,
     path_prefix: &Path,
     encoded_prefix: &Path,
-) -> Result<String, PackagingError> {
-    let mut paths_json: PathsJson = PathsJson {
+) -> Result<PathsJson, PackagingError> {
+    let mut paths_json = PathsJson {
         paths: Vec::new(),
         paths_version: 1,
     };
@@ -235,7 +235,7 @@ fn create_paths_json(
         }
     }
 
-    Ok(serde_json::to_string_pretty(&paths_json)?)
+    Ok(paths_json)
 }
 
 /// Create the index.json file for the given output.
@@ -793,7 +793,7 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
     package_format: ArchiveType,
-) -> Result<PathBuf, PackagingError> {
+) -> Result<(PathBuf, PathsJson), PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
     }
@@ -867,7 +867,8 @@ pub fn package_conda(
     fs::create_dir_all(&info_folder)?;
 
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
-    paths_json.write_all(create_paths_json(&tmp_files, tmp_dir_path, prefix)?.as_bytes())?;
+    let paths_json_struct = create_paths_json(&tmp_files, tmp_dir_path, prefix)?;
+    paths_json.write_all(serde_json::to_string_pretty(&paths_json_struct)?.as_bytes())?;
     tmp_files.insert(info_folder.join("paths.json"));
 
     let mut index_json = File::create(info_folder.join("index.json"))?;
@@ -957,7 +958,7 @@ pub fn package_conda(
         }
     }
 
-    Ok(out_path)
+    Ok((out_path, paths_json_struct))
 }
 
 #[cfg(test)]

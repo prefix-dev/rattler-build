@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  name: llama.cpp
+  version: b1513
+
+package:
+  name: "${{ name|lower }}"
+  version: "${{ version }}"
+
+source:
+  git_url: https://github.com/ggerganov/llama.cpp.git
+  git_rev: "${{ version }}"
+
+build:
+  number: 0
+  script: |
+    cmake -S . -B build
+    cmake --build build --config Release --parallel
+    cmake --install build --prefix %LIBRARY_PREFIX%
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - cmake
+    - if: win
+      then: ninja
+
+test:
+  package_contents:
+    bins:
+      - main
+      - quantize
+
+about:
+  homepage: https://github.com/ggerganov/llama.cpp
+  license: MIT
+  license_file: LICENSE
+  summary: Port of Facebook's LLaMA model in C/C++

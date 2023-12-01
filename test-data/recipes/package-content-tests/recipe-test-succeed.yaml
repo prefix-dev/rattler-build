@@ -1,0 +1,20 @@
+package:
+  name: test-execution
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "Hello World" > $PREFIX/test-execution.txt
+        - mkdir $PREFIX/bin && echo "Hello World" > $PREFIX/bin/rust
+      else:
+        - echo "Hello World" > %PREFIX%\test-execution.txt
+        - mkdir %PREFIX%\Library\bin && echo "Hello World" > %PREFIX%\Library\bin\rust.exe
+
+test:
+  package_contents:
+    files:
+      - "**/*.txt"
+    bins:
+      - rust

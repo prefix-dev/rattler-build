@@ -37,6 +37,7 @@ test:
   requires: []
   source_files: []
   files: []
+  package_contents: ~
 about:
   homepage: ~
   repository: ~
