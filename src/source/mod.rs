@@ -97,8 +97,11 @@ pub async fn fetch_sources(
                 } else {
                     work_dir.to_path_buf()
                 };
+
                 // Create folder if it doesn't exist
-                fs::create_dir_all(&dest_dir)?;
+                if !dest_dir.exists() {
+                    fs::create_dir_all(&dest_dir)?;
+                }
 
                 const KNOWN_ARCHIVE_EXTENSIONS: [&str; 5] =
                     ["tar", "tar.gz", "tar.xz", "tar.bz2", "zip"];
@@ -111,9 +114,6 @@ pub async fn fetch_sources(
                     extract(&res, &dest_dir)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else {
-                    if !dest_dir.exists() {
-                        fs::create_dir_all(&dest_dir)?;
-                    }
                     if let Some(file_name) = src.file_name() {
                         dest_dir = dest_dir.join(file_name);
                     } else {
@@ -141,9 +141,20 @@ pub async fn fetch_sources(
                 } else {
                     work_dir.to_path_buf()
                 };
-                let _ = copy_dir::CopyDir::new(&src_path, &dest_dir)
-                    .use_gitignore(src.use_gitignore())
-                    .run()?;
+
+                // Create folder if it doesn't exist
+                if !dest_dir.exists() {
+                    fs::create_dir_all(&dest_dir)?;
+                }
+
+                // check if the source path is a directory
+                if src_path.is_dir() {
+                    copy_dir::CopyDir::new(&src_path, &dest_dir)
+                        .use_gitignore(src.use_gitignore())
+                        .run()?;
+                } else {
+                    fs::copy(&src_path, &dest_dir.join(src_path.file_name().unwrap()))?;
+                }
 
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
