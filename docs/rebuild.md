@@ -40,4 +40,3 @@ To compare two packages, you can use the following command:
 rattler-build rebuild ./build0.tar.bz2
 diffoscope ./build0.tar.bz2 ./mypkg-0.1.0-h60d57d3_0.tar.bz2
 ```
-

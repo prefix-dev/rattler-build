@@ -32,7 +32,7 @@ The reason for a new spec are:
   YAML
 - Jinja string interpolation needs to be preceded by a dollar sign at the beginning of a string,
   e.g. `- ${{ version }}` in order for it to be valid YAML
-- Selectors use a YAML dictionary style (vs. comments in conda-build). Instead of `- somepkg  #[osx]` 
+- Selectors use a YAML dictionary style (vs. comments in conda-build). Instead of `- somepkg  #[osx]`
   we use
    ```yaml
    if: osx
@@ -118,15 +118,14 @@ test:
 
 # information about the package
 about:
-  home: https://github.com/shibukawa/imagesize_py
+  homepage: https://github.com/shibukawa/imagesize_py
   license: MIT
   summary: 'Getting image size from png/jpeg/jpeg2000/gif file'
   description: |
     This module analyzes jpeg/jpeg2000/png/gif image header and
     return image size.
-  dev_url: https://github.com/shibukawa/imagesize_py
-  doc_url: https://pypi.python.org/pypi/imagesize
-  doc_source_url: https://github.com/shibukawa/imagesize_py/blob/master/README.rst
+  repository: https://github.com/shibukawa/imagesize_py
+  documentation: https://pypi.python.org/pypi/imagesize
 
 # the below is conda-forge specific!
 extra:
@@ -179,45 +178,24 @@ of the work folder.
 
 ```yaml
 source:
-  git_url: https://github.com/ilanschnell/bsdiff4.git
-  git_rev: 1.1.4
-  git_depth: -1 # Defaults to -1/not shallow
+  git: https://github.com/ilanschnell/bsdiff4.git
+  rev: 1.1.4
+  depth: -1 # Defaults to -1/not shallow
 ```
 
-The `git_url` can also be a relative path to the recipe directory.
+The `git` can also be a relative path to the recipe directory.
 
 ```yaml
 source:
-  git_url: ../../bsdiff4/.git
-  git_rev: 1.1.4
-  git_depth: -1 # Defaults to -1/not shallow
+  git: ../../bsdiff4/.git
+  rev: 1.1.4
+  depth: -1 # Defaults to -1/not shallow
   lfs: true # defaults to false
 ```
 
 Note: `git_rev` may not be available within commit depth range, consider avoiding use of both simultaneously.
 
 When you want to use git-lfs, you need to set `lfs: true`. This will also pull the lfs files from the repository.
-
-#### Source from hg
-
-**Note: not yet implemented in rattler-build**
-
-```yaml
-source:
-  hg_url: ssh://hg@bitbucket.org/ilanschnell/bsdiff4
-  hg_tag: 1.1.4
-```
-
-#### Source from svn
-
-**Note: not yet implemented in rattler-build**
-
-```
-source:
-  svn_url: https://github.com/ilanschnell/bsdiff
-  svn_rev: 1.1.4
-  svn_ignore_externals: True # (defaults to False)
-```
 
 #### Source from a local path
 
@@ -230,13 +208,6 @@ source is copied to the work directory before building.
     use_gitignore: false # (defaults to true)
 ```
 
-If the local path is a git or svn repository, you get the corresponding
-environment variables defined in your build environment. The only practical
-difference between `git_url` or `hg_url` and path as source arguments is that
-`git_url` and `hg_url` would be clones of a repository, while path would be a copy
-of the repository. Using path allows you to build packages with unstaged and
-uncommitted changes in the working directory. `git_url` can build only up to the
-latest commit.
 By default, all files in the local path that are ignored by git are also ignored by rattler-build.
 You can disable this behavior by setting `use_gitignore` to `false`.
 
@@ -282,7 +253,7 @@ source:
     folder: stuff
   - url: https://package1.com/b.tar.bz2
     folder: stuff
-  - git_url: https://github.com/mamba-org/boa
+  - git: https://github.com/mamba-org/boa
     folder: boa
 ```
 
@@ -600,7 +571,7 @@ This would be equivalent to having a `run_test.py` with the following:
 ```python
 import bsdiff4
 ```
-### Check for package-contents 
+### Check for package-contents
 
 Checks if the built package contains the mentioned items.
 
@@ -881,7 +852,7 @@ package:
   name: mypkg
   version: "1.2.3"
 
-build:
+requirements:
   run_exports:
     # this will evaluate to `mypkg <1.3`
     - ${{ pin_subpackage(name, max_pin='x.x') }}
