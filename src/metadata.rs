@@ -179,6 +179,7 @@ pub struct BuildConfiguration {
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
     /// Wether to set additional environment variables to force colors in the build script or not
+    #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 }
 

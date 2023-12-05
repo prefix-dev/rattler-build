@@ -155,21 +155,19 @@ pub async fn fetch_sources(
                     copy_dir::CopyDir::new(&src_path, &dest_dir)
                         .use_gitignore(src.use_gitignore())
                         .run()?;
+                } else if let Some(file_name) = src
+                    .file_name()
+                    .cloned()
+                    .or_else(|| src_path.file_name().map(PathBuf::from))
+                {
+                    tracing::info!(
+                        "Copying source from path: {:?} to {:?}",
+                        src_path,
+                        dest_dir.join(&file_name)
+                    );
+                    fs::copy(&src_path, &dest_dir.join(file_name))?;
                 } else {
-                    if let Some(file_name) = src
-                        .file_name()
-                        .cloned()
-                        .or_else(|| src_path.file_name().map(PathBuf::from))
-                    {
-                        tracing::info!(
-                            "Copying source from path: {:?} to {:?}",
-                            src_path,
-                            dest_dir.join(&file_name)
-                        );
-                        fs::copy(&src_path, &dest_dir.join(file_name))?;
-                    } else {
-                        return Err(SourceError::FileNotFound(src_path));
-                    }
+                    return Err(SourceError::FileNotFound(src_path));
                 }
 
                 if !src.patches().is_empty() {
