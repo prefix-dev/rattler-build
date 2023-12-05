@@ -15,7 +15,10 @@ pub(crate) fn apply_patches(
 ) -> Result<(), SourceError> {
     for patch in patches {
         let patch = recipe_dir.join(patch);
-        let output = Command::new("patch")
+
+        let patch_exe = which::which("patch").map_err(|_| SourceError::PatchNotFound)?;
+
+        let output = Command::new(patch_exe)
             .arg("-p1")
             .arg("-i")
             .arg(String::from(patch.to_string_lossy()))

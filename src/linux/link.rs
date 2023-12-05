@@ -30,6 +30,9 @@ pub enum RelinkError {
     #[error("failed to run patchelf")]
     PatchElfFailed,
 
+    #[error("failed to find patchelf: please install patchelf on your system")]
+    PatchElfNotFound(#[from] which::Error),
+
     #[error("failed to read or write elf file: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -117,7 +120,9 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 
     tracing::info!("patchelf for {:?}: {:?}", elf_path, new_rpath);
 
-    let mut cmd = std::process::Command::new("patchelf");
+    let patchelf_exe = which::which("patchelf")?;
+
+    let mut cmd = std::process::Command::new(patchelf_exe);
 
     // prefer using RPATH over RUNPATH because RPATH takes precedence when
     // searching for shared libraries and cannot be overriden with
