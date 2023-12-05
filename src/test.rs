@@ -94,7 +94,7 @@ fn run_in_environment(
     let av = ActivationVariables {
         conda_prefix,
         path: current_path,
-        path_modification_behaviour: Default::default(),
+        path_modification_behavior: Default::default(),
     };
 
     let activator = Activator::from_path(environment, shell.clone(), Platform::current())?;

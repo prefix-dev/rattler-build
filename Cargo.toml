@@ -20,21 +20,21 @@ rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 [dependencies]
 serde = { version = "1.0.193", features = ["derive"] }
 serde_yaml = "0.9.27"
-rattler = { version = "0.13.0", default-features = false }
-rattler_conda_types = { version = "0.13.0", default-features = false }
-rattler_digest = { version = "0.13.0", default-features = false }
-rattler_networking = { version = "0.13.0", default-features = false }
-rattler_repodata_gateway = { version = "0.13.0", default-features = false, features = [
+rattler = { version = "0.14.0", default-features = false }
+rattler_conda_types = { version = "0.14.0", default-features = false }
+rattler_digest = { version = "0.14.0", default-features = false }
+rattler_networking = { version = "0.14.0", default-features = false }
+rattler_repodata_gateway = { version = "0.14.0", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.13.0", default-features = false, features = [
+rattler_shell = { version = "0.14.0", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.13.0", default-features = false, features = [
+rattler_solve = { version = "0.14.0", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.13.0", default-features = false }
-rattler_package_streaming = { version = "0.13.0", default-features = false }
+rattler_virtual_packages = { version = "0.14.0", default-features = false }
+rattler_package_streaming = { version = "0.14.0", default-features = false }
 anyhow = "1.0.75"
 walkdir = "2.4.0"
 sha2 = "0.10.8"
@@ -47,7 +47,7 @@ content_inspector = "0.2.4"
 serde_with = "3.4.0"
 url = "2.5.0"
 tracing = "0.1.40"
-clap = { version = "4.4.8", features = ["derive", "env", "cargo"] }
+clap = { version = "4.4.11", features = ["derive", "env", "cargo"] }
 minijinja = { version = "1.0.10", features = [
     "unstable_machinery",
     "custom_syntax",

@@ -402,7 +402,7 @@ pub fn write_env_script<T: Shell + Clone>(
     let activation_vars = ActivationVariables {
         conda_prefix,
         path: current_path,
-        path_modification_behaviour: Default::default(),
+        path_modification_behavior: Default::default(),
     };
 
     let host_activation = host_prefix_activator
@@ -420,7 +420,7 @@ pub fn write_env_script<T: Shell + Clone>(
     let activation_vars = ActivationVariables {
         conda_prefix: None,
         path: Some(host_activation.path.clone()),
-        path_modification_behaviour: Default::default(),
+        path_modification_behavior: Default::default(),
     };
 
     let build_activation = build_prefix_activator
