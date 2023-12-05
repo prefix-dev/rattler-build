@@ -17,10 +17,6 @@ recipe:
     string: h60d57d3_0
     skip: false
     script: []
-    script_env:
-      passthrough: []
-      env: {}
-      secrets: []
     ignore_run_exports: []
     ignore_run_exports_from: []
     run_exports:

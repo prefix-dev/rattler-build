@@ -12,10 +12,6 @@ build:
   skip: false
   script:
     - test succeeded
-  script_env:
-    passthrough: []
-    env: {}
-    secrets: []
   ignore_run_exports: []
   ignore_run_exports_from: []
   run_exports:

@@ -21,15 +21,17 @@ mod build;
 mod output;
 mod package;
 mod requirements;
+mod script;
 mod source;
 mod test;
 
 pub use self::{
     about::About,
-    build::{Build, RunExports, ScriptEnv},
+    build::{Build, RunExports},
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
     requirements::{Compiler, Dependency, PinSubpackage, Requirements},
+    script::{Script, ScriptContent},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{PackageContent, Test},
 };
@@ -133,7 +135,7 @@ impl Recipe {
                         ErrorKind::InvalidField("recipe".to_string().into()),
                         help =
                             "The recipe field is only allowed in conjunction with multiple outputs"
-                    ))
+                    ));
                 }
                 "source" => source = value.try_convert(key_str)?,
                 "build" => build = value.try_convert(key_str)?,
@@ -146,7 +148,7 @@ impl Recipe {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                    ))
+                    ));
                 }
             }
         }
