@@ -191,6 +191,23 @@ macro_rules! insert {
     };
 }
 
+/// Set environment variables that help to force color output.
+fn force_color_vars(platform: &Platform) -> HashMap<String, String> {
+    let mut vars = HashMap::<String, String>::new();
+
+    insert!(vars, "CLICOLOR_FORCE", "1");
+    insert!(vars, "FORCE_COLOR", "1");
+    insert!(vars, "AM_COLOR_TESTS", "always");
+    insert!(vars, "MAKE_TERMOUT", "1");
+
+    if !platform.is_windows() {
+        insert!(vars, "CXXFLAGS", "-fdiagnostics-color=always");
+        insert!(vars, "CFLAGS", "-fdiagnostics-color=always");
+    }
+
+    vars
+}
+
 /// Return all variables that should be set during the build process, including
 /// operating system specific environment variables.
 pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
@@ -252,6 +269,10 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // For noarch packages, do not write any bytecode
     if output.build_configuration.target_platform == Platform::NoArch {
         insert!(vars, "PYTHONDONTWRITEBYTECODE", "1");
+    }
+
+    if output.build_configuration.force_colors {
+        vars.extend(force_color_vars(&output.build_configuration.host_platform));
     }
 
     // pkg vars

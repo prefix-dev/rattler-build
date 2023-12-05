@@ -178,6 +178,8 @@ pub struct BuildConfiguration {
     /// Whether to store the recipe and build instructions in the final package or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
+    /// Wether to set additional environment variables to force colors in the build script or not
+    pub force_colors: bool,
 }
 
 impl BuildConfiguration {

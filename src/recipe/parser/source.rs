@@ -404,6 +404,8 @@ pub struct PathSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     folder: Option<PathBuf>,
+    /// Optionally a file name to rename the file to
+    file_name: Option<PathBuf>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
     use_gitignore: bool,
 }
@@ -424,6 +426,11 @@ impl PathSource {
         self.folder.as_ref()
     }
 
+    /// Get the file name.
+    pub const fn file_name(&self) -> Option<&PathBuf> {
+        self.file_name.as_ref()
+    }
+
     /// Whether to use the `.gitignore` file in the source directory.
     pub const fn use_gitignore(&self) -> bool {
         self.use_gitignore
@@ -436,18 +443,20 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut patches = Vec::new();
         let mut folder = None;
         let mut use_gitignore = true;
+        let mut file_name = None;
 
         for (key, value) in self.iter() {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
                 "folder" => folder = value.try_convert("folder")?,
+                "file_name" => file_name = value.try_convert("file_name")?,
                 "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        help = "valid fields for path `source` are `path`, `patches`, `folder` and `use_gitignore`"
+                        help = "valid fields for path `source` are `path`, `patches`, `folder`, `file_name` and `use_gitignore`"
                     ))
                 }
             }
@@ -465,6 +474,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             path,
             patches,
             folder,
+            file_name,
             use_gitignore,
         })
     }

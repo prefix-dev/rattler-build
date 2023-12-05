@@ -1,7 +1,7 @@
 //! Module for fetching sources and applying patches
 
 use std::{
-    path::{Path, StripPrefixError},
+    path::{Path, PathBuf, StripPrefixError},
     process::Command,
 };
 
@@ -34,8 +34,8 @@ pub enum SourceError {
     #[error("Download could not be validated with checksum!")]
     ValidationFailed,
 
-    #[error("File not found!")]
-    FileNotFound,
+    #[error("File not found: {0}")]
+    FileNotFound(PathBuf),
 
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
@@ -134,7 +134,6 @@ pub async fn fetch_sources(
             }
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
-                tracing::info!("Copying source from path: {:?}", src_path);
 
                 let dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
@@ -147,13 +146,30 @@ pub async fn fetch_sources(
                     fs::create_dir_all(&dest_dir)?;
                 }
 
+                if !src_path.exists() {
+                    return Err(SourceError::FileNotFound(src_path));
+                }
+
                 // check if the source path is a directory
                 if src_path.is_dir() {
                     copy_dir::CopyDir::new(&src_path, &dest_dir)
                         .use_gitignore(src.use_gitignore())
                         .run()?;
                 } else {
-                    fs::copy(&src_path, &dest_dir.join(src_path.file_name().unwrap()))?;
+                    if let Some(file_name) = src
+                        .file_name()
+                        .cloned()
+                        .or_else(|| src_path.file_name().map(PathBuf::from))
+                    {
+                        tracing::info!(
+                            "Copying source from path: {:?} to {:?}",
+                            src_path,
+                            dest_dir.join(&file_name)
+                        );
+                        fs::copy(&src_path, &dest_dir.join(file_name))?;
+                    } else {
+                        return Err(SourceError::FileNotFound(src_path));
+                    }
                 }
 
                 if !src.patches().is_empty() {

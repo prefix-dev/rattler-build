@@ -119,12 +119,14 @@ fn run_in_environment(
 
     writeln!(tmpfile, "{}", additional_script.contents)?;
     writeln!(tmpfile, "{}", script.script)?;
+    writeln!(tmpfile, "set -x")?;
     writeln!(tmpfile, "{}", cmd)?;
 
     let tmpfile_path = tmpfile.into_temp_path();
     let executable = shell.executable();
     let status = match shell {
         ShellEnum::Bash(_) => std::process::Command::new(executable)
+            .arg("-e")
             .arg(&tmpfile_path)
             .current_dir(cwd)
             .status()?,
