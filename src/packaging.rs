@@ -112,16 +112,15 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
     buf_reader.read_to_string(&mut content)?;
 
     // Check if the content contains the prefix
-    let prefix = prefix.to_string_lossy().to_string();
     #[allow(unused_mut)]
-    let mut contains_prefix = content.contains(&prefix);
+    let mut contains_prefix = content.contains(&prefix.to_string_lossy().to_string());
     #[cfg(target_os = "windows")]
     {
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
-        let prefix_str = to_forward_slash_lossy(prefix).to_string();
-        contains_prefix += content.contains(prefix_str);
+        contains_prefix =
+            contains_prefix || content.contains(&to_forward_slash_lossy(prefix).to_string());
     }
 
     Ok(contains_prefix)
