@@ -25,6 +25,16 @@ use crate::source::fetch_sources;
 use crate::test::TestConfiguration;
 use crate::{index, test, tool_configuration};
 
+const BASH_PREAMBLE: &str = r#"
+## Start of bash preamble
+if [ -z ${CONDA_BUILD+x} ]; then
+    source ((script_path))
+fi
+# enable debug mode for the rest of the script
+set -x
+## End of preamble
+"#;
+
 /// Create a conda build script and return the path to it
 pub fn get_conda_build_script(
     output: &Output,
@@ -98,18 +108,17 @@ pub fn get_conda_build_script(
 
     if cfg!(unix) {
         let build_env_script_path = directories.work_dir.join("build_env.sh");
-        let preambel = format!(
-            "if [ -z ${{CONDA_BUILD+x}} ]; then\n    source {}\nfi",
-            build_env_script_path.to_string_lossy()
-        );
-        let mut fout = File::create(&build_env_script_path)?;
-        write_env_script(output, "BUILD", &mut fout, shell::Bash).map_err(|e| {
+        let preamble =
+            BASH_PREAMBLE.replace("((script_path))", &build_env_script_path.to_string_lossy());
+
+        let mut file_out = File::create(&build_env_script_path)?;
+        write_env_script(output, "BUILD", &mut file_out, shell::Bash).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to write build env script: {}", e),
             )
         })?;
-        let full_script = format!("{}\n{}", preambel, script_content);
+        let full_script = format!("{}\n{}", preamble, script_content);
         let build_script_path = directories.work_dir.join("conda_build.sh");
 
         let mut build_script_file = File::create(&build_script_path)?;
@@ -117,20 +126,20 @@ pub fn get_conda_build_script(
         Ok(build_script_path)
     } else {
         let build_env_script_path = directories.work_dir.join("build_env.bat");
-        let preambel = format!(
+        let preamble = format!(
             "IF \"%CONDA_BUILD%\" == \"\" (\n    call {}\n)",
             build_env_script_path.to_string_lossy()
         );
-        let mut fout = File::create(&build_env_script_path)?;
+        let mut file_out = File::create(&build_env_script_path)?;
 
-        write_env_script(output, "BUILD", &mut fout, shell::CmdExe).map_err(|e| {
+        write_env_script(output, "BUILD", &mut file_out, shell::CmdExe).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::Other,
                 format!("Failed to write build env script: {}", e),
             )
         })?;
 
-        let full_script = format!("{}\n{}", preambel, script_content);
+        let full_script = format!("{}\n{}", preamble, script_content);
         let build_script_path = directories.work_dir.join("conda_build.bat");
 
         let mut build_script_file = File::create(&build_script_path)?;
@@ -238,7 +247,10 @@ pub async fn run_build(
     let files_before = record_files(&directories.host_prefix).expect("Could not record files");
 
     let (interpreter, args) = if cfg!(unix) {
-        ("/bin/bash", vec![build_script.as_os_str().to_owned()])
+        (
+            "/bin/bash",
+            vec![OsString::from("-e"), build_script.as_os_str().to_owned()],
+        )
     } else {
         (
             "cmd.exe",

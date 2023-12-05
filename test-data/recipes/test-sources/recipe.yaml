@@ -1,5 +1,5 @@
 context:
-  name: test_files
+  name: test-sources
   version: 1.0.0
 
 package:
@@ -10,6 +10,20 @@ source:
   - file_name: test.avi
     url: https://github.com/opencv/opencv_extra/raw/master/testdata/highgui/video/VID00003-20100701-2204.avi
     sha256: 78884f64b564a3b06dc6ee731ed33b60c6d8cd864cea07f21d94ba0f90c7b310
+
+  - path: ./test-folder/test-file-2.txt
+  - path: ./test-folder
+    folder: just-a-test
+  - path: test-file.txt
+    file_name: am-i-renamed.txt
+
+build:
+  script:
+    - echo "running build (test)"
+    - test -f ./test-file-2.txt
+    - test -f ./just-a-test/test-file-2.txt
+    - test -f ./am-i-renamed.txt
+    - test -f ./test.avi
 
 test:
   source_files:

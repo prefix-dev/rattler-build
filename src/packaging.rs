@@ -971,6 +971,6 @@ mod test {
             .join("test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        create_prefix_placeholder(&test_data, &prefix).unwrap();
+        create_prefix_placeholder(&test_data, prefix).unwrap();
     }
 }

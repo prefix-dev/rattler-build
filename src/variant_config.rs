@@ -565,6 +565,13 @@ impl VariantConfig {
                             exact_pins.insert(val);
                         }
                     }
+                    Dependency::PinCompatible(pin_compatible) => {
+                        let pin = pin_compatible.pin_value();
+                        let val = pin.name.as_normalized().to_owned();
+                        if pin.exact {
+                            exact_pins.insert(val);
+                        }
+                    }
                     // Be explicit about the other cases, so we can add them later
                     Dependency::Compiler(_) => (),
                 });

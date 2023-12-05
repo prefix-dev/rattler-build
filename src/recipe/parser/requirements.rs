@@ -152,6 +152,23 @@ impl PinSubpackage {
     }
 }
 
+/// A pin compatible is a special kind of dependency that is used to depend on
+/// a package from a previously resolved environment and applies a version range
+/// to the resolved version (e.g. resolve `python` in the host env to 3.10 and pin in the run
+/// env to `>=3.10,<3.11`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PinCompatible {
+    /// The pin value.
+    pin_compatible: Pin,
+}
+
+impl PinCompatible {
+    /// Get the [`Pin`] value.
+    pub const fn pin_value(&self) -> &Pin {
+        &self.pin_compatible
+    }
+}
+
 /// A compiler is a special kind of dependency that, when rendered, has
 /// some additional information about the target_platform attached.
 ///
@@ -201,6 +218,8 @@ pub enum Dependency {
     Spec(MatchSpec),
     /// A pin_subpackage dependency
     PinSubpackage(PinSubpackage),
+    /// A pin_compatible dependency
+    PinCompatible(PinCompatible),
     /// A compiler dependency
     Compiler(Compiler),
 }
@@ -245,13 +264,23 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
         } else if self.contains("__PIN_SUBPACKAGE") {
             let pin_subpackage: String = self.try_convert(name)?;
 
-            // Panic should never happen from this strip unless the prefix magic for the pin
-            // subpackage changes
+            // Panic should never happen from this strip unless the
+            // prefix magic for the pin subpackage changes
             let internal_repr = pin_subpackage
                 .strip_prefix("__PIN_SUBPACKAGE ")
                 .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
             let pin_subpackage = Pin::from_internal_repr(internal_repr);
             Ok(Dependency::PinSubpackage(PinSubpackage { pin_subpackage }))
+        } else if self.contains("__PIN_COMPATIBLE") {
+            let pin_compatible: String = self.try_convert(name)?;
+
+            // Panic should never happen from this strip unless the
+            // prefix magic for the pin compatible changes
+            let internal_repr = pin_compatible
+                .strip_prefix("__PIN_COMPATIBLE ")
+                .expect("pin compatible without prefix __PIN_COMPATIBLE ");
+            let pin_compatible = Pin::from_internal_repr(internal_repr);
+            Ok(Dependency::PinCompatible(PinCompatible { pin_compatible }))
         } else {
             let spec = self.try_convert(name)?;
 
@@ -288,6 +317,10 @@ impl<'de> Deserialize<'de> for Dependency {
                     Ok(Dependency::PinSubpackage(PinSubpackage {
                         pin_subpackage: Pin::from_internal_repr(pin),
                     }))
+                } else if let Some(pin) = value.strip_prefix("__PIN_COMPATIBLE ") {
+                    Ok(Dependency::PinCompatible(PinCompatible {
+                        pin_compatible: Pin::from_internal_repr(pin),
+                    }))
                 } else {
                     // Assuming MatchSpec can be constructed from a string.
                     MatchSpec::from_str(value)
@@ -311,6 +344,10 @@ impl Serialize for Dependency {
             Dependency::PinSubpackage(pin) => serializer.serialize_str(&format!(
                 "__PIN_SUBPACKAGE {}",
                 pin.pin_subpackage.internal_repr()
+            )),
+            Dependency::PinCompatible(pin) => serializer.serialize_str(&format!(
+                "__PIN_COMPATIBLE {}",
+                pin.pin_compatible.internal_repr()
             )),
             Dependency::Compiler(compiler) => {
                 serializer.serialize_str(&format!("__COMPILER {}", compiler.language()))

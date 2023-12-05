@@ -89,8 +89,9 @@ pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<Path
                 "Invalid local file path",
             ))
         })?;
+
         if !local_path.is_file() {
-            return Err(SourceError::FileNotFound);
+            return Err(SourceError::FileNotFound(local_path));
         }
 
         if let Some(sha256) = source.sha256() {
