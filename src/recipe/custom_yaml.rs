@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use marked_yaml::{types::MarkedScalarNode, Span};
 use url::Url;
 
@@ -1083,6 +1083,16 @@ where
 {
     fn try_convert(&self, name: &str) -> Result<Option<T>, PartialParsingError> {
         self.try_convert(name).map(|v| Some(v))
+    }
+}
+
+impl<T: Hash + Eq> TryConvertNode<IndexSet<T>> for RenderedNode
+where
+    RenderedNode: TryConvertNode<T>,
+    RenderedScalarNode: TryConvertNode<T>,
+{
+    fn try_convert(&self, name: &str) -> Result<IndexSet<T>, PartialParsingError> {
+        TryConvertNode::<Vec<T>>::try_convert(self, name).map(|v| v.into_iter().collect())
     }
 }
 

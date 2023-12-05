@@ -599,7 +599,7 @@ impl VariantConfig {
                     .run
                     .iter()
                     .chain(requirements.run_constrained.iter())
-                    .chain(parsed_recipe.build().run_exports().all())
+                    .chain(requirements.run_exports().all())
                     .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();

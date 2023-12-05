@@ -12,12 +12,6 @@ source:
     sha256: 63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8
 build:
   number: 0
-  ignore_run_exports:
-    - libcurl
-    - libarchive
-    - libgcc-ng
-    - libstdcxx-ng
-    - spdlog
 requirements:
   build:
     - "{{ compiler(\"c\") }}"
@@ -42,6 +36,13 @@ requirements:
     - openssl-static
     - reproc-cpp-static
     - reproc-static
+  ignore_run_exports:
+    by_name:
+    - libcurl
+    - libarchive
+    - libgcc-ng
+    - libstdcxx-ng
+    - spdlog
 test:
   commands:
     - test -f $PREFIX/bin/micromamba

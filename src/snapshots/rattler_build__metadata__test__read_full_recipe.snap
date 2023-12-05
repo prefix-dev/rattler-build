@@ -18,18 +18,9 @@ recipe:
     skip: false
     script:
       - python -m pip install . -vv --no-deps --no-build-isolation
-    ignore_run_exports: []
-    ignore_run_exports_from: []
-    run_exports:
-      noarch: []
-      strong: []
-      strong_constrains: []
-      weak: []
-      weak_constrains: []
     noarch: python
     entry_points: []
   requirements:
-    build: []
     host:
       - pip
       - poetry-core >=1.0.0
@@ -39,7 +30,6 @@ recipe:
       - "pygments >=2.13.0,<3.0.0"
       - python ==3.10
       - "typing_extensions >=4.0.0,<5.0.0"
-    run_constrained: []
   test:
     imports:
       - rich

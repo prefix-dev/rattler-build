@@ -1,10 +1,12 @@
 //! Parsing for the requirements section of the recipe.
 
+use indexmap::IndexSet;
 use std::{fmt, str::FromStr};
 
-use rattler_conda_types::MatchSpec;
+use rattler_conda_types::{MatchSpec, PackageName};
 use serde::{Deserialize, Serialize};
 
+use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::{
     _partialerror,
     recipe::{
@@ -24,7 +26,7 @@ pub struct Requirements {
     /// The environment will thus be resolved with the appropriate platform
     /// that is currently running (e.g. on linux-64 it will be resolved with linux-64).
     /// Typically things like compilers, build tools, etc. are installed here.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub build: Vec<Dependency>,
     /// Requirements at _host_ time are requirements that the final executable is going
     /// to _link_ against. The environment will be resolved with the target_platform
@@ -32,18 +34,26 @@ pub struct Requirements {
     /// host environment will be resolved with linux-aarch64).
     ///
     /// Typically things like libraries, headers, etc. are installed here.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub host: Vec<Dependency>,
     /// Requirements at _run_ time are requirements that the final executable is going
     /// to _run_ against. The environment will be resolved with the target_platform
     /// at runtime.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run: Vec<Dependency>,
     /// Constrains are optional runtime requirements that are used to constrain the
     /// environment that is resolved. They are not installed by default, but when
     /// installed they will have to conform to the constrains specified here.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_constrained: Vec<Dependency>,
+
+    /// The recipe can specify a list of run exports that it provides.
+    #[serde(default, skip_serializing_if = "RunExports::is_empty")]
+    pub run_exports: RunExports,
+
+    /// Ignore run-exports by name or from certain packages
+    #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
+    pub ignore_run_exports: IgnoreRunExports,
 }
 
 impl Requirements {
@@ -65,6 +75,16 @@ impl Requirements {
     /// Get the run constrained requirements.
     pub fn run_constrained(&self) -> &[Dependency] {
         self.run_constrained.as_slice()
+    }
+
+    /// Get run exports.
+    pub const fn run_exports(&self) -> &RunExports {
+        &self.run_exports
+    }
+
+    /// Get run exports that are ignored.
+    pub const fn ignore_run_exports(&self) -> &IgnoreRunExports {
+        &self.ignore_run_exports
     }
 
     /// Get all requirements at build time (combines build and host requirements)
@@ -110,6 +130,8 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
         let mut host = Vec::new();
         let mut run = Vec::new();
         let mut run_constrained = Vec::new();
+        let mut run_exports = RunExports::default();
+        let mut ignore_run_exports = IgnoreRunExports::default();
 
         for (key, value) in self.iter() {
             let key_str = key.as_str();
@@ -118,6 +140,12 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
                 "host" => host = value.try_convert(key_str)?,
                 "run" => run = value.try_convert(key_str)?,
                 "run_constrained" => run_constrained = value.try_convert(key_str)?,
+                "run_exports" => {
+                    run_exports = value.try_convert(key_str)?;
+                }
+                "ignore_run_exports" => {
+                    ignore_run_exports = value.try_convert(key_str)?;
+                }
                 invalid_key => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -132,6 +160,8 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
             host,
             run,
             run_constrained,
+            run_exports,
+            ignore_run_exports,
         })
     }
 }
@@ -381,6 +411,211 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
         })
     }
 }
+/// Run exports are applied to downstream packages that depend on this package.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct RunExports {
+    /// Noarch run exports are the only ones looked at when building noarch packages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub noarch: Vec<Dependency>,
+    /// Strong run exports apply from the build and host env to the run env.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub strong: Vec<Dependency>,
+    /// Strong run constrains add run_constrains from the build and host env.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub strong_constrains: Vec<Dependency>,
+    /// Weak run exports apply from the host env to the run env.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub weak: Vec<Dependency>,
+    /// Weak run constrains add run_constrains from the host env.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub weak_constrains: Vec<Dependency>,
+}
+
+impl RunExports {
+    /// Check if all fields are empty
+    pub fn is_empty(&self) -> bool {
+        self.noarch.is_empty()
+            && self.strong.is_empty()
+            && self.strong_constrains.is_empty()
+            && self.weak.is_empty()
+            && self.weak_constrains.is_empty()
+    }
+
+    /// Get all run exports from all configurations
+    pub fn all(&self) -> impl Iterator<Item = &Dependency> {
+        self.noarch
+            .iter()
+            .chain(self.strong.iter())
+            .chain(self.strong_constrains.iter())
+            .chain(self.weak.iter())
+            .chain(self.weak_constrains.iter())
+    }
+
+    /// Get the noarch run exports.
+    pub fn noarch(&self) -> &[Dependency] {
+        self.noarch.as_slice()
+    }
+
+    /// Get the strong run exports.
+    pub fn strong(&self) -> &[Dependency] {
+        self.strong.as_slice()
+    }
+
+    /// Get the strong run constrains.
+    pub fn strong_constrains(&self) -> &[Dependency] {
+        self.strong_constrains.as_slice()
+    }
+
+    /// Get the weak run exports.
+    pub fn weak(&self) -> &[Dependency] {
+        self.weak.as_slice()
+    }
+
+    /// Get the weak run constrains.
+    pub fn weak_constrains(&self) -> &[Dependency] {
+        self.weak_constrains.as_slice()
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(s) => s.try_convert(name),
+            RenderedNode::Sequence(seq) => seq.try_convert(name),
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Null(_) => Ok(RunExports::default()),
+        }
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        let dep = self.try_convert(name)?;
+        run_exports.weak.push(dep);
+
+        Ok(run_exports)
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        for node in self.iter() {
+            let deps = node.try_convert(name)?;
+            run_exports.weak = deps;
+        }
+
+        Ok(run_exports)
+    }
+}
+
+impl TryConvertNode<RunExports> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+        let mut run_exports = RunExports::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "noarch" => {
+                    run_exports.noarch = value.try_convert(key_str)?;
+                }
+                "strong" => {
+                    let deps = value.try_convert(key_str)?;
+                    run_exports.strong = deps;
+                }
+                "strong_constrains" => {
+                    let deps = value.try_convert(key_str)?;
+                    run_exports.strong_constrains = deps;
+                }
+                "weak" => {
+                    let deps = value.try_convert(key_str)?;
+                    run_exports.weak = deps;
+                }
+                "weak_constrains" => {
+                    let deps = value.try_convert(key_str)?;
+                    run_exports.weak_constrains = deps;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_owned().into()),
+                        help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
+                    ));
+                }
+            }
+        }
+
+        Ok(run_exports)
+    }
+}
+
+/// Run exports to ignore
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct IgnoreRunExports {
+    #[serde(default, skip_serializing_if = "IndexSet::is_empty")]
+    pub(super) by_name: IndexSet<PackageName>,
+    #[serde(default, skip_serializing_if = "IndexSet::is_empty")]
+    pub(super) from_package: IndexSet<PackageName>,
+}
+
+impl IgnoreRunExports {
+    /// Returns the package names that should be ignored as run_exports.
+    pub fn by_name(&self) -> &IndexSet<PackageName> {
+        &self.by_name
+    }
+
+    /// Returns the package names from who we should ignore any run_export requirement.
+    #[allow(clippy::wrong_self_convention)]
+    pub fn from_package(&self) -> &IndexSet<PackageName> {
+        &self.from_package
+    }
+
+    /// Returns true if this instance is considered empty, e.g. no run_exports should be ignored at
+    /// all.
+    pub fn is_empty(&self) -> bool {
+        self.by_name.is_empty() && self.from_package.is_empty()
+    }
+}
+
+impl TryConvertNode<IgnoreRunExports> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, PartialParsingError> {
+        let mut ignore_run_exports = IgnoreRunExports::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "by_name" => {
+                    ignore_run_exports.by_name = value.try_convert(key_str)?;
+                }
+                "from_package" => {
+                    ignore_run_exports.from_package = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_owned().into()),
+                        help = format!(
+                            "fields for {name} should be one of: `by_name`, or `from_package`"
+                        )
+                    ));
+                }
+            }
+        }
+
+        Ok(ignore_run_exports)
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -402,18 +637,13 @@ mod test {
 
         let requirements = Requirements {
             build: vec![Dependency::Compiler(compiler)],
-            host: vec![],
-            run: vec![],
-            run_constrained: vec![],
+            ..Default::default()
         };
 
         insta::assert_yaml_snapshot!(requirements);
 
         let yaml = serde_yaml::to_string(&requirements).unwrap();
-        assert_eq!(
-            yaml,
-            "build:\n- __COMPILER gcc\nhost: []\nrun: []\nrun_constrained: []\n"
-        );
+        assert_eq!(yaml, "build:\n- __COMPILER gcc\n");
 
         let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
         insta::assert_yaml_snapshot!(deserialized);

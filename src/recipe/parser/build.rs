@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
+use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::Dependency;
@@ -9,8 +9,7 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode,
-            TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
     },
@@ -30,12 +29,6 @@ pub struct Build {
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     pub(super) script: Script,
-    /// A recipe can choose to ignore certain run exports of its dependencies
-    pub(super) ignore_run_exports: Vec<PackageName>,
-    /// A recipe can choose to ignore all run exports of coming from some packages
-    pub(super) ignore_run_exports_from: Vec<PackageName>,
-    /// The recipe can specify a list of run exports that it provides
-    pub(super) run_exports: RunExports,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
     pub(super) noarch: NoArchType,
     /// For a Python noarch package to have executables it is necessary to specify the python entry points.
@@ -63,25 +56,6 @@ impl Build {
     /// Get the build script.
     pub fn script(&self) -> &Script {
         &self.script
-    }
-
-    /// Get run exports.
-    pub const fn run_exports(&self) -> &RunExports {
-        &self.run_exports
-    }
-
-    /// Get the ignore run exports.
-    ///
-    /// A recipe can choose to ignore certain run exports of its dependencies
-    pub fn ignore_run_exports(&self) -> &[PackageName] {
-        self.ignore_run_exports.as_slice()
-    }
-
-    /// Get the ignore run exports from.
-    ///
-    /// A recipe can choose to ignore all run exports of coming from some packages
-    pub fn ignore_run_exports_from(&self) -> &[PackageName] {
-        self.ignore_run_exports_from.as_slice()
     }
 
     /// Get the noarch type.
@@ -127,17 +101,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     build.skip = conds.iter().any(|&v| v);
                 }
                 "script" => build.script = value.try_convert(key_str)?,
-                "ignore_run_exports" => {
-                    build.ignore_run_exports = value.try_convert(key_str)?;
-                }
-                "ignore_run_exports_from" => {
-                    build.ignore_run_exports_from = value.try_convert(key_str)?;
-                }
                 "noarch" => {
                     build.noarch = value.try_convert(key_str)?;
-                }
-                "run_exports" => {
-                    build.run_exports = value.try_convert(key_str)?;
                 }
                 "entry_points" => {
                     if let Some(NoArchKind::Generic) = build.noarch.kind() {
@@ -224,76 +189,12 @@ impl RunExports {
     }
 }
 
-impl TryConvertNode<RunExports> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
-        match self {
-            RenderedNode::Scalar(s) => s.try_convert(name),
-            RenderedNode::Sequence(seq) => seq.try_convert(name),
-            RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Null(_) => Ok(RunExports::default()),
-        }
-    }
-}
-
 impl TryConvertNode<RunExports> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
         let mut run_exports = RunExports::default();
 
         let dep = self.try_convert(name)?;
         run_exports.weak.push(dep);
-
-        Ok(run_exports)
-    }
-}
-
-impl TryConvertNode<RunExports> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
-        let mut run_exports = RunExports::default();
-
-        for node in self.iter() {
-            let deps = node.try_convert(name)?;
-            run_exports.weak = deps;
-        }
-
-        Ok(run_exports)
-    }
-}
-
-impl TryConvertNode<RunExports> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
-        let mut run_exports = RunExports::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "noarch" => {
-                    run_exports.noarch = value.try_convert(key_str)?;
-                }
-                "strong" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.strong = deps;
-                }
-                "strong_constrains" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.strong_constrains = deps;
-                }
-                "weak" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.weak = deps;
-                }
-                "weak_constrains" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.weak_constrains = deps;
-                }
-                invalid => {
-                    return Err(_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_owned().into()),
-                        help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
-                    ));
-                }
-            }
-        }
 
         Ok(run_exports)
     }

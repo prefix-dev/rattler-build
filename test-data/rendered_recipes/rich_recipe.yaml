@@ -14,14 +14,6 @@ recipe:
     skip: false
     script:
     - python -m pip install . -vv --no-deps --no-build-isolation
-    ignore_run_exports: []
-    ignore_run_exports_from: []
-    run_exports:
-      noarch: []
-      strong: []
-      strong_constrains: []
-      weak: []
-      weak_constrains: []
     noarch: python
     entry_points: []
   requirements:

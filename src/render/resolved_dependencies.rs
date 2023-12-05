@@ -478,12 +478,13 @@ pub async fn resolve_dependencies(
                 .iter()
                 .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
 
-            let ignore_run_exports_from = output.recipe.build().ignore_run_exports_from();
-            if !ignore_run_exports_from.is_empty() {
-                res && !ignore_run_exports_from.contains(&rec.package_record.name)
-            } else {
-                res
-            }
+            let ignore_run_exports_from = output
+                .recipe
+                .requirements()
+                .ignore_run_exports()
+                .from_package();
+
+            res && !ignore_run_exports_from.contains(&rec.package_record.name)
         })
         .map_err(ResolveError::CouldNotCollectRunExports)?;
 
@@ -588,7 +589,7 @@ pub async fn resolve_dependencies(
             .collect::<Vec<_>>())
     };
 
-    let run_exports = output.recipe.build().run_exports();
+    let run_exports = output.recipe.requirements().run_exports();
 
     let run_exports = if !run_exports.is_empty() {
         Some(RunExportsJson {

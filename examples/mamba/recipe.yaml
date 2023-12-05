@@ -25,12 +25,6 @@ outputs:
       script:
         - ${{ "build_mamba.sh" if unix }}
         - ${{ "build_mamba.bat" if win }}
-      run_exports:
-        - ${{ pin_subpackage('libmamba', max_pin='x.x') }}
-      ignore_run_exports:
-        - spdlog
-        - python
-        # - ${{ "python" if win }}
     requirements:
       build:
         - ${{ compiler('cxx') }}
@@ -54,6 +48,13 @@ outputs:
         - zstd
       run:
         - libsolv >=0.7.23
+      run_exports:
+        - ${{ pin_subpackage('libmamba', max_pin='x.x') }}
+      ignore_run_exports:
+        by_name:
+          - spdlog
+          - python
+        # - ${{ "python" if win }}
     test:
       commands:
         - if: unix
@@ -81,10 +82,6 @@ outputs:
         - ${{ "build_mamba.sh" if unix }}
         - ${{ "build_mamba.bat" if win }}
       string: py_sup${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
-      run_exports:
-        - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
-      ignore_run_exports:
-        - spdlog
     requirements:
       build:
         - ${{ compiler('cxx') }}
@@ -112,7 +109,11 @@ outputs:
       run:
         - python
         - ${{ pin_subpackage('libmamba', exact=True) }}
-
+      run_exports:
+        - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
+      ignore_run_exports:
+        by_name:
+          - spdlog
     test:
       imports:
         - libmambapy
