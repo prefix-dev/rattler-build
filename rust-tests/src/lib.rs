@@ -435,4 +435,16 @@ mod tests {
 
         assert!(pkg.join("info/link.json").exists())
     }
+
+    #[test]
+    fn test_files_copy() {
+        if cfg!(target_os = "windows") {
+            return;
+        }
+        let tmp = tmp("test-sources");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("test-sources"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+    }
 }

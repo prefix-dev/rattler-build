@@ -126,6 +126,10 @@ struct BuildOpts {
     #[arg(long, default_value = "false")]
     no_test: bool,
 
+    /// Do not force colors in the output of the build script
+    #[arg(long, default_value = "false")]
+    no_force_colors: bool,
+
     #[clap(flatten)]
     common: CommonOpts,
 }
@@ -379,6 +383,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     PackageFormat::Conda => ArchiveType::Conda,
                 },
                 store_recipe: !args.no_include_recipe,
+                force_colors: !args.no_force_colors,
             },
             finalized_dependencies: None,
         };
