@@ -12,21 +12,9 @@ build:
   skip: false
   script:
     - test succeeded
-  ignore_run_exports: []
-  ignore_run_exports_from: []
-  run_exports:
-    noarch: []
-    strong: []
-    strong_constrains: []
-    weak: []
-    weak_constrains: []
   noarch: false
   entry_points: []
-requirements:
-  build: []
-  host: []
-  run: []
-  run_constrained: []
+requirements: {}
 test:
   imports: []
   commands: []

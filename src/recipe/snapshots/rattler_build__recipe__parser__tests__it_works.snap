@@ -85,15 +85,6 @@ Recipe {
                 ],
             ),
         },
-        ignore_run_exports: [],
-        ignore_run_exports_from: [],
-        run_exports: RunExports {
-            noarch: [],
-            strong: [],
-            strong_constrains: [],
-            weak: [],
-            weak_constrains: [],
-        },
         noarch: NoArchType(
             None,
         ),

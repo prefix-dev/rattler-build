@@ -27,10 +27,12 @@ mod test;
 
 pub use self::{
     about::About,
-    build::{Build, RunExports},
+    build::Build,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
-    requirements::{Compiler, Dependency, PinSubpackage, Requirements},
+    requirements::{
+        Compiler, Dependency, IgnoreRunExports, PinSubpackage, Requirements, RunExports,
+    },
     script::{Script, ScriptContent},
     source::{Checksum, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{PackageContent, Test},

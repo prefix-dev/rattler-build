@@ -4,7 +4,4 @@ expression: requirements
 ---
 build:
   - __COMPILER gcc
-host: []
-run: []
-run_constrained: []
 
