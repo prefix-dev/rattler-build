@@ -600,67 +600,44 @@ This would be equivalent to having a `run_test.py` with the following:
 ```python
 import bsdiff4
 ```
+### Check for package-contents 
 
-<!--
-### Run test script
-
-The script `run_test.sh`---or `.bat`, `.py`, or `.pl`---is run
-automatically if it is part of the recipe.
-
-```{note}
-Python .py and Perl .pl scripts are valid only as part of Python and
-Perl packages, respectively.
-```
-
-### Check for file existence in the final package
-
-Boa comes with some helpers to check for commonly used files in the final package. These
-helpers are clever and adjust for things like shared-library extensions and installation
-prefixes automatically.
+Checks if the built package contains the mentioned items.
 
 ```yaml
 test:
-  exists:
+  package-contents:
     # checks for the existence of files inside $PREFIX or %PREFIX%
+    # or, checks that there is at least one file matching the specified `glob`
+    # pattern inside the prefix
     files:
       - etc/libmamba/test.txt
       - etc/libmamba
+      - etc/libmamba/*.mamba.txt
 
     # checks for the existence of `mamba/api/__init__.py` inside of the
     # Python site-packages directory (note: also see Python import checks)
     site_packages:
       - mamba.api
 
-    # checks that there is at least one file matching the specified `glob`
-    # pattern inside the prefix
-    glob:
-      - etc/libmamba/*.mamba.txt
 
     # looks in $PREFIX/bin/mamba for unix and %PREFIX%\Library\bin\mamba.exe on Windows
     # note: also check the `commands` and execute something like `mamba --help` to make
     # sure things work fine
-    bin:
+    bins:
       - mamba
 
     # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
     # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
-    lib:
+    libs:
       - mamba
 
     # searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and
     # on Windows for `%PREFIX%\Library\include\mamba.hpp`
-    include:
+    includes:
       - libmamba/mamba.hpp
-
-    # executes cmake `find_package(libmamba REQUIRED)` and checks that it works
-    cmake_find:
-      - libmamba
-
-    # executes `pkg-config --exists libmamba` and `pkg-config --validate libmamba`
-    pkg_config:
-      - libmamba
 ```
--->
+
 
 Outputs section
 ---------------
