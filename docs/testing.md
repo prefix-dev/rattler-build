@@ -11,7 +11,7 @@ rattler-build test --package-file ./xtensor-0.24.6-h60d57d3_0.tar.bz2
 ```
 
 Running the above command will extract the package and create a clean environment
-where the package and dependencies are installed. Then the tests are executed in 
+where the package and dependencies are installed. Then the tests are executed in
 this environment.
 
 If you inspect the package contents, you would find the test files under

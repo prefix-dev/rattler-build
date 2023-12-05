@@ -124,29 +124,21 @@ Optional file. Contains the entries of the about section of the recipe of the
 `recipe.yaml` file. The following keys are added to `info/about.json` if present
 in the build recipe:
 
-* `home`
-* `dev_url`
-* `doc_url`
+* `home` (from about.homepage)
+* `dev_url` (from about.repository)
+* `doc_url` (from about.documentation)
 * `license_url`
 * `license`
 * `summary`
 * `description`
-* `license_family`
+* `license_family` (this field is not used anymore as we rely on SPDX license identifiers)
 
 
-
-<!--
-
-### `info/recipe/...`
+### `info/recipe/<...>`
 
 A directory containing the full contents of the build recipe.
+This folder also contains a rendered version of the recipe (`rendered_recipe.yaml`).
+This rendered version is used for the `rebuild` command.
+However, note that currently this format is still in flux and can change at any time.
 
-meta.yaml.rendered
-------------------
-
-The fully rendered build recipe. See :doc:`../resources/commands/conda-render`.
-
-This directory is present only when the the `include_recipe` flag
-is `True` in the :ref:`meta-build`.
-
--->
+You can also use `--no-include-recipe` to disable the inclusion of the recipe in the package.

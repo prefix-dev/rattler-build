@@ -5,7 +5,7 @@ members = [
 
 [package]
 name = "rattler-build"
-version = "0.5.2"
+version = "0.6.0"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
