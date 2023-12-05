@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use rattler_conda_types::{NoArchKind, NoArchType, package::EntryPoint, PackageName};
+use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
 use serde::{Deserialize, Serialize};
 
 use super::Dependency;
+use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
     recipe::{
@@ -14,7 +15,6 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
-use crate::recipe::parser::script::Script;
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.

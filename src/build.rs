@@ -49,17 +49,27 @@ pub fn get_conda_build_script(
         "sh"
     };
     let script_content = match script.contents() {
-        // The scripts path was not specified or explicitly specified. Use the default
-        // `build.{bat,sh}` if not specified. If the file cannot be found we error out.
-        ScriptContent::Default | ScriptContent::Path(_) => {
-            let path = match script.contents() {
-                ScriptContent::Path(path) => path.as_path(),
-                _ => Path::new("build"),
-            };
-            let path_with_ext = if path.extension() == None {
+        // No script was specified, so we try to read the default script. If the file cannot be
+        // found we return an empty string.
+        ScriptContent::Default => {
+            let recipe_file = directories
+                .recipe_dir
+                .join(Path::new("build").with_extension(default_extension));
+            match std::fs::read_to_string(recipe_file) {
+                Err(err) if err.kind() == ErrorKind::NotFound => String::new(),
+                Err(e) => {
+                    return Err(e);
+                }
+                Ok(content) => content,
+            }
+        }
+
+        // The scripts path was explicitly specified. If the file cannot be found we error out.
+        ScriptContent::Path(path) => {
+            let path_with_ext = if path.extension().is_none() {
                 Cow::Owned(path.with_extension(default_extension))
             } else {
-                Cow::Borrowed(path)
+                Cow::Borrowed(path.as_path())
             };
             let recipe_file = directories.recipe_dir.join(path_with_ext);
             match std::fs::read_to_string(&recipe_file) {

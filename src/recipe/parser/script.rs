@@ -7,11 +7,7 @@ use crate::{
     recipe::error::{ErrorKind, PartialParsingError},
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{
-    path::PathBuf,
-    collections::BTreeMap,
-    borrow::Cow
-};
+use std::{borrow::Cow, collections::BTreeMap, path::PathBuf};
 
 /// Defines the script to run to build the package.
 #[derive(Debug, Default, Clone)]
@@ -70,13 +66,11 @@ impl Serialize for Script {
                 env: &self.env,
                 secrets: &self.secrets,
                 content: match &self.content {
-                    ScriptContent::Command(content) => {
-                        Some(RawScriptContent::Command { content: &content })
-                    }
+                    ScriptContent::Command(content) => Some(RawScriptContent::Command { content }),
                     ScriptContent::Commands(content) => {
-                        Some(RawScriptContent::Commands { content: &content })
+                        Some(RawScriptContent::Commands { content })
                     }
-                    ScriptContent::Path(file) => Some(RawScriptContent::Path { file: &file }),
+                    ScriptContent::Path(file) => Some(RawScriptContent::Path { file }),
                     ScriptContent::Default => None,
                     ScriptContent::CommandOrPath(_) => unreachable!(),
                 },
@@ -267,14 +261,10 @@ impl TryConvertNode<Script> for RenderedMappingNode {
                     help = format!("cannot specify both `content` and `file`")
                 ));
             }
-            (Some(file), None) => file
-                .try_convert("file")
-                .map(|path| ScriptContent::Path(path))?,
+            (Some(file), None) => file.try_convert("file").map(ScriptContent::Path)?,
             (None, Some(content)) => match content {
                 RenderedNode::Scalar(node) => ScriptContent::Command(node.as_str().to_owned()),
-                node @ _ => node
-                    .try_convert("content")
-                    .map(|commands| ScriptContent::Commands(commands))?,
+                node => node.try_convert("content").map(ScriptContent::Commands)?,
             },
             (None, None) => ScriptContent::Default,
         };
