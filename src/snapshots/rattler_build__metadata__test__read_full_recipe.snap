@@ -18,10 +18,6 @@ recipe:
     skip: false
     script:
       - python -m pip install . -vv --no-deps --no-build-isolation
-    script_env:
-      passthrough: []
-      env: {}
-      secrets: []
     ignore_run_exports: []
     ignore_run_exports_from: []
     run_exports:

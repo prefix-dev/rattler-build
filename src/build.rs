@@ -3,12 +3,14 @@
 use std::collections::HashSet;
 use std::ffi::OsString;
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 
 use fs_err as fs;
 use fs_err::File;
+use std::borrow::Cow;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{io::Read, path::PathBuf};
 
 use itertools::Itertools;
 use miette::IntoDiagnostic;
@@ -17,6 +19,7 @@ use rattler_shell::shell;
 use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
+use crate::recipe::parser::ScriptContent;
 use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
 use crate::test::TestConfiguration;
@@ -39,43 +42,79 @@ pub fn get_conda_build_script(
 ) -> Result<PathBuf, std::io::Error> {
     let recipe = &output.recipe;
 
-    let default_script = if output.build_configuration.target_platform.is_windows() {
-        ["build.bat".to_owned()]
+    let script = recipe.build().script();
+    let default_extension = if output.build_configuration.target_platform.is_windows() {
+        "bat"
     } else {
-        ["build.sh".to_owned()]
+        "sh"
     };
-
-    let script = if recipe.build().scripts().is_empty() {
-        &default_script
-    } else {
-        recipe.build().scripts()
-    };
-
-    let script = script.iter().join("\n");
-
-    let script = if script.ends_with(".sh") || script.ends_with(".bat") {
-        let recipe_file = directories.recipe_dir.join(script);
-        tracing::info!("Reading recipe file: {:?}", recipe_file);
-
-        if !recipe_file.exists() {
-            if recipe.build().scripts().is_empty() {
-                tracing::info!("Empty build script");
-                String::new()
-            } else {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    format!("Recipe file {:?} does not exist", recipe_file),
-                ));
+    let script_content = match script.contents() {
+        // No script was specified, so we try to read the default script. If the file cannot be
+        // found we return an empty string.
+        ScriptContent::Default => {
+            let recipe_file = directories
+                .recipe_dir
+                .join(Path::new("build").with_extension(default_extension));
+            match std::fs::read_to_string(recipe_file) {
+                Err(err) if err.kind() == ErrorKind::NotFound => String::new(),
+                Err(e) => {
+                    return Err(e);
+                }
+                Ok(content) => content,
             }
-        } else {
-            let mut orig_build_file = File::open(recipe_file)?;
-            let mut orig_build_file_text = String::new();
-            orig_build_file.read_to_string(&mut orig_build_file_text)?;
-            orig_build_file_text
         }
-    } else {
-        script
+
+        // The scripts path was explicitly specified. If the file cannot be found we error out.
+        ScriptContent::Path(path) => {
+            let path_with_ext = if path.extension().is_none() {
+                Cow::Owned(path.with_extension(default_extension))
+            } else {
+                Cow::Borrowed(path.as_path())
+            };
+            let recipe_file = directories.recipe_dir.join(path_with_ext);
+            match std::fs::read_to_string(&recipe_file) {
+                Err(err) if err.kind() == ErrorKind::NotFound => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("recipe file {:?} does not exist", recipe_file.display()),
+                    ));
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+                Ok(content) => content,
+            }
+        }
+        // The scripts content was specified but it is still ambiguous whether it is a path or the
+        // contents of the string. Try to read the file as a script but fall back to using the string
+        // as the contents itself if the file is missing.
+        ScriptContent::CommandOrPath(path) => {
+            let content =
+                if !path.contains('\n') && (path.ends_with(".bat") || path.ends_with(".sh")) {
+                    let recipe_file = directories.recipe_dir.join(Path::new(path));
+                    match std::fs::read_to_string(recipe_file) {
+                        Err(err) if err.kind() == ErrorKind::NotFound => None,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                        Ok(content) => Some(content),
+                    }
+                } else {
+                    None
+                };
+            match content {
+                Some(content) => content,
+                None => path.to_owned(),
+            }
+        }
+        ScriptContent::Commands(commands) => commands.iter().join("\n"),
+        ScriptContent::Command(command) => command.to_owned(),
     };
+
+    if script.interpreter().is_some() {
+        // We don't support an interpreter yet
+        tracing::error!("build.script.interpreter is not supported yet");
+    }
 
     if cfg!(unix) {
         let build_env_script_path = directories.work_dir.join("build_env.sh");
@@ -89,7 +128,7 @@ pub fn get_conda_build_script(
                 format!("Failed to write build env script: {}", e),
             )
         })?;
-        let full_script = format!("{}\n{}", preamble, script);
+        let full_script = format!("{}\n{}", preamble, script_content);
         let build_script_path = directories.work_dir.join("conda_build.sh");
 
         let mut build_script_file = File::create(&build_script_path)?;
@@ -110,7 +149,7 @@ pub fn get_conda_build_script(
             )
         })?;
 
-        let full_script = format!("{}\n{}", preamble, script);
+        let full_script = format!("{}\n{}", preamble, script_content);
         let build_script_path = directories.work_dir.join("conda_build.bat");
 
         let mut build_script_file = File::create(&build_script_path)?;

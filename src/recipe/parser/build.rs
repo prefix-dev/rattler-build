@@ -1,8 +1,10 @@
-use std::{collections::BTreeMap, str::FromStr};
+use std::str::FromStr;
 
 use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType, PackageName};
 use serde::{Deserialize, Serialize};
 
+use super::Dependency;
+use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
     recipe::{
@@ -13,8 +15,6 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
-
-use super::Dependency;
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
@@ -29,9 +29,7 @@ pub struct Build {
     pub(super) skip: bool,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
-    pub(super) script: Vec<String>,
-    /// Environment variables to pass through or set in the script
-    pub(super) script_env: ScriptEnv,
+    pub(super) script: Script,
     /// A recipe can choose to ignore certain run exports of its dependencies
     pub(super) ignore_run_exports: Vec<PackageName>,
     /// A recipe can choose to ignore all run exports of coming from some packages
@@ -63,13 +61,8 @@ impl Build {
     }
 
     /// Get the build script.
-    pub fn scripts(&self) -> &[String] {
-        self.script.as_slice()
-    }
-
-    /// Get the build script environment.
-    pub const fn script_env(&self) -> &ScriptEnv {
-        &self.script_env
+    pub fn script(&self) -> &Script {
+        &self.script
     }
 
     /// Get run exports.
@@ -134,7 +127,6 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     build.skip = conds.iter().any(|&v| v);
                 }
                 "script" => build.script = value.try_convert(key_str)?,
-                "script_env" => build.script_env = value.try_convert(key_str)?,
                 "ignore_run_exports" => {
                     build.ignore_run_exports = value.try_convert(key_str)?;
                 }
@@ -162,108 +154,12 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_string().into()),
-                    ))
+                    ));
                 }
             }
         }
 
         Ok(build)
-    }
-}
-
-/// Extra environment variables to set during the build script execution
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct ScriptEnv {
-    /// Environments variables to leak into the build environment from the host system.
-    /// During build time these variables are recorded and stored in the package output.
-    /// Use `secrets` for environment variables that should not be recorded.
-    pub(super) passthrough: Vec<String>,
-    /// Environment variables to set in the build environment.
-    pub(super) env: BTreeMap<String, String>,
-    /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information. Use with care because this might make recipes no
-    /// longer reproducible on other machines.
-    pub(super) secrets: Vec<String>,
-}
-
-impl ScriptEnv {
-    /// Check if the script environment is empty is all its fields.
-    pub fn is_empty(&self) -> bool {
-        self.passthrough.is_empty() && self.env.is_empty() && self.secrets.is_empty()
-    }
-
-    /// Get the passthrough environment variables.
-    ///
-    /// Those are the environments variables to leak into the build environment from the host system.
-    ///
-    /// During build time these variables are recorded and stored in the package output.
-    /// Use `secrets` for environment variables that should not be recorded.
-    pub fn passthrough(&self) -> &[String] {
-        self.passthrough.as_slice()
-    }
-
-    /// Get the environment variables to set in the build environment.
-    pub fn env(&self) -> &BTreeMap<String, String> {
-        &self.env
-    }
-
-    /// Get the secrets environment variables.
-    ///
-    /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information.
-    ///
-    /// # Warning
-    /// Use with care because this might make recipes no longer reproducible on other machines.
-    pub fn secrets(&self) -> &[String] {
-        self.secrets.as_slice()
-    }
-}
-
-impl TryConvertNode<ScriptEnv> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<ScriptEnv, PartialParsingError> {
-        self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
-            .and_then(|m| m.try_convert(name))
-    }
-}
-
-impl TryConvertNode<ScriptEnv> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<ScriptEnv, PartialParsingError> {
-        let invalid = self
-            .keys()
-            .find(|k| matches!(k.as_str(), "env" | "passthrough" | "secrets"));
-
-        if let Some(invalid) = invalid {
-            return Err(_partialerror!(
-                *invalid.span(),
-                ErrorKind::InvalidField(invalid.to_string().into()),
-                help = format!("valid keys for {name} are `env`, `passthrough` or `secrets`")
-            ));
-        }
-
-        let env = self
-            .get("env")
-            .map(|node| node.try_convert("env"))
-            .transpose()?
-            .unwrap_or_default();
-
-        let passthrough = self
-            .get("passthrough")
-            .map(|node| node.try_convert("passthrough"))
-            .transpose()?
-            .unwrap_or_default();
-
-        let secrets = self
-            .get("secrets")
-            .map(|node| node.try_convert("secrets"))
-            .transpose()?
-            .unwrap_or_default();
-
-        Ok(ScriptEnv {
-            passthrough,
-            env,
-            secrets,
-        })
     }
 }
 
@@ -394,7 +290,7 @@ impl TryConvertNode<RunExports> for RenderedMappingNode {
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_owned().into()),
                         help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
-                    ))
+                    ));
                 }
             }
         }
@@ -422,7 +318,7 @@ impl TryConvertNode<NoArchType> for RenderedScalarNode {
                     *self.span(),
                     ErrorKind::InvalidField(invalid.to_owned().into()),
                     help = format!("expected `python` or `generic` for {name}"),
-                ))
+                ));
             }
         };
         Ok(noarch)
