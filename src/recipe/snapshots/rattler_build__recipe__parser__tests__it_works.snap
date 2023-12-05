@@ -75,9 +75,16 @@ Recipe {
         number: 0,
         string: None,
         skip: false,
-        script: [
-            "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
-        ],
+        script: Script {
+            interpreter: None,
+            env: {},
+            secrets: [],
+            content: Commands(
+                [
+                    "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
+                ],
+            ),
+        },
         ignore_run_exports: [],
         ignore_run_exports_from: [],
         run_exports: RunExports {
