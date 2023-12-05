@@ -259,6 +259,17 @@ Recipe {
                 },
             ),
         ],
+        run_exports: RunExports {
+            noarch: [],
+            strong: [],
+            strong_constrains: [],
+            weak: [],
+            weak_constrains: [],
+        },
+        ignore_run_exports: IgnoreRunExports {
+            by_name: {},
+            from_package: {},
+        },
     },
     test: Test {
         imports: [],
