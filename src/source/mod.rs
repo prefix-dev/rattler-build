@@ -37,8 +37,17 @@ pub enum SourceError {
     #[error("File not found!")]
     FileNotFound,
 
+    #[error("Could not find `patch` executable")]
+    PatchNotFound,
+
+    #[error("Could not find `tar` executable")]
+    TarNotFound,
+
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
+
+    #[error("Failed to extract archive: {0}")]
+    ExtractionError(String),
 
     #[error("Failed to run git command: {0}")]
     GitError(String),
@@ -152,18 +161,26 @@ pub async fn fetch_sources(
 }
 
 /// Extracts a tar archive to the specified target directory
-fn extract(
-    archive: &Path,
-    target_directory: &Path,
-) -> Result<std::process::Output, std::io::Error> {
-    let output = Command::new("tar")
+fn extract(archive: &Path, target_directory: &Path) -> Result<std::process::Output, SourceError> {
+    let tar_exe = which::which("tar").map_err(|_| SourceError::TarNotFound)?;
+
+    let output = Command::new(tar_exe)
         .arg("-xf")
         .arg(archive.as_os_str())
         .arg("--preserve-permissions")
         .arg("--strip-components=1")
         .arg("-C")
         .arg(target_directory.as_os_str())
-        .output();
+        .output()?;
 
-    output
+    if !output.status.success() {
+        return Err(SourceError::ExtractionError(format!(
+            "Failed to extract archive: {}.\nStdout: {}\nStderr: {}",
+            archive.display(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )));
+    }
+
+    Ok(output)
 }

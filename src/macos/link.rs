@@ -23,6 +23,11 @@ pub enum RelinkError {
     #[error("failed to run install_name_tool")]
     InstallNameToolFailed,
 
+    #[error(
+        "failed to find install_name_tool: please install xcode / install_name_tool on your system"
+    )]
+    InstallNameToolNotFound(#[from] which::Error),
+
     #[error("failed to read or write MachO file: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -189,7 +194,9 @@ struct DylibChanges {
 fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
     tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
 
-    let mut cmd = std::process::Command::new("install_name_tool");
+    let install_name_tool_exe = which::which("install_name_tool")?;
+
+    let mut cmd = std::process::Command::new(install_name_tool_exe);
 
     if let Some(id) = &changes.change_id {
         cmd.arg("-id").arg(id);
