@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType};
+use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::Dependency;
