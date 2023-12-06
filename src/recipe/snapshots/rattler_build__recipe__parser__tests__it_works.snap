@@ -88,7 +88,9 @@ Recipe {
         noarch: NoArchType(
             None,
         ),
-        entry_points: [],
+        python: Python {
+            entry_points: [],
+        }
     },
     requirements: Requirements {
         build: [

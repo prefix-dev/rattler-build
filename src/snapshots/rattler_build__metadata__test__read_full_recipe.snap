@@ -19,7 +19,6 @@ recipe:
     script:
       - python -m pip install . -vv --no-deps --no-build-isolation
     noarch: python
-    entry_points: []
   requirements:
     host:
       - pip
