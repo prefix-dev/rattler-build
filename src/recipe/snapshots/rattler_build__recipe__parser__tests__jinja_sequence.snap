@@ -13,7 +13,6 @@ build:
   script:
     - test succeeded
   noarch: false
-  entry_points: []
 requirements: {}
 test:
   imports: []

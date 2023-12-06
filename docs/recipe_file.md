@@ -311,9 +311,10 @@ The following example creates a Python entry point named "bsdiff4" that calls
 
 ```yaml
 build:
-  entry_points:
-    - bsdiff4 = bsdiff4.cli:main_bsdiff4
-    - bspatch4 = bsdiff4.cli:main_bspatch4
+  python:
+    entry_points:
+      - bsdiff4 = bsdiff4.cli:main_bsdiff4
+      - bspatch4 = bsdiff4.cli:main_bspatch4
 ```
 
 

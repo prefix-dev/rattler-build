@@ -18,7 +18,6 @@ recipe:
     skip: false
     script: []
     noarch: false
-    entry_points: []
   requirements:
     build:
       - __COMPILER c

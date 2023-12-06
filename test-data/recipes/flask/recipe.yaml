@@ -16,8 +16,9 @@ source:
 build:
   number: 0
   script: python -m pip install . -vv --no-deps --no-build-isolation
-  entry_points:
-    - flask = flask.cli:main
+  python:
+    entry_points:
+      - flask = flask.cli:main
   noarch: python
 
 requirements:
