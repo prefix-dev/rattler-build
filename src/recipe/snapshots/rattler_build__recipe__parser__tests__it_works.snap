@@ -90,7 +90,7 @@ Recipe {
         ),
         python: Python {
             entry_points: [],
-        }
+        },
     },
     requirements: Requirements {
         build: [

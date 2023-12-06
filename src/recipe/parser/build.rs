@@ -105,14 +105,6 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     build.noarch = value.try_convert(key_str)?;
                 }
                 "python" => {
-                    if let Some(NoArchKind::Generic) = build.noarch.kind() {
-                        return Err(_partialerror!(
-                            *key.span(),
-                            ErrorKind::Other,
-                            label = "`python` is only allowed for `python` noarch packages"
-                        ));
-                    }
-
                     build.python = value.try_convert(key_str)?;
                 }
                 invalid => {
