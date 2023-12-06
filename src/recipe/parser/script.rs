@@ -162,6 +162,15 @@ impl Script {
     pub fn secrets(&self) -> &[String] {
         self.secrets.as_slice()
     }
+
+    /// Returns true if the script references the default build script and has no additional
+    /// configuration.
+    pub fn is_default(&self) -> bool {
+        self.content.is_default()
+            && self.interpreter.is_none()
+            && self.env.is_empty()
+            && self.secrets.is_empty()
+    }
 }
 
 impl From<ScriptContent> for Script {

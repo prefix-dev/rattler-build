@@ -335,5 +335,4 @@ Recipe {
         ),
         prelink_message: None,
     },
-    extra: (),
 }

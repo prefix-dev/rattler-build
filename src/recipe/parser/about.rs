@@ -21,19 +21,34 @@ use crate::{
 /// About information.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct About {
+    #[serde(skip_serializing_if = "Option::is_none")]
     homepage: Option<Url>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     repository: Option<Url>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     documentation: Option<Url>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     license: Option<License>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     license_family: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     license_files: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     license_url: Option<Url>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     prelink_message: Option<String>,
 }
 
 impl About {
+    /// Returns true if the about has its default configuration.
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+
     /// Get the homepage.
     pub const fn homepage(&self) -> Option<&Url> {
         self.homepage.as_ref()

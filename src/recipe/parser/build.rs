@@ -15,6 +15,11 @@ use crate::{
     },
 };
 
+/// A helper method to skip serializing the `skip` field if it's false.
+fn should_not_serialize_skip(skip: &bool) -> bool {
+    !skip
+}
+
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -23,13 +28,17 @@ pub struct Build {
     pub(super) number: u64,
     /// The build string is usually set automatically as the hash of the variant configuration.
     /// It's possible to override this by setting it manually, but not recommended.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) string: Option<String>,
     /// List of conditions under which to skip the build of the package.
+    #[serde(default, skip_serializing_if = "should_not_serialize_skip")]
     pub(super) skip: bool,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
+    #[serde(default, skip_serializing_if = "Script::is_default")]
     pub(super) script: Script,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
+    #[serde(default, skip_serializing_if = "NoArchType::is_none")]
     pub(super) noarch: NoArchType,
     /// For a Python noarch package to have executables it is necessary to specify the python entry points.
     /// These contain the name of the executable and the module + function that should be executed.

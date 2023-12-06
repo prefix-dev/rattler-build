@@ -5,33 +5,10 @@ expression: recipe
 package:
   name: blib
   version: 0.1.0
-source: []
 build:
   number: 0
-  string: ~
-  skip: false
   script:
     - test succeeded
-  noarch: false
   entry_points: []
 requirements: {}
-test:
-  imports: []
-  commands: []
-  requires: []
-  source_files: []
-  files: []
-  package_contents: ~
-about:
-  homepage: ~
-  repository: ~
-  documentation: ~
-  license: ~
-  license_family: ~
-  license_files: []
-  license_url: ~
-  summary: ~
-  description: ~
-  prelink_message: ~
-extra: ~
 
