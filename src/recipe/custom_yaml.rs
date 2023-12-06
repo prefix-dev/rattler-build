@@ -967,17 +967,25 @@ impl TryConvertNode<u64> for RenderedNode {
 
 impl TryConvertNode<u64> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<u64, PartialParsingError> {
-        self.as_str()
-            .parse()
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+        self.as_str().parse().map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("failed to parse `{}` as unsigned integer", self.as_str())
+            )
+        })
     }
 }
 
 impl TryConvertNode<i32> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<i32, PartialParsingError> {
-        self.as_str()
-            .parse()
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+        self.as_str().parse::<i32>().map_err(|err| {
+            _partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!("failed to parse `{}` as integer", self.as_str())
+            )
+        })
     }
 }
 
