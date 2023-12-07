@@ -14,7 +14,7 @@ recipe:
     string: h60d57d3_0
   requirements:
     build:
-      - __COMPILER c
+      - compiler: c
       - make
       - perl
       - pkg-config
