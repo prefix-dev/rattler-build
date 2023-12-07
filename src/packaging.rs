@@ -764,6 +764,19 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
 
             test_files.extend(copy_dir.copied_pathes().iter().cloned());
         }
+
+        if !test.downstream().is_empty() {
+            #[derive(serde::Serialize)]
+            struct Downstreams<'a> {
+                downstream: &'a [String],
+            }
+            let d = Downstreams {
+                downstream: test.downstream(),
+            };
+            let test_file = tests_folder.join("test_downstream.json");
+            let file = File::create(test_file);
+            file?.write_all(serde_json::to_string_pretty(&d)?.as_bytes())?;
+        }
     }
 
     Ok(test_files)

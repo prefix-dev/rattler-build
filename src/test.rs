@@ -193,14 +193,12 @@ async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestErro
         if path.is_dir() {
             continue;
         }
-        let Some(file_name) = path.file_name() else {
+        let Some(ext) = path.extension() else {
             continue;
         };
-        if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
-            println!("test {}", file_name.to_string_lossy());
+        if ext.eq("sh") || ext.eq("bat") {
             tests.push(Tests::Commands(path));
-        } else if file_name.eq("run_test.py") {
-            println!("test {}", file_name.to_string_lossy());
+        } else if ext.eq("py") {
             tests.push(Tests::Python(path));
         }
     }

@@ -95,7 +95,7 @@ pub struct Test {
     /// Match against items in built package.
     package_contents: Option<PackageContent>,
     /// Packages to be tested against this package
-    downstreams: Vec<String>,
+    downstream: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -237,17 +237,28 @@ impl Test {
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
     }
+
+    /// Get the Downstream package MatchSpec
+    pub fn downstream(&self) -> &[String] {
+        &self.downstream
+    }
 }
 
 impl TryConvertNode<Test> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Test, PartialParsingError> {
         match self {
             RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Scalar(_) => {
-                Err(_partialerror!(*self.span(), ErrorKind::ExpectedMapping,))?
-            }
+            RenderedNode::Scalar(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                help = format!("expected mapping for {name}")
+            ))?,
             RenderedNode::Null(_) => Ok(Test::default()),
-            RenderedNode::Sequence(_) => todo!("Not implemented yet: sequence on Test"),
+            RenderedNode::Sequence(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                help = format!("expected mapping for {name}")
+            ))?,
         }
     }
 }
@@ -385,7 +396,7 @@ impl TryConvertNode<Test> for RenderedMappingNode {
                 "commands" => test.commands = value.try_convert(key_str)?,
                 "requirements" => test.requirements = value.try_convert(key_str)?,
                 "files" => test.files = value.try_convert(key_str)?,
-                "downstream" => test.downstreams = value.try_convert(key_str)?,
+                "downstream" => test.downstream = value.try_convert(key_str)?,
                 invalid => Err(_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
