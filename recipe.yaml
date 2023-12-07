@@ -1,7 +1,0 @@
-
-package:
-  name: test
-  version: v0.0.1
-
-build:
-  number: ${{ 0 if false else -1 }}
