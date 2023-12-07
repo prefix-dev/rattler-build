@@ -199,6 +199,7 @@ mod test {
     use crate::{
         assert_miette_snapshot,
         recipe::{jinja::SelectorConfig, Recipe},
+        variant_config::ParseErrors,
     };
 
     #[test]
@@ -212,7 +213,9 @@ mod test {
             homepage: license_urla.asda:://sdskd
         "#;
 
-        let err = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap_err();
+        let err: ParseErrors = Recipe::from_yaml(recipe, SelectorConfig::default())
+            .unwrap_err()
+            .into();
 
         assert_miette_snapshot!(err);
     }
@@ -228,7 +231,9 @@ mod test {
             license: MIT/X derivate
         "#;
 
-        let err = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap_err();
+        let err: ParseErrors = Recipe::from_yaml(recipe, SelectorConfig::default())
+            .unwrap_err()
+            .into();
 
         assert_miette_snapshot!(err);
     }

@@ -44,17 +44,12 @@ impl TryConvertNode<Package> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
         let mut name_val = None;
         let mut version = None;
-        let span = *self.span();
 
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
-                "name" => {
-                    name_val = value.try_convert(key_str)?;
-                }
-                "version" => {
-                    version = value.try_convert(key_str)?;
-                }
+                "name" => name_val = value.try_convert(key_str)?,
+                "version" => version = value.try_convert(key_str)?,
                 invalid => {
                     return Err(_partialerror!(
                         *key.span(),
@@ -67,16 +62,18 @@ impl TryConvertNode<Package> for RenderedMappingNode {
 
         let Some(version) = version else {
             return Err(_partialerror!(
-                span,
+                *self.span(),
                 ErrorKind::MissingField("version".into()),
+                label = "add the field `version` in between here",
                 help = format!("the field `version` is required for `{name}`")
             ));
         };
 
         let Some(name) = name_val else {
             return Err(_partialerror!(
-                span,
+                *self.span(),
                 ErrorKind::MissingField("name".into()),
+                label = "add the field `name` in between here",
                 help = format!("the field `name` is required for `{name}`")
             ));
         };
@@ -170,6 +167,7 @@ mod tests {
     use crate::{
         assert_miette_snapshot,
         recipe::{jinja::SelectorConfig, Recipe},
+        variant_config::ParseErrors,
     };
 
     #[test]
@@ -180,7 +178,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err = recipe.unwrap_err();
+        let err: ParseErrors = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -194,7 +192,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err = recipe.unwrap_err();
+        let err: ParseErrors = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 }

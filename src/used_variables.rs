@@ -9,8 +9,9 @@
 //!    - extract all `if ... then ... else ` and `jinja` statements and find used variables
 //!    - retrieve used variables from configuration and flatten selectors
 //!    - extract all dependencies and add them to used variables to build full variant
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
+use itertools::Itertools;
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
@@ -114,58 +115,79 @@ fn find_all_selectors<'a>(node: &'a Node, selectors: &mut HashSet<&'a ScalarNode
 }
 
 // find all scalar nodes and Jinja expressions
-fn find_jinja(node: &Node, src: &str, variables: &mut HashSet<String>) -> Result<(), ParsingError> {
+fn find_jinja(
+    node: &Node,
+    src: &str,
+    variables: &mut HashSet<String>,
+) -> Result<(), Vec<ParsingError>> {
     use crate::recipe::custom_yaml::SequenceNodeInternal;
 
-    match node {
-        Node::Mapping(map) => {
-            for (_, value) in map.iter() {
-                find_jinja(value, src, variables)?;
+    let mut errs = Vec::<ParsingError>::new();
+    let mut queue = VecDeque::from([(node, src)]);
+    while let Some((node, src)) = queue.pop_front() {
+        match node {
+            Node::Mapping(map) => {
+                for (_, value) in map.iter() {
+                    queue.push_back((value, src));
+                    // find_jinja(value, src, variables)?;
+                }
             }
-        }
-        Node::Sequence(seq) => {
-            for item in seq.iter() {
-                match item {
-                    SequenceNodeInternal::Simple(node) => find_jinja(node, src, variables)?,
-                    SequenceNodeInternal::Conditional(if_sel) => {
-                        // we need to convert the if condition to a Jinja expression to parse it
-                        let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
-                        let ast = parse(&as_jinja_expr, "jinja.yaml").map_err(|e| {
-                            crate::recipe::ParsingError::from_partial(
-                                src,
-                                crate::_partialerror!(
-                                    *if_sel.span(),
-                                    crate::recipe::error::ErrorKind::from(e),
-                                    label = "failed to parse as jinja expression"
-                                ),
-                            )
-                        })?;
-                        extract_variables(&ast, variables);
-
-                        find_jinja(if_sel.then(), src, variables)?;
-                        if let Some(otherwise) = if_sel.otherwise() {
-                            find_jinja(otherwise, src, variables)?;
+            Node::Sequence(seq) => {
+                for item in seq.iter() {
+                    match item {
+                        SequenceNodeInternal::Simple(node) => queue.push_back((node, src)),
+                        SequenceNodeInternal::Conditional(if_sel) => {
+                            // we need to convert the if condition to a Jinja expression to parse it
+                            let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
+                            match parse(&as_jinja_expr, "jinja.yaml") {
+                                Ok(ast) => {
+                                    extract_variables(&ast, variables);
+                                    queue.push_back((if_sel.then(), src));
+                                    // find_jinja(if_sel.then(), src, variables)?;
+                                    if let Some(otherwise) = if_sel.otherwise() {
+                                        queue.push_back((otherwise, src));
+                                        // find_jinja(otherwise, src, variables)?;
+                                    }
+                                }
+                                Err(err) => {
+                                    let err = crate::recipe::ParsingError::from_partial(
+                                        src,
+                                        crate::_partialerror!(
+                                            *if_sel.span(),
+                                            crate::recipe::error::ErrorKind::from(err),
+                                            label = "failed to parse as jinja expression"
+                                        ),
+                                    );
+                                    errs.push(err);
+                                }
+                            }
                         }
                     }
                 }
             }
-        }
-        Node::Scalar(scalar) => {
-            if scalar.contains("${{") {
-                let ast = parse(scalar, "jinja.yaml").map_err(|e| {
-                    crate::recipe::ParsingError::from_partial(
-                        src,
-                        crate::_partialerror!(
-                            *scalar.span(),
-                            crate::recipe::error::ErrorKind::from(e),
-                            label = "failed to parse as jinja expression"
-                        ),
-                    )
-                })?;
-                extract_variables(&ast, variables);
+            Node::Scalar(scalar) => {
+                if scalar.contains("${{") {
+                    match parse(scalar, "jinja.yaml") {
+                        Ok(ast) => extract_variables(&ast, variables),
+                        Err(err) => {
+                            let err = crate::recipe::ParsingError::from_partial(
+                                src,
+                                crate::_partialerror!(
+                                    *scalar.span(),
+                                    crate::recipe::error::ErrorKind::from(err),
+                                    label = "failed to parse as jinja expression"
+                                ),
+                            );
+                            errs.push(err);
+                        }
+                    }
+                }
             }
+            _ => {}
         }
-        _ => {}
+    }
+    if !errs.is_empty() {
+        return Err(errs);
     }
 
     Ok(())
@@ -175,26 +197,34 @@ fn find_jinja(node: &Node, src: &str, variables: &mut HashSet<String>) -> Result
 pub(crate) fn used_vars_from_expressions(
     yaml_node: &Node,
     src: &str,
-) -> Result<HashSet<String>, ParsingError> {
+) -> Result<HashSet<String>, Vec<ParsingError>> {
     let mut selectors = HashSet::new();
 
     find_all_selectors(yaml_node, &mut selectors);
 
     let mut variables = HashSet::new();
 
-    for selector in selectors {
-        let selector_tmpl = format!("{{{{ {} }}}}", selector.as_str());
-        let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| -> ParsingError {
-            crate::recipe::ParsingError::from_partial(
-                src,
-                crate::_partialerror!(
-                    *selector.span(),
-                    crate::recipe::error::ErrorKind::from(e),
-                    label = "failed to parse as jinja expression"
-                ),
-            )
-        })?;
-        extract_variables(&ast, &mut variables);
+    let (_, errs): (Vec<()>, Vec<ParsingError>) = selectors
+        .iter()
+        .map(|selector| -> Result<(), ParsingError> {
+            let selector_tmpl = format!("{{{{ {} }}}}", selector.as_str());
+            let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| -> ParsingError {
+                crate::recipe::ParsingError::from_partial(
+                    src,
+                    crate::_partialerror!(
+                        *selector.span(),
+                        crate::recipe::error::ErrorKind::from(e),
+                        label = "failed to parse as jinja expression"
+                    ),
+                )
+            })?;
+            extract_variables(&ast, &mut variables);
+            Ok(())
+        })
+        .partition_result();
+
+    if !errs.is_empty() {
+        return Err(errs);
     }
 
     // parse recipe into AST

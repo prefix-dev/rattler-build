@@ -380,9 +380,19 @@ impl VariantConfig {
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
             // in the recipe which are captured by the `used vars`
-            let used_vars = used_vars_from_expressions(output, recipe)?;
-            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
-                .map_err(|err| ParsingError::from_partial(recipe, err))?;
+            let used_vars = used_vars_from_expressions(output, recipe).map_err(|e| {
+                let errs: ParseErrors = e.into();
+                errs
+            })?;
+            let parsed_recipe =
+                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
+                    let errs: ParseErrors = err
+                        .into_iter()
+                        .map(|err| ParsingError::from_partial(recipe, err))
+                        .collect::<Vec<ParsingError>>()
+                        .into();
+                    errs
+                })?;
             let noarch_type = parsed_recipe.build().noarch();
 
             let target_platform = if noarch_type.is_none() {
@@ -466,8 +476,15 @@ impl VariantConfig {
 
         let mut all_build_dependencies = Vec::new();
         for (_, (_, output, _, _)) in outputs_map.iter() {
-            let parsed_recipe = Recipe::from_node(output, selector_config.clone())
-                .map_err(|err| ParsingError::from_partial(recipe, err))?;
+            let parsed_recipe =
+                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
+                    let errs: ParseErrors = err
+                        .into_iter()
+                        .map(|err| ParsingError::from_partial(recipe, err))
+                        .collect::<Vec<ParsingError>>()
+                        .into();
+                    errs
+                })?;
 
             let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
             all_build_dependencies.extend(build_time_requirements);
@@ -546,7 +563,14 @@ impl VariantConfig {
                     selector_config.new_with_variant(combination.clone(), *target_platform);
 
                 let parsed_recipe = Recipe::from_node(output, selector_config_with_variant.clone())
-                    .map_err(|err| ParsingError::from_partial(recipe, err))?;
+                    .map_err(|err| {
+                        let errs: ParseErrors = err
+                            .into_iter()
+                            .map(|err| ParsingError::from_partial(recipe, err))
+                            .collect::<Vec<ParsingError>>()
+                            .into();
+                        errs
+                    })?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
                 let requirements = parsed_recipe.requirements();
@@ -632,8 +656,15 @@ impl VariantConfig {
                     hash: Some(hash.clone()),
                     ..selector_config_with_variant
                 };
-                let parsed_recipe = Recipe::from_node(output, selector_config_with_hash)
-                    .map_err(|err| ParsingError::from_partial(recipe, err))?;
+                let parsed_recipe =
+                    Recipe::from_node(output, selector_config_with_hash).map_err(|err| {
+                        let errs: ParseErrors = err
+                            .into_iter()
+                            .map(|err| ParsingError::from_partial(recipe, err))
+                            .collect::<Vec<ParsingError>>()
+                            .into();
+                        errs
+                    })?;
 
                 let build_string = parsed_recipe
                     .build()
@@ -741,6 +772,19 @@ impl VariantKey {
     }
 }
 
+#[derive(Error, Debug, Diagnostic)]
+#[error("Failed to parse recipe")]
+/// Collection of parse errors to build related diagnostics
+pub struct ParseErrors {
+    #[related]
+    errs: Vec<ParsingError>,
+}
+impl From<Vec<ParsingError>> for ParseErrors {
+    fn from(errs: Vec<ParsingError>) -> Self {
+        Self { errs }
+    }
+}
+
 #[allow(missing_docs)]
 #[derive(Error, Debug, Diagnostic)]
 pub enum VariantError {
@@ -749,6 +793,10 @@ pub enum VariantError {
 
     #[error("Failed to parse version: {0}")]
     RecipeParseVersionError(#[from] ParseVersionError),
+
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    RecipeParseErrors(#[from] ParseErrors),
 
     #[error(transparent)]
     #[diagnostic(transparent)]
