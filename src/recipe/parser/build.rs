@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rattler_conda_types::{package::EntryPoint, NoArchKind, NoArchType};
+use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::Dependency;
@@ -40,9 +40,9 @@ pub struct Build {
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
     #[serde(default, skip_serializing_if = "NoArchType::is_none")]
     pub(super) noarch: NoArchType,
-    /// For a Python noarch package to have executables it is necessary to specify the python entry points.
-    /// These contain the name of the executable and the module + function that should be executed.
-    pub(super) entry_points: Vec<EntryPoint>,
+    /// Python specific build configuration
+    #[serde(default, skip_serializing_if = "Python::is_default")]
+    pub(super) python: Python,
     // TODO: Add and parse the rest of the fields
 }
 
@@ -72,9 +72,9 @@ impl Build {
         &self.noarch
     }
 
-    /// Get the entry points.
-    pub fn entry_points(&self) -> &[EntryPoint] {
-        self.entry_points.as_slice()
+    /// Python specific build configuration.
+    pub const fn python(&self) -> &Python {
+        &self.python
     }
 
     /// Check if the build should be skipped.
@@ -113,16 +113,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                 "noarch" => {
                     build.noarch = value.try_convert(key_str)?;
                 }
-                "entry_points" => {
-                    if let Some(NoArchKind::Generic) = build.noarch.kind() {
-                        return Err(_partialerror!(
-                            *key.span(),
-                            ErrorKind::Other,
-                            label = "`entry_points` are only allowed for `python` noarch packages"
-                        ));
-                    }
-
-                    build.entry_points = value.try_convert(key_str)?;
+                "python" => {
+                    build.python = value.try_convert(key_str)?;
                 }
                 invalid => {
                     return Err(_partialerror!(
@@ -134,6 +126,58 @@ impl TryConvertNode<Build> for RenderedMappingNode {
         }
 
         Ok(build)
+    }
+}
+
+/// Python specific build configuration
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct Python {
+    /// For a Python noarch package to have executables it is necessary to specify the python entry points.
+    /// These contain the name of the executable and the module + function that should be executed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) entry_points: Vec<EntryPoint>,
+}
+
+impl Python {
+    /// Get the entry points.
+    pub fn entry_points(&self) -> &[EntryPoint] {
+        self.entry_points.as_slice()
+    }
+
+    /// Returns true if this is the default python configuration.
+    pub fn is_default(&self) -> bool {
+        self.entry_points.is_empty()
+    }
+}
+
+impl TryConvertNode<Python> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Python, PartialParsingError> {
+        self.as_mapping()
+            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Python> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<Python, PartialParsingError> {
+        let mut python = Python::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "entry_points" => {
+                    python.entry_points = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                    ));
+                }
+            }
+        }
+
+        Ok(python)
     }
 }
 

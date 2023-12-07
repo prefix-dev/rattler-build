@@ -9,6 +9,5 @@ build:
   number: 0
   script:
     - test succeeded
-  entry_points: []
 requirements: {}
 

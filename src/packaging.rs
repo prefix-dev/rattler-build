@@ -546,7 +546,7 @@ fn write_to_dest(
 /// This function creates a link.json file for the given output.
 fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     let noarch_links = PythonEntryPoints {
-        entry_points: output.recipe.build().entry_points().to_owned(),
+        entry_points: output.recipe.build().python().entry_points().to_owned(),
     };
 
     let link_json = LinkJson {
@@ -816,6 +816,7 @@ pub fn package_conda(
                     if output
                         .recipe
                         .build()
+                        .python()
                         .entry_points()
                         .iter()
                         .any(|ep| ep.command == name.to_string_lossy())
@@ -827,10 +828,17 @@ pub fn package_conda(
             // Windows
             else if stripped.starts_with("Scripts") {
                 if let Some(name) = stripped.file_name() {
-                    if output.recipe.build().entry_points().iter().any(|ep| {
-                        format!("{}.exe", ep.command) == name.to_string_lossy()
-                            || format!("{}-script.py", ep.command) == name.to_string_lossy()
-                    }) {
+                    if output
+                        .recipe
+                        .build()
+                        .python()
+                        .entry_points()
+                        .iter()
+                        .any(|ep| {
+                            format!("{}.exe", ep.command) == name.to_string_lossy()
+                                || format!("{}-script.py", ep.command) == name.to_string_lossy()
+                        })
+                    {
                         continue;
                     }
                 }

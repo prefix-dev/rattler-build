@@ -8,7 +8,6 @@ recipe:
   build:
     number: 0
     string: h60d57d3_0
-    entry_points: []
   requirements:
     build:
     - __COMPILER c

@@ -59,17 +59,17 @@ outputs:
       commands:
         - if: unix
           then:
-          - test -d ${PREFIX}/include/mamba  # [unix]
-          - test -f ${PREFIX}/include/mamba/version.hpp  # [unix]
-          - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfig.cmake  # [unix]
-          - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfigVersion.cmake  # [unix]
-          - test -e ${PREFIX}/lib/libmamba${SHLIB_EXT}  # [unix]
+            - test -d ${PREFIX}/include/mamba  # [unix]
+            - test -f ${PREFIX}/include/mamba/version.hpp  # [unix]
+            - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfig.cmake  # [unix]
+            - test -f ${PREFIX}/lib/cmake/libmamba/libmambaConfigVersion.cmake  # [unix]
+            - test -e ${PREFIX}/lib/libmamba${SHLIB_EXT}  # [unix]
           else:
-          - if not exist %LIBRARY_PREFIX%\include\mamba\version.hpp (exit 1)  # [win]
-          - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfig.cmake (exit 1)  # [win]
-          - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfigVersion.cmake (exit 1)  # [win]
-          - if not exist %LIBRARY_PREFIX%\bin\libmamba.dll (exit 1)  # [win]
-          - if not exist %LIBRARY_PREFIX%\lib\libmamba.lib (exit 1)  # [win]
+            - if not exist %LIBRARY_PREFIX%\include\mamba\version.hpp (exit 1)  # [win]
+            - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfig.cmake (exit 1)  # [win]
+            - if not exist %LIBRARY_PREFIX%\lib\cmake\libmamba\libmambaConfigVersion.cmake (exit 1)  # [win]
+            - if not exist %LIBRARY_PREFIX%\bin\libmamba.dll (exit 1)  # [win]
+            - if not exist %LIBRARY_PREFIX%\lib\libmamba.lib (exit 1)  # [win]
         # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MAJOR ${{ libmamba_version_split[0] }}"  # [unix]
         # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_MINOR ${{ libmamba_version_split[1] }}"  # [unix]
         # - cat $PREFIX/include/mamba/version.hpp | grep "LIBMAMBA_VERSION_PATCH ${{ libmamba_version_split[2] }}"  # [unix]
@@ -129,8 +129,9 @@ outputs:
         - ${{ "build_mamba.sh" if unix }}
         - ${{ "build_mamba.bat" if win }}
       string: py${{ python | version_to_buildstring }}h${{ hash }}_${{ build_number }}
-      entry_points:
-        - mamba = mamba.mamba:main
+      python:
+        entry_points:
+          - mamba = mamba.mamba:main
     requirements:
       build:
         - if: build_platform != target_platform

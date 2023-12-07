@@ -18,7 +18,6 @@ build:
   number: 0
   string: h12341234_0
   noarch: false
-  entry_points: []
 requirements:
   build: []
   host: []
