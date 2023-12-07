@@ -20,7 +20,7 @@ recipe:
     noarch: false
   requirements:
     build:
-      - __COMPILER c
+      - compiler: c
       - make
       - perl
       - pkg-config

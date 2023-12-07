@@ -1,9 +1,10 @@
 //! Parsing for the requirements section of the recipe.
 
 use indexmap::IndexSet;
-use std::{fmt, str::FromStr};
+use std::str::FromStr;
 
 use rattler_conda_types::{MatchSpec, PackageName};
+use serde::de::Error;
 use serde::{Deserialize, Serialize};
 
 use crate::recipe::custom_yaml::RenderedSequenceNode;
@@ -205,7 +206,8 @@ impl PinCompatible {
 /// For example, a c-compiler will resolve to the variant key `c_compiler`.
 /// If that value is `gcc`, the rendered compiler will read `gcc_linux-64` because
 /// it is always resolved with the target_platform.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct Compiler {
     /// The language such as c, cxx, rust, etc.
     language: String,
@@ -215,29 +217,6 @@ impl Compiler {
     /// Get the language value as a string.
     pub fn language(&self) -> &str {
         &self.language
-    }
-}
-
-impl Serialize for Compiler {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        format!("__COMPILER {}", self.language).serialize(serializer)
-    }
-}
-
-impl FromStr for Compiler {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if let Some(lang) = s.strip_prefix("__COMPILER ") {
-            Ok(Self {
-                language: lang.into(),
-            })
-        } else {
-            Err(format!("compiler without prefix: {}", s))
-        }
     }
 }
 
@@ -324,43 +303,28 @@ impl<'de> Deserialize<'de> for Dependency {
     where
         D: serde::Deserializer<'de>,
     {
-        struct DependencyVisitor;
-
-        impl<'de> serde::de::Visitor<'de> for DependencyVisitor {
-            type Value = Dependency;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(
-                    "a string starting with '__COMPILER', '__PIN_SUBPACKAGE', or a MatchSpec",
-                )
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Dependency, E>
-            where
-                E: serde::de::Error,
-            {
-                if let Some(compiler_language) = value.strip_prefix("__COMPILER ") {
-                    Ok(Dependency::Compiler(Compiler {
-                        language: compiler_language.to_lowercase(),
-                    }))
-                } else if let Some(pin) = value.strip_prefix("__PIN_SUBPACKAGE ") {
-                    Ok(Dependency::PinSubpackage(PinSubpackage {
-                        pin_subpackage: Pin::from_internal_repr(pin),
-                    }))
-                } else if let Some(pin) = value.strip_prefix("__PIN_COMPATIBLE ") {
-                    Ok(Dependency::PinCompatible(PinCompatible {
-                        pin_compatible: Pin::from_internal_repr(pin),
-                    }))
-                } else {
-                    // Assuming MatchSpec can be constructed from a string.
-                    MatchSpec::from_str(value)
-                        .map(Dependency::Spec)
-                        .map_err(serde::de::Error::custom)
-                }
-            }
+        #[derive(Deserialize)]
+        #[serde(rename_all = "snake_case")]
+        enum RawDependency {
+            PinSubpackage(PinSubpackage),
+            PinCompatible(PinCompatible),
+            Compiler(Compiler),
         }
 
-        deserializer.deserialize_str(DependencyVisitor)
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum RawSpec {
+            String(String),
+            Explicit(#[serde(with = "serde_yaml::with::singleton_map")] RawDependency),
+        }
+
+        let raw_spec = RawSpec::deserialize(deserializer)?;
+        Ok(match raw_spec {
+            RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
+            RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
+            RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
+            RawSpec::Explicit(RawDependency::Compiler(dep)) => Dependency::Compiler(dep),
+        })
     }
 }
 
@@ -369,20 +333,29 @@ impl Serialize for Dependency {
     where
         S: serde::ser::Serializer,
     {
-        match self {
-            Dependency::Spec(spec) => serializer.serialize_str(&spec.to_string()),
-            Dependency::PinSubpackage(pin) => serializer.serialize_str(&format!(
-                "__PIN_SUBPACKAGE {}",
-                pin.pin_subpackage.internal_repr()
-            )),
-            Dependency::PinCompatible(pin) => serializer.serialize_str(&format!(
-                "__PIN_COMPATIBLE {}",
-                pin.pin_compatible.internal_repr()
-            )),
-            Dependency::Compiler(compiler) => {
-                serializer.serialize_str(&format!("__COMPILER {}", compiler.language()))
-            }
+        #[derive(Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum RawDependency<'a> {
+            PinSubpackage(&'a PinSubpackage),
+            PinCompatible(&'a PinCompatible),
+            Compiler(&'a Compiler),
         }
+
+        #[derive(Serialize)]
+        #[serde(untagged)]
+        enum RawSpec<'a> {
+            String(String),
+            Explicit(#[serde(with = "serde_yaml::with::singleton_map")] RawDependency<'a>),
+        }
+
+        let raw = match self {
+            Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
+            Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
+            Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
+            Dependency::Compiler(dep) => RawSpec::Explicit(RawDependency::Compiler(dep)),
+        };
+
+        raw.serialize(serializer)
     }
 }
 
@@ -619,12 +592,7 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
 
 #[cfg(test)]
 mod test {
-    use requirements::{Dependency, Requirements};
-
-    use crate::recipe::parser::requirements;
-
-    /// test serialization and deserialization of Compiler
-    use super::Compiler;
+    use super::*;
 
     #[test]
     fn test_compiler_serde() {
@@ -633,7 +601,7 @@ mod test {
         };
 
         let serialized = serde_yaml::to_string(&compiler).unwrap();
-        assert_eq!(serialized, "__COMPILER gcc\n");
+        assert_eq!(serialized, "gcc\n");
 
         let requirements = Requirements {
             build: vec![Dependency::Compiler(compiler)],
@@ -643,7 +611,7 @@ mod test {
         insta::assert_yaml_snapshot!(requirements);
 
         let yaml = serde_yaml::to_string(&requirements).unwrap();
-        assert_eq!(yaml, "build:\n- __COMPILER gcc\n");
+        assert_eq!(yaml, "build:\n- compiler: gcc\n");
 
         let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
         insta::assert_yaml_snapshot!(deserialized);
