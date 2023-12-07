@@ -12,32 +12,50 @@ use crate::{
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Test {
     /// Try importing a python module as a sanity check
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     imports: Vec<String>,
     /// Run a list of given commands
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     commands: Vec<String>,
     /// Extra requirements to be installed at test time
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     requires: Vec<String>,
     /// Extra files to be copied to the test environment from the source dir (can be globs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     source_files: Vec<String>,
     /// Extra files to be copied to the test environment from the build dir (can be globs)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     files: Vec<String>,
     /// <!-- TODO: use a better name: --> All new test section
+    #[serde(skip_serializing_if = "Option::is_none")]
     package_contents: Option<PackageContent>,
+}
+
+impl Test {
+    /// Returns true if the test has its default configuration.
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 /// PackageContent
 pub struct PackageContent {
     /// file paths, direct and/or globs
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     files: Vec<String>,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     site_packages: Vec<String>,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     bins: Vec<String>,
     /// check for dynamic or static library file path
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     libs: Vec<String>,
     /// check if include path contains the file, direct or glob?
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     includes: Vec<String>,
 }
 

@@ -89,6 +89,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OutputPackage {
     name: PackageName,
+    #[serde(skip_serializing_if = "Option::is_none")]
     version: Option<String>,
 }
 

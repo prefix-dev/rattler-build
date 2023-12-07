@@ -102,13 +102,22 @@ pub struct GitSource {
     #[serde(default)]
     rev: String,
     /// Optionally a depth to clone the repository, defaults to `None`
+    #[serde(skip_serializing_if = "Option::is_none")]
     depth: Option<i32>,
     /// Optionally patches to apply to the source code
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
+    #[serde(skip_serializing_if = "Option::is_none")]
     folder: Option<PathBuf>,
     /// Optionally request the lfs pull in git source
+    #[serde(skip_serializing_if = "should_not_serialize_lfs")]
     lfs: bool,
+}
+
+/// A helper method to skip serializing the lfs flag if it is false.
+fn should_not_serialize_lfs(lfs: &bool) -> bool {
+    !lfs
 }
 
 impl GitSource {
@@ -283,10 +292,13 @@ pub struct UrlSource {
     md5: Option<Md5Hash>,
 
     /// Optionally a file name to rename the downloaded file (does not apply to archives)
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_name: Option<String>,
     /// Patches to apply to the source code
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
+    #[serde(skip_serializing_if = "Option::is_none")]
     folder: Option<PathBuf>,
 }
 
@@ -401,13 +413,22 @@ pub struct PathSource {
     /// Path to the local source code
     path: PathBuf,
     /// Patches to apply to the source code
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
+    #[serde(skip_serializing_if = "Option::is_none")]
     folder: Option<PathBuf>,
     /// Optionally a file name to rename the file to
+    #[serde(skip_serializing_if = "Option::is_none")]
     file_name: Option<PathBuf>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
+    #[serde(skip_serializing_if = "should_not_serialize_use_gitignore")]
     use_gitignore: bool,
+}
+
+/// Helper method to skip serializing the use_gitignore flag if it is true.
+fn should_not_serialize_use_gitignore(use_gitignore: &bool) -> bool {
+    *use_gitignore
 }
 
 impl PathSource {

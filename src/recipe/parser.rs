@@ -44,12 +44,14 @@ use super::custom_yaml::Node;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
     package: Package,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     source: Vec<Source>,
     build: Build,
     requirements: Requirements,
+    #[serde(default, skip_serializing_if = "Test::is_default")]
     test: Test,
+    #[serde(default, skip_serializing_if = "About::is_default")]
     about: About,
-    extra: (),
 }
 
 impl Recipe {
@@ -175,7 +177,6 @@ impl Recipe {
             requirements,
             test,
             about,
-            extra: (),
         };
 
         Ok(recipe)

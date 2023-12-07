@@ -5,15 +5,9 @@ recipe:
   source:
   - url: http://curl.haxx.se/download/curl-8.0.1.tar.bz2
     sha256: 9b6b1e96b748d04b968786b6bdf407aa5c75ab53a3d37c1c8c81cdb736555ccf
-    file_name: null
-    patches: []
-    folder: null
   build:
     number: 0
     string: h60d57d3_0
-    skip: false
-    script: []
-    noarch: false
   requirements:
     build:
     - __COMPILER c
@@ -21,30 +15,17 @@ recipe:
     - perl
     - pkg-config
     - libtool
-    host: []
-    run: []
-    run_constrained: []
-  test:
-    imports: []
-    commands: []
-    requires: []
-    source_files: []
-    files: []
   about:
     homepage: http://curl.haxx.se/
     repository: https://github.com/curl/curl
     documentation: https://curl.haxx.se/docs/
     license: curl
-    license_family: null
     license_files:
     - COPYING
-    license_url: null
     summary: tool and library for transferring data with URL syntax
     description: |-
       Curl is an open source command line tool and library for transferring data
       with URL syntax. It is used in command lines or scripts to transfer data.
-    prelink_message: null
-  extra: null
 build_configuration:
   target_platform: osx-arm64
   host_platform: osx-arm64
