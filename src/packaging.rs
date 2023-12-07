@@ -658,28 +658,42 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
 
 fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
     let mut test_files = Vec::new();
-    let test = output.recipe.test();
+    let test = output.recipe.tests();
+    let mut legacy = true;
     if !test.is_empty() {
-        let test_folder = tmp_dir_path.join("info/test/");
-        fs::create_dir_all(&test_folder)?;
+        let mut tests_folder = tmp_dir_path.join("info/test/");
+        if !tests_folder.exists() {
+            tests_folder = tmp_dir_path.join("info/tests/");
+            legacy = false;
+        }
+        fs::create_dir_all(&tests_folder)?;
 
-        if !test.imports().is_empty() {
-            let test_file = test_folder.join("run_test.py");
-            let mut file = File::create(&test_file)?;
-            for el in test.imports() {
-                writeln!(file, "import {}\n", el)?;
+        if !test.python_imports().is_empty() {
+            if legacy {
+                let test_file = tests_folder.join("run_test.py");
+                let mut file = File::create(&test_file)?;
+                for el in test.python_imports() {
+                    writeln!(file, "import {}\n", el)?;
+                }
+                test_files.push(test_file);
+            } else {
+                let test_file = tests_folder.join("test_import.py");
+                let mut file = File::create(&test_file)?;
+                for el in test.python_imports() {
+                    writeln!(file, "import {}\n", el)?;
+                }
+                test_files.push(test_file);
             }
-            test_files.push(test_file);
         }
 
         if !test.commands().is_empty() {
             let mut command_files = vec![];
             let target_platform = &output.build_configuration.target_platform;
             if target_platform.is_windows() || target_platform == &Platform::NoArch {
-                command_files.push(test_folder.join("run_test.bat"));
+                command_files.push(tests_folder.join("run_test.bat"));
             }
             if target_platform.is_unix() || target_platform == &Platform::NoArch {
-                command_files.push(test_folder.join("run_test.sh"));
+                command_files.push(tests_folder.join("run_test.sh"));
             }
 
             for cf in command_files {
@@ -691,16 +705,16 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
             }
         }
 
-        if !test.requires().is_empty() {
-            let test_dependencies = test.requires();
-            let test_file = test_folder.join("test_time_dependencies.json");
+        if !test.requirements().is_empty() {
+            let test_dependencies = test.requirements();
+            let test_file = tests_folder.join("test_time_dependencies.json");
             let mut file = File::create(&test_file)?;
             file.write_all(serde_json::to_string(test_dependencies)?.as_bytes())?;
             test_files.push(test_file);
         }
 
-        if !test.files().is_empty() {
-            let globs = test.files();
+        if !test.recipe_files().is_empty() {
+            let globs = test.recipe_files();
             let include_globs = globs
                 .iter()
                 .filter(|glob| !glob.trim_start().starts_with('~'))
@@ -715,7 +729,7 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
 
             let copy_dir = crate::source::copy_dir::CopyDir::new(
                 &output.build_configuration.directories.recipe_dir,
-                &test_folder,
+                &tests_folder,
             )
             .with_include_globs(include_globs)
             .with_exclude_globs(exclude_globs)
@@ -741,7 +755,7 @@ fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>
 
             let copy_dir = crate::source::copy_dir::CopyDir::new(
                 &output.build_configuration.directories.work_dir,
-                &test_folder,
+                &tests_folder,
             )
             .with_include_globs(include_globs)
             .with_exclude_globs(exclude_globs)

@@ -252,7 +252,7 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    if let Some(package_content) = output.recipe.test().package_content() {
+    if let Some(package_content) = output.recipe.tests().package_content() {
         test::run_package_content_tests(
             package_content,
             paths_json,

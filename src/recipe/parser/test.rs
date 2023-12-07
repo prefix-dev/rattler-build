@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -8,25 +10,97 @@ use crate::{
     },
 };
 
-/// Define tests in your recipe that are executed after successfully building the package.
+/// Format for requirements in form of build and run
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct Test {
-    /// Try importing a python module as a sanity check
-    imports: Vec<String>,
-    /// Run a list of given commands
-    commands: Vec<String>,
-    /// Extra requirements to be installed at test time
-    requires: Vec<String>,
-    /// Extra files to be copied to the test environment from the source dir (can be globs)
-    source_files: Vec<String>,
-    /// Extra files to be copied to the test environment from the build dir (can be globs)
-    files: Vec<String>,
-    /// <!-- TODO: use a better name: --> All new test section
-    package_contents: Option<PackageContent>,
+pub struct Requirement {
+    /// Build time requirement for tests
+    build: Vec<String>,
+    /// Runtime requirement for tests
+    run: Vec<String>,
+}
+impl Requirement {
+    pub const fn empty() -> Self {
+        Requirement {
+            build: Vec::new(),
+            run: Vec::new(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.build.is_empty() && self.run.is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-/// PackageContent
+pub struct Files {
+    source: Vec<String>,
+    recipe: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Python {
+    imports: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AsScript {
+    String(String),
+    Strings(Vec<String>),
+    Script(Script),
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Script {
+    interpreter: String,
+    env: BTreeMap<String, String>,
+    secrets: Vec<String>,
+    file: Option<String>,
+    content: Content,
+}
+impl Default for Script {
+    fn default() -> Self {
+        Self {
+            interpreter: if cfg!(not(target_os = "windows")) {
+                "sh".to_string()
+            } else {
+                "cmd.exe".to_string()
+            },
+            env: Default::default(),
+            secrets: Default::default(),
+            file: Some("default_test".to_string()),
+            content: Content::Src(String::new()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Content {
+    Src(String),
+    Page(Vec<String>),
+}
+
+/// Define tests in your recipe that are executed after successfully building the package.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Test {
+    script: Option<AsScript>,
+    /// Try importing a python module as a sanity check
+    python: Option<Python>,
+    /// Run a list of given commands
+    commands: Vec<String>,
+    /// Extra requirements to be installed at test time
+    requirements: Option<Requirement>,
+    /// Extra files to be copied to the test environment from the build dir (can be globs)
+    files: Option<Files>,
+    /// Match against items in built package.
+    package_contents: Option<PackageContent>,
+    /// Packages to be tested against this package
+    downstreams: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+/// PackageContent provides skeleton for testing for file and artifact match against
+/// files and artifacts inside built the package
 pub struct PackageContent {
     /// file paths, direct and/or globs
     files: Vec<String>,
@@ -119,8 +193,12 @@ impl Test {
     }
 
     /// Get the imports.
-    pub fn imports(&self) -> &[String] {
-        self.imports.as_slice()
+    pub fn python_imports(&self) -> &[String] {
+        static EMPTY: &[String] = &[];
+        match &self.python {
+            Some(py) => py.imports.as_slice(),
+            None => &EMPTY,
+        }
     }
 
     /// Get the commands.
@@ -129,18 +207,30 @@ impl Test {
     }
 
     /// Get the requires.
-    pub fn requires(&self) -> &[String] {
-        self.requires.as_slice()
+    pub fn requirements<'a>(&'a self) -> &'a Requirement {
+        static EMPTY: Requirement = Requirement::empty();
+        match &self.requirements {
+            Some(reqs) => reqs,
+            None => &EMPTY,
+        }
     }
 
     /// Get the source files.
     pub fn source_files(&self) -> &[String] {
-        self.source_files.as_slice()
+        static EMPTY: &[String] = &[];
+        match &self.files {
+            Some(files) => files.source.as_slice(),
+            None => &EMPTY,
+        }
     }
 
     /// Get the files.
-    pub fn files(&self) -> &[String] {
-        self.files.as_slice()
+    pub fn recipe_files(&self) -> &[String] {
+        static EMPTY: &[String] = &[];
+        match &self.files {
+            Some(f) => f.recipe.as_slice(),
+            None => &EMPTY,
+        }
     }
 
     /// Check if there is not test commands to be run
@@ -162,6 +252,127 @@ impl TryConvertNode<Test> for RenderedNode {
     }
 }
 
+impl TryConvertNode<Requirement> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<Requirement, PartialParsingError> {
+        let mut req = Requirement::default();
+        for (k, v) in self.iter() {
+            let ks = k.as_str();
+            match ks {
+                "build" => req.build = v.try_convert(ks)?,
+                "run" => req.run = v.try_convert(ks)?,
+                invalid => Err(_partialerror!(
+                    *k.span(),
+                    ErrorKind::InvalidField(invalid.to_string().into()),
+                    help = format!("expected fields for {name} is `build` and `run`")
+                ))?,
+            }
+        }
+        Ok(req)
+    }
+}
+impl TryConvertNode<Files> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<Files, PartialParsingError> {
+        let mut files = Files::default();
+        for (k, v) in self.iter() {
+            let ks = k.as_str();
+            match ks {
+                "source" => files.source = v.try_convert(ks)?,
+                "recipe" => files.recipe = v.try_convert(ks)?,
+                invalid => Err(_partialerror!(
+                    *k.span(),
+                    ErrorKind::InvalidField(invalid.to_string().into()),
+                    help = format!("expected fields for {name} is `source` and `recipe`")
+                ))?,
+            }
+        }
+        Ok(files)
+    }
+}
+impl TryConvertNode<Python> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<Python, PartialParsingError> {
+        let mut python = Python::default();
+        for (k, v) in self.iter() {
+            let ks = k.as_str();
+            match ks {
+                "imports" => python.imports = v.try_convert(ks)?,
+                invalid => Err(_partialerror!(
+                    *k.span(),
+                    ErrorKind::InvalidField(invalid.to_string().into()),
+                    help = format!("expected fields for {name} is `imports`")
+                ))?,
+            }
+        }
+        Ok(python)
+    }
+}
+
+impl TryConvertNode<Requirement> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Requirement, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `build` and `run` field(s)"
+            ))?,
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Sequence(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `build` and `run` field(s)"
+            ))?,
+            RenderedNode::Null(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `build` and `run` field(s)"
+            ))?,
+        }
+    }
+}
+impl TryConvertNode<Files> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Files, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `source` and `recipe` field(s)"
+            ))?,
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Sequence(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `source` and `recipe` field(s)"
+            ))?,
+            RenderedNode::Null(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `source` and `recipe` field(s)"
+            ))?,
+        }
+    }
+}
+impl TryConvertNode<Python> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Python, PartialParsingError> {
+        match self {
+            RenderedNode::Scalar(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `imports` field(s)"
+            ))?,
+            RenderedNode::Mapping(map) => map.try_convert(name),
+            RenderedNode::Sequence(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `imports` field(s)"
+            ))?,
+            RenderedNode::Null(_) => Err(_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+                label = "python accepts only `imports` field(s)"
+            ))?,
+        }
+    }
+}
+
 impl TryConvertNode<Test> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<Test, PartialParsingError> {
         let mut test = Test::default();
@@ -170,19 +381,18 @@ impl TryConvertNode<Test> for RenderedMappingNode {
             let key_str = key.as_str();
             match key_str {
                 "package_contents" => test.package_contents = value.try_convert(key_str)?,
-                "imports" => test.imports = value.try_convert(key_str)?,
+                "python" => test.python = value.try_convert(key_str)?,
                 "commands" => test.commands = value.try_convert(key_str)?,
-                "requires" => test.requires = value.try_convert(key_str)?,
-                "source_files" => test.source_files = value.try_convert(key_str)?,
+                "requirements" => test.requirements = value.try_convert(key_str)?,
                 "files" => test.files = value.try_convert(key_str)?,
+                "downstream" => test.downstreams = value.try_convert(key_str)?,
                 invalid => Err(_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `imports`, `commands`, `requires`, `source_files`, `files`")
+                    help = format!("expected fields for {name} is one of `imports`, `commands`, `requires`, `downstream`, `source_files`, `files`, `package_contents`")
                 ))?
             }
         }
-
         Ok(test)
     }
 }

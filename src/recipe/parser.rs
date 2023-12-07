@@ -43,7 +43,7 @@ pub struct Recipe {
     source: Vec<Source>,
     build: Build,
     requirements: Requirements,
-    test: Test,
+    tests: Test,
     about: About,
     extra: (),
 }
@@ -120,7 +120,7 @@ impl Recipe {
         let mut build = Build::default();
         let mut source = Vec::new();
         let mut requirements = Requirements::default();
-        let mut test = Test::default();
+        let mut tests = Test::default();
         let mut about = About::default();
 
         for (key, value) in rendered_node.iter() {
@@ -138,7 +138,7 @@ impl Recipe {
                 "source" => source = value.try_convert(key_str)?,
                 "build" => build = value.try_convert(key_str)?,
                 "requirements" => requirements = value.try_convert(key_str)?,
-                "test" => test = value.try_convert(key_str)?,
+                "tests" => tests = value.try_convert(key_str)?,
                 "about" => about = value.try_convert(key_str)?,
                 "context" => {}
                 "extra" => {}
@@ -169,7 +169,7 @@ impl Recipe {
             build,
             source,
             requirements,
-            test,
+            tests,
             about,
             extra: (),
         };
@@ -198,8 +198,8 @@ impl Recipe {
     }
 
     /// Get the test information.
-    pub const fn test(&self) -> &Test {
-        &self.test
+    pub const fn tests(&self) -> &Test {
+        &self.tests
     }
 
     /// Get the about information.
