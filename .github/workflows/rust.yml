@@ -1,0 +1,186 @@
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*.*.*'
+  pull_request:
+  workflow_dispatch:
+
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_LOG: info
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.73.0
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --all-features --verbose -- --nocapture
+      - name: Format
+        run: cargo fmt --all -- --check
+      - uses: giraffate/clippy-action@v1
+        with:
+          reporter: 'github-pr-check'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-22.04
+          # - target: aarch64-unknown-linux-musl
+          #   os: ubuntu-22.04
+          #   use-cross: true
+          # - target: powerpc64le-unknown-linux-musl
+          #   os: ubuntu-22.04
+          #   use-cross: true
+          - target: x86_64-apple-darwin
+            os: macos-13
+          - target: aarch64-apple-darwin
+            os: macos-13
+          - target: x86_64-pc-windows-gnu
+            os: windows-2022
+          - target: x86_64-pc-windows-msvc
+            os: windows-2022
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        shell: bash
+        id: metadata
+        run: |
+          echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.73.0
+          targets: ${{ matrix.target }}
+      
+      - name: Install musl-gcc
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt install musl-tools
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cross
+        if: matrix.use-cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Add macOS cross build capability
+        if: matrix.target == 'aarch64-apple-darwin'
+        run: |
+          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
+          rustup default stable-aarch64-apple-darwin
+
+      - name: Show version information (Rust, cargo, GCC)
+        run: |
+          gcc --version || true
+          rustup -V
+          rustup toolchain list
+          rustup default
+          cargo -V
+          rustc -V
+
+      - name: Set build options
+        id: options
+        shell: bash
+        run: |
+          unset CARGO_BUILD_OPTIONS
+          case ${{ matrix.target }} in
+            *-musl) CARGO_BUILD_OPTIONS="--no-default-features --features rustls-tls"  ;;
+            *) CARGO_BUILD_OPTIONS=""  ;;
+          esac
+          echo "cargo-build-options=${CARGO_BUILD_OPTIONS}" >> "$GITHUB_OUTPUT"
+
+          # test only library unit tests and binary for arm-type targets
+          unset CARGO_TEST_OPTIONS
+          case ${{ matrix.target }} in
+            arm-* | aarch64-*) CARGO_TEST_OPTIONS="--lib --bin rattler-build" ;;
+          esac
+          echo "cargo-test-options=${CARGO_TEST_OPTIONS}" >> $GITHUB_OUTPUT
+
+      - name: Build
+        run: >-
+          ${{ matrix.use-cross && 'cross' || 'cargo' }}
+          build
+          --locked
+          --release
+          --target=${{ matrix.target }}
+          ${{ steps.options.outputs.cargo-build-options }}
+
+      - name: Run tests
+        shell: bash
+        if: matrix.target != 'aarch64-apple-darwin'
+        run: ${{ matrix.use-cross && 'cross' || 'cargo' }} test --locked --target=${{ matrix.target }} ${{ steps.options.outputs.cargo-build-options }} ${{ steps.options.outputs.cargo-test-options }}
+
+      - name: Create tarball
+        id: package
+        shell: bash
+        run: |
+          PKG_BASENAME=rattler-build-v${{ steps.metadata.outputs.project-version }}-${{ matrix.target }}
+          PKG_NAME=${PKG_BASENAME}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}
+
+          ARCHIVE_DIR="pkg/${PKG_BASENAME}"
+          mkdir -p "${ARCHIVE_DIR}"
+
+          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "$ARCHIVE_DIR"
+          cp README.md LICENSE "$ARCHIVE_DIR"
+
+          pushd pkg >/dev/null
+          case ${{ matrix.target }} in
+            *-pc-windows-*) 7z -y a "${PKG_NAME}" "${PKG_BASENAME}"/* | tail -2 ;;
+            *) tar czf "${PKG_NAME}" "${PKG_BASENAME}"/* ;;
+          esac;
+          popd >/dev/null
+
+          echo "pkg-name=${PKG_NAME}" >> $GITHUB_OUTPUT
+          echo pkg-path="${ARCHIVE_DIR}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ steps.package.outputs.pkg-name }}
+          path: ${{ steps.package.outputs.pkg-path }}
+
+      - name: Publish archives and packages
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          draft: true
+          files: |
+            ${{ steps.package.outputs.pkg-path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
