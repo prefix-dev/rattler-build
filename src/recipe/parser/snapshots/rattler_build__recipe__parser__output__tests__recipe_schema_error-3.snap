@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser/output.rs
-expression: parsed_recipe.unwrap_err()
+assertion_line: 237
+expression: err
 ---
-  × Parsing: missing field `version`
+  × Failed to parse recipe
+
+Error:   × Parsing: missing field `version`
    ╭─[5:1]
  5 │       - package:
  6 │ ╭─▶       name: bla

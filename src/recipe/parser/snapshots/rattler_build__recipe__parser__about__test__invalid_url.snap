@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser/about.rs
+assertion_line: 220
 expression: err
 ---
-  × Parsing: failed to parse URL: relative URL without a base
+  × Failed to parse recipe
+
+Error:   × Parsing: failed to parse URL: relative URL without a base
    ╭─[6:1]
  6 │         about:
  7 │             homepage: license_urla.asda:://sdskd

@@ -775,6 +775,8 @@ impl VariantKey {
 #[derive(Error, Debug, Diagnostic)]
 #[error("Failed to parse recipe")]
 /// Collection of parse errors to build related diagnostics
+/// TODO: also provide `Vec<PartialParsingError>` with source `&str`
+/// to avoid excessive traversal
 pub struct ParseErrors {
     #[related]
     errs: Vec<ParsingError>,

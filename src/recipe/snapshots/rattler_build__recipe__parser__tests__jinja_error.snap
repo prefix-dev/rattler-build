@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser.rs
+assertion_line: 295
 expression: err
 ---
-  × Parsing: failed to render Jinja expression: unknown function
+  × Failed to parse recipe
+
+Error:   × Parsing: failed to render Jinja expression: unknown function
    ╭─[6:1]
  6 │   host:
  7 │     - ${{ zcompiler('c') }}

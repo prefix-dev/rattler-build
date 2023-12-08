@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser/package.rs
+assertion_line: 196
 expression: err
 ---
-  × Parsing: invalid field `invalid`.
+  × Failed to parse recipe
+
+Error:   × Parsing: invalid field `invalid`.
    ╭─[4:1]
  4 │             version: 0.1.0
  5 │             invalid: "field"
