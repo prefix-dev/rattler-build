@@ -190,11 +190,9 @@ pub async fn fetch_sources(
 
 /// Extracts a tar archive to the specified target directory
 fn extract(archive: &Path, target_directory: &Path) -> Result<std::process::Output, SourceError> {
-    if cfg!(target_os = "windows") {
-    }
     let tar_exe = which::which("tar").map_err(|_| SourceError::TarNotFound)?;
 
-    let output = Command::new(tar_exe)
+    let output = Command::new(&tar_exe)
         .arg("-xf")
         .arg(archive.as_os_str())
         .arg("--preserve-permissions")
@@ -205,7 +203,8 @@ fn extract(archive: &Path, target_directory: &Path) -> Result<std::process::Outp
 
     if !output.status.success() {
         return Err(SourceError::ExtractionError(format!(
-            "Failed to extract archive: {}.\nStdout: {}\nStderr: {}",
+            "Failed to extract archive with {:?}: {}.\nStdout: {}\nStderr: {}",
+            tar_exe,
             archive.display(),
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
