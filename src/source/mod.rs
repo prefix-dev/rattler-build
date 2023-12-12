@@ -190,6 +190,8 @@ pub async fn fetch_sources(
 
 /// Extracts a tar archive to the specified target directory
 fn extract(archive: &Path, target_directory: &Path) -> Result<std::process::Output, SourceError> {
+    if cfg!(target_os = "windows") {
+    }
     let tar_exe = which::which("tar").map_err(|_| SourceError::TarNotFound)?;
 
     let output = Command::new(tar_exe)

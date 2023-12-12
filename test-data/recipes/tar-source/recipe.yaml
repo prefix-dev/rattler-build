@@ -1,0 +1,11 @@
+context:
+  name: polarify
+  version: 0.1.3
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/quantco/polarify/archive/refs/tags/v${{ version }}.tar.gz
+    sha256: 93441164c23b764d72c8a66d14b11d5bbd353ed6112ccf3b35efda2a98f9df02
