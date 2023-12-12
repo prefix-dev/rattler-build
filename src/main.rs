@@ -80,6 +80,15 @@ struct CommonOpts {
     /// Enable support for repodata.json.bz2
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
+
+    /// Force usage of the fallback key storage and disable usage of the system keyring
+    #[clap(
+        long,
+        env = "RATTLER_FORCE_FALLBACK_AUTH",
+        default_value = "false",
+        hide = true
+    )]
+    force_fallback_auth: bool,
 }
 
 #[derive(Parser)]
@@ -139,6 +148,9 @@ struct TestOpts {
     /// The package file to test
     #[arg(short, long)]
     package_file: PathBuf,
+
+    #[clap(flatten)]
+    common: CommonOpts,
 }
 
 #[derive(Parser)]
@@ -190,7 +202,26 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
     };
 
-    test::run_test(&package_file, &test_options)
+    let mut auth_store = rattler_networking::AuthenticationStorage::default();
+
+    auth_store.set_force_fallback_storage(args.common.force_fallback_auth);
+
+    let client = AuthenticatedClient::from_client(
+        reqwest::Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+        auth_store,
+    );
+
+    let global_configuration = tool_configuration::Configuration {
+        client,
+        multi_progress_indicator: MultiProgress::new(),
+        no_clean: test_options.keep_test_prefix,
+        ..Default::default()
+    };
+
+    test::run_test(&package_file, &test_options, &global_configuration)
         .await
         .into_diagnostic()?;
 
@@ -293,8 +324,20 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         tracing::info!("{}\n", table);
     }
 
+    let mut auth_store = rattler_networking::AuthenticationStorage::default();
+
+    auth_store.set_force_fallback_storage(args.common.force_fallback_auth);
+
+    let client = AuthenticatedClient::from_client(
+        reqwest::Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+        auth_store,
+    );
+
     let tool_config = tool_configuration::Configuration {
-        client: AuthenticatedClient::default(),
+        client,
         multi_progress_indicator: multi_progress,
         no_clean: args.keep_build,
         no_test: args.no_test,

@@ -2475,7 +2475,6 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2577,7 +2576,6 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "chrono",
  "fxhash",
@@ -2606,7 +2604,6 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "blake2",
  "digest",
@@ -2621,7 +2618,6 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "quote",
  "syn 2.0.39",
@@ -2630,7 +2626,6 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2653,7 +2648,6 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "bzip2",
  "chrono",
@@ -2676,7 +2670,6 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2714,7 +2707,6 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.1.0",
@@ -2731,7 +2723,6 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2750,7 +2741,6 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.14.0"
-source = "git+https://github.com/mamba-org/rattler?branch=main#bd5cb2c6eb9344f1d3fbe4fe75d547add92629d4"
 dependencies = [
  "cfg-if",
  "libloading",

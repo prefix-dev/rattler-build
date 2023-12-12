@@ -15,19 +15,17 @@ use std::{
 };
 
 use dunce::canonicalize;
-use indicatif::MultiProgress;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{ArchiveIdentifier, ArchiveType, PathsJson},
     MatchSpec, Platform,
 };
-use rattler_networking::AuthenticatedClient;
 use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
     shell::{Shell, ShellEnum, ShellScript},
 };
 
-use crate::{env_vars, index, render::solver::create_environment, tool_configuration};
+use crate::{env_vars, index, render::solver::create_environment, tool_configuration::Configuration};
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -290,7 +288,7 @@ pub struct TestConfiguration {
 ///
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
+pub async fn run_test(package_file: &Path, config: &TestConfiguration, global_configuration: &Configuration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
     let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
@@ -354,13 +352,6 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     let prefix = canonicalize(&config.test_prefix)?;
 
-    let global_configuration = tool_configuration::Configuration {
-        client: AuthenticatedClient::default(),
-        multi_progress_indicator: MultiProgress::new(),
-        no_clean: config.keep_test_prefix,
-        ..Default::default()
-    };
-
     tracing::info!("Creating test environment in {:?}", prefix);
 
     let platform = if target_platform != Platform::NoArch {
@@ -374,7 +365,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         &platform,
         &prefix,
         &config.channels,
-        &global_configuration,
+        global_configuration,
     )
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
