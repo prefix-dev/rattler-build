@@ -2,6 +2,7 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
+use itertools::Itertools;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -56,10 +57,14 @@ pub struct Recipe {
 
 impl Recipe {
     /// Build a recipe from a YAML string.
-    pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, ParsingError> {
-        let yaml_root = Node::parse_yaml(0, yaml)?;
+    pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, Vec<ParsingError>> {
+        let yaml_root = Node::parse_yaml(0, yaml).map_err(|err| vec![err])?;
 
-        Self::from_node(&yaml_root, jinja_opt).map_err(|err| ParsingError::from_partial(yaml, err))
+        Self::from_node(&yaml_root, jinja_opt).map_err(|errs| {
+            errs.into_iter()
+                .map(|err| ParsingError::from_partial(yaml, err))
+                .collect()
+        })
     }
 
     /// Build a recipe from a YAML string and use a given package hash string as default value.
@@ -67,7 +72,7 @@ impl Recipe {
         yaml: &str,
         default_pkg_hash: &str,
         jinja_opt: SelectorConfig,
-    ) -> Result<Self, ParsingError> {
+    ) -> Result<Self, Vec<ParsingError>> {
         let mut recipe = Self::from_yaml(yaml, jinja_opt)?;
 
         // Set the build string to the package hash if it is not set
@@ -82,45 +87,56 @@ impl Recipe {
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
-    ) -> Result<Self, PartialParsingError> {
+    ) -> Result<Self, Vec<PartialParsingError>> {
         let hash = jinja_opt.hash.clone();
         let mut jinja = Jinja::new(jinja_opt);
 
-        let root_node = root_node
-            .as_mapping()
-            .ok_or_else(|| _partialerror!(*root_node.span(), ErrorKind::ExpectedMapping,))?;
+        let root_node = root_node.as_mapping().ok_or_else(|| {
+            vec![_partialerror!(
+                *root_node.span(),
+                ErrorKind::ExpectedMapping,
+            )]
+        })?;
 
         // add context values
         if let Some(context) = root_node.get("context") {
             let context = context.as_mapping().ok_or_else(|| {
-                _partialerror!(
+                vec![_partialerror!(
                     *context.span(),
                     ErrorKind::ExpectedMapping,
                     help = "`context` must always be a mapping"
-                )
+                )]
             })?;
 
-            for (k, v) in context.iter() {
-                let val = v.as_scalar().ok_or_else(|| {
-                    _partialerror!(
-                        *v.span(),
-                        ErrorKind::ExpectedScalar,
-                        help = "`context` values must always be scalars"
-                    )
-                })?;
-                let rendered: Option<ScalarNode> =
-                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
+            let (_, err): (Vec<()>, Vec<PartialParsingError>) = context
+                .iter()
+                .map(|(k, v)| -> Result<(), PartialParsingError> {
+                    let val = v.as_scalar().ok_or_else(|| {
+                        _partialerror!(
+                            *v.span(),
+                            ErrorKind::ExpectedScalar,
+                            help = "`context` values must always be scalars"
+                        )
+                    })?;
+                    let rendered: Option<ScalarNode> =
+                        val.render(&jinja, &format!("context.{}", k.as_str()))?;
 
-                if let Some(rendered) = rendered {
-                    jinja.context_mut().insert(
-                        k.as_str().to_owned(),
-                        Value::from_safe_string(rendered.as_str().to_string()),
-                    );
-                }
+                    if let Some(rendered) = rendered {
+                        jinja.context_mut().insert(
+                            k.as_str().to_owned(),
+                            Value::from_safe_string(rendered.as_str().to_string()),
+                        );
+                    }
+                    Ok(())
+                })
+                .partition_result();
+            if !err.is_empty() {
+                return Err(err);
             }
         }
 
-        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
+        let rendered_node: RenderedMappingNode =
+            root_node.render(&jinja, "ROOT").map_err(|err| vec![err])?;
 
         let mut package = None;
         let mut build = Build::default();
@@ -129,32 +145,40 @@ impl Recipe {
         let mut test = Test::default();
         let mut about = About::default();
 
-        for (key, value) in rendered_node.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "package" => package = Some(value.try_convert(key_str)?),
-                "recipe" => {
-                    return Err(_partialerror!(
+        let (_, errs): (Vec<()>, Vec<PartialParsingError>) = rendered_node
+            .iter()
+            .map(|(key, value)| {
+                let key_str = key.as_str();
+                match key_str {
+                    "package" => package = Some(value.try_convert(key_str)?),
+                    "recipe" => {
+                        return Err(_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField("recipe".to_string().into()),
                         help =
                             "The recipe field is only allowed in conjunction with multiple outputs"
-                    ));
+                    ))
+                    }
+                    "source" => source = value.try_convert(key_str)?,
+                    "build" => build = value.try_convert(key_str)?,
+                    "requirements" => requirements = value.try_convert(key_str)?,
+                    "test" => test = value.try_convert(key_str)?,
+                    "about" => about = value.try_convert(key_str)?,
+                    "context" => {}
+                    "extra" => {}
+                    invalid_key => {
+                        return Err(_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid_key.to_string().into()),
+                        ))
+                    }
                 }
-                "source" => source = value.try_convert(key_str)?,
-                "build" => build = value.try_convert(key_str)?,
-                "requirements" => requirements = value.try_convert(key_str)?,
-                "test" => test = value.try_convert(key_str)?,
-                "about" => about = value.try_convert(key_str)?,
-                "context" => {}
-                "extra" => {}
-                invalid_key => {
-                    return Err(_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid_key.to_string().into()),
-                    ));
-                }
-            }
+                Ok(())
+            })
+            .partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs);
         }
 
         // Add hash to build.string if it is not set
@@ -166,11 +190,11 @@ impl Recipe {
 
         let recipe = Recipe {
             package: package.ok_or_else(|| {
-                _partialerror!(
+                vec![_partialerror!(
                     *root_node.span(),
                     ErrorKind::Other,
                     label = "missing required key `package`"
-                )
+                )]
             })?,
             build,
             source,
@@ -217,7 +241,7 @@ impl Recipe {
 mod tests {
     use insta::assert_yaml_snapshot;
 
-    use crate::assert_miette_snapshot;
+    use crate::{assert_miette_snapshot, variant_config::ParseErrors};
 
     use super::*;
 
@@ -243,7 +267,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err = recipe.unwrap_err();
+        let err: ParseErrors = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -259,7 +283,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err = recipe.unwrap_err();
+        let err: ParseErrors = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -267,7 +291,7 @@ mod tests {
     fn jinja_error() {
         let recipe = include_str!("../../test-data/recipes/test-parsing/recipe_jinja_error.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
-        let err = recipe.unwrap_err();
+        let err: ParseErrors = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 

@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser.rs
+assertion_line: 271
 expression: err
 ---
-  × Parsing: expected a mapping.
+  × Failed to parse recipe
+
+Error:   × Parsing: expected a mapping.
    ╭─[1:1]
  1 │ 
  2 │         context: "not-mapping"

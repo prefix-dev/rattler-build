@@ -444,7 +444,7 @@ pub(crate) fn jinja_error_to_label(err: &minijinja::Error) -> String {
 #[cfg(test)]
 mod tests {
 
-    use crate::{assert_miette_snapshot, recipe::Recipe};
+    use crate::{assert_miette_snapshot, recipe::Recipe, variant_config::ParseErrors};
 
     #[test]
     fn miette_output() {
@@ -459,6 +459,7 @@ mod tests {
         let res = Recipe::from_yaml(fault_yaml, Default::default());
 
         if let Err(err) = res {
+            let err: ParseErrors = err.into();
             assert_miette_snapshot!(err);
         }
     }

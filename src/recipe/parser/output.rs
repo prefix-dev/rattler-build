@@ -227,9 +227,14 @@ mod tests {
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_missing_version.yaml");
         let src = std::fs::read_to_string(yaml_file).unwrap();
         let nodes = find_outputs_from_src(&src).unwrap();
-        let parsed_recipe = Recipe::from_node(&nodes[0], SelectorConfig::default())
-            .map_err(|err| ParsingError::from_partial(&src, err));
-        assert_miette_snapshot!(parsed_recipe.unwrap_err());
+        let parsed_recipe =
+            Recipe::from_node(&nodes[0], SelectorConfig::default()).map_err(|err| {
+                err.into_iter()
+                    .map(|err| ParsingError::from_partial(&src, err))
+                    .collect::<Vec<_>>()
+            });
+        let err: crate::variant_config::ParseErrors = parsed_recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_extra_keys.yaml");
         let src = std::fs::read_to_string(yaml_file).unwrap();

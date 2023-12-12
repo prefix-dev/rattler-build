@@ -30,7 +30,7 @@ use rattler_build::{
     selectors::SelectorConfig,
     test::{self, TestConfiguration},
     tool_configuration,
-    variant_config::VariantConfig,
+    variant_config::{ParseErrors, VariantConfig},
 };
 
 mod console_utils;
@@ -314,8 +314,15 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             build_platform: selector_config.build_platform,
         };
 
-        let recipe = Recipe::from_node(&discovered_output.node, selector_config)
-            .map_err(|err| ParsingError::from_partial(&recipe_text, err))?;
+        let recipe =
+            Recipe::from_node(&discovered_output.node, selector_config).map_err(|err| {
+                let errs: ParseErrors = err
+                    .into_iter()
+                    .map(|err| ParsingError::from_partial(&recipe_text, err))
+                    .collect::<Vec<ParsingError>>()
+                    .into();
+                errs
+            })?;
 
         if args.render_only {
             tracing::info!(

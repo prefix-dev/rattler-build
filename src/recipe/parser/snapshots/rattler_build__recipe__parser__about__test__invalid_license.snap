@@ -1,8 +1,11 @@
 ---
 source: src/recipe/parser/about.rs
+assertion_line: 238
 expression: err
 ---
-  × Parsing: failed to parse SPDX license: invalid character(s)
+  × Failed to parse recipe
+
+Error:   × Parsing: failed to parse SPDX license: invalid character(s)
    ╭─[6:1]
  6 │         about:
  7 │             license: MIT/X derivate
