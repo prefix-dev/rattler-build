@@ -447,4 +447,13 @@ mod tests {
         assert!(rattler_build.is_ok());
         assert!(rattler_build.unwrap().status.success());
     }
+
+    #[test]
+    fn test_tar_source() {
+        let tmp = tmp("test_tar_source");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("tar-source"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+    }
 }

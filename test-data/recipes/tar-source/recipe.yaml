@@ -1,0 +1,21 @@
+context:
+  name: polarify
+  version: 0.1.3
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/quantco/polarify/archive/refs/tags/v${{ version }}.tar.gz
+    sha256: 93441164c23b764d72c8a66d14b11d5bbd353ed6112ccf3b35efda2a98f9df02
+  - url: https://repo1.maven.org/maven2/net/java/dev/jna/jna/5.8.0/jna-5.8.0.jar
+    sha256: 930273cc1c492f25661ea62413a6da3fd7f6e01bf1c4dcc0817fc8696a7b07ac
+
+build:
+  script:
+    - if: unix
+      then:
+        - test -f jna-5.8.0.jar
+      else:
+        - if not exist jna-5.8.0.jar exit 1
