@@ -22,6 +22,9 @@ pub enum SourceError {
     #[error("Failed to download source from url: {0}")]
     Url(#[from] reqwest::Error),
 
+    #[error("Url does not point to a file: {0}")]
+    UrlNotFile(url::Url),
+
     #[error("WalkDir Error: {0}")]
     WalkDir(#[from] walkdir::Error),
 
@@ -100,6 +103,13 @@ pub async fn fetch_sources(
             }
             Source::Url(src) => {
                 tracing::info!("Fetching source from URL: {}", src.url());
+
+                let file_name_from_url = src
+                    .url()
+                    .path_segments()
+                    .and_then(|segments| segments.last().map(|last| last.to_string()))
+                    .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
+
                 let res = url_source::url_src(src, &cache_src).await?;
                 let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
@@ -126,12 +136,7 @@ pub async fn fetch_sources(
                     if let Some(file_name) = src.file_name() {
                         dest_dir = dest_dir.join(file_name);
                     } else {
-                        dest_dir = dest_dir.join(res.file_name().ok_or_else(|| {
-                            SourceError::UnknownError(format!(
-                                "Failed to get filename for `{}`",
-                                res.display()
-                            ))
-                        })?);
+                        dest_dir = dest_dir.join(file_name_from_url);
                     }
                     fs::copy(&res, &dest_dir)?;
                     tracing::info!("Downloaded to {:?}", dest_dir);
