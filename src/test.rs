@@ -363,9 +363,15 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     tracing::info!("Creating test environment in {:?}", prefix);
 
+    let platform = if target_platform != Platform::NoArch {
+        target_platform
+    } else {
+        Platform::current()
+    };
+
     create_environment(
         &dependencies,
-        &target_platform,
+        &platform,
         &prefix,
         &config.channels,
         &global_configuration,
