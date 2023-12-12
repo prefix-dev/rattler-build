@@ -77,9 +77,15 @@ pub async fn create_environment(
     // Find the default cache directory. Create it if it doesn't exist yet.
     let cache_dir = rattler::default_cache_dir()?;
 
-    tracing::info!("\nResolving for environment specs for {}:", target_platform);
+    tracing::info!("\nResolving environment for:\n");
+    tracing::info!("  Platform: {}", target_platform);
+    tracing::info!("  Channels: ");
+    for channel in channels {
+        tracing::info!("   - {}", channel);
+    }
+    tracing::info!("  Specs:");
     for spec in specs {
-        tracing::info!(" - {}", spec);
+        tracing::info!("   - {}", spec);
     }
     tracing::info!("\n");
 
@@ -97,11 +103,14 @@ pub async fn create_environment(
     // to use when specifying their channels. If the user didn't specify the default subdirectories
     // we use defaults based on the current platform.
     let platforms = vec![Platform::NoArch, *target_platform];
-    let channel_urls = channels.iter().flat_map(|channel| {
-        platforms
-            .iter()
-            .map(move |platform| (channel.clone(), *platform))
-    }).collect::<Vec<_>>();
+    let channel_urls = channels
+        .iter()
+        .flat_map(|channel| {
+            platforms
+                .iter()
+                .map(move |platform| (channel.clone(), *platform))
+        })
+        .collect::<Vec<_>>();
 
     // Determine the packages that are currently installed in the environment.
     let installed_packages = find_installed_packages(target_prefix, 100)

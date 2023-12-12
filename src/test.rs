@@ -365,7 +365,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     create_environment(
         &dependencies,
-        &Platform::current(),
+        &target_platform,
         &prefix,
         &config.channels,
         &global_configuration,
