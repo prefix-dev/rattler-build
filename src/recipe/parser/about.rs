@@ -3,7 +3,6 @@ use std::{
     str::FromStr,
 };
 
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 use spdx::Expression;
@@ -18,6 +17,8 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
+
+use super::FlattenErrors;
 
 /// About information.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -112,7 +113,7 @@ impl TryConvertNode<About> for RenderedNode {
 impl TryConvertNode<About> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<About, Vec<PartialParsingError>> {
         let mut about = About::default();
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
+        self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "homepage" => about.homepage = value.try_convert(key_str)?,
@@ -142,11 +143,7 @@ impl TryConvertNode<About> for RenderedMappingNode {
                 }
             }
             Ok(())
-        }).partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+        }).flatten_errors()?;
 
         Ok(about)
     }

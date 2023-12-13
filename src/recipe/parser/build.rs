@@ -1,10 +1,9 @@
 use std::str::FromStr;
 
-use itertools::Itertools;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
-use super::Dependency;
+use super::{Dependency, FlattenErrors};
 use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
@@ -96,8 +95,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Build, Vec<PartialParsingError>> {
         let mut build = Build::default();
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self
-            .iter()
+        self.iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
@@ -127,11 +125,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                 }
                 Ok(())
             })
-            .partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+            .flatten_errors()?;
 
         Ok(build)
     }
