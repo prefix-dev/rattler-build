@@ -1,8 +1,6 @@
 //! Configuration for the rattler-build tool
 //! This is useful when using rattler-build as a library
 
-use std::path::PathBuf;
-
 use rattler_networking::AuthenticatedClient;
 
 /// Global configuration for the build
@@ -36,10 +34,7 @@ impl Default for Configuration {
                     .no_gzip()
                     .build()
                     .expect("failed to create client"),
-                rattler_networking::AuthenticationStorage::new(
-                    "rattler",
-                    &PathBuf::from("~/.rattler"),
-                ),
+                rattler_networking::AuthenticationStorage::default(),
             ),
             no_clean: false,
             no_test: false,

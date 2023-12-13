@@ -81,14 +81,14 @@ struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
 
-    /// Force usage of the fallback key storage and disable usage of the system keyring
+    /// Force usage of the file based authentication storage
     #[clap(
         long,
-        env = "RATTLER_FORCE_FALLBACK_AUTH",
+        env = "RATTLER_USE_AUTH_FILE",
         default_value = "false",
         hide = true
     )]
-    force_fallback_auth: bool,
+    use_auth_file: bool,
 }
 
 #[derive(Parser)]
@@ -190,6 +190,18 @@ async fn main() -> miette::Result<()> {
     }
 }
 
+fn get_auth_store(use_auth_file: bool) -> rattler_networking::AuthenticationStorage {
+    if use_auth_file {
+        let mut store = rattler_networking::AuthenticationStorage::new();
+        store.add_backend(Box::from(
+            rattler_networking::authentication_storage::backends::file::FileStorage::default(),
+        ));
+        store
+    } else {
+        rattler_networking::AuthenticationStorage::default()
+    }
+}
+
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
     let test_prefix = PathBuf::from("test-prefix");
@@ -202,16 +214,12 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
     };
 
-    let mut auth_store = rattler_networking::AuthenticationStorage::default();
-
-    auth_store.set_force_fallback_storage(args.common.force_fallback_auth);
-
     let client = AuthenticatedClient::from_client(
         reqwest::Client::builder()
             .no_gzip()
             .build()
             .expect("failed to create client"),
-        auth_store,
+        get_auth_store(args.common.use_auth_file),
     );
 
     let global_configuration = tool_configuration::Configuration {
@@ -324,16 +332,12 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         tracing::info!("{}\n", table);
     }
 
-    let mut auth_store = rattler_networking::AuthenticationStorage::default();
-
-    auth_store.set_force_fallback_storage(args.common.force_fallback_auth);
-
     let client = AuthenticatedClient::from_client(
         reqwest::Client::builder()
             .no_gzip()
             .build()
             .expect("failed to create client"),
-        auth_store,
+        get_auth_store(args.common.use_auth_file),
     );
 
     let tool_config = tool_configuration::Configuration {
