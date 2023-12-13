@@ -31,6 +31,22 @@ pub struct ParsingError {
 }
 
 impl ParsingError {
+    /// Turn a Vec of [`PartialParsingError`] into a Vec of [`ParsingError`] by adding the source string.
+    pub fn from_partial_vec(
+        src: &str,
+        errs: impl IntoIterator<Item = PartialParsingError>,
+    ) -> Vec<Self> {
+        errs.into_iter()
+            .map(|err| Self {
+                src: src.to_owned(),
+                span: marker_span_to_span(src, err.span),
+                label: err.label,
+                help: err.help,
+                kind: err.kind,
+            })
+            .collect()
+    }
+
     /// Turn a [`PartialParsingError`] into a [`ParsingError`] by adding the source string.
     pub fn from_partial(src: &str, err: PartialParsingError) -> Self {
         Self {

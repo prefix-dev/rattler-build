@@ -10,7 +10,7 @@ pub mod jinja;
 
 /// A trait to render a certain stage1 node into its final type.
 pub(crate) trait Render<T> {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, error::PartialParsingError>;
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<T, Vec<error::PartialParsingError>>;
 }
 
 #[cfg(test)]

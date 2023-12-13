@@ -108,15 +108,15 @@ impl Recipe {
                 )]
             })?;
 
-            let (_, err): (Vec<()>, Vec<PartialParsingError>) = context
+            let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = context
                 .iter()
-                .map(|(k, v)| -> Result<(), PartialParsingError> {
+                .map(|(k, v)| {
                     let val = v.as_scalar().ok_or_else(|| {
-                        _partialerror!(
+                        vec![_partialerror!(
                             *v.span(),
                             ErrorKind::ExpectedScalar,
                             help = "`context` values must always be scalars"
-                        )
+                        )]
                     })?;
                     let rendered: Option<ScalarNode> =
                         val.render(&jinja, &format!("context.{}", k.as_str()))?;
@@ -130,13 +130,13 @@ impl Recipe {
                     Ok(())
                 })
                 .partition_result();
-            if !err.is_empty() {
-                return Err(err);
+
+            if !errs.is_empty() {
+                return Err(errs.into_iter().flatten().collect_vec());
             }
         }
 
-        let rendered_node: RenderedMappingNode =
-            root_node.render(&jinja, "ROOT").map_err(|err| vec![err])?;
+        let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
 
         let mut package = None;
         let mut build = Build::default();
@@ -145,19 +145,19 @@ impl Recipe {
         let mut test = Test::default();
         let mut about = About::default();
 
-        let (_, errs): (Vec<()>, Vec<PartialParsingError>) = rendered_node
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = rendered_node
             .iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
                     "package" => package = Some(value.try_convert(key_str)?),
                     "recipe" => {
-                        return Err(_partialerror!(
+                        return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField("recipe".to_string().into()),
                         help =
                             "The recipe field is only allowed in conjunction with multiple outputs"
-                    ))
+                    )])
                     }
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
@@ -167,10 +167,10 @@ impl Recipe {
                     "context" => {}
                     "extra" => {}
                     invalid_key => {
-                        return Err(_partialerror!(
+                        return Err(vec![_partialerror!(
                             *key.span(),
                             ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        ))
+                        )])
                     }
                 }
                 Ok(())
@@ -178,7 +178,7 @@ impl Recipe {
             .partition_result();
 
         if !errs.is_empty() {
-            return Err(errs);
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         // Add hash to build.string if it is not set

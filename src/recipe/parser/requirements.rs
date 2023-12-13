@@ -112,21 +112,21 @@ impl Requirements {
 }
 
 impl TryConvertNode<Requirements> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Requirements, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Requirements, Vec<PartialParsingError>> {
         self.as_mapping()
             .ok_or_else(|| {
-                _partialerror!(
+                vec![_partialerror!(
                     *self.span(),
                     ErrorKind::ExpectedMapping,
                     label = format!("expected a mapping for `{name}`")
-                )
+                )]
             })
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<Requirements> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<Requirements, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<Requirements, Vec<PartialParsingError>> {
         let mut build = Vec::new();
         let mut host = Vec::new();
         let mut run = Vec::new();
@@ -148,10 +148,10 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
                     ignore_run_exports = value.try_convert(key_str)?;
                 }
                 invalid_key => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                    ))
+                    )])
                 }
             }
         }
@@ -234,7 +234,7 @@ pub enum Dependency {
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Vec<Dependency>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Vec<Dependency>, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Scalar(s) => {
                 let dep: Dependency = s.try_convert(name)?;
@@ -248,18 +248,18 @@ impl TryConvertNode<Vec<Dependency>> for RenderedNode {
                 }
                 Ok(deps)
             }
-            RenderedNode::Mapping(_) => Err(_partialerror!(
+            RenderedNode::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::Other,
                 label = "expected scalar or sequence"
-            )),
+            )]),
             RenderedNode::Null(_) => Ok(vec![]),
         }
     }
 }
 
 impl TryConvertNode<Dependency> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<Dependency, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Dependency, Vec<PartialParsingError>> {
         // compiler
         if self.contains("__COMPILER") {
             let compiler: String = self.try_convert(name)?;
@@ -360,27 +360,27 @@ impl Serialize for Dependency {
 }
 
 impl TryConvertNode<MatchSpec> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
-                _partialerror!(
+                vec![_partialerror!(
                     *self.span(),
                     ErrorKind::ExpectedScalar,
                     label = format!("expected a string value for `{name}`")
-                )
+                )]
             })
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<MatchSpec> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<MatchSpec, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
         MatchSpec::from_str(self.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::from(err),
                 label = format!("error parsing `{name}` as a match spec")
-            )
+            )]
         })
     }
 }
@@ -451,7 +451,7 @@ impl RunExports {
 }
 
 impl TryConvertNode<RunExports> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Scalar(s) => s.try_convert(name),
             RenderedNode::Sequence(seq) => seq.try_convert(name),
@@ -462,7 +462,7 @@ impl TryConvertNode<RunExports> for RenderedNode {
 }
 
 impl TryConvertNode<RunExports> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         let mut run_exports = RunExports::default();
 
         let dep = self.try_convert(name)?;
@@ -473,7 +473,7 @@ impl TryConvertNode<RunExports> for RenderedScalarNode {
 }
 
 impl TryConvertNode<RunExports> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         let mut run_exports = RunExports::default();
 
         for node in self.iter() {
@@ -486,7 +486,7 @@ impl TryConvertNode<RunExports> for RenderedSequenceNode {
 }
 
 impl TryConvertNode<RunExports> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         let mut run_exports = RunExports::default();
 
         for (key, value) in self.iter() {
@@ -512,11 +512,11 @@ impl TryConvertNode<RunExports> for RenderedMappingNode {
                     run_exports.weak_constrains = deps;
                 }
                 invalid => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_owned().into()),
                         help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
-                    ));
+                    )]);
                 }
             }
         }
@@ -554,15 +554,15 @@ impl IgnoreRunExports {
 }
 
 impl TryConvertNode<IgnoreRunExports> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
         let mut ignore_run_exports = IgnoreRunExports::default();
 
         for (key, value) in self.iter() {
@@ -575,13 +575,13 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
                     ignore_run_exports.from_package = value.try_convert(key_str)?;
                 }
                 invalid => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_owned().into()),
                         help = format!(
                             "fields for {name} should be one of: `by_name`, or `from_package`"
                         )
-                    ));
+                    )]);
                 }
             }
         }

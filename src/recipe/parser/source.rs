@@ -2,6 +2,7 @@
 
 use std::{fmt, path::PathBuf, str::FromStr};
 
+use itertools::Itertools;
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -50,7 +51,7 @@ impl Source {
 }
 
 impl TryConvertNode<Vec<Source>> for RenderedNode {
-    fn try_convert(&self, _name: &str) -> Result<Vec<Source>, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<Vec<Source>, Vec<PartialParsingError>> {
         let mut sources = Vec::new();
 
         match self {
@@ -66,11 +67,11 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
                     let path_src = map.try_convert("source")?;
                     sources.push(Source::Path(path_src));
                 } else {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *self.span(),
                         ErrorKind::Other,
                         label = "unknown source type"
-                    ));
+                    )]);
                 }
             }
             RenderedNode::Sequence(seq) => {
@@ -81,11 +82,11 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
             }
             RenderedNode::Null(_) => (),
             RenderedNode::Scalar(s) => {
-                return Err(_partialerror!(
+                return Err(vec![_partialerror!(
                     *s.span(),
                     ErrorKind::Other,
                     label = "expected mapping or sequence"
-                ))
+                )])
             }
         }
 
@@ -172,7 +173,7 @@ impl GitSource {
 }
 
 impl TryConvertNode<GitSource> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<GitSource, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<GitSource, Vec<PartialParsingError>> {
         let mut url = None;
         let mut rev = None;
         let mut depth = None;
@@ -185,15 +186,15 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         // in case we build linting functionality on top
         if self.contains_key("git_rev") {
             if let Some((k, _)) = self.get_key_value("git_depth") {
-                return Err(_partialerror!(
+                return Err(vec![_partialerror!(
                     *k.span(),
                     ErrorKind::InvalidField(k.as_str().to_owned().into()),
                     help = "use of `git_depth` with `git_rev` is invalid"
-                ));
+                )]);
             }
         }
 
-        for (k, v) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(k, v)| {
             match k.as_str() {
                 "git_url" => {
                     let url_str: String = v.try_convert("git_url")?;
@@ -224,21 +225,26 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     lfs = v.try_convert("lfs")?;
                 }
                 _ => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
                         help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches`, `lfs` and `folder`"
-                    ))
+                    )])
                 }
             }
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         let url = url.ok_or_else(|| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("git_url".into()),
                 help = "git `source` must have a `git_url` field"
-            )
+            )]
         })?;
 
         let rev = rev.unwrap_or_else(|| "HEAD".to_owned());
@@ -335,7 +341,7 @@ impl UrlSource {
 }
 
 impl TryConvertNode<UrlSource> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<UrlSource, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<UrlSource, Vec<PartialParsingError>> {
         let mut url = None;
         let mut sha256 = None;
         let mut md5 = None;
@@ -343,47 +349,52 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut folder = None;
         let mut file_name = None;
 
-        for (key, value) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "url" => url = value.try_convert(key_str)?,
                 "sha256" => {
                     let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
-                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| _partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256))?;
+                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| vec![_partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256)])?;
                     sha256 = Some(sha256_out);
                 }
                 "md5" => {
                     let md5_str: RenderedScalarNode = value.try_convert(key_str)?;
-                    let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| _partialerror!(*md5_str.span(), ErrorKind::InvalidMd5))?;
+                    let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| vec![_partialerror!(*md5_str.span(), ErrorKind::InvalidMd5)])?;
                     md5 = Some(md5_out);
                 }
                 "file_name" => file_name = value.try_convert(key_str)?,
                 "patches" => patches = value.try_convert(key_str)?,
                 "folder" => folder = value.try_convert(key_str)?,
                 invalid_key => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
                         help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `folder`"
-                    ))
+                    )])
                 }
             }
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         let url = url.ok_or_else(|| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("url".into()),
                 help = "URL `source` must have a `url` field"
-            )
+            )]
         })?;
 
         if md5.is_none() && sha256.is_none() {
-            return Err(_partialerror!(
+            return Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("sha256 or md5".into()),
                 help = "URL `source` must have a `sha256` or `md5` checksum field"
-            ));
+            )]);
         }
 
         Ok(UrlSource {
@@ -459,14 +470,14 @@ impl PathSource {
 }
 
 impl TryConvertNode<PathSource> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<PathSource, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<PathSource, Vec<PartialParsingError>> {
         let mut path = None;
         let mut patches = Vec::new();
         let mut folder = None;
         let mut use_gitignore = true;
         let mut file_name = None;
 
-        for (key, value) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
@@ -474,21 +485,26 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
                 "file_name" => file_name = value.try_convert("file_name")?,
                 "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
                 invalid_key => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
                         help = "valid fields for path `source` are `path`, `patches`, `folder`, `file_name` and `use_gitignore`"
-                    ))
+                    )])
                 }
             }
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         let path = path.ok_or_else(|| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("path".into()),
                 help = "path `source` must have a `path` field"
-            )
+            )]
         })?;
 
         Ok(PathSource {

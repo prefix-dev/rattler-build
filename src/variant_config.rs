@@ -49,15 +49,16 @@ pub struct Pin {
 }
 
 impl TryConvertNode<Pin> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Pin, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Pin, Vec<PartialParsingError>> {
         self.as_mapping()
             .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .map_err(|e| vec![e])
             .and_then(|map| map.try_convert(name))
     }
 }
 
 impl TryConvertNode<Pin> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<Pin, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Pin, Vec<PartialParsingError>> {
         let mut pin = Pin::default();
 
         for (key, value) in self.iter() {
@@ -70,11 +71,11 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
                     pin.min_pin = value.try_convert(key_str)?;
                 }
                 _ => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(key_str.to_string().into()),
                         help = format!("Valid fields for {name} are: max_pin, min_pin")
-                    ))
+                    )])
                 }
             }
         }
@@ -156,6 +157,10 @@ pub struct VariantConfig {
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error, Diagnostic)]
 pub enum VariantConfigError {
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    RecipeParseErrors(#[from] ParseErrors),
+
     #[error("Could not parse variant config file ({0}): {1}")]
     ParseError(PathBuf, serde_yaml::Error),
 
@@ -244,10 +249,13 @@ impl VariantConfig {
             let jinja = Jinja::new(selector_config.clone());
             let rendered_node: RenderedNode = yaml_node
                 .render(&jinja, filename.to_string_lossy().as_ref())
-                .map_err(|e| ParsingError::from_partial(&file, e))?;
+                .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
             let config: VariantConfig = rendered_node
                 .try_convert(filename.to_string_lossy().as_ref())
-                .map_err(|e| ParsingError::from_partial(&file, e))?;
+                .map_err(|e| {
+                    let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
+                    parse_errors
+                })?;
 
             variant_configs.push(config);
         }
@@ -702,15 +710,15 @@ impl VariantConfig {
 }
 
 impl TryConvertNode<VariantConfig> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<VariantConfig, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
             .and_then(|map| map.try_convert(name))
     }
 }
 
 impl TryConvertNode<VariantConfig> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<VariantConfig, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
         let mut config = VariantConfig::default();
 
         for (key, value) in self.iter() {
@@ -781,6 +789,14 @@ pub struct ParseErrors {
     #[related]
     errs: Vec<ParsingError>,
 }
+impl ParseErrors {
+    fn from_partial_vec(file: &str, errs: Vec<PartialParsingError>) -> Self {
+        Self {
+            errs: ParsingError::from_partial_vec(file, errs),
+        }
+    }
+}
+
 impl From<Vec<ParsingError>> for ParseErrors {
     fn from(errs: Vec<ParsingError>) -> Self {
         Self { errs }
