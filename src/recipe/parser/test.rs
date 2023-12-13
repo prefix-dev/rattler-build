@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -87,25 +88,26 @@ impl PackageContent {
 }
 
 impl TryConvertNode<PackageContent> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<PackageContent, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<PackageContent, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => {
-                Err(_partialerror!(*self.span(), ErrorKind::ExpectedMapping,))?
-            }
+            RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+            )])?,
             RenderedNode::Null(_) => Ok(PackageContent::default()),
         }
     }
 }
 
 impl TryConvertNode<PackageContent> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<PackageContent, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<PackageContent, Vec<PartialParsingError>> {
         let mut files = vec![];
         let mut site_packages = vec![];
         let mut libs = vec![];
         let mut bins = vec![];
         let mut includes = vec![];
-        for (key, value) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "files" => files = value.try_convert(key_str)?,
@@ -113,13 +115,19 @@ impl TryConvertNode<PackageContent> for RenderedMappingNode {
                 "libs" => libs = value.try_convert(key_str)?,
                 "bins" => bins = value.try_convert(key_str)?,
                 "includes" => includes = value.try_convert(key_str)?,
-                invalid => Err(_partialerror!(
+                invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
                     help = format!("expected fields for {name} is one of `files`, `site_packages`, `libs`, `bins`, `includes`")
-                ))?
+                )])?
             }
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
+
         Ok(PackageContent {
             files,
             site_packages,
@@ -168,12 +176,13 @@ impl Test {
 }
 
 impl TryConvertNode<Test> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Test, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Test, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Scalar(_) => {
-                Err(_partialerror!(*self.span(), ErrorKind::ExpectedMapping,))?
-            }
+            RenderedNode::Scalar(_) => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedMapping,
+            )])?,
             RenderedNode::Null(_) => Ok(Test::default()),
             RenderedNode::Sequence(_) => todo!("Not implemented yet: sequence on Test"),
         }
@@ -181,10 +190,10 @@ impl TryConvertNode<Test> for RenderedNode {
 }
 
 impl TryConvertNode<Test> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<Test, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Test, Vec<PartialParsingError>> {
         let mut test = Test::default();
 
-        for (key, value) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "package_contents" => test.package_contents = value.try_convert(key_str)?,
@@ -193,12 +202,17 @@ impl TryConvertNode<Test> for RenderedMappingNode {
                 "requires" => test.requires = value.try_convert(key_str)?,
                 "source_files" => test.source_files = value.try_convert(key_str)?,
                 "files" => test.files = value.try_convert(key_str)?,
-                invalid => Err(_partialerror!(
+                invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
                     help = format!("expected fields for {name} is one of `imports`, `commands`, `requires`, `source_files`, `files`")
-                ))?
-            }
+                )])?
+            };
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         Ok(test)

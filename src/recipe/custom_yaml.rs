@@ -117,7 +117,7 @@ impl Node {
 }
 
 impl Render<Node> for Node {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
         match self {
             Node::Scalar(s) => s.render(jinja, name),
             Node::Mapping(m) => m.render(jinja, name),
@@ -128,13 +128,13 @@ impl Render<Node> for Node {
 }
 
 impl Render<Node> for ScalarNode {
-    fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
                 label = jinja_error_to_label(&err)
-            )
+            )]
         })?;
 
         Ok(Node::from(ScalarNode::new(*self.span(), rendered)))
@@ -146,13 +146,13 @@ impl Render<Option<ScalarNode>> for ScalarNode {
         &self,
         jinja: &Jinja,
         _name: &str,
-    ) -> Result<Option<ScalarNode>, super::error::PartialParsingError> {
+    ) -> Result<std::option::Option<ScalarNode>, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
                 label = jinja_error_to_label(&err)
-            )
+            )]
         })?;
 
         if rendered.is_empty() {
@@ -164,7 +164,7 @@ impl Render<Option<ScalarNode>> for ScalarNode {
 }
 
 impl Render<Node> for MappingNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
         let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
@@ -181,7 +181,7 @@ impl Render<Node> for MappingNode {
 }
 
 impl Render<Node> for SequenceNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
         let mut rendered = Vec::new();
 
         for item in self.iter() {
@@ -194,7 +194,7 @@ impl Render<Node> for SequenceNode {
 }
 
 impl Render<Node> for SequenceNodeInternal {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
         match self {
             Self::Simple(n) => n.render(jinja, name),
             Self::Conditional(if_sel) => {
@@ -214,7 +214,7 @@ impl Render<SequenceNodeInternal> for SequenceNodeInternal {
         &self,
         jinja: &Jinja,
         name: &str,
-    ) -> Result<SequenceNodeInternal, PartialParsingError> {
+    ) -> Result<SequenceNodeInternal, Vec<PartialParsingError>> {
         match self {
             Self::Simple(n) => Ok(Self::Simple(n.render(jinja, name)?)),
             Self::Conditional(if_sel) => {
@@ -725,7 +725,7 @@ impl SequenceNodeInternal {
     }
 
     /// Process the sequence node using the given jinja environment, returning the chosen node.
-    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialParsingError> {
+    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, Vec<PartialParsingError>> {
         match self {
             Self::Simple(node) => Ok(Some(node.clone())),
             Self::Conditional(selector) => selector.process(jinja),
@@ -834,13 +834,13 @@ impl IfSelector {
     }
 
     /// Process the if-selector using the given jinja environment, returning the chosen node.
-    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, PartialParsingError> {
+    pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, Vec<PartialParsingError>> {
         let cond = jinja.eval(self.cond.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.cond.span(),
                 ErrorKind::JinjaRendering(err),
                 label = "error evaluating if-selector condition"
-            )
+            )]
         })?;
 
         if cond.is_true() {
@@ -890,29 +890,31 @@ impl fmt::Debug for IfSelector {
 /// A trait that defines that the implementer can be converted from a node.
 pub trait TryConvertNode<T> {
     /// Try to convert the implementer from a node.
-    fn try_convert(&self, name: &str) -> Result<T, PartialParsingError>;
+    fn try_convert(&self, name: &str) -> Result<T, Vec<PartialParsingError>>;
 }
 
 impl<'a> TryConvertNode<&'a ScalarNode> for &'a Node {
-    fn try_convert(&self, name: &str) -> Result<&'a ScalarNode, PartialParsingError> {
-        self.as_scalar().ok_or_else(|| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::ExpectedScalar,
-                label = format!("expected a scalar value for `{name}`")
-            )
-        })
+    fn try_convert(&self, name: &str) -> Result<&'a ScalarNode, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl<T: Clone> TryConvertNode<T> for T {
-    fn try_convert(&self, _: &str) -> Result<T, PartialParsingError> {
+    fn try_convert(&self, _: &str) -> Result<T, Vec<PartialParsingError>> {
         Ok(self.clone())
     }
 }
 
 impl TryConvertNode<i32> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<i32, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<i32, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -921,12 +923,13 @@ impl TryConvertNode<i32> for RenderedNode {
                     label = format!("expected a scalar value for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<bool> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<bool, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -935,24 +938,27 @@ impl TryConvertNode<bool> for RenderedNode {
                     label = format!("expected a scalar value for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<bool> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<bool, PartialParsingError> {
-        self.as_bool().ok_or_else(|| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::ExpectedScalar,
-                label = format!("expected a boolean value for `{name}`")
-            )
-        })
+    fn try_convert(&self, name: &str) -> Result<bool, Vec<PartialParsingError>> {
+        self.as_bool()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a boolean value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl TryConvertNode<u64> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<u64, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<u64, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -961,48 +967,57 @@ impl TryConvertNode<u64> for RenderedNode {
                     label = format!("expected a scalar value for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<u64> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<u64, PartialParsingError> {
-        self.as_str().parse().map_err(|err| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::from(err),
-                label = format!("failed to parse `{}` as unsigned integer", self.as_str())
-            )
-        })
+    fn try_convert(&self, _name: &str) -> Result<u64, Vec<PartialParsingError>> {
+        self.as_str()
+            .parse()
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::from(err),
+                    label = format!("failed to parse `{}` as unsigned integer", self.as_str())
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl TryConvertNode<i32> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<i32, PartialParsingError> {
-        self.as_str().parse::<i32>().map_err(|err| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::from(err),
-                label = format!("failed to parse `{}` as integer", self.as_str())
-            )
-        })
+    fn try_convert(&self, _name: &str) -> Result<i32, Vec<PartialParsingError>> {
+        self.as_str()
+            .parse()
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::from(err),
+                    label = format!("failed to parse `{}` as integer", self.as_str())
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl<'a> TryConvertNode<&'a RenderedScalarNode> for &'a RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<&'a RenderedScalarNode, PartialParsingError> {
-        self.as_scalar().ok_or_else(|| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::ExpectedScalar,
-                label = format!("expected a scalar value for `{name}`")
-            )
-        })
+    fn try_convert(&self, name: &str) -> Result<&'a RenderedScalarNode, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a scalar value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl TryConvertNode<String> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<String, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<String, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -1012,17 +1027,18 @@ impl TryConvertNode<String> for RenderedNode {
                 )
             })
             .map(|s| s.as_str().to_owned())
+            .map_err(|e| vec![e])
     }
 }
 
 impl TryConvertNode<String> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<String, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<String, Vec<PartialParsingError>> {
         Ok(self.as_str().to_owned())
     }
 }
 
 impl TryConvertNode<PathBuf> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<PathBuf, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<PathBuf, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -1031,30 +1047,34 @@ impl TryConvertNode<PathBuf> for RenderedNode {
                     label = format!("expected a string value for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<PathBuf> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<PathBuf, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<PathBuf, Vec<PartialParsingError>> {
         Ok(PathBuf::from(self.as_str()))
     }
 }
 
 impl TryConvertNode<RenderedScalarNode> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<RenderedScalarNode, PartialParsingError> {
-        self.as_scalar().cloned().ok_or_else(|| {
-            _partialerror!(
-                *self.span(),
-                ErrorKind::ExpectedScalar,
-                help = format!("expected a string value for `{name}`")
-            )
-        })
+    fn try_convert(&self, name: &str) -> Result<RenderedScalarNode, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .cloned()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    help = format!("expected a string value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }
 
 impl TryConvertNode<Url> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Url, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Url, Vec<PartialParsingError>> {
         self.as_scalar()
             .ok_or_else(|| {
                 _partialerror!(
@@ -1063,13 +1083,16 @@ impl TryConvertNode<Url> for RenderedNode {
                     label = format!("expected a string value for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<Url> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<Url, PartialParsingError> {
-        Url::parse(self.as_str()).map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err)))
+    fn try_convert(&self, _name: &str) -> Result<Url, Vec<PartialParsingError>> {
+        Url::parse(self.as_str())
+            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err)))
+            .map_err(|e| vec![e])
     }
 }
 
@@ -1077,7 +1100,7 @@ impl<T> TryConvertNode<Option<T>> for RenderedNode
 where
     RenderedNode: TryConvertNode<T>,
 {
-    fn try_convert(&self, name: &str) -> Result<Option<T>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Option<T>, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Null(_) => Ok(None),
             _ => Ok(Some(self.try_convert(name)?)),
@@ -1089,7 +1112,7 @@ impl<T> TryConvertNode<Option<T>> for RenderedScalarNode
 where
     RenderedScalarNode: TryConvertNode<T>,
 {
-    fn try_convert(&self, name: &str) -> Result<Option<T>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Option<T>, Vec<PartialParsingError>> {
         self.try_convert(name).map(|v| Some(v))
     }
 }
@@ -1099,7 +1122,7 @@ where
     RenderedNode: TryConvertNode<T>,
     RenderedScalarNode: TryConvertNode<T>,
 {
-    fn try_convert(&self, name: &str) -> Result<IndexSet<T>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<IndexSet<T>, Vec<PartialParsingError>> {
         TryConvertNode::<Vec<T>>::try_convert(self, name).map(|v| v.into_iter().collect())
     }
 }
@@ -1117,7 +1140,7 @@ where
     ///
     /// Alternatively, you can also specify the result to be `Vec<Option<_>>` to handle the
     /// case of a null node in other ways.
-    fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Vec<T>, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Scalar(s) => {
                 let item = s.try_convert(name)?;
@@ -1125,11 +1148,11 @@ where
             }
             RenderedNode::Sequence(seq) => seq.iter().map(|item| item.try_convert(name)).collect(),
             RenderedNode::Null(_) => Ok(vec![]),
-            RenderedNode::Mapping(_) => Err(_partialerror!(
+            RenderedNode::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::Other,
                 label = format!("expected scalar or sequence for {name}")
-            )),
+            )]),
         }
     }
 }
@@ -1138,7 +1161,7 @@ impl<T> TryConvertNode<Vec<T>> for RenderedScalarNode
 where
     RenderedScalarNode: TryConvertNode<T>,
 {
-    fn try_convert(&self, name: &str) -> Result<Vec<T>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Vec<T>, Vec<PartialParsingError>> {
         self.try_convert(name).map(|v| vec![v])
     }
 }
@@ -1149,7 +1172,7 @@ where
     RenderedScalarNode: TryConvertNode<K>,
     RenderedNode: TryConvertNode<V>,
 {
-    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, Vec<PartialParsingError>> {
         self.as_mapping()
             .ok_or_else(|| {
                 _partialerror!(
@@ -1158,6 +1181,7 @@ where
                     help = format!("expected a mapping for `{name}`")
                 )
             })
+            .map_err(|e| vec![e])
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -1168,7 +1192,7 @@ where
     RenderedScalarNode: TryConvertNode<K>,
     RenderedNode: TryConvertNode<V>,
 {
-    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<BTreeMap<K, V>, Vec<PartialParsingError>> {
         let mut map = BTreeMap::new();
         for (key, value) in self.iter() {
             let key = key.try_convert(name)?;

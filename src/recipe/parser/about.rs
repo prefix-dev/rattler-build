@@ -3,6 +3,7 @@ use std::{
     str::FromStr,
 };
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
 use spdx::Expression;
@@ -101,17 +102,17 @@ impl About {
 }
 
 impl TryConvertNode<About> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<About, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<About, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<About> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<About, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<About, Vec<PartialParsingError>> {
         let mut about = About::default();
-        for (key, value) in self.iter() {
+        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "homepage" => about.homepage = value.try_convert(key_str)?,
@@ -133,13 +134,18 @@ impl TryConvertNode<About> for RenderedMappingNode {
                     about.prelink_message = value.try_convert(key_str)?
                 }
                 invalid_key => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
                         help = format!("expected for `{name}` one of `homepage`, `repository`, `documentation`, `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`")
-                    ))
+                    )])
                 }
             }
+            Ok(())
+        }).partition_result();
+
+        if !errs.is_empty() {
+            return Err(errs.into_iter().flatten().collect_vec());
         }
 
         Ok(about)
@@ -177,18 +183,18 @@ impl FromStr for License {
 }
 
 impl TryConvertNode<License> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<License, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<License, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar,))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar,)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<License> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<License, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<License, Vec<PartialParsingError>> {
         let original: String = self.try_convert(name)?;
         let expr = Expression::parse(original.as_str())
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))?;
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])?;
 
         Ok(License { original, expr })
     }
