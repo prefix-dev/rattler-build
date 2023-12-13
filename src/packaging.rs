@@ -1,3 +1,4 @@
+use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use std::collections::HashSet;
@@ -102,6 +103,8 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
     }
 }
 
+/// This function requires we know the file content we are matching against is UTF-8
+/// In case the source is non utf-8 it will fail with a read error
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
@@ -112,17 +115,19 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
     buf_reader.read_to_string(&mut content)?;
 
     // Check if the content contains the prefix
-    #[allow(unused_mut)]
-    let mut contains_prefix = content.contains(&prefix.to_string_lossy().to_string());
+    let src = prefix.to_string_lossy();
+    let contains_prefix = content.contains(&src.to_string());
+
     #[cfg(target_os = "windows")]
     {
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
-        contains_prefix =
-            contains_prefix || content.contains(&to_forward_slash_lossy(prefix).to_string());
+        let s = to_forward_slash_lossy(prefix);
+        return Ok(contains_prefix || content.contains(s.to_string().as_str()));
     }
 
+    #[cfg(not(target_os = "windows"))]
     Ok(contains_prefix)
 }
 
@@ -130,7 +135,6 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
 fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
     {
-        use std::path::Component;
         let mut buf = String::new();
         for c in path.components() {
             match c {
@@ -155,7 +159,7 @@ fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
             buf.pop();
         }
 
-        Cow::Owned(buf)
+        std::borrow::Cow::Owned(buf)
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -182,7 +186,10 @@ fn create_prefix_placeholder(
     let content_type = content_inspector::inspect(buffer);
     let mut has_prefix = None;
 
-    let file_mode = if content_type.is_text() {
+    let file_mode = if content_type.is_text()
+        // treat everything else as binary for now!
+        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM)
+    {
         match contains_prefix_text(file_path, prefix) {
             Ok(true) => {
                 has_prefix = Some(prefix.to_path_buf());
