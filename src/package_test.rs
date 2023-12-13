@@ -7,9 +7,9 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 
+use fs_err as fs;
 use std::{
-    fs::{self},
-    io::{Read, Write},
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -17,7 +17,7 @@ use std::{
 use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, ArchiveType, PathsJson},
+    package::{ArchiveIdentifier, PathsJson},
     MatchSpec, Platform,
 };
 use rattler_shell::{
@@ -26,7 +26,8 @@ use rattler_shell::{
 };
 
 use crate::{
-    env_vars, index, render::solver::create_environment, tool_configuration::Configuration,
+    env_vars, index, recipe::parser::CommandsTestRequirements, render::solver::create_environment,
+    tool_configuration,
 };
 
 #[allow(missing_docs)]
@@ -57,7 +58,7 @@ pub enum TestError {
     TestEnvironmentSetup(#[from] anyhow::Error),
 
     #[error("Failed to setup test environment: {0}")]
-    TestEnvironementActivation(#[from] ActivationError),
+    TestEnvironmentActivation(#[from] ActivationError),
 
     #[error("Failed to parse JSON from test files: {0}")]
     TestJSONParseError(#[from] serde_json::Error),
@@ -181,10 +182,10 @@ impl Tests {
     }
 }
 
-async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestError> {
+async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestError> {
     let mut tests = Vec::new();
 
-    let test_folder = pkg.join("info").join("test");
+    let test_folder = pkg.join("info/test");
 
     if !test_folder.exists() {
         return Ok((test_folder, tests));
@@ -212,52 +213,8 @@ async fn tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestErro
     Ok((test_folder, tests))
 }
 
-fn file_from_tar_bz2(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
-    let reader = std::fs::File::open(archive_path)?;
-    let mut archive = rattler_package_streaming::read::stream_tar_bz2(reader);
-
-    for entry in archive.entries()? {
-        let mut entry = entry?;
-        let path = entry.path()?;
-        if path == find_path {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents)?;
-            return Ok(contents);
-        }
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("{:?} not found in {:?}", find_path, archive_path),
-    ))
-}
-
-fn file_from_conda(archive_path: &Path, find_path: &Path) -> Result<String, std::io::Error> {
-    let reader = std::fs::File::open(archive_path)?;
-
-    let mut archive = if find_path.starts_with("info") {
-        rattler_package_streaming::seek::stream_conda_info(reader)
-            .expect("Could not open conda file")
-    } else {
-        todo!("Not implemented yet");
-    };
-
-    for entry in archive.entries()? {
-        let mut entry = entry?;
-        let path = entry.path()?;
-        if path == find_path {
-            let mut contents = String::new();
-            entry.read_to_string(&mut contents)?;
-            return Ok(contents);
-        }
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
-        format!("{:?} not found in {:?}", find_path, archive_path),
-    ))
-}
-
 /// The configuration for a test
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
@@ -268,6 +225,8 @@ pub struct TestConfiguration {
     /// The channels to use for the test – do not forget to add the local build outputs channel
     /// if desired
     pub channels: Vec<String>,
+    /// The tool configuration
+    pub tool_configuration: tool_configuration::Configuration,
 }
 
 /// Run a test for a single package
@@ -292,11 +251,7 @@ pub struct TestConfiguration {
 ///
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_test(
-    package_file: &Path,
-    config: &TestConfiguration,
-    global_configuration: &Configuration,
-) -> Result<(), TestError> {
+pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
     let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
@@ -312,31 +267,6 @@ pub async fn run_test(
         ),
     )?;
 
-    let archive_type =
-        ArchiveType::try_from(package_file).ok_or(TestError::ArchiveTypeNotSupported)?;
-    let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
-    let test_dependencies = match archive_type {
-        ArchiveType::TarBz2 => file_from_tar_bz2(package_file, &test_dep_json),
-        ArchiveType::Conda => file_from_conda(package_file, &test_dep_json),
-    };
-
-    let mut dependencies: Vec<MatchSpec> = match test_dependencies {
-        Ok(contents) => {
-            let test_deps: Vec<String> = serde_json::from_str(&contents)?;
-            test_deps
-                .iter()
-                .map(|s| MatchSpec::from_str(s))
-                .collect::<Result<Vec<_>, _>>()?
-        }
-        Err(error) => {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                Vec::new()
-            } else {
-                return Err(TestError::TestFailed);
-            }
-        }
-    };
-
     // index the temporary channel
     index::index(tmp_repo.path(), Some(&target_platform))?;
 
@@ -349,14 +279,9 @@ pub async fn run_test(
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
 
     if package_folder.exists() {
-        tracing::info!("Removing previously cached package {:?}", package_folder);
-        fs::remove_dir_all(package_folder)?;
+        tracing::info!("Removing previously cached package {:?}", &package_folder);
+        fs::remove_dir_all(&package_folder)?;
     }
-
-    let match_spec =
-        MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
-            .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
-    dependencies.push(match_spec);
 
     let prefix = canonicalize(&config.test_prefix)?;
 
@@ -368,32 +293,189 @@ pub async fn run_test(
         Platform::current()
     };
 
+    let mut channels = config.channels.clone();
+    channels.insert(0, tmp_repo.path().to_string_lossy().to_string());
+
+    tracing::info!("Collecting tests from {:?}", package_folder);
+
+    rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
+        tracing::error!("Failed to extract package: {:?}", e);
+        TestError::TestFailed
+    })?;
+
+    // extract package in place
+    if package_folder.join("info/test").exists() {
+        let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
+        let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
+            serde_json::from_str(&std::fs::read_to_string(
+                package_folder.join(&test_dep_json),
+            )?)?
+        } else {
+            Vec::new()
+        };
+
+        let mut dependencies: Vec<MatchSpec> = test_dependencies
+            .iter()
+            .map(|s| MatchSpec::from_str(s))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        tracing::info!("Creating test environment in {:?}", prefix);
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+        )
+        .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
+        dependencies.push(match_spec);
+
+        create_environment(
+            &dependencies,
+            &platform,
+            &prefix,
+            &channels,
+            &config.tool_configuration,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        // These are the legacy tests
+        let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
+
+        for test in tests {
+            test.run(&prefix, &test_folder)?;
+        }
+
+        tracing::info!(
+            "{} all tests passed!",
+            console::style(console::Emoji("✔", "")).green()
+        );
+    }
+
+    if package_folder.join("info/tests").exists() {
+        // These are the new style tests
+        let test_folder = package_folder.join("info/tests");
+        let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
+
+        // for each enumerated test, we load and run it
+        while let Some(entry) = read_dir.next_entry().await? {
+            println!("test {:?}", entry.path());
+            run_individual_test(&pkg, &entry.path(), &prefix, config).await?;
+        }
+    }
+
+    fs::remove_dir_all(prefix)?;
+
+    Ok(())
+}
+
+async fn run_python_test(
+    pkg: &ArchiveIdentifier,
+    _path: &Path,
+    prefix: &Path,
+    config: &TestConfiguration,
+) -> Result<(), TestError> {
+    // create environment with the test dependencies
+    let match_spec =
+        MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
+            .unwrap();
+
+    let platform = Platform::current();
+
     create_environment(
-        &dependencies,
+        &[match_spec],
         &platform,
-        &prefix,
+        prefix,
         &config.channels,
-        global_configuration,
+        &config.tool_configuration,
     )
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let cache_key = CacheKey::from(pkg);
-    let dir = cache_dir.join("pkgs").join(cache_key.to_string());
+    Ok(())
+}
 
-    tracing::info!("Collecting tests from {:?}", dir);
-    let (test_folder, tests) = tests_from_folder(&dir).await?;
+async fn run_shell_test(
+    pkg: &ArchiveIdentifier,
+    path: &Path,
+    prefix: &Path,
+    config: &TestConfiguration,
+) -> Result<(), TestError> {
+    // read the test dependencies
+    let deps = if path.join("test_time_dependencies.json").exists() {
+        let test_dep_json = path.join("test_time_dependencies.json");
+        serde_json::from_str(&fs::read_to_string(test_dep_json)?)?
+    } else {
+        CommandsTestRequirements::default()
+    };
 
-    for test in tests {
-        test.run(&prefix, &test_folder)?;
+    if !deps.build.is_empty() {
+        todo!("build dependencies not implemented yet");
     }
 
-    tracing::info!(
-        "{} all tests passed!",
-        console::style(console::Emoji("✔", "")).green()
-    );
+    let mut dependencies = deps
+        .run
+        .iter()
+        .map(|s| MatchSpec::from_str(s))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    fs::remove_dir_all(prefix)?;
+    // create environment with the test dependencies
+    dependencies.push(MatchSpec::from_str(
+        format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+    )?);
+
+    let platform = Platform::current();
+
+    create_environment(
+        &dependencies,
+        &platform,
+        prefix,
+        &config.channels,
+        &config.tool_configuration,
+    )
+    .await
+    .map_err(TestError::TestEnvironmentSetup)?;
+
+    let default_shell = ShellEnum::default();
+
+    let test_file_path = if platform.is_windows() {
+        path.join("run_test.bat")
+    } else {
+        path.join("run_test.sh")
+    };
+
+    let contents = fs::read_to_string(&test_file_path)?;
+    let is_path_ext = |ext: &str| {
+        test_file_path
+            .extension()
+            .map(|s| s.eq(ext))
+            .unwrap_or_default()
+    };
+
+    if Platform::current().is_windows() && is_path_ext("bat") {
+        tracing::info!("Testing commands:");
+        run_in_environment(default_shell, contents, path, prefix)?;
+    } else if Platform::current().is_unix() && is_path_ext("sh") {
+        tracing::info!("Testing commands:");
+        run_in_environment(default_shell, contents, path, prefix)?;
+    }
+
+    Ok(())
+}
+
+async fn run_individual_test(
+    pkg: &ArchiveIdentifier,
+    path: &Path,
+    prefix: &Path,
+    config: &TestConfiguration,
+) -> Result<(), TestError> {
+    // detect which of the test files we have
+    if path.join("run_test.py").exists() {
+        // run python test
+        run_python_test(pkg, path, prefix, config).await?;
+    } else if path.join("run_test.sh").exists() || path.join("run_test.bat").exists() {
+        // run shell test
+        run_shell_test(pkg, path, prefix, config).await?;
+    } else {
+        // no test found
+    }
 
     Ok(())
 }
@@ -408,8 +490,8 @@ pub async fn run_test(
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_package_content_tests(
-    package_content: &crate::recipe::parser::PackageContent,
-    paths_json: PathsJson,
+    package_content: &crate::recipe::parser::PackageContents,
+    paths_json: &PathsJson,
     target_platform: &Platform,
 ) -> Result<(), TestError> {
     // files globset

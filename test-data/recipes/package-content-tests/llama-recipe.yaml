@@ -26,11 +26,11 @@ requirements:
     - if: win
       then: ninja
 
-test:
-  package_contents:
-    bins:
-      - main
-      - quantize
+tests:
+  - package_contents:
+      bin:
+        - main
+        - quantize
 
 about:
   homepage: https://github.com/ggerganov/llama.cpp

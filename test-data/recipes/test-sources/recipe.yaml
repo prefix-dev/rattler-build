@@ -25,16 +25,17 @@ build:
     - test -f ./am-i-renamed.txt
     - test -f ./test.avi
 
-test:
-  source_files:
-    - test.avi
-  files:
-    - test-file.txt
-    - test-folder/
-  commands:
-    - echo "test"
-    - test -f ./test.avi
-    - test -f ./test-file.txt
-    - test -d ./test-folder
-    - test -f ./test-folder/test-file-2.txt
-    - test -f ./test-folder/test-file-3.txt
+tests:
+  - script:
+      - echo "test"
+      - test -f ./test.avi
+      - test -f ./test-file.txt
+      - test -d ./test-folder
+      - test -f ./test-folder/test-file-2.txt
+      - test -f ./test-folder/test-file-3.txt
+    files:
+      source:
+        - test.avi
+      recipe:
+        - test-file.txt
+        - test-folder/

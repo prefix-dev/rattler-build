@@ -12,9 +12,9 @@ build:
         - echo "Hello World" > %PREFIX%\test-execution.txt
         - mkdir %PREFIX%\Library\bin && echo "Hello World" > %PREFIX%\Library\bin\rust.exe
 
-test:
-  package_contents:
-    files:
-      - "**/*.txt"
-    bins:
-      - rust
+tests:
+  - package_contents:
+      files:
+        - "**/*.txt"
+      bin:
+        - rust

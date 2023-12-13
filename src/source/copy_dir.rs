@@ -75,6 +75,7 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn with_include_globs<I>(mut self, includes: I) -> Self
     where
         I: IntoIterator<Item = &'a str>,
@@ -89,6 +90,7 @@ impl<'a> CopyDir<'a> {
         self
     }
 
+    #[allow(unused)]
     pub fn with_exclude_globs<I>(mut self, excludes: I) -> Self
     where
         I: IntoIterator<Item = &'a str>,
@@ -146,7 +148,7 @@ impl<'a> CopyDir<'a> {
         let folders = Arc::new(folders.into_iter().map(PathBuf::from).collect::<Vec<_>>());
 
         let mut result = CopyDirResult {
-            copied_pathes: Vec::with_capacity(0), // do not allocate as we overwrite this anyways
+            copied_paths: Vec::with_capacity(0), // do not allocate as we overwrite this anyways
             include_globs: make_glob_match_map(globs)?,
             exclude_globs: make_glob_match_map(self.exclude_globs)?,
         };
@@ -257,20 +259,20 @@ impl<'a> CopyDir<'a> {
             .filter_map(|res| res.transpose())
             .collect::<Result<Vec<_>, SourceError>>()?;
 
-        result.copied_pathes = copied_pathes;
+        result.copied_paths = copied_pathes;
         Ok(result)
     }
 }
 
 pub(crate) struct CopyDirResult<'a> {
-    copied_pathes: Vec<PathBuf>,
+    copied_paths: Vec<PathBuf>,
     include_globs: HashMap<Glob<'a>, Match>,
     exclude_globs: HashMap<Glob<'a>, Match>,
 }
 
 impl<'a> CopyDirResult<'a> {
-    pub fn copied_pathes(&self) -> &[PathBuf] {
-        &self.copied_pathes
+    pub fn copied_paths(&self) -> &[PathBuf] {
+        &self.copied_paths
     }
 
     pub fn include_globs(&self) -> &HashMap<Glob<'a>, Match> {
@@ -397,8 +399,8 @@ mod test {
             .run()
             .unwrap();
 
-        assert_eq!(copy_dir.copied_pathes().len(), 1);
-        assert_eq!(copy_dir.copied_pathes()[0], dest_dir_2.join("test.txt"));
+        assert_eq!(copy_dir.copied_paths().len(), 1);
+        assert_eq!(copy_dir.copied_paths()[0], dest_dir_2.join("test.txt"));
 
         let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
         // ignore all txt files
@@ -408,13 +410,13 @@ mod test {
             .run()
             .unwrap();
 
-        assert_eq!(copy_dir.copied_pathes().len(), 2);
+        assert_eq!(copy_dir.copied_paths().len(), 2);
         let expected = [
             dest_dir_3.join("test_dir/test.md"),
             dest_dir_3.join("test_dir/test_dir2"),
         ];
         let expected = expected.iter().collect::<HashSet<_>>();
-        let result = copy_dir.copied_pathes().iter().collect::<HashSet<_>>();
+        let result = copy_dir.copied_paths().iter().collect::<HashSet<_>>();
         assert_eq!(result, expected);
     }
 
@@ -434,7 +436,7 @@ mod test {
             .use_gitignore(false)
             .run()
             .unwrap();
-        assert_eq!(copy_dir.copied_pathes().len(), 2);
+        assert_eq!(copy_dir.copied_paths().len(), 2);
 
         fs_extra::dir::create_all(&dest_dir, true).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
@@ -443,9 +445,9 @@ mod test {
             .use_gitignore(false)
             .run()
             .unwrap();
-        assert_eq!(copy_dir.copied_pathes().len(), 1);
+        assert_eq!(copy_dir.copied_paths().len(), 1);
         assert_eq!(
-            copy_dir.copied_pathes()[0],
+            copy_dir.copied_paths()[0],
             dest_dir.path().join("test_copy_dir/test_1.txt")
         );
 
@@ -455,9 +457,9 @@ mod test {
             .use_gitignore(false)
             .run()
             .unwrap();
-        assert_eq!(copy_dir.copied_pathes().len(), 1);
+        assert_eq!(copy_dir.copied_paths().len(), 1);
         assert_eq!(
-            copy_dir.copied_pathes()[0],
+            copy_dir.copied_paths()[0],
             dest_dir.path().join("test_copy_dir/test_1.txt")
         );
     }
@@ -493,7 +495,7 @@ mod test {
             .use_gitignore(false)
             .run()
             .unwrap();
-        assert_eq!(copy_dir.copied_pathes().len(), 3);
+        assert_eq!(copy_dir.copied_paths().len(), 3);
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
         assert_eq!(

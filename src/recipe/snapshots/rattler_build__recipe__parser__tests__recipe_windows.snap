@@ -1,6 +1,6 @@
 ---
 source: src/recipe/parser.rs
-expression: recipe.unwrap()
+expression: win_recipe.unwrap()
 ---
 Recipe {
     package: Package {
@@ -254,18 +254,25 @@ Recipe {
             from_package: {},
         },
     },
-    test: Test {
-        imports: [],
-        commands: [
-            "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
-            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
-            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
-        ],
-        requires: [],
-        source_files: [],
-        files: [],
-        package_contents: None,
-    },
+    tests: [
+        Command(
+            CommandsTest {
+                script: [
+                    "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                ],
+                requirements: CommandsTestRequirements {
+                    run: [],
+                    build: [],
+                },
+                files: CommandsTestFiles {
+                    source: [],
+                    recipe: [],
+                },
+            },
+        ),
+    ],
     about: About {
         homepage: Some(
             Url {
