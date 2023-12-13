@@ -119,7 +119,9 @@ fn run_in_environment(
 
     writeln!(tmpfile, "{}", additional_script.contents)?;
     writeln!(tmpfile, "{}", script.script)?;
-    writeln!(tmpfile, "set -x")?;
+    if matches!(shell, ShellEnum::Bash(_)) {
+        writeln!(tmpfile, "set -x")?;
+    }
     writeln!(tmpfile, "{}", cmd)?;
 
     let tmpfile_path = tmpfile.into_temp_path();
