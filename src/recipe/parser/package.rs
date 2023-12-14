@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use itertools::Itertools;
 use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 
@@ -13,6 +12,8 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
+
+use super::FlattenErrors;
 
 /// A recipe package information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -46,8 +47,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
         let mut name_val = None;
         let mut version = None;
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self
-            .iter()
+        self.iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
@@ -63,11 +63,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
                 }
                 Ok(())
             })
-            .partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+            .flatten_errors()?;
 
         let Some(version) = version else {
             return Err(vec![_partialerror!(
@@ -125,8 +121,7 @@ impl TryConvertNode<OutputPackage> for RenderedMappingNode {
         let mut version = None;
         let span = *self.span();
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self
-            .iter()
+        self.iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
@@ -146,11 +141,7 @@ impl TryConvertNode<OutputPackage> for RenderedMappingNode {
                 }
                 Ok(())
             })
-            .partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+            .flatten_errors()?;
 
         let Some(name) = name_val else {
             return Err(vec![_partialerror!(

@@ -2,7 +2,6 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
-use itertools::Itertools;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -54,6 +53,47 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "About::is_default")]
     about: About,
 }
+pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
+    fn collect_errors(self) -> Result<(), Vec<V>> {
+        let err = self
+            .filter_map(|res| match res {
+                Ok(_) => None,
+                Err(err) => Some(err),
+            })
+            .fold(Vec::<V>::new(), |mut acc, x| {
+                acc.push(x);
+                acc
+            });
+        if err.is_empty() {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+}
+
+impl<T, K, V> CollectErrors<K, V> for T where T: Iterator<Item = Result<K, V>> + Sized {}
+
+pub(crate) trait FlattenErrors<K, V>: Iterator<Item = Result<K, Vec<V>>> + Sized {
+    fn flatten_errors(self) -> Result<(), Vec<V>> {
+        let err = self
+            .filter_map(|res| match res {
+                Ok(_) => None,
+                Err(err) => Some(err),
+            })
+            .fold(Vec::<V>::new(), |mut acc, x| {
+                acc.extend(x);
+                acc
+            });
+        if err.is_empty() {
+            Ok(())
+        } else {
+            Err(err)
+        }
+    }
+}
+
+impl<T, K, V> FlattenErrors<K, V> for T where T: Iterator<Item = Result<K, Vec<V>>> + Sized {}
 
 impl Recipe {
     /// Build a recipe from a YAML string.
@@ -108,7 +148,7 @@ impl Recipe {
                 )]
             })?;
 
-            let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = context
+            context
                 .iter()
                 .map(|(k, v)| {
                     let val = v.as_scalar().ok_or_else(|| {
@@ -129,11 +169,7 @@ impl Recipe {
                     }
                     Ok(())
                 })
-                .partition_result();
-
-            if !errs.is_empty() {
-                return Err(errs.into_iter().flatten().collect_vec());
-            }
+                .flatten_errors()?;
         }
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
@@ -145,7 +181,7 @@ impl Recipe {
         let mut test = Test::default();
         let mut about = About::default();
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = rendered_node
+        rendered_node
             .iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
@@ -175,11 +211,7 @@ impl Recipe {
                 }
                 Ok(())
             })
-            .partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+            .flatten_errors()?;
 
         // Add hash to build.string if it is not set
         if build.string.is_none() {

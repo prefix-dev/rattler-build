@@ -2,7 +2,6 @@
 
 use std::{fmt, path::PathBuf, str::FromStr};
 
-use itertools::Itertools;
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -17,6 +16,8 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
+
+use super::FlattenErrors;
 
 /// Source information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,7 +195,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             }
         }
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(k, v)| {
+        self.iter().map(|(k, v)| {
             match k.as_str() {
                 "git_url" => {
                     let url_str: String = v.try_convert("git_url")?;
@@ -233,11 +234,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                 }
             }
             Ok(())
-        }).partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+        }).flatten_errors()?;
 
         let url = url.ok_or_else(|| {
             vec![_partialerror!(
@@ -349,7 +346,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut folder = None;
         let mut file_name = None;
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
+        self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "url" => url = value.try_convert(key_str)?,
@@ -375,11 +372,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                 }
             }
             Ok(())
-        }).partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+        }).flatten_errors()?;
 
         let url = url.ok_or_else(|| {
             vec![_partialerror!(
@@ -477,7 +470,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut use_gitignore = true;
         let mut file_name = None;
 
-        let (_, errs): (Vec<()>, Vec<Vec<PartialParsingError>>) = self.iter().map(|(key, value)| {
+        self.iter().map(|(key, value)| {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
@@ -493,11 +486,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
                 }
             }
             Ok(())
-        }).partition_result();
-
-        if !errs.is_empty() {
-            return Err(errs.into_iter().flatten().collect_vec());
-        }
+        }).flatten_errors()?;
 
         let path = path.ok_or_else(|| {
             vec![_partialerror!(
