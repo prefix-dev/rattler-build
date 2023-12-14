@@ -1,0 +1,32 @@
+[package]
+name = "py-rattler-build"
+version = "0.0.1"
+edition = "2021"
+license = "BSD-3-Clause"
+
+[lib]
+name = "rattler_build"
+crate-type = ["cdylib"]
+
+[features]
+
+[dependencies]
+anyhow = "1.0.75"
+futures = "0.3.28"
+rattler-build = { path = "../" }
+
+pyo3 = { version = "0.19", features = [
+    "abi3-py38",
+    "extension-module",
+    "multiple-pymethods",
+] }
+pyo3-asyncio = { version = "0.19", features = ["tokio-runtime"] }
+tokio = { version = "1.32" }
+
+thiserror = "1.0.44"
+url = "2.4.1"
+
+openssl = { version = "0.10", optional = true }
+
+# Prevent package from thinking it's in the workspace
+[workspace]
