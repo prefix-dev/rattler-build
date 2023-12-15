@@ -81,7 +81,7 @@ struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
 
-    /// Use a auth file for storing authentication information
+    /// Path to an auth-file to read authentication information from
     #[clap(
         long,
         env = "RATTLER_AUTH_FILE",
