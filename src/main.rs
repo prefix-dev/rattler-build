@@ -13,7 +13,8 @@ use std::{
     collections::BTreeMap,
     env::current_dir,
     path::PathBuf,
-    str::{self, FromStr}, sync::Arc,
+    str::{self, FromStr},
+    sync::Arc,
 };
 use tracing_subscriber::{
     filter::{Directive, ParseError},
@@ -82,12 +83,7 @@ struct CommonOpts {
     use_bz2: bool,
 
     /// Path to an auth-file to read authentication information from
-    #[clap(
-        long,
-        env = "RATTLER_AUTH_FILE",
-        default_value = "None",
-        hide = true
-    )]
+    #[clap(long, env = "RATTLER_AUTH_FILE", default_value = "None", hide = true)]
     auth_file: Option<PathBuf>,
 }
 
