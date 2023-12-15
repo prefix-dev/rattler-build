@@ -1,5 +1,6 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
+use std::process::Command;
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
@@ -244,6 +245,140 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 }
 
 #[derive(Debug)]
+pub(crate) struct Git;
+impl std::fmt::Display for Git {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Git")
+    }
+}
+
+impl Object for Git {
+    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
+        minijinja::value::ObjectKind::Plain
+    }
+
+    fn call_method(
+        &self,
+        _state: &minijinja::State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, minijinja::Error> {
+        match name {
+            "latest_tag_hash" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`latest_tag_hash` requires at least one argument",
+                    ));
+                };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag_hash` only accepts one argument",
+                    ));
+                }
+                let Some(src) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag_hash` requires a string argument",
+                    ));
+                };
+                let output = Command::new("git")
+                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
+                    .output()
+                    .map_err(|e| {
+                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+                    })?;
+                let value = if !output.status.success() {
+                    Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                    ))?
+                } else {
+                    String::from_utf8(output.stdout)
+                        .map_err(|e| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                e.to_string(),
+                            )
+                        })?
+                        .lines()
+                        .last()
+                        .and_then(|s| s.split_ascii_whitespace().nth(0))
+                        .ok_or_else(|| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                "Failed to get the latest tag".to_string(),
+                            )
+                        })?
+                        .to_string()
+                };
+                Ok(Value::from(value))
+            }
+            "latest_tag" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`latest_tag` requires at least one argument",
+                    ));
+                };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag` only accepts one argument",
+                    ));
+                }
+                let Some(src) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag` requires a string argument",
+                    ));
+                };
+                let output = Command::new("git")
+                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
+                    .output()
+                    .map_err(|e| {
+                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+                    })?;
+                let value = if !output.status.success() {
+                    Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                    ))?
+                } else {
+                    String::from_utf8(output.stdout)
+                        .map_err(|e| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                e.to_string(),
+                            )
+                        })?
+                        .lines()
+                        .last()
+                        .and_then(|s| s.split_ascii_whitespace().nth(1))
+                        .and_then(|s| s.strip_prefix("refs/tags/"))
+                        .map(|s| s.trim_end_matches("^{}"))
+                        .ok_or_else(|| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                "Failed to get the latest tag".to_string(),
+                            )
+                        })?
+                        .to_string()
+                };
+                Ok(Value::from(value))
+            }
+            name => Err(minijinja::Error::new(
+                minijinja::ErrorKind::UnknownMethod,
+                format!("object has no method named {name}"),
+            )),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct Env;
 impl std::fmt::Display for Env {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -358,9 +493,59 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    use anyhow::Context;
     use rattler_conda_types::Platform;
 
     use super::*;
+
+    // run tests within a temp dir set as the current_dir
+    // and cleanup the temp dir after the fact
+    fn within_temp_dir(f: impl Fn()) {
+        let current_dir = std::env::current_dir();
+        let dir = tempfile::TempDir::new().unwrap();
+        _ = std::env::set_current_dir(dir);
+        f();
+        _ = current_dir.map(|dir| std::env::set_current_dir(dir));
+    }
+
+    // clone git repo src with rev within current dir
+    fn git_clone_current_dir(src: impl AsRef<str>, hash: impl AsRef<str>) -> anyhow::Result<()> {
+        _ = std::process::Command::new("git")
+            // clone to current dir, fails if the current dir is non-empty
+            .args(["clone", src.as_ref(), "."])
+            .output()
+            .ok()
+            .and_then(|o| o.status.success().then_some(()))
+            .context("failed to clone to current dir")?;
+        _ = std::process::Command::new("git")
+            .args(["reset", "--hard", hash.as_ref()])
+            .output()
+            .ok()
+            .and_then(|o| o.status.success().then_some(()))
+            .context("failed to reset to commit hash")?;
+        Ok(())
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn eval_git() {
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant: BTreeMap::new(),
+            hash: None,
+        };
+
+        let jinja = Jinja::new(options);
+
+        within_temp_dir(|| {
+            git_clone_current_dir("https://github.com/prefix-dev/rip.git", "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
+            assert_eq!(jinja.eval("git.latest_tag('.')").expect("test 0").as_str().unwrap(), "v0.1.0");
+            assert_eq!(jinja.eval("git.latest_tag_hash('.')").expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+            // assert_eq!(jinja.eval("git.head_hash('.')").expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+            // assert_eq!(jinja.eval("git.tag_hash('.', 'v0.1.0')").expect("test 3").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+        });
+    }
 
     #[test]
     #[rustfmt::skip]

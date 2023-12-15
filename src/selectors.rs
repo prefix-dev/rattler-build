@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{hash::HashInfo, recipe::jinja::Env};
+use crate::{hash::HashInfo, recipe::jinja::Env, recipe::jinja::Git};
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
@@ -56,6 +56,7 @@ impl SelectorConfig {
         }
 
         context.insert("env".to_string(), Value::from_object(Env));
+        context.insert("git".to_string(), Value::from_object(Git));
 
         for (key, v) in self.variant {
             context.insert(key, Value::from_safe_string(v));
