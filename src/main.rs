@@ -13,7 +13,7 @@ use std::{
     collections::BTreeMap,
     env::current_dir,
     path::PathBuf,
-    str::{self, FromStr},
+    str::{self, FromStr}, sync::Arc,
 };
 use tracing_subscriber::{
     filter::{Directive, ParseError},
@@ -81,14 +81,14 @@ struct CommonOpts {
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
 
-    /// Force usage of the file based authentication storage
+    /// Use a auth file for storing authentication information
     #[clap(
         long,
-        env = "RATTLER_USE_AUTH_FILE",
-        default_value = "false",
+        env = "RATTLER_AUTH_FILE",
+        default_value = "None",
         hide = true
     )]
-    use_auth_file: bool,
+    auth_file: Option<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -190,15 +190,18 @@ async fn main() -> miette::Result<()> {
     }
 }
 
-fn get_auth_store(use_auth_file: bool) -> rattler_networking::AuthenticationStorage {
-    if use_auth_file {
-        let mut store = rattler_networking::AuthenticationStorage::new();
-        store.add_backend(Box::from(
-            rattler_networking::authentication_storage::backends::file::FileStorage::default(),
-        ));
-        store
-    } else {
-        rattler_networking::AuthenticationStorage::default()
+fn get_auth_store(auth_file: Option<PathBuf>) -> rattler_networking::AuthenticationStorage {
+    match auth_file {
+        Some(auth_file) => {
+            let mut store = rattler_networking::AuthenticationStorage::new();
+            store.add_backend(Arc::from(
+                rattler_networking::authentication_storage::backends::file::FileStorage::new(
+                    auth_file,
+                ),
+            ));
+            store
+        }
+        None => rattler_networking::AuthenticationStorage::default(),
     }
 }
 
@@ -219,7 +222,7 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
             .no_gzip()
             .build()
             .expect("failed to create client"),
-        get_auth_store(args.common.use_auth_file),
+        get_auth_store(args.common.auth_file),
     );
 
     let global_configuration = tool_configuration::Configuration {
@@ -337,7 +340,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             .no_gzip()
             .build()
             .expect("failed to create client"),
-        get_auth_store(args.common.use_auth_file),
+        get_auth_store(args.common.auth_file),
     );
 
     let tool_config = tool_configuration::Configuration {
