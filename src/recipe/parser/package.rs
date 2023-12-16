@@ -13,6 +13,8 @@ use crate::{
     },
 };
 
+use super::FlattenErrors;
+
 /// A recipe package information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Package {
@@ -33,49 +35,52 @@ impl Package {
 }
 
 impl TryConvertNode<Package> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Package, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<Package> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<Package, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Package, Vec<PartialParsingError>> {
         let mut name_val = None;
         let mut version = None;
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "name" => name_val = value.try_convert(key_str)?,
-                "version" => version = value.try_convert(key_str)?,
-                invalid => {
-                    return Err(_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("valid fields for `{name}` are `name` and `version`")
-                    ))
+        self.iter()
+            .map(|(key, value)| {
+                let key_str = key.as_str();
+                match key_str {
+                    "name" => name_val = value.try_convert(key_str)?,
+                    "version" => version = value.try_convert(key_str)?,
+                    invalid => {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid.to_string().into()),
+                            help = format!("valid fields for `{name}` are `name` and `version`")
+                        )])
+                    }
                 }
-            }
-        }
+                Ok(())
+            })
+            .flatten_errors()?;
 
         let Some(version) = version else {
-            return Err(_partialerror!(
+            return Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("version".into()),
                 label = "add the field `version` in between here",
                 help = format!("the field `version` is required for `{name}`")
-            ));
+            )]);
         };
 
         let Some(name) = name_val else {
-            return Err(_partialerror!(
+            return Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("name".into()),
                 label = "add the field `name` in between here",
                 help = format!("the field `name` is required for `{name}`")
-            ));
+            )]);
         };
 
         Ok(Package { name, version })
@@ -103,44 +108,47 @@ impl OutputPackage {
 }
 
 impl TryConvertNode<OutputPackage> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<OutputPackage, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<OutputPackage, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<OutputPackage> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<OutputPackage, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<OutputPackage, Vec<PartialParsingError>> {
         let mut name_val = None;
         let mut version = None;
         let span = *self.span();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "name" => {
-                    name_val = value.try_convert(key_str)?;
+        self.iter()
+            .map(|(key, value)| {
+                let key_str = key.as_str();
+                match key_str {
+                    "name" => {
+                        name_val = value.try_convert(key_str)?;
+                    }
+                    "version" => {
+                        version = value.try_convert(key_str)?;
+                    }
+                    invalid => {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid.to_string().into()),
+                            help = format!("valid fields for `{name}` are `name` and `version`")
+                        )])
+                    }
                 }
-                "version" => {
-                    version = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("valid fields for `{name}` are `name` and `version`")
-                    ))
-                }
-            }
-        }
+                Ok(())
+            })
+            .flatten_errors()?;
 
         let Some(name) = name_val else {
-            return Err(_partialerror!(
+            return Err(vec![_partialerror!(
                 span,
                 ErrorKind::MissingField("name".into()),
                 help = format!("the field `name` is required for `{name}`")
-            ));
+            )]);
         };
 
         Ok(OutputPackage { name, version })
@@ -148,17 +156,17 @@ impl TryConvertNode<OutputPackage> for RenderedMappingNode {
 }
 
 impl TryConvertNode<PackageName> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<PackageName, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<PackageName, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
         PackageName::from_str(self.as_str())
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err),))
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])
     }
 }
 

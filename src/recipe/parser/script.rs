@@ -185,27 +185,27 @@ impl From<ScriptContent> for Script {
 }
 
 impl TryConvertNode<Script> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Script, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Scalar(s) => s.try_convert(name),
             RenderedNode::Sequence(seq) => seq.try_convert(name),
             RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Null(_) => Err(_partialerror!(
+            RenderedNode::Null(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField(Cow::Owned(name.to_owned()))
-            )),
+            )]),
         }
     }
 }
 
 impl TryConvertNode<Script> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<Script, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<Script, Vec<PartialParsingError>> {
         Ok(ScriptContent::CommandOrPath(self.as_str().to_owned()).into())
     }
 }
 
 impl TryConvertNode<Script> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<Script, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
         Ok(ScriptContent::Commands(
             self.iter()
                 .map(|node| node.try_convert(name))
@@ -216,7 +216,7 @@ impl TryConvertNode<Script> for RenderedSequenceNode {
 }
 
 impl TryConvertNode<Script> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<Script, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
         let invalid = self.keys().find(|k| {
             matches!(
                 k.as_str(),
@@ -225,11 +225,11 @@ impl TryConvertNode<Script> for RenderedMappingNode {
         });
 
         if let Some(invalid) = invalid {
-            return Err(_partialerror!(
+            return Err(vec![_partialerror!(
                 *invalid.span(),
                 ErrorKind::InvalidField(invalid.to_string().into()),
                 help = format!("valid keys for {name} are `env`, `secrets`, `interpreter`, `content` or `file`")
-            ));
+            )]);
         }
 
         let env = self
@@ -264,11 +264,11 @@ impl TryConvertNode<Script> for RenderedMappingNode {
                     } else {
                         (file, "file")
                     };
-                return Err(_partialerror!(
+                return Err(vec![_partialerror!(
                     *last_node.span(),
                     ErrorKind::InvalidField(last_node_name.into()),
                     help = format!("cannot specify both `content` and `file`")
-                ));
+                )]);
             }
             (Some(file), None) => file.try_convert("file").map(ScriptContent::Path)?,
             (None, Some(content)) => match content {

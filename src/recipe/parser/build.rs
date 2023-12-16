@@ -3,7 +3,7 @@ use std::str::FromStr;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
-use super::Dependency;
+use super::{Dependency, FlattenErrors};
 use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
@@ -84,46 +84,48 @@ impl Build {
 }
 
 impl TryConvertNode<Build> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Build, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Build, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<Build> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<Build, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<Build, Vec<PartialParsingError>> {
         let mut build = Build::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "number" => {
-                    build.number = value.try_convert(key_str)?;
+        self.iter()
+            .map(|(key, value)| {
+                let key_str = key.as_str();
+                match key_str {
+                    "number" => {
+                        build.number = value.try_convert(key_str)?;
+                    }
+                    "string" => {
+                        build.string = value.try_convert(key_str)?;
+                    }
+                    "skip" => {
+                        let conds: Vec<bool> = value.try_convert(key_str)?;
+                        build.skip = conds.iter().any(|&v| v);
+                    }
+                    "script" => build.script = value.try_convert(key_str)?,
+                    "noarch" => {
+                        build.noarch = value.try_convert(key_str)?;
+                    }
+                    "python" => {
+                        build.python = value.try_convert(key_str)?;
+                    }
+                    invalid => {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid.to_string().into()),
+                        )]);
+                    }
                 }
-                "string" => {
-                    build.string = value.try_convert(key_str)?;
-                }
-                "skip" => {
-                    let conds: Vec<bool> = value.try_convert(key_str)?;
-
-                    build.skip = conds.iter().any(|&v| v);
-                }
-                "script" => build.script = value.try_convert(key_str)?,
-                "noarch" => {
-                    build.noarch = value.try_convert(key_str)?;
-                }
-                "python" => {
-                    build.python = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    ));
-                }
-            }
-        }
+                Ok(())
+            })
+            .flatten_errors()?;
 
         Ok(build)
     }
@@ -151,15 +153,15 @@ impl Python {
 }
 
 impl TryConvertNode<Python> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<Python, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<Python, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
             .and_then(|m| m.try_convert(name))
     }
 }
 
 impl TryConvertNode<Python> for RenderedMappingNode {
-    fn try_convert(&self, _name: &str) -> Result<Python, PartialParsingError> {
+    fn try_convert(&self, _name: &str) -> Result<Python, Vec<PartialParsingError>> {
         let mut python = Python::default();
 
         for (key, value) in self.iter() {
@@ -169,10 +171,10 @@ impl TryConvertNode<Python> for RenderedMappingNode {
                     python.entry_points = value.try_convert(key_str)?;
                 }
                 invalid => {
-                    return Err(_partialerror!(
+                    return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_string().into()),
-                    ));
+                    )]);
                 }
             }
         }
@@ -243,7 +245,7 @@ impl RunExports {
 }
 
 impl TryConvertNode<RunExports> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         let mut run_exports = RunExports::default();
 
         let dep = self.try_convert(name)?;
@@ -254,25 +256,25 @@ impl TryConvertNode<RunExports> for RenderedScalarNode {
 }
 
 impl TryConvertNode<NoArchType> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<NoArchType, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<NoArchType, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar,))?
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar,)])?
             .try_convert(name)
     }
 }
 
 impl TryConvertNode<NoArchType> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<NoArchType, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<NoArchType, Vec<PartialParsingError>> {
         let noarch = self.as_str();
         let noarch = match noarch {
             "python" => NoArchType::python(),
             "generic" => NoArchType::generic(),
             invalid => {
-                return Err(_partialerror!(
+                return Err(vec![_partialerror!(
                     *self.span(),
                     ErrorKind::InvalidField(invalid.to_owned().into()),
                     help = format!("expected `python` or `generic` for {name}"),
-                ));
+                )]);
             }
         };
         Ok(noarch)
@@ -280,16 +282,20 @@ impl TryConvertNode<NoArchType> for RenderedScalarNode {
 }
 
 impl TryConvertNode<EntryPoint> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<EntryPoint, PartialParsingError> {
+    fn try_convert(&self, name: &str) -> Result<EntryPoint, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedScalar))
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
             .and_then(|s| s.try_convert(name))
     }
 }
 
 impl TryConvertNode<EntryPoint> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<EntryPoint, PartialParsingError> {
-        EntryPoint::from_str(self.as_str())
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::EntryPointParsing(err),))
+    fn try_convert(&self, _name: &str) -> Result<EntryPoint, Vec<PartialParsingError>> {
+        EntryPoint::from_str(self.as_str()).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::EntryPointParsing(err),
+            )]
+        })
     }
 }

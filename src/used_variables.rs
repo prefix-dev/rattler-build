@@ -11,7 +11,6 @@
 //!    - extract all dependencies and add them to used variables to build full variant
 use std::collections::{HashSet, VecDeque};
 
-use itertools::Itertools;
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
@@ -19,6 +18,7 @@ use minijinja::machinery::{
 
 use crate::recipe::{
     custom_yaml::{HasSpan, Node, ScalarNode},
+    parser::CollectErrors,
     ParsingError,
 };
 
@@ -204,7 +204,7 @@ pub(crate) fn used_vars_from_expressions(
 
     let mut variables = HashSet::new();
 
-    let (_, errs): (Vec<()>, Vec<ParsingError>) = selectors
+    selectors
         .iter()
         .map(|selector| -> Result<(), ParsingError> {
             let selector_tmpl = format!("{{{{ {} }}}}", selector.as_str());
@@ -221,11 +221,7 @@ pub(crate) fn used_vars_from_expressions(
             extract_variables(&ast, &mut variables);
             Ok(())
         })
-        .partition_result();
-
-    if !errs.is_empty() {
-        return Err(errs);
-    }
+        .collect_errors()?;
 
     // parse recipe into AST
     find_jinja(yaml_node, src, &mut variables)?;

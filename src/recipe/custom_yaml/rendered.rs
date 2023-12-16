@@ -560,7 +560,7 @@ impl ops::DerefMut for RenderedMappingNode {
 }
 
 impl Render<RenderedNode> for Node {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         match self {
             Node::Scalar(s) => s.render(jinja, name),
             Node::Mapping(m) => m.render(jinja, name),
@@ -574,7 +574,7 @@ impl Render<RenderedNode> for Node {
 }
 
 impl Render<RenderedNode> for ScalarNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         // Special case for the `skip` key when rendering
         //
         // The `skip` key is special. It expects one or more strings that are supposed to be
@@ -585,11 +585,11 @@ impl Render<RenderedNode> for ScalarNode {
         // node.
         if name == "ROOT.build.skip" || name == "ROOT.outputs.build.skip" {
             let rendered = jinja.eval(self.as_str()).map_err(|err| {
-                _partialerror!(
+                vec![_partialerror!(
                     *self.span(),
                     ErrorKind::JinjaRendering(err),
                     label = jinja_error_to_label(&err),
-                )
+                )]
             })?;
 
             let rendered = RenderedScalarNode::new(*self.span(), rendered.is_true().to_string());
@@ -597,11 +597,11 @@ impl Render<RenderedNode> for ScalarNode {
         }
 
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
                 label = jinja_error_to_label(&err),
-            )
+            )]
         })?;
         let rendered = RenderedScalarNode::new(*self.span(), rendered);
 
@@ -618,13 +618,13 @@ impl Render<Option<RenderedNode>> for ScalarNode {
         &self,
         jinja: &Jinja,
         _name: &str,
-    ) -> Result<Option<RenderedNode>, PartialParsingError> {
+    ) -> Result<Option<RenderedNode>, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
-            _partialerror!(
+            vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
                 label = format!("Rendering error: {}", err.kind())
-            )
+            )]
         })?;
 
         let rendered = RenderedScalarNode::new(*self.span(), rendered);
@@ -638,7 +638,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
 }
 
 impl Render<RenderedNode> for MappingNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         let rendered = self.render(jinja, name)?;
 
         Ok(RenderedNode::Mapping(rendered))
@@ -650,7 +650,7 @@ impl Render<RenderedMappingNode> for MappingNode {
         &self,
         jinja: &Jinja,
         name: &str,
-    ) -> Result<RenderedMappingNode, PartialParsingError> {
+    ) -> Result<RenderedMappingNode, Vec<PartialParsingError>> {
         let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
@@ -666,7 +666,7 @@ impl Render<RenderedMappingNode> for MappingNode {
 }
 
 impl Render<RenderedNode> for SequenceNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, PartialParsingError> {
+    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         let rendered: RenderedSequenceNode = self.render(jinja, name)?;
 
         if rendered.is_empty() {
@@ -685,7 +685,7 @@ impl Render<RenderedSequenceNode> for SequenceNode {
         &self,
         jinja: &Jinja,
         name: &str,
-    ) -> Result<RenderedSequenceNode, PartialParsingError> {
+    ) -> Result<RenderedSequenceNode, Vec<PartialParsingError>> {
         let mut rendered = Vec::with_capacity(self.len());
 
         for item in self.iter() {
@@ -704,7 +704,7 @@ impl Render<RenderedSequenceNode> for SequenceNodeInternal {
         &self,
         jinja: &Jinja,
         name: &str,
-    ) -> Result<RenderedSequenceNode, crate::recipe::error::PartialParsingError> {
+    ) -> Result<RenderedSequenceNode, Vec<crate::recipe::error::PartialParsingError>> {
         let mut rendered = Vec::new();
         match self {
             SequenceNodeInternal::Simple(node) => rendered.push(node.render(jinja, name)?),
