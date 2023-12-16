@@ -83,7 +83,7 @@ struct CommonOpts {
     use_bz2: bool,
 
     /// Path to an auth-file to read authentication information from
-    #[clap(long, env = "RATTLER_AUTH_FILE", default_value = "None", hide = true)]
+    #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
     auth_file: Option<PathBuf>,
 }
 
