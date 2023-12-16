@@ -27,11 +27,17 @@ class RattlerBuild:
         recipe_folder: Path,
         output_folder: Path,
         variant_config: Optional[Path] = None,
+        custom_channels: list[str] | None = None,
     ):
         args = ["build", "--recipe", str(recipe_folder)]
         if variant_config is not None:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
+
+        if custom_channels:
+            for c in custom_channels:
+                args += ["--channel", c]
+
         print(args)
         return self(*args)
 
@@ -169,3 +175,31 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
+
+@pytest.mark.skipif("PREFIX_DEV_READ_ONLY_TOKEN" not in os.environ, reason="requires PREFIX_DEV_READ_ONLY_TOKEN")
+def test_auth_file(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch):
+    auth_file = tmp_path / "auth.json"
+    monkeypatch.setenv('RATTLER_AUTH_FILE', str(auth_file))
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "private-repository",
+            tmp_path,
+            custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
+        )
+    
+    auth_file.write_text(
+        json.dumps(
+            {
+                "repo.prefix.dev": {
+                    "BearerToken": os.environ["PREFIX_DEV_READ_ONLY_TOKEN"]
+                }
+            }
+        )
+    )
+
+    rattler_build.build(
+        recipes / "private-repository",
+        tmp_path,
+        custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
+    )
