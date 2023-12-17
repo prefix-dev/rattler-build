@@ -48,11 +48,17 @@ def rattler_build():
         return RattlerBuild(os.environ["RATTLER_BUILD_PATH"])
     else:
         base_path = Path(__file__).parent.parent.parent
-        # use the default target release path, then debug
-        if (base_path / "target/release/rattler-build").exists():
-            return RattlerBuild((base_path / "target/release/rattler-build"))
-        elif (base_path / "target/debug/rattler-build").exists():
-            return RattlerBuild((base_path / "target/debug/rattler-build"))
+        executable_name = "rattler-build"
+        if os.name == 'nt':
+            executable_name += ".exe"
+
+        release_path = base_path / f"target/release/{executable_name}"
+        debug_path = base_path / f"target/debug/{executable_name}"
+
+        if release_path.exists():
+            return RattlerBuild(release_path)
+        elif debug_path.exists():
+            return RattlerBuild(debug_path)
 
     raise FileNotFoundError("Could not find rattler-build executable")
 
