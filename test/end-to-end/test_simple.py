@@ -176,7 +176,7 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
 
-@pytest.mark.skipif("PREFIX_DEV_READ_ONLY_TOKEN" not in os.environ, reason="requires PREFIX_DEV_READ_ONLY_TOKEN")
+@pytest.mark.skipif(not os.environ.get("PREFIX_DEV_READ_ONLY_TOKEN", ""), reason="requires PREFIX_DEV_READ_ONLY_TOKEN")
 def test_auth_file(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch):
     auth_file = tmp_path / "auth.json"
     monkeypatch.setenv('RATTLER_AUTH_FILE', str(auth_file))
