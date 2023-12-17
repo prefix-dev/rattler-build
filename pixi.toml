@@ -1,6 +1,5 @@
 [project]
 name = "rattler-build"
-version = "0.3.1"
 description = "Conda package builder, using the rattler rust backend"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 channels = ["conda-forge"]
