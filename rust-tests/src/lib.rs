@@ -185,7 +185,7 @@ mod tests {
         let help_test = rattler()
             // no heap allocations happen here, ideally!
             .with_args(Vec::<&str>::new())
-            .map(|out| out.stderr)
+            .map(|out| out.stdout)
             .map(|s| {
                 #[cfg(target_family = "unix")]
                 return s.starts_with(b"Usage: rattler-build [OPTIONS]");
