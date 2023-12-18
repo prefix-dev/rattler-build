@@ -14,6 +14,7 @@ use std::{
     env::current_dir,
     path::PathBuf,
     str::{self, FromStr},
+    sync::Arc,
 };
 use tracing_subscriber::{
     filter::{Directive, ParseError},
@@ -80,6 +81,10 @@ struct CommonOpts {
     /// Enable support for repodata.json.bz2
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
+
+    /// Path to an auth-file to read authentication information from
+    #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
+    auth_file: Option<PathBuf>,
 }
 
 #[derive(Parser)]
@@ -139,6 +144,9 @@ struct TestOpts {
     /// The package file to test
     #[arg(short, long)]
     package_file: PathBuf,
+
+    #[clap(flatten)]
+    common: CommonOpts,
 }
 
 #[derive(Parser)]
@@ -178,6 +186,21 @@ async fn main() -> miette::Result<()> {
     }
 }
 
+fn get_auth_store(auth_file: Option<PathBuf>) -> rattler_networking::AuthenticationStorage {
+    match auth_file {
+        Some(auth_file) => {
+            let mut store = rattler_networking::AuthenticationStorage::new();
+            store.add_backend(Arc::from(
+                rattler_networking::authentication_storage::backends::file::FileStorage::new(
+                    auth_file,
+                ),
+            ));
+            store
+        }
+        None => rattler_networking::AuthenticationStorage::default(),
+    }
+}
+
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
     let test_prefix = PathBuf::from("test-prefix");
@@ -190,7 +213,22 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
         channels: vec!["conda-forge".to_string(), "./output".to_string()],
     };
 
-    test::run_test(&package_file, &test_options)
+    let client = AuthenticatedClient::from_client(
+        reqwest::Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+        get_auth_store(args.common.auth_file),
+    );
+
+    let global_configuration = tool_configuration::Configuration {
+        client,
+        multi_progress_indicator: MultiProgress::new(),
+        no_clean: test_options.keep_test_prefix,
+        ..Default::default()
+    };
+
+    test::run_test(&package_file, &test_options, &global_configuration)
         .await
         .into_diagnostic()?;
 
@@ -293,8 +331,16 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         tracing::info!("{}\n", table);
     }
 
+    let client = AuthenticatedClient::from_client(
+        reqwest::Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+        get_auth_store(args.common.auth_file),
+    );
+
     let tool_config = tool_configuration::Configuration {
-        client: AuthenticatedClient::default(),
+        client,
         multi_progress_indicator: multi_progress,
         no_clean: args.keep_build,
         no_test: args.no_test,

@@ -19,7 +19,7 @@ jobs:
   run_tests:
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest"]
+        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
       fail-fast: false
 
     name: Run tests
@@ -30,11 +30,13 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: '1.73.0'
       - uses: prefix-dev/setup-pixi@v0.4.1
         with:
           pixi-version: v0.10.0
       # build in release mode so that it's reasonably fast to run the tests
       - run: cargo build --release
-      - run: cargo test -p rust-tests -- --test-threads 1
-      # - run: pixi run end_to_end_test
+      - run: cargo test --release -p rust-tests -- --test-threads 1
+      - run: pixi run end_to_end_test
+        env:
+          PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}

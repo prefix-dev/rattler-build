@@ -341,6 +341,7 @@ pub async fn run_build(
                 keep_test_prefix: tool_configuration.no_clean,
                 channels,
             },
+            &tool_configuration,
         )
         .await
         .into_diagnostic()?;
