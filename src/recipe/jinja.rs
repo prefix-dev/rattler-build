@@ -264,24 +264,24 @@ impl Object for Git {
         args: &[Value],
     ) -> Result<Value, minijinja::Error> {
         match name {
-            "latest_tag_hash" => {
+            "latest_tag_rev" => {
                 let mut args = args.iter();
                 let Some(arg) = args.next() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::MissingArgument,
-                        "`latest_tag_hash` requires at least one argument",
+                        "`latest_tag_rev` requires at least one argument",
                     ));
                 };
                 if args.next().is_some() {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag_hash` only accepts one argument",
+                        "`latest_tag_rev` only accepts one argument",
                     ));
                 }
                 let Some(src) = arg.as_str() else {
                     return Err(minijinja::Error::new(
                         minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag_hash` requires a string argument",
+                        "`latest_tag_rev` requires a string argument",
                     ));
                 };
                 let output = Command::new("git")
@@ -498,19 +498,21 @@ mod tests {
 
     use super::*;
 
-    // run tests within a temp dir set as the current_dir
-    // and cleanup the temp dir after the fact
-    fn within_temp_dir(f: impl Fn()) {
-        let current_dir = std::env::current_dir();
-        let dir = tempfile::TempDir::new().unwrap();
-        _ = std::env::set_current_dir(dir);
-        f();
-        _ = current_dir.map(|dir| std::env::set_current_dir(dir));
+    fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
+        let dir = std::env::temp_dir().join(key);
+        _ = std::fs::create_dir_all(&dir).unwrap();
+        f(&dir);
+        _ = std::fs::remove_dir_all(dir).unwrap();
     }
 
     // clone git repo src with rev within current dir
-    fn git_clone_current_dir(src: impl AsRef<str>, hash: impl AsRef<str>) -> anyhow::Result<()> {
+    fn git_clone(
+        src: impl AsRef<str>,
+        path: impl AsRef<std::path::Path>,
+        hash: impl AsRef<str>,
+    ) -> anyhow::Result<()> {
         _ = std::process::Command::new("git")
+            .current_dir(&path)
             // clone to current dir, fails if the current dir is non-empty
             .args(["clone", src.as_ref(), "."])
             .output()
@@ -518,6 +520,7 @@ mod tests {
             .and_then(|o| o.status.success().then_some(()))
             .context("failed to clone to current dir")?;
         _ = std::process::Command::new("git")
+            .current_dir(&path)
             .args(["reset", "--hard", hash.as_ref()])
             .output()
             .ok()
@@ -538,10 +541,10 @@ mod tests {
 
         let jinja = Jinja::new(options);
 
-        within_temp_dir(|| {
-            git_clone_current_dir("https://github.com/prefix-dev/rip.git", "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
-            assert_eq!(jinja.eval("git.latest_tag('.')").expect("test 0").as_str().unwrap(), "v0.1.0");
-            assert_eq!(jinja.eval("git.latest_tag_hash('.')").expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+        with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
+            git_clone("https://github.com/prefix-dev/rip.git", path, "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
+            assert_eq!(jinja.eval(&format!("git.latest_tag('{}')", path.display())).expect("test 0").as_str().unwrap(), "v0.1.0");
+            assert_eq!(jinja.eval(&format!("git.latest_tag_rev('{}')", path.display())).expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             // assert_eq!(jinja.eval("git.head_hash('.')").expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             // assert_eq!(jinja.eval("git.tag_hash('.', 'v0.1.0')").expect("test 3").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
         });

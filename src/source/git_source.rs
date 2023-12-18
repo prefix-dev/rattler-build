@@ -237,82 +237,89 @@ mod tests {
         source::git_source::git_src,
     };
 
+    fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
+        let dir = std::env::temp_dir().join(key);
+        _ = std::fs::create_dir_all(&dir).unwrap();
+        f(&dir);
+        _ = std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[tracing_test::traced_test]
     #[test]
     fn test_host_git_source() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
-        let cases = vec![
-            (
-                GitSource::create(
-                    GitUrl::Url(
-                        "https://github.com/prefix-dev/rattler-build"
-                            .parse()
-                            .unwrap(),
+        with_temp_dir("rattler-build-test-host-git-source", |cache_dir| {
+            let cases = vec![
+                (
+                    GitSource::create(
+                        GitUrl::Url(
+                            "https://github.com/prefix-dev/rattler-build"
+                                .parse()
+                                .unwrap(),
+                        ),
+                        "main".to_owned(),
+                        None,
+                        vec![],
+                        None,
+                        false,
                     ),
-                    "main".to_owned(),
-                    None,
-                    vec![],
-                    None,
-                    false,
+                    "rattler-build",
                 ),
-                "rattler-build",
-            ),
-            (
-                GitSource::create(
-                    GitUrl::Url(
-                        "https://github.com/prefix-dev/rattler-build"
-                            .parse()
-                            .unwrap(),
+                (
+                    GitSource::create(
+                        GitUrl::Url(
+                            "https://github.com/prefix-dev/rattler-build"
+                                .parse()
+                                .unwrap(),
+                        ),
+                        "v0.1.3".to_owned(),
+                        None,
+                        vec![],
+                        None,
+                        false,
                     ),
-                    "v0.1.3".to_owned(),
-                    None,
-                    vec![],
-                    None,
-                    false,
+                    "rattler-build",
                 ),
-                "rattler-build",
-            ),
-            (
-                GitSource::create(
-                    GitUrl::Url(
-                        "https://github.com/prefix-dev/rattler-build"
-                            .parse()
-                            .unwrap(),
+                (
+                    GitSource::create(
+                        GitUrl::Url(
+                            "https://github.com/prefix-dev/rattler-build"
+                                .parse()
+                                .unwrap(),
+                        ),
+                        "v0.1.2".to_owned(),
+                        None,
+                        vec![],
+                        None,
+                        false,
                     ),
-                    "v0.1.2".to_owned(),
-                    None,
-                    vec![],
-                    None,
-                    false,
+                    "rattler-build",
                 ),
-                "rattler-build",
-            ),
-            (
-                GitSource::create(
-                    GitUrl::Path("../rattler-build".parse().unwrap()),
-                    "".to_owned(),
-                    None,
-                    vec![],
-                    None,
-                    false,
+                (
+                    GitSource::create(
+                        GitUrl::Path("../rattler-build".parse().unwrap()),
+                        "".to_owned(),
+                        None,
+                        vec![],
+                        None,
+                        false,
+                    ),
+                    "rattler-build",
                 ),
-                "rattler-build",
-            ),
-        ];
-        for (source, repo_name) in cases {
-            let path = git_src(
-                &source,
-                cache_dir.as_ref(),
-                // TODO: this test assumes current dir is the root folder of the project which may
-                // not be necessary for local runs.
-                std::env::current_dir().unwrap().as_ref(),
-            )
-            .unwrap();
-            assert_eq!(
-                path.to_string_lossy(),
-                cache_dir.join(repo_name).to_string_lossy()
-            );
-        }
+            ];
+            for (source, repo_name) in cases {
+                let path = git_src(
+                    &source,
+                    cache_dir.as_ref(),
+                    // TODO: this test assumes current dir is the root folder of the project which may
+                    // not be necessary for local runs.
+                    std::env::current_dir().unwrap().as_ref(),
+                )
+                .unwrap();
+                assert_eq!(
+                    path.to_string_lossy(),
+                    cache_dir.join(repo_name).to_string_lossy()
+                );
+            }
+        });
     }
 }
