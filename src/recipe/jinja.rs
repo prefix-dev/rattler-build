@@ -543,8 +543,8 @@ mod tests {
 
         with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
             git_clone("https://github.com/prefix-dev/rip.git", path, "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
-            assert_eq!(jinja.eval(&format!("git.latest_tag('{}')", path.display())).expect("test 0").as_str().unwrap(), "v0.1.0");
-            assert_eq!(jinja.eval(&format!("git.latest_tag_rev('{}')", path.display())).expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+            assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
+            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             // assert_eq!(jinja.eval("git.head_hash('.')").expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             // assert_eq!(jinja.eval("git.tag_hash('.', 'v0.1.0')").expect("test 3").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
         });
