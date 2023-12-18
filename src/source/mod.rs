@@ -197,14 +197,25 @@ pub async fn fetch_sources(
 fn extract(archive: &Path, target_directory: &Path) -> Result<std::process::Output, SourceError> {
     let tar_exe = which::which("tar").map_err(|_| SourceError::TarNotFound)?;
 
-    let output = Command::new(&tar_exe)
+    let mut command = Command::new(&tar_exe);
+    command
         .arg("-xf")
         .arg(archive.as_os_str())
-        .arg("--preserve-permissions")
-        .arg("--strip-components=1")
-        .arg("-C")
-        .arg(target_directory.as_os_str())
-        .output()?;
+        .arg("--preserve-permissions");
+
+    // zip files don't need to have root directory (they can though, but we can't strip-component
+    // unconditionally as it's generally not the case)
+    if !archive
+        .extension()
+        .map(|ex| ex.eq("zip"))
+        .unwrap_or_default()
+    {
+        command.arg("--strip-components=1");
+    }
+
+    command.arg("-C").arg(target_directory.as_os_str());
+
+    let output = command.output()?;
 
     if !output.status.success() {
         return Err(SourceError::ExtractionError(format!(
