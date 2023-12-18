@@ -78,13 +78,14 @@ nav:
 
   - Package specification: package_spec.md
   - Compilers and cross compilation: compilers.md
-  - Automatic recipe linting: automatic_linting.md
   - Testing packages: testing.md
   - Reproducible builds: rebuild.md
 
   - Internals: internals.md
   - Recipe file: recipe_file.md
 
+  - CLI Usage: cli_usage.md
+  - Automatic recipe linting: automatic_linting.md
 
 plugins:
   - search
