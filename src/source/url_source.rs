@@ -119,7 +119,6 @@ pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<Path
     }
 
     let response = reqwest::get(source.url().clone()).await?;
-
     let mut file = std::fs::File::create(&cache_name)?;
 
     let mut content = Cursor::new(response.bytes().await?);
@@ -167,6 +166,13 @@ mod tests {
     fn test_cache_name() {
         let cases =
             vec![
+            (
+                "https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip",
+                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
+                    "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
+                ).unwrap()),
+                "snowflake-3.13.27_6a15e95e.zip",
+            ),
             (
                 "https://example.com/example.tar.gz",
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
