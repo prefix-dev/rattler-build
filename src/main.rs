@@ -22,6 +22,7 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+use url::Url;
 
 use rattler_build::{
     build::run_build,
@@ -36,6 +37,7 @@ use rattler_build::{
 
 mod console_utils;
 mod rebuild;
+mod upload;
 
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
@@ -49,6 +51,9 @@ enum SubCommands {
 
     /// Rebuild a package
     Rebuild(RebuildOpts),
+
+    /// Upload a package
+    Upload(UploadOpts),
 }
 
 #[derive(Parser)]
@@ -163,6 +168,42 @@ struct RebuildOpts {
     common: CommonOpts,
 }
 
+#[derive(Parser)]
+struct UploadOpts {
+    /// The package file to upload
+    #[clap(short, long)]
+    package_file: PathBuf,
+
+    /// The server type
+    #[clap(subcommand)]
+    server_type: ServerType,
+
+    #[clap(flatten)]
+    common: CommonOpts,
+}
+
+#[derive(Clone, Debug, PartialEq, Parser)]
+enum ServerType {
+    Quetz(QuetzOpts),
+}
+
+#[derive(Clone, Debug, PartialEq, Parser)]
+/// Options for uploading to a Quetz server
+/// Authentication is used from the keychain / auth-file
+struct QuetzOpts {
+    /// The URL to your Quetz server
+    #[arg(short, long, env = "QUETZ_SERVER_URL")]
+    url: Url,
+
+    /// The URL to your channel
+    #[arg(short, long, env = "QUETZ_CHANNEL")]
+    channel: String,
+
+    /// The quetz API key, if none is provided, the token is read from the keychain / auth-file
+    #[arg(short, long, env = "QUETZ_API_KEY")]
+    api_key: Option<String>,
+}
+
 #[tokio::main]
 async fn main() -> miette::Result<()> {
     let args = App::parse();
@@ -183,6 +224,7 @@ async fn main() -> miette::Result<()> {
         SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
         SubCommands::Test(args) => run_test_from_args(args).await,
         SubCommands::Rebuild(args) => rebuild_from_args(args).await,
+        SubCommands::Upload(args) => upload_from_args(args).await,
     }
 }
 
@@ -494,6 +536,32 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
         .into_diagnostic()?;
 
     run_build(&output, tool_config.clone()).await?;
+
+    Ok(())
+}
+
+async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
+    if ArchiveType::try_from(&args.package_file).is_none() {
+        return Err(miette::miette!(
+            "The file {} does not appear to be a conda package.",
+            args.package_file.to_string_lossy()
+        ));
+    }
+
+    let store = get_auth_store(args.common.auth_file);
+
+    match args.server_type {
+        ServerType::Quetz(quetz_opts) => {
+            upload::upload_package_to_quetz(
+                &store,
+                quetz_opts.api_key,
+                args.package_file,
+                quetz_opts.url,
+                quetz_opts.channel,
+            )
+            .await?;
+        }
+    }
 
     Ok(())
 }
