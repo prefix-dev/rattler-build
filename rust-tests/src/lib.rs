@@ -186,12 +186,7 @@ mod tests {
             // no heap allocations happen here, ideally!
             .with_args(Vec::<&str>::new())
             .map(|out| out.stdout)
-            .map(|s| {
-                #[cfg(target_family = "unix")]
-                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
-                #[cfg(target_family = "windows")]
-                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
-            })
+            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
             .unwrap();
         assert!(help_test);
     }
