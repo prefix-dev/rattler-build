@@ -2573,6 +2573,7 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-core",
  "tracing-indicatif",
