@@ -34,33 +34,78 @@ these are the only variables available to your build script. Unless otherwise
 noted, no variables are inherited from the shell environment in which you invoke
 `conda-build`. To override this behavior, see :ref:`inherited-env-vars`.
 
-| Variable           | Description                                                                                                                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ARCH`             | Either `32` or `64`, to specify whether the build is 32-bit or 64-bit. The value depends on the ARCH environment variable and defaults to the architecture the interpreter running conda was compiled with.                                                        |
-| `CMAKE_GENERATOR`  | The CMake generator string for the current build environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it is generated according to the Visual Studio version activated at build time, for example, `Visual Studio 9 2008 Win64`.            |
-| `CONDA_BUILD=1`    | Always set.                                                                                                                                                                                                                                                        |
-| `CPU_COUNT`        | The number of CPUs on the system, as reported by `multiprocessing.cpu_count()`.                                                                                                                                                                                    |
-| `SHLIB_EXT`        | The shared library extension.                                                                                                                                                                                                                                      |
-| `DIRTY`            | Set to 1 if the `--dirty` flag is passed to the `conda-build` command. May be used to skip parts of a build script conditionally for faster iteration time when developing recipes. For example, downloads, extraction and other things that need not be repeated. |
-| `HTTP_PROXY`       | Inherited from your shell environment.                                                                                                                                                                                                                             |
-| `HTTPS_PROXY`      | Inherited from your shell environment.                                                                                                                                                                                                                             |
-| `LANG`             | Inherited from your shell environment.                                                                                                                                                                                                                             |
-| `MAKEFLAGS`        | Inherited from your shell environment. May be used to set additional arguments to make, such as `-j2`, which uses 2 CPU cores to build your recipe.                                                                                                                |
-| `PY_VER`           | Python version building against. Set with the `--python` argument or with the CONDA_PY environment variable.                                                                                                                                                       |
-| `PATH`             | Inherited from your shell environment and augmented with `$PREFIX/bin`.                                                                                                                                                                                            |
-| `PREFIX`           | Build prefix to which the build script should install.                                                                                                                                                                                                             |
-| `PKG_BUILDNUM`     | Build number of the package being built.                                                                                                                                                                                                                           |
-| `PKG_NAME`         | Name of the package being built.                                                                                                                                                                                                                                   |
-| `PKG_VERSION`      | Version of the package being built.                                                                                                                                                                                                                                |
-| `PKG_BUILD_STRING` | Complete build string of the package being built, including hash. EXAMPLE: py27h21422ab_0. Conda-build 3.0+.                                                                                                                                                       |
-| `PKG_HASH`         | Hash of the package being built, without leading h. EXAMPLE: 21422ab. Conda-build 3.0+.                                                                                                                                                                            |
-| `PYTHON`           | Path to the Python executable in the host prefix. Python is installed only in the host prefix when it is listed as a host requirement.                                                                                                                             |
-| `R`                | Path to the R executable in the build prefix. R is only installed in the build prefix when it is listed as a build requirement.                                                                                                                                    |
-| `RECIPE_DIR`       | Directory of the recipe.                                                                                                                                                                                                                                           |
-| `SP_DIR`           | Python's site-packages location.                                                                                                                                                                                                                                   |
-| `SRC_DIR`          | Path to where source is unpacked or cloned. If the source file is not a recognized file type---zip, tar, tar.bz2, or tar.xz---this is a directory containing a copy of the source file.                                                                            |
-| `STDLIB_DIR`       | Python standard library location.                                                                                                                                                                                                                                  |
-| `build_platform`   | The native subdir of the conda executable                                                                                                                                                                                                                          |
+`ARCH`
+: Either `32` or `64`, to specify whether the build is 32-bit or 64-bit. The value depends on the ARCH environment variable and defaults to the architecture the interpreter running conda was compiled with.
+
+`CMAKE_GENERATOR`
+: The CMake generator string for the current build environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it is generated according to the Visual Studio version activated at build time, for example, `Visual Studio 9 2008 Win64`. 
+
+`CONDA_BUILD=1`
+: Always set to indicate that the conda-build process is running.
+
+`CPU_COUNT`
+: Represents the number of CPUs on the system.
+
+`SHLIB_EXT`
+: Denotes the shared library extension specific to the operating system (e.g., .so for Linux, .dylib for macOS, and .dll for Windows).
+
+`HTTP_PROXY`
+: Inherited from the user's shell environment, specifying the HTTP proxy settings.
+
+`HTTPS_PROXY`
+: Similar to HTTP_PROXY, this is inherited from the user's shell environment and specifies the HTTPS proxy settings.
+
+`LANG`
+: Inherited from the user's shell environment, defining the system language and locale settings.
+
+`MAKEFLAGS`
+: Inherited from the user's shell environment. This can be used to set additional arguments for the make command, such as -j2 to utilize 2 CPU cores for building the recipe.
+
+`PY_VER`
+: Specifies the Python version against which the build is occurring. This can be modified with a `variant_config.yaml` file.
+
+`PATH`
+: Inherited from the user's shell environment and augmented with the activated host and build prefixes.
+
+`PREFIX`
+: The build prefix to which the build script should install the software.
+
+`PKG_BUILDNUM`
+: Indicates the build number of the package currently being built.
+
+`PKG_NAME`
+: The name of the package that is being built.
+
+`PKG_VERSION`
+: The version of the package currently under construction.
+
+`PKG_BUILD_STRING`
+: The complete build string of the package being built, including the hash (e.g., py311h21422ab_0).
+
+`PKG_HASH`
+: Represents the hash of the package being built, excluding the leading 'h' (e.g., 21422ab). This is applicable from Conda-build 3.0 onwards.
+
+`PYTHON`
+: The path to the Python executable in the host prefix. Python is installed in the host prefix only when it is listed as a host requirement.
+
+`R`
+: The path to the R executable in the build prefix. R is installed in the build prefix only when it is listed as a build requirement.
+
+`RECIPE_DIR`
+: The directory where the recipe is located.
+
+`SP_DIR`
+: The location of Python's site-packages, where Python libraries are installed.
+
+`SRC_DIR`
+: The path to where the source code is unpacked or cloned. If the source file is not a recognized archive format, this directory contains a copy of the source file.
+
+`STDLIB_DIR`
+: The location of Python's standard library.
+
+`build_platform`
+: Represents the native subdirectory of the conda executable, indicating the platform for which the build is occurring.
+
 
 Removed from `conda-build` are:
 - `NPY_VER`
