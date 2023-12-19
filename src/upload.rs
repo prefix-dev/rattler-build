@@ -23,7 +23,9 @@ pub async fn upload_package_to_quetz(
                         Authentication information found in the keychain / auth file, but it was not a Conda token"));
             }
             Ok((_, None)) => {
-                return Err(miette::miette!("No quetz api key was given and none was found in the keychain / auth file"));
+                return Err(miette::miette!(
+                    "No quetz api key was given and none was found in the keychain / auth file"
+                ));
             }
             Err(e) => {
                 return Err(miette::miette!(
@@ -64,7 +66,7 @@ pub async fn upload_package_to_quetz(
         .map_err(redact_known_secrets_from_error)
         .into_diagnostic()
         .map_err(|e| miette::miette!("Quetz server responded with error: {e}"))?;
-    
+
     info!("Package was successfully uploaded to Quetz server");
     Ok(())
 }
