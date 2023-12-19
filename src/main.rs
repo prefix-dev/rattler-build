@@ -1,6 +1,6 @@
 //! This is the main entry point for the `rattler-build` binary.
 
-use clap::{arg, crate_version, Parser};
+use clap::{arg, crate_version, CommandFactory, Parser};
 
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use dunce::canonicalize;
@@ -59,8 +59,12 @@ enum SubCommands {
 #[derive(Parser)]
 #[clap(version = crate_version!())]
 struct App {
+    // If provided, outputs the completion file for given shell
+    #[arg(long = "generate", value_enum)]
+    generator: Option<clap_complete::Shell>,
+
     #[clap(subcommand)]
-    subcommand: SubCommands,
+    subcommand: Option<SubCommands>,
 
     #[command(flatten)]
     verbose: Verbosity<InfoLevel>,
@@ -220,11 +224,25 @@ async fn main() -> miette::Result<()> {
         )
         .init();
 
-    match args.subcommand {
-        SubCommands::Build(args) => run_build_from_args(args, multi_progress).await,
-        SubCommands::Test(args) => run_test_from_args(args).await,
-        SubCommands::Rebuild(args) => rebuild_from_args(args).await,
-        SubCommands::Upload(args) => upload_from_args(args).await,
+    if let Some(generator) = args.generator {
+        let mut cmd = App::command();
+        tracing::info!("Generating completion file for {generator:?}...");
+        fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
+            clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
+        }
+        print_completions(generator, &mut cmd);
+        Ok(())
+    } else {
+        match args.subcommand {
+            Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
+            Some(SubCommands::Test(args)) => run_test_from_args(args).await,
+            Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
+            Some(SubCommands::Upload(args)) => upload_from_args(args).await,
+            None => {
+                _ = App::command().print_long_help();
+                Ok(())
+            }
+        }
     }
 }
 
