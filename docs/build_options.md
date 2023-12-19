@@ -32,10 +32,10 @@ desirable, and in that case you can use the `always_copy_files` option.
 build:
   # include files even if they are already in the environment
   # as part of some other host dependency
-  always_include_files: [glob]
+  always_include_files: list of globs
 
   # do not soft- or hard-link these files, but always copy them was `no_link`
-  always_copy_files: [glob]
+  always_copy_files: list of globs
 ```
 
 !!! note "Glob patterns"
@@ -87,9 +87,9 @@ build:
     # for prefix replacement
     force_file_type:
       # force TEXT file type (list of globs)
-      text: [globs]
+      text: list of globs
       # force binary file type (list of globs)
-      binary: [globs]
+      binary: list of globs
 
     # ignore all or specific files for prefix replacement`
     ignore: bool | [path] (defaults to false)
@@ -127,11 +127,11 @@ build:
   variant:
     # Keys to forcibly use for the variant computation
     # even if they are not in the dependencies
-    use_keys: [string]
+    use_keys: list of strings
 
     # Keys to forcibly ignore for the variant computation
     # even if they are in the dependencies
-    ignore_keys: [string]
+    ignore_keys: list of strings
 
     # used to prefer this variant less
     down_prioritize_variant: integer (defaults to 0, higher is less preferred)
@@ -181,18 +181,18 @@ build:
   # settings for shared libraries and executables
   dynamic_linking:
     # linux only, list of rpaths relative to the installation prefix
-    rpaths: [path] (defaults to ['lib/'])
+    rpaths: list of paths (defaults to ['lib/'])
 
     # Allow runpath / rpath to point to these locations
     # outside of the environment
-    rpath_allowlist: [glob]
+    rpath_allowlist: list of globs
 
     # wether to relocate binaries or not. If this is a list of paths, then
     # only the listed paths are relocated
-    binary_relocation: bool (defaults to true) | [glob]
+    binary_relocation: bool (defaults to true) | list of globs
 
     # Allow linking against libraries that are not in the run requirements
-    missing_dso_allowlist: [glob]
+    missing_dso_allowlist: list of globs
 
     # what to do when detecting overdepending
     overdepending_behavior: "ignore" or "error" # (defaults to "error")
