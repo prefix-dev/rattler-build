@@ -11,6 +11,9 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end -v"
 test = "cargo test"
 lint = "pre-commit run --all"
+docs = "mkdocs serve"
+build-docs =  "mkdocs build --strict"
+
 
 [dependencies]
 openssl = "3.*"
@@ -24,3 +27,9 @@ make = "4.3.*"
 perl = "5.32.1.*"
 pytest = "7.4.2.*"
 conda-package-handling = "2.2.0.*"
+
+# Documentation building
+mkdocs = "1.5.3.*"
+mkdocs-material = "9.4.4.*"
+pillow = ">=9.4.0.*"
+cairosvg = "2.7.1.*"

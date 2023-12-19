@@ -94,7 +94,7 @@ jobs:
         with:
           toolchain: '1.73.0'
           targets: ${{ matrix.target }}
-      
+
       - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt install musl-tools
