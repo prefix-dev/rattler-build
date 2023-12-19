@@ -192,12 +192,16 @@ enum ServerType {
 /// Authentication is used from the keychain / auth-file
 struct QuetzOpts {
     /// The URL to your Quetz server
-    #[arg(short, long)]
+    #[arg(short, long, env = "QUETZ_SERVER_URL")]
     url: Url,
 
     /// The URL to your channel
-    #[arg(short, long)]
+    #[arg(short, long, env = "QUETZ_CHANNEL")]
     channel: String,
+
+    /// The quetz API key, if none is provided, the token is read from the keychain / auth-file
+    #[arg(short, long, env = "QUETZ_API_KEY")]
+    api_key: Option<String>,
 }
 
 #[tokio::main]
@@ -544,18 +548,13 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
         ));
     }
 
-    let client = AuthenticatedClient::from_client(
-        reqwest::Client::builder()
-            .no_gzip()
-            .build()
-            .expect("failed to create client"),
-        get_auth_store(args.common.auth_file),
-    );
+    let store = get_auth_store(args.common.auth_file);
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {
             upload::upload_package_to_quetz(
-                &client,
+                &store,
+                quetz_opts.api_key,
                 args.package_file,
                 quetz_opts.url,
                 quetz_opts.channel,
