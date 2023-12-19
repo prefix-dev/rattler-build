@@ -1,4 +1,4 @@
-use std::{path::PathBuf, fmt::Write};
+use std::{fmt::Write, path::PathBuf};
 
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
@@ -12,7 +12,6 @@ use reqwest::Method;
 use sha2::{Digest, Sha256};
 use tracing::info;
 use url::Url;
-
 
 /// Returns the style to use for a progressbar that is currently in progress.
 fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
@@ -182,6 +181,27 @@ pub async fn upload_package_to_prefix(
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
+    let token = match api_key {
+        Some(api_key) => api_key,
+        None => match storage.get_by_url(url.clone()) {
+            Ok((_, Some(Authentication::BearerToken(token)))) => token,
+            Ok((_, Some(_))) => {
+                return Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
+                        Authentication information found in the keychain / auth file, but it was not a Bearer token"));
+            }
+            Ok((_, None)) => {
+                return Err(miette::miette!(
+                    "No prefix.dev api key was given and none was found in the keychain / auth file"
+                ));
+            }
+            Err(e) => {
+                return Err(miette::miette!(
+                    "Failed to get authentication information form keychain: {e}"
+                ));
+            }
+        },
+    };
+
     let filename = package_file
         .file_name()
         .unwrap()
@@ -197,6 +217,10 @@ pub async fn upload_package_to_prefix(
         HumanBytes(file_size)
     );
 
+    let url = url
+        .join(&format!("api/v1/upload/{}", channel))
+        .into_diagnostic()?;
+
     let client = reqwest::Client::builder()
         .no_gzip()
         .build()
@@ -207,7 +231,9 @@ pub async fn upload_package_to_prefix(
         compute_file_digest::<Sha256>(&package_file).into_diagnostic()?
     );
 
-    let file = tokio::fs::File::open(&package_file).await.into_diagnostic()?;
+    let file = tokio::fs::File::open(&package_file)
+        .await
+        .into_diagnostic()?;
 
     let progress_bar = indicatif::ProgressBar::new(file_size)
         .with_prefix("Uploading")
@@ -229,6 +255,7 @@ pub async fn upload_package_to_prefix(
         .header("X-File-Name", filename)
         .header("Content-Length", file_size)
         .header("Content-Type", "application/octet-stream")
+        .bearer_auth(token)
         .body(body)
         .send()
         .await
@@ -238,10 +265,9 @@ pub async fn upload_package_to_prefix(
         println!("Upload successful!");
     } else {
         println!("Upload failed!");
-
         if response.status() == 401 {
             println!(
-                "Authentication failed! Did you run `pixi auth login {}`?",
+                "Authentication failed! Did you set the correct API key for {}",
                 url
             );
         }

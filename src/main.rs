@@ -189,6 +189,7 @@ struct UploadOpts {
 enum ServerType {
     Quetz(QuetzOpts),
     Artifactory(ArtifactoryOpts),
+    Prefix(PrefixOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -227,6 +228,28 @@ struct ArtifactoryOpts {
     /// Your Artifactory password
     #[arg(short, long, env = "ARTIFACTORY_PASSWORD")]
     password: Option<String>,
+}
+
+/// Options for uploading to a Quetz server
+/// Authentication is used from the keychain / auth-file
+#[derive(Clone, Debug, PartialEq, Parser)]
+struct PrefixOpts {
+    /// The URL to the prefix.dev server (only necessary for self-hosted instances)
+    #[arg(
+        short,
+        long,
+        env = "PREFIX_SERVER_URL",
+        default_value = "https://prefix.dev"
+    )]
+    url: Url,
+
+    /// The channel to upload the package to
+    #[arg(short, long, env = "PREFIX_CHANNEL")]
+    channel: String,
+
+    /// The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
+    #[arg(short, long, env = "PREFIX_API_KEY")]
+    api_key: Option<String>,
 }
 
 #[tokio::main]
@@ -608,6 +631,16 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 args.package_file,
                 artifactory_opts.url,
                 artifactory_opts.channel,
+            )
+            .await?;
+        }
+        ServerType::Prefix(prefix_opts) => {
+            upload::upload_package_to_prefix(
+                &store,
+                prefix_opts.api_key,
+                args.package_file,
+                prefix_opts.url,
+                prefix_opts.channel,
             )
             .await?;
         }
