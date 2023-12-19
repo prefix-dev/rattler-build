@@ -38,7 +38,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Either `32` or `64`, to specify whether the build is 32-bit or 64-bit. The value depends on the ARCH environment variable and defaults to the architecture the interpreter running conda was compiled with.
 
 `CMAKE_GENERATOR`
-: The CMake generator string for the current build environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it is generated according to the Visual Studio version activated at build time, for example, `Visual Studio 9 2008 Win64`. 
+: The CMake generator string for the current build environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it is generated according to the Visual Studio version activated at build time, for example, `Visual Studio 9 2008 Win64`.
 
 `CONDA_BUILD=1`
 : Always set to indicate that the conda-build process is running.

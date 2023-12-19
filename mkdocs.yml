@@ -35,7 +35,7 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
-repo_url: https://github.com/prefix-dev/pixi/
+repo_url: https://github.com/prefix-dev/rattler-build/
 edit_uri: edit/main/docs/
 
 markdown_extensions:
@@ -89,4 +89,3 @@ nav:
 plugins:
   - search
   - social
-

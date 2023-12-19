@@ -2,8 +2,8 @@
 
 `rattler-build` comes with a couple of useful helpers that can be used in the recipe.
 
-- `${{ compiler('c') }}` 
-- `${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x.x") }}` creates a pin to another output in the recipe. 
+- `${{ compiler('c') }}`
+- `${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x.x") }}` creates a pin to another output in the recipe.
 
 <!-- `pin_compatible` (not implemented yet). -->
 
