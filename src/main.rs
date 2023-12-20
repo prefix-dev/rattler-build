@@ -175,7 +175,6 @@ struct RebuildOpts {
 #[derive(Parser)]
 struct UploadOpts {
     /// The package file to upload
-    #[clap(short, long)]
     package_file: PathBuf,
 
     /// The server type
