@@ -175,7 +175,6 @@ struct RebuildOpts {
 #[derive(Parser)]
 struct UploadOpts {
     /// The package file to upload
-    #[clap(short, long)]
     package_file: PathBuf,
 
     /// The server type
@@ -189,6 +188,7 @@ struct UploadOpts {
 #[derive(Clone, Debug, PartialEq, Parser)]
 enum ServerType {
     Quetz(QuetzOpts),
+    Artifactory(ArtifactoryOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -206,6 +206,27 @@ struct QuetzOpts {
     /// The quetz API key, if none is provided, the token is read from the keychain / auth-file
     #[arg(short, long, env = "QUETZ_API_KEY")]
     api_key: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Parser)]
+/// Options for uploading to a Artifactory channel
+/// Authentication is used from the keychain / auth-file
+struct ArtifactoryOpts {
+    /// The URL to your Artifactory server
+    #[arg(short, long, env = "ARTIFACTORY_SERVER_URL")]
+    url: Url,
+
+    /// The URL to your channel
+    #[arg(short, long, env = "ARTIFACTORY_CHANNEL")]
+    channel: String,
+
+    /// Your Artifactory username
+    #[arg(short, long, env = "ARTIFACTORY_USERNAME")]
+    username: Option<String>,
+
+    /// Your Artifactory password
+    #[arg(short, long, env = "ARTIFACTORY_PASSWORD")]
+    password: Option<String>,
 }
 
 #[tokio::main]
@@ -576,6 +597,17 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 args.package_file,
                 quetz_opts.url,
                 quetz_opts.channel,
+            )
+            .await?;
+        }
+        ServerType::Artifactory(artifactory_opts) => {
+            upload::upload_package_to_artifactory(
+                &store,
+                artifactory_opts.username,
+                artifactory_opts.password,
+                args.package_file,
+                artifactory_opts.url,
+                artifactory_opts.channel,
             )
             .await?;
         }
