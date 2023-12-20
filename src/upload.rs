@@ -80,7 +80,10 @@ pub async fn upload_package_to_artifactory(
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
-    let package_dir = tempfile::tempdir().unwrap();
+    let package_dir = tempfile::tempdir()
+        .into_diagnostic()
+        .wrap_err("Creating temporary directory failed")?;
+
     rattler_package_streaming::fs::extract(&package_file, package_dir.path()).into_diagnostic()?;
 
     let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
