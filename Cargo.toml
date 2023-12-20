@@ -1,7 +1,5 @@
 [workspace]
-members = [
-    "rust-tests"
-]
+members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
@@ -84,6 +82,16 @@ indexmap = "2.1.0"
 dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "5.0.0"
+
+tar = "0.4.40"
+zip = { version = "0.6.6", default-features = false, features = [
+    "flate2",
+    "deflate",
+] }
+bzip2 = "0.4.4"
+flate2 = "1.0.28"
+xz2 = "0.1.7"
+zstd = "0.13.0"
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["yaml"] }
