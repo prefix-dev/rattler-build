@@ -288,8 +288,16 @@ fn extract(
         }
         let path = target_directory.join(path);
         if entry.header().entry_type().is_dir() {
+            // only errors if fails to create dir
+            // and if file doesn't already exists
             std::fs::create_dir_all(&path)?;
             continue;
+        }
+        // create parent dir if doesn't already exists before unpacking
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent)?;
+            }
         }
         // should setup permissions and xattrs
         entry.unpack(path)?;
