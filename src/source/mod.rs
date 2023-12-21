@@ -341,7 +341,7 @@ fn extract_zip_stripped(
             .components()
             .skip(strip_components)
             .collect::<PathBuf>();
-        if filepath.as_os_str().len() < 1 {
+        if filepath.as_os_str().is_empty() {
             continue;
         }
         let outpath = target_directory.join(filepath);
