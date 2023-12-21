@@ -1,3 +1,4 @@
+use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use std::collections::HashSet;
@@ -102,6 +103,8 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
     }
 }
 
+/// This function requires we know the file content we are matching against is UTF-8
+/// In case the source is non utf-8 it will fail with a read error
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
@@ -112,10 +115,56 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
     buf_reader.read_to_string(&mut content)?;
 
     // Check if the content contains the prefix
-    let prefix = prefix.to_string_lossy().to_string();
-    let contains_prefix = content.contains(&prefix);
+    let src = prefix.to_string_lossy();
+    let contains_prefix = content.contains(&src.to_string());
 
+    #[cfg(target_os = "windows")]
+    {
+        // absolute and unc paths will break but it,
+        // will break either way as C:/ can't be converted
+        // to something meaningful in unix either way
+        let s = to_forward_slash_lossy(prefix);
+        return Ok(contains_prefix || content.contains(s.to_string().as_str()));
+    }
+
+    #[cfg(not(target_os = "windows"))]
     Ok(contains_prefix)
+}
+
+#[allow(dead_code)]
+fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut buf = String::new();
+        for c in path.components() {
+            match c {
+                Component::RootDir => { /* root on windows can be skipped */ }
+                Component::CurDir => buf.push('.'),
+                Component::ParentDir => buf.push_str(".."),
+                Component::Prefix(prefix) => {
+                    buf.push_str(&prefix.as_os_str().to_string_lossy());
+                    continue;
+                }
+                Component::Normal(s) => buf.push_str(&s.to_string_lossy()),
+            }
+            // use `/` instead of `\`
+            buf.push('/');
+        }
+
+        fn ends_with_main_sep(p: &Path) -> bool {
+            use std::os::windows::ffi::OsStrExt as _;
+            p.as_os_str().encode_wide().last() == Some(std::path::MAIN_SEPARATOR as u16)
+        }
+        if buf != "/" && !ends_with_main_sep(path) && buf.ends_with('/') {
+            buf.pop();
+        }
+
+        std::borrow::Cow::Owned(buf)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        path.to_string_lossy()
+    }
 }
 
 fn create_prefix_placeholder(
@@ -137,7 +186,10 @@ fn create_prefix_placeholder(
     let content_type = content_inspector::inspect(buffer);
     let mut has_prefix = None;
 
-    let file_mode = if content_type.is_text() {
+    let file_mode = if content_type.is_text()
+        // treat everything else as binary for now!
+        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM)
+    {
         match contains_prefix_text(file_path, prefix) {
             Ok(true) => {
                 has_prefix = Some(prefix.to_path_buf());
