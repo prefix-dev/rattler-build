@@ -2,7 +2,7 @@
 
 use std::{
     ffi::OsStr,
-    path::{Path, PathBuf, StripPrefixError},
+    path::{Component, Path, PathBuf, StripPrefixError},
 };
 
 use crate::recipe::parser::Source;
@@ -133,7 +133,7 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .contains(".tar")
                 {
-                    extract(&res, &dest_dir)?;
+                    extract(&res, &dest_dir, 1)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if res
                     .file_name()
@@ -253,15 +253,45 @@ impl std::io::Read for TarCompression<'_> {
 }
 
 /// Extracts a tar archive to the specified target directory
-fn extract(archive: &Path, target_directory: &Path) -> Result<(), SourceError> {
+fn extract(
+    archive: &Path,
+    target_directory: &Path,
+    strip_components: usize,
+) -> Result<(), SourceError> {
     let mut archive = tar::Archive::new(ext_to_compression(
         archive.file_name(),
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
     ));
 
-    archive
-        .unpack(target_directory)
-        .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let mut path = PathBuf::new();
+        {
+            // Essentially from https://github.com/alexcrichton/tar-rs/blob/34744459084c1fffb03d6c742f5a5af9a6403bc4/src/entry.rs#L381
+            // for secure implementation of unpack, we skip all paths with ParentDir component as listed in below CVEs
+            let entrypath = entry.path()?;
+            for part in entrypath.components().skip(strip_components) {
+                match part {
+                    // Leading '/' characters, root paths, and '.'
+                    // components are just ignored and treated as "empty
+                    // components"
+                    Component::Prefix(..) | Component::RootDir | Component::CurDir => continue,
+                    // If any part of the filename is '..', then skip over
+                    // unpacking the file to prevent directory traversal
+                    // security issues.  See, e.g.: CVE-2001-1267,
+                    // CVE-2002-0399, CVE-2005-1918, CVE-2007-4131
+                    Component::ParentDir => continue,
+                    Component::Normal(part) => path.push(part),
+                }
+            }
+        }
+        let path = target_directory.join(path);
+        if entry.header().entry_type().is_dir() {
+            std::fs::create_dir_all(&path)?;
+            continue;
+        }
+        entry.unpack(path)?;
+    }
 
     Ok(())
 }

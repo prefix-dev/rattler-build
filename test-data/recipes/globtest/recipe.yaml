@@ -9,7 +9,7 @@ package:
   version: "${{ version }}"
 
 source:
-  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
+  url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.zip
   sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 about:
