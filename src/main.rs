@@ -609,7 +609,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
     }
 
     for package_file in &args.package_files {
-        if ArchiveType::try_from(&package_file).is_none() {
+        if ArchiveType::try_from(package_file).is_none() {
             return Err(miette::miette!(
                 "The file {} does not appear to be a conda package.",
                 package_file.to_string_lossy()

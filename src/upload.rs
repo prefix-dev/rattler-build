@@ -84,14 +84,14 @@ pub async fn upload_package_to_quetz(
             ))
             .into_diagnostic()?;
 
-        let hash = sha256_sum(&package_file).into_diagnostic()?;
+        let hash = sha256_sum(package_file).into_diagnostic()?;
 
         let prepared_request = client
             .request(Method::POST, upload_url)
             .query(&[("force", "false"), ("sha256", &hash)])
             .header("X-API-Key", token.clone());
 
-        send_request(prepared_request, &package_file).await?;
+        send_request(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to Quetz server");
@@ -136,13 +136,13 @@ pub async fn upload_package_to_artifactory(
             .into_diagnostic()
             .wrap_err("Creating temporary directory failed")?;
 
-        rattler_package_streaming::fs::extract(&package_file, package_dir.path())
+        rattler_package_streaming::fs::extract(package_file, package_dir.path())
             .into_diagnostic()?;
 
         let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
         let subdir = index_json
             .subdir
-            .ok_or_else(|| miette::miette!("index.json of the package has no subdirectory. Cannot determine which directory to upload to"))?;
+            .ok_or_else(|| miette::miette!("index.json of package {} has no subdirectory. Cannot determine which directory to upload to", package_file.display()))?;
 
         let client = get_client().into_diagnostic()?;
 
@@ -159,7 +159,7 @@ pub async fn upload_package_to_artifactory(
             .request(Method::PUT, upload_url)
             .basic_auth(username.clone(), Some(password.clone()));
 
-        send_request(prepared_request, &package_file).await?;
+        send_request(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to Artifactory server");
@@ -198,7 +198,7 @@ pub async fn upload_package_to_prefix(
     for package_file in package_files {
         let filename = package_file
             .file_name()
-            .unwrap()
+            .expect("no filename found")
             .to_string_lossy()
             .to_string();
 
@@ -210,7 +210,7 @@ pub async fn upload_package_to_prefix(
 
         let client = get_client().into_diagnostic()?;
 
-        let hash = sha256_sum(&package_file).into_diagnostic()?;
+        let hash = sha256_sum(package_file).into_diagnostic()?;
 
         let prepared_request = client
             .post(url.clone())
@@ -220,7 +220,7 @@ pub async fn upload_package_to_prefix(
             .header("Content-Type", "application/octet-stream")
             .bearer_auth(token.clone());
 
-        send_request(prepared_request, &package_file).await?;
+        send_request(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to prefix.dev server");
@@ -239,7 +239,10 @@ async fn send_request(
     let file_size = file.metadata().await.into_diagnostic()?.len();
     info!(
         "Uploading package file: {} ({})\n",
-        package_file.file_name().unwrap().to_string_lossy(),
+        package_file
+            .file_name()
+            .expect("no filename found")
+            .to_string_lossy(),
         HumanBytes(file_size)
     );
     let progress_bar = indicatif::ProgressBar::new(file_size)
@@ -273,7 +276,10 @@ async fn send_request(
     progress_bar.finish();
     info!(
         "\nUpload complete for package file: {}",
-        package_file.file_name().unwrap().to_string_lossy()
+        package_file
+            .file_name()
+            .expect("no filename found")
+            .to_string_lossy()
     );
 
     Ok(response)
