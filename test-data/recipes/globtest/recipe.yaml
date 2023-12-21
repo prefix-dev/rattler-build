@@ -10,7 +10,7 @@ package:
 
 source:
   url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.zip
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
+  sha256: 8cd062cfefce0f5bff8961e0c42b3636d5e7eddbe33e5c3167e3fb6d8380f50e
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor
