@@ -1,7 +1,9 @@
-use std::{fmt::Write, path::PathBuf};
-
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
+use std::{
+    fmt::Write,
+    path::{Path, PathBuf},
+};
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
@@ -9,7 +11,7 @@ use rattler_conda_types::package::{IndexJson, PackageFile};
 use rattler_digest::compute_file_digest;
 use rattler_networking::{redact_known_secrets_from_error, Authentication, AuthenticationStorage};
 use reqwest::Method;
-use sha2::{Digest, Sha256};
+use sha2::Sha256;
 use tracing::info;
 use url::Url;
 
@@ -32,10 +34,21 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
             ))
 }
 
+fn get_client() -> Result<reqwest::Client, reqwest::Error> {
+    reqwest::Client::builder().no_gzip().build()
+}
+
+fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
+    Ok(format!(
+        "{:x}",
+        compute_file_digest::<Sha256>(&package_file)?
+    ))
+}
+
 pub async fn upload_package_to_quetz(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
-    package_file: PathBuf,
+    package_files: &Vec<PathBuf>,
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
@@ -60,39 +73,29 @@ pub async fn upload_package_to_quetz(
         },
     };
 
-    let client = reqwest::Client::builder()
-        .no_gzip()
-        .build()
-        .expect("failed to create client");
+    let client = get_client().into_diagnostic()?;
 
-    let upload_url = url
-        .join(&format!(
-            "api/channels/{}/upload/{}",
-            channel,
-            package_file.file_name().unwrap().to_string_lossy()
-        ))
-        .into_diagnostic()?;
+    for package_file in package_files {
+        let upload_url = url
+            .join(&format!(
+                "api/channels/{}/upload/{}",
+                channel,
+                package_file.file_name().unwrap().to_string_lossy()
+            ))
+            .into_diagnostic()?;
 
-    let bytes = tokio::fs::read(package_file).await.into_diagnostic()?;
-    let upload_hash = sha2::Sha256::digest(&bytes);
+        let hash = sha256_sum(&package_file).into_diagnostic()?;
 
-    let req = client
-        .request(Method::POST, upload_url)
-        .query(&[("force", "false"), ("sha256", &hex::encode(upload_hash))])
-        .body(bytes)
-        .header("X-API-Key", token)
-        .send()
-        .await
-        .map_err(redact_known_secrets_from_error)
-        .into_diagnostic()
-        .map_err(|e| miette::miette!("Sending package to Quetz server failed: {e}"))?;
+        let prepared_request = client
+            .request(Method::POST, upload_url)
+            .query(&[("force", "false"), ("sha256", &hash)])
+            .header("X-API-Key", token.clone());
 
-    req.error_for_status_ref()
-        .map_err(redact_known_secrets_from_error)
-        .into_diagnostic()
-        .map_err(|e| miette::miette!("Quetz server responded with error: {e}"))?;
+        send_request(prepared_request, &package_file).await?;
+    }
 
-    info!("Package was successfully uploaded to Quetz server");
+    info!("Packages successfully uploaded to Quetz server");
+
     Ok(())
 }
 
@@ -100,21 +103,10 @@ pub async fn upload_package_to_artifactory(
     storage: &AuthenticationStorage,
     username: Option<String>,
     password: Option<String>,
-    package_file: PathBuf,
+    package_files: &Vec<PathBuf>,
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
-    let package_dir = tempfile::tempdir()
-        .into_diagnostic()
-        .wrap_err("Creating temporary directory failed")?;
-
-    rattler_package_streaming::fs::extract(&package_file, package_dir.path()).into_diagnostic()?;
-
-    let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
-    let subdir = index_json
-        .subdir
-        .ok_or_else(|| miette::miette!("index.json of the package has no subdirectory. Cannot determine which directory to upload to"))?;
-
     let (username, password) = match (username, password) {
         (Some(u), Some(p)) => (u, p),
         (Some(_), _) | (_, Some(_)) => {
@@ -139,37 +131,38 @@ pub async fn upload_package_to_artifactory(
         },
     };
 
-    let client = reqwest::Client::builder()
-        .no_gzip()
-        .build()
-        .expect("failed to create client");
+    for package_file in package_files {
+        let package_dir = tempfile::tempdir()
+            .into_diagnostic()
+            .wrap_err("Creating temporary directory failed")?;
 
-    let package_name = package_file
-        .file_name()
-        .expect("no filename found")
-        .to_string_lossy();
+        rattler_package_streaming::fs::extract(&package_file, package_dir.path())
+            .into_diagnostic()?;
 
-    let upload_url = url
-        .join(&format!("{}/{}/{}", channel, subdir, package_name))
-        .into_diagnostic()?;
+        let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
+        let subdir = index_json
+            .subdir
+            .ok_or_else(|| miette::miette!("index.json of the package has no subdirectory. Cannot determine which directory to upload to"))?;
 
-    let bytes = tokio::fs::read(package_file).await.into_diagnostic()?;
+        let client = get_client().into_diagnostic()?;
 
-    client
-        .request(Method::PUT, upload_url)
-        .body(bytes)
-        .basic_auth(username, Some(password))
-        .send()
-        .await
-        .map_err(redact_known_secrets_from_error)
-        .into_diagnostic()
-        .wrap_err("Sending package to artifactory server failed")?
-        .error_for_status_ref()
-        .map_err(redact_known_secrets_from_error)
-        .into_diagnostic()
-        .wrap_err("Artifactory responded with error")?;
+        let package_name = package_file
+            .file_name()
+            .expect("no filename found")
+            .to_string_lossy();
 
-    info!("Package was successfully uploaded to artifactory server");
+        let upload_url = url
+            .join(&format!("{}/{}/{}", channel, subdir, package_name))
+            .into_diagnostic()?;
+
+        let prepared_request = client
+            .request(Method::PUT, upload_url)
+            .basic_auth(username.clone(), Some(password.clone()));
+
+        send_request(prepared_request, &package_file).await?;
+    }
+
+    info!("Packages successfully uploaded to Artifactory server");
 
     Ok(())
 }
@@ -177,7 +170,7 @@ pub async fn upload_package_to_artifactory(
 pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
-    package_file: PathBuf,
+    package_files: &Vec<PathBuf>,
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
@@ -202,46 +195,61 @@ pub async fn upload_package_to_prefix(
         },
     };
 
-    let filename = package_file
-        .file_name()
-        .unwrap()
-        .to_string_lossy()
-        .to_string();
+    for package_file in package_files {
+        let filename = package_file
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
 
-    let file_size = package_file.metadata().into_diagnostic()?.len();
+        let file_size = package_file.metadata().into_diagnostic()?.len();
 
-    println!("Uploading package to: {}", url);
-    println!(
-        "Package file:         {} ({})\n",
-        package_file.display(),
-        HumanBytes(file_size)
-    );
+        let url = url
+            .join(&format!("api/v1/upload/{}", channel))
+            .into_diagnostic()?;
 
-    let url = url
-        .join(&format!("api/v1/upload/{}", channel))
-        .into_diagnostic()?;
+        let client = get_client().into_diagnostic()?;
 
-    let client = reqwest::Client::builder()
-        .no_gzip()
-        .build()
-        .expect("failed to create client");
+        let hash = sha256_sum(&package_file).into_diagnostic()?;
 
-    let sha256sum = format!(
-        "{:x}",
-        compute_file_digest::<Sha256>(&package_file).into_diagnostic()?
-    );
+        let prepared_request = client
+            .post(url.clone())
+            .header("X-File-Sha256", hash)
+            .header("X-File-Name", filename)
+            .header("Content-Length", file_size)
+            .header("Content-Type", "application/octet-stream")
+            .bearer_auth(token.clone());
 
-    let file = tokio::fs::File::open(&package_file)
+        send_request(prepared_request, &package_file).await?;
+    }
+
+    info!("Packages successfully uploaded to prefix.dev server");
+
+    Ok(())
+}
+
+async fn send_request(
+    prepared_request: reqwest::RequestBuilder,
+    package_file: &Path,
+) -> miette::Result<reqwest::Response> {
+    let file = tokio::fs::File::open(package_file)
         .await
         .into_diagnostic()?;
 
+    let file_size = file.metadata().await.into_diagnostic()?.len();
+    info!(
+        "Uploading package file: {} ({})\n",
+        package_file.file_name().unwrap().to_string_lossy(),
+        HumanBytes(file_size)
+    );
     let progress_bar = indicatif::ProgressBar::new(file_size)
         .with_prefix("Uploading")
         .with_style(default_bytes_style().into_diagnostic()?);
 
+    let progress_bar_clone = progress_bar.clone();
     let reader_stream = ReaderStream::new(file)
         .inspect_ok(move |bytes| {
-            progress_bar.inc(bytes.len() as u64);
+            progress_bar_clone.inc(bytes.len() as u64);
         })
         .inspect_err(|e| {
             println!("Error while uploading: {}", e);
@@ -249,31 +257,24 @@ pub async fn upload_package_to_prefix(
 
     let body = reqwest::Body::wrap_stream(reader_stream);
 
-    let response = client
-        .post(url.clone())
-        .header("X-File-Sha256", sha256sum)
-        .header("X-File-Name", filename)
-        .header("Content-Length", file_size)
-        .header("Content-Type", "application/octet-stream")
-        .bearer_auth(token)
+    let response = prepared_request
         .body(body)
         .send()
         .await
+        .map_err(redact_known_secrets_from_error)
         .into_diagnostic()?;
 
-    if response.status().is_success() {
-        println!("Upload successful!");
-    } else {
-        println!("Upload failed!");
-        if response.status() == 401 {
-            println!(
-                "Authentication failed! Did you set the correct API key for {}",
-                url
-            );
-        }
+    response
+        .error_for_status_ref()
+        .map_err(redact_known_secrets_from_error)
+        .into_diagnostic()
+        .wrap_err("Server responded with error")?;
 
-        std::process::exit(1);
-    }
+    progress_bar.finish();
+    info!(
+        "\nUpload complete for package file: {}",
+        package_file.file_name().unwrap().to_string_lossy()
+    );
 
-    Ok(())
+    Ok(response)
 }
