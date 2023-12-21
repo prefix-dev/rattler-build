@@ -342,6 +342,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .constrains
             .iter()
             .map(|dep| dep.spec().to_string())
+            .dedup()
             .collect(),
         noarch: *recipe.build().noarch(),
         track_features: vec![],
