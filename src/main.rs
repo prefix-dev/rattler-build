@@ -175,7 +175,8 @@ struct RebuildOpts {
 #[derive(Parser)]
 struct UploadOpts {
     /// The package file to upload
-    package_file: PathBuf,
+    #[arg(global = true, required = false)]
+    package_files: Vec<PathBuf>,
 
     /// The server type
     #[clap(subcommand)]
@@ -189,6 +190,7 @@ struct UploadOpts {
 enum ServerType {
     Quetz(QuetzOpts),
     Artifactory(ArtifactoryOpts),
+    Prefix(PrefixOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -227,6 +229,28 @@ struct ArtifactoryOpts {
     /// Your Artifactory password
     #[arg(short, long, env = "ARTIFACTORY_PASSWORD")]
     password: Option<String>,
+}
+
+/// Options for uploading to a Quetz server
+/// Authentication is used from the keychain / auth-file
+#[derive(Clone, Debug, PartialEq, Parser)]
+struct PrefixOpts {
+    /// The URL to the prefix.dev server (only necessary for self-hosted instances)
+    #[arg(
+        short,
+        long,
+        env = "PREFIX_SERVER_URL",
+        default_value = "https://prefix.dev"
+    )]
+    url: Url,
+
+    /// The channel to upload the package to
+    #[arg(short, long, env = "PREFIX_CHANNEL")]
+    channel: String,
+
+    /// The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
+    #[arg(short, long, env = "PREFIX_API_KEY")]
+    api_key: Option<String>,
 }
 
 #[tokio::main]
@@ -580,11 +604,17 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 }
 
 async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
-    if ArchiveType::try_from(&args.package_file).is_none() {
-        return Err(miette::miette!(
-            "The file {} does not appear to be a conda package.",
-            args.package_file.to_string_lossy()
-        ));
+    if args.package_files.is_empty() {
+        return Err(miette::miette!("No package files were provided."));
+    }
+
+    for package_file in &args.package_files {
+        if ArchiveType::try_from(package_file).is_none() {
+            return Err(miette::miette!(
+                "The file {} does not appear to be a conda package.",
+                package_file.to_string_lossy()
+            ));
+        }
     }
 
     let store = get_auth_store(args.common.auth_file);
@@ -594,7 +624,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             upload::upload_package_to_quetz(
                 &store,
                 quetz_opts.api_key,
-                args.package_file,
+                &args.package_files,
                 quetz_opts.url,
                 quetz_opts.channel,
             )
@@ -605,9 +635,19 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 &store,
                 artifactory_opts.username,
                 artifactory_opts.password,
-                args.package_file,
+                &args.package_files,
                 artifactory_opts.url,
                 artifactory_opts.channel,
+            )
+            .await?;
+        }
+        ServerType::Prefix(prefix_opts) => {
+            upload::upload_package_to_prefix(
+                &store,
+                prefix_opts.api_key,
+                &args.package_files,
+                prefix_opts.url,
+                prefix_opts.channel,
             )
             .await?;
         }

@@ -83,6 +83,7 @@ dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "5.0.0"
 clap_complete = "4.4.4"
+tokio-util = "0.7.10"
 
 tar = "0.4.40"
 zip = { version = "0.6.6", default-features = false, features = [

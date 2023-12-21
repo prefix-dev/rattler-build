@@ -102,7 +102,7 @@ pub async fn create_environment(
     // Each channel contains multiple subdirectories. Users can specify the subdirectories they want
     // to use when specifying their channels. If the user didn't specify the default subdirectories
     // we use defaults based on the current platform.
-    let platforms = vec![Platform::NoArch, *target_platform];
+    let platforms = [Platform::NoArch, *target_platform];
     let channel_urls = channels
         .iter()
         .flat_map(|channel| {
