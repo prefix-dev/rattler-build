@@ -26,4 +26,3 @@ Example for Fish Shell just generate the `completions.fish` and add to `~/.confi
 ```sh
 rattler-build --generate=fish > ${ZSH_COMPLETIONS_PATH:~/.config/fish/completions}/rattler-build.fish
 ```
-

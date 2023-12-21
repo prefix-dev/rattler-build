@@ -332,6 +332,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .depends
             .iter()
             .map(|dep| dep.spec().to_string())
+            .dedup()
             .collect(),
         constrains: output
             .finalized_dependencies
