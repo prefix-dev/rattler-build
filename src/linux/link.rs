@@ -17,6 +17,8 @@ pub struct SharedObject {
     pub rpaths: Vec<String>,
     /// RUNPATH entries
     pub runpaths: Vec<String>,
+    /// Whether the shared object is dynamically linked
+    pub has_dynamic: bool,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -65,6 +67,7 @@ impl SharedObject {
             libraries: elf.libraries.iter().map(|s| s.to_string()).collect(),
             rpaths: elf.rpaths.iter().map(|s| s.to_string()).collect(),
             runpaths: elf.runpaths.iter().map(|s| s.to_string()).collect(),
+            has_dynamic: elf.dynamic.is_some(),
         })
     }
 
@@ -72,6 +75,11 @@ impl SharedObject {
     /// replace them with the encoded prefix
     /// if the prefix is not found, add it to the end of the list
     pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+        if !self.has_dynamic {
+            tracing::debug!("{} is not dynamically linked", self.path.display());
+            return Ok(());
+        }
+
         let rpaths = self
             .rpaths
             .iter()
