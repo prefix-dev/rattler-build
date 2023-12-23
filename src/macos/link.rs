@@ -1,11 +1,12 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
 use scroll::Pread;
-use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tracing::debug;
+
 /// A macOS dylib (Mach-O)
 pub struct Dylib {
     /// Path to the dylib
@@ -105,7 +106,6 @@ impl Dylib {
     /// * `prefix` - The prefix of the file (usually a temporary directory)
     /// * `encoded_prefix` - The prefix of the file as encoded in the dylib at build time (e.g. the host prefix)
     pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
-        let mut changes = DylibChanges::default();
         let mut modified = false;
 
         let exchange_dylib = |path: &Path| {
@@ -131,10 +131,9 @@ impl Dylib {
         for cmd in object.load_commands.iter() {
             match cmd.command {
                 goblin::mach::load_command::CommandVariant::Rpath(ref rpath) => {
-                    let cmdsize = rpath.cmdsize as usize;
                     let offset = cmd.offset + rpath.path as usize;
                     let path_data = data.pread::<&str>(offset).unwrap().to_string();
-                    println!("path_data: {:?}", path_data);
+
                     let path = PathBuf::from(&path_data);
                     if path.is_absolute() {
                         let orig_path = encoded_prefix.join(
@@ -153,14 +152,13 @@ impl Dylib {
 
                         let new_rpath =
                             PathBuf::from(format!("@loader_path/{}", relpath.to_string_lossy()));
-                        println!("Exchange rpath {:?} -> {:?}", path, new_rpath);
-                        let new_rpath_string = new_rpath.to_string_lossy();
-                        let mut new_rpath_bytes = new_rpath_string.as_bytes().to_vec();
-                        // extend with null bytes
-                        let string_len = path_data.len();
-                        new_rpath_bytes.resize(string_len, 0);
 
-                        new_data.splice(offset..offset + string_len, new_rpath_bytes);
+                        debug!("Exchange RPath in {:?}: {:?} -> {:?}", self.path, path, new_rpath);
+
+                        let mut new_rpath_bytes = new_rpath.to_string_lossy().as_bytes().to_vec();
+                        // extend with null bytes
+                        new_rpath_bytes.resize(path_data.len(), 0);
+                        new_data.splice(offset..offset + path_data.len(), new_rpath_bytes);
 
                         modified = true;
                     }
@@ -174,13 +172,11 @@ impl Dylib {
                 | goblin::mach::load_command::CommandVariant::LoadDylib(ref id) => {
                     let offset = cmd.offset + id.dylib.name as usize;
                     let path_data = data.pread::<&str>(offset).unwrap().to_string();
-                    println!("ID path_data: {:?}", path_data);
 
                     let path = PathBuf::from(&path_data);
 
                     if let Some(new_path) = exchange_dylib(&path) {
                         let new_rpath_string = new_path.to_string_lossy();
-                        println!("Exchange dylib {:?} -> {:?}", path, new_rpath_string);
                         let mut new_rpath_bytes = new_rpath_string.as_bytes().to_vec();
                         // extend with null bytes
                         let string_len = path_data.len() + 1;
@@ -194,44 +190,6 @@ impl Dylib {
                 _ => {}
             }
         }
-
-        // for rpath in &self.rpaths {
-        //     if rpath.is_absolute() {
-        //         let orig_path = encoded_prefix.join(
-        //             self.path
-        //                 .strip_prefix(prefix)?
-        //                 .parent()
-        //                 .expect("Could not get parent"),
-        //         );
-
-        //         let relpath =
-        //             pathdiff::diff_paths(rpath, &orig_path).ok_or(RelinkError::PathDiffError {
-        //                 from: orig_path.clone(),
-        //                 to: rpath.clone(),
-        //             })?;
-
-        //         let new_rpath =
-        //             PathBuf::from(format!("@loader_path/{}", relpath.to_string_lossy()));
-
-        //         changes.add_rpath.insert(new_rpath);
-        //         changes.delete_rpath.insert(rpath.clone());
-        //         modified = true;
-        //     }
-        // }
-
-        // if let Some(id) = &self.id {
-        //     if let Some(new_dylib) = exchange_dylib(id) {
-        //         changes.change_id = Some(new_dylib);
-        //         modified = true;
-        //     }
-        // }
-
-        // for lib in &self.libraries {
-        //     if let Some(new_dylib) = exchange_dylib(lib) {
-        //         changes.change_dylib.push((lib.clone(), new_dylib));
-        //         modified = true;
-        //     }
-        // }
 
         if modified {
             // install_name_tool(&self.path, &changes)?;
@@ -257,57 +215,6 @@ fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
             tracing::error!("codesign failed: {}", e);
             e
         })
-}
-
-/// Changes to apply to a dylib
-#[derive(Debug, Default)]
-struct DylibChanges {
-    // rpaths to delete
-    delete_rpath: HashSet<PathBuf>,
-    // rpaths to add
-    add_rpath: HashSet<PathBuf>,
-    // dylib id to change
-    change_id: Option<PathBuf>,
-    // dylibs to rewrite
-    change_dylib: Vec<(PathBuf, PathBuf)>,
-}
-
-fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
-    tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
-
-    let install_name_tool_exe = which::which("install_name_tool")?;
-
-    let mut cmd = std::process::Command::new(install_name_tool_exe);
-
-    if let Some(id) = &changes.change_id {
-        cmd.arg("-id").arg(id);
-    }
-
-    for (old, new) in &changes.change_dylib {
-        cmd.arg("-change").arg(old).arg(new);
-    }
-
-    for rpath in &changes.delete_rpath {
-        cmd.arg("-delete_rpath").arg(rpath);
-    }
-
-    for rpath in &changes.add_rpath {
-        cmd.arg("-add_rpath").arg(rpath);
-    }
-
-    cmd.arg(dylib_path);
-
-    let output = cmd.output()?;
-
-    if !output.status.success() {
-        tracing::error!(
-            "install_name_tool failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return Err(RelinkError::InstallNameToolFailed);
-    }
-
-    Ok(())
 }
 
 #[cfg(test)]

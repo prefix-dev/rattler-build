@@ -63,6 +63,21 @@ impl SharedObject {
             .expect("Failed to read the DLL file");
         let elf = Elf::parse(&buffer).expect("Failed to parse the ELF file");
 
+        if let Some(dynamic) = elf.dynamic {
+            for dyn_ in &dynamic.dyns {
+                if dyn_.d_tag == dynamic::DT_RPATH {
+                    if let Some(path) = elf.dynstrtab.get_at(dyn_.d_val as usize) {
+                        println!("RPATH: {}", path);
+                    }
+                } else if dyn_.d_tag == dynamic::DT_RUNPATH {
+                    if let Some(path) = elf.dynstrtab.get_at(dyn_.d_val as usize) {
+                        println!("RUNPATH: {}", path);
+                    }
+                }
+            }
+
+        }
+
         Ok(Self {
             path: path.to_path_buf(),
             libraries: elf.libraries.iter().map(|s| s.to_string()).collect(),
@@ -127,6 +142,8 @@ impl SharedObject {
                 );
             }
         }
+
+
 
         // keep only first unique item
         final_rpath = final_rpath.into_iter().unique().collect();
