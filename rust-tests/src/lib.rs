@@ -126,7 +126,7 @@ mod tests {
     }
 
     /// doesn't correctly handle spaces within argument of args escape all spaces
-    fn shx<'a>(src: impl AsRef<str>) -> Option<String> {
+    fn shx(src: impl AsRef<str>) -> Option<String> {
         let (prog, args) = src.as_ref().split_once(' ')?;
         Command::new(prog)
             .args(args.split(' '))
@@ -312,8 +312,7 @@ mod tests {
                     assert!(c["path_type"] == p["path_type"]);
                     if ppath
                         .components()
-                        .find(|s| s.eq(&Component::Normal("dist-info".as_ref())))
-                        .is_some()
+                        .any(|s| s.eq(&Component::Normal("dist-info".as_ref())))
                     {
                         assert!(c["sha256"] == p["sha256"]);
                         assert!(c["size_in_bytes"] == p["size_in_bytes"]);
