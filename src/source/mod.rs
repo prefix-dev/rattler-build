@@ -258,12 +258,10 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
 
     for entry in entries {
         let entry = entry?;
-        if entry.file_type()?.is_dir() {
-            match dir_name {
-                Some(_) => dir_name = None,
-                _ => dir_name = Some(entry.file_name()),
-            }
+        if entry.file_type()?.is_dir() && dir_name.is_none() {
+            dir_name = Some(entry.file_name());
         } else {
+            dir_name = None;
             break;
         }
     }
