@@ -288,21 +288,19 @@ fn extract_tar(
     target_directory: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
-    let progress_bar = indicatif::ProgressBar::new(1)
-        .with_finish(indicatif::ProgressFinish::AndLeave)
-        .with_prefix("Extracting tar")
-        .with_style(default_bytes_style().map_err(|_| {
-            SourceError::UnknownError("Failed to get progress bar style".to_string())
-        })?);
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        indicatif::ProgressBar::new(1)
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Extracting tar")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
 
     let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
         archive.file_name(),
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
     )));
-
-    tool_configuration
-        .multi_progress_indicator
-        .add(progress_bar);
 
     let tmp_extraction_dir = tempfile::tempdir()?;
 
@@ -311,6 +309,7 @@ fn extract_tar(
         .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
+    progress_bar.finish_with_message("Extracted...");
 
     Ok(())
 }
