@@ -609,7 +609,7 @@ fn friendly_channel_name(channel: &Channel) -> String {
 }
 
 /// Returns the style to use for a progressbar that is currently in progress.
-fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
+pub(crate) fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
     Ok(indicatif::ProgressStyle::default_bar()
             .template("{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {bytes:>8} @ {smoothed_bytes_per_sec:8}")?
             .progress_chars("━━╾─")

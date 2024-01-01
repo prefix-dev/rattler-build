@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use crate::recipe::parser::Source;
+use crate::{recipe::parser::Source, render::solver::default_bytes_style, tool_configuration};
 
 use fs_err as fs;
 use fs_err::File;
@@ -85,6 +85,7 @@ pub async fn fetch_sources(
     work_dir: &Path,
     recipe_dir: &Path,
     cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
@@ -115,7 +116,7 @@ pub async fn fetch_sources(
                     .and_then(|segments| segments.last().map(|last| last.to_string()))
                     .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
 
-                let res = url_source::url_src(src, &cache_src).await?;
+                let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
                 let mut dest_dir = if let Some(folder) = src.folder() {
                     work_dir.join(folder)
                 } else {
@@ -133,7 +134,7 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .contains(".tar")
                 {
-                    extract_tar(&res, &dest_dir)?;
+                    extract_tar(&res, &dest_dir, tool_configuration)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if res
                     .file_name()
@@ -141,7 +142,7 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .ends_with(".zip")
                 {
-                    extract_zip(&res, &dest_dir)?;
+                    extract_zip(&res, &dest_dir, tool_configuration)?;
                     tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else {
                     if let Some(file_name) = src.file_name() {
@@ -282,11 +283,26 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
 }
 
 /// Extracts a tar archive to the specified target directory
-fn extract_tar(archive: &Path, target_directory: &Path) -> Result<(), SourceError> {
-    let mut archive = tar::Archive::new(ext_to_compression(
+fn extract_tar(
+    archive: &Path,
+    target_directory: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<(), SourceError> {
+    let progress_bar = indicatif::ProgressBar::new(1)
+        .with_finish(indicatif::ProgressFinish::AndLeave)
+        .with_prefix("Extracting tar")
+        .with_style(default_bytes_style().map_err(|_| {
+            SourceError::UnknownError("Failed to get progress bar style".to_string())
+        })?);
+
+    let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
         archive.file_name(),
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    ));
+    )));
+
+    tool_configuration
+        .multi_progress_indicator
+        .add(progress_bar);
 
     let tmp_extraction_dir = tempfile::tempdir()?;
 
@@ -302,10 +318,23 @@ fn extract_tar(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
 /// Extracts a zip archive to the specified target directory
 /// currently this doesn't support bzip2 and zstd, zip archived with compression other than deflate would fail.
 /// <!-- TODO: we can trivially add support for bzip2 and zstd by enabling the feature flags -->
-fn extract_zip(archive: &Path, target_directory: &Path) -> Result<(), SourceError> {
-    let mut archive = zip::ZipArchive::new(
+fn extract_zip(
+    archive: &Path,
+    target_directory: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<(), SourceError> {
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        indicatif::ProgressBar::new(1)
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Extracting zip")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
+
+    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    )
+    ))
     .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::tempdir()?;
@@ -314,6 +343,7 @@ fn extract_zip(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
         .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
+    progress_bar.finish_with_message("Extracted...");
 
     Ok(())
 }

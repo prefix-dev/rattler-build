@@ -4,9 +4,14 @@ use std::{
     fs,
     io::Cursor,
     path::{Path, PathBuf},
+    time::Duration,
 };
 
-use crate::recipe::parser::{Checksum, UrlSource};
+use crate::{
+    recipe::parser::{Checksum, UrlSource},
+    render::solver::default_bytes_style,
+    tool_configuration,
+};
 use rattler_digest::compute_file_digest;
 
 use super::SourceError;
@@ -72,7 +77,11 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
     Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
 }
 
-pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<PathBuf, SourceError> {
+pub(crate) async fn url_src(
+    source: &UrlSource,
+    cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
     let checksum = if let Some(sha256) = source.sha256() {
         Checksum::Sha256(*sha256)
@@ -121,7 +130,17 @@ pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<Path
     let response = reqwest::get(source.url().clone()).await?;
     let mut file = std::fs::File::create(&cache_name)?;
 
-    let mut content = Cursor::new(response.bytes().await?);
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        indicatif::ProgressBar::new(1)
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Downloading src")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
+    progress_bar.enable_steady_tick(Duration::from_millis(100));
+
+    let mut content = progress_bar.wrap_read(Cursor::new(response.bytes().await?));
     std::io::copy(&mut content, &mut file)?;
 
     if !validate_checksum(&cache_name, &checksum) {
@@ -130,6 +149,7 @@ pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<Path
         return Err(SourceError::ValidationFailed);
     }
 
+    progress_bar.finish_with_message("Downloaded...");
     Ok(cache_name)
 }
 
