@@ -3,6 +3,13 @@ name = "rust-tests"
 version = "0.1.0"
 edition = "2021"
 
+autotests = false
+
+[[test]]
+name = "main"
+path = "src/test.rs"
+harness = false
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
