@@ -55,7 +55,7 @@ enum SubCommands {
     /// Upload a package
     Upload(UploadOpts),
 
-    /// Shell commands
+    /// Generate shell completion script
     Completion(ShellCompletion),
 }
 
