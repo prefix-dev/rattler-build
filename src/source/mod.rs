@@ -252,30 +252,22 @@ impl std::io::Read for TarCompression<'_> {
     }
 }
 
+/// Moves the directory content from src to dest
+/// after stripping root dir, if present.
 fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
-    let entries = fs::read_dir(src)?;
-    let mut dir_name = None;
-
-    for entry in entries {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() && dir_name.is_none() {
-            dir_name = Some(entry.file_name());
-        } else {
-            dir_name = None;
-            break;
+    let mut entries = fs::read_dir(src)?;
+    let src_dir = match entries.next().transpose()? {
+        // ensure if only single directory in entries(root dir)
+        Some(dir) if entries.next().is_none() && dir.file_type()?.is_dir() => {
+            src.join(dir.file_name())
         }
-    }
-
-    let src_dir = if let Some(dir) = dir_name {
-        src.join(dir)
-    } else {
-        src.to_path_buf()
+        _ => src.to_path_buf(),
     };
 
-    for inner_entry in fs::read_dir(&src_dir)? {
-        let inner_entry = inner_entry?;
-        let destination = dest.join(inner_entry.file_name());
-        fs::rename(inner_entry.path(), destination)?;
+    for entry in fs::read_dir(&src_dir)? {
+        let entry = entry?;
+        let destination = dest.join(entry.file_name());
+        fs::rename(entry.path(), destination)?;
     }
 
     Ok(())
