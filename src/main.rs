@@ -228,7 +228,7 @@ struct ArtifactoryOpts {
     channel: String,
 
     /// Your Artifactory username
-    #[arg(short, long, env = "ARTIFACTORY_USERNAME")]
+    #[arg(short = 'r', long, env = "ARTIFACTORY_USERNAME")]
     username: Option<String>,
 
     /// Your Artifactory password
