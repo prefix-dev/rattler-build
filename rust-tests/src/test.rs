@@ -5,6 +5,7 @@ use std::{
     collections::HashMap,
     ffi::OsStr,
     fs::File,
+    io,
     path::{Component, Path, PathBuf},
     process::{Command, Output},
     sync::{Arc, Mutex, OnceLock},
@@ -442,8 +443,28 @@ fn init_tests() {
     add_test_recipe_temp!(test_zip_source);
 }
 
+fn get_target_dir() -> std::io::Result<PathBuf> {
+    let output = shx("cargo metadata --no-deps").expect("Failed to run cargo metadata");
+    let json: serde_json::Value = serde_json::from_str(output.as_str())?;
+    json.get("target_directory")
+        .and_then(|td| td.as_str())
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Failed to find target_directory",
+            )
+        })
+}
+
+fn set_env_without_override(key: &str, value: &str) {
+    if std::env::var_os(key).is_none() {
+        std::env::set_var(key, value);
+    }
+}
+
 /// entrypoint for all tests
-fn main() {
+fn main() -> io::Result<()> {
     init_tests();
     fn test_data_dir() -> PathBuf {
         PathBuf::from(shx("cargo locate-project --workspace -q --message-format=plain").unwrap())
@@ -452,19 +473,35 @@ fn main() {
             .join("test-data")
     }
     let recipes_dir = test_data_dir().join("recipes");
+
+    // build project
+    shx("cargo build --release -p rattler-build");
+    // use binary just built
+    let binary = get_target_dir()?.join("release/rattler-build");
+    set_env_without_override("RATTLER_BUILD_PATH", binary.to_str().unwrap());
+
     let queue = get_test_queue();
+    // cleanup after all tests have successfully completed
+    let mut temp_dirs = vec![];
+    // set_env_without_override
     if let Ok(handle) = queue.lock() {
         for (name, f) in handle.iter() {
             match f {
                 TestFunction::NoArg(f) => f(),
                 TestFunction::RecipeTemp(f) => {
                     let tmp_dir = std::env::temp_dir().join(name);
+                    _ = std::fs::remove_dir_all(&tmp_dir);
                     _ = std::fs::create_dir_all(&tmp_dir);
                     f(&recipes_dir, &tmp_dir);
-                    _ = std::fs::remove_dir_all(&tmp_dir);
+                    temp_dirs.push(tmp_dir);
                 }
             }
-            println!("success - {name}");
+            println!("success - rust-tests::test::{name}");
         }
     };
+    println!("All tests completed successfully");
+    for tmp_dir in temp_dirs {
+        std::fs::remove_dir_all(&tmp_dir)?;
+    }
+    Ok(())
 }
