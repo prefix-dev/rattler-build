@@ -14,11 +14,11 @@ source:
 
 build:
   number: 0
-  script: cmake -B build
+  script:
+    - if: unix
+      then: test -f CMakeLists.txt
+      else: if not exist CMakeLists.txt (exit 1)
 
-requirements:
-  build:
-    - cmake
 about:
   homepage: https://github.com/ggerganov/llama.cpp
   license: MIT

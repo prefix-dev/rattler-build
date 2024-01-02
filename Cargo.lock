@@ -2602,6 +2602,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rattler-build-tests"
+version = "0.2.0"
+dependencies = [
+ "glob",
+ "itertools 0.12.0",
+ "rattler_package_streaming",
+ "serde_json",
+ "sha1",
+]
+
+[[package]]
 name = "rattler_conda_types"
 version = "0.14.0"
 source = "git+https://github.com/mamba-org/rattler?branch=main#8948ec7b2669604dcc402062bf528790df2665b6"
@@ -2992,17 +3003,6 @@ dependencies = [
  "rustc_version",
  "syn 2.0.41",
  "unicode-ident",
-]
-
-[[package]]
-name = "rust-tests"
-version = "0.1.0"
-dependencies = [
- "glob",
- "itertools 0.12.0",
- "rattler_package_streaming",
- "serde_json",
- "sha1",
 ]
 
 [[package]]

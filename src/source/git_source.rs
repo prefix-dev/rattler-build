@@ -42,13 +42,6 @@ pub fn git_src(
     cache_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<PathBuf, SourceError> {
-    tracing::info!(
-        "git source: ({:?}) cache_dir: ({}) recipe_dir: ({})",
-        source,
-        cache_dir.display(),
-        recipe_dir.display()
-    );
-
     // test if git is available locally as we fetch the git from PATH,
     // user can always override git path
     if !Command::new("git")

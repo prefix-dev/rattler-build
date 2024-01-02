@@ -1,14 +1,11 @@
 [package]
-name = "rust-tests"
-version = "0.1.0"
+name = "rattler-build-tests"
+version = "0.2.0"
 edition = "2021"
 
-autotests = false
-
-[[test]]
-name = "main"
-path = "src/test.rs"
-harness = false
+[[bin]]
+name = "rattler-build-test"
+path = "src/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
