@@ -474,27 +474,45 @@ fn main() -> io::Result<()> {
     let recipes_dir = test_data_dir().join("recipes");
 
     // build project
+    println!("Building rattler-build...");
     shx("cargo build --release -p rattler-build");
+    println!("Built rattler-build with release config");
     // use binary just built
     let binary = get_target_dir()?.join("release/rattler-build");
     set_env_without_override("RATTLER_BUILD_PATH", binary.to_str().unwrap());
 
     // cleanup after all tests have successfully completed
     let mut temp_dirs = vec![];
-    for (name, f) in tests.iter() {
+    let (mut successes, mut failures) = (0, 0);
+
+    for (name, f) in tests.into_iter() {
         match f {
             TestFunction::NoArg(f) => f(),
             TestFunction::RecipeTemp(f) => {
                 let tmp_dir = std::env::temp_dir().join(name);
                 _ = std::fs::remove_dir_all(&tmp_dir);
                 _ = std::fs::create_dir_all(&tmp_dir);
-                f(&recipes_dir, &tmp_dir);
-                temp_dirs.push(tmp_dir);
+                let recipes_dir = recipes_dir.clone();
+                temp_dirs.push(tmp_dir.clone());
+                match std::thread::spawn(move || f(&recipes_dir, &tmp_dir)).join() {
+                    Ok(_) => {
+                        println!("Success - rust-tests::test::{name}");
+                        successes += 1;
+                    }
+                    Err(_e) => {
+                        println!("Failed - rust-tests::test::{name}");
+                        failures += 1;
+                    }
+                };
             }
         }
-        println!("Success - rust-tests::test::{name}");
     }
-    println!("All tests completed successfully");
+    if failures > 0 {
+        println!("\n{} tests failed.", failures);
+        println!("{} tests passed.", successes);
+    } else {
+        println!("\nAll tests({0}/{0}) passed.", successes);
+    }
     for tmp_dir in temp_dirs {
         std::fs::remove_dir_all(&tmp_dir)?;
     }
