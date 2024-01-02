@@ -2,6 +2,7 @@
 
 use std::{
     ffi::OsStr,
+    io::Result as IoResult,
     path::{Path, PathBuf, StripPrefixError},
 };
 
@@ -267,10 +268,62 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
     for entry in fs::read_dir(&src_dir)? {
         let entry = entry?;
         let destination = dest.join(entry.file_name());
-        fs::rename(entry.path(), destination)?;
+        rename(&entry.path(), &destination)?;
     }
 
     Ok(())
+}
+
+/// Rename file or directory.
+///
+/// This behaves differently on Linux since `fs::rename` will not work
+/// when the new name is on a different mount point. To mitigate that,
+/// we check the error kind and copy + delete instead of move if necessary.
+#[cfg(target_os = "linux")]
+fn rename(src: &Path, dest: &Path) -> IoResult<()> {
+    if let Err(e) = fs::rename(src, dest) {
+        // TODO: replace it with `std::io::ErrorKind::CrossesDevices`
+        // when <https://github.com/rust-lang/rust/issues/86442> is stabilized.
+        if format!("{:?}", e.kind()) == *"CrossesDevices" {
+            if src.is_dir() {
+                copy_dir(src, dest).and(fs::remove_dir_all(src))?;
+            } else if fs::symlink_metadata(src)?.is_symlink() {
+                std::os::unix::fs::symlink(src, dest)?;
+            } else {
+                fs::copy(src, dest).and(fs::remove_file(src))?;
+            }
+        } else {
+            return Err(e);
+        }
+    }
+    Ok(())
+}
+
+/// Recursively copy directory contents.
+///
+// This function uses `std::fs::copy()` instead of the
+// faster `std::fs::rename()` to avoid cross-device link errors.
+#[cfg(target_os = "linux")]
+fn copy_dir(src: &Path, dest: &Path) -> IoResult<()> {
+    fs::create_dir(dest)?;
+    for entry in src.read_dir()? {
+        let entry = entry?;
+        let kind = entry.file_type()?;
+        let src = entry.path();
+        let dest = dest.join(entry.file_name());
+        if kind.is_dir() {
+            copy_dir(&src, &dest)?;
+        } else {
+            fs::copy(&src, &dest)?;
+        }
+    }
+    Ok(())
+}
+
+/// Rename file or directory.
+#[cfg(not(target_os = "linux"))]
+fn rename(src: &Path, dest: &Path) -> IoResult<()> {
+    fs::rename(src, dest)
 }
 
 /// Extracts a tar archive to the specified target directory
