@@ -8,7 +8,6 @@ use std::{
     io,
     path::{Component, Path, PathBuf},
     process::{Command, Output},
-    sync::{Arc, Mutex, OnceLock},
 };
 
 enum TestFunction {
@@ -26,37 +25,6 @@ impl From<fn(&Path, &Path) -> ()> for TestFunction {
     }
 }
 
-type Tests = Arc<Mutex<Vec<(&'static str, TestFunction)>>>;
-static TESTS: OnceLock<Tests> = OnceLock::new();
-fn get_test_queue() -> Tests {
-    TESTS
-        .get_or_init(|| Arc::new(Mutex::new(Vec::new())))
-        .clone()
-}
-fn __append_test_recipe_temp(name: &'static str, test_fn: fn(&Path, &Path) -> ()) {
-    let test_fn: TestFunction = test_fn.into();
-    let test_queue = get_test_queue();
-    if let Ok(mut handle) = test_queue.lock() {
-        handle.push((name, test_fn));
-    };
-}
-fn __append_test(name: &'static str, test_fn: fn() -> ()) {
-    let test_fn: TestFunction = test_fn.into();
-    let test_queue = get_test_queue();
-    if let Ok(mut handle) = test_queue.lock() {
-        handle.push((name, test_fn));
-    };
-}
-macro_rules! add_test {
-    ($name:ident) => {{
-        __append_test(stringify!($name), $name);
-    }};
-}
-macro_rules! add_test_recipe_temp {
-    ($name:ident) => {{
-        __append_test_recipe_temp(stringify!($name), $name);
-    }};
-}
 enum RattlerBuild {
     WithCargo(PathBuf),
     WithBinary(String),
@@ -427,20 +395,51 @@ fn test_zip_source(recipes: &Path, tmp_dir: &Path) {
     assert!(rattler_build.unwrap().status.success());
 }
 
-fn init_tests() {
-    add_test!(test_help);
-    add_test!(test_no_cmd);
-    add_test_recipe_temp!(test_run_exports);
-    add_test_recipe_temp!(test_pkg_hash);
-    add_test_recipe_temp!(test_license_glob);
-    add_test_recipe_temp!(test_python_noarch);
-    add_test_recipe_temp!(test_git_source);
-    add_test_recipe_temp!(test_package_content_test_execution);
-    add_test_recipe_temp!(test_test_execution);
-    add_test_recipe_temp!(test_noarch_flask);
-    add_test_recipe_temp!(test_files_copy);
-    add_test_recipe_temp!(test_tar_source);
-    add_test_recipe_temp!(test_zip_source);
+type Tests = Vec<(&'static str, TestFunction)>;
+fn init_tests() -> Tests {
+    let mut tests = vec![];
+    fn __append_test_recipe_temp(
+        queue: &mut Tests,
+        name: &'static str,
+        test_fn: fn(&Path, &Path) -> (),
+    ) {
+        let test_fn: TestFunction = test_fn.into();
+        queue.push((name, test_fn));
+    }
+    fn __append_test(queue: &mut Tests, name: &'static str, test_fn: fn() -> ()) {
+        let test_fn: TestFunction = test_fn.into();
+        queue.push((name, test_fn));
+    }
+    macro_rules! add_test {
+        ($queue:expr, $($names:ident $(,)?)+) => {{
+            $(
+                __append_test($queue, stringify!($names), $names);
+            )+
+        }};
+    }
+    macro_rules! add_test_recipe_temp {
+        ($queue:expr, $($names:ident $(,)?)+) => {{
+            $(
+                __append_test_recipe_temp($queue, stringify!($names), $names);
+            )+
+        }};
+    }
+    add_test!(&mut tests, test_help, test_no_cmd);
+    add_test_recipe_temp!(
+        &mut tests,
+        test_run_exports,
+        test_pkg_hash,
+        test_license_glob,
+        test_python_noarch,
+        test_git_source,
+        test_package_content_test_execution,
+        test_test_execution,
+        test_noarch_flask,
+        test_files_copy,
+        test_tar_source,
+        test_zip_source,
+    );
+    tests
 }
 
 fn get_target_dir() -> std::io::Result<PathBuf> {
@@ -465,7 +464,7 @@ fn set_env_without_override(key: &str, value: &str) {
 
 /// entrypoint for all tests
 fn main() -> io::Result<()> {
-    init_tests();
+    let tests = init_tests();
     fn test_data_dir() -> PathBuf {
         PathBuf::from(shx("cargo locate-project --workspace -q --message-format=plain").unwrap())
             .parent()
@@ -480,25 +479,21 @@ fn main() -> io::Result<()> {
     let binary = get_target_dir()?.join("release/rattler-build");
     set_env_without_override("RATTLER_BUILD_PATH", binary.to_str().unwrap());
 
-    let queue = get_test_queue();
     // cleanup after all tests have successfully completed
     let mut temp_dirs = vec![];
-    // set_env_without_override
-    if let Ok(handle) = queue.lock() {
-        for (name, f) in handle.iter() {
-            match f {
-                TestFunction::NoArg(f) => f(),
-                TestFunction::RecipeTemp(f) => {
-                    let tmp_dir = std::env::temp_dir().join(name);
-                    _ = std::fs::remove_dir_all(&tmp_dir);
-                    _ = std::fs::create_dir_all(&tmp_dir);
-                    f(&recipes_dir, &tmp_dir);
-                    temp_dirs.push(tmp_dir);
-                }
+    for (name, f) in tests.iter() {
+        match f {
+            TestFunction::NoArg(f) => f(),
+            TestFunction::RecipeTemp(f) => {
+                let tmp_dir = std::env::temp_dir().join(name);
+                _ = std::fs::remove_dir_all(&tmp_dir);
+                _ = std::fs::create_dir_all(&tmp_dir);
+                f(&recipes_dir, &tmp_dir);
+                temp_dirs.push(tmp_dir);
             }
-            println!("success - rust-tests::test::{name}");
         }
-    };
+        println!("Success - rust-tests::test::{name}");
+    }
     println!("All tests completed successfully");
     for tmp_dir in temp_dirs {
         std::fs::remove_dir_all(&tmp_dir)?;
