@@ -1,5 +1,6 @@
 #![deny(dead_code)]
 
+use itertools::Itertools;
 use rattler_package_streaming::read::extract_tar_bz2;
 use std::{
     collections::HashMap,
@@ -88,7 +89,6 @@ impl RattlerBuild {
         // command
         //     .stderr(std::process::Stdio::inherit())
         //     .stdout(std::process::Stdio::inherit());
-        // use itertools::Itertools;
         // println!(
         //     "{} {}",
         //     command.get_program().to_string_lossy(),
@@ -485,28 +485,37 @@ fn main() -> io::Result<()> {
     let mut temp_dirs = vec![];
     let (mut successes, mut failures) = (0, 0);
 
-    for (name, f) in tests.into_iter() {
-        match f {
-            TestFunction::NoArg(f) => f(),
-            TestFunction::RecipeTemp(f) => {
-                let tmp_dir = std::env::temp_dir().join(name);
-                _ = std::fs::remove_dir_all(&tmp_dir);
-                _ = std::fs::create_dir_all(&tmp_dir);
-                let recipes_dir = recipes_dir.clone();
-                temp_dirs.push(tmp_dir.clone());
-                match std::thread::spawn(move || f(&recipes_dir, &tmp_dir)).join() {
-                    Ok(_) => {
-                        println!("Success - rust-tests::test::{name}");
-                        successes += 1;
-                    }
-                    Err(_e) => {
-                        println!("Failed - rust-tests::test::{name}");
-                        failures += 1;
-                    }
-                };
+    for chunk in &tests.into_iter().chunks(4) {
+        let mut test_threads = vec![];
+        test_threads.reserve(4);
+        for (name, f) in chunk {
+            match f {
+                TestFunction::NoArg(f) => f(),
+                TestFunction::RecipeTemp(f) => {
+                    let tmp_dir = std::env::temp_dir().join(name);
+                    _ = std::fs::remove_dir_all(&tmp_dir);
+                    _ = std::fs::create_dir_all(&tmp_dir);
+                    let recipes_dir = recipes_dir.clone();
+                    temp_dirs.push(tmp_dir.clone());
+                    test_threads
+                        .push((name, std::thread::spawn(move || f(&recipes_dir, &tmp_dir))));
+                }
+            }
+        }
+        for (name, thread) in test_threads {
+            match thread.join() {
+                Ok(_) => {
+                    println!("Success - rust-tests::test::{name}");
+                    successes += 1;
+                }
+                Err(_) => {
+                    println!("Failed - rust-tests::test::{name}");
+                    failures += 1;
+                }
             }
         }
     }
+
     if failures > 0 {
         println!("\n{} tests failed.", failures);
         println!("{} tests passed.", successes);
