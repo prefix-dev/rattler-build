@@ -280,8 +280,7 @@ fn extract_tar(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
     ));
 
-    let tmp_extraction_dir = tempfile::tempdir()?;
-
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
         .unpack(&tmp_extraction_dir)
         .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
@@ -300,7 +299,7 @@ fn extract_zip(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
     )
     .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
-    let tmp_extraction_dir = tempfile::tempdir()?;
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
         .extract(&tmp_extraction_dir)
         .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
