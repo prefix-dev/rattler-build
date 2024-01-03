@@ -20,5 +20,6 @@ mod linux;
 mod macos;
 mod packaging;
 mod post;
+mod post_process;
 mod unix;
 mod windows;

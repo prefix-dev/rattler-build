@@ -228,3 +228,15 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
 
     Ok(())
 }
+
+// We are checking two things here: over- and underlinking.
+// Overlinking is when a package is installed that is not actually needed because no shared library
+// actually requires it.
+// Underlinking is when a package is installed that is needed but not installed.
+// fn check_overlinking(dylib: &Dylib) -> Result<(), OverlinkingError> {
+//     for lib in &dylib.libraries {
+//         if lib.is_absolute() {
+//             return Err(OverlinkingError::AbsoluteLink(lib.clone()));
+//         }
+//     }
+// }
