@@ -27,10 +27,11 @@ use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
 
+use crate::linux;
 use crate::macos;
 use crate::metadata::{Output, PackagingSettings};
 use crate::package_test::write_test_files;
-use crate::{linux, post};
+use crate::post_process;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
@@ -68,7 +69,7 @@ pub enum PackagingError {
     MacOSRelinkError(#[from] macos::link::RelinkError),
 
     #[error("Relink error: {0}")]
-    RelinkError(#[from] crate::post::RelinkError),
+    RelinkError(#[from] crate::post_process::relink::RelinkError),
 
     #[error(transparent)]
     SourceError(#[from] crate::source::SourceError),
@@ -908,16 +909,18 @@ pub fn package_conda(
         if let Some(paths) = relocation_config.relocate_paths()? {
             binaries.retain(|v| paths.iter().any(|glob| glob.is_match(v)));
         }
-        post::relink(
+        post_process::relink::relink(
             &binaries,
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
             &rpath_allowlist,
         )?;
+
+        let _ = post_process::linking_checks(output, &tmp_files);
     }
 
-    post::python(output.name(), output.version(), &tmp_files)?;
+    post_process::python::python(output.name(), output.version(), &tmp_files)?;
 
     tracing::info!("Relink done!");
 

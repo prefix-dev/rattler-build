@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  version: "0.1.0"
+
+package:
+  name: zlink
+  version: ${{ version }}
+
+source:
+  path: ./zlink
+
+build:
+  script:
+    - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    - cmake --build build --config Release
+    - cmake --install build --prefix ${PREFIX}
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ninja
+    - cmake
+  host:
+    - zlib
+
+test:
+  commands:
+    - zlink
+
+about:
+  homepage: https://github.com/killercup/cargo-edit
+  license: MIT
+  description: "A utility for managing cargo dependencies from the command line."
+  summary: "A utility for managing cargo dependencies from the command line."

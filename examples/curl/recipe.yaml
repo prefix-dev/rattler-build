@@ -28,9 +28,9 @@ requirements:
         - pkg-config
         - libtool
   host:
-    - if: linux
-      then:
-        - openssl
+    - openssl
+    - zlib
+    - libssh2
 
 tests:
   - script:
