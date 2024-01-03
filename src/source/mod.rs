@@ -94,8 +94,8 @@ pub async fn fetch_sources(
             Source::Git(src) => {
                 tracing::info!("Fetching source from git repo: {}", src.url());
                 let result = git_source::git_src(src, &cache_src, recipe_dir)?;
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -116,8 +116,8 @@ pub async fn fetch_sources(
                     .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
 
                 let res = url_source::url_src(src, &cache_src).await?;
-                let mut dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let mut dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -160,8 +160,8 @@ pub async fn fetch_sources(
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
 
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };

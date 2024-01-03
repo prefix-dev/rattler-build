@@ -62,12 +62,10 @@ pub fn git_src(
         ));
     }
 
-    if (source.rev().is_empty() || source.rev().eq("HEAD"))
-        // depth == -1, fetches the entire git history
-        && source.depth().map(|s| s != -1).unwrap_or_default()
-    {
+    // depth == -1, fetches the entire git history
+    if !source.rev().is_head() && (source.depth().is_some() && source.depth() != Some(-1)) {
         return Err(SourceError::GitErrorStr(
-            "use of `git_rev` with `git_depth` is invalid",
+            "use of `depth` with `rev` is invalid",
         ));
     }
 
@@ -105,7 +103,7 @@ pub fn git_src(
                 if !output.status.success() {
                     return Err(SourceError::GitErrorStr("Git clone failed for source"));
                 }
-                if source.rev() == "HEAD" || source.rev().trim().is_empty() {
+                if source.rev().is_head() {
                     // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                     return Ok(PathBuf::from(&cache_path));
                 }
@@ -145,7 +143,7 @@ pub fn git_src(
                 ));
             }
 
-            if source.rev() == "HEAD" || source.rev().trim().is_empty() {
+            if source.rev().is_head() {
                 // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                 return Ok(PathBuf::from(&cache_path));
             }
@@ -153,17 +151,20 @@ pub fn git_src(
     }
 
     // Resolve the reference and set the head to the specified revision.
-    // let ref_git = format!("refs/remotes/origin/{}", source.git_rev.to_string());
-    // let reference = match repo.find_reference(&ref_git) {
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", source.rev()])
+        .args(["rev-parse", &source.rev().to_string()])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
+
     if !output.status.success() {
-        tracing::error!("Command failed: \"git\" \"rev-parse\" \"{}\"", source.rev());
+        tracing::error!(
+            "Command failed: `git rev-parse \"{}\"`",
+            source.rev().to_string()
+        );
         return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
     }
+
     let ref_git = String::from_utf8(output.stdout)
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?;
     tracing::info!("cache_path = {}", cache_path.display());
@@ -199,7 +200,7 @@ pub fn git_src(
         git_lfs_pull()?;
     }
 
-    tracing::info!("Checked out reference: '{}'", &source.rev());
+    tracing::info!("Checked out reference: '{}'", &source.rev().to_string());
 
     Ok(cache_path)
 }
@@ -233,7 +234,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        recipe::parser::{GitSource, GitUrl},
+        recipe::parser::{GitRev, GitSource, GitUrl},
         source::git_source::git_src,
     };
 
@@ -250,7 +251,7 @@ mod tests {
                             .parse()
                             .unwrap(),
                     ),
-                    "main".to_owned(),
+                    GitRev::Branch("main".to_owned()),
                     None,
                     vec![],
                     None,
@@ -265,7 +266,7 @@ mod tests {
                             .parse()
                             .unwrap(),
                     ),
-                    "v0.1.3".to_owned(),
+                    GitRev::Tag("v0.1.3".to_owned()),
                     None,
                     vec![],
                     None,
@@ -280,7 +281,7 @@ mod tests {
                             .parse()
                             .unwrap(),
                     ),
-                    "v0.1.2".to_owned(),
+                    GitRev::Tag("v0.1.2".to_owned()),
                     None,
                     vec![],
                     None,
@@ -291,7 +292,7 @@ mod tests {
             (
                 GitSource::create(
                     GitUrl::Path("../rattler-build".parse().unwrap()),
-                    "".to_owned(),
+                    GitRev::default(),
                     None,
                     vec![],
                     None,

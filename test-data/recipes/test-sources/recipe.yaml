@@ -13,7 +13,7 @@ source:
 
   - path: ./test-folder/test-file-2.txt
   - path: ./test-folder
-    folder: just-a-test
+    target_directory: just-a-test
   - path: test-file.txt
     file_name: am-i-renamed.txt
 

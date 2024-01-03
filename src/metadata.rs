@@ -25,11 +25,13 @@ impl FromStr for GitRev {
         Ok(GitRev(s.to_string()))
     }
 }
+
 impl Default for GitRev {
     fn default() -> Self {
         Self(String::from("HEAD"))
     }
 }
+
 impl Display for GitRev {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)

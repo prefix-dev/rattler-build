@@ -9,8 +9,8 @@ package:
   version: "${{ version }}"
 
 source:
-  git_url: https://github.com/ggerganov/llama.cpp.git
-  git_rev: "${{ version }}"
+  git: https://github.com/ggerganov/llama.cpp.git
+  rev: "${{ version }}"
 
 build:
   number: 0
