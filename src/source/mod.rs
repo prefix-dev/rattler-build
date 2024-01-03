@@ -287,6 +287,7 @@ fn rename(src: &Path, dest: &Path) -> IoResult<()> {
     } else {
         File::create(dest)?;
     }
+    // check if the files are on the same filesystem
     if fs::metadata(src)?.dev() != fs::metadata(dest)?.dev() {
         if src.is_dir() {
             copy_dir(src, dest).and(fs::remove_dir_all(src))?;
