@@ -2,9 +2,7 @@
 
 use std::{
     fs,
-    io::Cursor,
     path::{Path, PathBuf},
-    time::Duration,
 };
 
 use crate::{
@@ -13,6 +11,7 @@ use crate::{
     tool_configuration,
 };
 use rattler_digest::compute_file_digest;
+use tokio::io::AsyncWriteExt;
 
 use super::SourceError;
 
@@ -127,29 +126,57 @@ pub(crate) async fn url_src(
         return Ok(cache_name.clone());
     }
 
-    let response = reqwest::get(source.url().clone()).await?;
-    let mut file = std::fs::File::create(&cache_name)?;
+    let client = reqwest::Client::new();
+    let download_size = {
+        let resp = client.head(source.url().as_str()).send().await?;
+        if resp.status().is_success() {
+            resp.headers() // Gives is the HeaderMap
+                .get(reqwest::header::CONTENT_LENGTH) // Gives us an Option containing the HeaderValue
+                .and_then(|ct_len| ct_len.to_str().ok()) // Unwraps the Option as &str
+                .and_then(|ct_len| ct_len.parse().ok()) // Parses the Option as u64
+                .unwrap_or(0) // Fallback to 0
+        } else {
+            // We return an Error if something goes wrong here
+            return Err(SourceError::UrlNotFile(source.url().clone()));
+        }
+    };
 
     let progress_bar = tool_configuration.multi_progress_indicator.add(
-        indicatif::ProgressBar::new(1)
-            .with_finish(indicatif::ProgressFinish::AndLeave)
-            .with_prefix("Downloading src")
+        indicatif::ProgressBar::new(download_size)
+            .with_prefix("Downloading")
             .with_style(default_bytes_style().map_err(|_| {
                 SourceError::UnknownError("Failed to get progress bar style".to_string())
             })?),
     );
-    progress_bar.enable_steady_tick(Duration::from_millis(100));
+    progress_bar.set_message(
+        source
+            .url()
+            .path_segments()
+            .and_then(|segs| segs.last())
+            .map(str::to_string)
+            .unwrap_or_else(|| "Unknown File".to_string()),
+    );
+    // let mut file = std::fs::File::create(&cache_name)?;
+    let mut file = tokio::fs::File::create(&cache_name).await?;
 
-    let mut content = progress_bar.wrap_read(Cursor::new(response.bytes().await?));
-    std::io::copy(&mut content, &mut file)?;
+    let request = client.get(source.url().as_str());
+    let mut download = request.send().await?;
+
+    while let Some(chunk) = download.chunk().await? {
+        progress_bar.inc(chunk.len() as u64);
+        file.write(&chunk).await?;
+    }
+
+    // let mut content = progress_bar.wrap_read(Cursor::new(response.bytes().await?));
+    // std::io::copy(&mut content, &mut file)?;
 
     if !validate_checksum(&cache_name, &checksum) {
         tracing::error!("Checksum validation failed!");
         fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);
     }
+    progress_bar.finish();
 
-    progress_bar.finish_with_message("Downloaded...");
     Ok(cache_name)
 }
 

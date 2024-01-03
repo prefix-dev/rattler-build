@@ -290,7 +290,6 @@ fn extract_tar(
 ) -> Result<(), SourceError> {
     let progress_bar = tool_configuration.multi_progress_indicator.add(
         indicatif::ProgressBar::new(1)
-            .with_finish(indicatif::ProgressFinish::AndLeave)
             .with_prefix("Extracting tar")
             .with_style(default_bytes_style().map_err(|_| {
                 SourceError::UnknownError("Failed to get progress bar style".to_string())
@@ -324,7 +323,6 @@ fn extract_zip(
 ) -> Result<(), SourceError> {
     let progress_bar = tool_configuration.multi_progress_indicator.add(
         indicatif::ProgressBar::new(1)
-            .with_finish(indicatif::ProgressFinish::AndLeave)
             .with_prefix("Extracting zip")
             .with_style(default_bytes_style().map_err(|_| {
                 SourceError::UnknownError("Failed to get progress bar style".to_string())
