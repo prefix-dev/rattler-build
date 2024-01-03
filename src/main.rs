@@ -54,15 +54,20 @@ enum SubCommands {
 
     /// Upload a package
     Upload(UploadOpts),
+
+    /// Generate shell completion script
+    Completion(ShellCompletion),
+}
+
+#[derive(Parser)]
+struct ShellCompletion {
+    #[arg(short, long)]
+    shell: clap_complete::Shell,
 }
 
 #[derive(Parser)]
 #[clap(version = crate_version!())]
 struct App {
-    // If provided, outputs the completion file for given shell
-    #[arg(long = "generate", value_enum)]
-    generator: Option<clap_complete::Shell>,
-
     #[clap(subcommand)]
     subcommand: Option<SubCommands>,
 
@@ -223,7 +228,7 @@ struct ArtifactoryOpts {
     channel: String,
 
     /// Your Artifactory username
-    #[arg(short, long, env = "ARTIFACTORY_USERNAME")]
+    #[arg(short = 'r', long, env = "ARTIFACTORY_USERNAME")]
     username: Option<String>,
 
     /// Your Artifactory password
@@ -269,24 +274,27 @@ async fn main() -> miette::Result<()> {
         )
         .init();
 
-    if let Some(generator) = args.generator {
-        let mut cmd = App::command();
-        tracing::info!("Generating completion file for {generator:?}...");
-        fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
-            clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
-        }
-        print_completions(generator, &mut cmd);
-        Ok(())
-    } else {
-        match args.subcommand {
-            Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
-            Some(SubCommands::Test(args)) => run_test_from_args(args).await,
-            Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
-            Some(SubCommands::Upload(args)) => upload_from_args(args).await,
-            None => {
-                _ = App::command().print_long_help();
-                Ok(())
+    match args.subcommand {
+        Some(SubCommands::Completion(ShellCompletion { shell })) => {
+            let mut cmd = App::command();
+            fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
+                clap_complete::generate(
+                    gen,
+                    cmd,
+                    cmd.get_name().to_string(),
+                    &mut std::io::stdout(),
+                );
             }
+            print_completions(shell, &mut cmd);
+            Ok(())
+        }
+        Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
+        Some(SubCommands::Test(args)) => run_test_from_args(args).await,
+        Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
+        Some(SubCommands::Upload(args)) => upload_from_args(args).await,
+        None => {
+            _ = App::command().print_long_help();
+            Ok(())
         }
     }
 }
