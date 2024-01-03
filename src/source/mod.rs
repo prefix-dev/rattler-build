@@ -278,23 +278,25 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
 ///
 /// This behaves differently on Linux since `fs::rename` will not work
 /// when the new name is on a different mount point. To mitigate that,
-/// we check the error kind and copy + delete instead of move if necessary.
+/// we check the filesystem and copy + delete instead of move if necessary.
 #[cfg(target_os = "linux")]
 fn rename(src: &Path, dest: &Path) -> IoResult<()> {
-    if let Err(e) = fs::rename(src, dest) {
-        // TODO: replace it with `std::io::ErrorKind::CrossesDevices`
-        // when <https://github.com/rust-lang/rust/issues/86442> is stabilized.
-        if format!("{:?}", e.kind()) == *"CrossesDevices" {
-            if src.is_dir() {
-                copy_dir(src, dest).and(fs::remove_dir_all(src))?;
-            } else if fs::symlink_metadata(src)?.is_symlink() {
-                std::os::unix::fs::symlink(src, dest)?;
-            } else {
-                fs::copy(src, dest).and(fs::remove_file(src))?;
-            }
+    use std::os::unix::fs::MetadataExt;
+    if src.is_dir() {
+        fs::create_dir(dest)?;
+    } else {
+        File::create(dest)?;
+    }
+    if fs::metadata(src)?.dev() != fs::metadata(dest)?.dev() {
+        if src.is_dir() {
+            copy_dir(src, dest).and(fs::remove_dir_all(src))?;
+        } else if fs::symlink_metadata(src)?.is_symlink() {
+            std::os::unix::fs::symlink(src, dest)?;
         } else {
-            return Err(e);
+            fs::copy(src, dest).and(fs::remove_file(src))?;
         }
+    } else {
+        fs::rename(src, dest)?
     }
     Ok(())
 }
@@ -305,7 +307,9 @@ fn rename(src: &Path, dest: &Path) -> IoResult<()> {
 // faster `std::fs::rename()` to avoid cross-device link errors.
 #[cfg(target_os = "linux")]
 fn copy_dir(src: &Path, dest: &Path) -> IoResult<()> {
-    fs::create_dir(dest)?;
+    if !dest.exists() {
+        fs::create_dir(dest)?;
+    }
     for entry in src.read_dir()? {
         let entry = entry?;
         let kind = entry.file_type()?;
