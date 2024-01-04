@@ -251,11 +251,6 @@ impl<'a> CopyDir<'a> {
                             .map_err(SourceError::FileSystemError)?;
                     }
 
-                    tracing::info!(
-                        "Copied {} to {}",
-                        path.to_string_lossy(),
-                        dest_path.to_string_lossy()
-                    );
                     Ok(Some(dest_path))
                 }
             })

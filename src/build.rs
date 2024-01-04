@@ -216,9 +216,19 @@ pub async fn run_build(
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
-
-    if !output.recipe.sources().is_empty() {
+    let output = if let Some(finalized_sources) = &output.finalized_sources {
         fetch_sources(
+            finalized_sources,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.output_dir,
+        )
+        .await
+        .into_diagnostic()?;
+
+        output.clone()
+    } else {
+        let rendered_sources = fetch_sources(
             output.recipe.sources(),
             &directories.work_dir,
             &directories.recipe_dir,
@@ -226,27 +236,31 @@ pub async fn run_build(
         )
         .await
         .into_diagnostic()?;
-    }
+
+        Output {
+            finalized_sources: Some(rendered_sources),
+            ..output.clone()
+        }
+    };
 
     let output = if output.finalized_dependencies.is_some() {
         tracing::info!("Using finalized dependencies");
 
         // The output already has the finalized dependencies, so we can just use it as-is
-        install_environments(output, tool_configuration.clone())
+        install_environments(&output, tool_configuration.clone())
             .await
             .into_diagnostic()?;
         output.clone()
     } else {
         let finalized_dependencies =
-            resolve_dependencies(output, &channels, tool_configuration.clone())
+            resolve_dependencies(&output, &channels, tool_configuration.clone())
                 .await
                 .into_diagnostic()?;
 
         // The output with the resolved dependencies
         Output {
             finalized_dependencies: Some(finalized_dependencies),
-            recipe: output.recipe.clone(),
-            build_configuration: output.build_configuration.clone(),
+            ..output.clone()
         }
     };
 

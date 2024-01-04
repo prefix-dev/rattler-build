@@ -67,7 +67,7 @@ Recipe {
                 md5: None,
                 file_name: None,
                 patches: [],
-                folder: None,
+                target_directory: None,
             },
         ),
     ],

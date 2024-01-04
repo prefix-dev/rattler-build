@@ -227,7 +227,7 @@ Patches may optionally be applied to the source.
 #### Destination path
 
 Within boa's work directory, you may specify a particular folder to place source
-into. Boa will always drop you into the same folder (build folder/work), but
+into. `rattler-build` will always drop you into the same folder (build folder/work), but
 it's up to you whether you want your source extracted into that folder, or
 nested deeper. This feature is particularly useful when dealing with multiple
 sources, but can apply to recipes with single sources as well.
@@ -235,7 +235,7 @@ sources, but can apply to recipes with single sources as well.
 ```yaml
 source:
   #[source information here]
-  folder: my-destination/folder
+  target_directory: my-destination/folder
 ```
 
 #### Source from multiple sources
@@ -250,11 +250,11 @@ Example:
 ```yaml
 source:
   - url: https://package1.com/a.tar.bz2
-    folder: stuff
+    target_directory: stuff
   - url: https://package1.com/b.tar.bz2
-    folder: stuff
+    target_directory: stuff
   - git: https://github.com/mamba-org/boa
-    folder: boa
+    target_directory: boa
 ```
 
 Here, the two URL tarballs will go into one folder, and the git repo is checked
@@ -276,7 +276,7 @@ Recursive globbing using `**` is also supported.
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "-". The string defaults
-to the default boa build string plus the build number.
+to the default rattler-build build string plus the build number.
 
 ```yaml
 build:
@@ -320,7 +320,7 @@ build:
 
 ### Script
 
-By default, boa uses a `build.sh` file on Unix (macOS and Linux) and a
+By default, rattler-build uses a `build.sh` file on Unix (macOS and Linux) and a
 `build.bat` file on Linux, if they exist in the same folder as the `recipe.yaml`
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different

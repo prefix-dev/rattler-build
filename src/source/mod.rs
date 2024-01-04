@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use crate::recipe::parser::Source;
+use crate::recipe::parser::{GitRev, GitSource, Source};
 
 use fs_err as fs;
 use fs_err::File;
@@ -85,21 +85,33 @@ pub async fn fetch_sources(
     work_dir: &Path,
     recipe_dir: &Path,
     cache_dir: &Path,
-) -> Result<(), SourceError> {
+) -> Result<Vec<Source>, SourceError> {
+    if sources.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
+
+    let mut rendered_sources = Vec::new();
 
     for src in sources {
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from git repo: {}", src.url());
                 let result = git_source::git_src(src, &cache_src, recipe_dir)?;
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
-                crate::source::copy_dir::CopyDir::new(&result, &dest_dir)
+
+                rendered_sources.push(Source::Git(GitSource {
+                    rev: GitRev::Commit(result.1),
+                    ..src.clone()
+                }));
+
+                crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
                     .use_gitignore(false)
                     .run()?;
                 if !src.patches().is_empty() {
@@ -116,8 +128,8 @@ pub async fn fetch_sources(
                     .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
 
                 let res = url_source::url_src(src, &cache_src).await?;
-                let mut dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let mut dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -156,12 +168,14 @@ pub async fn fetch_sources(
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
+
+                rendered_sources.push(Source::Url(src.clone()));
             }
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
 
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -198,10 +212,12 @@ pub async fn fetch_sources(
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
+
+                rendered_sources.push(Source::Path(src.clone()));
             }
         }
     }
-    Ok(())
+    Ok(rendered_sources)
 }
 
 /// Handle Compression formats internally

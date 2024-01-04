@@ -42,11 +42,11 @@ impl Source {
     }
 
     /// Get the folder.
-    pub fn folder(&self) -> Option<&PathBuf> {
+    pub fn target_directory(&self) -> Option<&PathBuf> {
         match self {
-            Self::Git(git) => git.folder(),
-            Self::Url(url) => url.folder(),
-            Self::Path(path) => path.folder(),
+            Self::Git(git) => git.target_directory(),
+            Self::Url(url) => url.target_directory(),
+            Self::Path(path) => path.target_directory(),
         }
     }
 }
@@ -58,7 +58,7 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
         match self {
             RenderedNode::Mapping(map) => {
                 // Git source
-                if map.contains_key("git_url") {
+                if map.contains_key("git") {
                     let git_src = map.try_convert("source")?;
                     sources.push(Source::Git(git_src));
                 } else if map.contains_key("url") {
@@ -95,26 +95,102 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A git revision (branch, tag or commit)
+pub enum GitRev {
+    /// A git branch
+    Branch(String),
+    /// A git tag
+    Tag(String),
+    /// A specific git commit hash
+    Commit(String),
+    /// The default revision (HEAD)
+    Head,
+}
+
+impl GitRev {
+    /// Returns true if the revision is HEAD.
+    pub fn is_head(&self) -> bool {
+        matches!(self, Self::Head)
+    }
+}
+
+impl ToString for GitRev {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Branch(branch) => format!("refs/heads/{}", branch),
+            Self::Tag(tag) => format!("refs/tags/{}", tag),
+            Self::Head => "HEAD".into(),
+            Self::Commit(commit) => commit.clone(),
+        }
+    }
+}
+
+impl FromStr for GitRev {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, String> {
+        if s.to_uppercase() == "HEAD" {
+            Ok(Self::Head)
+        } else if let Some(tag) = s.strip_prefix("refs/tags/") {
+            Ok(Self::Tag(tag.to_owned()))
+        } else if let Some(branch) = s.strip_prefix("refs/heads/") {
+            Ok(Self::Branch(branch.to_owned()))
+        } else {
+            Ok(Self::Commit(s.to_owned()))
+        }
+    }
+}
+
+impl Default for GitRev {
+    fn default() -> Self {
+        Self::Head
+    }
+}
+
+/// Serialize a GitRev to a string.
+fn serialize_gitrev<S>(rev: &GitRev, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&rev.to_string())
+}
+
+/// Deserialize a GitRev from a string.
+fn deserialize_gitrev<'de, D>(deserializer: D) -> Result<GitRev, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    GitRev::from_str(&s).map_err(serde::de::Error::custom)
+}
+
 /// Git source information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
-    url: GitUrl,
+    #[serde(rename = "git")]
+    pub url: GitUrl,
     /// Optionally a revision to checkout, defaults to `HEAD`
-    #[serde(default)]
-    rev: String,
+    #[serde(
+        default,
+        skip_serializing_if = "GitRev::is_head",
+        serialize_with = "serialize_gitrev",
+        deserialize_with = "deserialize_gitrev"
+    )]
+    pub rev: GitRev,
     /// Optionally a depth to clone the repository, defaults to `None`
-    #[serde(skip_serializing_if = "Option::is_none")]
-    depth: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub depth: Option<i32>,
     /// Optionally patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    patches: Vec<PathBuf>,
+    pub patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
-    #[serde(skip_serializing_if = "Option::is_none")]
-    folder: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_directory: Option<PathBuf>,
     /// Optionally request the lfs pull in git source
-    #[serde(skip_serializing_if = "should_not_serialize_lfs")]
-    lfs: bool,
+    #[serde(default, skip_serializing_if = "should_not_serialize_lfs")]
+    pub lfs: bool,
 }
 
 /// A helper method to skip serializing the lfs flag if it is false.
@@ -126,10 +202,10 @@ impl GitSource {
     #[cfg(test)]
     pub fn create(
         url: GitUrl,
-        rev: String,
+        rev: GitRev,
         depth: Option<i32>,
         patches: Vec<PathBuf>,
-        folder: Option<PathBuf>,
+        target_directory: Option<PathBuf>,
         lfs: bool,
     ) -> Self {
         Self {
@@ -137,7 +213,7 @@ impl GitSource {
             rev,
             depth,
             patches,
-            folder,
+            target_directory,
             lfs,
         }
     }
@@ -148,7 +224,7 @@ impl GitSource {
     }
 
     /// Get the git revision.
-    pub fn rev(&self) -> &str {
+    pub fn rev(&self) -> &GitRev {
         &self.rev
     }
 
@@ -162,9 +238,9 @@ impl GitSource {
         self.patches.as_slice()
     }
 
-    /// Get the folder.
-    pub const fn folder(&self) -> Option<&PathBuf> {
-        self.folder.as_ref()
+    /// Get the target_directory.
+    pub const fn target_directory(&self) -> Option<&PathBuf> {
+        self.target_directory.as_ref()
     }
 
     /// Get true if source requires lfs.
@@ -179,48 +255,57 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
         let mut rev = None;
         let mut depth = None;
         let mut patches = Vec::new();
-        let mut folder = None;
+        let mut target_directory = None;
         let mut lfs = false;
-
-        // TODO: is there a better place for this error?
-        // raising the error during parsing allows us to suggest fixes in future
-        // in case we build linting functionality on top
-        if self.contains_key("git_rev") {
-            if let Some((k, _)) = self.get_key_value("git_depth") {
-                return Err(vec![_partialerror!(
-                    *k.span(),
-                    ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                    help = "use of `git_depth` with `git_rev` is invalid"
-                )]);
-            }
-        }
 
         self.iter().map(|(k, v)| {
             match k.as_str() {
-                "git_url" => {
-                    let url_str: String = v.try_convert("git_url")?;
+                "git" => {
+                    let url_str: String = v.try_convert("git")?;
                     let url_ = Url::from_str(&url_str);
                     match url_ {
                         Ok(url_) => url = Some(GitUrl::Url(url_)),
                         Err(err) => {
-                            tracing::warn!("invalid `git_url` `{url_str}`: {err}");
+                            tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
                             tracing::warn!("attempting to parse as path");
                             let path = PathBuf::from(url_str);
                             url = Some(GitUrl::Path(path));
                         }
                     }
                 }
-                "git_rev" => {
-                    rev = Some(v.try_convert("git_rev")?);
+                "rev" | "tag" | "branch" => {
+                    if rev.is_some() {
+                        return Err(vec![_partialerror!(
+                            *k.span(),
+                            ErrorKind::Other,
+                            help = "git `source` can only have one of `rev`, `tag` or `branch`"
+                        )]);
+                    }
+
+                    match k.as_str() {
+                        "rev" => {
+                            let rev_str: String = v.try_convert("rev")?;
+                            rev = Some(GitRev::Commit(rev_str));
+                        }
+                        "tag" => {
+                            let tag_str: String = v.try_convert("tag")?;
+                            rev = Some(GitRev::Tag(tag_str));
+                        }
+                        "branch" => {
+                            let branch_str: String = v.try_convert("branch")?;
+                            rev = Some(GitRev::Branch(branch_str));
+                        }
+                        _ => unreachable!(),
+                    }
                 }
-                "git_depth" => {
+                "depth" => {
                     depth = Some(v.try_convert("git_depth")?);
                 }
                 "patches" => {
                     patches = v.try_convert("patches")?;
                 }
-                "folder" => {
-                    folder = Some(v.try_convert("folder")?);
+                "target_directory" => {
+                    target_directory = Some(v.try_convert("target_directory")?);
                 }
                 "lfs" => {
                     lfs = v.try_convert("lfs")?;
@@ -229,7 +314,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git_url`, `git_rev`, `git_depth`, `patches`, `lfs` and `folder`"
+                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
                     )])
                 }
             }
@@ -240,18 +325,27 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("git_url".into()),
-                help = "git `source` must have a `git_url` field"
+                help = "git `source` must have a `url` field"
             )]
         })?;
 
-        let rev = rev.unwrap_or_else(|| "HEAD".to_owned());
+        // Use HEAD as default rev
+        let rev = rev.unwrap_or_default();
+
+        if !rev.is_head() && depth.is_some() {
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                help = "git `source` with a `tag`, `branch` or `rev` cannot have a `depth`"
+            )]);
+        }
 
         Ok(GitSource {
             url,
             rev,
             depth,
             patches,
-            folder,
+            target_directory,
             lfs,
         })
     }
@@ -302,7 +396,7 @@ pub struct UrlSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
-    folder: Option<PathBuf>,
+    target_directory: Option<PathBuf>,
 }
 
 impl UrlSource {
@@ -327,8 +421,8 @@ impl UrlSource {
     }
 
     /// Get the folder of the URL source.
-    pub const fn folder(&self) -> Option<&PathBuf> {
-        self.folder.as_ref()
+    pub const fn target_directory(&self) -> Option<&PathBuf> {
+        self.target_directory.as_ref()
     }
 
     /// Get the file name of the URL source.
@@ -343,7 +437,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut sha256 = None;
         let mut md5 = None;
         let mut patches = Vec::new();
-        let mut folder = None;
+        let mut target_directory = None;
         let mut file_name = None;
 
         self.iter().map(|(key, value)| {
@@ -362,12 +456,12 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
                 }
                 "file_name" => file_name = value.try_convert(key_str)?,
                 "patches" => patches = value.try_convert(key_str)?,
-                "folder" => folder = value.try_convert(key_str)?,
+                "target_directory" => target_directory = value.try_convert(key_str)?,
                 invalid_key => {
                     return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_owned().into()),
-                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `folder`"
+                        help = "valid fields for URL `source` are `url`, `sha256`, `md5`, `patches`, `file_name` and `target_directory`"
                     )])
                 }
             }
@@ -396,7 +490,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
             sha256,
             file_name,
             patches,
-            folder,
+            target_directory,
         })
     }
 }
@@ -421,7 +515,7 @@ pub struct PathSource {
     patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
-    folder: Option<PathBuf>,
+    target_directory: Option<PathBuf>,
     /// Optionally a file name to rename the file to
     #[serde(skip_serializing_if = "Option::is_none")]
     file_name: Option<PathBuf>,
@@ -446,9 +540,9 @@ impl PathSource {
         self.patches.as_slice()
     }
 
-    /// Get the folder.
-    pub const fn folder(&self) -> Option<&PathBuf> {
-        self.folder.as_ref()
+    /// Get the target_directory.
+    pub const fn target_directory(&self) -> Option<&PathBuf> {
+        self.target_directory.as_ref()
     }
 
     /// Get the file name.
@@ -466,7 +560,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PathSource, Vec<PartialParsingError>> {
         let mut path = None;
         let mut patches = Vec::new();
-        let mut folder = None;
+        let mut target_directory = None;
         let mut use_gitignore = true;
         let mut file_name = None;
 
@@ -474,14 +568,14 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
                 "patches" => patches = value.try_convert("patches")?,
-                "folder" => folder = value.try_convert("folder")?,
+                "target_directory" => target_directory = value.try_convert("target_directory")?,
                 "file_name" => file_name = value.try_convert("file_name")?,
                 "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
                 invalid_key => {
                     return Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        help = "valid fields for path `source` are `path`, `patches`, `folder`, `file_name` and `use_gitignore`"
+                        help = "valid fields for path `source` are `path`, `patches`, `target_directory`, `file_name` and `use_gitignore`"
                     )])
                 }
             }
@@ -499,9 +593,34 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         Ok(PathSource {
             path,
             patches,
-            folder,
+            target_directory,
             file_name,
             use_gitignore,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_git_serialization() {
+        let git = GitSource {
+            url: GitUrl::Url(Url::parse("https://test.com/test.git").unwrap()),
+            rev: GitRev::Branch("master".into()),
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+
+        insta::assert_snapshot!(yaml);
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.url, git.url);
     }
 }

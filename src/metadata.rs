@@ -12,8 +12,11 @@ use fs_err as fs;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
-use crate::{hash::HashInfo, render::resolved_dependencies::FinalizedDependencies};
-
+use crate::{
+    hash::HashInfo,
+    recipe::parser::{Recipe, Source},
+    render::resolved_dependencies::FinalizedDependencies,
+};
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
@@ -25,11 +28,13 @@ impl FromStr for GitRev {
         Ok(GitRev(s.to_string()))
     }
 }
+
 impl Default for GitRev {
     fn default() -> Self {
         Self(String::from("HEAD"))
     }
 }
+
 impl Display for GitRev {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -206,12 +211,15 @@ pub struct PackageIdentifier {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
-    pub recipe: crate::recipe::parser::Recipe,
+    pub recipe: Recipe,
     /// The build configuration for this output (e.g. target_platform, channels, and other settings)
     pub build_configuration: BuildConfiguration,
     /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
     /// During the `run_build` functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
+    /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
+    /// to build this output.
+    pub finalized_sources: Option<Vec<Source>>,
 }
 
 impl Output {
@@ -445,5 +453,16 @@ mod test {
         let recipe_2 = std::fs::read_to_string(recipe_2).unwrap();
         let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
         assert_yaml_snapshot!(output_curl);
+    }
+
+    #[test]
+    fn read_recipe_with_sources() {
+        let test_data_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let recipe_1 = test_data_dir.join("git_source.yaml");
+        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
+
+        let git_source_output: Output = serde_yaml::from_str(&recipe_1).unwrap();
+        assert_yaml_snapshot!(git_source_output);
     }
 }
