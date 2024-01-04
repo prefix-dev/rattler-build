@@ -102,7 +102,7 @@ pub enum GitRev {
     Branch(String),
     /// A git tag
     Tag(String),
-    /// A git commit
+    /// A specific git commit hash
     Commit(String),
     /// The default revision (HEAD)
     Head,

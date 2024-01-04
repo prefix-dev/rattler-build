@@ -7,18 +7,17 @@ use std::{
 };
 
 use fs_extra::dir::remove;
+use url::Url;
 
 use crate::recipe::parser::{GitSource, GitUrl};
 
 use super::SourceError;
 
-type RepoPath<'a> = &'a Path;
-
 /// Fetch the given repository using the host `git` executable.
-pub fn fetch_repo(repo_path: RepoPath, rev: &str) -> Result<(), SourceError> {
+pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceError> {
     let mut command = git_command("fetch");
     let output = command
-        .args(["origin", rev])
+        .args([url.to_string().as_str(), rev])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -30,6 +29,24 @@ pub fn fetch_repo(repo_path: RepoPath, rev: &str) -> Result<(), SourceError> {
         ));
     }
 
+    // try to suppress detached head warning
+    let _ = Command::new("git")
+        .current_dir(repo_path)
+        .args(["config", "--local", "advice.detachedHead", "false"])
+        .status();
+
+    // checkout fetch_head
+    let mut command = git_command("checkout");
+    let output = command
+        .args(["FETCH_HEAD"])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|_err| SourceError::ValidationFailed)?;
+
+    if !output.status.success() {
+        tracing::debug!("Repository fetch for revision {:?} failed!", rev);
+        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+    }
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
@@ -94,10 +111,10 @@ pub fn git_src(
 
     // Initialize or clone the repository depending on the source's git_url.
     match &source.url() {
-        GitUrl::Url(_) => {
+        GitUrl::Url(url) => {
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
-                fetch_repo(&cache_path, &rev)?;
+                fetch_repo(&cache_path, &url, &rev)?;
             } else {
                 let mut command = git_command("clone");
 
@@ -173,11 +190,6 @@ pub fn git_src(
             .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
             .trim()
             .to_owned();
-
-        // If the source is a path and the revision is HEAD, return the path to avoid git actions.
-        if source.rev().is_head() {
-            return Ok((PathBuf::from(&cache_path), ref_git));
-        }
 
         ref_git
     } else {
