@@ -104,16 +104,14 @@ pub enum GitRev {
     Tag(String),
     /// A git commit
     Commit(String),
+    /// The default revision (HEAD)
+    Head,
 }
 
 impl GitRev {
     /// Returns true if the revision is HEAD.
     pub fn is_head(&self) -> bool {
-        match self {
-            Self::Branch(branch) => branch == "HEAD",
-            Self::Commit(commit) => commit == "HEAD",
-            _ => false,
-        }
+        matches!(self, Self::Head)
     }
 }
 
@@ -122,37 +120,80 @@ impl ToString for GitRev {
         match self {
             Self::Branch(branch) => format!("refs/heads/{}", branch),
             Self::Tag(tag) => format!("refs/tags/{}", tag),
+            Self::Head => "HEAD".into(),
             Self::Commit(commit) => commit.clone(),
+        }
+    }
+}
+
+impl FromStr for GitRev {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, String> {
+        if s.to_uppercase() == "HEAD" {
+            Ok(Self::Head)
+        } else if let Some(tag) = s.strip_prefix("refs/tags/") {
+            Ok(Self::Tag(tag.to_owned()))
+        } else if let Some(branch) = s.strip_prefix("refs/heads/") {
+            Ok(Self::Branch(branch.to_owned()))
+        } else {
+            Ok(Self::Commit(s.to_owned()))
         }
     }
 }
 
 impl Default for GitRev {
     fn default() -> Self {
-        Self::Branch("HEAD".into())
+        Self::Head
     }
+}
+
+/// Serialize a GitRev to a string.
+fn serialize_gitrev<S>(rev: &GitRev, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&rev.to_string())
+}
+
+/// Deserialize a GitRev from a string.
+fn deserialize_gitrev<'de, D>(deserializer: D) -> Result<GitRev, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    GitRev::from_str(&s).map_err(serde::de::Error::custom)
 }
 
 /// Git source information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
-    url: GitUrl,
+    pub url: GitUrl,
     /// Optionally a revision to checkout, defaults to `HEAD`
-    #[serde(default)]
-    rev: GitRev,
+    #[serde(
+        default,
+        skip_serializing_if = "GitRev::is_head",
+        serialize_with = "serialize_gitrev",
+        deserialize_with = "deserialize_gitrev"
+    )]
+    pub rev: GitRev,
     /// Optionally a depth to clone the repository, defaults to `None`
     #[serde(skip_serializing_if = "Option::is_none")]
-    depth: Option<i32>,
+    pub depth: Option<i32>,
     /// Optionally patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    patches: Vec<PathBuf>,
+    pub patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
-    target_directory: Option<PathBuf>,
+    pub target_directory: Option<PathBuf>,
     /// Optionally request the lfs pull in git source
     #[serde(skip_serializing_if = "should_not_serialize_lfs")]
-    lfs: bool,
+    pub lfs: bool,
+    /// Optionally the exact commit this source was checked out to (used for rebuilding)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub commit: Option<String>,
 }
 
 /// A helper method to skip serializing the lfs flag if it is false.
@@ -169,6 +210,7 @@ impl GitSource {
         patches: Vec<PathBuf>,
         target_directory: Option<PathBuf>,
         lfs: bool,
+        commit: Option<String>,
     ) -> Self {
         Self {
             url,
@@ -177,6 +219,7 @@ impl GitSource {
             patches,
             target_directory,
             lfs,
+            commit,
         }
     }
 
@@ -309,6 +352,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             patches,
             target_directory,
             lfs,
+            commit: None,
         })
     }
 }

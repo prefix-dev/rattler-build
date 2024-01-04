@@ -43,15 +43,21 @@ use super::custom_yaml::Node;
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
-    package: Package,
+    /// The package information
+    pub package: Package,
+    /// The information about where to obtain the sources
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    source: Vec<Source>,
-    build: Build,
-    requirements: Requirements,
+    pub source: Vec<Source>,
+    /// The information about how to build the package
+    pub build: Build,
+    /// The information about the requirements
+    pub requirements: Requirements,
+    /// The information about how to test the package
     #[serde(default, skip_serializing_if = "Test::is_default")]
-    test: Test,
+    pub test: Test,
+    /// The information about the package
     #[serde(default, skip_serializing_if = "About::is_default")]
-    about: About,
+    pub about: About,
 }
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
     fn collect_errors(self) -> Result<(), Vec<V>> {
