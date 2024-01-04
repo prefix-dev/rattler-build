@@ -1,8 +1,9 @@
 //! This module contains the implementation of the fetching of `GitSource` struct.
 
 use std::{
+    io::IsTerminal,
     path::{Path, PathBuf},
-    process::Command, io::IsTerminal,
+    process::Command,
 };
 
 use fs_extra::dir::remove;
@@ -201,7 +202,11 @@ pub fn git_src(
         git_lfs_pull()?;
     }
 
-    tracing::info!("Checked out reference: '{}' at '{}'", &source.rev().to_string(), ref_git.as_str().trim());
+    tracing::info!(
+        "Checked out reference: '{}' at '{}'",
+        &source.rev().to_string(),
+        ref_git.as_str().trim()
+    );
 
     Ok(cache_path)
 }
