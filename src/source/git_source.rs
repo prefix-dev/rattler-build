@@ -2,7 +2,7 @@
 
 use std::{
     path::{Path, PathBuf},
-    process::Command,
+    process::Command, io::IsTerminal,
 };
 
 use fs_extra::dir::remove;
@@ -42,15 +42,7 @@ pub fn git_src(
     cache_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<PathBuf, SourceError> {
-    tracing::info!(
-        "git source: ({:?}) cache_dir: ({}) recipe_dir: ({})",
-        source,
-        cache_dir.display(),
-        recipe_dir.display()
-    );
-
     // test if git is available locally as we fetch the git from PATH,
-    // user can always override git path
     if !Command::new("git")
         .arg("--version")
         .output()?
@@ -92,19 +84,29 @@ pub fn git_src(
                 fetch_repo(&cache_path, &[source.rev().to_string()])?;
             } else {
                 let mut command = Command::new("git");
-                command.args(["clone", "--recursive", source.url().to_string().as_str()]);
-                command.arg(cache_path.as_os_str());
+
+                command
+                    .args(["clone", "--recursive", source.url().to_string().as_str()])
+                    .arg(cache_path.as_os_str());
+
+                if std::io::stdin().is_terminal() {
+                    command.stdout(std::process::Stdio::inherit());
+                    command.stderr(std::process::Stdio::inherit());
+                    command.arg("--progress");
+                }
+
                 if let Some(depth) = source.depth() {
                     command.args(["--depth", depth.to_string().as_str()]);
                 }
+
                 let output = command
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
                 if !output.status.success() {
                     return Err(SourceError::GitErrorStr("Git clone failed for source"));
                 }
+                // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                 if source.rev().is_head() {
-                    // If the source is a path and the revision is HEAD, return the path to avoid git actions.
                     return Ok(PathBuf::from(&cache_path));
                 }
             }
@@ -167,7 +169,6 @@ pub fn git_src(
 
     let ref_git = String::from_utf8(output.stdout)
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?;
-    tracing::info!("cache_path = {}", cache_path.display());
 
     let mut command = Command::new("git");
     command
@@ -191,7 +192,7 @@ pub fn git_src(
         .map_err(|_| SourceError::GitErrorStr("failed to execute git reset"))?;
 
     if !output.status.success() {
-        tracing::error!("Command failed: \"git\" \"reset\" \"--hard\"");
+        tracing::error!("Command failed: `git reset --hard`");
         return Err(SourceError::GitErrorStr("failed to git reset"));
     }
 
@@ -200,7 +201,7 @@ pub fn git_src(
         git_lfs_pull()?;
     }
 
-    tracing::info!("Checked out reference: '{}'", &source.rev().to_string());
+    tracing::info!("Checked out reference: '{}' at '{}'", &source.rev().to_string(), ref_git.as_str().trim());
 
     Ok(cache_path)
 }
