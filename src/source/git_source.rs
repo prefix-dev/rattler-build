@@ -37,9 +37,9 @@ pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceEr
         .status();
 
     // checkout fetch_head
-    let mut command = git_command("checkout");
+    let mut command = Command::new("git");
     let output = command
-        .args(["FETCH_HEAD"])
+        .args(["reset", "--hard", "FETCH_HEAD"])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
