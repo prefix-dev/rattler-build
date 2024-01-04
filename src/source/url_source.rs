@@ -164,11 +164,8 @@ pub(crate) async fn url_src(
 
     while let Some(chunk) = download.chunk().await? {
         progress_bar.inc(chunk.len() as u64);
-        file.write(&chunk).await?;
+        file.write_all(&chunk).await?;
     }
-
-    // let mut content = progress_bar.wrap_read(Cursor::new(response.bytes().await?));
-    // std::io::copy(&mut content, &mut file)?;
 
     if !validate_checksum(&cache_name, &checksum) {
         tracing::error!("Checksum validation failed!");
