@@ -155,7 +155,6 @@ pub(crate) async fn url_src(
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
-    // let mut file = std::fs::File::create(&cache_name)?;
     let mut file = tokio::fs::File::create(&cache_name).await?;
 
     let request = client.get(source.url().as_str());
