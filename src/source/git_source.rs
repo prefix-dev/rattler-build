@@ -104,17 +104,14 @@ pub fn git_src(
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
 
-    let rev = match source.commit {
-        Some(ref commit) => commit.clone(),
-        None => source.rev().to_string(),
-    };
+    let rev = source.rev().to_string();
 
     // Initialize or clone the repository depending on the source's git_url.
     match &source.url() {
         GitUrl::Url(url) => {
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
-                fetch_repo(&cache_path, &url, &rev)?;
+                fetch_repo(&cache_path, url, &rev)?;
             } else {
                 let mut command = git_command("clone");
 
@@ -174,27 +171,21 @@ pub fn git_src(
     }
 
     // Resolve the reference and set the head to the specified revision.
-    let ref_git = if source.commit.is_none() {
-        let output = Command::new("git")
-            .current_dir(&cache_path)
-            .args(["rev-parse", &rev])
-            .output()
-            .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
+    let output = Command::new("git")
+        .current_dir(&cache_path)
+        .args(["rev-parse", &rev])
+        .output()
+        .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
 
-        if !output.status.success() {
-            tracing::error!("Command failed: `git rev-parse \"{}\"`", &rev);
-            return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
-        }
+    if !output.status.success() {
+        tracing::error!("Command failed: `git rev-parse \"{}\"`", &rev);
+        return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
+    }
 
-        let ref_git = String::from_utf8(output.stdout)
-            .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
-            .trim()
-            .to_owned();
-
-        ref_git
-    } else {
-        source.commit.clone().unwrap()
-    };
+    let ref_git = String::from_utf8(output.stdout)
+        .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
+        .trim()
+        .to_owned();
 
     let mut command = Command::new("git");
     command
@@ -287,7 +278,6 @@ mod tests {
                     vec![],
                     None,
                     false,
-                    None,
                 ),
                 "rattler-build",
             ),
@@ -303,7 +293,6 @@ mod tests {
                     vec![],
                     None,
                     false,
-                    None,
                 ),
                 "rattler-build",
             ),
@@ -319,7 +308,6 @@ mod tests {
                     vec![],
                     None,
                     false,
-                    None,
                 ),
                 "rattler-build",
             ),
@@ -331,7 +319,6 @@ mod tests {
                     vec![],
                     None,
                     false,
-                    None,
                 ),
                 "rattler-build",
             ),

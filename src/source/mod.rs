@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use crate::recipe::parser::{GitSource, Source};
+use crate::recipe::parser::{GitRev, GitSource, Source};
 
 use fs_err as fs;
 use fs_err::File;
@@ -107,7 +107,7 @@ pub async fn fetch_sources(
                 };
 
                 rendered_sources.push(Source::Git(GitSource {
-                    commit: Some(result.1),
+                    rev: GitRev::Commit(result.1),
                     ..src.clone()
                 }));
 

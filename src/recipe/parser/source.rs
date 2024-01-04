@@ -169,6 +169,7 @@ where
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
+    #[serde(rename = "git")]
     pub url: GitUrl,
     /// Optionally a revision to checkout, defaults to `HEAD`
     #[serde(
@@ -190,10 +191,6 @@ pub struct GitSource {
     /// Optionally request the lfs pull in git source
     #[serde(skip_serializing_if = "should_not_serialize_lfs")]
     pub lfs: bool,
-    /// Optionally the exact commit this source was checked out to (used for rebuilding)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    pub commit: Option<String>,
 }
 
 /// A helper method to skip serializing the lfs flag if it is false.
@@ -210,7 +207,6 @@ impl GitSource {
         patches: Vec<PathBuf>,
         target_directory: Option<PathBuf>,
         lfs: bool,
-        commit: Option<String>,
     ) -> Self {
         Self {
             url,
@@ -219,7 +215,6 @@ impl GitSource {
             patches,
             target_directory,
             lfs,
-            commit,
         }
     }
 
@@ -352,7 +347,6 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
             patches,
             target_directory,
             lfs,
-            commit: None,
         })
     }
 }
