@@ -454,4 +454,15 @@ mod test {
         let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
         assert_yaml_snapshot!(output_curl);
     }
+
+    #[test]
+    fn read_recipe_with_sources() {
+        let test_data_dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
+        let recipe_1 = test_data_dir.join("git_source.yaml");
+        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
+
+        let git_source_output: Output = serde_yaml::from_str(&recipe_1).unwrap();
+        assert_yaml_snapshot!(git_source_output);
+    }
 }

@@ -180,16 +180,16 @@ pub struct GitSource {
     )]
     pub rev: GitRev,
     /// Optionally a depth to clone the repository, defaults to `None`
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<i32>,
     /// Optionally patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target_directory: Option<PathBuf>,
     /// Optionally request the lfs pull in git source
-    #[serde(skip_serializing_if = "should_not_serialize_lfs")]
+    #[serde(default, skip_serializing_if = "should_not_serialize_lfs")]
     pub lfs: bool,
 }
 
@@ -597,5 +597,30 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             file_name,
             use_gitignore,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_git_serialization() {
+        let git = GitSource {
+            url: GitUrl::Url(Url::parse("https://test.com/test.git").unwrap()),
+            rev: GitRev::Branch("master".into()),
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+
+        insta::assert_snapshot!(yaml);
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.url, git.url);
     }
 }
