@@ -199,8 +199,8 @@ enum ServerType {
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Quetz server
-/// Authentication is used from the keychain / auth-file
+/// Options for uploading to a Quetz server.
+/// Authentication is used from the keychain / auth-file.
 struct QuetzOpts {
     /// The URL to your Quetz server
     #[arg(short, long, env = "QUETZ_SERVER_URL")]
@@ -210,14 +210,14 @@ struct QuetzOpts {
     #[arg(short, long, env = "QUETZ_CHANNEL")]
     channel: String,
 
-    /// The quetz API key, if none is provided, the token is read from the keychain / auth-file
+    /// The Quetz API key, if none is provided, the token is read from the keychain / auth-file
     #[arg(short, long, env = "QUETZ_API_KEY")]
     api_key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Artifactory channel
-/// Authentication is used from the keychain / auth-file
+/// Options for uploading to a Artifactory channel.
+/// Authentication is used from the keychain / auth-file.
 struct ArtifactoryOpts {
     /// The URL to your Artifactory server
     #[arg(short, long, env = "ARTIFACTORY_SERVER_URL")]
@@ -236,7 +236,7 @@ struct ArtifactoryOpts {
     password: Option<String>,
 }
 
-/// Options for uploading to a Quetz server
+/// Options for uploading to a prefix.dev server.
 /// Authentication is used from the keychain / auth-file
 #[derive(Clone, Debug, PartialEq, Parser)]
 struct PrefixOpts {
