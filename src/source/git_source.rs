@@ -15,6 +15,7 @@ use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
 pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceError> {
+    println!("Fetching repository from {} at {}", url, rev);
     let mut command = git_command("fetch");
     let output = command
         .args([url.to_string().as_str(), rev])
@@ -47,6 +48,7 @@ pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceEr
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
         return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
     }
+
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
@@ -173,7 +175,7 @@ pub fn git_src(
     // Resolve the reference and set the head to the specified revision.
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", &rev])
+        .args(["rev-parse", "HEAD"])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
 
@@ -186,32 +188,6 @@ pub fn git_src(
         .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
         .trim()
         .to_owned();
-
-    let mut command = Command::new("git");
-    command
-        .current_dir(&cache_path)
-        .arg("checkout")
-        .arg(ref_git.trim());
-
-    let output = command
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute git checkout"))?;
-
-    if !output.status.success() {
-        tracing::error!("Command failed: {:?}", command);
-        return Err(SourceError::GitErrorStr("failed to checkout for ref"));
-    }
-
-    let output = Command::new("git")
-        .current_dir(&cache_path)
-        .args(["reset", "--hard"])
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute git reset"))?;
-
-    if !output.status.success() {
-        tracing::error!("Command failed: `git reset --hard`");
-        return Err(SourceError::GitErrorStr("failed to git reset"));
-    }
 
     // only do lfs pull if a requirement!
     if source.lfs() {
