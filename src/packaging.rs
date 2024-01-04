@@ -625,17 +625,6 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        for license_glob in license_globs
-            .iter()
-            // Only license globs that do not end with '/' or '*'
-            .filter(|license_glob| !license_glob.ends_with('/') && !license_glob.ends_with('*'))
-        {
-            let filepath = licenses_folder.join(license_glob);
-            if !filepath.exists() {
-                tracing::warn!(path = %filepath.display(), "File does not exist");
-            }
-        }
-
         let copy_dir = crate::source::copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
@@ -828,12 +817,8 @@ fn serialize_python_test(
     let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
     fs::create_dir_all(&folder)?;
 
-    let path = folder.join("run_test.py");
-    let mut file = File::create(&path)?;
-
-    for el in &python_test.imports {
-        writeln!(file, "import {}", el)?;
-    }
+    let path = folder.join("python_test.json");
+    serde_json::to_writer(&File::create(&path)?, python_test)?;
 
     Ok(vec![path])
 }

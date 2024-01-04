@@ -26,7 +26,9 @@ use rattler_shell::{
 };
 
 use crate::{
-    env_vars, index, recipe::parser::CommandsTestRequirements, render::solver::create_environment,
+    env_vars, index,
+    recipe::parser::{CommandsTestRequirements, PackageContents, PythonTest},
+    render::solver::create_environment,
     tool_configuration,
 };
 
@@ -368,19 +370,25 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
 async fn run_python_test(
     pkg: &ArchiveIdentifier,
-    _path: &Path,
+    path: &Path,
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    // create environment with the test dependencies
+    let test_file = path.join("python_test.json");
+    let test: PythonTest = serde_json::from_str(&fs::read_to_string(test_file)?)?;
+
     let match_spec =
         MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
             .unwrap();
+    let mut dependencies = vec![match_spec];
+    if test.pip_check {
+        dependencies.push(MatchSpec::from_str("pip").unwrap());
+    }
 
     let platform = Platform::current();
 
     create_environment(
-        &[match_spec],
+        &dependencies,
         &platform,
         prefix,
         &config.channels,
@@ -389,7 +397,29 @@ async fn run_python_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    Ok(())
+    let default_shell = ShellEnum::default();
+
+    let mut test_file = tempfile::Builder::new()
+        .prefix("rattler-test-")
+        .suffix(".py")
+        .tempfile()?;
+
+    for import in test.imports {
+        writeln!(test_file, "import {}", import)?;
+    }
+
+    run_in_environment(
+        default_shell.clone(),
+        format!("python {}", test_file.path().to_string_lossy()),
+        path,
+        prefix,
+    )?;
+
+    if test.pip_check {
+        run_in_environment(default_shell, "pip check".into(), path, prefix)
+    } else {
+        Ok(())
+    }
 }
 
 async fn run_shell_test(
@@ -398,7 +428,6 @@ async fn run_shell_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    // read the test dependencies
     let deps = if path.join("test_time_dependencies.json").exists() {
         let test_dep_json = path.join("test_time_dependencies.json");
         serde_json::from_str(&fs::read_to_string(test_dep_json)?)?
@@ -441,21 +470,10 @@ async fn run_shell_test(
         path.join("run_test.sh")
     };
 
-    let contents = fs::read_to_string(&test_file_path)?;
-    let is_path_ext = |ext: &str| {
-        test_file_path
-            .extension()
-            .map(|s| s.eq(ext))
-            .unwrap_or_default()
-    };
+    let contents = fs::read_to_string(test_file_path)?;
 
-    if Platform::current().is_windows() && is_path_ext("bat") {
-        tracing::info!("Testing commands:");
-        run_in_environment(default_shell, contents, path, prefix)?;
-    } else if Platform::current().is_unix() && is_path_ext("sh") {
-        tracing::info!("Testing commands:");
-        run_in_environment(default_shell, contents, path, prefix)?;
-    }
+    tracing::info!("Testing commands:");
+    run_in_environment(default_shell, contents, path, prefix)?;
 
     Ok(())
 }
@@ -466,9 +484,7 @@ async fn run_individual_test(
     prefix: &Path,
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
-    // detect which of the test files we have
-    if path.join("run_test.py").exists() {
-        // run python test
+    if path.join("python_test.json").exists() {
         run_python_test(pkg, path, prefix, config).await?;
     } else if path.join("run_test.sh").exists() || path.join("run_test.bat").exists() {
         // run shell test
@@ -490,7 +506,7 @@ async fn run_individual_test(
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_package_content_tests(
-    package_content: &crate::recipe::parser::PackageContents,
+    package_content: &PackageContents,
     paths_json: &PathsJson,
     target_platform: &Platform,
 ) -> Result<(), TestError> {

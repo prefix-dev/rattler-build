@@ -31,13 +31,8 @@ requirements:
 
 tests:
   - python:
-       imports:
+      imports:
         - rich
-  - script:
-    - pip check
-    requirements:
-      run:
-      - pip
 
 about:
   homepage: https://github.com/Textualize/rich

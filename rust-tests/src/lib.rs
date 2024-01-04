@@ -429,7 +429,7 @@ mod tests {
             .join("info/tests/1/test_time_dependencies.json")
             .exists());
 
-        assert!(pkg.join("info/tests/0/run_test.py").exists());
+        assert!(pkg.join("info/tests/0/python_test.json").exists());
         // make sure that the entry point does not exist
         assert!(!pkg.join("python-scripts/flask").exists());
 

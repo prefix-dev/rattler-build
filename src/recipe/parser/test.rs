@@ -18,9 +18,11 @@ use super::FlattenErrors;
 pub struct CommandsTestRequirements {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run: Vec<String>,
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub build: Vec<String>,
 }
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
     // TODO parse as globs
@@ -51,10 +53,23 @@ impl CommandsTestFiles {
     }
 }
 
+fn default_pip_check() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
+    /// List of imports to test
     pub imports: Vec<String>,
+    /// Wether to run `pip check` or not (default to true)
+    #[serde(default = "default_pip_check", skip_serializing_if = "is_true")]
+    pub pip_check: bool,
 }
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
     pub downstream: String,
@@ -216,12 +231,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 impl TryConvertNode<PythonTest> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
         let mut imports = vec![];
+        let mut pip_check = true;
 
         self.iter()
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
                     "imports" => imports = value.try_convert(key_str)?,
+                    "pip_check" => pip_check = value.try_convert(key_str)?,
                     invalid => Err(vec![_partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(invalid.to_string().into()),
@@ -240,7 +257,7 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
             )])?;
         }
 
-        Ok(PythonTest { imports })
+        Ok(PythonTest { imports, pip_check })
     }
 }
 
