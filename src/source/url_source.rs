@@ -130,13 +130,12 @@ pub(crate) async fn url_src(
     let download_size = {
         let resp = client.head(source.url().as_str()).send().await?;
         if resp.status().is_success() {
-            resp.headers() // Gives is the HeaderMap
-                .get(reqwest::header::CONTENT_LENGTH) // Gives us an Option containing the HeaderValue
-                .and_then(|ct_len| ct_len.to_str().ok()) // Unwraps the Option as &str
-                .and_then(|ct_len| ct_len.parse().ok()) // Parses the Option as u64
-                .unwrap_or(0) // Fallback to 0
+            resp.headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|ct_len| ct_len.to_str().ok())
+                .and_then(|ct_len| ct_len.parse().ok())
+                .unwrap_or(0)
         } else {
-            // We return an Error if something goes wrong here
             return Err(SourceError::UrlNotFile(source.url().clone()));
         }
     };
