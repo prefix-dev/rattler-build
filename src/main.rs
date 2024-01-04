@@ -544,6 +544,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 force_colors: !args.no_force_colors,
             },
             finalized_dependencies: None,
+            finalized_sources: None,
         };
 
         run_build(&output, tool_config.clone()).await?;

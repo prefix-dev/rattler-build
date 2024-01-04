@@ -20,7 +20,6 @@ use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
 use crate::packaging::{package_conda, record_files};
 use crate::recipe::parser::ScriptContent;
-use crate::recipe::Recipe;
 use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
 use crate::test::TestConfiguration;
@@ -217,23 +216,31 @@ pub async fn run_build(
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
+    let output = if let Some(ref finalized_sources) = output.finalized_sources {
+        fetch_sources(
+            &finalized_sources,
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.output_dir,
+        )
+        .await
+        .into_diagnostic()?;
 
-    let rendered_sources = fetch_sources(
-        output.recipe.sources(),
-        &directories.work_dir,
-        &directories.recipe_dir,
-        &directories.output_dir,
-    )
-    .await
-    .into_diagnostic()?;
+        output.clone()
+    } else {
+        let rendered_sources = fetch_sources(
+            output.recipe.sources(),
+            &directories.work_dir,
+            &directories.recipe_dir,
+            &directories.output_dir,
+        )
+        .await
+        .into_diagnostic()?;
 
-    let output = Output {
-        recipe: Recipe {
-            source: rendered_sources,
-            ..output.recipe.clone()
-        },
-        build_configuration: output.build_configuration.clone(),
-        finalized_dependencies: None,
+        Output {
+            finalized_sources: Some(rendered_sources),
+            ..output.clone()
+        }
     };
 
     let output = if output.finalized_dependencies.is_some() {
@@ -253,8 +260,7 @@ pub async fn run_build(
         // The output with the resolved dependencies
         Output {
             finalized_dependencies: Some(finalized_dependencies),
-            recipe: output.recipe.clone(),
-            build_configuration: output.build_configuration.clone(),
+            ..output.clone()
         }
     };
 

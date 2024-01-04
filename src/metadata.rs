@@ -12,8 +12,11 @@ use fs_err as fs;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
 use serde::{Deserialize, Serialize};
 
-use crate::{hash::HashInfo, render::resolved_dependencies::FinalizedDependencies};
-
+use crate::{
+    hash::HashInfo,
+    recipe::parser::{Recipe, Source},
+    render::resolved_dependencies::FinalizedDependencies,
+};
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GitRev(String);
@@ -208,12 +211,15 @@ pub struct PackageIdentifier {
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
-    pub recipe: crate::recipe::parser::Recipe,
+    pub recipe: Recipe,
     /// The build configuration for this output (e.g. target_platform, channels, and other settings)
     pub build_configuration: BuildConfiguration,
     /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
     /// During the `run_build` functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
+    /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
+    /// to build this output.
+    pub finalized_sources: Option<Vec<Source>>,
 }
 
 impl Output {
