@@ -216,9 +216,9 @@ pub async fn run_build(
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
-    let output = if let Some(ref finalized_sources) = output.finalized_sources {
+    let output = if let Some(finalized_sources) = &output.finalized_sources {
         fetch_sources(
-            &finalized_sources,
+            finalized_sources,
             &directories.work_dir,
             &directories.recipe_dir,
             &directories.output_dir,
