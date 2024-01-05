@@ -12,7 +12,7 @@ use reqwest::Method;
 use tracing::info;
 use url::Url;
 
-use crate::upload::package::{sha256_sum, Package};
+use crate::upload::package::{sha256_sum, ExtractedPackage};
 
 mod anaconda;
 mod package;
@@ -132,7 +132,7 @@ pub async fn upload_package_to_artifactory(
     };
 
     for package_file in package_files {
-        let package = Package::from_package_file(package_file)?;
+        let package = ExtractedPackage::from_package_file(package_file)?;
 
         let subdir = package.subdir().ok_or_else(|| {
             miette::miette!(
@@ -261,7 +261,7 @@ pub async fn upload_package_to_anaconda(
     let anaconda = anaconda::Anaconda::new(token, url);
 
     for package_file in package_files {
-        let package = package::Package::from_package_file(package_file)?;
+        let package = package::ExtractedPackage::from_package_file(package_file)?;
 
         anaconda
             .create_or_update_package(&owner, &package)

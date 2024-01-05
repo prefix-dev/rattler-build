@@ -12,7 +12,7 @@ use tracing::debug;
 use url::Url;
 
 
-use super::package::Package;
+use super::package::ExtractedPackage;
 use super::VERSION;
 
 pub struct Anaconda {
@@ -77,7 +77,7 @@ impl Anaconda {
     pub async fn create_or_update_package(
         &self,
         owner: &str,
-        package: &Package<'_>,
+        package: &ExtractedPackage<'_>,
     ) -> miette::Result<()> {
         let package_name = package.package_name();
         debug!("getting package {}/{}", owner, package_name.as_normalized(),);
@@ -163,7 +163,7 @@ impl Anaconda {
     pub async fn create_or_update_release(
         &self,
         owner: &str,
-        package: &Package<'_>,
+        package: &ExtractedPackage<'_>,
     ) -> miette::Result<()> {
         let package_name = package.package_name();
         let package_version = package.package_version();
@@ -252,7 +252,7 @@ impl Anaconda {
         Ok(())
     }
 
-    pub async fn upload_file(&self, owner: &str, channels: &[String], package: &Package<'_>) -> miette::Result<()> {
+    pub async fn upload_file(&self, owner: &str, channels: &[String], package: &ExtractedPackage<'_>) -> miette::Result<()> {
         let sha256 = package.sha256().into_diagnostic()?;
 
         let package_name = package.package_name();

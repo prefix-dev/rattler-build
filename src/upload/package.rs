@@ -13,13 +13,13 @@ pub fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
     ))
 }
 
-pub struct Package<'a> {
+pub struct ExtractedPackage<'a> {
     file: &'a Path,
     about_json: AboutJson,
     index_json: IndexJson,
 }
 
-impl<'a> Package<'a> {
+impl<'a> ExtractedPackage<'a> {
     pub fn from_package_file(file: &'a Path) -> miette::Result<Self> {
         let extraction_dir = tempfile::tempdir().into_diagnostic()?;
 
@@ -55,7 +55,7 @@ impl<'a> Package<'a> {
     }
 
     pub fn sha256(&self) -> Result<String, std::io::Error> {
-        sha256_sum(&self.file)
+        sha256_sum(self.file)
     }
 
     pub fn base64_md5(&self) -> Result<String, std::io::Error> {
