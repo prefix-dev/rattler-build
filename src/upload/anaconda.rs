@@ -12,8 +12,6 @@ use tracing::debug;
 use tracing::info;
 use url::Url;
 
-use crate::upload::get_default_client;
-
 use super::package::ExtractedPackage;
 use super::VERSION;
 

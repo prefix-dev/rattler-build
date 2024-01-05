@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use miette::IntoDiagnostic;
 use tracing::debug;
@@ -17,7 +17,7 @@ pub async fn upload_package_to_conda_forge(
     let anaconda = anaconda::Anaconda::new(opts.staging_token, opts.anaconda_url);
 
     let channels = vec![opts.label];
-    let mut checksums = Vec::new();
+    let mut checksums = HashMap::new();
 
     for package_file in package_files {
         let package = package::ExtractedPackage::from_package_file(package_file)?;
@@ -39,7 +39,15 @@ pub async fn upload_package_to_conda_forge(
             // Anaconda automatically deletes releases / packages when the deletion of a file would leave them empty.
             // Therefore, we need to ensure that the release / package still exists before trying to upload again.
             if successful {
-                checksums.push(package.sha256().into_diagnostic()?);
+                let dist_name = format!(
+                    "{}/{}",
+                    package.subdir().ok_or(miette::miette!("No subdir found"))?,
+                    package
+                        .filename()
+                        .ok_or(miette::miette!("No filename found"))?
+                );
+
+                checksums.insert(dist_name, package.sha256().into_diagnostic()?);
                 break;
             }
         }
