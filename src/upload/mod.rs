@@ -7,13 +7,12 @@ use std::{
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::package::{IndexJson, PackageFile};
-use rattler_digest::compute_file_digest;
 use rattler_networking::{redact_known_secrets_from_error, Authentication, AuthenticationStorage};
 use reqwest::Method;
-use sha2::Sha256;
 use tracing::info;
 use url::Url;
+
+use crate::upload::package::{sha256_sum, Package};
 
 mod anaconda;
 mod package;
@@ -44,13 +43,6 @@ fn get_client() -> Result<reqwest::Client, reqwest::Error> {
         .no_gzip()
         .user_agent(format!("rattler-build/{}", VERSION))
         .build()
-}
-
-fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
-    Ok(format!(
-        "{:x}",
-        compute_file_digest::<Sha256>(&package_file)?
-    ))
 }
 
 pub async fn upload_package_to_quetz(
@@ -140,24 +132,21 @@ pub async fn upload_package_to_artifactory(
     };
 
     for package_file in package_files {
-        let package_dir = tempfile::tempdir()
-            .into_diagnostic()
-            .wrap_err("Creating temporary directory failed")?;
+        let package = Package::from_package_file(package_file)?;
 
-        rattler_package_streaming::fs::extract(package_file, package_dir.path())
-            .into_diagnostic()?;
+        let subdir = package.subdir().ok_or_else(|| {
+            miette::miette!(
+                "index.json of package {} has no subdirectory. Cannot determine which directory to upload to",
+                package_file.display()
+            )
+        })?;
 
-        let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
-        let subdir = index_json
-            .subdir
-            .ok_or_else(|| miette::miette!("index.json of package {} has no subdirectory. Cannot determine which directory to upload to", package_file.display()))?;
+        let package_name = package.filename().ok_or(miette::miette!(
+            "Package file {} has no filename",
+            package_file.display()
+        ))?;
 
         let client = get_client().into_diagnostic()?;
-
-        let package_name = package_file
-            .file_name()
-            .expect("no filename found")
-            .to_string_lossy();
 
         let upload_url = url
             .join(&format!("{}/{}/{}", channel, subdir, package_name))
@@ -284,7 +273,10 @@ pub async fn upload_package_to_anaconda(
             .await
             .unwrap();
 
-        anaconda.upload_file(&owner, &channels, &package).await.unwrap();
+        anaconda
+            .upload_file(&owner, &channels, &package)
+            .await
+            .unwrap();
     }
 
     Ok(())

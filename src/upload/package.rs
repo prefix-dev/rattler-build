@@ -6,6 +6,13 @@ use rattler_conda_types::{package::{AboutJson, IndexJson, PackageFile}, PackageN
 use rattler_digest::{compute_file_digest, Md5};
 use sha2::Sha256;
 
+pub fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
+    Ok(format!(
+        "{:x}",
+        compute_file_digest::<Sha256>(&package_file)?
+    ))
+}
+
 pub struct Package<'a> {
     file: &'a Path,
     about_json: AboutJson,
@@ -43,11 +50,12 @@ impl<'a> Package<'a> {
         &self.index_json.version
     }
 
+    pub fn subdir(&self) -> Option<&String> {
+        self.index_json.subdir.as_ref()
+    }
+
     pub fn sha256(&self) -> Result<String, std::io::Error> {
-        Ok(format!(
-            "{:x}",
-            compute_file_digest::<Sha256>(&self.path())?
-        ))
+        sha256_sum(&self.file)
     }
 
     pub fn base64_md5(&self) -> Result<String, std::io::Error> {
