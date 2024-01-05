@@ -269,7 +269,7 @@ struct AnacondaOpts {
     /// The owner of the distribution (e.g. conda-forge or your username)
     #[arg(short, long, env = "ANACONDA_OWNER")]
     owner: String,
-    
+
     /// The channel / label to upload the package to (e.g. main / rc)
     #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main", num_args = 1..)]
     channel: Vec<String>,
@@ -279,7 +279,12 @@ struct AnacondaOpts {
     api_key: Option<String>,
 
     /// The URL to the Anaconda server
-    #[arg(short, long, env = "ANACONDA_SERVER_URL", default_value = "https://api.anaconda.org")]
+    #[arg(
+        short,
+        long,
+        env = "ANACONDA_SERVER_URL",
+        default_value = "https://api.anaconda.org"
+    )]
     url: Url,
 }
 
@@ -689,7 +694,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 prefix_opts.channel,
             )
             .await?;
-        },
+        }
         ServerType::Anaconda(anaconda_opts) => {
             upload::upload_package_to_anaconda(
                 &store,

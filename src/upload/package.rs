@@ -2,7 +2,10 @@ use std::path::Path;
 
 use base64::{engine::general_purpose, Engine};
 use miette::IntoDiagnostic;
-use rattler_conda_types::{package::{AboutJson, IndexJson, PackageFile}, PackageName, Version as PackageVersion};
+use rattler_conda_types::{
+    package::{AboutJson, IndexJson, PackageFile},
+    PackageName, Version as PackageVersion,
+};
 use rattler_digest::{compute_file_digest, Md5};
 use sha2::Sha256;
 
@@ -64,15 +67,11 @@ impl<'a> ExtractedPackage<'a> {
     }
 
     pub fn filename(&self) -> Option<&str> {
-        self.file
-            .file_name()
-            .and_then(|s| s.to_str())
+        self.file.file_name().and_then(|s| s.to_str())
     }
 
     pub fn file_size(&self) -> Result<u64, std::io::Error> {
-        self.file
-            .metadata()
-            .map(|metadata| metadata.len())
+        self.file.metadata().map(|metadata| metadata.len())
     }
 
     pub fn about_json(&self) -> &AboutJson {

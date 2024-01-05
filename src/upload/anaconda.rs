@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use url::Url;
 
-
 use super::package::ExtractedPackage;
 use super::VERSION;
 
@@ -252,7 +251,12 @@ impl Anaconda {
         Ok(())
     }
 
-    pub async fn upload_file(&self, owner: &str, channels: &[String], package: &ExtractedPackage<'_>) -> miette::Result<()> {
+    pub async fn upload_file(
+        &self,
+        owner: &str,
+        channels: &[String],
+        package: &ExtractedPackage<'_>,
+    ) -> miette::Result<()> {
         let sha256 = package.sha256().into_diagnostic()?;
 
         let package_name = package.package_name();
