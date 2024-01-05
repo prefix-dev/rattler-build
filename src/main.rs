@@ -201,6 +201,8 @@ enum ServerType {
     Artifactory(ArtifactoryOpts),
     Prefix(PrefixOpts),
     Anaconda(AnacondaOpts),
+    #[clap(hide = true)]
+    CondaForge(CondaForgeOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -290,6 +292,56 @@ struct AnacondaOpts {
     /// Replace files on conflict
     #[arg(long, short, env = "ANACONDA_FORCE", default_value = "false")]
     force: bool,
+}
+
+/// Options for uploading to conda-forge
+#[derive(Clone, Debug, PartialEq, Parser)]
+pub struct CondaForgeOpts {
+    /// The label to upload the package to (e.g. main / rc)
+    #[arg(short, long, env = "CONDA_FORGE_LABEL", required = true)]
+    label: String,
+
+    /// The Anaconda API key
+    #[arg(short, long, env = "STAGING_BINSTAR_TOKEN", required = true)]
+    staging_token: String,
+
+    /// The feedstock name
+    #[arg(short, long, env = "FEEDSTOCK_NAME", required = true)]
+    feedstock: String,
+
+    /// The feedstock token
+    #[arg(short, long, env = "FEEDSTOCK_TOKEN", required = true)]
+    feedstock_token: String,
+
+    /// The staging channel name
+    #[arg(short, long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
+    staging_channel: String,
+
+    /// The Anaconda Server URL
+    #[arg(
+        short,
+        long,
+        env = "ANACONDA_SERVER_URL",
+        default_value = "https://api.anaconda.org"
+    )]
+    anaconda_url: Url,
+
+    /// The validation endpoint url
+    #[arg(
+        short,
+        long,
+        env = "VALIDATION_ENDPOINT",
+        default_value = "https://conda-forge.herokuapp.com/feedstock-outputs/copy"
+    )]
+    validation_endpoint: Url,
+
+    /// Post comment on promotion failure
+    #[arg(long, env = "POST_COMMENT_ON_ERROR", default_value = "true")]
+    post_comment_on_error: bool,
+
+    /// The CI provider
+    #[arg(short, long, env = "CI")]
+    provider: Option<String>,
 }
 
 #[tokio::main]
@@ -708,6 +760,13 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 anaconda_opts.owner,
                 anaconda_opts.channel,
                 anaconda_opts.force,
+            )
+            .await?;
+        }
+        ServerType::CondaForge(conda_forge_opts) => {
+            upload::conda_forge::upload_package_to_conda_forge(
+                conda_forge_opts,
+                &args.package_files,
             )
             .await?;
         }
