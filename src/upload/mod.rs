@@ -276,9 +276,7 @@ pub async fn upload_package_to_anaconda(
             // When running with --force and experiencing a conflict error, we delete the conflicting file.
             // Anaconda automatically deletes releases / packages when the deletion of a file would leave them empty.
             // Therefore, we need to ensure that the release / package still exists before trying to upload again.
-            if !successful {
-                continue;
-            } else {
+            if successful {
                 break;
             }
         }
