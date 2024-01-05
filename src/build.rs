@@ -18,12 +18,12 @@ use rattler_shell::shell;
 
 use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
+use crate::package_test::TestConfiguration;
 use crate::packaging::{package_conda, record_files};
-use crate::recipe::parser::ScriptContent;
+use crate::recipe::parser::{ScriptContent, TestType};
 use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
-use crate::test::TestConfiguration;
-use crate::{index, test, tool_configuration};
+use crate::{index, package_test, tool_configuration};
 
 const BASH_PREAMBLE: &str = r#"
 ## Start of bash preamble
@@ -317,14 +317,18 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    if let Some(package_content) = output.recipe.test().package_content() {
-        test::run_package_content_tests(
-            package_content,
-            paths_json,
-            &output.build_configuration.target_platform,
-        )
-        .await
-        .into_diagnostic()?;
+    // We run all the package content tests
+    for test in output.recipe.tests() {
+        // TODO we could also run each of the (potentially multiple) test scripts and collect the errors
+        if let TestType::PackageContents(package_contents) = test {
+            package_test::run_package_content_tests(
+                package_contents,
+                &paths_json,
+                &output.build_configuration.target_platform,
+            )
+            .await
+            .into_diagnostic()?;
+        }
     }
 
     if !tool_configuration.no_clean {
@@ -347,15 +351,15 @@ pub async fn run_build(
     } else {
         tracing::info!("Running tests");
 
-        test::run_test(
+        package_test::run_test(
             &result,
             &TestConfiguration {
                 test_prefix: test_dir.clone(),
                 target_platform: Some(output.build_configuration.target_platform),
                 keep_test_prefix: tool_configuration.no_clean,
                 channels,
+                tool_configuration: tool_configuration.clone(),
             },
-            &tool_configuration,
         )
         .await
         .into_diagnostic()?;

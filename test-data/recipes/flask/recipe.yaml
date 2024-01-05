@@ -35,15 +35,17 @@ requirements:
     - importlib-metadata >=3.6.0
     - blinker >=1.6.2
 
-test:
-  requires:
-    - pip
-  imports:
-    - flask
-    - flask.json
-  commands:
-    - flask --help
-    - pip check
+tests:
+  - python:
+      imports:
+        - flask
+        - flask.json
+  - requirements:
+      run:
+        - pip
+    script:
+      - flask --help
+      - pip check
 
 about:
   homepage: https://palletsprojects.com/p/flask

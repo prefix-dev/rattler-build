@@ -35,7 +35,10 @@ pub use self::{
     },
     script::{Script, ScriptContent},
     source::{Checksum, GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
-    test::{PackageContent, Test},
+    test::{
+        CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest, PackageContents,
+        PythonTest, TestType,
+    },
 };
 
 use super::custom_yaml::Node;
@@ -53,12 +56,13 @@ pub struct Recipe {
     /// The information about the requirements
     pub requirements: Requirements,
     /// The information about how to test the package
-    #[serde(default, skip_serializing_if = "Test::is_default")]
-    pub test: Test,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<TestType>,
     /// The information about the package
     #[serde(default, skip_serializing_if = "About::is_default")]
     pub about: About,
 }
+
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
     fn collect_errors(self) -> Result<(), Vec<V>> {
         let err = self
@@ -184,7 +188,7 @@ impl Recipe {
         let mut build = Build::default();
         let mut source = Vec::new();
         let mut requirements = Requirements::default();
-        let mut test = Test::default();
+        let mut tests = Vec::default();
         let mut about = About::default();
 
         rendered_node
@@ -204,7 +208,7 @@ impl Recipe {
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
                     "requirements" => requirements = value.try_convert(key_str)?,
-                    "test" => test = value.try_convert(key_str)?,
+                    "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "context" => {}
                     "extra" => {}
@@ -237,7 +241,7 @@ impl Recipe {
             build,
             source,
             requirements,
-            test,
+            tests,
             about,
         };
 
@@ -265,8 +269,8 @@ impl Recipe {
     }
 
     /// Get the test information.
-    pub const fn test(&self) -> &Test {
-        &self.test
+    pub const fn tests(&self) -> &Vec<TestType> {
+        &self.tests
     }
 
     /// Get the about information.
@@ -278,6 +282,7 @@ impl Recipe {
 #[cfg(test)]
 mod tests {
     use insta::assert_yaml_snapshot;
+    use rattler_conda_types::Platform;
 
     use crate::{assert_miette_snapshot, variant_config::ParseErrors};
 
@@ -286,12 +291,24 @@ mod tests {
     #[test]
     fn it_works() {
         let recipe = include_str!("../../examples/xtensor/recipe.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
-        assert!(recipe.is_ok());
-        #[cfg(target_family = "unix")]
-        insta::assert_debug_snapshot!(recipe.unwrap());
-        #[cfg(target_family = "windows")]
-        insta::assert_debug_snapshot!("recipe_windows", recipe.unwrap());
+
+        let selector_config_win = SelectorConfig {
+            target_platform: Platform::Win64,
+            ..SelectorConfig::default()
+        };
+
+        let selector_config_unix = SelectorConfig {
+            target_platform: Platform::Linux64,
+            ..SelectorConfig::default()
+        };
+
+        let unix_recipe = Recipe::from_yaml(recipe, selector_config_unix);
+        let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
+        assert!(unix_recipe.is_ok());
+        assert!(win_recipe.is_ok());
+
+        insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+        insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
     }
 
     #[test]

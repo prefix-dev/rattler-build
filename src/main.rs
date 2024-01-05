@@ -28,9 +28,9 @@ use rattler_build::{
     build::run_build,
     hash::HashInfo,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
+    package_test::{self, TestConfiguration},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
-    test::{self, TestConfiguration},
     tool_configuration,
     variant_config::{ParseErrors, VariantConfig},
 };
@@ -155,6 +155,10 @@ struct BuildOpts {
 
 #[derive(Parser)]
 struct TestOpts {
+    /// Channels to use when testing
+    #[arg(short = 'c', long)]
+    channel: Option<Vec<String>>,
+
     /// The package file to test
     #[arg(short, long)]
     package_file: PathBuf,
@@ -322,13 +326,6 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let test_prefix = PathBuf::from("test-prefix");
     fs::create_dir_all(&test_prefix).into_diagnostic()?;
 
-    let test_options = TestConfiguration {
-        test_prefix,
-        target_platform: Some(Platform::current()),
-        keep_test_prefix: false,
-        channels: vec!["conda-forge".to_string(), "./output".to_string()],
-    };
-
     let client = AuthenticatedClient::from_client(
         reqwest::Client::builder()
             .no_gzip()
@@ -337,14 +334,23 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
         get_auth_store(args.common.auth_file),
     );
 
-    let global_configuration = tool_configuration::Configuration {
-        client,
-        multi_progress_indicator: MultiProgress::new(),
-        no_clean: test_options.keep_test_prefix,
-        ..Default::default()
+    let test_options = TestConfiguration {
+        test_prefix,
+        target_platform: Some(Platform::current()),
+        keep_test_prefix: false,
+        channels: args
+            .channel
+            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
+        tool_configuration: tool_configuration::Configuration {
+            client,
+            multi_progress_indicator: MultiProgress::new(),
+            // duplicate from `keep_test_prefix`?
+            no_clean: false,
+            ..Default::default()
+        },
     };
 
-    test::run_test(&package_file, &test_options, &global_configuration)
+    package_test::run_test(&package_file, &test_options)
         .await
         .into_diagnostic()?;
 

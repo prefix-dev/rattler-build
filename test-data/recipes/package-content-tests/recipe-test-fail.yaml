@@ -10,8 +10,8 @@ build:
       else:
         - echo "Hello World" > %PREFIX%\test-execution.txt
 
-test:
-  package_contents:
-    files:
-      - "**/*.txt"
-      - "**/*.php"
+tests:
+  - package_contents:
+      files:
+        - "**/*.txt"
+        - "**/*.php"
