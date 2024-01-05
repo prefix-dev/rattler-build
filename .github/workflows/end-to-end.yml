@@ -40,3 +40,4 @@ jobs:
       - run: pixi run end_to_end_test
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
+          ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}

@@ -7,13 +7,17 @@ use std::{
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::package::{IndexJson, PackageFile};
-use rattler_digest::compute_file_digest;
 use rattler_networking::{redact_known_secrets_from_error, Authentication, AuthenticationStorage};
 use reqwest::Method;
-use sha2::Sha256;
 use tracing::info;
 use url::Url;
+
+use crate::upload::package::{sha256_sum, ExtractedPackage};
+
+mod anaconda;
+mod package;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Returns the style to use for a progressbar that is currently in progress.
 fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
@@ -35,14 +39,10 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
 }
 
 fn get_client() -> Result<reqwest::Client, reqwest::Error> {
-    reqwest::Client::builder().no_gzip().build()
-}
-
-fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
-    Ok(format!(
-        "{:x}",
-        compute_file_digest::<Sha256>(&package_file)?
-    ))
+    reqwest::Client::builder()
+        .no_gzip()
+        .user_agent(format!("rattler-build/{}", VERSION))
+        .build()
 }
 
 pub async fn upload_package_to_quetz(
@@ -132,24 +132,21 @@ pub async fn upload_package_to_artifactory(
     };
 
     for package_file in package_files {
-        let package_dir = tempfile::tempdir()
-            .into_diagnostic()
-            .wrap_err("Creating temporary directory failed")?;
+        let package = ExtractedPackage::from_package_file(package_file)?;
 
-        rattler_package_streaming::fs::extract(package_file, package_dir.path())
-            .into_diagnostic()?;
+        let subdir = package.subdir().ok_or_else(|| {
+            miette::miette!(
+                "index.json of package {} has no subdirectory. Cannot determine which directory to upload to",
+                package_file.display()
+            )
+        })?;
 
-        let index_json = IndexJson::from_package_directory(package_dir.path()).into_diagnostic()?;
-        let subdir = index_json
-            .subdir
-            .ok_or_else(|| miette::miette!("index.json of package {} has no subdirectory. Cannot determine which directory to upload to", package_file.display()))?;
+        let package_name = package.filename().ok_or(miette::miette!(
+            "Package file {} has no filename",
+            package_file.display()
+        ))?;
 
         let client = get_client().into_diagnostic()?;
-
-        let package_name = package_file
-            .file_name()
-            .expect("no filename found")
-            .to_string_lossy();
 
         let upload_url = url
             .join(&format!("{}/{}/{}", channel, subdir, package_name))
@@ -225,6 +222,65 @@ pub async fn upload_package_to_prefix(
 
     info!("Packages successfully uploaded to prefix.dev server");
 
+    Ok(())
+}
+
+pub async fn upload_package_to_anaconda(
+    storage: &AuthenticationStorage,
+    token: Option<String>,
+    package_files: &Vec<PathBuf>,
+    url: Url,
+    owner: String,
+    channels: Vec<String>,
+    force: bool,
+) -> miette::Result<()> {
+    println!("{:?}", channels);
+    let token = match token {
+        Some(token) => token,
+        None => match storage.get("anaconda.org") {
+            Ok(Some(Authentication::CondaToken(token))) => token,
+            Ok(Some(_)) => {
+                return Err(miette::miette!(
+                    "A Conda token is required for authentication with anaconda.org.
+                        Authentication information found in the keychain / auth file, but it was not a Conda token.
+                        Please create a token on anaconda.org"
+                ));
+            }
+            Ok(None) => {
+                return Err(miette::miette!(
+                    "No anaconda.org api key was given and no token were found in the keychain / auth file. Please create a token on anaconda.org"
+                ));
+            }
+            Err(e) => {
+                return Err(miette::miette!(
+                    "Failed to get authentication information form keychain: {e}"
+                ));
+            }
+        },
+    };
+
+    let anaconda = anaconda::Anaconda::new(token, url);
+
+    for package_file in package_files {
+        loop {
+            let package = package::ExtractedPackage::from_package_file(package_file)?;
+
+            anaconda.create_or_update_package(&owner, &package).await?;
+
+            anaconda.create_or_update_release(&owner, &package).await?;
+
+            let successful = anaconda
+                .upload_file(&owner, &channels, force, &package)
+                .await?;
+
+            // When running with --force and experiencing a conflict error, we delete the conflicting file.
+            // Anaconda automatically deletes releases / packages when the deletion of a file would leave them empty.
+            // Therefore, we need to ensure that the release / package still exists before trying to upload again.
+            if successful {
+                break;
+            }
+        }
+    }
     Ok(())
 }
 

@@ -5,6 +5,7 @@ import platform
 from pathlib import Path
 from subprocess import CalledProcessError, check_output
 from typing import Any, Optional
+import requests
 
 import pytest
 from conda_package_handling.api import extract
@@ -217,3 +218,60 @@ def test_auth_file(
         tmp_path,
         custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
     )
+
+
+@pytest.mark.skipif(
+    not os.environ.get("ANACONDA_ORG_TEST_TOKEN", ""),
+    reason="requires ANACONDA_ORG_TEST_TOKEN",
+)
+def test_anaconda_upload(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    URL = "https://api.anaconda.org/package/rattler-build-testpackages/globtest"
+
+    # Make sure the package doesn't exist
+    requests.delete(
+        URL, headers={"Authorization": f"token {os.environ['ANACONDA_ORG_TEST_TOKEN']}"}
+    )
+
+    assert requests.get(URL).status_code == 404
+
+    monkeypatch.setenv("ANACONDA_API_KEY", os.environ["ANACONDA_ORG_TEST_TOKEN"])
+
+    rattler_build.build(recipes / "globtest", tmp_path)
+
+    rattler_build(
+        "upload",
+        "-vvv",
+        "anaconda",
+        "--owner",
+        "rattler-build-testpackages",
+        str(get_package(tmp_path, "globtest")),
+    )
+
+    # Make sure the package exists
+    assert requests.get(URL).status_code == 200
+
+    # Make sure the package attempted overwrites fail without --force
+    with pytest.raises(CalledProcessError):
+        rattler_build(
+            "upload",
+            "-vvv",
+            "anaconda",
+            "--owner",
+            "rattler-build-testpackages",
+            str(get_package(tmp_path, "globtest")),
+        )
+
+    # Make sure the package attempted overwrites succeed with --force
+    rattler_build(
+        "upload",
+        "-vvv",
+        "anaconda",
+        "--owner",
+        "rattler-build-testpackages",
+        "--force",
+        str(get_package(tmp_path, "globtest")),
+    )
+
+    assert requests.get(URL).status_code == 200
