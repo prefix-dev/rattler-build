@@ -5,7 +5,11 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use crate::recipe::parser::{GitRev, GitSource, Source};
+use crate::{
+    recipe::parser::{GitRev, GitSource, Source},
+    render::solver::default_bytes_style,
+    tool_configuration,
+};
 
 use fs_err as fs;
 use fs_err::File;
@@ -85,6 +89,7 @@ pub async fn fetch_sources(
     work_dir: &Path,
     recipe_dir: &Path,
     cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
         return Ok(Vec::new());
@@ -127,7 +132,7 @@ pub async fn fetch_sources(
                     .and_then(|segments| segments.last().map(|last| last.to_string()))
                     .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
 
-                let res = url_source::url_src(src, &cache_src).await?;
+                let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
                 let mut dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
                 } else {
@@ -145,7 +150,11 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .contains(".tar")
                 {
-                    extract_tar(&res, &dest_dir)?;
+                    extract_tar(
+                        &res,
+                        &dest_dir,
+                        tool_configuration.multi_progress_indicator.clone(),
+                    )?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if res
                     .file_name()
@@ -153,7 +162,11 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .ends_with(".zip")
                 {
-                    extract_zip(&res, &dest_dir)?;
+                    extract_zip(
+                        &res,
+                        &dest_dir,
+                        tool_configuration.multi_progress_indicator.clone(),
+                    )?;
                     tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else {
                     if let Some(file_name) = src.file_name() {
@@ -290,11 +303,27 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
 }
 
 /// Extracts a tar archive to the specified target directory
-fn extract_tar(archive: &Path, target_directory: &Path) -> Result<(), SourceError> {
-    let mut archive = tar::Archive::new(ext_to_compression(
+fn extract_tar(
+    archive: impl AsRef<Path>,
+    target_directory: impl AsRef<Path>,
+    multi_progress_indicator: indicatif::MultiProgress,
+) -> Result<(), SourceError> {
+    let archive = archive.as_ref();
+    let target_directory = target_directory.as_ref();
+
+    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
+    let progress_bar = multi_progress_indicator.add(
+        indicatif::ProgressBar::new(len)
+            .with_prefix("Extracting tar")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
+
+    let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
         archive.file_name(),
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    ));
+    )));
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
@@ -302,17 +331,38 @@ fn extract_tar(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
         .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
+    progress_bar.finish_with_message("Extracted...");
 
     Ok(())
 }
 
 /// Extracts a zip archive to the specified target directory
-/// currently this doesn't support bzip2 and zstd, zip archived with compression other than deflate would fail.
+/// currently this doesn't support bzip2 and zstd.
+///
+/// `.zip` files archived with compression other than deflate would fail.
+///
 /// <!-- TODO: we can trivially add support for bzip2 and zstd by enabling the feature flags -->
-fn extract_zip(archive: &Path, target_directory: &Path) -> Result<(), SourceError> {
-    let mut archive = zip::ZipArchive::new(
+fn extract_zip(
+    archive: impl AsRef<Path>,
+    target_directory: impl AsRef<Path>,
+    multi_progress_indicator: indicatif::MultiProgress,
+) -> Result<(), SourceError> {
+    let archive = archive.as_ref();
+    let target_directory = target_directory.as_ref();
+
+    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
+    let progress_bar = multi_progress_indicator.add(
+        indicatif::ProgressBar::new(len)
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Extracting zip")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
+
+    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    )
+    ))
     .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
@@ -321,6 +371,68 @@ fn extract_zip(archive: &Path, target_directory: &Path) -> Result<(), SourceErro
         .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
+    progress_bar.finish_with_message("Extracted...");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use std::{fs::File, io::Write};
+
+    use crate::source::SourceError;
+
+    use super::extract_zip;
+
+    #[test]
+    fn test_extract_zip() {
+        // zip contains text.txt with "Hello, World" text
+        const HELLOW_ZIP_FILE: &[u8] = &[
+            80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13,
+            0, 0, 0, 8, 0, 28, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85, 84, 9, 0, 3, 4, 130,
+            150, 101, 6, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 72,
+            101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 10, 80, 75, 1, 2, 30, 3, 10, 0, 0,
+            0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13, 0, 0, 0, 8, 0, 24, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 164, 129, 0, 0, 0, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85,
+            84, 5, 0, 3, 4, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 80,
+            75, 5, 6, 0, 0, 0, 0, 1, 0, 1, 0, 78, 0, 0, 0, 79, 0, 0, 0, 0, 0,
+        ];
+        let term = indicatif::InMemoryTerm::new(100, 100);
+        let multi_progress = indicatif::MultiProgress::new();
+        multi_progress.set_draw_target(indicatif::ProgressDrawTarget::term_like(Box::new(
+            term.clone(),
+        )));
+        let tempdir = tempfile::tempdir().unwrap();
+        let file_path = tempdir.path().join("test.zip");
+        let mut file = File::create(&file_path).unwrap();
+        _ = file.write_all(HELLOW_ZIP_FILE);
+
+        let res = extract_zip(file_path, tempdir.path(), multi_progress.clone());
+        assert!(term.contents().trim().starts_with(
+            "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
+        ));
+        assert!(matches!(res.err(), None));
+        assert!(tempdir.path().join("text.txt").exists());
+        assert!(std::fs::read_to_string(tempdir.path().join("text.txt"))
+            .unwrap()
+            .contains("Hello, World"));
+    }
+
+    #[test]
+    fn test_extract_fail() {
+        let multi_progress = indicatif::MultiProgress::new();
+        let tempdir = tempfile::tempdir().unwrap();
+        let res = extract_zip("", tempdir.path(), multi_progress.clone());
+        assert!(matches!(res.err(), Some(SourceError::FileNotFound(_))));
+    }
+
+    #[test]
+    fn test_extract_fail_2() {
+        let multi_progress = indicatif::MultiProgress::new();
+        let tempdir = tempfile::tempdir().unwrap();
+        let file = tempdir.path().join("test.zip");
+        _ = File::create(&file);
+        let res = extract_zip(file, tempdir.path(), multi_progress.clone());
+        assert!(matches!(res.err(), Some(SourceError::InvalidZip(_))));
+    }
 }
