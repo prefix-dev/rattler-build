@@ -298,28 +298,27 @@ struct AnacondaOpts {
 #[derive(Clone, Debug, PartialEq, Parser)]
 pub struct CondaForgeOpts {
     /// The label to upload the package to (e.g. main / rc)
-    #[arg(short, long, env = "CONDA_FORGE_LABEL", required = true)]
+    #[arg(long, env = "CONDA_FORGE_LABEL", required = true)]
     label: String,
 
     /// The Anaconda API key
-    #[arg(short, long, env = "STAGING_BINSTAR_TOKEN", required = true)]
+    #[arg(long, env = "STAGING_BINSTAR_TOKEN", required = true)]
     staging_token: String,
 
     /// The feedstock name
-    #[arg(short, long, env = "FEEDSTOCK_NAME", required = true)]
+    #[arg(long, env = "FEEDSTOCK_NAME", required = true)]
     feedstock: String,
 
     /// The feedstock token
-    #[arg(short, long, env = "FEEDSTOCK_TOKEN", required = true)]
+    #[arg(long, env = "FEEDSTOCK_TOKEN", required = true)]
     feedstock_token: String,
 
     /// The staging channel name
-    #[arg(short, long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
+    #[arg(long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
     staging_channel: String,
 
     /// The Anaconda Server URL
     #[arg(
-        short,
         long,
         env = "ANACONDA_SERVER_URL",
         default_value = "https://api.anaconda.org"
@@ -328,7 +327,6 @@ pub struct CondaForgeOpts {
 
     /// The validation endpoint url
     #[arg(
-        short,
         long,
         env = "VALIDATION_ENDPOINT",
         default_value = "https://conda-forge.herokuapp.com/feedstock-outputs/copy"
@@ -340,7 +338,7 @@ pub struct CondaForgeOpts {
     post_comment_on_error: bool,
 
     /// The CI provider
-    #[arg(short, long, env = "CI")]
+    #[arg(long, env = "CI")]
     provider: Option<String>,
 }
 
