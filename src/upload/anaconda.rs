@@ -9,6 +9,7 @@ use reqwest::multipart::Part;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
+use tracing::info;
 use url::Url;
 
 use super::package::ExtractedPackage;
@@ -251,12 +252,61 @@ impl Anaconda {
         Ok(())
     }
 
+    pub async fn remove_file(
+        &self,
+        owner: &str,
+        package: &ExtractedPackage<'_>,
+    ) -> miette::Result<()> {
+        let package_name = package.package_name();
+        let package_version = package.package_version();
+        let subdir = package
+            .subdir()
+            .ok_or(miette!("missing subdir in index.json"))?;
+        let filename = package
+            .filename()
+            .ok_or(miette!("missing filename in index.json"))?;
+
+        debug!(
+            "removing file {}/{}/{}/{}/{}",
+            owner,
+            package_name.as_normalized(),
+            package_version,
+            subdir,
+            filename,
+        );
+
+        let url = self
+            .url
+            .join(&format!(
+                "dist/{}/{}/{}/{}/{}",
+                owner,
+                package_name.as_normalized(),
+                package_version,
+                subdir,
+                filename,
+            ))
+            .into_diagnostic()?;
+
+        self.client
+            .delete(url)
+            .send()
+            .await
+            .into_diagnostic()
+            .map_err(|e| miette!("failed to send request: {}", e))?
+            .error_for_status()
+            .into_diagnostic()
+            .map_err(|e| miette!("failed to remove file: {}", e))?;
+
+        Ok(())
+    }
+
     pub async fn upload_file(
         &self,
         owner: &str,
         channels: &[String],
+        force: bool,
         package: &ExtractedPackage<'_>,
-    ) -> miette::Result<()> {
+    ) -> miette::Result<bool> {
         let sha256 = package.sha256().into_diagnostic()?;
 
         let package_name = package.package_name();
@@ -300,30 +350,58 @@ impl Anaconda {
             "sha256": sha256,
         });
 
-        let response: FileStageResponse = self
+        let resp = self
             .client
             .post(url)
             .json(&payload)
             .send()
             .await
             .into_diagnostic()
-            .map_err(|e| miette!("failed to send request: {}", e))?
-            .error_for_status()
-            .into_diagnostic()
-            .map_err(|e| miette!("failed to stage upload, server replied with: {}", e))?
+            .map_err(|e| miette!("failed to send request: {}", e))?;
+
+        match resp.status() {
+            reqwest::StatusCode::OK => (),
+            reqwest::StatusCode::CONFLICT => {
+                if force {
+                    info!(
+                        "file {} already exists, running with --force, removing file and retrying",
+                        filename
+                    );
+                    self.remove_file(owner, package).await?;
+
+                    // We cannot just rety the staging request here,
+                    // because anaconda might have garbage collected the release / package
+                    // after the deletion of the file.
+                    return Ok(false);
+                } else {
+                    return Err(miette!(
+                        "file {} already exists, use --force to overwrite",
+                        filename
+                    ));
+                }
+            }
+            _ => {
+                return Err(miette!(
+                    "failed to stage file, server replied with: {}",
+                    resp.status()
+                ))
+            }
+        }
+
+        let parsed_response: FileStageResponse = resp
             .json()
             .await
             .into_diagnostic()
-            .map_err(|e| miette!("failed to parse staging response: {}", e))?;
+            .map_err(|e| miette!("failed to parse response: {}", e))?;
 
-        debug!("Uploading file to S3 Bucket {}", response.post_url);
+        debug!("Uploading file to S3 Bucket {}", parsed_response.post_url);
 
         let base64_md5 = package.base64_md5().into_diagnostic()?;
         let file_size = package.file_size().into_diagnostic()?;
 
         let mut form_data = Form::new();
 
-        for (key, value) in response.form_data {
+        for (key, value) in parsed_response.form_data {
             let serde_json::Value::String(value) = value else {
                 Err(miette!("invalid value in form data: {}", value))?
             };
@@ -338,7 +416,7 @@ impl Anaconda {
         form_data = form_data.part("file", Part::bytes(content));
 
         reqwest::Client::new()
-            .post(response.post_url)
+            .post(parsed_response.post_url)
             .multipart(form_data)
             .header("Accept", "application/json")
             .send()
@@ -366,7 +444,7 @@ impl Anaconda {
         self.client
             .post(url)
             .json(&serde_json::json!({
-                "dist_id": response.dist_id,
+                "dist_id": parsed_response.dist_id,
             }))
             .send()
             .await
@@ -378,6 +456,6 @@ impl Anaconda {
 
         debug!("File {} uploaded successfully", filename);
 
-        Ok(())
+        Ok(true)
     }
 }

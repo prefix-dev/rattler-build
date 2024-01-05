@@ -286,6 +286,10 @@ struct AnacondaOpts {
         default_value = "https://api.anaconda.org"
     )]
     url: Url,
+
+    /// Replace files on conflict
+    #[arg(long, short, env = "ANACONDA_FORCE", default_value = "false")]
+    force: bool,
 }
 
 #[tokio::main]
@@ -703,6 +707,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 anaconda_opts.url,
                 anaconda_opts.owner,
                 anaconda_opts.channel,
+                anaconda_opts.force,
             )
             .await?;
         }

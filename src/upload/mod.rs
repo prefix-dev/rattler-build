@@ -232,6 +232,7 @@ pub async fn upload_package_to_anaconda(
     url: Url,
     owner: String,
     channels: Vec<String>,
+    force: bool,
 ) -> miette::Result<()> {
     println!("{:?}", channels);
     let token = match token {
@@ -261,24 +262,27 @@ pub async fn upload_package_to_anaconda(
     let anaconda = anaconda::Anaconda::new(token, url);
 
     for package_file in package_files {
-        let package = package::ExtractedPackage::from_package_file(package_file)?;
+        loop {
+            let package = package::ExtractedPackage::from_package_file(package_file)?;
 
-        anaconda
-            .create_or_update_package(&owner, &package)
-            .await
-            .unwrap();
+            anaconda.create_or_update_package(&owner, &package).await?;
 
-        anaconda
-            .create_or_update_release(&owner, &package)
-            .await
-            .unwrap();
+            anaconda.create_or_update_release(&owner, &package).await?;
 
-        anaconda
-            .upload_file(&owner, &channels, &package)
-            .await
-            .unwrap();
+            let successful = anaconda
+                .upload_file(&owner, &channels, force, &package)
+                .await?;
+
+            // When running with --force and experiencing a conflict error, we delete the conflicting file.
+            // Anaconda automatically deletes releases / packages when the deletion of a file would leave them empty.
+            // Therefore, we need to ensure that the release / package still exists before trying to upload again.
+            if !successful {
+                continue;
+            } else {
+                break;
+            }
+        }
     }
-
     Ok(())
 }
 
