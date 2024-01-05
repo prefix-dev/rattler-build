@@ -222,6 +222,7 @@ pub async fn run_build(
             &directories.work_dir,
             &directories.recipe_dir,
             &directories.output_dir,
+            &tool_configuration,
         )
         .await
         .into_diagnostic()?;
