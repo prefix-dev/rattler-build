@@ -15,6 +15,11 @@ use sha2::Sha256;
 use tracing::info;
 use url::Url;
 
+mod anaconda;
+mod package;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Returns the style to use for a progressbar that is currently in progress.
 fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
     Ok(indicatif::ProgressStyle::default_bar()
@@ -35,7 +40,10 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
 }
 
 fn get_client() -> Result<reqwest::Client, reqwest::Error> {
-    reqwest::Client::builder().no_gzip().build()
+    reqwest::Client::builder()
+        .no_gzip()
+        .user_agent(format!("rattler-build/{}", VERSION))
+        .build()
 }
 
 fn sha256_sum(package_file: &Path) -> Result<String, std::io::Error> {
@@ -224,6 +232,60 @@ pub async fn upload_package_to_prefix(
     }
 
     info!("Packages successfully uploaded to prefix.dev server");
+
+    Ok(())
+}
+
+pub async fn upload_package_to_anaconda(
+    storage: &AuthenticationStorage,
+    token: Option<String>,
+    package_files: &Vec<PathBuf>,
+    url: Url,
+    owner: String,
+    channels: Vec<String>,
+) -> miette::Result<()> {
+    println!("{:?}", channels);
+    let token = match token {
+        Some(token) => token,
+        None => match storage.get("anaconda.org") {
+            Ok(Some(Authentication::CondaToken(token))) => token,
+            Ok(Some(_)) => {
+                return Err(miette::miette!(
+                    "A Conda token is required for authentication with anaconda.org.
+                        Authentication information found in the keychain / auth file, but it was not a Conda token.
+                        Please create a token on anaconda.org"
+                ));
+            }
+            Ok(None) => {
+                return Err(miette::miette!(
+                    "No anaconda.org api key was given and no token were found in the keychain / auth file. Please create a token on anaconda.org"
+                ));
+            }
+            Err(e) => {
+                return Err(miette::miette!(
+                    "Failed to get authentication information form keychain: {e}"
+                ));
+            }
+        },
+    };
+
+    let anaconda = anaconda::Anaconda::new(token, url);
+
+    for package_file in package_files {
+        let package = package::Package::from_package_file(package_file)?;
+
+        anaconda
+            .create_or_update_package(&owner, &package)
+            .await
+            .unwrap();
+
+        anaconda
+            .create_or_update_release(&owner, &package)
+            .await
+            .unwrap();
+
+        anaconda.upload_file(&owner, &channels, &package).await.unwrap();
+    }
 
     Ok(())
 }

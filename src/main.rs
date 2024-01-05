@@ -200,6 +200,7 @@ enum ServerType {
     Quetz(QuetzOpts),
     Artifactory(ArtifactoryOpts),
     Prefix(PrefixOpts),
+    Anaconda(AnacondaOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -260,6 +261,26 @@ struct PrefixOpts {
     /// The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
     #[arg(short, long, env = "PREFIX_API_KEY")]
     api_key: Option<String>,
+}
+
+/// Options for uploading to a Anaconda.org server
+#[derive(Clone, Debug, PartialEq, Parser)]
+struct AnacondaOpts {
+    /// The owner of the distribution (e.g. conda-forge or your username)
+    #[arg(short, long, env = "ANACONDA_OWNER")]
+    owner: String,
+    
+    /// The channel / label to upload the package to (e.g. main / rc)
+    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main", num_args = 1..)]
+    channel: Vec<String>,
+
+    /// The Anaconda API key, if none is provided, the token is read from the keychain / auth-file
+    #[arg(short, long, env = "ANACONDA_API_KEY")]
+    api_key: Option<String>,
+
+    /// The URL to the Anaconda server
+    #[arg(short, long, env = "ANACONDA_SERVER_URL", default_value = "https://api.anaconda.org")]
+    url: Url,
 }
 
 #[tokio::main]
@@ -668,6 +689,17 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 prefix_opts.channel,
             )
             .await?;
+        },
+        ServerType::Anaconda(anaconda_opts) => {
+            upload::upload_package_to_anaconda(
+                &store,
+                anaconda_opts.api_key,
+                &args.package_files,
+                anaconda_opts.url,
+                anaconda_opts.owner,
+                anaconda_opts.channel,
+            )
+            .await?;
         }
     }
 
@@ -678,7 +710,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
 pub fn get_default_env_filter(
     verbose: clap_verbosity_flag::LevelFilter,
 ) -> Result<EnvFilter, ParseError> {
-    let mut result = EnvFilter::new("rattler_build=info");
+    let mut result = EnvFilter::new(format!("rattler_build={verbose}"));
 
     if verbose >= clap_verbosity_flag::LevelFilter::Trace {
         result = result.add_directive(Directive::from_str("resolvo=info")?);
