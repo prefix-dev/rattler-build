@@ -10,8 +10,8 @@ build:
       else:
         - echo "Hello World" > %PREFIX%\test-execution.txt
 
-test:
-  commands:
+tests:
+  - script:
     - if: unix
       then:
         - test -f $PREFIX/fail.txt

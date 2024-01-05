@@ -28,9 +28,9 @@ use rattler_build::{
     build::run_build,
     hash::HashInfo,
     metadata::{BuildConfiguration, Directories, PackageIdentifier},
+    package_test::{self, TestConfiguration},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
-    test::{self, TestConfiguration},
     tool_configuration,
     variant_config::{ParseErrors, VariantConfig},
 };
@@ -54,15 +54,20 @@ enum SubCommands {
 
     /// Upload a package
     Upload(UploadOpts),
+
+    /// Generate shell completion script
+    Completion(ShellCompletion),
+}
+
+#[derive(Parser)]
+struct ShellCompletion {
+    #[arg(short, long)]
+    shell: Option<clap_complete::Shell>,
 }
 
 #[derive(Parser)]
 #[clap(version = crate_version!())]
 struct App {
-    // If provided, outputs the completion file for given shell
-    #[arg(long = "generate", value_enum)]
-    generator: Option<clap_complete::Shell>,
-
     #[clap(subcommand)]
     subcommand: Option<SubCommands>,
 
@@ -150,6 +155,10 @@ struct BuildOpts {
 
 #[derive(Parser)]
 struct TestOpts {
+    /// Channels to use when testing
+    #[arg(short = 'c', long)]
+    channel: Option<Vec<String>>,
+
     /// The package file to test
     #[arg(short, long)]
     package_file: PathBuf,
@@ -194,8 +203,8 @@ enum ServerType {
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Quetz server
-/// Authentication is used from the keychain / auth-file
+/// Options for uploading to a Quetz server.
+/// Authentication is used from the keychain / auth-file.
 struct QuetzOpts {
     /// The URL to your Quetz server
     #[arg(short, long, env = "QUETZ_SERVER_URL")]
@@ -205,14 +214,14 @@ struct QuetzOpts {
     #[arg(short, long, env = "QUETZ_CHANNEL")]
     channel: String,
 
-    /// The quetz API key, if none is provided, the token is read from the keychain / auth-file
+    /// The Quetz API key, if none is provided, the token is read from the keychain / auth-file
     #[arg(short, long, env = "QUETZ_API_KEY")]
     api_key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Artifactory channel
-/// Authentication is used from the keychain / auth-file
+/// Options for uploading to a Artifactory channel.
+/// Authentication is used from the keychain / auth-file.
 struct ArtifactoryOpts {
     /// The URL to your Artifactory server
     #[arg(short, long, env = "ARTIFACTORY_SERVER_URL")]
@@ -223,7 +232,7 @@ struct ArtifactoryOpts {
     channel: String,
 
     /// Your Artifactory username
-    #[arg(short, long, env = "ARTIFACTORY_USERNAME")]
+    #[arg(short = 'r', long, env = "ARTIFACTORY_USERNAME")]
     username: Option<String>,
 
     /// Your Artifactory password
@@ -231,7 +240,7 @@ struct ArtifactoryOpts {
     password: Option<String>,
 }
 
-/// Options for uploading to a Quetz server
+/// Options for uploading to a prefix.dev server.
 /// Authentication is used from the keychain / auth-file
 #[derive(Clone, Debug, PartialEq, Parser)]
 struct PrefixOpts {
@@ -269,24 +278,30 @@ async fn main() -> miette::Result<()> {
         )
         .init();
 
-    if let Some(generator) = args.generator {
-        let mut cmd = App::command();
-        tracing::info!("Generating completion file for {generator:?}...");
-        fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
-            clap_complete::generate(gen, cmd, cmd.get_name().to_string(), &mut std::io::stdout());
-        }
-        print_completions(generator, &mut cmd);
-        Ok(())
-    } else {
-        match args.subcommand {
-            Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
-            Some(SubCommands::Test(args)) => run_test_from_args(args).await,
-            Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
-            Some(SubCommands::Upload(args)) => upload_from_args(args).await,
-            None => {
-                _ = App::command().print_long_help();
-                Ok(())
+    match args.subcommand {
+        Some(SubCommands::Completion(ShellCompletion { shell })) => {
+            let mut cmd = App::command();
+            fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
+                clap_complete::generate(
+                    gen,
+                    cmd,
+                    cmd.get_name().to_string(),
+                    &mut std::io::stdout(),
+                );
             }
+            let shell = shell
+                .or(clap_complete::Shell::from_env())
+                .unwrap_or(clap_complete::Shell::Bash);
+            print_completions(shell, &mut cmd);
+            Ok(())
+        }
+        Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
+        Some(SubCommands::Test(args)) => run_test_from_args(args).await,
+        Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
+        Some(SubCommands::Upload(args)) => upload_from_args(args).await,
+        None => {
+            _ = App::command().print_long_help();
+            Ok(())
         }
     }
 }
@@ -311,13 +326,6 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let test_prefix = PathBuf::from("test-prefix");
     fs::create_dir_all(&test_prefix).into_diagnostic()?;
 
-    let test_options = TestConfiguration {
-        test_prefix,
-        target_platform: Some(Platform::current()),
-        keep_test_prefix: false,
-        channels: vec!["conda-forge".to_string(), "./output".to_string()],
-    };
-
     let client = AuthenticatedClient::from_client(
         reqwest::Client::builder()
             .no_gzip()
@@ -326,14 +334,23 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
         get_auth_store(args.common.auth_file),
     );
 
-    let global_configuration = tool_configuration::Configuration {
-        client,
-        multi_progress_indicator: MultiProgress::new(),
-        no_clean: test_options.keep_test_prefix,
-        ..Default::default()
+    let test_options = TestConfiguration {
+        test_prefix,
+        target_platform: Some(Platform::current()),
+        keep_test_prefix: false,
+        channels: args
+            .channel
+            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
+        tool_configuration: tool_configuration::Configuration {
+            client,
+            multi_progress_indicator: MultiProgress::new(),
+            // duplicate from `keep_test_prefix`?
+            no_clean: false,
+            ..Default::default()
+        },
     };
 
-    test::run_test(&package_file, &test_options, &global_configuration)
+    package_test::run_test(&package_file, &test_options)
         .await
         .into_diagnostic()?;
 
@@ -544,6 +561,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 force_colors: !args.no_force_colors,
             },
             finalized_dependencies: None,
+            finalized_sources: None,
         };
 
         run_build(&output, tool_config.clone()).await?;

@@ -5,7 +5,11 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
-use crate::{recipe::parser::Source, render::solver::default_bytes_style, tool_configuration};
+use crate::{
+    recipe::parser::{GitRev, GitSource, Source},
+    render::solver::default_bytes_style,
+    tool_configuration,
+};
 
 use fs_err as fs;
 use fs_err::File;
@@ -86,21 +90,33 @@ pub async fn fetch_sources(
     recipe_dir: &Path,
     cache_dir: &Path,
     tool_configuration: &tool_configuration::Configuration,
-) -> Result<(), SourceError> {
+) -> Result<Vec<Source>, SourceError> {
+    if sources.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let cache_src = cache_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
+
+    let mut rendered_sources = Vec::new();
 
     for src in sources {
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from git repo: {}", src.url());
                 let result = git_source::git_src(src, &cache_src, recipe_dir)?;
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
-                crate::source::copy_dir::CopyDir::new(&result, &dest_dir)
+
+                rendered_sources.push(Source::Git(GitSource {
+                    rev: GitRev::Commit(result.1),
+                    ..src.clone()
+                }));
+
+                crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
                     .use_gitignore(false)
                     .run()?;
                 if !src.patches().is_empty() {
@@ -117,8 +133,8 @@ pub async fn fetch_sources(
                     .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
 
                 let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
-                let mut dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let mut dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -165,12 +181,14 @@ pub async fn fetch_sources(
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
+
+                rendered_sources.push(Source::Url(src.clone()));
             }
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
 
-                let dest_dir = if let Some(folder) = src.folder() {
-                    work_dir.join(folder)
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
+                    work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
                 };
@@ -207,10 +225,12 @@ pub async fn fetch_sources(
                 if !src.patches().is_empty() {
                     patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
                 }
+
+                rendered_sources.push(Source::Path(src.clone()));
             }
         }
     }
-    Ok(())
+    Ok(rendered_sources)
 }
 
 /// Handle Compression formats internally
@@ -261,30 +281,22 @@ impl std::io::Read for TarCompression<'_> {
     }
 }
 
+/// Moves the directory content from src to dest
+/// after stripping root dir, if present.
 fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
-    let entries = fs::read_dir(src)?;
-    let mut dir_name = None;
-
-    for entry in entries {
-        let entry = entry?;
-        if entry.file_type()?.is_dir() && dir_name.is_none() {
-            dir_name = Some(entry.file_name());
-        } else {
-            dir_name = None;
-            break;
+    let mut entries = fs::read_dir(src)?;
+    let src_dir = match entries.next().transpose()? {
+        // ensure if only single directory in entries(root dir)
+        Some(dir) if entries.next().is_none() && dir.file_type()?.is_dir() => {
+            src.join(dir.file_name())
         }
-    }
-
-    let src_dir = if let Some(dir) = dir_name {
-        src.join(dir)
-    } else {
-        src.to_path_buf()
+        _ => src.to_path_buf(),
     };
 
-    for inner_entry in fs::read_dir(&src_dir)? {
-        let inner_entry = inner_entry?;
-        let destination = dest.join(inner_entry.file_name());
-        fs::rename(inner_entry.path(), destination)?;
+    for entry in fs::read_dir(&src_dir)? {
+        let entry = entry?;
+        let destination = dest.join(entry.file_name());
+        fs::rename(entry.path(), destination)?;
     }
 
     Ok(())
@@ -313,8 +325,7 @@ fn extract_tar(
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
     )));
 
-    let tmp_extraction_dir = tempfile::tempdir()?;
-
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
         .unpack(&tmp_extraction_dir)
         .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
@@ -354,7 +365,7 @@ fn extract_zip(
     ))
     .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
-    let tmp_extraction_dir = tempfile::tempdir()?;
+    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
         .extract(&tmp_extraction_dir)
         .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;

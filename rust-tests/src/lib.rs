@@ -147,6 +147,7 @@ mod tests {
         }
         unreachable!("above is an infinite loop")
     }
+
     fn rattler() -> RattlerBuild {
         if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
             if let Some(ret) = RattlerBuild::with_binary(path) {
@@ -155,9 +156,11 @@ mod tests {
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
+
     fn recipes() -> PathBuf {
         test_data_dir().join("recipes")
     }
+
     fn test_data_dir() -> PathBuf {
         PathBuf::from(shx("cargo locate-project --workspace -q --message-format=plain").unwrap())
             .parent()
@@ -420,10 +423,13 @@ mod tests {
         let license = pkg.join("info/licenses/LICENSE.rst");
         assert!(license.exists());
 
-        assert!(pkg.join("info/test/run_test.sh").exists());
-        assert!(pkg.join("info/test/run_test.bat").exists());
-        assert!(pkg.join("info/test/run_test.py").exists());
-        assert!(pkg.join("info/test/test_time_dependencies.json").exists());
+        assert!(pkg.join("info/tests/1/run_test.sh").exists());
+        assert!(pkg.join("info/tests/1/run_test.bat").exists());
+        assert!(pkg
+            .join("info/tests/1/test_time_dependencies.json")
+            .exists());
+
+        assert!(pkg.join("info/tests/0/python_test.json").exists());
         // make sure that the entry point does not exist
         assert!(!pkg.join("python-scripts/flask").exists());
 

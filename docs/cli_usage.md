@@ -3,11 +3,11 @@
 ## Shell Completions
 
 We support shell completions through clap-complete.
-You can generate them for your shell using the `--generate` command.
+You can generate them for your shell using the `completion` command.
 
 Eg,
 ```sh
-rattler-build --generate=zsh > ${ZSH_COMPLETIONS_PATH:~/.zsh/completions}/_rattler-build
+rattler-build completion --shell=zsh > ${ZSH_COMPLETIONS_PATH:~/.zsh/completions}/_rattler-build
 compinit
 ```
 
@@ -24,5 +24,5 @@ test     -- Test a package
 
 Example for Fish Shell just generate the `completions.fish` and add to `~/.config/fish/completions`.
 ```sh
-rattler-build --generate=fish > ${ZSH_COMPLETIONS_PATH:~/.config/fish/completions}/rattler-build.fish
+rattler-build completion --shell=fish > ${ZSH_COMPLETIONS_PATH:~/.config/fish/completions}/rattler-build.fish
 ```
