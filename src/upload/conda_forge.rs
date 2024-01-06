@@ -22,35 +22,27 @@ pub async fn upload_package_to_conda_forge(
     for package_file in package_files {
         let package = package::ExtractedPackage::from_package_file(package_file)?;
 
-        loop {
-            anaconda
-                .create_or_update_package(&opts.staging_channel, &package)
-                .await?;
+        anaconda
+            .create_or_update_package(&opts.staging_channel, &package)
+            .await?;
 
-            anaconda
-                .create_or_update_release(&opts.staging_channel, &package)
-                .await?;
+        anaconda
+            .create_or_update_release(&opts.staging_channel, &package)
+            .await?;
 
-            let successful = anaconda
-                .upload_file(&opts.staging_channel, &channels, false, &package)
-                .await?;
+        anaconda
+            .upload_file(&opts.staging_channel, &channels, false, &package)
+            .await?;
 
-            // When running with --force and experiencing a conflict error, we delete the conflicting file.
-            // Anaconda automatically deletes releases / packages when the deletion of a file would leave them empty.
-            // Therefore, we need to ensure that the release / package still exists before trying to upload again.
-            if successful {
-                let dist_name = format!(
-                    "{}/{}",
-                    package.subdir().ok_or(miette::miette!("No subdir found"))?,
-                    package
-                        .filename()
-                        .ok_or(miette::miette!("No filename found"))?
-                );
+        let dist_name = format!(
+            "{}/{}",
+            package.subdir().ok_or(miette::miette!("No subdir found"))?,
+            package
+                .filename()
+                .ok_or(miette::miette!("No filename found"))?
+        );
 
-                checksums.insert(dist_name, package.sha256().into_diagnostic()?);
-                break;
-            }
-        }
+        checksums.insert(dist_name, package.sha256().into_diagnostic()?);
     }
 
     let payload = serde_json::json!({
@@ -64,7 +56,10 @@ pub async fn upload_package_to_conda_forge(
 
     let client = get_default_client().into_diagnostic()?;
 
-    debug!("Sending payload to validation endpoint: {:?}", payload);
+    debug!(
+        "Sending payload to validation endpoint: {}",
+        serde_json::to_string_pretty(&payload).into_diagnostic()?
+    );
 
     let resp = client
         .post(opts.validation_endpoint)
@@ -74,8 +69,15 @@ pub async fn upload_package_to_conda_forge(
         .await
         .into_diagnostic()?;
 
-    debug!("Response from validation endpoint: {:?}", resp);
-    debug!("Response body: {:?}", resp.text().await);
+    let status = resp.status();
+
+    let body: serde_json::Value = resp.json().await.into_diagnostic()?;
+
+    debug!(
+        "Copying to conda-forge returned status code {} with body: {}",
+        status,
+        serde_json::to_string_pretty(&body).into_diagnostic()?
+    );
 
     Ok(())
 }
