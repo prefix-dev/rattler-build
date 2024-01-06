@@ -16,7 +16,7 @@ pub async fn upload_package_to_conda_forge(
 ) -> miette::Result<()> {
     let anaconda = anaconda::Anaconda::new(opts.staging_token, opts.anaconda_url);
 
-    let channels = vec![opts.label];
+    let channels = vec![opts.label.clone()];
     let mut checksums = HashMap::new();
 
     for package_file in package_files {
@@ -56,7 +56,7 @@ pub async fn upload_package_to_conda_forge(
     let payload = serde_json::json!({
         "feedstock": opts.feedstock,
         "outputs": checksums,
-        "channel": opts.staging_channel,
+        "channel": opts.label,
         "comment_on_error": opts.post_comment_on_error,
         "hash_type": "sha256",
         "provider": opts.provider
