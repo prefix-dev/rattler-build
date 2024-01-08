@@ -21,7 +21,7 @@ requirements:
     - ${{ compiler('rust') }}
     - cargo-bundle-licenses
 
-test:
+tests:
   commands:
     - cargo-upgrade --help
 

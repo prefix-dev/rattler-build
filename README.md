@@ -85,6 +85,8 @@ package as output. The `test` subcommand can be used to test existing packages
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   name: xtensor
   version: 0.24.6
@@ -127,8 +129,8 @@ requirements:
   run_constrained:
     - xsimd >=8.0.3,<10
 
-test:
-  commands:
+tests:
+  - script:
     - if: unix or emscripten
       then:
         - test -d ${PREFIX}/include/xtensor
@@ -190,13 +192,11 @@ requirements:
     - python 3.10
     - typing_extensions >=4.0.0,<5.0.0
 
-test:
-  imports:
-    - rich
-  commands:
-    - pip check
-  requires:
-    - pip
+tests:
+  - python:
+      imports:
+        - rich
+      pip_check: true
 
 about:
   homepage: https://github.com/Textualize/rich
