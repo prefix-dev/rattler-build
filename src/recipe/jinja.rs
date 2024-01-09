@@ -615,7 +615,7 @@ mod tests {
             assert_eq!(jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             assert_eq!(
                 jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 3").to_string(),
-                "Experimental feature: provide the `--experimental` flag to enable this feature",
+                "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });
     }
