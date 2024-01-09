@@ -240,6 +240,31 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         format!("{}{}", major, minor)
     });
 
+    env.add_function("load_from_file", |path: String| {
+        let src = std::fs::read_to_string(&path).map_err(|e| {
+            minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
+        })?;
+        // tracing::info!("loading from path: {path}");
+        let filename = path
+            .split('/')
+            .last()
+            .expect("unreachable: split will always atleast return empty string");
+        // tracing::info!("loading filename: {filename}");
+        let value: minijinja::Value = match filename.split_once('.') {
+            Some((_, "yaml")) | Some((_, "yml")) => serde_yaml::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            Some((_, "json")) => serde_json::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            Some((_, "toml")) => toml::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            _ => Value::from(src),
+        };
+        Ok(value)
+    });
+
     env
 }
 
@@ -361,6 +386,41 @@ mod tests {
     use rattler_conda_types::Platform;
 
     use super::*;
+
+    #[test]
+    #[rustfmt::skip]
+    fn eval_load_from_file() {
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            variant: BTreeMap::new(),
+            hash: None,
+        };
+
+        let jinja = Jinja::new(options);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("test.json");
+        std::fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 1").as_str(),
+            Some("world"),
+        ); 
+
+        let path = temp_dir.path().join("test.yaml");
+        std::fs::write(&path, "hello: world").unwrap();
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 2").as_str(),
+            Some("world"),
+        ); 
+
+        let path = temp_dir.path().join("test.toml");
+        std::fs::write(&path, "hello = 'world'").unwrap();
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 2").as_str(),
+            Some("world"),
+        ); 
+    }
 
     #[test]
     #[rustfmt::skip]
