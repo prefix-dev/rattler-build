@@ -38,7 +38,7 @@ Releases](https://github.com/prefix-dev/rattler-build/releases/).
 Alternatively, you can install `rattler-build` via Homebrew:
 
 ```
-brew install pavelzw/pavelzw/rattler-build
+brew install rattler-build
 ```
 
 #### Dependencies
