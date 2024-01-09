@@ -115,8 +115,9 @@ requirements:
 
 # tests to validate that the package works as expected
 tests:
-  imports:
-    - imagesize
+  python:
+    imports:
+      - imagesize
 
 # information about the package
 about:
@@ -885,7 +886,7 @@ and automatically selects the right (cross-)compiler for the target platform.
 
 ```
 build:
-  - "{{ compiler('c') }}"
+  - ${{ compiler('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
@@ -928,8 +929,6 @@ requirements:
 ```
 
 #### Pin compatible
-
-**Note: not yet implemented**
 
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
@@ -1020,7 +1019,7 @@ items under a single selector:
 
 ```yaml
 tests:
-  commands:
+  script:
     - if: unix
       then:
       - test -d ${PREFIX}/include/xtensor
@@ -1032,7 +1031,7 @@ tests:
 
 # On unix this is rendered to:
 tests:
-  commands:
+  script:
     - test -d ${PREFIX}/include/xtensor
     - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
