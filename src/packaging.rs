@@ -454,7 +454,8 @@ fn write_to_dest(
     }
 
     if noarch_type.is_python() {
-        if ext == "pyc" {
+        // skip .pyc or .pyo or .egg-info files
+        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
             return Ok(None); // skip .pyc files
         }
 
