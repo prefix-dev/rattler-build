@@ -22,7 +22,7 @@ requirements:
     - cargo-bundle-licenses
 
 tests:
-  commands:
+  script:
     - cargo-upgrade --help
 
 about:
