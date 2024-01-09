@@ -104,21 +104,19 @@ impl SharedObject {
                     self.path.parent().ok_or(RelinkError::NoParentDir)?,
                 )
                 .ok_or(RelinkError::PathDiffFailed)?;
-                if relative_path.starts_with("..") {
-                    tracing::warn!(
-                        "rpath ({:?}) is outside of prefix ({:?}) - removing it",
-                        new_rpath,
-                        self.path
-                    )
-                } else {
-                    tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
-                    final_rpath.push(PathBuf::from(format!(
-                        "$ORIGIN/{}",
-                        relative_path.to_string_lossy()
-                    )));
-                }
-            } else {
+                tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
+                final_rpath.push(PathBuf::from(format!(
+                    "$ORIGIN/{}",
+                    relative_path.to_string_lossy()
+                )));
+            } else if rpath.starts_with("$ORIGIN") {
                 final_rpath.push(rpath.clone());
+            } else {
+                tracing::warn!(
+                    "rpath ({:?}) is outside of prefix ({:?}) - removing it",
+                    rpath,
+                    encoded_prefix
+                )
             }
         }
 
