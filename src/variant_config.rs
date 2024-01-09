@@ -870,6 +870,7 @@ mod tests {
             build_platform: Platform::Linux64,
             variant: Default::default(),
             hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(selector_config);
 
@@ -880,8 +881,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Win64,
             build_platform: Platform::Win64,
-            variant: Default::default(),
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(selector_config);
 
@@ -897,8 +897,7 @@ mod tests {
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: Default::default(),
-            hash: None,
+            ..Default::default()
         };
 
         let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();

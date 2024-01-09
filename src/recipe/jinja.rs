@@ -245,7 +245,9 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 }
 
 #[derive(Debug)]
-pub(crate) struct Git;
+pub(crate) struct Git {
+    pub(crate) experimental: bool,
+}
 impl std::fmt::Display for Git {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Git")
@@ -263,6 +265,12 @@ impl Object for Git {
         name: &str,
         args: &[Value],
     ) -> Result<Value, minijinja::Error> {
+        if !self.experimental {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Experimental feature: provide the `--experimental` flag to enable this feature",
+            ));
+        }
         match name {
             "head_rev" => {
                 let mut args = args.iter();
@@ -551,7 +559,8 @@ mod tests {
     use super::*;
 
     fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
-        let dir = std::env::temp_dir().join(key);
+        let tempdir = tempfile::tempdir().unwrap();
+        let dir = tempdir.path().join(key);
         _ = std::fs::create_dir_all(&dir).unwrap();
         f(&dir);
         _ = std::fs::remove_dir_all(dir).unwrap();
@@ -587,17 +596,27 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            experimental: true,
+            ..Default::default()
+        };
+        let options_wo_experimental = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
+        let jinja_wo_experimental = Jinja::new(options_wo_experimental);
 
         with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
             git_clone("https://github.com/prefix-dev/rip.git", path, "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
             assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
             assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
             assert_eq!(jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+            assert_eq!(
+                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 3").to_string(),
+                "Experimental feature: provide the `--experimental` flag to enable this feature",
+            );
         });
     }
 
@@ -607,8 +626,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
@@ -632,8 +650,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
@@ -648,7 +665,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -677,7 +694,7 @@ mod tests {
             target_platform: Platform::Linux32,
             build_platform: Platform::Linux32,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -706,7 +723,7 @@ mod tests {
             target_platform: Platform::LinuxAarch64,
             build_platform: Platform::LinuxAarch64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -735,7 +752,7 @@ mod tests {
             target_platform: Platform::LinuxArmV6l,
             build_platform: Platform::LinuxArmV6l,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -766,7 +783,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -788,7 +805,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -818,8 +835,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: Default::default(),
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 

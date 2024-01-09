@@ -18,6 +18,8 @@ pub struct SelectorConfig {
     pub hash: Option<HashInfo>,
     /// The variant config
     pub variant: BTreeMap<String, String>,
+    /// Enable experimental features
+    pub experimental: bool,
 }
 
 impl SelectorConfig {
@@ -56,7 +58,13 @@ impl SelectorConfig {
         }
 
         context.insert("env".to_string(), Value::from_object(Env));
-        context.insert("git".to_string(), Value::from_object(Git));
+        context.insert(
+            "git".to_string(),
+            Value::from_object(Git {
+                // only enable git if experimental is enabled
+                experimental: self.experimental,
+            }),
+        );
 
         for (key, v) in self.variant {
             context.insert(key, Value::from_safe_string(v));
@@ -86,6 +94,7 @@ impl Default for SelectorConfig {
             build_platform: Platform::current(),
             hash: None,
             variant: Default::default(),
+            experimental: false,
         }
     }
 }

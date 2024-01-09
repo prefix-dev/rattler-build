@@ -80,6 +80,10 @@ struct CommonOpts {
     /// Enable support for repodata.json.bz2
     #[clap(long, env = "RATTLER_BZ2", default_value = "true", hide = true)]
     use_bz2: bool,
+
+    /// Enable experimental features
+    #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
+    experimental: bool,
 }
 
 #[derive(Parser)]
@@ -266,6 +270,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         hash: None,
         build_platform: Platform::current(),
         variant: BTreeMap::new(),
+        experimental: args.common.experimental,
     };
 
     let variant_config =
@@ -312,6 +317,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             hash: Some(hash.clone()),
             target_platform: selector_config.target_platform,
             build_platform: selector_config.build_platform,
+            experimental: args.common.experimental,
         };
 
         let recipe =
