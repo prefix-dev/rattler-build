@@ -22,8 +22,8 @@ requirements:
     - cargo-bundle-licenses
 
 tests:
-  script:
-    - cargo-upgrade --help
+  - script:
+      - cargo-upgrade --help
 
 about:
   homepage: https://github.com/killercup/cargo-edit
