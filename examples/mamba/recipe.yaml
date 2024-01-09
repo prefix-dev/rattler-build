@@ -163,19 +163,16 @@ outputs:
 
         - if: win
           then:
-            - script:
-                - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1)  # [win]
+            - if exist %PREFIX%\condabin\mamba.bat (exit 0) else (exit 1)  # [win]
         - if: linux
           then:
-            - script:
-                - test -f ${PREFIX}/etc/profile.d/mamba.sh
-                # these tests work when run on win, but for some reason not during conda build
-                - mamba create -n test_py2 python=2.7 --dry-run
-                - mamba install xtensor xsimd -c conda-forge --dry-run
+            - test -f ${PREFIX}/etc/profile.d/mamba.sh
+            # these tests work when run on win, but for some reason not during conda build
+            - mamba create -n test_py2 python=2.7 --dry-run
+            - mamba install xtensor xsimd -c conda-forge --dry-run
         - if: unix
           then:
-            script:
-              - test -f ${PREFIX}/condabin/mamba
+            - test -f ${PREFIX}/condabin/mamba
 
 about:
   homepage: https://github.com/mamba-org/mamba
