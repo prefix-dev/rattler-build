@@ -115,9 +115,9 @@ requirements:
 
 # tests to validate that the package works as expected
 tests:
-  python:
-    imports:
-      - imagesize
+  - python:
+      imports:
+        - imagesize
 
 # information about the package
 about:
@@ -1019,21 +1019,21 @@ items under a single selector:
 
 ```yaml
 tests:
-  script:
-    - if: unix
-      then:
-      - test -d ${PREFIX}/include/xtensor
-      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
-    - if: win
-      then:
-      - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-      - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+  - script:
+      - if: unix
+        then:
+        - test -d ${PREFIX}/include/xtensor
+        - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+      - if: win
+        then:
+        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+        - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 # On unix this is rendered to:
 tests:
-  script:
-    - test -d ${PREFIX}/include/xtensor
-    - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+  - script:
+      - test -d ${PREFIX}/include/xtensor
+      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
 <!--
