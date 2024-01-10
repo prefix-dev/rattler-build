@@ -191,6 +191,29 @@ mod tests {
     }
 
     #[test]
+    fn test_run_exports_from() {
+        let recipes = recipes();
+        let tmp = tmp("test_run_exports_from");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes.join("run_exports_from"), tmp.as_dir(), None);
+        // ensure rattler build succeeded
+        assert!(rattler_build.is_ok());
+        let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
+        assert!(pkg.join("info/run_exports.json").exists());
+        let actual_run_export: HashMap<String, Vec<String>> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/run_exports.json")).unwrap())
+                .unwrap();
+        assert!(actual_run_export.contains_key("weak"));
+        assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
+        let x = &actual_run_export.get("weak").unwrap()[0];
+        assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
+        assert!(pkg.join("info/index.json").exists());
+        let index_json: HashMap<String, serde_json::Value> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+        assert!(index_json.get("depends").is_none());
+    }
+
+    #[test]
     fn test_run_exports() {
         let recipes = recipes();
         let tmp = tmp("test_run_exports");
@@ -207,6 +230,10 @@ mod tests {
         assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
         let x = &actual_run_export.get("weak").unwrap()[0];
         assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
+        assert!(pkg.join("info/index.json").exists());
+        let index_json: HashMap<String, serde_json::Value> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+        assert!(index_json.get("depends").is_none());
     }
 
     fn get_package(folder: impl AsRef<Path>, mut glob_str: String) -> PathBuf {
