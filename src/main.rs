@@ -42,6 +42,7 @@ mod upload;
 use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
 #[derive(Parser)]
+/// The main subcommands of the `rattler-build` binary.
 enum SubCommands {
     /// Build a package
     Build(BuildOpts),
@@ -72,6 +73,7 @@ struct App {
     subcommand: Option<SubCommands>,
 
     #[command(flatten)]
+    /// Increase or decrease logging verbosity
     verbose: Verbosity<InfoLevel>,
 }
 
