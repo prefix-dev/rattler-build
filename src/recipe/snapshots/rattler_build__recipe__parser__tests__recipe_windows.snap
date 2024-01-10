@@ -91,6 +91,7 @@ Recipe {
         python: Python {
             entry_points: [],
         },
+        dynamic_linking: None,
     },
     requirements: Requirements {
         build: [
