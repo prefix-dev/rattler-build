@@ -517,6 +517,23 @@ pub async fn resolve_dependencies(
         let mut cloned = Vec::new();
         for spec in specs {
             let spec = MatchSpec::from_str(spec)?;
+            let in_ignore_run_exports = |pkg| {
+                output
+                    .recipe
+                    .requirements()
+                    .ignore_run_exports()
+                    .by_name()
+                    .contains(pkg)
+            };
+            if spec
+                .name
+                .as_ref()
+                .map(in_ignore_run_exports)
+                .unwrap_or_default()
+            {
+                continue;
+            }
+
             let dep = DependencyInfo::RunExport {
                 spec,
                 from: env.to_string(),
