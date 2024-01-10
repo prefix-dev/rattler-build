@@ -170,28 +170,24 @@ mod tests {
 
     #[test]
     fn test_help() {
-        let help_test = rattler()
-            .with_args(["help"])
-            .map(|out| out.stdout)
-            .map(|s| {
-                #[cfg(target_family = "unix")]
-                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
-                #[cfg(target_family = "windows")]
-                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
-            })
-            .unwrap();
-        assert!(help_test);
+        let help_test = rattler().with_args(["help"]).map(|out| out.stdout).unwrap();
+
+        let help_text = help_test.split(|c| *c == b'\n').collect::<Vec<_>>();
+
+        #[cfg(target_family = "unix")]
+        assert!(help_text[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        #[cfg(target_family = "windows")]
+        assert!(help_text[2].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
     }
 
     #[test]
     fn test_no_cmd() {
-        let help_test = rattler()
-            // no heap allocations happen here, ideally!
+        let help_text = rattler()
             .with_args(Vec::<&str>::new())
             .map(|out| out.stdout)
-            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
             .unwrap();
-        assert!(help_test);
+        let lines = help_text.split(|c| *c == b'\n').collect::<Vec<_>>();
+        assert!(lines[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
     }
 
     #[test]
