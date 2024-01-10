@@ -12,6 +12,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use globset::GlobMatcher;
 use rattler_conda_types::{PackageName, Platform};
 
 use crate::{linux::link::SharedObject, macos::link::Dylib, packaging::PackagingError};
@@ -51,6 +52,7 @@ pub fn relink(
     prefix: &Path,
     encoded_prefix: &Path,
     target_platform: &Platform,
+    rpath_allowlist: &[GlobMatcher],
 ) -> Result<(), RelinkError> {
     for p in paths {
         let metadata = fs::symlink_metadata(p)?;
@@ -73,7 +75,7 @@ pub fn relink(
         if target_platform.is_linux() {
             if SharedObject::test_file(p)? {
                 let so = SharedObject::new(p)?;
-                so.relink(prefix, encoded_prefix)?;
+                so.relink(prefix, encoded_prefix, rpath_allowlist)?;
             }
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;

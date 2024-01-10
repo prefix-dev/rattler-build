@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use globset::{Glob, GlobMatcher};
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +44,9 @@ pub struct Build {
     /// Python specific build configuration
     #[serde(default, skip_serializing_if = "Python::is_default")]
     pub(super) python: Python,
+    /// Settings for shared libraries and executables
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) dynamic_linking: Option<DynamicLinking>,
     // TODO: Add and parse the rest of the fields
 }
 
@@ -75,6 +79,11 @@ impl Build {
     /// Python specific build configuration.
     pub const fn python(&self) -> &Python {
         &self.python
+    }
+
+    /// Settings for shared libraries and executables
+    pub const fn dynamic_linking(&self) -> &Option<DynamicLinking> {
+        &self.dynamic_linking
     }
 
     /// Check if the build should be skipped.
@@ -128,6 +137,25 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             .flatten_errors()?;
 
         Ok(build)
+    }
+}
+
+/// Settings for shared libraries and executables.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct DynamicLinking {
+    /// Allow runpath / rpath to point to these locations outside of the environment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) rpath_allowlist: Vec<Glob>,
+}
+
+impl DynamicLinking {
+    /// Get the rpath allow list.
+    pub fn rpath_allowlist(&self) -> Vec<GlobMatcher> {
+        self.rpath_allowlist
+            .clone()
+            .iter()
+            .map(|glob| glob.compile_matcher())
+            .collect()
     }
 }
 

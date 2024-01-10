@@ -1240,6 +1240,7 @@ dependencies = [
  "log",
  "regex-automata 0.4.3",
  "regex-syntax 0.8.2",
+ "serde",
 ]
 
 [[package]]
