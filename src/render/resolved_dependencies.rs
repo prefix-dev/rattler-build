@@ -565,9 +565,17 @@ pub async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
-            match_specs
+            let res = match_specs
                 .iter()
-                .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
+                .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
+
+            let ignore_run_exports_from = output
+                .recipe
+                .requirements()
+                .ignore_run_exports()
+                .from_package();
+
+            res && !ignore_run_exports_from.contains(&rec.package_record.name)
         })
         .map_err(ResolveError::CouldNotCollectRunExports)?;
 
