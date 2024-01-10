@@ -9,6 +9,8 @@ homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
 license = "BSD-3-Clause"
 readme = "README.md"
+description = "Rust crate to build conda packages on Windows, macOS and Linux"
+
 
 [features]
 default = ['native-tls']
