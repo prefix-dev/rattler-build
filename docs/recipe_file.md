@@ -30,10 +30,11 @@ The reason for a new spec are:
 - no full Jinja2 support: no conditional or `{% set ...` support, only string
   interpolation. Variables can be set in the toplevel "context" which is valid
   YAML
-- Jinja string interpolation needs to be preceded by a dollar sign at the beginning of a string,
-  e.g. `- ${{ version }}` in order for it to be valid YAML
-- Selectors use a YAML dictionary style (vs. comments in conda-build). Instead of `- somepkg  #[osx]`
-  we use
+- Jinja string interpolation needs to be preceded by a dollar sign at the
+  beginning of a string, e.g. `- ${{ version }}` in order for it to be valid
+  YAML
+- Selectors use a YAML dictionary style (vs. comments in conda-build). Instead
+  of `- somepkg  #[osx]` we use
    ```yaml
    if: osx
    then:
@@ -60,9 +61,10 @@ The recipe spec has the following parts:
 Spec reference
 --------------
 
-The spec is also made available through a JSON Schema (which is used for validation).
-The schema (and pydantic source file) can be found in this repository: https://github.com/prefix-dev/recipe-format.
-To use with VSCode or other IDEs, start the document with the following line:
+The spec is also made available through a JSON Schema (which is used for
+validation). The schema (and pydantic source file) can be found in this
+repository: https://github.com/prefix-dev/recipe-format. To use with VSCode or
+other IDEs, start the document with the following line:
 
 ```yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
@@ -112,9 +114,10 @@ requirements:
     - python
 
 # tests to validate that the package works as expected
-test:
-  imports:
-    - imagesize
+tests:
+  - python:
+      imports:
+        - imagesize
 
 # information about the package
 about:
@@ -193,9 +196,11 @@ source:
   lfs: true # defaults to false
 ```
 
-Note: `git_rev` may not be available within commit depth range, consider avoiding use of both simultaneously.
+Note: `git_rev` may not be available within commit depth range, consider
+avoiding use of both simultaneously.
 
-When you want to use git-lfs, you need to set `lfs: true`. This will also pull the lfs files from the repository.
+When you want to use git-lfs, you need to set `lfs: true`. This will also pull
+the lfs files from the repository.
 
 #### Source from a local path
 
@@ -208,8 +213,9 @@ source is copied to the work directory before building.
     use_gitignore: false # (defaults to true)
 ```
 
-By default, all files in the local path that are ignored by git are also ignored by rattler-build.
-You can disable this behavior by setting `use_gitignore` to `false`.
+By default, all files in the local path that are ignored by git are also ignored
+by rattler-build. You can disable this behavior by setting `use_gitignore` to
+`false`.
 
 #### Patches
 
@@ -227,15 +233,15 @@ Patches may optionally be applied to the source.
 #### Destination path
 
 Within boa's work directory, you may specify a particular folder to place source
-into. Boa will always drop you into the same folder (build folder/work), but
-it's up to you whether you want your source extracted into that folder, or
-nested deeper. This feature is particularly useful when dealing with multiple
-sources, but can apply to recipes with single sources as well.
+into. `rattler-build` will always drop you into the same folder (build
+folder/work), but it's up to you whether you want your source extracted into
+that folder, or nested deeper. This feature is particularly useful when dealing
+with multiple sources, but can apply to recipes with single sources as well.
 
 ```yaml
 source:
   #[source information here]
-  folder: my-destination/folder
+  target_directory: my-destination/folder
 ```
 
 #### Source from multiple sources
@@ -250,11 +256,11 @@ Example:
 ```yaml
 source:
   - url: https://package1.com/a.tar.bz2
-    folder: stuff
+    target_directory: stuff
   - url: https://package1.com/b.tar.bz2
-    folder: stuff
+    target_directory: stuff
   - git: https://github.com/mamba-org/boa
-    folder: boa
+    target_directory: boa
 ```
 
 Here, the two URL tarballs will go into one folder, and the git repo is checked
@@ -276,7 +282,7 @@ Recursive globbing using `**` is also supported.
 
 The build number should be incremented for new builds of the same version. The
 number defaults to `0`. The build string cannot contain "-". The string defaults
-to the default boa build string plus the build number.
+to the default rattler-build build string plus the build number.
 
 ```yaml
 build:
@@ -320,7 +326,7 @@ build:
 
 ### Script
 
-By default, boa uses a `build.sh` file on Unix (macOS and Linux) and a
+By default, rattler-build uses a `build.sh` file on Unix (macOS and Linux) and a
 `build.bat` file on Linux, if they exist in the same folder as the `recipe.yaml`
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different
@@ -367,10 +373,11 @@ build:
   noarch: python
 ```
 
-> ***Note***: At the time of this writing, `noarch` packages should not make use
-> of preprocess-selectors: `noarch` packages are built with the directives which
-> evaluate to `true` in the platform it is built on, which probably will result
-> in incorrect/incomplete installation in other platforms.
+!!! note
+    At the time of this writing, `noarch` packages should not make use
+    of preprocess-selectors: `noarch` packages are built with the directives which
+    evaluate to `true` in the platform it is built on, which probably will result
+    in incorrect/incomplete installation in other platforms.
 
 <!--
 ### Include build recipe
@@ -468,7 +475,7 @@ version is part of the package dependencies, list `numpy` as a requirement in
 `recipe.yaml` and use a `conda_build_config.yaml` file with multiple NumPy
 versions.
 
-### Run\_constrained
+### Run constrained
 
 Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.
@@ -479,7 +486,7 @@ specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pk
 ```yaml
 requirements:
   run_constrained:
-    - optional-subpackage =={{ version }}
+    - optional-subpackage ==${{ version }}
 ```
 
 For example, let's say we have an environment that has package "a" installed at
@@ -498,118 +505,180 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 mamba tell the user that a given package can't be installed if their system
 glibc version is too old.
 
-Test section
-------------
+Tests section
+-------------
 
-If this section exists or if there is a `run_test.[py,pl,sh,bat]` file in the
-recipe, the package is installed into a test environment after the build is
-finished and the tests are run there.
+Rattler-build supports 4 different types of tests. The "script" test installs
+the package and runs a list of commands. The python test attempts to import a
+list of python modules and runs `pip check`. The downstream test runs the tests
+of a downstream package that reverse depends on the package being built.
 
-<!--
-### Test files
+And lastly, the package content test checks if the built package contains the
+mentioned items.
 
-Test files that are copied from the _recipe_ into the temporary test
-directory and are needed during testing.
-
-```yaml
-test:
-  files:
-    - test-data.txt
-```
-
-### Source files
-
-Test files that are copied from the _source work directory_ into the
-temporary test directory and are needed during testing (note that the
-source work directory is otherwise not available at all during testing).
+The tests section is a list of these items:
 
 ```yaml
-test:
-  source_files:
-    - test-data.txt
-    - some/directory
-    - some/directory/pattern*.sh
+tests:
+  - script:
+      - echo "hello world"
+    requirements:
+      run:
+        - pytest
+    files:
+      source:
+        - test-data.txt
+
+  - python:
+      imports:
+        - bsdiff4
+      pip_check: true  # this is the default
+  - downstream: numpy
 ```
 
--->
+### Script test
 
-### Test requirements
+The script test has 3 top-level keys: `script`, `files` and `requirements`. Only
+the `script` key is required.
 
-In addition to the runtime requirements, you can specify requirements needed
-during testing. The runtime requirements that you specified in the "run" section
-described above are automatically included during testing.
-
-```yaml
-test:
-  requires:
-    - nose
-```
-
-### Test commands
+#### Test commands
 
 Commands that are run as part of the test.
 
 ```yaml
-test:
-  commands:
-    - bsdiff4 -h
-    - bspatch4 -h
+tests:
+  - script:
+      - echo "hello world"
+      - bsdiff4 -h
+      - bspatch4 -h
 ```
 
-### Python imports
+#### Extra Test Files
 
-List of Python modules or packages that will be imported in the test
-environment.
+Test files that are copied from the source work directory into the temporary
+test directory and are needed during testing (note that the source work
+directory is otherwise not available at all during testing).
+
+You can also include files that come from the `recipe` folder. They are copied
+into the test directory as well.
+
+At test execution time, the test directory is the current working directory.
 
 ```yaml
-test:
-  imports:
-    - bsdiff4
+tests:
+  - script:
+      - ls
+    files:
+      source:
+        - myfile.txt
+        - tests/
+        - some/directory/pattern*.sh
+      recipe:
+        - extra-file.txt
 ```
 
-This would be equivalent to having a `run_test.py` with the following:
+-->
+
+#### Test requirements
+
+In addition to the runtime requirements, you can specify requirements needed
+during testing. The runtime requirements that you specified in the "run" section
+described above are automatically included during testing (because the built
+package is installed like regular).
+
+In the `build` section you can specify additional requirements that are only
+needed on the build system for cross-compilation (e.g. emulators or compilers).
+
+```yaml
+tests:
+  - script:
+      - echo "hello world"
+    requirements:
+      build:
+        - myemulator
+      run:
+        - nose
+```
+
+### Python tests
+
+For this test type you can list a set of Python modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+The test will also automatically run `pip check` to check for any broken
+dependencies. This can be disabled by setting `pip_check: false` in the YAML.
+
+
+```yaml
+tests:
+  - python:
+      imports:
+        - bsdiff4
+        - bspatch4
+      pip_check: true  # can be left out because this is the default
+```
+
+Internally this will write a small Python script that imports the modules:
 
 ```python
 import bsdiff4
+import bspatch4
 ```
+
 ### Check for package-contents
 
-Checks if the built package contains the mentioned items.
+Checks if the built package contains the mentioned items. These checks are executed directly at
+the end of the build process to make sure that all expected files are present in the package.
 
 ```yaml
-test:
-  package-contents:
-    # checks for the existence of files inside $PREFIX or %PREFIX%
-    # or, checks that there is at least one file matching the specified `glob`
-    # pattern inside the prefix
-    files:
-      - etc/libmamba/test.txt
-      - etc/libmamba
-      - etc/libmamba/*.mamba.txt
+tests:
+  - package-contents:
+      # checks for the existence of files inside $PREFIX or %PREFIX%
+      # or, checks that there is at least one file matching the specified `glob`
+      # pattern inside the prefix
+      files:
+        - etc/libmamba/test.txt
+        - etc/libmamba
+        - etc/libmamba/*.mamba.txt
 
-    # checks for the existence of `mamba/api/__init__.py` inside of the
-    # Python site-packages directory (note: also see Python import checks)
-    site_packages:
-      - mamba.api
+      # checks for the existence of `mamba/api/__init__.py` inside of the
+      # Python site-packages directory (note: also see Python import checks)
+      site_packages:
+        - mamba.api
 
 
-    # looks in $PREFIX/bin/mamba for unix and %PREFIX%\Library\bin\mamba.exe on Windows
-    # note: also check the `commands` and execute something like `mamba --help` to make
-    # sure things work fine
-    bins:
-      - mamba
+      # looks in $PREFIX/bin/mamba for unix and %PREFIX%\Library\bin\mamba.exe on Windows
+      # note: also check the `commands` and execute something like `mamba --help` to make
+      # sure things work fine
+      bin:
+        - mamba
 
-    # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
-    # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
-    libs:
-      - mamba
+      # searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,
+      # on Windows for %PREFIX%\Library\lib\mamba.dll & %PREFIX%\Library\bin\mamba.bin
+      lib:
+        - mamba
 
-    # searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and
-    # on Windows for `%PREFIX%\Library\include\mamba.hpp`
-    includes:
-      - libmamba/mamba.hpp
+      # searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and
+      # on Windows for `%PREFIX%\Library\include\mamba.hpp`
+      includes:
+        - libmamba/mamba.hpp
 ```
 
+### Downstream tests
+
+!!! warning
+    Downstream tests are not yet implemented in `rattler-build`.
+
+A downstream test can mention a single package that has a dependency on the package being built.
+The test will install the package and run the tests of the downstream package with our current
+package as a dependency.
+
+Sometimes downstream packages do not resolve. In this case, the test is ignored.
+
+```yaml
+tests:
+  - downstream: numpy
+```
 
 Outputs section
 ---------------
@@ -817,7 +886,7 @@ and automatically selects the right (cross-)compiler for the target platform.
 
 ```
 build:
-  - "{{ compiler('c') }}"
+  - ${{ compiler('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
@@ -860,8 +929,6 @@ requirements:
 ```
 
 #### Pin compatible
-
-**Note: not yet implemented**
 
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
@@ -951,22 +1018,22 @@ Lists are automatically "merged" upwards, so it is possible to group multiple
 items under a single selector:
 
 ```yaml
-test:
-  commands:
-    - if: unix
-      then:
-      - test -d ${PREFIX}/include/xtensor
-      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
-    - if: win
-      then:
-      - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-      - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+tests:
+  - script:
+      - if: unix
+        then:
+        - test -d ${PREFIX}/include/xtensor
+        - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+      - if: win
+        then:
+        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+        - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 # On unix this is rendered to:
-test:
-commands:
-    - test -d ${PREFIX}/include/xtensor
-    - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+tests:
+  - script:
+      - test -d ${PREFIX}/include/xtensor
+      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
 <!--

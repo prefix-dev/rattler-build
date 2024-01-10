@@ -40,19 +40,19 @@ requirements:
   run_constrained:
     - xsimd >=8.0.3,<10
 
-test:
-  commands:
-    - if: unix or emscripten
-      then:
-        - test -d ${PREFIX}/include/xtensor
-        - test -f ${PREFIX}/include/xtensor/xarray.hpp
-        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
-        - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
-    - if: win
-      then:
-        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
-        - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+tests:
+  - script:
+      - if: unix or emscripten
+        then:
+          - test -d ${PREFIX}/include/xtensor
+          - test -f ${PREFIX}/include/xtensor/xarray.hpp
+          - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
+          - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
+      - if: win
+        then:
+          - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+          - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
+          - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor

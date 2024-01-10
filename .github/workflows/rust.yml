@@ -31,7 +31,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: '1.73.0'
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check
@@ -80,12 +80,21 @@ jobs:
         run: |
           echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
 
+      - name: Assert version in release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          if [[ "v${{ steps.metadata.outputs.project-version }}" != "${{ github.ref_name }}" ]]; then
+            echo ::error file=Cargo.toml::"Version mismatch: Cargo.toml: v${{ steps.metadata.outputs.project-version }} != ${{ github.ref_name }}"
+            exit 1
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: '1.73.0'
           targets: ${{ matrix.target }}
-      
+
       - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt install musl-tools

@@ -1,6 +1,6 @@
 ---
 source: src/recipe/parser.rs
-expression: recipe.unwrap()
+expression: unix_recipe.unwrap()
 ---
 Recipe {
     package: Package {
@@ -67,7 +67,7 @@ Recipe {
                 md5: None,
                 file_name: None,
                 patches: [],
-                folder: None,
+                target_directory: None,
             },
         ),
     ],
@@ -273,19 +273,26 @@ Recipe {
             from_package: {},
         },
     },
-    test: Test {
-        imports: [],
-        commands: [
-            "test -d ${PREFIX}/include/xtensor",
-            "test -f ${PREFIX}/include/xtensor/xarray.hpp",
-            "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake",
-            "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
-        ],
-        requires: [],
-        source_files: [],
-        files: [],
-        package_contents: None,
-    },
+    tests: [
+        Command(
+            CommandsTest {
+                script: [
+                    "test -d ${PREFIX}/include/xtensor",
+                    "test -f ${PREFIX}/include/xtensor/xarray.hpp",
+                    "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake",
+                    "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
+                ],
+                requirements: CommandsTestRequirements {
+                    run: [],
+                    build: [],
+                },
+                files: CommandsTestFiles {
+                    source: [],
+                    recipe: [],
+                },
+            },
+        ),
+    ],
     about: About {
         homepage: Some(
             Url {

@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+package:
+  name: "_testpackage_requiring_private_repo"
+  version: "1"
+
+requirements:
+  build:
+    - private-package

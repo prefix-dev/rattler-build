@@ -1,0 +1,94 @@
+site_name: "rattler-build"
+site_url: https://prefix-dev.github.io/rattler-build/
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  # favicon: assets/pixi.png
+  # logo: assets/pixi.png
+  site_url: https://prefix.dev
+  font:
+    text: Red Hat Text
+    code: JetBrains Mono
+
+  palette:
+    primary: yellow
+    accent: yellow
+    scheme: slate
+
+  icon:
+    edit: material/pencil
+    view: material/eye
+
+  features:
+    - content.tabs.link
+    - content.code.copy
+    - content.action.edit
+    # - content.code.select Sponsor only
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+
+extra_css:
+  - stylesheets/extra.css
+
+repo_url: https://github.com/prefix-dev/rattler-build/
+edit_uri: edit/main/docs/
+
+markdown_extensions:
+  - admonition
+  - def_list
+  - footnotes
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      toc_depth: 3
+      permalink: "#"
+
+extra:
+  homepage: https://prefix.dev
+  social:
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/prefix_dev
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/prefix-dev
+    - icon: fontawesome/brands/github
+      link: https://github.com/prefix-dev
+
+
+nav:
+  - Home: index.md
+  - Highlevel overview: highlevel.md
+  - Recipe file: recipe_file.md
+
+  - Selector syntax: selectors.md
+  - Build script: build_script.md
+  - Variants: variants.md
+
+  - Compilers and cross compilation: compilers.md
+
+  - CLI Usage: cli_usage.md
+  - Automatic recipe linting: automatic_linting.md
+
+  - Testing packages: testing.md
+  - Reproducible builds: rebuild.md
+
+  - Package specification: package_spec.md
+  - Internals: internals.md
+
+plugins:
+  - search
+  - social

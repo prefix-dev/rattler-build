@@ -2,12 +2,16 @@
 
 use std::{
     fs,
-    io::Cursor,
     path::{Path, PathBuf},
 };
 
-use crate::recipe::parser::{Checksum, UrlSource};
+use crate::{
+    recipe::parser::{Checksum, UrlSource},
+    render::solver::default_bytes_style,
+    tool_configuration,
+};
 use rattler_digest::compute_file_digest;
+use tokio::io::AsyncWriteExt;
 
 use super::SourceError;
 
@@ -72,7 +76,11 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
     Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
 }
 
-pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<PathBuf, SourceError> {
+pub(crate) async fn url_src(
+    source: &UrlSource,
+    cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
     let checksum = if let Some(sha256) = source.sha256() {
         Checksum::Sha256(*sha256)
@@ -118,18 +126,51 @@ pub(crate) async fn url_src(source: &UrlSource, cache_dir: &Path) -> Result<Path
         return Ok(cache_name.clone());
     }
 
-    let response = reqwest::get(source.url().clone()).await?;
+    let client = reqwest::Client::new();
+    let download_size = {
+        let resp = client.head(source.url().as_str()).send().await?;
+        if resp.status().is_success() {
+            resp.headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|ct_len| ct_len.to_str().ok())
+                .and_then(|ct_len| ct_len.parse().ok())
+                .unwrap_or(0)
+        } else {
+            return Err(SourceError::UrlNotFile(source.url().clone()));
+        }
+    };
 
-    let mut file = std::fs::File::create(&cache_name)?;
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        indicatif::ProgressBar::new(download_size)
+            .with_prefix("Downloading")
+            .with_style(default_bytes_style().map_err(|_| {
+                SourceError::UnknownError("Failed to get progress bar style".to_string())
+            })?),
+    );
+    progress_bar.set_message(
+        source
+            .url()
+            .path_segments()
+            .and_then(|segs| segs.last())
+            .map(str::to_string)
+            .unwrap_or_else(|| "Unknown File".to_string()),
+    );
+    let mut file = tokio::fs::File::create(&cache_name).await?;
 
-    let mut content = Cursor::new(response.bytes().await?);
-    std::io::copy(&mut content, &mut file)?;
+    let request = client.get(source.url().as_str());
+    let mut download = request.send().await?;
+
+    while let Some(chunk) = download.chunk().await? {
+        progress_bar.inc(chunk.len() as u64);
+        file.write_all(&chunk).await?;
+    }
 
     if !validate_checksum(&cache_name, &checksum) {
         tracing::error!("Checksum validation failed!");
         fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);
     }
+    progress_bar.finish();
 
     Ok(cache_name)
 }
@@ -167,6 +208,13 @@ mod tests {
     fn test_cache_name() {
         let cases =
             vec![
+            (
+                "https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip",
+                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
+                    "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
+                ).unwrap()),
+                "snowflake-3.13.27_6a15e95e.zip",
+            ),
             (
                 "https://example.com/example.tar.gz",
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(

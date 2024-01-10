@@ -126,7 +126,7 @@ mod tests {
     }
 
     /// doesn't correctly handle spaces within argument of args escape all spaces
-    fn shx<'a>(src: impl AsRef<str>) -> Option<String> {
+    fn shx(src: impl AsRef<str>) -> Option<String> {
         let (prog, args) = src.as_ref().split_once(' ')?;
         Command::new(prog)
             .args(args.split(' '))
@@ -147,6 +147,7 @@ mod tests {
         }
         unreachable!("above is an infinite loop")
     }
+
     fn rattler() -> RattlerBuild {
         if let Ok(path) = std::env::var("RATTLER_BUILD_PATH") {
             if let Some(ret) = RattlerBuild::with_binary(path) {
@@ -155,9 +156,11 @@ mod tests {
         }
         RattlerBuild::with_cargo(".").unwrap()
     }
+
     fn recipes() -> PathBuf {
         test_data_dir().join("recipes")
     }
+
     fn test_data_dir() -> PathBuf {
         PathBuf::from(shx("cargo locate-project --workspace -q --message-format=plain").unwrap())
             .parent()
@@ -185,13 +188,8 @@ mod tests {
         let help_test = rattler()
             // no heap allocations happen here, ideally!
             .with_args(Vec::<&str>::new())
-            .map(|out| out.stderr)
-            .map(|s| {
-                #[cfg(target_family = "unix")]
-                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
-                #[cfg(target_family = "windows")]
-                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
-            })
+            .map(|out| out.stdout)
+            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
             .unwrap();
         assert!(help_test);
     }
@@ -317,8 +315,7 @@ mod tests {
                     assert!(c["path_type"] == p["path_type"]);
                     if ppath
                         .components()
-                        .find(|s| s.eq(&Component::Normal("dist-info".as_ref())))
-                        .is_some()
+                        .any(|s| s.eq(&Component::Normal("dist-info".as_ref())))
                     {
                         assert!(c["sha256"] == p["sha256"]);
                         assert!(c["size_in_bytes"] == p["size_in_bytes"]);
@@ -426,10 +423,13 @@ mod tests {
         let license = pkg.join("info/licenses/LICENSE.rst");
         assert!(license.exists());
 
-        assert!(pkg.join("info/test/run_test.sh").exists());
-        assert!(pkg.join("info/test/run_test.bat").exists());
-        assert!(pkg.join("info/test/run_test.py").exists());
-        assert!(pkg.join("info/test/test_time_dependencies.json").exists());
+        assert!(pkg.join("info/tests/1/run_test.sh").exists());
+        assert!(pkg.join("info/tests/1/run_test.bat").exists());
+        assert!(pkg
+            .join("info/tests/1/test_time_dependencies.json")
+            .exists());
+
+        assert!(pkg.join("info/tests/0/python_test.json").exists());
         // make sure that the entry point does not exist
         assert!(!pkg.join("python-scripts/flask").exists());
 
@@ -453,6 +453,15 @@ mod tests {
         let tmp = tmp("test_tar_source");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("tar-source"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+    }
+
+    #[test]
+    fn test_zip_source() {
+        let tmp = tmp("test_zip_source");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("zip-source"), tmp.as_dir(), None);
         assert!(rattler_build.is_ok());
         assert!(rattler_build.unwrap().status.success());
     }

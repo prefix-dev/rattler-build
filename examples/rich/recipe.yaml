@@ -29,13 +29,10 @@ requirements:
     - python 3.10
     - typing_extensions >=4.0.0,<5.0.0
 
-test:
-  imports:
-    - rich
-  commands:
-    - pip check
-  requires:
-    - pip
+tests:
+  - python:
+      imports:
+        - rich
 
 about:
   homepage: https://github.com/Textualize/rich

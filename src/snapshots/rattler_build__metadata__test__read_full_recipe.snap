@@ -25,13 +25,16 @@ recipe:
       - "pygments >=2.13.0,<3.0.0"
       - python ==3.10
       - "typing_extensions >=4.0.0,<5.0.0"
-  test:
-    imports:
-      - rich
-    commands:
-      - pip check
-    requires:
-      - pip
+  tests:
+    - test_type: python
+      imports:
+        - rich
+    - test_type: command
+      script:
+        - pip check
+      requirements:
+        run:
+          - pip
   about:
     homepage: "https://github.com/Textualize/rich"
     repository: "https://github.com/Textualize/rich"
@@ -52,13 +55,13 @@ build_configuration:
     hash_input: "{\"target_platform\": \"noarch\"}"
     hash_prefix: py
   directories:
-    host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
-    build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/build_env
-    work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439/work
-    build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1700573439
+    host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
+    build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/build_env
+    work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/work
+    build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812
   channels:
     - conda-forge
-  timestamp: "2023-11-21T13:30:39.246259Z"
+  timestamp: "2023-12-13T18:40:12.845800Z"
   subpackages:
     rich:
       name: rich
@@ -225,39 +228,6 @@ finalized_dependencies:
         fn: tzdata-2023c-h71feb2d_0.conda
         url: "https://conda.anaconda.org/conda-forge/noarch/tzdata-2023c-h71feb2d_0.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
-      - build: hf2abe2d_0
-        build_number: 0
-        depends:
-          - libsqlite 3.44.0 h091b4b1_0
-          - "libzlib >=1.2.13,<1.3.0a0"
-          - "ncurses >=6.4,<7.0a0"
-          - "readline >=8.2,<9.0a0"
-        license: Unlicense
-        md5: 0080e3f5d7d13d3b1e244ed24642ca9e
-        name: sqlite
-        sha256: 8263043d2a5762a5bbbb4ceee28382d97e70182fff8d45371b65fedda0b709ee
-        size: 800748
-        subdir: osx-arm64
-        timestamp: 1698855055771
-        version: 3.44.0
-        fn: sqlite-3.44.0-hf2abe2d_0.conda
-        url: "https://conda.anaconda.org/conda-forge/osx-arm64/sqlite-3.44.0-hf2abe2d_0.conda"
-        channel: "https://conda.anaconda.org/conda-forge/"
-      - build: h091b4b1_0
-        build_number: 0
-        depends:
-          - "libzlib >=1.2.13,<1.3.0a0"
-        license: Unlicense
-        md5: 28eb31a5b4e704353ed575758e2fcf1d
-        name: libsqlite
-        sha256: 38e98953b572e2871f2b318fa7fe8d9997b0927970916c2d09402273b60ff832
-        size: 815079
-        subdir: osx-arm64
-        timestamp: 1698855024189
-        version: 3.44.0
-        fn: libsqlite-3.44.0-h091b4b1_0.conda
-        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libsqlite-3.44.0-h091b4b1_0.conda"
-        channel: "https://conda.anaconda.org/conda-forge/"
       - build: pyhd8ed1ab_0
         build_number: 0
         depends:
@@ -275,23 +245,56 @@ finalized_dependencies:
         fn: poetry-core-1.8.1-pyhd8ed1ab_0.conda
         url: "https://conda.anaconda.org/conda-forge/noarch/poetry-core-1.8.1-pyhd8ed1ab_0.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
-      - build: h0d3ecfb_0
+      - build: hf2abe2d_0
         build_number: 0
+        depends:
+          - libsqlite 3.44.2 h091b4b1_0
+          - "libzlib >=1.2.13,<1.3.0a0"
+          - "ncurses >=6.4,<7.0a0"
+          - "readline >=8.2,<9.0a0"
+        license: Unlicense
+        md5: c98aa8eb8f02260610c5bb981027ba5d
+        name: sqlite
+        sha256: b034405d93e7153f777d52c18fe26120356c568e4ca85626712d633d939a8923
+        size: 803166
+        subdir: osx-arm64
+        timestamp: 1700863604745
+        version: 3.44.2
+        fn: sqlite-3.44.2-hf2abe2d_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/sqlite-3.44.2-hf2abe2d_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h091b4b1_0
+        build_number: 0
+        depends:
+          - "libzlib >=1.2.13,<1.3.0a0"
+        license: Unlicense
+        md5: d7e1af696cfadec251a0abdd7b79ed77
+        name: libsqlite
+        sha256: f0dc2fe69eddb4bab72ff6bb0da51d689294f466ee1b01e80ced1e7878a21aa5
+        size: 815254
+        subdir: osx-arm64
+        timestamp: 1700863572318
+        version: 3.44.2
+        fn: libsqlite-3.44.2-h091b4b1_0.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/libsqlite-3.44.2-h091b4b1_0.conda"
+        channel: "https://conda.anaconda.org/conda-forge/"
+      - build: h0d3ecfb_1
+        build_number: 1
         constrains:
           - pyopenssl >=22.1
         depends:
           - ca-certificates
         license: Apache-2.0
         license_family: Apache
-        md5: 5a89552fececf4cd99628318ccbb67a3
+        md5: 47d16d26100f19ca495882882b7bc93b
         name: openssl
-        sha256: 3c715b1d4940c7ad6065935db18924b85a54048dde066f963cfc250340639457
-        size: 2147225
+        sha256: a53e1c6c058b621fd1d13cca6f9cccd534d2b3f4b4ac789fe26f7902031d6c41
+        size: 2856233
         subdir: osx-arm64
-        timestamp: 1698164947105
-        version: 3.1.4
-        fn: openssl-3.1.4-h0d3ecfb_0.conda
-        url: "https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.1.4-h0d3ecfb_0.conda"
+        timestamp: 1701162541844
+        version: 3.2.0
+        fn: openssl-3.2.0-h0d3ecfb_1.conda
+        url: "https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.2.0-h0d3ecfb_1.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
       - build: hf0a4a13_0
         build_number: 0
@@ -332,16 +335,16 @@ finalized_dependencies:
           - python >=3.7
         license: MIT
         license_family: MIT
-        md5: 3fc026b9c87d091c4b34a6c997324ae8
+        md5: 1cdea58981c5cbc17b51973bcaddcea7
         name: wheel
         noarch: python
-        sha256: 84c3b57fba778add2bd47b7cc70e86f746d2c55549ffd2ccb6f3d6bf7c94d21d
-        size: 57901
+        sha256: 80be0ccc815ce22f80c141013302839b0ed938a2edb50b846cf48d8a8c1cfa01
+        size: 57553
         subdir: noarch
-        timestamp: 1698670970223
-        version: 0.41.3
-        fn: wheel-0.41.3-pyhd8ed1ab_0.conda
-        url: "https://conda.anaconda.org/conda-forge/noarch/wheel-0.41.3-pyhd8ed1ab_0.conda"
+        timestamp: 1701013309664
+        version: 0.42.0
+        fn: wheel-0.42.0-pyhd8ed1ab_0.conda
+        url: "https://conda.anaconda.org/conda-forge/noarch/wheel-0.42.0-pyhd8ed1ab_0.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
       - build: pyhd8ed1ab_0
         build_number: 0
@@ -382,4 +385,5 @@ finalized_dependencies:
         source_package: python
     constrains: []
     run_exports: ~
+finalized_sources: ~
 

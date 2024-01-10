@@ -1,39 +1,69 @@
 //! This module contains the implementation of the fetching of `GitSource` struct.
 
 use std::{
+    io::IsTerminal,
     path::{Path, PathBuf},
     process::Command,
 };
 
 use fs_extra::dir::remove;
-use itertools::Itertools;
+use url::Url;
 
 use crate::recipe::parser::{GitSource, GitUrl};
 
 use super::SourceError;
 
-type RepoPath<'a> = &'a Path;
-
 /// Fetch the given repository using the host `git` executable.
-pub fn fetch_repo(repo_path: RepoPath, refspecs: &[String]) -> Result<(), SourceError> {
-    // might break on some platforms due to auth and ssh
-    // especially ssh with password
-    let refspecs_str = refspecs.iter().join(" ");
-    let cd = std::env::current_dir();
-    _ = std::env::set_current_dir(repo_path);
-    let output = Command::new("git")
-        .args(["fetch", "origin", refspecs_str.as_str()])
+pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceError> {
+    println!("Fetching repository from {} at {}", url, rev);
+    let mut command = git_command("fetch");
+    let output = command
+        .args([url.to_string().as_str(), rev])
+        .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
-    _ = cd.map(std::env::set_current_dir);
+
     if !output.status.success() {
-        tracing::debug!("Repository fetch for refs {:?} failed!", refspecs);
+        tracing::debug!("Repository fetch for revision {:?} failed!", rev);
         return Err(SourceError::GitErrorStr(
             "failed to git fetch refs from origin",
         ));
     }
+
+    // try to suppress detached head warning
+    let _ = Command::new("git")
+        .current_dir(repo_path)
+        .args(["config", "--local", "advice.detachedHead", "false"])
+        .status();
+
+    // checkout fetch_head
+    let mut command = Command::new("git");
+    let output = command
+        .args(["reset", "--hard", "FETCH_HEAD"])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|_err| SourceError::ValidationFailed)?;
+
+    if !output.status.success() {
+        tracing::debug!("Repository fetch for revision {:?} failed!", rev);
+        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+    }
+
     tracing::debug!("Repository fetched successfully!");
     Ok(())
+}
+
+/// Create a `git` command with the given subcommand.
+fn git_command(sub_cmd: &str) -> Command {
+    let mut command = Command::new("git");
+    command.arg(sub_cmd);
+
+    if std::io::stdin().is_terminal() {
+        command.stdout(std::process::Stdio::inherit());
+        command.stderr(std::process::Stdio::inherit());
+        command.arg("--progress");
+    }
+    command
 }
 
 /// Fetch the git repository specified by the given source and place it in the cache directory.
@@ -41,16 +71,8 @@ pub fn git_src(
     source: &GitSource,
     cache_dir: &Path,
     recipe_dir: &Path,
-) -> Result<PathBuf, SourceError> {
-    tracing::info!(
-        "git source: ({:?}) cache_dir: ({}) recipe_dir: ({})",
-        source,
-        cache_dir.display(),
-        recipe_dir.display()
-    );
-
+) -> Result<(PathBuf, String), SourceError> {
     // test if git is available locally as we fetch the git from PATH,
-    // user can always override git path
     if !Command::new("git")
         .arg("--version")
         .output()?
@@ -62,12 +84,10 @@ pub fn git_src(
         ));
     }
 
-    if (source.rev().is_empty() || source.rev().eq("HEAD"))
-        // depth == -1, fetches the entire git history
-        && source.depth().map(|s| s != -1).unwrap_or_default()
-    {
+    // depth == -1, fetches the entire git history
+    if !source.rev().is_head() && (source.depth().is_some() && source.depth() != Some(-1)) {
         return Err(SourceError::GitErrorStr(
-            "use of `git_rev` with `git_depth` is invalid",
+            "use of `depth` with `rev` is invalid",
         ));
     }
 
@@ -86,28 +106,30 @@ pub fn git_src(
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
 
+    let rev = source.rev().to_string();
+
     // Initialize or clone the repository depending on the source's git_url.
     match &source.url() {
-        GitUrl::Url(_) => {
+        GitUrl::Url(url) => {
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
-                fetch_repo(&cache_path, &[source.rev().to_string()])?;
+                fetch_repo(&cache_path, url, &rev)?;
             } else {
-                let mut command = Command::new("git");
-                command.args(["clone", "--recursive", source.url().to_string().as_str()]);
-                command.arg(cache_path.as_os_str());
+                let mut command = git_command("clone");
+
+                command
+                    .args(["--recursive", source.url().to_string().as_str()])
+                    .arg(cache_path.as_os_str());
+
                 if let Some(depth) = source.depth() {
                     command.args(["--depth", depth.to_string().as_str()]);
                 }
+
                 let output = command
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
                 if !output.status.success() {
                     return Err(SourceError::GitErrorStr("Git clone failed for source"));
-                }
-                if source.rev() == "HEAD" || source.rev().trim().is_empty() {
-                    // If the source is a path and the revision is HEAD, return the path to avoid git actions.
-                    return Ok(PathBuf::from(&cache_path));
                 }
             }
         }
@@ -126,82 +148,59 @@ pub fn git_src(
             })?;
 
             let path = path.to_string_lossy();
-            let mut command = Command::new("git");
+            let mut command = git_command("clone");
+
             command
-                .arg("clone")
                 .arg("--recursive")
                 .arg(format!("file://{}/.git", path).as_str())
                 .arg(cache_path.as_os_str());
+
             if let Some(depth) = source.depth() {
                 command.args(["--depth", depth.to_string().as_str()]);
             }
+
             let output = command
                 .output()
                 .map_err(|_| SourceError::ValidationFailed)?;
+
             if !output.status.success() {
                 tracing::error!("Command failed: {:?}", command);
                 return Err(SourceError::GitErrorStr(
                     "failed to execute clone from file",
                 ));
             }
-
-            if source.rev() == "HEAD" || source.rev().trim().is_empty() {
-                // If the source is a path and the revision is HEAD, return the path to avoid git actions.
-                return Ok(PathBuf::from(&cache_path));
-            }
         }
     }
 
     // Resolve the reference and set the head to the specified revision.
-    // let ref_git = format!("refs/remotes/origin/{}", source.git_rev.to_string());
-    // let reference = match repo.find_reference(&ref_git) {
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", source.rev()])
+        .args(["rev-parse", "HEAD"])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
+
     if !output.status.success() {
-        tracing::error!("Command failed: \"git\" \"rev-parse\" \"{}\"", source.rev());
+        tracing::error!("Command failed: `git rev-parse \"{}\"`", &rev);
         return Err(SourceError::GitErrorStr("failed to get valid hash for rev"));
     }
+
     let ref_git = String::from_utf8(output.stdout)
-        .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?;
-    tracing::info!("cache_path = {}", cache_path.display());
-
-    let mut command = Command::new("git");
-    command
-        .current_dir(&cache_path)
-        .arg("checkout")
-        .arg(ref_git.as_str().trim());
-
-    let output = command
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute git checkout"))?;
-
-    if !output.status.success() {
-        tracing::error!("Command failed: {:?}", command);
-        return Err(SourceError::GitErrorStr("failed to checkout for ref"));
-    }
-
-    let output = Command::new("git")
-        .current_dir(&cache_path)
-        .args(["reset", "--hard"])
-        .output()
-        .map_err(|_| SourceError::GitErrorStr("failed to execute git reset"))?;
-
-    if !output.status.success() {
-        tracing::error!("Command failed: \"git\" \"reset\" \"--hard\"");
-        return Err(SourceError::GitErrorStr("failed to git reset"));
-    }
+        .map_err(|_| SourceError::GitErrorStr("failed to parse git rev as utf-8"))?
+        .trim()
+        .to_owned();
 
     // only do lfs pull if a requirement!
     if source.lfs() {
         git_lfs_pull()?;
     }
 
-    tracing::info!("Checked out reference: '{}'", &source.rev());
+    tracing::info!(
+        "Checked out revision: '{}' at '{}'",
+        &rev,
+        ref_git.as_str().trim()
+    );
 
-    Ok(cache_path)
+    Ok((cache_path, ref_git))
 }
 
 fn git_lfs_pull() -> Result<(), SourceError> {
@@ -233,93 +232,86 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        recipe::parser::{GitSource, GitUrl},
+        recipe::parser::{GitRev, GitSource, GitUrl},
         source::git_source::git_src,
     };
-
-    fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
-        let dir = std::env::temp_dir().join(key);
-        _ = std::fs::create_dir_all(&dir).unwrap();
-        f(&dir);
-        _ = std::fs::remove_dir_all(dir).unwrap();
-    }
 
     #[tracing_test::traced_test]
     #[test]
     fn test_host_git_source() {
-        with_temp_dir("rattler-build-test-host-git-source", |cache_dir| {
-            let cases = vec![
-                (
-                    GitSource::create(
-                        GitUrl::Url(
-                            "https://github.com/prefix-dev/rattler-build"
-                                .parse()
-                                .unwrap(),
-                        ),
-                        "main".to_owned(),
-                        None,
-                        vec![],
-                        None,
-                        false,
+        let temp_dir = tempfile::tempdir().unwrap();
+        let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
+        let cases = vec![
+            (
+                GitSource::create(
+                    GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
                     ),
-                    "rattler-build",
+                    GitRev::Branch("main".to_owned()),
+                    None,
+                    vec![],
+                    None,
+                    false,
                 ),
-                (
-                    GitSource::create(
-                        GitUrl::Url(
-                            "https://github.com/prefix-dev/rattler-build"
-                                .parse()
-                                .unwrap(),
-                        ),
-                        "v0.1.3".to_owned(),
-                        None,
-                        vec![],
-                        None,
-                        false,
+                "rattler-build",
+            ),
+            (
+                GitSource::create(
+                    GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
                     ),
-                    "rattler-build",
+                    GitRev::Tag("v0.1.3".to_owned()),
+                    None,
+                    vec![],
+                    None,
+                    false,
                 ),
-                (
-                    GitSource::create(
-                        GitUrl::Url(
-                            "https://github.com/prefix-dev/rattler-build"
-                                .parse()
-                                .unwrap(),
-                        ),
-                        "v0.1.2".to_owned(),
-                        None,
-                        vec![],
-                        None,
-                        false,
+                "rattler-build",
+            ),
+            (
+                GitSource::create(
+                    GitUrl::Url(
+                        "https://github.com/prefix-dev/rattler-build"
+                            .parse()
+                            .unwrap(),
                     ),
-                    "rattler-build",
+                    GitRev::Tag("v0.1.2".to_owned()),
+                    None,
+                    vec![],
+                    None,
+                    false,
                 ),
-                (
-                    GitSource::create(
-                        GitUrl::Path("../rattler-build".parse().unwrap()),
-                        "".to_owned(),
-                        None,
-                        vec![],
-                        None,
-                        false,
-                    ),
-                    "rattler-build",
+                "rattler-build",
+            ),
+            (
+                GitSource::create(
+                    GitUrl::Path("../rattler-build".parse().unwrap()),
+                    GitRev::default(),
+                    None,
+                    vec![],
+                    None,
+                    false,
                 ),
-            ];
-            for (source, repo_name) in cases {
-                let path = git_src(
-                    &source,
-                    cache_dir.as_ref(),
-                    // TODO: this test assumes current dir is the root folder of the project which may
-                    // not be necessary for local runs.
-                    std::env::current_dir().unwrap().as_ref(),
-                )
-                .unwrap();
-                assert_eq!(
-                    path.to_string_lossy(),
-                    cache_dir.join(repo_name).to_string_lossy()
-                );
-            }
-        });
+                "rattler-build",
+            ),
+        ];
+        for (source, repo_name) in cases {
+            let res = git_src(
+                &source,
+                cache_dir.as_ref(),
+                // TODO: this test assumes current dir is the root folder of the project which may
+                // not be necessary for local runs.
+                std::env::current_dir().unwrap().as_ref(),
+            )
+            .unwrap();
+            assert_eq!(
+                res.0.to_string_lossy(),
+                cache_dir.join(repo_name).to_string_lossy()
+            );
+        }
     }
 }

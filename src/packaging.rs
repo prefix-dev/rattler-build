@@ -1,3 +1,4 @@
+use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use std::collections::HashSet;
@@ -27,6 +28,7 @@ use rattler_package_streaming::write::{
 
 use crate::macos;
 use crate::metadata::Output;
+use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -102,6 +104,8 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
     }
 }
 
+/// This function requires we know the file content we are matching against is UTF-8
+/// In case the source is non utf-8 it will fail with a read error
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
@@ -112,10 +116,56 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
     buf_reader.read_to_string(&mut content)?;
 
     // Check if the content contains the prefix
-    let prefix = prefix.to_string_lossy().to_string();
-    let contains_prefix = content.contains(&prefix);
+    let src = prefix.to_string_lossy();
+    let contains_prefix = content.contains(&src.to_string());
 
+    #[cfg(target_os = "windows")]
+    {
+        // absolute and unc paths will break but it,
+        // will break either way as C:/ can't be converted
+        // to something meaningful in unix either way
+        let s = to_forward_slash_lossy(prefix);
+        return Ok(contains_prefix || content.contains(s.to_string().as_str()));
+    }
+
+    #[cfg(not(target_os = "windows"))]
     Ok(contains_prefix)
+}
+
+#[allow(dead_code)]
+fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
+    #[cfg(target_os = "windows")]
+    {
+        let mut buf = String::new();
+        for c in path.components() {
+            match c {
+                Component::RootDir => { /* root on windows can be skipped */ }
+                Component::CurDir => buf.push('.'),
+                Component::ParentDir => buf.push_str(".."),
+                Component::Prefix(prefix) => {
+                    buf.push_str(&prefix.as_os_str().to_string_lossy());
+                    continue;
+                }
+                Component::Normal(s) => buf.push_str(&s.to_string_lossy()),
+            }
+            // use `/` instead of `\`
+            buf.push('/');
+        }
+
+        fn ends_with_main_sep(p: &Path) -> bool {
+            use std::os::windows::ffi::OsStrExt as _;
+            p.as_os_str().encode_wide().last() == Some(std::path::MAIN_SEPARATOR as u16)
+        }
+        if buf != "/" && !ends_with_main_sep(path) && buf.ends_with('/') {
+            buf.pop();
+        }
+
+        std::borrow::Cow::Owned(buf)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        path.to_string_lossy()
+    }
 }
 
 fn create_prefix_placeholder(
@@ -137,7 +187,10 @@ fn create_prefix_placeholder(
     let content_type = content_inspector::inspect(buffer);
     let mut has_prefix = None;
 
-    let file_mode = if content_type.is_text() {
+    let file_mode = if content_type.is_text()
+        // treat everything else as binary for now!
+        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM)
+    {
         match contains_prefix_text(file_path, prefix) {
             Ok(true) => {
                 has_prefix = Some(prefix.to_path_buf());
@@ -280,6 +333,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .depends
             .iter()
             .map(|dep| dep.spec().to_string())
+            .dedup()
             .collect(),
         constrains: output
             .finalized_dependencies
@@ -289,6 +343,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .constrains
             .iter()
             .map(|dep| dep.spec().to_string())
+            .dedup()
             .collect(),
         noarch: *recipe.build().noarch(),
         track_features: vec![],
@@ -399,7 +454,8 @@ fn write_to_dest(
     }
 
     if noarch_type.is_python() {
-        if ext == "pyc" {
+        // skip .pyc or .pyo or .egg-info files
+        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
             return Ok(None); // skip .pyc files
         }
 
@@ -570,17 +626,6 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        for license_glob in license_globs
-            .iter()
-            // Only license globs that do not end with '/' or '*'
-            .filter(|license_glob| !license_glob.ends_with('/') && !license_glob.ends_with('*'))
-        {
-            let filepath = licenses_folder.join(license_glob);
-            if !filepath.exists() {
-                tracing::warn!(path = %filepath.display(), "File does not exist");
-            }
-        }
-
         let copy_dir = crate::source::copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
@@ -589,7 +634,7 @@ fn copy_license_files(
         .use_gitignore(false)
         .run()?;
 
-        let copied_files_recipe_dir = copy_dir.copied_pathes();
+        let copied_files_recipe_dir = copy_dir.copied_paths();
         let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
 
         let copy_dir = crate::source::copy_dir::CopyDir::new(
@@ -600,7 +645,7 @@ fn copy_license_files(
         .use_gitignore(false)
         .run()?;
 
-        let copied_files_work_dir = copy_dir.copied_pathes();
+        let copied_files_work_dir = copy_dir.copied_paths();
         let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
 
         let copied_files = copied_files_recipe_dir
@@ -658,101 +703,125 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
 
 fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
     let mut test_files = Vec::new();
-    let test = output.recipe.test();
-    if !test.is_empty() {
-        let test_folder = tmp_dir_path.join("info/test/");
-        fs::create_dir_all(&test_folder)?;
 
-        if !test.imports().is_empty() {
-            let test_file = test_folder.join("run_test.py");
-            let mut file = File::create(&test_file)?;
-            for el in test.imports() {
-                writeln!(file, "import {}\n", el)?;
+    for (idx, test) in output.recipe.tests().iter().enumerate() {
+        if let Some(files) = match test {
+            TestType::Python(python_test) => {
+                Some(serialize_python_test(python_test, idx, tmp_dir_path)?)
             }
-            test_files.push(test_file);
-        }
-
-        if !test.commands().is_empty() {
-            let mut command_files = vec![];
-            let target_platform = &output.build_configuration.target_platform;
-            if target_platform.is_windows() || target_platform == &Platform::NoArch {
-                command_files.push(test_folder.join("run_test.bat"));
-            }
-            if target_platform.is_unix() || target_platform == &Platform::NoArch {
-                command_files.push(test_folder.join("run_test.sh"));
-            }
-
-            for cf in command_files {
-                let mut file = File::create(&cf)?;
-                for el in test.commands() {
-                    writeln!(file, "{}\n", el)?;
-                }
-                test_files.push(cf);
-            }
-        }
-
-        if !test.requires().is_empty() {
-            let test_dependencies = test.requires();
-            let test_file = test_folder.join("test_time_dependencies.json");
-            let mut file = File::create(&test_file)?;
-            file.write_all(serde_json::to_string(test_dependencies)?.as_bytes())?;
-            test_files.push(test_file);
-        }
-
-        if !test.files().is_empty() {
-            let globs = test.files();
-            let include_globs = globs
-                .iter()
-                .filter(|glob| !glob.trim_start().starts_with('~'))
-                .map(AsRef::as_ref)
-                .collect::<Vec<&str>>();
-
-            let exclude_globs = globs
-                .iter()
-                .filter(|glob| glob.trim_start().starts_with('~'))
-                .map(AsRef::as_ref)
-                .collect::<Vec<&str>>();
-
-            let copy_dir = crate::source::copy_dir::CopyDir::new(
-                &output.build_configuration.directories.recipe_dir,
-                &test_folder,
-            )
-            .with_include_globs(include_globs)
-            .with_exclude_globs(exclude_globs)
-            .use_gitignore(true)
-            .run()?;
-
-            test_files.extend(copy_dir.copied_pathes().iter().cloned());
-        }
-
-        if !test.source_files().is_empty() {
-            let globs = test.source_files();
-            let include_globs = globs
-                .iter()
-                .filter(|glob| !glob.trim_start().starts_with('~'))
-                .map(AsRef::as_ref)
-                .collect::<Vec<&str>>();
-
-            let exclude_globs = globs
-                .iter()
-                .filter(|glob| glob.trim_start().starts_with('~'))
-                .map(AsRef::as_ref)
-                .collect::<Vec<&str>>();
-
-            let copy_dir = crate::source::copy_dir::CopyDir::new(
-                &output.build_configuration.directories.work_dir,
-                &test_folder,
-            )
-            .with_include_globs(include_globs)
-            .with_exclude_globs(exclude_globs)
-            .use_gitignore(true)
-            .run()?;
-
-            test_files.extend(copy_dir.copied_pathes().iter().cloned());
+            TestType::Command(command_test) => Some(serialize_command_test(
+                command_test,
+                idx,
+                output,
+                tmp_dir_path,
+            )?),
+            TestType::Downstream(downstream_test) => Some(serialize_downstream_test(
+                downstream_test,
+                idx,
+                tmp_dir_path,
+            )?),
+            TestType::PackageContents(_) => None,
+        } {
+            test_files.extend(files);
         }
     }
 
     Ok(test_files)
+}
+
+fn serialize_downstream_test(
+    downstream_test: &DownstreamTest,
+    idx: usize,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
+    fs::create_dir_all(&folder)?;
+
+    let path = folder.join("downstream_test.json");
+    let mut file = File::create(&path)?;
+    file.write_all(serde_json::to_string(downstream_test)?.as_bytes())?;
+
+    Ok(vec![path])
+}
+
+fn serialize_command_test(
+    command_test: &crate::recipe::parser::CommandsTest,
+    idx: usize,
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let mut command_files = vec![];
+    let mut test_files = vec![];
+
+    let test_folder = tmp_dir_path.join(format!("info/tests/{}", idx));
+    fs::create_dir_all(&test_folder)?;
+
+    let target_platform = &output.build_configuration.target_platform;
+    if target_platform.is_windows() || target_platform == &Platform::NoArch {
+        command_files.push(test_folder.join("run_test.bat"));
+    }
+
+    if target_platform.is_unix() || target_platform == &Platform::NoArch {
+        command_files.push(test_folder.join("run_test.sh"));
+    }
+
+    for cf in command_files {
+        let mut file = File::create(&cf)?;
+        for el in &command_test.script {
+            writeln!(file, "{}\n", el)?;
+        }
+        test_files.push(cf);
+    }
+
+    if !command_test.requirements.is_empty() {
+        let test_dependencies = &command_test.requirements;
+        let test_file = test_folder.join("test_time_dependencies.json");
+        let mut file = File::create(&test_file)?;
+        file.write_all(serde_json::to_string(&test_dependencies)?.as_bytes())?;
+        test_files.push(test_file);
+    }
+
+    if !command_test.files.recipe.is_empty() {
+        let globs = &command_test.files.recipe;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.recipe_dir,
+            &test_folder,
+        )
+        .with_parse_globs(globs.iter().map(AsRef::as_ref))
+        .use_gitignore(true)
+        .run()?;
+
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
+
+    if !command_test.files.source.is_empty() {
+        let globs = &command_test.files.source;
+        let copy_dir = crate::source::copy_dir::CopyDir::new(
+            &output.build_configuration.directories.work_dir,
+            &test_folder,
+        )
+        .with_parse_globs(globs.iter().map(AsRef::as_ref))
+        .use_gitignore(true)
+        .run()?;
+
+        test_files.extend(copy_dir.copied_paths().iter().cloned());
+    }
+
+    Ok(test_files)
+}
+
+fn serialize_python_test(
+    python_test: &PythonTest,
+    idx: usize,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
+    fs::create_dir_all(&folder)?;
+
+    let path = folder.join("python_test.json");
+    serde_json::to_writer(&File::create(&path)?, python_test)?;
+
+    Ok(vec![path])
 }
 
 fn write_recipe_folder(
@@ -764,7 +833,7 @@ fn write_recipe_folder(
 
     let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
 
-    let mut files = Vec::from(copy_result.copied_pathes());
+    let mut files = Vec::from(copy_result.copied_paths());
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;

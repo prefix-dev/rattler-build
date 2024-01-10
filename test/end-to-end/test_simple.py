@@ -5,6 +5,7 @@ import platform
 from pathlib import Path
 from subprocess import CalledProcessError, check_output
 from typing import Any, Optional
+import requests
 
 import pytest
 from conda_package_handling.api import extract
@@ -27,11 +28,17 @@ class RattlerBuild:
         recipe_folder: Path,
         output_folder: Path,
         variant_config: Optional[Path] = None,
+        custom_channels: list[str] | None = None,
     ):
         args = ["build", "--recipe", str(recipe_folder)]
         if variant_config is not None:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
+
+        if custom_channels:
+            for c in custom_channels:
+                args += ["--channel", c]
+
         print(args)
         return self(*args)
 
@@ -42,17 +49,25 @@ def rattler_build():
         return RattlerBuild(os.environ["RATTLER_BUILD_PATH"])
     else:
         base_path = Path(__file__).parent.parent.parent
-        # use the default target release path, then debug
-        if (base_path / "target/release/rattler-build").exists():
-            return RattlerBuild((base_path / "target/release/rattler-build"))
-        elif (base_path / "target/debug/rattler-build").exists():
-            return RattlerBuild((base_path / "target/debug/rattler-build"))
+        executable_name = "rattler-build"
+        if os.name == "nt":
+            executable_name += ".exe"
+
+        release_path = base_path / f"target/release/{executable_name}"
+        debug_path = base_path / f"target/debug/{executable_name}"
+
+        if release_path.exists():
+            return RattlerBuild(release_path)
+        elif debug_path.exists():
+            return RattlerBuild(debug_path)
 
     raise FileNotFoundError("Could not find rattler-build executable")
 
 
 def test_functionality(rattler_build: RattlerBuild):
-    assert rattler_build("--help").startswith("Usage: rattler-build [OPTIONS]")
+    suffix = ".exe" if os.name == "nt" else ""
+
+    assert rattler_build("--help").startswith(f"Usage: rattler-build{suffix} [OPTIONS]")
 
 
 @pytest.fixture
@@ -169,3 +184,94 @@ def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
+
+
+@pytest.mark.skipif(
+    not os.environ.get("PREFIX_DEV_READ_ONLY_TOKEN", ""),
+    reason="requires PREFIX_DEV_READ_ONLY_TOKEN",
+)
+def test_auth_file(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    auth_file = tmp_path / "auth.json"
+    monkeypatch.setenv("RATTLER_AUTH_FILE", str(auth_file))
+
+    with pytest.raises(CalledProcessError):
+        rattler_build.build(
+            recipes / "private-repository",
+            tmp_path,
+            custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
+        )
+
+    auth_file.write_text(
+        json.dumps(
+            {
+                "repo.prefix.dev": {
+                    "BearerToken": os.environ["PREFIX_DEV_READ_ONLY_TOKEN"]
+                }
+            }
+        )
+    )
+
+    rattler_build.build(
+        recipes / "private-repository",
+        tmp_path,
+        custom_channels=["conda-forge", "https://repo.prefix.dev/setup-pixi-test"],
+    )
+
+
+@pytest.mark.skipif(
+    not os.environ.get("ANACONDA_ORG_TEST_TOKEN", ""),
+    reason="requires ANACONDA_ORG_TEST_TOKEN",
+)
+def test_anaconda_upload(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    URL = "https://api.anaconda.org/package/rattler-build-testpackages/globtest"
+
+    # Make sure the package doesn't exist
+    requests.delete(
+        URL, headers={"Authorization": f"token {os.environ['ANACONDA_ORG_TEST_TOKEN']}"}
+    )
+
+    assert requests.get(URL).status_code == 404
+
+    monkeypatch.setenv("ANACONDA_API_KEY", os.environ["ANACONDA_ORG_TEST_TOKEN"])
+
+    rattler_build.build(recipes / "globtest", tmp_path)
+
+    rattler_build(
+        "upload",
+        "-vvv",
+        "anaconda",
+        "--owner",
+        "rattler-build-testpackages",
+        str(get_package(tmp_path, "globtest")),
+    )
+
+    # Make sure the package exists
+    assert requests.get(URL).status_code == 200
+
+    # Make sure the package attempted overwrites fail without --force
+    with pytest.raises(CalledProcessError):
+        rattler_build(
+            "upload",
+            "-vvv",
+            "anaconda",
+            "--owner",
+            "rattler-build-testpackages",
+            str(get_package(tmp_path, "globtest")),
+        )
+
+    # Make sure the package attempted overwrites succeed with --force
+    rattler_build(
+        "upload",
+        "-vvv",
+        "anaconda",
+        "--owner",
+        "rattler-build-testpackages",
+        "--force",
+        str(get_package(tmp_path, "globtest")),
+    )
+
+    assert requests.get(URL).status_code == 200

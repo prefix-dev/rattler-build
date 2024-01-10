@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+package:
+  name: zip-source
+  version: 0.1.0
+source:
+  - url: https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip
+    sha256: 6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18
+
+build:
+  script:
+    - if: unix
+      then:
+        - test -f snowflake-jdbc-3.13.27.jar
+      else:
+        - if not exist snowflake-jdbc-3.13.27.jar exit 1

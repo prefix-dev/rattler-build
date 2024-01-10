@@ -9,8 +9,8 @@ package:
   version: "${{ version }}"
 
 source:
-  git_url: https://github.com/ggerganov/llama.cpp.git
-  git_rev: "${{ version }}"
+  git: https://github.com/ggerganov/llama.cpp.git
+  rev: "${{ version }}"
 
 build:
   number: 0
@@ -26,11 +26,11 @@ requirements:
     - if: win
       then: ninja
 
-test:
-  package_contents:
-    bins:
-      - main
-      - quantize
+tests:
+  - package_contents:
+      bin:
+        - main
+        - quantize
 
 about:
   homepage: https://github.com/ggerganov/llama.cpp

@@ -4,18 +4,19 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+      - 'mkdocs.yml'
+      - 'pixi.*'
+  workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-  RUSTFLAGS: "-D warnings"
-  RUSTDOCFLAGS: --html-in-header header.html
-
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 # Allow one concurrent deployment
 concurrency:
@@ -23,7 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
+    # Don't run on forks
     if: github.repository == 'prefix-dev/rattler-build'
     runs-on: ubuntu-latest
     steps:
@@ -32,54 +34,42 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v1
+      - uses: prefix-dev/setup-pixi@v0.4.1
         with:
-          mdbook-version: 'latest'
-
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.68.0
+          pixi-version: v0.10.0
+          cache: true
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      #  This does the following:
-      #   - Replaces the docs icon with one that clearly denotes it's not the released package on crates.io
-      #   - Adds a meta tag that forces Google not to index any page on the site.
-      - name: Pre-docs-build
-        run: |
-          echo "<meta name=\"robots\" content=\"noindex\">" > header.html
-
-      - uses: Swatinem/rust-cache@v2
-      - name: Build Documentation
-        run: cargo doc --workspace --no-deps --all-features
-      - name: Build Book
-        run: mdbook build
+      - name: Build pixi Documentation
+        run: pixi run build-docs
 
       #  This adds the following:
-      #   - A top level redirect to the bevy crate documentation
-      #   - A robots.txt file to forbid any crawling of the site (to defer to the docs.rs site on search engines).
       #   - A .nojekyll file to disable Jekyll GitHub Pages builds.
+      #   - Adds installation scripts to the pages webserver.
       - name: Finalize documentation
         run: |
-          mkdir final_docs
-          touch final_docs/.nojekyll
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=rattler/index.html\">" > target/doc/index.html
+          touch site/.nojekyll
+          # cp install/{install.sh,install.ps1} site
 
-          mkdir -p final_docs/reference
-          mv target/doc/* final_docs/reference
-
-          mv book/* final_docs/
-
-          echo "User-Agent: *\nDisallow: /" > final_docs/robots.txt
+      # https://github.com/actions/upload-pages-artifact#file-permissions
+      - run: chmod -c -R +rX site/
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v3
         with:
-          path: 'final_docs'
+          path: "site"
 
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.repository == 'prefix-dev/rattler-build' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v3
+        uses: actions/deploy-pages@v4
