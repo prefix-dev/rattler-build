@@ -111,9 +111,10 @@ impl SharedObject {
                 )));
             } else {
                 tracing::warn!(
-                    "rpath ({:?}) is outside of prefix ({:?}) - removing it",
+                    "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
                     rpath,
-                    encoded_prefix
+                    encoded_prefix,
+                    self.path
                 );
             }
         }
