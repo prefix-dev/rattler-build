@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   name: mamba
   libmamba_version: "1.5.3"
@@ -55,8 +57,8 @@ outputs:
           - spdlog
           - python
         # - ${{ "python" if win }}
-    test:
-      commands:
+    tests:
+      - script:
         - if: unix
           then:
             - test -d ${PREFIX}/include/mamba  # [unix]
@@ -114,12 +116,13 @@ outputs:
       ignore_run_exports:
         by_name:
           - spdlog
-    test:
-      imports:
-        - libmambapy
-        - libmambapy.bindings
-      commands:
-        - python -c "import libmambapy._version; assert libmambapy._version.__version__ == '${{ libmambapy_version }}'"
+    tests:
+      - python:
+          imports:
+            - libmambapy
+            - libmambapy.bindings
+      - script:
+          - python -c "import libmambapy._version; assert libmambapy._version.__version__ == '${{ libmambapy_version }}'"
 
   - package:
       name: mamba
@@ -148,12 +151,11 @@ outputs:
         - conda >=23.9,<24
         - ${{ pin_subpackage('libmambapy', exact=True) }}
 
-    test:
-      imports:
-        - mamba
-      requires:
-        - pip
-      commands:
+    tests:
+      - python:
+          imports:
+            - mamba
+      - script:
         - mamba --help
         # for some reason tqdm doesn't have a proper colorama dependency so pip check fails
         # but that's completely unrelated to mamba

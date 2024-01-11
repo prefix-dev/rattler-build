@@ -114,9 +114,10 @@ requirements:
     - python
 
 # tests to validate that the package works as expected
-test:
-  imports:
-    - imagesize
+tests:
+  - python:
+      imports:
+        - imagesize
 
 # information about the package
 about:
@@ -372,10 +373,11 @@ build:
   noarch: python
 ```
 
-> ***Note***: At the time of this writing, `noarch` packages should not make use
-> of preprocess-selectors: `noarch` packages are built with the directives which
-> evaluate to `true` in the platform it is built on, which probably will result
-> in incorrect/incomplete installation in other platforms.
+!!! note
+    At the time of this writing, `noarch` packages should not make use
+    of preprocess-selectors: `noarch` packages are built with the directives which
+    evaluate to `true` in the platform it is built on, which probably will result
+    in incorrect/incomplete installation in other platforms.
 
 <!--
 ### Include build recipe
@@ -473,7 +475,7 @@ version is part of the package dependencies, list `numpy` as a requirement in
 `recipe.yaml` and use a `conda_build_config.yaml` file with multiple NumPy
 versions.
 
-### Run\_constrained
+### Run constrained
 
 Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.
@@ -484,7 +486,7 @@ specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pk
 ```yaml
 requirements:
   run_constrained:
-    - optional-subpackage =={{ version }}
+    - optional-subpackage ==${{ version }}
 ```
 
 For example, let's say we have an environment that has package "a" installed at
@@ -884,7 +886,7 @@ and automatically selects the right (cross-)compiler for the target platform.
 
 ```
 build:
-  - "{{ compiler('c') }}"
+  - ${{ compiler('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
@@ -927,8 +929,6 @@ requirements:
 ```
 
 #### Pin compatible
-
-**Note: not yet implemented**
 
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
@@ -1018,22 +1018,22 @@ Lists are automatically "merged" upwards, so it is possible to group multiple
 items under a single selector:
 
 ```yaml
-test:
-  commands:
-    - if: unix
-      then:
-      - test -d ${PREFIX}/include/xtensor
-      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
-    - if: win
-      then:
-      - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-      - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+tests:
+  - script:
+      - if: unix
+        then:
+        - test -d ${PREFIX}/include/xtensor
+        - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+      - if: win
+        then:
+        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+        - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 # On unix this is rendered to:
-test:
-commands:
-    - test -d ${PREFIX}/include/xtensor
-    - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+tests:
+  - script:
+      - test -d ${PREFIX}/include/xtensor
+      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
 <!--

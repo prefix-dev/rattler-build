@@ -5,9 +5,9 @@ import platform
 from pathlib import Path
 from subprocess import CalledProcessError, check_output
 from typing import Any, Optional
-import requests
 
 import pytest
+import requests
 from conda_package_handling.api import extract
 
 
@@ -66,8 +66,8 @@ def rattler_build():
 
 def test_functionality(rattler_build: RattlerBuild):
     suffix = ".exe" if os.name == "nt" else ""
-
-    assert rattler_build("--help").startswith(f"Usage: rattler-build{suffix} [OPTIONS]")
+    text = rattler_build("--help").splitlines()
+    assert text[2] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
 
 
 @pytest.fixture
