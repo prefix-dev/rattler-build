@@ -172,6 +172,7 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 #[cfg(target_os = "linux")]
 mod test {
     use super::*;
+    use globset::Glob;
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -196,9 +197,20 @@ mod test {
         // so we are expecting it to keep the host prefix and discard the build prefix
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(&prefix, encoded_prefix, &[])?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[Glob::new("/usr/lib/custom**").unwrap().compile_matcher()],
+        )?;
         let object = SharedObject::new(&binary_path)?;
-        assert_eq!(vec!["$ORIGIN/../lib"], object.rpaths);
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
 
         // manually clean up temporary directory because it was
         // persisted to disk by calling `into_path`
