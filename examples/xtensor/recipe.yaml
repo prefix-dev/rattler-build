@@ -28,6 +28,7 @@ build:
         make install
   dynamic_linking:
     rpath_allowlist: ["/usr/lib/**"]
+    binary_relocation: true
 
 requirements:
   build:
