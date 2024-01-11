@@ -1129,8 +1129,8 @@ These are experimental features of `rattler-build` and may change or go away com
 
 ### Jinja functions
 
-- [`load_from_file`](experimental-features.md#load-from-files)
-- [`git.*` functions](experimental-features.md#git-functions)
+- [`load_from_file`](./experimental_features.md#load-from-files)
+- [`git.*` functions](./experimental_features.md#git-functions)
 
 <!--
 
