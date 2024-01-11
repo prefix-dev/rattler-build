@@ -156,7 +156,7 @@ impl DynamicLinking {
     pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
         let mut matchers = Vec::new();
         for glob in self.rpath_allowlist.iter() {
-            let glob = Glob::new(&glob)?.compile_matcher();
+            let glob = Glob::new(glob)?.compile_matcher();
             matchers.push(glob);
         }
         Ok(matchers)
