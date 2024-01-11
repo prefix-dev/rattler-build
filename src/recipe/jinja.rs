@@ -178,6 +178,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         target_platform,
         build_platform,
         variant,
+        experimental,
         ..
     } = config.clone();
     env.add_function("cdt", move |package_name: String| {
@@ -241,7 +242,13 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         format!("{}{}", major, minor)
     });
 
-    env.add_function("load_from_file", |path: String| {
+    env.add_function("load_from_file", move |path: String| {
+        if !experimental {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Experimental feature: provide the `--experimental` flag to enable this feature",
+            ));
+        }
         let src = std::fs::read_to_string(&path).map_err(|e| {
             minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
         })?;
@@ -651,8 +658,8 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            experimental: true,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
