@@ -541,6 +541,54 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 mamba tell the user that a given package can't be installed if their system
 glibc version is too old.
 
+### Run exports
+
+Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
+
+Example from zlib:
+
+```yaml
+  requirements:
+    run_exports:
+      - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+Run exports are weak by default. But you can also define strong run_exports.
+
+```yaml
+  requirements:
+    run_exports:
+      strong:
+        - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+### Ignore run exports
+
+There maybe cases where an upstream package has a problematic `run_exports` constraint, you can ignore it in your recipe by listing the upstream package name in the `ignore_run_exports` section in `requirements`.
+
+You can ignore them by package name, or by naming the runtime dependency directly.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_package:
+        - zlib
+```
+
+Using, runtime depenedency name.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_name:
+        - libzlib
+```
+
+```{note}
+`ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
+```
+
 Tests section
 -------------
 
