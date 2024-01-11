@@ -1072,6 +1072,18 @@ tests:
       - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
+Experimental features
+---------------------
+
+```{warning}
+These are experimental features of `rattler-build` and may change or go away completely.
+```
+
+### Jinja functions
+
+- [`load_from_file`](experimental-features.md#load-from-files)
+- [`git.*` functions](experimental-features.md#git-functions)
+
 <!--
 
 Experimental features

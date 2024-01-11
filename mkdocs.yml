@@ -73,6 +73,7 @@ nav:
   - Home: index.md
   - Highlevel overview: highlevel.md
   - Recipe file: recipe_file.md
+  - Experimental features: experimental_features.md
 
   - Selector syntax: selectors.md
   - Build script: build_script.md
