@@ -75,7 +75,7 @@ sha1 = "0.10.6"
 spdx = "0.10.3"
 fs_extra = "1.3.0"
 ignore = "0.4.22"
-globset = { version = "0.4.14", features = ["serde1"] }
+globset = "0.4.14"
 tracing-indicatif = "0.3.6"
 clap-verbosity-flag = "2.1.1"
 tracing-core = "0.1.32"

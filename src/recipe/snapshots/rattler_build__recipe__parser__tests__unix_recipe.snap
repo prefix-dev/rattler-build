@@ -91,7 +91,13 @@ Recipe {
         python: Python {
             entry_points: [],
         },
-        dynamic_linking: None,
+        dynamic_linking: Some(
+            DynamicLinking {
+                rpath_allowlist: [
+                    "/usr/lib/**",
+                ],
+            },
+        ),
     },
     requirements: Requirements {
         build: [

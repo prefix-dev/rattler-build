@@ -933,13 +933,10 @@ pub fn package_conda(
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
-            &output
-                .recipe
-                .build()
-                .dynamic_linking()
-                .as_ref()
-                .map(|v| v.rpath_allowlist())
-                .unwrap_or_default(),
+            &match output.recipe.build().dynamic_linking() {
+                Some(dynamic_linking) => dynamic_linking.rpath_allowlist()?,
+                None => Vec::new(),
+            },
         )?;
     }
 

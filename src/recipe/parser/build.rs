@@ -125,6 +125,9 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     "python" => {
                         build.python = value.try_convert(key_str)?;
                     }
+                    "dynamic_linking" => {
+                        build.dynamic_linking = value.try_convert(key_str)?;
+                    }
                     invalid => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -145,17 +148,49 @@ impl TryConvertNode<Build> for RenderedMappingNode {
 pub struct DynamicLinking {
     /// Allow runpath / rpath to point to these locations outside of the environment.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) rpath_allowlist: Vec<Glob>,
+    pub(super) rpath_allowlist: Vec<String>,
 }
 
 impl DynamicLinking {
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Vec<GlobMatcher> {
-        self.rpath_allowlist
-            .clone()
-            .iter()
-            .map(|glob| glob.compile_matcher())
-            .collect()
+    pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
+        let mut matchers = Vec::new();
+        for glob in self.rpath_allowlist.iter() {
+            let glob = Glob::new(&glob)?.compile_matcher();
+            matchers.push(glob);
+        }
+        Ok(matchers)
+    }
+}
+
+impl TryConvertNode<DynamicLinking> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
+        let mut dynamic_linking = DynamicLinking::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "rpath_allowlist" => {
+                    dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(vec![_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                    )]);
+                }
+            }
+        }
+
+        Ok(dynamic_linking)
     }
 }
 
