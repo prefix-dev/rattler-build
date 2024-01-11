@@ -1,4 +1,5 @@
 //! Relink shared objects to use an relative path prefix
+use globset::GlobMatcher;
 use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
 use itertools::Itertools;
@@ -74,7 +75,12 @@ impl SharedObject {
     /// find all RPATH and RUNPATH entries
     /// replace them with the encoded prefix
     /// if the rpath is outside of the prefix, it is removed
-    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+    pub fn relink(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+        rpath_allowlist: &[GlobMatcher],
+    ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::debug!("{} is not dynamically linked", self.path.display());
             return Ok(());
@@ -109,6 +115,9 @@ impl SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
+            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+                tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
+                final_rpath.push(rpath.clone());
             } else {
                 tracing::warn!(
                     "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
@@ -163,6 +172,7 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
 #[cfg(target_os = "linux")]
 mod test {
     use super::*;
+    use globset::Glob;
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -187,9 +197,20 @@ mod test {
         // so we are expecting it to keep the host prefix and discard the build prefix
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(&prefix, encoded_prefix)?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[Glob::new("/usr/lib/custom**").unwrap().compile_matcher()],
+        )?;
         let object = SharedObject::new(&binary_path)?;
-        assert_eq!(vec!["$ORIGIN/../lib"], object.rpaths);
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
 
         // manually clean up temporary directory because it was
         // persisted to disk by calling `into_path`
