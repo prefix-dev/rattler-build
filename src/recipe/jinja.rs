@@ -585,7 +585,6 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Context;
     use rattler_conda_types::Platform;
 
     use super::*;
@@ -598,27 +597,32 @@ mod tests {
         _ = std::fs::remove_dir_all(dir).unwrap();
     }
 
-    // clone git repo src with rev within current dir
-    fn git_clone(
-        src: impl AsRef<str>,
+    fn create_repo_with_tag(
         path: impl AsRef<std::path::Path>,
-        hash: impl AsRef<str>,
+        tag: impl AsRef<str>,
     ) -> anyhow::Result<()> {
-        _ = std::process::Command::new("git")
-            .current_dir(&path)
-            // clone to current dir, fails if the current dir is non-empty
-            .args(["clone", src.as_ref(), "."])
-            .output()
-            .ok()
-            .and_then(|o| o.status.success().then_some(()))
-            .context("failed to clone to current dir")?;
-        _ = std::process::Command::new("git")
-            .current_dir(&path)
-            .args(["reset", "--hard", hash.as_ref()])
-            .output()
-            .ok()
-            .and_then(|o| o.status.success().then_some(()))
-            .context("failed to reset to commit hash")?;
+        let git_with_args = |arg: &str, args: &[&str]| -> anyhow::Result<bool> {
+            Ok(Command::new("git")
+                .current_dir(&path)
+                .arg(arg)
+                .args(args)
+                // .stderr(std::process::Stdio::inherit())
+                // .stdout(std::process::Stdio::inherit())
+                .output()?
+                .status
+                .success())
+        };
+        if git_with_args("init", &[])? {
+            std::fs::write(path.as_ref().join("README.md"), "init")?;
+            let git_add = git_with_args("add", &["."])?;
+            let commit_created = git_with_args("commit", &["-m", "init", "--no-gpg-sign"])?;
+            let tag_created = git_with_args("tag", &[tag.as_ref()])?;
+            if !git_add || !commit_created || !tag_created {
+                anyhow::bail!("failed to create add, commit or tag");
+            }
+        } else {
+            anyhow::bail!("failed to create git repo");
+        }
         Ok(())
     }
 
@@ -641,10 +645,9 @@ mod tests {
         let jinja_wo_experimental = Jinja::new(options_wo_experimental);
 
         with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
-            git_clone("https://github.com/prefix-dev/rip.git", path, "803b7e3859ce38e101b0a573420a40736bc91d69").expect("Failed to clone the git repo");
+            create_repo_with_tag(path, "v0.1.0").expect("failed to create repo with tag");
             assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
-            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
-            assert_eq!(jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 2").as_str().unwrap(), "803b7e3859ce38e101b0a573420a40736bc91d69");
+            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 2").as_str().unwrap());
             assert_eq!(
                 jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 3").to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
@@ -668,21 +671,21 @@ mod tests {
         let path = temp_dir.path().join("test.json");
         std::fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 1").as_str(),
+            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 1").as_str(),
             Some("world"),
         ); 
 
         let path = temp_dir.path().join("test.yaml");
         std::fs::write(&path, "hello: world").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 2").as_str(),
+            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 2").as_str(),
             Some("world"),
         ); 
 
         let path = temp_dir.path().join("test.toml");
         std::fs::write(&path, "hello = 'world'").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path.display().to_string())).expect("test 2").as_str(),
+            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 2").as_str(),
             Some("world"),
         ); 
     }
