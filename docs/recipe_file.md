@@ -182,8 +182,23 @@ of the work folder.
 ```yaml
 source:
   git: https://github.com/ilanschnell/bsdiff4.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
+  # branch: master # note: defaults to fetching the repo's default branch
+```
+
+You can use `rev` to pin the commit version directly.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  rev: "50a1f7ed6c168eb0815d424cba2df62790f168f0"
+```
+
+Or you can use the `tag`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
 ```
 
 The `git` can also be a relative path to the recipe directory.
@@ -191,16 +206,37 @@ The `git` can also be a relative path to the recipe directory.
 ```yaml
 source:
   git: ../../bsdiff4/.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
-  lfs: true # defaults to false
+  tag: "1.1.4"
 ```
 
-Note: `git_rev` may not be available within commit depth range, consider
-avoiding use of both simultaneously.
+Futhermore if you want to fetch just the current "HEAD"(this may result in non-deterministic builds)
+then you can use `depth`,
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  depth: 1 # note: the behaviour defaults to -1
+```
+
+Note: `tag` or `rev` may not be available within commit depth range, hence we don't
+allow using `rev` or `tag` and `depth` of them together if not set to `-1`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
+  depth: 1 # error: use of `depth` with `rev` is invalid, they are mutually exclusive
+```
 
 When you want to use git-lfs, you need to set `lfs: true`. This will also pull
 the lfs files from the repository.
+
+```yaml
+source:
+  git: ../../bsdiff4/.git
+  tag: "1.1.4"
+  lfs: true # note: defaults to false
+```
 
 #### Source from a local path
 
@@ -210,7 +246,7 @@ source is copied to the work directory before building.
 ```yaml
   source:
     path: ../src
-    use_gitignore: false # (defaults to true)
+    use_gitignore: false # note: defaults to true
 ```
 
 By default, all files in the local path that are ignored by git are also ignored
