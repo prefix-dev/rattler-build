@@ -182,8 +182,23 @@ of the work folder.
 ```yaml
 source:
   git: https://github.com/ilanschnell/bsdiff4.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
+  # branch: master # note: defaults to fetching the repo's default branch
+```
+
+You can use `rev` to pin the commit version directly.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  rev: "50a1f7ed6c168eb0815d424cba2df62790f168f0"
+```
+
+Or you can use the `tag`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
 ```
 
 The `git` can also be a relative path to the recipe directory.
@@ -191,16 +206,37 @@ The `git` can also be a relative path to the recipe directory.
 ```yaml
 source:
   git: ../../bsdiff4/.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
-  lfs: true # defaults to false
+  tag: "1.1.4"
 ```
 
-Note: `git_rev` may not be available within commit depth range, consider
-avoiding use of both simultaneously.
+Futhermore if you want to fetch just the current "HEAD"(this may result in non-deterministic builds)
+then you can use `depth`,
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  depth: 1 # note: the behaviour defaults to -1
+```
+
+Note: `tag` or `rev` may not be available within commit depth range, hence we don't
+allow using `rev` or `tag` and `depth` of them together if not set to `-1`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
+  depth: 1 # error: use of `depth` with `rev` is invalid, they are mutually exclusive
+```
 
 When you want to use git-lfs, you need to set `lfs: true`. This will also pull
 the lfs files from the repository.
+
+```yaml
+source:
+  git: ../../bsdiff4/.git
+  tag: "1.1.4"
+  lfs: true # note: defaults to false
+```
 
 #### Source from a local path
 
@@ -210,7 +246,7 @@ source is copied to the work directory before building.
 ```yaml
   source:
     path: ../src
-    use_gitignore: false # (defaults to true)
+    use_gitignore: false # note: defaults to true
 ```
 
 By default, all files in the local path that are ignored by git are also ignored
@@ -514,6 +550,54 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 2.12 will be compatible with CentOS 6. This run\_constrained dependency helps
 mamba tell the user that a given package can't be installed if their system
 glibc version is too old.
+
+### Run exports
+
+Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
+
+Example from zlib:
+
+```yaml
+  requirements:
+    run_exports:
+      - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+Run exports are weak by default. But you can also define strong run_exports.
+
+```yaml
+  requirements:
+    run_exports:
+      strong:
+        - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+### Ignore run exports
+
+There maybe cases where an upstream package has a problematic `run_exports` constraint, you can ignore it in your recipe by listing the upstream package name in the `ignore_run_exports` section in `requirements`.
+
+You can ignore them by package name, or by naming the runtime dependency directly.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_package:
+        - zlib
+```
+
+Using, runtime depenedency name.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_name:
+        - libzlib
+```
+
+```{note}
+`ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
+```
 
 Tests section
 -------------
@@ -1045,6 +1129,18 @@ tests:
       - test -d ${PREFIX}/include/xtensor
       - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
+
+Experimental features
+---------------------
+
+```{warning}
+These are experimental features of `rattler-build` and may change or go away completely.
+```
+
+### Jinja functions
+
+- [`load_from_file`](./experimental_features.md#load-from-files)
+- [`git.*` functions](./experimental_features.md#git-functions)
 
 <!--
 

@@ -87,7 +87,7 @@ pub fn git_src(
     // depth == -1, fetches the entire git history
     if !source.rev().is_head() && (source.depth().is_some() && source.depth() != Some(-1)) {
         return Err(SourceError::GitErrorStr(
-            "use of `depth` with `rev` is invalid",
+            "use of `depth` with `rev` is invalid, they are mutually exclusive",
         ));
     }
 
