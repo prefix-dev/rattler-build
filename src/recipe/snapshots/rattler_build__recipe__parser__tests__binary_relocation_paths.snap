@@ -1,0 +1,15 @@
+---
+source: src/recipe/parser.rs
+expression: recipe
+---
+package:
+  name: zlib
+  version: 0.1.0
+build:
+  number: 0
+  dynamic_linking:
+    binary_relocation:
+      - /usr/lib/**
+      - /etc
+requirements: {}
+
