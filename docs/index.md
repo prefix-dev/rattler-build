@@ -32,7 +32,7 @@ micromamba install rattler-build -c conda-forge
 Alternatively, you can install `rattler-build` via Homebrew:
 
 ```bash
-brew install pavelzw/pavelzw/rattler-build
+brew install rattler-build
 ```
 
 #### Dependencies
