@@ -310,6 +310,16 @@ OR
   * package uses `{{ compiler() }}` jinja2 function
 
 
+#### Dynamic linking
+
+This section contains settings for the shared libraries and executables.
+
+```yaml
+build:
+  dynamic_linking:
+    rpath_allowlist: ["/usr/lib/**"]
+```
+
 #### Python entry points
 
 The following example creates a Python entry point named "bsdiff4" that calls

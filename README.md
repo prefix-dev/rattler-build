@@ -38,7 +38,13 @@ Releases](https://github.com/prefix-dev/rattler-build/releases/).
 Alternatively, you can install `rattler-build` via Homebrew:
 
 ```
-brew install pavelzw/pavelzw/rattler-build
+brew install rattler-build
+```
+
+`rattler-build` is also available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
+
+```
+pacman -S rattler-build
 ```
 
 #### Dependencies

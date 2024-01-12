@@ -585,6 +585,8 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rattler_conda_types::Platform;
 
     use super::*;
@@ -597,10 +599,17 @@ mod tests {
         _ = std::fs::remove_dir_all(dir).unwrap();
     }
 
-    fn create_repo_with_tag(
-        path: impl AsRef<std::path::Path>,
-        tag: impl AsRef<str>,
-    ) -> anyhow::Result<()> {
+    fn git_setup(path: &Path) -> anyhow::Result<()> {
+        let git_config = r#"
+[user]
+	name = John Doe 
+	email = johndoe@example.ne
+"#;
+        std::fs::write(path.join(".git/config"), git_config)?;
+        Ok(())
+    }
+
+    fn create_repo_with_tag(path: impl AsRef<Path>, tag: impl AsRef<str>) -> anyhow::Result<()> {
         let git_with_args = |arg: &str, args: &[&str]| -> anyhow::Result<bool> {
             Ok(Command::new("git")
                 .current_dir(&path)
@@ -613,6 +622,7 @@ mod tests {
                 .success())
         };
         if git_with_args("init", &[])? {
+            git_setup(path.as_ref())?;
             std::fs::write(path.as_ref().join("README.md"), "init")?;
             let git_add = git_with_args("add", &["."])?;
             let commit_created = git_with_args("commit", &["-m", "init", "--no-gpg-sign"])?;
@@ -645,11 +655,11 @@ mod tests {
         let jinja_wo_experimental = Jinja::new(options_wo_experimental);
 
         with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
-            create_repo_with_tag(path, "v0.1.0").expect("failed to create repo with tag");
+            create_repo_with_tag(path, "v0.1.0").expect("Failed to clone the git repo");
             assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
-            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 2").as_str().unwrap());
+            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1 left").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 1 right").as_str().unwrap());
             assert_eq!(
-                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 3").to_string(),
+                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 2").to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });
