@@ -316,7 +316,7 @@ pub async fn run_build(
         &difference,
         &directories.host_prefix,
         &directories.output_dir,
-        output.build_configuration.package_format,
+        &output.build_configuration.packaging_settings,
     )
     .into_diagnostic()?;
 

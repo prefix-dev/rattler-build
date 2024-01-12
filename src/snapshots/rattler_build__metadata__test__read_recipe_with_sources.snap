@@ -47,7 +47,9 @@ build_configuration:
       name: git_source
       version: "1"
       build_string: h60d57d3_0
-  package_format: tar_bz2
+  packaging_settings:
+    archive_type: tar_bz2
+    compression_level: 9
 finalized_dependencies:
   build: ~
   host: ~
