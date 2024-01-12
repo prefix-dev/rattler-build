@@ -15,7 +15,6 @@ pub mod variant_config;
 
 mod env_vars;
 pub mod hash;
-mod index;
 mod linux;
 mod macos;
 mod packaging;

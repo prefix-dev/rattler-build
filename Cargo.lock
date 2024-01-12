@@ -2580,6 +2580,7 @@ dependencies = [
  "rattler",
  "rattler_conda_types",
  "rattler_digest",
+ "rattler_index",
  "rattler_networking",
  "rattler_package_streaming",
  "rattler_repodata_gateway",
@@ -2659,6 +2660,21 @@ dependencies = [
  "serde_with",
  "sha2",
  "tokio",
+]
+
+[[package]]
+name = "rattler_index"
+version = "0.16.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b41c19bcd60dbc9375b90fd8ce4cce7073d56cab42879a5728a49965aaa6d50"
+dependencies = [
+ "fs-err",
+ "rattler_conda_types",
+ "rattler_digest",
+ "rattler_package_streaming",
+ "serde_json",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

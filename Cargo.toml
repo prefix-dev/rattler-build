@@ -25,6 +25,7 @@ rattler = { version = "0.16.2", default-features = false }
 rattler_conda_types = { version = "0.16.2", default-features = false }
 rattler_digest = { version = "0.16.2", default-features = false }
 rattler_networking = { version = "0.16.2", default-features = false }
+rattler_index = { version = "0.16.2", default-features = false }
 rattler_repodata_gateway = { version = "0.16.2", default-features = false, features = [
     "sparse",
 ] }
