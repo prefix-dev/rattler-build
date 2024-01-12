@@ -553,6 +553,8 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rattler_conda_types::Platform;
 
     use super::*;
@@ -565,22 +567,30 @@ mod tests {
         _ = std::fs::remove_dir_all(dir).unwrap();
     }
 
-    fn create_repo_with_tag(
-        path: impl AsRef<std::path::Path>,
-        tag: impl AsRef<str>,
-    ) -> anyhow::Result<()> {
+    fn git_setup(path: &Path) -> anyhow::Result<()> {
+        let git_config = r#"
+[user]
+	name = John Doe 
+	email = johndoe@example.ne
+"#;
+        std::fs::write(path.join(".git/config"), git_config)?;
+        Ok(())
+    }
+
+    fn create_repo_with_tag(path: impl AsRef<Path>, tag: impl AsRef<str>) -> anyhow::Result<()> {
         let git_with_args = |arg: &str, args: &[&str]| -> anyhow::Result<bool> {
             Ok(Command::new("git")
                 .current_dir(&path)
                 .arg(arg)
                 .args(args)
-                // .stderr(std::process::Stdio::inherit())
-                // .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
                 .output()?
                 .status
                 .success())
         };
         if git_with_args("init", &[])? {
+            git_setup(path.as_ref())?;
             std::fs::write(path.as_ref().join("README.md"), "init")?;
             let git_add = git_with_args("add", &["."])?;
             let commit_created = git_with_args("commit", &["-m", "init", "--no-gpg-sign"])?;
