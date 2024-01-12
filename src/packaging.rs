@@ -133,7 +133,7 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
 }
 
 #[allow(dead_code)]
-fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
+pub(crate) fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
     {
         let mut buf = String::new();
