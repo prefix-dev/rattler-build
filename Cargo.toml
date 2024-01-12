@@ -21,21 +21,21 @@ rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
 [dependencies]
 serde = { version = "1.0.195", features = ["derive"] }
 serde_yaml = "0.9.30"
-rattler = { version = "0.16.1", default-features = false }
-rattler_conda_types = { version = "0.16.1", default-features = false }
-rattler_digest = { version = "0.16.1", default-features = false }
-rattler_networking = { version = "0.16.1", default-features = false }
-rattler_repodata_gateway = { version = "0.16.1", default-features = false, features = [
+rattler = { version = "0.16.2", default-features = false }
+rattler_conda_types = { version = "0.16.2", default-features = false }
+rattler_digest = { version = "0.16.2", default-features = false }
+rattler_networking = { version = "0.16.2", default-features = false }
+rattler_repodata_gateway = { version = "0.16.2", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.16.1", default-features = false, features = [
+rattler_shell = { version = "0.16.2", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.16.1", default-features = false, features = [
+rattler_solve = { version = "0.16.2", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.16.1", default-features = false }
-rattler_package_streaming = { version = "0.16.1", default-features = false }
+rattler_virtual_packages = { version = "0.16.2", default-features = false }
+rattler_package_streaming = { version = "0.16.2", default-features = false }
 anyhow = "1.0.79"
 walkdir = "2.4.0"
 sha2 = "0.10.8"
