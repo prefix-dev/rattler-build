@@ -888,7 +888,7 @@ rendered `recipe.yaml`, use the commands/boa-render command.
 #### Additional Jinja2 functionality in rattler-build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the conda-build process: `pin_compatible`, `pin_subpackage`,
+available during the rattler-build process: `pin_compatible`, `pin_subpackage`,
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
@@ -905,7 +905,7 @@ the supplied parameters.
 Similarly, the `pin_compatible` function will pin a package according to the
 specified rules.
 
-### Pin expressions
+#### Pin expressions
 
 `rattler-build` knows pin expressions. A pin expression can have a `min_pin`,
 `max_pin` and `exact` value. A `max_pin` and `min_pin` are specified with a
@@ -975,6 +975,14 @@ This can be used for some light templating, e.g.
 ```yaml
 build:
   string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
+```
+
+#### `cmp` function
+
+This function matches the first argument(package's MatchSpec) against the second argument(the version spec) and returns the resulting boolean.
+
+```yaml
+cmp(python, '>=3.4')
 ```
 
 Preprocessing selectors
