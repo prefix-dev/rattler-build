@@ -97,10 +97,10 @@ Recipe {
                     "/usr/lib/**",
                 ],
                 binary_relocation: Some(
-                  All(
-                      true,
-                 ),
-               ),
+                    All(
+                        true,
+                    ),
+                ),
             },
         ),
     },
