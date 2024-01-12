@@ -589,6 +589,8 @@ mod tests {
 
     use rattler_conda_types::Platform;
 
+    use crate::packaging::to_forward_slash_lossy;
+
     use super::*;
 
     fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
@@ -679,23 +681,26 @@ mod tests {
 
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test.json");
+        let path_str = to_forward_slash_lossy(&path);
         std::fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 1").as_str(),
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 1").as_str(),
             Some("world"),
         ); 
 
         let path = temp_dir.path().join("test.yaml");
         std::fs::write(&path, "hello: world").unwrap();
+        let path_str = to_forward_slash_lossy(&path);
         assert_eq!(
-            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 2").as_str(),
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
             Some("world"),
         ); 
 
         let path = temp_dir.path().join("test.toml");
+        let path_str = to_forward_slash_lossy(&path);
         std::fs::write(&path, "hello = 'world'").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file({:?})['hello']", path)).expect("test 2").as_str(),
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
             Some("world"),
         ); 
     }
