@@ -96,6 +96,11 @@ Recipe {
                 rpath_allowlist: [
                     "/usr/lib/**",
                 ],
+                binary_relocation: Some(
+                    All(
+                        true,
+                    ),
+                ),
             },
         ),
     },

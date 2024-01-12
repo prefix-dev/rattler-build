@@ -356,4 +356,22 @@ mod tests {
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         assert_yaml_snapshot!(recipe);
     }
+
+    #[test]
+    fn binary_relocation() {
+        let recipe = include_str!(
+            "../../test-data/recipes/test-parsing/recipe_build_binary_relocation.yaml"
+        );
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        assert_yaml_snapshot!(recipe);
+    }
+
+    #[test]
+    fn binary_relocation_paths() {
+        let recipe = include_str!(
+            "../../test-data/recipes/test-parsing/recipe_build_binary_relocation_paths.yaml"
+        );
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        assert_yaml_snapshot!(recipe);
+    }
 }

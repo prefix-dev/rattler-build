@@ -5,6 +5,7 @@ use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::{Dependency, FlattenErrors};
+use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
@@ -149,6 +150,9 @@ pub struct DynamicLinking {
     /// Allow runpath / rpath to point to these locations outside of the environment.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) rpath_allowlist: Vec<String>,
+    /// Whether to relocate binaries or not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) binary_relocation: Option<BinaryRelocation>,
 }
 
 impl DynamicLinking {
@@ -160,6 +164,11 @@ impl DynamicLinking {
             matchers.push(glob);
         }
         Ok(matchers)
+    }
+
+    // Get the binary relocation settings.
+    pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
+        self.binary_relocation.clone()
     }
 }
 
@@ -181,6 +190,9 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
                 "rpath_allowlist" => {
                     dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
                 }
+                "binary_relocation" => {
+                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
+                }
                 invalid => {
                     return Err(vec![_partialerror!(
                         *key.span(),
@@ -191,6 +203,79 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
         }
 
         Ok(dynamic_linking)
+    }
+}
+
+/// Settings for relocating binaries.
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum BinaryRelocation {
+    /// Relocate all binaries.
+    All(bool),
+    /// Relocate specific paths.
+    SpecificPaths(Vec<String>),
+}
+
+impl Default for BinaryRelocation {
+    fn default() -> Self {
+        Self::All(true)
+    }
+}
+
+impl BinaryRelocation {
+    /// Return the paths to relocate.
+    pub fn relocate_paths(&self) -> Result<Option<Vec<GlobMatcher>>, globset::Error> {
+        match self {
+            BinaryRelocation::All(_) => Ok(None),
+            BinaryRelocation::SpecificPaths(paths) => {
+                let mut matchers = Vec::new();
+                for glob in paths {
+                    let glob = Glob::new(glob)?.compile_matcher();
+                    matchers.push(glob);
+                }
+                Ok(Some(matchers))
+            }
+        }
+    }
+
+    /// Returns true if there will be no relocation.
+    pub fn no_relocation(&self) -> bool {
+        self == &Self::All(false)
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        if let Some(sequence) = self.as_sequence() {
+            sequence.try_convert(name)
+        } else if let Some(scalar) = self.as_scalar() {
+            scalar.try_convert(name)
+        } else {
+            Err(vec![
+                _partialerror!(*self.span(), ErrorKind::ExpectedScalar),
+                _partialerror!(*self.span(), ErrorKind::ExpectedSequence),
+            ])
+        }
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        let mut paths = Vec::with_capacity(self.len());
+        for item in self.iter() {
+            paths.push(item.try_convert(name)?)
+        }
+        Ok(BinaryRelocation::SpecificPaths(paths))
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        let mut binary_relocation = BinaryRelocation::default();
+        if let Some(relocate) = self.as_bool() {
+            binary_relocation = BinaryRelocation::All(relocate);
+        }
+        Ok(binary_relocation)
     }
 }
 

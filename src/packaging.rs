@@ -927,16 +927,28 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    if output.build_configuration.target_platform != Platform::NoArch {
+    let dynamic_linking = output.recipe.build().dynamic_linking();
+    let relocation_config = dynamic_linking
+        .clone()
+        .and_then(|v| v.binary_relocation())
+        .unwrap_or_default();
+    if output.build_configuration.target_platform != Platform::NoArch
+        && !relocation_config.no_relocation()
+    {
+        let rpath_allowlist = match dynamic_linking {
+            Some(v) => v.rpath_allowlist()?,
+            None => Vec::new(),
+        };
+        let mut binaries = tmp_files.clone();
+        if let Some(paths) = relocation_config.relocate_paths()? {
+            binaries.retain(|v| paths.iter().any(|glob| glob.is_match(v)));
+        }
         post::relink(
-            &tmp_files,
+            &binaries,
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
-            &match output.recipe.build().dynamic_linking() {
-                Some(dynamic_linking) => dynamic_linking.rpath_allowlist()?,
-                None => Vec::new(),
-            },
+            &rpath_allowlist,
         )?;
     }
 
