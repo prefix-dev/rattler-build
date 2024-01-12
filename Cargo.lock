@@ -2664,9 +2664,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_index"
-version = "0.16.1"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b41c19bcd60dbc9375b90fd8ce4cce7073d56cab42879a5728a49965aaa6d50"
+checksum = "75880100c0c8b6324ec09289f5e4b7c3922105d60b4dcdbfdb2b3c93e96f0f66"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
