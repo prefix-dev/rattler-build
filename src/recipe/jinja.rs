@@ -583,8 +583,8 @@ mod tests {
                 .current_dir(&path)
                 .arg(arg)
                 .args(args)
-                .stderr(std::process::Stdio::inherit())
-                .stdout(std::process::Stdio::inherit())
+                // .stderr(std::process::Stdio::inherit())
+                // .stdout(std::process::Stdio::inherit())
                 .output()?
                 .status
                 .success())
