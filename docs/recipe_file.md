@@ -390,7 +390,7 @@ scripts for different platforms.
 
 ```yaml
 build:
-  script: 
+  script:
     python setup.py install --single-version-externally-managed --record=record.txt
 ```
 
@@ -496,7 +496,7 @@ requirements:
     - python
 ```
 
-!!! note 
+!!! note
     When both build and host sections are defined, the build section can
     be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
     For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
@@ -1141,7 +1141,7 @@ tests:
 Experimental features
 ---------------------
 
-!!! warning 
+!!! warning
     These are experimental features of `rattler-build` and may change or go away completely.
 
 ### Jinja functions
