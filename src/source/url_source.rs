@@ -69,10 +69,7 @@ fn split_filename(filename: &str) -> (String, String) {
 fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
     let filename = url.path_segments()?.last()?;
     let (stem, extension) = split_filename(filename);
-    let checksum = match checksum {
-        Checksum::Sha256(value) => hex::encode(value),
-        Checksum::Md5(value) => hex::encode(value),
-    };
+    let checksum = checksum.to_hex();
     Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
 }
 
@@ -82,13 +79,7 @@ pub(crate) async fn url_src(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
-    let checksum = if let Some(sha256) = source.sha256() {
-        Checksum::Sha256(*sha256)
-    } else if let Some(md5) = source.md5() {
-        Checksum::Md5(*md5)
-    } else {
-        return Err(SourceError::NoChecksum(source.url().clone()));
-    };
+    let checksum = Checksum::try_from(source)?;
 
     if source.url().scheme() == "file" {
         let local_path = source.url().to_file_path().map_err(|_| {
@@ -102,15 +93,10 @@ pub(crate) async fn url_src(
             return Err(SourceError::FileNotFound(local_path));
         }
 
-        if let Some(sha256) = source.sha256() {
-            if !validate_checksum(&local_path, &Checksum::Sha256(*sha256)) {
-                return Err(SourceError::ValidationFailed);
-            }
-        } else if let Some(md5) = source.md5() {
-            if !validate_checksum(&local_path, &Checksum::Md5(*md5)) {
-                return Err(SourceError::ValidationFailed);
-            }
+        if !validate_checksum(&local_path, &checksum) {
+            return Err(SourceError::ValidationFailed);
         }
+
         tracing::info!("Using local source file.");
         return Ok(local_path);
     }
@@ -165,12 +151,15 @@ pub(crate) async fn url_src(
         file.write_all(&chunk).await?;
     }
 
+    progress_bar.finish();
+
+    file.flush().await?;
+
     if !validate_checksum(&cache_name, &checksum) {
         tracing::error!("Checksum validation failed!");
         fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);
     }
-    progress_bar.finish();
 
     Ok(cache_name)
 }

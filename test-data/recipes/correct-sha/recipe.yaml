@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+context:
+  version: '0.0.1'
+
+package:
+  name: test-package
+  version: ${{ version }}
+source:
+  - url: https://github.com/microsoft/mssql-jdbc/raw/v12.2.0/LICENSE
+    sha256: 96783d7ed4ff39e20c9ae6642ac6de02692ec8909e9910700e3694d68211ee97
+    file_name: mssql-jdbc-license.txt
+
+build:
+  number: 0
+  script:
+    - echo "Hello world!"
