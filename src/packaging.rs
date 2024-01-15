@@ -27,7 +27,7 @@ use rattler_package_streaming::write::{
 };
 
 use crate::macos;
-use crate::metadata::Output;
+use crate::metadata::{Output, PackagingSettings};
 use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
 use crate::{linux, post};
 
@@ -861,7 +861,7 @@ pub fn package_conda(
     new_files: &HashSet<PathBuf>,
     prefix: &Path,
     local_channel_dir: &Path,
-    package_format: ArchiveType,
+    packaging_settings: &PackagingSettings,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -1025,16 +1025,20 @@ pub fn package_conda(
     let identifier = output
         .identifier()
         .ok_or(PackagingError::BuildStringNotSet)?;
-    let out_path = output_folder.join(format!("{}{}", identifier, package_format.extension()));
+    let out_path = output_folder.join(format!(
+        "{}{}",
+        identifier,
+        packaging_settings.archive_type.extension()
+    ));
     let file = File::create(&out_path)?;
 
-    match package_format {
+    match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
             )?;
         }
@@ -1044,8 +1048,8 @@ pub fn package_conda(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
-                None,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
+                packaging_settings.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
             )?;
