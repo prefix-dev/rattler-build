@@ -1,0 +1,12 @@
+package:
+  name: additional_entrypoints
+  version: 0.1.0
+
+build:
+  python:
+    entry_points:
+      - additional_entrypoints = additional_entrypoints:main
+
+requirements:
+  host:
+    - python 3.11.*

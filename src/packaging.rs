@@ -664,6 +664,8 @@ fn create_entry_points(
         );
 
         if target_platform.is_windows() {
+            fs::create_dir_all(tmp_dir_path.join("Scripts"))?;
+
             let script_path = tmp_dir_path.join(format!("Scripts/{}-script.py", ep.command));
             let mut file = File::create(&script_path)?;
             file.write_all(script.as_bytes())?;
@@ -675,6 +677,8 @@ fn create_entry_points(
 
             new_files.extend(vec![script_path, exe_path]);
         } else {
+            fs::create_dir_all(tmp_dir_path.join("bin"))?;
+
             let script_path = tmp_dir_path.join(format!("bin/{}", ep.command));
             let mut file = File::create(&script_path)?;
             file.write_all(script.as_bytes())?;
