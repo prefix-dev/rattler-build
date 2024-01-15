@@ -14,5 +14,4 @@ system:
   rattler_build_version: test
   git_version: 2.43.0
   patchelf_version: 0.18.0
-  install_name_tool_version: 0.0.0
 

@@ -10,9 +10,6 @@ pub struct SystemInfo {
     /// `patchelf` version (Linux).
     #[serde(skip_serializing_if = "Option::is_none")]
     patchelf_version: Option<String>,
-    /// `install_name_tool` version (macOS).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    install_name_tool_version: Option<String>,
 }
 
 impl SystemInfo {
@@ -24,12 +21,7 @@ impl SystemInfo {
             ..Default::default()
         };
         system_info.git_version = Self::run_os_command("git", "version");
-        if cfg!(target_os = "linux") {
-            system_info.patchelf_version = Self::run_os_command("patchelf", "--version");
-        } else if cfg!(target_os = "macos") {
-            system_info.install_name_tool_version =
-                Self::run_os_command("install_name_tool", "--version");
-        }
+        system_info.patchelf_version = Self::run_os_command("patchelf", "--version");
         system_info
     }
 
@@ -40,7 +32,6 @@ impl SystemInfo {
             rattler_build_version: String::from("test"),
             git_version: Some(String::from("2.43.0")),
             patchelf_version: Some(String::from("0.18.0")),
-            install_name_tool_version: Some(String::from("0.0.0")),
         }
     }
 
