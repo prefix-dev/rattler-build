@@ -44,6 +44,11 @@ recipe:
       - LICENSE
     summary: "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
     description: "Rich is a Python library for rich text and beautiful formatting in the terminal.\n\nThe Rich API makes it easy to add color and style to terminal output. Rich\ncan also render pretty tables, progress bars, markdown, syntax highlighted\nsource code, tracebacks, and more — out of the box."
+  system:
+    rattler_build_version: test
+    git_version: 2.43.0
+    patchelf_version: 0.18.0
+    install_name_tool_version: 0.0.0
 build_configuration:
   target_platform: noarch
   host_platform: osx-arm64
