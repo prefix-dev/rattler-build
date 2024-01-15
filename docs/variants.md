@@ -8,7 +8,7 @@ For this use case, one can specify _variant_ configuration files. A variant
 configuration file has 2 special entries and a list of packages with variants.
 For example:
 
-```yaml
+```yaml title="variants.yaml"
 # special entry #1, the zip keys
 zip_keys:
 - [python, numpy]
@@ -34,7 +34,7 @@ numpy:
 We can pass a variant configuration file to `rattler-build` using a command line
 like this:
 
-```
+```sh
 rattler-build --variant-config ./variants.yaml --recipe-file myrecipe.yaml
 ```
 
