@@ -660,7 +660,12 @@ fn create_entry_points(
                 .to_string_lossy(),
             ep,
             &PythonInfo::from_version(&python_version, output.build_configuration.target_platform)
-                .unwrap(),
+                .map_err(|e| {
+                    PackagingError::CannotCreateEntryPoint(format!(
+                        "Could not create python info: {}",
+                        e
+                    ))
+                })?,
         );
 
         if target_platform.is_windows() {
