@@ -358,7 +358,7 @@ pub async fn run_build(
             &result,
             &TestConfiguration {
                 test_prefix: test_dir.clone(),
-                target_platform: Some(output.build_configuration.target_platform),
+                target_platform: Some(output.build_configuration.host_platform),
                 keep_test_prefix: tool_configuration.no_clean,
                 channels,
                 tool_configuration: tool_configuration.clone(),

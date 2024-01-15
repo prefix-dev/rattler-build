@@ -451,7 +451,7 @@ async fn run_shell_test(
         format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
     )?);
 
-    let platform = Platform::current();
+    let platform = config.target_platform.unwrap_or_else(Platform::current);
 
     create_environment(
         &dependencies,

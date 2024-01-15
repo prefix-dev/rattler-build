@@ -6,10 +6,10 @@ package:
 
 requirements:
   host:
-    - zlib 
+    - zlib
   run_exports:
     - ${{ pin_subpackage("run_exports_test", exact=True) }}
   # avoid from package
   ignore_run_exports:
     from_package:
-      - zlib 
+      - zlib
