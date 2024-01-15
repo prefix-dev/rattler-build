@@ -8,8 +8,10 @@ pub struct SystemInfo {
     /// Git version.
     git_version: Option<String>,
     /// `patchelf` version (Linux).
+    #[serde(skip_serializing_if = "Option::is_none")]
     patchelf_version: Option<String>,
     /// `install_name_tool` version (macOS).
+    #[serde(skip_serializing_if = "Option::is_none")]
     install_name_tool_version: Option<String>,
 }
 
