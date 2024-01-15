@@ -117,7 +117,7 @@ impl FromStr for PackageFormatAndCompression {
         let mut split = s.split(':');
         let package_format = split.next().ok_or("invalid")?;
 
-        let compression = split.next().ok_or("default")?;
+        let compression = split.next().unwrap_or("default");
 
         // remove all non-alphanumeric characters
         let package_format = package_format
@@ -197,7 +197,7 @@ struct BuildOpts {
 
     /// The package format to use for the build.
     /// Defaults to `.tar.bz2`.
-    #[arg(long, default_value = "tar-bz2:1")]
+    #[arg(long, default_value = "tar-bz2")]
     package_format: PackageFormatAndCompression,
 
     #[arg(long)]
@@ -811,6 +811,24 @@ mod test {
 
     #[test]
     fn test_parse_packaging() {
+        let package_format = PackageFormatAndCompression::from_str("tar-bz2").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
         let package_format = PackageFormatAndCompression::from_str("tar-bz2:1").unwrap();
         assert_eq!(
             package_format,
