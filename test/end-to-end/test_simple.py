@@ -284,7 +284,7 @@ def test_anaconda_upload(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
 def test_cross_testing(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ) -> None:
     native_platform = host_subdir()
     if native_platform.startswith("linux"):
@@ -297,3 +297,20 @@ def test_cross_testing(
         tmp_path,
         extra_args=["--target-platform", target_platform],
     )
+
+
+def test_additional_entrypoints(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "entry_points/additional_entrypoints.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "additional_entrypoints")
+
+    if os.name == "nt":
+        assert (pkg / "Scripts/additional_entrypoints-script.py").exists()
+        assert (pkg / "Scripts/additional_entrypoints.exe").exists()
+    else:
+        assert (pkg / "bin/additional_entrypoints").exists()

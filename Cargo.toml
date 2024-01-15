@@ -132,6 +132,7 @@ rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", bran
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
 # rattler_digest = { path = "../rattler/crates/rattler_digest" }
+# rattler_index = { path = "../rattler/crates/rattler_index" }
 # rattler_networking = { path = "../rattler/crates/rattler_networking" }
 # rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
