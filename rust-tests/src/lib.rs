@@ -524,7 +524,7 @@ mod tests {
         assert!(rattler_upload.status.success());
         assert!(output.contains("Done uploading packages to conda-forge"));
     }
-    
+
     #[test]
     fn test_correct_sha256() {
         let tmp = tmp("correct-sha");
