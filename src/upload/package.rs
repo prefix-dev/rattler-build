@@ -20,6 +20,7 @@ pub struct ExtractedPackage<'a> {
     file: &'a Path,
     about_json: AboutJson,
     index_json: IndexJson,
+    extraction_dir: tempfile::TempDir,
 }
 
 impl<'a> ExtractedPackage<'a> {
@@ -38,6 +39,7 @@ impl<'a> ExtractedPackage<'a> {
             file,
             about_json,
             index_json,
+            extraction_dir,
         })
     }
 
@@ -80,5 +82,9 @@ impl<'a> ExtractedPackage<'a> {
 
     pub fn index_json(&self) -> &IndexJson {
         &self.index_json
+    }
+
+    pub fn extraction_dir(&self) -> &Path {
+        self.extraction_dir.path()
     }
 }

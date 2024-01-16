@@ -297,10 +297,6 @@ struct AnacondaOpts {
 /// Options for uploading to conda-forge
 #[derive(Clone, Debug, PartialEq, Parser)]
 pub struct CondaForgeOpts {
-    /// The label to upload the package to (e.g. main / rc)
-    #[arg(long, env = "CONDA_FORGE_LABEL", required = true)]
-    label: String,
-
     /// The Anaconda API key
     #[arg(long, env = "STAGING_BINSTAR_TOKEN", required = true)]
     staging_token: String,
@@ -340,6 +336,10 @@ pub struct CondaForgeOpts {
     /// The CI provider
     #[arg(long, env = "CI")]
     provider: Option<String>,
+
+    /// Dry run, don't actually upload anything
+    #[arg(long, env = "DRY_RUN", default_value = "false")]
+    dry_run: bool,
 }
 
 #[tokio::main]
@@ -762,7 +762,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             .await?;
         }
         ServerType::CondaForge(conda_forge_opts) => {
-            upload::conda_forge::upload_package_to_conda_forge(
+            upload::conda_forge::upload_packages_to_conda_forge(
                 conda_forge_opts,
                 &args.package_files,
             )
