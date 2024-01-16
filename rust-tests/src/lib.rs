@@ -170,28 +170,47 @@ mod tests {
 
     #[test]
     fn test_help() {
-        let help_test = rattler()
-            .with_args(["help"])
-            .map(|out| out.stdout)
-            .map(|s| {
-                #[cfg(target_family = "unix")]
-                return s.starts_with(b"Usage: rattler-build [OPTIONS]");
-                #[cfg(target_family = "windows")]
-                return s.starts_with(b"Usage: rattler-build.exe [OPTIONS]");
-            })
-            .unwrap();
-        assert!(help_test);
+        let help_test = rattler().with_args(["help"]).map(|out| out.stdout).unwrap();
+
+        let help_text = help_test.split(|c| *c == b'\n').collect::<Vec<_>>();
+
+        #[cfg(target_family = "unix")]
+        assert!(help_text[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        #[cfg(target_family = "windows")]
+        assert!(help_text[2].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
     }
 
     #[test]
     fn test_no_cmd() {
-        let help_test = rattler()
-            // no heap allocations happen here, ideally!
+        let help_text = rattler()
             .with_args(Vec::<&str>::new())
             .map(|out| out.stdout)
-            .map(|s| s.starts_with(b"Usage: rattler-build [OPTIONS]"))
             .unwrap();
-        assert!(help_test);
+        let lines = help_text.split(|c| *c == b'\n').collect::<Vec<_>>();
+        assert!(lines[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+    }
+
+    #[test]
+    fn test_run_exports_from() {
+        let recipes = recipes();
+        let tmp = tmp("test_run_exports_from");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes.join("run_exports_from"), tmp.as_dir(), None);
+        // ensure rattler build succeeded
+        assert!(rattler_build.is_ok());
+        let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
+        assert!(pkg.join("info/run_exports.json").exists());
+        let actual_run_export: HashMap<String, Vec<String>> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/run_exports.json")).unwrap())
+                .unwrap();
+        assert!(actual_run_export.contains_key("weak"));
+        assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
+        let x = &actual_run_export.get("weak").unwrap()[0];
+        assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
+        assert!(pkg.join("info/index.json").exists());
+        let index_json: HashMap<String, serde_json::Value> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+        assert!(index_json.get("depends").is_none());
     }
 
     #[test]
@@ -211,6 +230,10 @@ mod tests {
         assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
         let x = &actual_run_export.get("weak").unwrap()[0];
         assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
+        assert!(pkg.join("info/index.json").exists());
+        let index_json: HashMap<String, serde_json::Value> =
+            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+        assert!(index_json.get("depends").is_none());
     }
 
     fn get_package(folder: impl AsRef<Path>, mut glob_str: String) -> PathBuf {
@@ -500,5 +523,14 @@ mod tests {
         let output = String::from_utf8(rattler_upload.stderr).unwrap();
         assert!(rattler_upload.status.success());
         assert!(output.contains("Done uploading packages to conda-forge"));
+    }
+    
+    #[test]
+    fn test_correct_sha256() {
+        let tmp = tmp("correct-sha");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("correct-sha"), tmp.as_dir(), None);
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
     }
 }

@@ -9,7 +9,7 @@ requirements:
     - zlib
   run_exports:
     - ${{ pin_subpackage("run_exports_test", exact=True) }}
-  # avoid adding libzlib
+  # avoid from package
   ignore_run_exports:
-    by_name:
-      - libzlib
+    from_package:
+      - zlib

@@ -1,6 +1,7 @@
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
+use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -27,7 +28,7 @@ use rattler_package_streaming::write::{
 };
 
 use crate::macos;
-use crate::metadata::Output;
+use crate::metadata::{Output, PackagingSettings};
 use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
 use crate::{linux, post};
 
@@ -71,6 +72,9 @@ pub enum PackagingError {
 
     #[error(transparent)]
     SourceError(#[from] crate::source::SourceError),
+
+    #[error("could not create python entry point: {0}")]
+    CannotCreateEntryPoint(String),
 }
 
 #[allow(unused_variables)]
@@ -133,7 +137,7 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
 }
 
 #[allow(dead_code)]
-fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
+pub(crate) fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
     {
         let mut buf = String::new();
@@ -454,7 +458,8 @@ fn write_to_dest(
     }
 
     if noarch_type.is_python() {
-        if ext == "pyc" {
+        // skip .pyc or .pyo or .egg-info files
+        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
             return Ok(None); // skip .pyc files
         }
 
@@ -610,6 +615,90 @@ fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     };
 
     Ok(Some(serde_json::to_string_pretty(&link_json)?))
+}
+
+/// Create the python entry point script for the recipe. Overwrites any existing entry points.
+fn create_entry_points(
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    if output.recipe.build().python().entry_points().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let target_platform = &output.build_configuration.target_platform;
+    let mut new_files = Vec::new();
+
+    let host_deps = output
+        .finalized_dependencies
+        .as_ref()
+        .ok_or_else(|| PackagingError::DependenciesNotFinalized)?
+        .host
+        .clone()
+        .ok_or_else(|| {
+            PackagingError::CannotCreateEntryPoint("Could not find host dependencies".to_string())
+        })?;
+
+    let python_record = host_deps
+        .resolved
+        .iter()
+        .find(|dep| dep.package_record.name.as_normalized() == "python");
+    let python_version = if let Some(python_record) = python_record {
+        python_record.package_record.version.version().clone()
+    } else {
+        return Err(PackagingError::CannotCreateEntryPoint(
+            "Could not find python in host dependencies".to_string(),
+        ));
+    };
+
+    for ep in output.recipe.build().python().entry_points() {
+        let script = python_entry_point_template(
+            &output
+                .build_configuration
+                .directories
+                .host_prefix
+                .to_string_lossy(),
+            ep,
+            &PythonInfo::from_version(&python_version, output.build_configuration.target_platform)
+                .map_err(|e| {
+                    PackagingError::CannotCreateEntryPoint(format!(
+                        "Could not create python info: {}",
+                        e
+                    ))
+                })?,
+        );
+
+        if target_platform.is_windows() {
+            fs::create_dir_all(tmp_dir_path.join("Scripts"))?;
+
+            let script_path = tmp_dir_path.join(format!("Scripts/{}-script.py", ep.command));
+            let mut file = File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            // write exe launcher as well
+            let exe_path = tmp_dir_path.join(format!("Scripts/{}.exe", ep.command));
+            let mut exe = File::create(&exe_path)?;
+            exe.write_all(get_windows_launcher(target_platform))?;
+
+            new_files.extend(vec![script_path, exe_path]);
+        } else {
+            fs::create_dir_all(tmp_dir_path.join("bin"))?;
+
+            let script_path = tmp_dir_path.join(format!("bin/{}", ep.command));
+            let mut file = File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            #[cfg(target_family = "unix")]
+            std::fs::set_permissions(
+                &script_path,
+                std::os::unix::fs::PermissionsExt::from_mode(0o775),
+            )?;
+
+            new_files.push(script_path);
+        }
+    }
+
+    Ok(new_files)
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -860,7 +949,7 @@ pub fn package_conda(
     new_files: &HashSet<PathBuf>,
     prefix: &Path,
     local_channel_dir: &Path,
-    package_format: ArchiveType,
+    packaging_settings: &PackagingSettings,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -926,12 +1015,28 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    if output.build_configuration.target_platform != Platform::NoArch {
+    let dynamic_linking = output.recipe.build().dynamic_linking();
+    let relocation_config = dynamic_linking
+        .clone()
+        .and_then(|v| v.binary_relocation())
+        .unwrap_or_default();
+    if output.build_configuration.target_platform != Platform::NoArch
+        && !relocation_config.no_relocation()
+    {
+        let rpath_allowlist = match dynamic_linking {
+            Some(v) => v.rpath_allowlist()?,
+            None => Vec::new(),
+        };
+        let mut binaries = tmp_files.clone();
+        if let Some(paths) = relocation_config.relocate_paths()? {
+            binaries.retain(|v| paths.iter().any(|glob| glob.is_match(v)));
+        }
         post::relink(
-            &tmp_files,
+            &binaries,
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
+            &rpath_allowlist,
         )?;
     }
 
@@ -981,12 +1086,16 @@ pub fn package_conda(
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
 
+    // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
         if let Some(link) = create_link_json(output)? {
             let mut link_json = File::create(info_folder.join("link.json"))?;
             link_json.write_all(link.as_bytes())?;
             tmp_files.insert(info_folder.join("link.json"));
         }
+    } else {
+        let entry_points = create_entry_points(output, tmp_dir_path)?;
+        tmp_files.extend(entry_points);
     }
 
     // print sorted files
@@ -1008,16 +1117,20 @@ pub fn package_conda(
     let identifier = output
         .identifier()
         .ok_or(PackagingError::BuildStringNotSet)?;
-    let out_path = output_folder.join(format!("{}{}", identifier, package_format.extension()));
+    let out_path = output_folder.join(format!(
+        "{}{}",
+        identifier,
+        packaging_settings.archive_type.extension()
+    ));
     let file = File::create(&out_path)?;
 
-    match package_format {
+    match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
             )?;
         }
@@ -1027,7 +1140,8 @@ pub fn package_conda(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
+                packaging_settings.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
             )?;

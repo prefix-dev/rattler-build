@@ -91,6 +91,18 @@ Recipe {
         python: Python {
             entry_points: [],
         },
+        dynamic_linking: Some(
+            DynamicLinking {
+                rpath_allowlist: [
+                    "/usr/lib/**",
+                ],
+                binary_relocation: Some(
+                    All(
+                        true,
+                    ),
+                ),
+            },
+        ),
     },
     requirements: Requirements {
         build: [

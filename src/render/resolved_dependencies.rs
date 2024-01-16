@@ -517,6 +517,23 @@ pub async fn resolve_dependencies(
         let mut cloned = Vec::new();
         for spec in specs {
             let spec = MatchSpec::from_str(spec)?;
+            let in_ignore_run_exports = |pkg| {
+                output
+                    .recipe
+                    .requirements()
+                    .ignore_run_exports()
+                    .by_name()
+                    .contains(pkg)
+            };
+            if spec
+                .name
+                .as_ref()
+                .map(in_ignore_run_exports)
+                .unwrap_or_default()
+            {
+                continue;
+            }
+
             let dep = DependencyInfo::RunExport {
                 spec,
                 from: env.to_string(),
@@ -548,9 +565,17 @@ pub async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         let run_exports = collect_run_exports_from_env(&env, &pkgs_dir, |rec| {
-            match_specs
+            let res = match_specs
                 .iter()
-                .any(|m| Some(&rec.package_record.name) == m.name.as_ref())
+                .any(|m| Some(&rec.package_record.name) == m.name.as_ref());
+
+            let ignore_run_exports_from = output
+                .recipe
+                .requirements()
+                .ignore_run_exports()
+                .from_package();
+
+            res && !ignore_run_exports_from.contains(&rec.package_record.name)
         })
         .map_err(ResolveError::CouldNotCollectRunExports)?;
 

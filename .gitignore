@@ -5,5 +5,8 @@ target/
 __pycache__/
 .pytest_cache/
 
+# mkdocs
+.cache
+
 # pixi environments
 .pixi

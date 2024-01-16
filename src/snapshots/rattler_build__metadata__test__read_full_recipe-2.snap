@@ -51,7 +51,10 @@ build_configuration:
       name: curl
       version: 8.0.1
       build_string: h60d57d3_0
-  package_format: tar_bz2
+  packaging_settings:
+    archive_type: tar_bz2
+    compression_level: 3
+    compression_threads: 1
 finalized_dependencies:
   build:
     specs:

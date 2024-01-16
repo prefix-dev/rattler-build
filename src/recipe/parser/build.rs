@@ -1,9 +1,11 @@
 use std::str::FromStr;
 
+use globset::{Glob, GlobMatcher};
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::{Dependency, FlattenErrors};
+use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::{
     _partialerror,
@@ -43,6 +45,9 @@ pub struct Build {
     /// Python specific build configuration
     #[serde(default, skip_serializing_if = "Python::is_default")]
     pub(super) python: Python,
+    /// Settings for shared libraries and executables
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) dynamic_linking: Option<DynamicLinking>,
     // TODO: Add and parse the rest of the fields
 }
 
@@ -75,6 +80,11 @@ impl Build {
     /// Python specific build configuration.
     pub const fn python(&self) -> &Python {
         &self.python
+    }
+
+    /// Settings for shared libraries and executables
+    pub const fn dynamic_linking(&self) -> &Option<DynamicLinking> {
+        &self.dynamic_linking
     }
 
     /// Check if the build should be skipped.
@@ -116,6 +126,9 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     "python" => {
                         build.python = value.try_convert(key_str)?;
                     }
+                    "dynamic_linking" => {
+                        build.dynamic_linking = value.try_convert(key_str)?;
+                    }
                     invalid => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -128,6 +141,141 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             .flatten_errors()?;
 
         Ok(build)
+    }
+}
+
+/// Settings for shared libraries and executables.
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct DynamicLinking {
+    /// Allow runpath / rpath to point to these locations outside of the environment.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) rpath_allowlist: Vec<String>,
+    /// Whether to relocate binaries or not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(super) binary_relocation: Option<BinaryRelocation>,
+}
+
+impl DynamicLinking {
+    /// Get the rpath allow list.
+    pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
+        let mut matchers = Vec::new();
+        for glob in self.rpath_allowlist.iter() {
+            let glob = Glob::new(glob)?.compile_matcher();
+            matchers.push(glob);
+        }
+        Ok(matchers)
+    }
+
+    // Get the binary relocation settings.
+    pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
+        self.binary_relocation.clone()
+    }
+}
+
+impl TryConvertNode<DynamicLinking> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
+        let mut dynamic_linking = DynamicLinking::default();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match key_str {
+                "rpath_allowlist" => {
+                    dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
+                }
+                "binary_relocation" => {
+                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
+                }
+                invalid => {
+                    return Err(vec![_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(invalid.to_string().into()),
+                    )]);
+                }
+            }
+        }
+
+        Ok(dynamic_linking)
+    }
+}
+
+/// Settings for relocating binaries.
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum BinaryRelocation {
+    /// Relocate all binaries.
+    All(bool),
+    /// Relocate specific paths.
+    SpecificPaths(Vec<String>),
+}
+
+impl Default for BinaryRelocation {
+    fn default() -> Self {
+        Self::All(true)
+    }
+}
+
+impl BinaryRelocation {
+    /// Return the paths to relocate.
+    pub fn relocate_paths(&self) -> Result<Option<Vec<GlobMatcher>>, globset::Error> {
+        match self {
+            BinaryRelocation::All(_) => Ok(None),
+            BinaryRelocation::SpecificPaths(paths) => {
+                let mut matchers = Vec::new();
+                for glob in paths {
+                    let glob = Glob::new(glob)?.compile_matcher();
+                    matchers.push(glob);
+                }
+                Ok(Some(matchers))
+            }
+        }
+    }
+
+    /// Returns true if there will be no relocation.
+    pub fn no_relocation(&self) -> bool {
+        self == &Self::All(false)
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        if let Some(sequence) = self.as_sequence() {
+            sequence.try_convert(name)
+        } else if let Some(scalar) = self.as_scalar() {
+            scalar.try_convert(name)
+        } else {
+            Err(vec![
+                _partialerror!(*self.span(), ErrorKind::ExpectedScalar),
+                _partialerror!(*self.span(), ErrorKind::ExpectedSequence),
+            ])
+        }
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        let mut paths = Vec::with_capacity(self.len());
+        for item in self.iter() {
+            paths.push(item.try_convert(name)?)
+        }
+        Ok(BinaryRelocation::SpecificPaths(paths))
+    }
+}
+
+impl TryConvertNode<BinaryRelocation> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+        let mut binary_relocation = BinaryRelocation::default();
+        if let Some(relocate) = self.as_bool() {
+            binary_relocation = BinaryRelocation::All(relocate);
+        }
+        Ok(binary_relocation)
     }
 }
 

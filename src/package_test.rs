@@ -20,13 +20,14 @@ use rattler_conda_types::{
     package::{ArchiveIdentifier, PathsJson},
     MatchSpec, Platform,
 };
+use rattler_index::index;
 use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
     shell::{Shell, ShellEnum, ShellScript},
 };
 
 use crate::{
-    env_vars, index,
+    env_vars,
     recipe::parser::{CommandsTestRequirements, PackageContents, PythonTest},
     render::solver::create_environment,
     tool_configuration,
@@ -270,7 +271,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     )?;
 
     // index the temporary channel
-    index::index(tmp_repo.path(), Some(&target_platform))?;
+    index(tmp_repo.path(), Some(&target_platform))?;
 
     let cache_dir = rattler::default_cache_dir()?;
 
@@ -450,7 +451,7 @@ async fn run_shell_test(
         format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
     )?);
 
-    let platform = Platform::current();
+    let platform = config.target_platform.unwrap_or_else(Platform::current);
 
     create_environment(
         &dependencies,

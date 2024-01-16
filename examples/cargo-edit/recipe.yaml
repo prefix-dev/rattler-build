@@ -21,9 +21,9 @@ requirements:
     - ${{ compiler('rust') }}
     - cargo-bundle-licenses
 
-test:
-  commands:
-    - cargo-upgrade --help
+tests:
+  - script:
+      - cargo-upgrade --help
 
 about:
   homepage: https://github.com/killercup/cargo-edit

@@ -1,4 +1,5 @@
 //! Relink shared objects to use an relative path prefix
+use globset::GlobMatcher;
 use goblin::elf::Elf;
 use goblin::elf64::header::ELFMAG;
 use itertools::Itertools;
@@ -73,8 +74,13 @@ impl SharedObject {
 
     /// find all RPATH and RUNPATH entries
     /// replace them with the encoded prefix
-    /// if the prefix is not found, add it to the end of the list
-    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+    /// if the rpath is outside of the prefix, it is removed
+    pub fn relink(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+        rpath_allowlist: &[GlobMatcher],
+    ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::debug!("{} is not dynamically linked", self.path.display());
             return Ok(());
@@ -100,7 +106,7 @@ impl SharedObject {
             if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
                 let relative_path = pathdiff::diff_paths(
-                    new_rpath,
+                    &new_rpath,
                     self.path.parent().ok_or(RelinkError::NoParentDir)?,
                 )
                 .ok_or(RelinkError::PathDiffFailed)?;
@@ -109,8 +115,16 @@ impl SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
-            } else {
+            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+                tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpath.push(rpath.clone());
+            } else {
+                tracing::warn!(
+                    "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
+                    rpath,
+                    encoded_prefix,
+                    self.path
+                );
             }
         }
 
@@ -150,6 +164,58 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
         );
         Err(RelinkError::PatchElfFailed)
     } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[cfg(target_os = "linux")]
+mod test {
+    use super::*;
+    use globset::Glob;
+    use std::{fs, path::Path};
+    use tempfile::tempdir_in;
+
+    // Assert the following case:
+    //
+    // rpath: "/rattler-build_zlink/host_env_placehold/lib"
+    // encoded prefix: "/rattler-build_zlink/host_env_placehold"
+    // binary path: test-data/binary_files/tmp/zlink
+    // prefix: "test-data/binary_files"
+    // new rpath: $ORIGIN/../lib
+    #[test]
+    fn relink() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let binary_path = tmp_dir.join("zlink");
+        fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        // default rpaths of the test binary are:
+        // - /rattler-build_zlink/host_env_placehold/lib
+        // - /rattler-build_zlink/build_env/lib
+        // so we are expecting it to keep the host prefix and discard the build prefix
+        let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
+        let object = SharedObject::new(&binary_path)?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[Glob::new("/usr/lib/custom**").unwrap().compile_matcher()],
+        )?;
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+
+        // manually clean up temporary directory because it was
+        // persisted to disk by calling `into_path`
+        fs::remove_dir_all(tmp_dir)?;
+
         Ok(())
     }
 }

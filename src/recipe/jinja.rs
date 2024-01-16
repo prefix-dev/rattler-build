@@ -1,5 +1,6 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
+use std::process::Command;
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
@@ -177,6 +178,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         target_platform,
         build_platform,
         variant,
+        experimental,
         ..
     } = config.clone();
     env.add_function("cdt", move |package_name: String| {
@@ -240,7 +242,232 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         format!("{}{}", major, minor)
     });
 
+    env.add_function("load_from_file", move |path: String| {
+        if !experimental {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Experimental feature: provide the `--experimental` flag to enable this feature",
+            ));
+        }
+        let src = std::fs::read_to_string(&path).map_err(|e| {
+            minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
+        })?;
+        // tracing::info!("loading from path: {path}");
+        let filename = path
+            .split('/')
+            .last()
+            .expect("unreachable: split will always atleast return empty string");
+        // tracing::info!("loading filename: {filename}");
+        let value: minijinja::Value = match filename.split_once('.') {
+            Some((_, "yaml")) | Some((_, "yml")) => serde_yaml::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            Some((_, "json")) => serde_json::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            Some((_, "toml")) => toml::from_str(&src).map_err(|e| {
+                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+            })?,
+            _ => Value::from(src),
+        };
+        Ok(value)
+    });
+
     env
+}
+
+#[derive(Debug)]
+pub(crate) struct Git {
+    pub(crate) experimental: bool,
+}
+impl std::fmt::Display for Git {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Git")
+    }
+}
+
+impl Object for Git {
+    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
+        minijinja::value::ObjectKind::Plain
+    }
+
+    fn call_method(
+        &self,
+        _state: &minijinja::State,
+        name: &str,
+        args: &[Value],
+    ) -> Result<Value, minijinja::Error> {
+        if !self.experimental {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "Experimental feature: provide the `--experimental` flag to enable this feature",
+            ));
+        }
+        match name {
+            "head_rev" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`head_hash` requires at least one argument",
+                    ));
+                };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`head_hash` only accepts one argument",
+                    ));
+                }
+                let Some(src) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`head_hash` requires a string argument",
+                    ));
+                };
+                let output = Command::new("git")
+                    .args(["ls-remote", src, "HEAD"])
+                    .output()
+                    .map_err(|e| {
+                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+                    })?;
+                let value = if !output.status.success() {
+                    Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                    ))?
+                } else {
+                    String::from_utf8(output.stdout)
+                        .map_err(|e| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                e.to_string(),
+                            )
+                        })?
+                        .lines()
+                        .next()
+                        .and_then(|s| s.split_ascii_whitespace().nth(0))
+                        .ok_or_else(|| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                "Failed to get the HEAD".to_string(),
+                            )
+                        })?
+                        .to_string()
+                };
+                Ok(Value::from(value))
+            }
+            "latest_tag_rev" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`latest_tag_rev` requires at least one argument",
+                    ));
+                };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag_rev` only accepts one argument",
+                    ));
+                }
+                let Some(src) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag_rev` requires a string argument",
+                    ));
+                };
+                let output = Command::new("git")
+                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
+                    .output()
+                    .map_err(|e| {
+                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+                    })?;
+                let value = if !output.status.success() {
+                    Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                    ))?
+                } else {
+                    String::from_utf8(output.stdout)
+                        .map_err(|e| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                e.to_string(),
+                            )
+                        })?
+                        .lines()
+                        .last()
+                        .and_then(|s| s.split_ascii_whitespace().nth(0))
+                        .ok_or_else(|| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                "Failed to get the latest tag".to_string(),
+                            )
+                        })?
+                        .to_string()
+                };
+                Ok(Value::from(value))
+            }
+            "latest_tag" => {
+                let mut args = args.iter();
+                let Some(arg) = args.next() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::MissingArgument,
+                        "`latest_tag` requires at least one argument",
+                    ));
+                };
+                if args.next().is_some() {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag` only accepts one argument",
+                    ));
+                }
+                let Some(src) = arg.as_str() else {
+                    return Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        "`latest_tag` requires a string argument",
+                    ));
+                };
+                let output = Command::new("git")
+                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
+                    .output()
+                    .map_err(|e| {
+                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+                    })?;
+                let value = if !output.status.success() {
+                    Err(minijinja::Error::new(
+                        minijinja::ErrorKind::InvalidOperation,
+                        String::from_utf8_lossy(&output.stderr).to_string(),
+                    ))?
+                } else {
+                    String::from_utf8(output.stdout)
+                        .map_err(|e| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                e.to_string(),
+                            )
+                        })?
+                        .lines()
+                        .last()
+                        .and_then(|s| s.split_ascii_whitespace().nth(1))
+                        .and_then(|s| s.strip_prefix("refs/tags/"))
+                        .map(|s| s.trim_end_matches("^{}"))
+                        .ok_or_else(|| {
+                            minijinja::Error::new(
+                                minijinja::ErrorKind::InvalidOperation,
+                                "Failed to get the latest tag".to_string(),
+                            )
+                        })?
+                        .to_string()
+                };
+                Ok(Value::from(value))
+            }
+            name => Err(minijinja::Error::new(
+                minijinja::ErrorKind::UnknownMethod,
+                format!("object has no method named {name}"),
+            )),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -358,9 +585,125 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use rattler_conda_types::Platform;
 
+    use crate::packaging::to_forward_slash_lossy;
+
     use super::*;
+
+    fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
+        let tempdir = tempfile::tempdir().unwrap();
+        let dir = tempdir.path().join(key);
+        _ = std::fs::create_dir_all(&dir).unwrap();
+        f(&dir);
+        _ = std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn git_setup(path: &Path) -> anyhow::Result<()> {
+        let git_config = r#"
+[user]
+	name = John Doe
+	email = johndoe@example.ne
+"#;
+        std::fs::write(path.join(".git/config"), git_config)?;
+        Ok(())
+    }
+
+    fn create_repo_with_tag(path: impl AsRef<Path>, tag: impl AsRef<str>) -> anyhow::Result<()> {
+        let git_with_args = |arg: &str, args: &[&str]| -> anyhow::Result<bool> {
+            Ok(Command::new("git")
+                .current_dir(&path)
+                .arg(arg)
+                .args(args)
+                // .stderr(std::process::Stdio::inherit())
+                // .stdout(std::process::Stdio::inherit())
+                .output()?
+                .status
+                .success())
+        };
+        if git_with_args("init", &[])? {
+            git_setup(path.as_ref())?;
+            std::fs::write(path.as_ref().join("README.md"), "init")?;
+            let git_add = git_with_args("add", &["."])?;
+            let commit_created = git_with_args("commit", &["-m", "init", "--no-gpg-sign"])?;
+            let tag_created = git_with_args("tag", &[tag.as_ref()])?;
+            if !git_add || !commit_created || !tag_created {
+                anyhow::bail!("failed to create add, commit or tag");
+            }
+        } else {
+            anyhow::bail!("failed to create git repo");
+        }
+        Ok(())
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn eval_git() {
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            experimental: true,
+            ..Default::default()
+        };
+        let options_wo_experimental = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+        let jinja_wo_experimental = Jinja::new(options_wo_experimental);
+
+        with_temp_dir("rattler_build_recipe_jinja_eval_git", |path| {
+            create_repo_with_tag(path, "v0.1.0").expect("Failed to clone the git repo");
+            assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
+            assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1 left").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 1 right").as_str().unwrap());
+            assert_eq!(
+                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 2").to_string(),
+                "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
+            );
+        });
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn eval_load_from_file() {
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            experimental: true,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("test.json");
+        let path_str = to_forward_slash_lossy(&path);
+        std::fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 1").as_str(),
+            Some("world"),
+        );
+
+        let path = temp_dir.path().join("test.yaml");
+        std::fs::write(&path, "hello: world").unwrap();
+        let path_str = to_forward_slash_lossy(&path);
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
+            Some("world"),
+        );
+
+        let path = temp_dir.path().join("test.toml");
+        let path_str = to_forward_slash_lossy(&path);
+        std::fs::write(&path, "hello = 'world'").unwrap();
+        assert_eq!(
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
+            Some("world"),
+        );
+    }
 
     #[test]
     #[rustfmt::skip]
@@ -368,8 +711,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
@@ -393,8 +735,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: BTreeMap::new(),
-            hash: None,
+            ..Default::default()
         };
 
         let jinja = Jinja::new(options);
@@ -409,7 +750,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -438,7 +779,7 @@ mod tests {
             target_platform: Platform::Linux32,
             build_platform: Platform::Linux32,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -467,7 +808,7 @@ mod tests {
             target_platform: Platform::LinuxAarch64,
             build_platform: Platform::LinuxAarch64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -496,7 +837,7 @@ mod tests {
             target_platform: Platform::LinuxArmV6l,
             build_platform: Platform::LinuxArmV6l,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -527,7 +868,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -549,7 +890,7 @@ mod tests {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 
@@ -579,8 +920,7 @@ mod tests {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
-            variant: Default::default(),
-            hash: None,
+            ..Default::default()
         };
         let jinja = Jinja::new(options);
 

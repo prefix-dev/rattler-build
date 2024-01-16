@@ -14,6 +14,7 @@ use std::process::{Command, Stdio};
 
 use itertools::Itertools;
 use miette::IntoDiagnostic;
+use rattler_index::index;
 use rattler_shell::shell;
 
 use crate::env_vars::write_env_script;
@@ -23,7 +24,7 @@ use crate::packaging::{package_conda, record_files};
 use crate::recipe::parser::{ScriptContent, TestType};
 use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
-use crate::{index, package_test, tool_configuration};
+use crate::{package_test, tool_configuration};
 
 const BASH_PREAMBLE: &str = r#"
 ## Start of bash preamble
@@ -207,7 +208,7 @@ pub async fn run_build(
 ) -> miette::Result<PathBuf> {
     let directories = &output.build_configuration.directories;
 
-    index::index(
+    index(
         &directories.output_dir,
         Some(&output.build_configuration.target_platform),
     )
@@ -315,7 +316,7 @@ pub async fn run_build(
         &difference,
         &directories.host_prefix,
         &directories.output_dir,
-        output.build_configuration.package_format,
+        &output.build_configuration.packaging_settings,
     )
     .into_diagnostic()?;
 
@@ -337,7 +338,7 @@ pub async fn run_build(
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
-    index::index(
+    index(
         &directories.output_dir,
         Some(&output.build_configuration.target_platform),
     )
@@ -357,7 +358,7 @@ pub async fn run_build(
             &result,
             &TestConfiguration {
                 test_prefix: test_dir.clone(),
-                target_platform: Some(output.build_configuration.target_platform),
+                target_platform: Some(output.build_configuration.host_platform),
                 keep_test_prefix: tool_configuration.no_clean,
                 channels,
                 tool_configuration: tool_configuration.clone(),

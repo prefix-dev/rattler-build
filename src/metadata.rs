@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
 use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
+use rattler_package_streaming::write::CompressionLevel;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -157,6 +158,50 @@ fn default_true() -> bool {
     true
 }
 
+/// Settings when creating the package (compression etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PackagingSettings {
+    /// The archive type, currently supported are `tar.bz2` and `conda`
+    pub archive_type: ArchiveType,
+    /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda` archives
+    pub compression_level: i32,
+    /// How many threads to use for compression (only relevant for `.conda` archives)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub compression_threads: Option<u32>,
+}
+
+impl PackagingSettings {
+    pub fn from_args(
+        archive_type: ArchiveType,
+        compression_level: CompressionLevel,
+        compression_threads: Option<u32>,
+    ) -> Self {
+        let compression_level: i32 = match archive_type {
+            ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
+            ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
+        };
+
+        if compression_threads.is_some()
+            && compression_threads.unwrap() > 1
+            && archive_type != ArchiveType::Conda
+        {
+            tracing::warn!("Multi-threaded compression is only supported for conda archives");
+        }
+
+        let compression_threads = if archive_type == ArchiveType::Conda {
+            Some(compression_threads.unwrap_or(1))
+        } else {
+            None
+        };
+
+        Self {
+            archive_type,
+            compression_level,
+            compression_threads,
+        }
+    }
+}
+
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
@@ -179,7 +224,7 @@ pub struct BuildConfiguration {
     /// All subpackages coming from this output or other outputs from the same recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
-    pub package_format: ArchiveType,
+    pub packaging_settings: PackagingSettings,
     /// Whether to store the recipe and build instructions in the final package or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,

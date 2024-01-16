@@ -62,13 +62,23 @@ Spec reference
 --------------
 
 The spec is also made available through a JSON Schema (which is used for
-validation). The schema (and pydantic source file) can be found in this
-repository: https://github.com/prefix-dev/recipe-format. To use with VSCode or
-other IDEs, start the document with the following line:
+validation).<br/>
+The schema (and pydantic source file) can be found in this repository:
+[`recipe-format`](https://github.com/prefix-dev/recipe-format).
 
-```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-```
+???+ info "To use with VSCode(yaml-plugin) and other IDEs:"
+    Either, start the document with the following line:
+    ```html
+    # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+    ```
+    Or, using `yaml.schemas`,
+    ```yaml
+    yaml.schemas: {
+      "https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json": "**/recipe.yaml",
+    }
+    ```
+    [Read more.](https://github.com/redhat-developer/yaml-language-server)
+
 
 See more in the [automatic linting](./automatic_linting.md) chapter.
 
@@ -83,7 +93,7 @@ You can use `boa convert meta.yaml` to convert an existing recipe from conda-bui
 Examples
 --------
 
-```yaml
+```yaml title="recipe.yaml"
 # this sets up "context variables" (in this case name and version) that
 # can later be used in Jinja expressions
 context:
@@ -114,9 +124,10 @@ requirements:
     - python
 
 # tests to validate that the package works as expected
-test:
-  imports:
-    - imagesize
+tests:
+  - python:
+      imports:
+        - imagesize
 
 # information about the package
 about:
@@ -181,8 +192,23 @@ of the work folder.
 ```yaml
 source:
   git: https://github.com/ilanschnell/bsdiff4.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
+  # branch: master # note: defaults to fetching the repo's default branch
+```
+
+You can use `rev` to pin the commit version directly.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  rev: "50a1f7ed6c168eb0815d424cba2df62790f168f0"
+```
+
+Or you can use the `tag`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
 ```
 
 The `git` can also be a relative path to the recipe directory.
@@ -190,16 +216,37 @@ The `git` can also be a relative path to the recipe directory.
 ```yaml
 source:
   git: ../../bsdiff4/.git
-  rev: 1.1.4
-  depth: -1 # Defaults to -1/not shallow
-  lfs: true # defaults to false
+  tag: "1.1.4"
 ```
 
-Note: `git_rev` may not be available within commit depth range, consider
-avoiding use of both simultaneously.
+Futhermore if you want to fetch just the current "HEAD"(this may result in non-deterministic builds)
+then you can use `depth`,
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  depth: 1 # note: the behaviour defaults to -1
+```
+
+Note: `tag` or `rev` may not be available within commit depth range, hence we don't
+allow using `rev` or `tag` and `depth` of them together if not set to `-1`.
+
+```yaml
+source:
+  git: https://github.com/ilanschnell/bsdiff4.git
+  tag: "1.1.4"
+  depth: 1 # error: use of `depth` with `rev` is invalid, they are mutually exclusive
+```
 
 When you want to use git-lfs, you need to set `lfs: true`. This will also pull
 the lfs files from the repository.
+
+```yaml
+source:
+  git: ../../bsdiff4/.git
+  tag: "1.1.4"
+  lfs: true # note: defaults to false
+```
 
 #### Source from a local path
 
@@ -209,7 +256,7 @@ source is copied to the work directory before building.
 ```yaml
   source:
     path: ../src
-    use_gitignore: false # (defaults to true)
+    use_gitignore: false # note: defaults to true
 ```
 
 By default, all files in the local path that are ignored by git are also ignored
@@ -309,6 +356,16 @@ OR
   * package uses `{{ compiler() }}` jinja2 function
 
 
+#### Dynamic linking
+
+This section contains settings for the shared libraries and executables.
+
+```yaml
+build:
+  dynamic_linking:
+    rpath_allowlist: ["/usr/lib/**"]
+```
+
 #### Python entry points
 
 The following example creates a Python entry point named "bsdiff4" that calls
@@ -333,7 +390,8 @@ scripts for different platforms.
 
 ```yaml
 build:
-  script: python setup.py install --single-version-externally-managed --record=record.txt
+  script:
+    python setup.py install --single-version-externally-managed --record=record.txt
 ```
 
 ### Skipping builds
@@ -372,10 +430,11 @@ build:
   noarch: python
 ```
 
-> ***Note***: At the time of this writing, `noarch` packages should not make use
-> of preprocess-selectors: `noarch` packages are built with the directives which
-> evaluate to `true` in the platform it is built on, which probably will result
-> in incorrect/incomplete installation in other platforms.
+!!! note
+    At the time of this writing, `noarch` packages should not make use
+    of preprocess-selectors: `noarch` packages are built with the directives which
+    evaluate to `true` in the platform it is built on, which probably will result
+    in incorrect/incomplete installation in other platforms.
 
 <!--
 ### Include build recipe
@@ -437,11 +496,11 @@ requirements:
     - python
 ```
 
-```{note}
-When both build and host sections are defined, the build section can
-be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
-For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
-```
+!!! note
+    When both build and host sections are defined, the build section can
+    be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
+    For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
+
 
 The PREFIX environment variable points to the host prefix. With respect to
 activation during builds, both the host and build environments are activated.
@@ -473,7 +532,7 @@ version is part of the package dependencies, list `numpy` as a requirement in
 `recipe.yaml` and use a `conda_build_config.yaml` file with multiple NumPy
 versions.
 
-### Run\_constrained
+### Run constrained
 
 Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.
@@ -484,7 +543,7 @@ specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pk
 ```yaml
 requirements:
   run_constrained:
-    - optional-subpackage =={{ version }}
+    - optional-subpackage ==${{ version }}
 ```
 
 For example, let's say we have an environment that has package "a" installed at
@@ -502,6 +561,53 @@ This is the version bound consistent with CentOS 6. Software built against glibc
 2.12 will be compatible with CentOS 6. This run\_constrained dependency helps
 mamba tell the user that a given package can't be installed if their system
 glibc version is too old.
+
+### Run exports
+
+Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
+
+Example from zlib:
+
+```yaml
+  requirements:
+    run_exports:
+      - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+Run exports are weak by default. But you can also define strong run_exports.
+
+```yaml
+  requirements:
+    run_exports:
+      strong:
+        - {{ pin_subpackage('libzlib', exact=True) }}
+```
+
+### Ignore run exports
+
+There maybe cases where an upstream package has a problematic `run_exports` constraint, you can ignore it in your recipe by listing the upstream package name in the `ignore_run_exports` section in `requirements`.
+
+You can ignore them by package name, or by naming the runtime dependency directly.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_package:
+        - zlib
+```
+
+Using, runtime depenedency name.
+
+```yaml
+  requirements:
+    ignore_run_exports:
+      from_name:
+        - libzlib
+```
+
+!!! note
+    `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
 Tests section
 -------------
@@ -574,8 +680,6 @@ tests:
       recipe:
         - extra-file.txt
 ```
-
--->
 
 #### Test requirements
 
@@ -821,13 +925,12 @@ Extra section
 A schema-free area for storing non-conda-specific metadata in standard YAML
 form.
 
-EXAMPLE: To store recipe maintainer information:
-
-```yaml
-extra:
-  maintainers:
-   - name of maintainer
-```
+???+ Example "Example: To store recipe maintainers information"
+    ```yaml
+    extra:
+      maintainers:
+       - name of maintainer
+    ```
 
 Templating with Jinja
 ---------------------
@@ -840,7 +943,8 @@ You can set up Jinja variables in the context yaml section:
 context:
   name: "test"
   version: "5.1.2"
-  # later keys can reference previous keys and use jinja functions to compute new values
+  # later keys can reference previous keys
+  # and use jinja functions to compute new values
   major_version: ${{ version.split('.')[0] }}
 ```
 
@@ -884,7 +988,7 @@ and automatically selects the right (cross-)compiler for the target platform.
 
 ```
 build:
-  - "{{ compiler('c') }}"
+  - ${{ compiler('c') }}
 ```
 
 The `pin_subpackage` function pins another package produced by the recipe with
@@ -927,8 +1031,6 @@ requirements:
 ```
 
 #### Pin compatible
-
-**Note: not yet implemented**
 
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
@@ -1018,8 +1120,8 @@ Lists are automatically "merged" upwards, so it is possible to group multiple
 items under a single selector:
 
 ```yaml
-test:
-  commands:
+tests:
+  - script:
     - if: unix
       then:
       - test -d ${PREFIX}/include/xtensor
@@ -1030,11 +1132,22 @@ test:
       - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 # On unix this is rendered to:
-test:
-commands:
+tests:
+  - script:
     - test -d ${PREFIX}/include/xtensor
     - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
+
+Experimental features
+---------------------
+
+!!! warning
+    These are experimental features of `rattler-build` and may change or go away completely.
+
+### Jinja functions
+
+- [`load_from_file`](./experimental_features.md#load-from-files)
+- [`git.*` functions](./experimental_features.md#git-functions)
 
 <!--
 
