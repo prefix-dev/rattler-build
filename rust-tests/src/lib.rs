@@ -175,9 +175,9 @@ mod tests {
         let help_text = help_test.split(|c| *c == b'\n').collect::<Vec<_>>();
 
         #[cfg(target_family = "unix")]
-        assert!(help_text[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        assert!(help_text[0].starts_with(b"Usage: rattler-build [OPTIONS]"));
         #[cfg(target_family = "windows")]
-        assert!(help_text[2].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
+        assert!(help_text[0].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
     }
 
     #[test]
@@ -187,7 +187,7 @@ mod tests {
             .map(|out| out.stdout)
             .unwrap();
         let lines = help_text.split(|c| *c == b'\n').collect::<Vec<_>>();
-        assert!(lines[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        assert!(lines[0].starts_with(b"Usage: rattler-build [OPTIONS]"));
     }
 
     #[test]
