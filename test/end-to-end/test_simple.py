@@ -70,7 +70,7 @@ def rattler_build():
 def test_functionality(rattler_build: RattlerBuild):
     suffix = ".exe" if os.name == "nt" else ""
     text = rattler_build("--help").splitlines()
-    assert text[2] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
+    assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
 
 
 @pytest.fixture
