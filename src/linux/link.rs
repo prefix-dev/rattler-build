@@ -87,6 +87,55 @@ impl SharedObject {
         })
     }
 
+    pub fn builtin_relink(&self, prefix: &Path, encoded_prefix: &Path, rpath_allowlist: &[GlobMatcher]) -> Result<(), RelinkError> {
+        if !self.has_dynamic {
+            tracing::debug!("{} is not dynamically linked", self.path.display());
+            return Ok(());
+        }
+
+        let rpaths = self
+            .rpaths
+            .iter()
+            .flat_map(|r| r.split(':'))
+            .map(PathBuf::from)
+            .collect::<Vec<_>>();
+
+        let runpaths = self
+            .runpaths
+            .iter()
+            .flat_map(|r| r.split(':'))
+            .map(PathBuf::from)
+            .collect::<Vec<_>>();
+
+        let mut final_rpath = Vec::new();
+
+        for rpath in rpaths.iter().chain(runpaths.iter()) {
+            if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
+                let new_rpath = prefix.join(rel);
+                let relative_path = pathdiff::diff_paths(
+                    &new_rpath,
+                    self.path.parent().ok_or(RelinkError::NoParentDir)?,
+                )
+                .ok_or(RelinkError::PathDiffFailed)?;
+                tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
+                final_rpath.push(PathBuf::from(format!(
+                    "$ORIGIN/{}",
+                    relative_path.to_string_lossy()
+                )));
+            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+                tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
+                final_rpath.push(rpath.clone());
+            } else {
+                tracing::warn!(
+                    "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
+                    rpath,
+                    encoded_prefix,
+                    self.path
+                );
+            }
+        }
+    }
+
     /// find all RPATH and RUNPATH entries
     /// replace them with the encoded prefix
     /// if the rpath is outside of the prefix, it is removed

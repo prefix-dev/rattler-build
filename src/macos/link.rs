@@ -19,6 +19,37 @@ pub struct Dylib {
     pub libraries: Vec<PathBuf>,
 }
 
+#[derive(Debug)]
+enum RelinkTool {
+    InstallNameTool,
+    Builtin
+}
+
+impl RelinkTool {
+    fn run(&self, args: &[&str]) -> Result<(), RelinkError> {
+        match self {
+            RelinkTool::InstallNameTool => {
+                let mut cmd = Command::new("install_name_tool");
+                cmd.args(args);
+                let output = cmd.output().map_err(|e| {
+                    tracing::error!("install_name_tool failed: {}", e);
+                    RelinkError::InstallNameToolFailed
+                })?;
+                if !output.status.success() {
+                    tracing::error!("install_name_tool failed: {}", String::from_utf8_lossy(&output.stderr));
+                    Err(RelinkError::InstallNameToolFailed)
+                } else {
+                    Ok(())
+                }
+            }
+            RelinkTool::Builtin => {
+                todo!()
+            }
+        }
+    }
+}
+
+
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
     #[error("failed to run install_name_tool")]
@@ -105,7 +136,7 @@ impl Dylib {
     /// * `dylib_path` - Path to the dylib to modify
     /// * `prefix` - The prefix of the file (usually a temporary directory)
     /// * `encoded_prefix` - The prefix of the file as encoded in the dylib at build time (e.g. the host prefix)
-    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path, tool: ) -> Result<(), RelinkError> {
         let mut modified = false;
 
         let exchange_dylib = |path: &Path| {
@@ -216,6 +247,44 @@ fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
             e
         })
 }
+
+// fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
+//     tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
+
+//     let install_name_tool_exe = which::which("install_name_tool")?;
+
+//     let mut cmd = std::process::Command::new(install_name_tool_exe);
+
+//     if let Some(id) = &changes.change_id {
+//         cmd.arg("-id").arg(id);
+//     }
+
+//     for (old, new) in &changes.change_dylib {
+//         cmd.arg("-change").arg(old).arg(new);
+//     }
+
+//     for rpath in &changes.delete_rpath {
+//         cmd.arg("-delete_rpath").arg(rpath);
+//     }
+
+//     for rpath in &changes.add_rpath {
+//         cmd.arg("-add_rpath").arg(rpath);
+//     }
+
+//     cmd.arg(dylib_path);
+
+//     let output = cmd.output()?;
+
+//     if !output.status.success() {
+//         tracing::error!(
+//             "install_name_tool failed: {}",
+//             String::from_utf8_lossy(&output.stderr)
+//         );
+//         return Err(RelinkError::InstallNameToolFailed);
+//     }
+
+//     Ok(())
+// }
 
 #[cfg(test)]
 mod test {
