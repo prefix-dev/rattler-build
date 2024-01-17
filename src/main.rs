@@ -267,6 +267,8 @@ enum ServerType {
     Artifactory(ArtifactoryOpts),
     Prefix(PrefixOpts),
     Anaconda(AnacondaOpts),
+    #[clap(hide = true)]
+    CondaForge(CondaForgeOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -356,6 +358,54 @@ struct AnacondaOpts {
     /// Replace files on conflict
     #[arg(long, short, env = "ANACONDA_FORCE", default_value = "false")]
     force: bool,
+}
+
+/// Options for uploading to conda-forge
+#[derive(Clone, Debug, PartialEq, Parser)]
+pub struct CondaForgeOpts {
+    /// The Anaconda API key
+    #[arg(long, env = "STAGING_BINSTAR_TOKEN", required = true)]
+    staging_token: String,
+
+    /// The feedstock name
+    #[arg(long, env = "FEEDSTOCK_NAME", required = true)]
+    feedstock: String,
+
+    /// The feedstock token
+    #[arg(long, env = "FEEDSTOCK_TOKEN", required = true)]
+    feedstock_token: String,
+
+    /// The staging channel name
+    #[arg(long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
+    staging_channel: String,
+
+    /// The Anaconda Server URL
+    #[arg(
+        long,
+        env = "ANACONDA_SERVER_URL",
+        default_value = "https://api.anaconda.org"
+    )]
+    anaconda_url: Url,
+
+    /// The validation endpoint url
+    #[arg(
+        long,
+        env = "VALIDATION_ENDPOINT",
+        default_value = "https://conda-forge.herokuapp.com/feedstock-outputs/copy"
+    )]
+    validation_endpoint: Url,
+
+    /// Post comment on promotion failure
+    #[arg(long, env = "POST_COMMENT_ON_ERROR", default_value = "true")]
+    post_comment_on_error: bool,
+
+    /// The CI provider
+    #[arg(long, env = "CI")]
+    provider: Option<String>,
+
+    /// Dry run, don't actually upload anything
+    #[arg(long, env = "DRY_RUN", default_value = "false")]
+    dry_run: bool,
 }
 
 #[tokio::main]
@@ -777,6 +827,13 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 anaconda_opts.owner,
                 anaconda_opts.channel,
                 anaconda_opts.force,
+            )
+            .await?;
+        }
+        ServerType::CondaForge(conda_forge_opts) => {
+            upload::conda_forge::upload_packages_to_conda_forge(
+                conda_forge_opts,
+                &args.package_files,
             )
             .await?;
         }

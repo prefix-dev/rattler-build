@@ -15,6 +15,7 @@ use url::Url;
 use crate::upload::package::{sha256_sum, ExtractedPackage};
 
 mod anaconda;
+pub mod conda_forge;
 mod package;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -38,7 +39,7 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
             ))
 }
 
-fn get_client() -> Result<reqwest::Client, reqwest::Error> {
+fn get_default_client() -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
         .no_gzip()
         .user_agent(format!("rattler-build/{}", VERSION))
@@ -73,7 +74,7 @@ pub async fn upload_package_to_quetz(
         },
     };
 
-    let client = get_client().into_diagnostic()?;
+    let client = get_default_client().into_diagnostic()?;
 
     for package_file in package_files {
         let upload_url = url
@@ -146,7 +147,7 @@ pub async fn upload_package_to_artifactory(
             package_file.display()
         ))?;
 
-        let client = get_client().into_diagnostic()?;
+        let client = get_default_client().into_diagnostic()?;
 
         let upload_url = url
             .join(&format!("{}/{}/{}", channel, subdir, package_name))
@@ -205,7 +206,7 @@ pub async fn upload_package_to_prefix(
             .join(&format!("api/v1/upload/{}", channel))
             .into_diagnostic()?;
 
-        let client = get_client().into_diagnostic()?;
+        let client = get_default_client().into_diagnostic()?;
 
         let hash = sha256_sum(package_file).into_diagnostic()?;
 
@@ -234,7 +235,6 @@ pub async fn upload_package_to_anaconda(
     channels: Vec<String>,
     force: bool,
 ) -> miette::Result<()> {
-    println!("{:?}", channels);
     let token = match token {
         Some(token) => token,
         None => match storage.get("anaconda.org") {

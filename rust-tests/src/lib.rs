@@ -490,6 +490,42 @@ mod tests {
     }
 
     #[test]
+    fn test_dry_run_cf_upload() {
+        let tmp = tmp("test_polarify");
+        let variant = recipes().join("polarify").join("linux_64_.yaml");
+        let rattler_build = rattler().build::<_, _, PathBuf>(
+            recipes().join("polarify"),
+            tmp.as_dir(),
+            Some(variant),
+        );
+
+        assert!(rattler_build.is_ok());
+        assert!(rattler_build.unwrap().status.success());
+
+        // try to upload the package using the rattler upload command
+        let pkg_path = get_package(tmp.as_dir(), "polarify".to_string());
+        let rattler_upload = rattler()
+            .with_args([
+                "upload",
+                "-vvv",
+                "conda-forge",
+                "--feedstock",
+                "polarify",
+                "--feedstock-token",
+                "fake-feedstock-token",
+                "--staging-token",
+                "fake-staging-token",
+                "--dry-run",
+                pkg_path.to_str().unwrap(),
+            ])
+            .expect("failed to run rattler upload");
+
+        let output = String::from_utf8(rattler_upload.stderr).unwrap();
+        assert!(rattler_upload.status.success());
+        assert!(output.contains("Done uploading packages to conda-forge"));
+    }
+
+    #[test]
     fn test_correct_sha256() {
         let tmp = tmp("correct-sha");
         let rattler_build =
