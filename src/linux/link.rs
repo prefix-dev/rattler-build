@@ -1,4 +1,5 @@
 //! Relink shared objects to use an relative path prefix
+
 use globset::GlobMatcher;
 use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
@@ -26,6 +27,7 @@ pub struct SharedObject {
     pub has_dynamic: bool,
 }
 
+/// Possible relinking error.
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
     #[error("non-absolute or non-normalized base path")]
@@ -76,9 +78,9 @@ impl SharedObject {
         })
     }
 
-    /// find all RPATH and RUNPATH entries
-    /// replace them with the encoded prefix
-    /// if the rpath is outside of the prefix, it is removed
+    /// Find all RPATH and RUNPATH entries and replace them with the encoded prefix.
+    ///
+    /// If the rpath is outside of the prefix, it is removed.
     pub fn relink(
         &self,
         prefix: &Path,
@@ -141,6 +143,7 @@ impl SharedObject {
     }
 }
 
+/// Calls `patchelf` utility for updating the rpath/runpath of the binary.
 fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
@@ -172,6 +175,7 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
     }
 }
 
+/// Returns the binary parsing context for the given ELF binary.
 fn ctx(object: &Elf) -> goblin::container::Ctx {
     let container = if object.is_64 {
         goblin::container::Container::Big
