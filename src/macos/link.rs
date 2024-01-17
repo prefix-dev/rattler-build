@@ -1,6 +1,8 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
-use std::collections::HashSet;
+use memmap2::MmapMut;
+use scroll::Pread;
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -125,8 +127,7 @@ impl Dylib {
                 let new_rpath =
                     PathBuf::from(format!("@loader_path/{}", relpath.to_string_lossy()));
 
-                changes.add_rpath.insert(new_rpath);
-                changes.delete_rpath.insert(rpath.clone());
+                changes.change_rpath.insert(rpath.clone(), new_rpath);
                 modified = true;
             }
         }
@@ -149,13 +150,14 @@ impl Dylib {
 
         for lib in &self.libraries {
             if let Some(new_dylib) = exchange_dylib(lib) {
-                changes.change_dylib.push((lib.clone(), new_dylib));
+                changes.change_dylib.insert(lib.clone(), new_dylib);
                 modified = true;
             }
         }
 
         if modified {
-            install_name_tool(&self.path, &changes)?;
+            // install_name_tool(&self.path, &changes)?;
+            relink(&self.path, &changes)?;
             codesign(&self.path)?;
         }
 
@@ -163,7 +165,7 @@ impl Dylib {
     }
 }
 
-fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
+fn codesign(path: &Path) -> Result<(), std::io::Error> {
     tracing::info!("codesigning {:?}", path);
     Command::new("codesign")
         .arg("-f")
@@ -181,16 +183,104 @@ fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
 /// Changes to apply to a dylib
 #[derive(Debug, Default)]
 struct DylibChanges {
-    // rpaths to delete
-    delete_rpath: HashSet<PathBuf>,
-    // rpaths to add
-    add_rpath: HashSet<PathBuf>,
+    // rpaths to change
+    change_rpath: HashMap<PathBuf, PathBuf>,
     // dylib id to change
     change_id: Option<PathBuf>,
     // dylibs to rewrite
-    change_dylib: Vec<(PathBuf, PathBuf)>,
+    change_dylib: HashMap<PathBuf, PathBuf>,
 }
 
+#[allow(dead_code)]
+fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
+    let mut modified = false;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(dylib_path)?;
+
+    let data = unsafe { memmap2::Mmap::map(&file) }?;
+
+    let object = match goblin::mach::Mach::parse(&data)? {
+        Mach::Binary(mach) => mach,
+        _ => {
+            tracing::error!("Not a valid Mach-O binary.");
+            return Err(RelinkError::FileTypeNotHandled);
+        }
+    };
+
+    // Reopen for the borrow checker
+    let mut data_mut = unsafe { memmap2::MmapMut::map_mut(&file) }?;
+
+    let overwrite_path =
+        |data_mut: &mut MmapMut, offset: usize, new_path: &Path, old_path: &str| {
+            let new_path = new_path.to_string_lossy();
+            let new_path = new_path.as_bytes();
+
+            // extend with null bytes
+            data_mut[offset..offset + new_path.len()].copy_from_slice(new_path);
+            // fill with null bytes
+            data_mut[offset + new_path.len()..offset + old_path.len()].fill(0);
+        };
+
+    for cmd in object.load_commands.iter() {
+        match cmd.command {
+            goblin::mach::load_command::CommandVariant::Rpath(ref rpath) => {
+                let offset = cmd.offset + rpath.path as usize;
+                let old_path = data.pread::<&str>(offset).unwrap().to_string();
+
+                let path = PathBuf::from(&old_path);
+                if let Some(new_path) = changes.change_rpath.get(&path) {
+                    tracing::info!("Changing rpath from {:?} to {:?}", path, new_path);
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path);
+                    modified = true;
+                }
+            }
+
+            // check dylib id
+            goblin::mach::load_command::CommandVariant::IdDylib(ref id) => {
+                let offset = cmd.offset + id.dylib.name as usize;
+                let old_path = data_mut.pread::<&str>(offset)?.to_string();
+
+                let path = PathBuf::from(&old_path);
+                if let Some(new_path) = changes.change_id.as_ref() {
+                    tracing::info!("Changing dylib id from {:?} to {:?}", path, new_path);
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path);
+
+                    modified = true;
+                }
+            }
+            goblin::mach::load_command::CommandVariant::LoadWeakDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LoadUpwardDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::ReexportDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LazyLoadDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LoadDylib(ref id) => {
+                let offset = cmd.offset + id.dylib.name as usize;
+                let old_path = data_mut.pread::<&str>(offset)?.to_string();
+
+                let path = PathBuf::from(&old_path);
+                if let Some(new_path) = changes.change_dylib.get(&path) {
+                    tracing::info!("Changing dylib from {:?} to {:?}", path, new_path);
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path);
+
+                    modified = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // overwrite the file and resign
+    if modified {
+        data_mut.flush()?;
+        codesign(dylib_path)?;
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
 fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
     tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
 
@@ -206,12 +296,9 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    for rpath in &changes.delete_rpath {
-        cmd.arg("-delete_rpath").arg(rpath);
-    }
-
-    for rpath in &changes.add_rpath {
-        cmd.arg("-add_rpath").arg(rpath);
+    for (old, new) in &changes.change_rpath {
+        cmd.arg("-delete_rpath").arg(old);
+        cmd.arg("-add_rpath").arg(new);
     }
 
     cmd.arg(dylib_path);
