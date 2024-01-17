@@ -39,6 +39,9 @@ pub enum RelinkError {
     #[error("failed to run patchelf")]
     PatchElfFailed,
 
+    #[error("failed to relink with built-in patcher")]
+    BuiltinPatcherFailed,
+
     #[error("failed to find patchelf: please install patchelf on your system")]
     PatchElfNotFound(#[from] which::Error),
 
@@ -218,12 +221,10 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
         }
     };
 
-    let ctx = ctx(&object);
-
     let dynstrtab =
         Strtab::parse(&data, dynamic.info.strtab, dynamic.info.strsz, 0x0).map_err(|e| {
             tracing::error!("Failed to parse strtab: {:?}", e);
-            RelinkError::PatchElfFailed
+            RelinkError::BuiltinPatcherFailed
         })?;
 
     // reopen to please the borrow checker
@@ -241,10 +242,11 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
             let new_value = new_value.as_bytes();
             let old_value = dynstrtab
                 .get_at(offset)
-                .ok_or(RelinkError::PatchElfFailed)?;
+                .ok_or(RelinkError::BuiltinPatcherFailed)?;
 
             if new_value.len() > old_value.len() {
-                panic!("new value is longer than old value");
+                tracing::error!("new value is longer than old value");
+                return Err(RelinkError::BuiltinPatcherFailed);
             }
 
             let offset = offset + dynamic.info.strtab as usize;
@@ -287,14 +289,13 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 
     if needs_rewrite {
         // now we need to write the new dynamic section
-        let header_offset = object
+        let mut offset = object
             .program_headers
             .iter()
             .find(|header| header.p_type == goblin::elf::program_header::PT_DYNAMIC)
             .map(|header| header.p_offset)
             .ok_or(RelinkError::PatchElfFailed)? as usize;
-
-        let mut offset = header_offset;
+        let ctx = ctx(&object);
         for d in new_dynamic {
             data_mut.pwrite_with::<goblin::elf::dynamic::Dyn>(d, offset, ctx)?;
             offset += goblin::elf::dynamic::Dyn::size_with(&ctx);
@@ -323,7 +324,7 @@ mod test {
     // new rpath: $ORIGIN/../lib
     #[test]
     #[cfg(target_os = "linux")]
-    fn relink() -> Result<(), RelinkError> {
+    fn relink_patchelf() -> Result<(), RelinkError> {
         use globset::Glob;
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
