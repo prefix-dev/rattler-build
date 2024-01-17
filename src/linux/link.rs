@@ -1,8 +1,12 @@
 //! Relink shared objects to use an relative path prefix
 use globset::GlobMatcher;
-use goblin::elf::Elf;
+use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
+use goblin::strtab::Strtab;
 use itertools::Itertools;
+use memmap2::MmapMut;
+use scroll::ctx::SizeWith;
+use scroll::Pwrite;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -166,6 +170,128 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
     } else {
         Ok(())
     }
+}
+
+fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
+    let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
+
+    // if have runpath & rpath, delete runpath
+    // if only runpath, make rpath = runpath
+    // if only rpath, just rewrite the rpath
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&elf_path)
+        .unwrap();
+
+    let data = unsafe { memmap2::Mmap::map(&file) }.unwrap();
+
+    let object = goblin::elf::Elf::parse(&data)?;
+
+    let ctx = goblin::container::Ctx {
+        container: object
+            .is_64
+            .then_some(goblin::container::Container::Big)
+            .unwrap_or(goblin::container::Container::Little),
+        le: object
+            .little_endian
+            .then_some(goblin::container::Endian::Little)
+            .unwrap_or(goblin::container::Endian::Big),
+    };
+
+    if object.dynamic.is_none() {
+        return Ok(());
+    }
+
+    let mut has_rpath = false;
+    let mut has_runpath = false;
+    let dynamic = object.dynamic.unwrap();
+
+    let Ok(dynstrtab) = Strtab::parse(&data, dynamic.info.strtab, dynamic.info.strsz, 0x0) else {
+        todo!()
+    };
+
+    // reopen to please the borrow checker
+    let data = unsafe { memmap2::Mmap::map(&file) }.unwrap();
+
+    for entry in dynamic.dyns.iter() {
+        if entry.d_tag == goblin::elf::dynamic::DT_RPATH {
+            tracing::info!("found rpath: {:?}", entry);
+            has_rpath = true;
+        }
+        if entry.d_tag == goblin::elf::dynamic::DT_RUNPATH {
+            tracing::info!("found runpath: {:?}", entry);
+            has_runpath = true;
+        }
+    }
+
+    let mut data_mut = data.make_mut().expect("Failed to make data mutable");
+
+    let overwrite_strtab =
+        |data_mut: &mut MmapMut, offset: usize, new_value: &str| -> Result<(), RelinkError> {
+            let new_value = new_value.as_bytes();
+            let new_value_len = new_value.len();
+            let old_value = dynstrtab.get_at(offset).unwrap();
+            let old_value_len = old_value.len();
+
+            if new_value_len > old_value_len {
+                panic!("new value is longer than old value");
+            }
+
+            data_mut[offset..offset + new_value_len].copy_from_slice(new_value);
+            // pad with null bytes
+            data_mut[offset + new_value_len..offset + old_value_len].fill(0);
+
+            Ok(())
+        };
+
+    let mut new_dynamic = Vec::new();
+    let mut push_to_end = Vec::new();
+
+    for entry in dynamic.dyns.iter() {
+        if entry.d_tag == goblin::elf::dynamic::DT_RPATH {
+            overwrite_strtab(&mut data_mut, entry.d_val as usize, &new_rpath)?;
+            new_dynamic.push(entry.clone());
+        } else if entry.d_tag == goblin::elf::dynamic::DT_RUNPATH {
+            if has_rpath {
+                // todo: clear value from strtab to avoid any mentions of placeholders in the binary
+                overwrite_strtab(&mut data_mut, entry.d_val as usize, "")?;
+                push_to_end.push(Dyn {
+                    d_tag: goblin::elf::dynamic::DT_RPATH,
+                    d_val: entry.d_val,
+                });
+            } else {
+                let mut new_entry = entry.clone();
+                new_entry.d_tag = goblin::elf::dynamic::DT_RPATH;
+                new_dynamic.push(new_entry);
+            }
+        } else {
+            new_dynamic.push(entry.clone());
+        }
+    }
+    // add empty entries to the end to keep offsets correct
+    new_dynamic.extend(push_to_end);
+
+    // now we need to write the new dynamic section
+    let phdr_offset = object
+        .program_headers
+        .iter()
+        .find(|phdr| phdr.p_type == goblin::elf::program_header::PT_DYNAMIC)
+        .map(|hdr_dynamic| hdr_dynamic.p_offset)
+        .unwrap() as usize;
+
+    let mut offset = phdr_offset;
+    for d in new_dynamic {
+        data_mut.pwrite_with::<goblin::elf::dynamic::Dyn>(d, offset, ctx)?;
+        offset += goblin::elf::dynamic::Dyn::size_with(&ctx);
+    }
+
+    tracing::info!("Patched dynamic section of {:?}", elf_path);
+
+    data_mut.flush().expect("bla");
+
+    Ok(())
 }
 
 #[cfg(test)]
