@@ -346,11 +346,10 @@ mod test {
 
         super::relink(
             &binary_path,
-            vec![
+            &[
                 PathBuf::from("$ORIGIN/../lib"),
                 PathBuf::from("/usr/lib/custom_lib"),
-            ]
-            .as_slice(),
+            ],
         )?;
 
         let object = SharedObject::new(&binary_path)?;
