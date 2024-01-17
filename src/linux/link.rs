@@ -307,7 +307,6 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use globset::Glob;
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -321,6 +320,7 @@ mod test {
     #[test]
     #[cfg(target_os = "linux")]
     fn relink() -> Result<(), RelinkError> {
+        use globset::Glob;
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.into_path();
@@ -362,6 +362,41 @@ mod test {
         let tmp_dir = tempdir_in(&prefix)?;
         let binary_path = tmp_dir.path().join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
+
+        super::relink(
+            &binary_path,
+            &[
+                PathBuf::from("$ORIGIN/../lib"),
+                PathBuf::from("/usr/lib/custom_lib"),
+            ],
+        )?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn relink_builtin_runpath() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-runpath"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
 
         super::relink(
             &binary_path,
