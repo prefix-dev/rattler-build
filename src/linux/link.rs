@@ -172,6 +172,7 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
     }
 }
 
+#[allow(dead_code)]
 fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
@@ -204,8 +205,6 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
         return Ok(());
     }
 
-    let mut has_rpath = false;
-    let mut has_runpath = false;
     let dynamic = object.dynamic.unwrap();
 
     let Ok(dynstrtab) = Strtab::parse(&data, dynamic.info.strtab, dynamic.info.strsz, 0x0) else {
@@ -215,33 +214,26 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     // reopen to please the borrow checker
     let data = unsafe { memmap2::Mmap::map(&file) }.unwrap();
 
-    for entry in dynamic.dyns.iter() {
-        if entry.d_tag == goblin::elf::dynamic::DT_RPATH {
-            tracing::info!("found rpath: {:?}", entry);
-            has_rpath = true;
-        }
-        if entry.d_tag == goblin::elf::dynamic::DT_RUNPATH {
-            tracing::info!("found runpath: {:?}", entry);
-            has_runpath = true;
-        }
-    }
+    let has_rpath = dynamic
+        .dyns
+        .iter()
+        .any(|entry| entry.d_tag == goblin::elf::dynamic::DT_RPATH);
 
     let mut data_mut = data.make_mut().expect("Failed to make data mutable");
 
     let overwrite_strtab =
         |data_mut: &mut MmapMut, offset: usize, new_value: &str| -> Result<(), RelinkError> {
             let new_value = new_value.as_bytes();
-            let new_value_len = new_value.len();
             let old_value = dynstrtab.get_at(offset).unwrap();
-            let old_value_len = old_value.len();
 
-            if new_value_len > old_value_len {
+            if new_value.len() > old_value.len() {
                 panic!("new value is longer than old value");
             }
 
-            data_mut[offset..offset + new_value_len].copy_from_slice(new_value);
+            let offset = offset + dynamic.info.strtab as usize;
+            data_mut[offset..offset + new_value.len()].copy_from_slice(new_value);
             // pad with null bytes
-            data_mut[offset + new_value_len..offset + old_value_len].fill(0);
+            data_mut[offset + new_value.len()..offset + old_value.len()].fill(0);
 
             Ok(())
         };
@@ -295,7 +287,6 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 }
 
 #[cfg(test)]
-#[cfg(target_os = "linux")]
 mod test {
     use super::*;
     use globset::Glob;
@@ -341,6 +332,36 @@ mod test {
         // manually clean up temporary directory because it was
         // persisted to disk by calling `into_path`
         fs::remove_dir_all(tmp_dir)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn relink_builtin() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        super::relink(
+            &binary_path,
+            vec![
+                PathBuf::from("$ORIGIN/../lib"),
+                PathBuf::from("/usr/lib/custom_lib"),
+            ]
+            .as_slice(),
+        )?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
 
         Ok(())
     }
