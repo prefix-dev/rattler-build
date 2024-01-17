@@ -319,6 +319,7 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
+    #[cfg(target_os = "linux")]
     fn relink() -> Result<(), RelinkError> {
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
