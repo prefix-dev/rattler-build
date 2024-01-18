@@ -317,7 +317,6 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 }
 
 #[cfg(test)]
-#[cfg(target_os = "linux")]
 mod test {
     use super::*;
     use std::{fs, path::Path};
@@ -331,6 +330,7 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
+    #[cfg(target_os = "linux")]
     fn relink_patchelf() -> Result<(), RelinkError> {
         use globset::Glob;
         // copy binary to a temporary directory
