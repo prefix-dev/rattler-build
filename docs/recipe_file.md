@@ -970,17 +970,19 @@ package:
   name: ${{ name }} # correct
 ```
 
-For more information, see the [Jinja2 template
-documentation](http://jinja.pocoo.org/docs/dev/templates/) and the list of
-available environment variables \<env-vars\>.
+For more information, see the [Jinja template
+documentation](https://jinja.palletsprojects.com/en/3.1.x/) and the list of
+available environment variables [`env-vars`]().
 
-Jinja templates are evaluated during the build process. To retrieve a fully
-rendered `recipe.yaml`, use the commands/boa-render command.
+Jinja templates are evaluated during the build process.
+<!-- TODO: implement the command to do below
+To retrieve a fully rendered `recipe.yaml`, use the `` command.
+-->
 
 #### Additional Jinja2 functionality in rattler-build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the conda-build process: `pin_compatible`, `pin_subpackage`,
+available during the rattler-build process: `pin_compatible`, `pin_subpackage`,
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
@@ -997,7 +999,7 @@ the supplied parameters.
 Similarly, the `pin_compatible` function will pin a package according to the
 specified rules.
 
-### Pin expressions
+#### Pin expressions
 
 `rattler-build` knows pin expressions. A pin expression can have a `min_pin`,
 `max_pin` and `exact` value. A `max_pin` and `min_pin` are specified with a
@@ -1068,6 +1070,29 @@ This can be used for some light templating, e.g.
 build:
   string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
 ```
+
+#### `cmp` function
+
+This function matches the first argument(package's MatchSpec) against the second argument(the version spec) and returns the resulting boolean.
+
+```yaml
+cmp(python, '>=3.4')
+```
+
+Example: [cmp usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+
+#### `cdt` function
+
+This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.
+
+```yaml
+# on x86_64 system
+cdt('package-name') # outputs: package-name-cos6-x86_64
+# on aarch64 system
+cdt('package-name') # outputs: package-name-cos6-aarch64
+```
+
+Example: [cdt usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
 
 Preprocessing selectors
 -----------------------

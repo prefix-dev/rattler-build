@@ -1,0 +1,14 @@
+# this is an example recipe to show how you may use cmp and
+# cdt in actual recipe code
+
+package:
+  name: async-cairo 
+  version: dev
+    
+requirements:
+  host:
+    - if: linux
+      then: ${{ cdt("cairo") }} 
+  run:
+    - if: cmp("python", "==3.3")
+      then: asyncio
