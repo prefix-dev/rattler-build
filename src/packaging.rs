@@ -1,9 +1,10 @@
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
+use indicatif::{ProgressBar, ProgressStyle};
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, Read, Write, BufWriter};
 use std::path::{Component, Path, PathBuf};
 
 #[cfg(target_family = "unix")]
@@ -938,6 +939,36 @@ fn write_recipe_folder(
     Ok(files)
 }
 
+struct ProgressWriter {
+    writer: BufWriter<File>,
+    progress_bar: ProgressBar,
+}
+
+impl ProgressWriter {
+    fn new(file: File, total_size: u64) -> ProgressWriter {
+        let writer = BufWriter::new(file);
+        let progress_bar = ProgressBar::new(total_size);
+        progress_bar.set_style(ProgressStyle::default_bar()
+            .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap()
+            .progress_chars("=>-"));
+
+        ProgressWriter { writer, progress_bar }
+    }
+}
+
+impl Write for ProgressWriter {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let size = self.writer.write(buf)?;
+        self.progress_bar.inc(size as u64);
+        Ok(size)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.writer.flush()
+    }
+}
+
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -1124,10 +1155,20 @@ pub fn package_conda(
     ));
     let file = File::create(&out_path)?;
 
+    // collect total number of bytes
+    let total_bytes = tmp_files
+        .iter()
+        .map(|p| fs::metadata(p).map(|m| m.len()))
+        .collect::<Result<Vec<_>, _>>()?
+        .iter()
+        .sum::<u64>();
+
+    let progress_writer = ProgressWriter::new(file, total_bytes);
+
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
-                file,
+                progress_writer,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
@@ -1136,15 +1177,15 @@ pub fn package_conda(
         }
         ArchiveType::Conda => {
             // This is safe because we're just putting it together before
-            write_conda_package(
-                file,
-                tmp_dir_path,
-                &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Numeric(packaging_settings.compression_level),
-                packaging_settings.compression_threads,
-                &identifier,
-                Some(&output.build_configuration.timestamp),
-            )?;
+            // write_conda_package(
+            //     progress_writer,
+            //     tmp_dir_path,
+            //     &tmp_files.into_iter().collect::<Vec<_>>(),
+            //     CompressionLevel::Numeric(packaging_settings.compression_level),
+            //     packaging_settings.compression_threads,
+            //     &identifier,
+            //     Some(&output.build_configuration.timestamp),
+            // )?;
         }
     }
 
