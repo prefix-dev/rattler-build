@@ -313,6 +313,11 @@ async fn execute_transaction(
         })
         .await?;
 
+    install_driver.post_process(
+        &PrefixRecord::collect_from_prefix(target_prefix)?,
+        target_prefix,
+    )?;
+
     Ok(())
 }
 
