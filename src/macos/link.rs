@@ -218,7 +218,7 @@ impl fmt::Display for DylibChanges {
 }
 
 fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
-    tracing::info!("builtin relink for {:?}:\n{:?}", dylib_path, changes);
+    tracing::info!("builtin relink for {:?}:\n{}", dylib_path, changes);
 
     let mut modified = false;
 
@@ -310,14 +310,13 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     // overwrite the file and resign
     if modified {
         data_mut.flush()?;
-        codesign(dylib_path)?;
     }
 
     Ok(())
 }
 
 fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
-    tracing::info!("install_name_tool for {:?}:\n{:?}", dylib_path, changes);
+    tracing::info!("install_name_tool for {:?}:\n{}", dylib_path, changes);
 
     let install_name_tool_exe = which::which("install_name_tool")?;
 
