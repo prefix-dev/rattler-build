@@ -47,7 +47,7 @@ rattler-build build --recipe myrecipe/recipe.yaml
 Or add a custom channel that is not conda-forge which is the default one.
 
 ```sh
-rattler -c robostack --recipe myrecipe/recipe.yaml
+rattler-build build -c robostack --recipe myrecipe/recipe.yaml
 ```
 
 ### Overview of a recipe.yaml
