@@ -140,7 +140,15 @@ impl SharedObject {
         // keep only first unique item
         final_rpath = final_rpath.into_iter().unique().collect();
 
-        call_patchelf(&self.path, &final_rpath)?;
+        // run builtin relink. if it fails, try patchelf
+        if let Err(e) = relink(&self.path, &final_rpath) {
+            tracing::warn!(
+                "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
+                &self.path.display(),
+                e
+            );
+            call_patchelf(&self.path, &final_rpath)?;
+        }
 
         Ok(())
     }
@@ -200,7 +208,6 @@ fn ctx(object: &Elf) -> goblin::container::Ctx {
 /// - if the binary has both, a RUNPATH and a RPATH, we delete the RUNPATH
 /// - if the binary has only a RUNPATH, we turn the RUNPATH into an RPATH
 /// - if the binary has only a RPATH, we just rewrite the RPATH
-#[allow(dead_code)]
 fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
