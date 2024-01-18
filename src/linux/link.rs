@@ -330,7 +330,6 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
-    #[cfg(target_os = "linux")]
     fn relink_patchelf() -> Result<(), RelinkError> {
         use globset::Glob;
         // copy binary to a temporary directory

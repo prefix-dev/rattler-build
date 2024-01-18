@@ -352,6 +352,7 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
 }
 
 #[cfg(test)]
+#[cfg(target_os = "macos")]
 mod tests {
     use std::{
         collections::HashMap,
