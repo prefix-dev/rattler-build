@@ -39,8 +39,8 @@ pub enum RelinkError {
     #[error("failed to run patchelf")]
     PatchElfFailed,
 
-    #[error("failed to relink with built-in patcher")]
-    BuiltinPatcherFailed,
+    #[error("failed to relink with built-in relinker")]
+    BuiltinRelinkFailed,
 
     #[error("failed to find patchelf: please install patchelf on your system")]
     PatchElfNotFound(#[from] which::Error),
@@ -231,7 +231,7 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let dynstrtab =
         Strtab::parse(&data, dynamic.info.strtab, dynamic.info.strsz, 0x0).map_err(|e| {
             tracing::error!("Failed to parse strtab: {:?}", e);
-            RelinkError::BuiltinPatcherFailed
+            RelinkError::BuiltinRelinkFailed
         })?;
 
     // reopen to please the borrow checker
@@ -249,11 +249,11 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
             let new_value = new_value.as_bytes();
             let old_value = dynstrtab
                 .get_at(offset)
-                .ok_or(RelinkError::BuiltinPatcherFailed)?;
+                .ok_or(RelinkError::BuiltinRelinkFailed)?;
 
             if new_value.len() > old_value.len() {
                 tracing::error!("new value is longer than old value");
-                return Err(RelinkError::BuiltinPatcherFailed);
+                return Err(RelinkError::BuiltinRelinkFailed);
             }
 
             let offset = offset + dynamic.info.strtab as usize;
