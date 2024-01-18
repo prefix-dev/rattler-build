@@ -4,7 +4,7 @@ use fs_err::File;
 use indicatif::{ProgressBar, ProgressStyle};
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
-use std::io::{BufReader, Read, Write, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 #[cfg(target_family = "unix")]
@@ -952,7 +952,10 @@ impl ProgressWriter {
             .template("{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})").unwrap()
             .progress_chars("=>-"));
 
-        ProgressWriter { writer, progress_bar }
+        ProgressWriter {
+            writer,
+            progress_bar,
+        }
     }
 }
 
@@ -967,7 +970,6 @@ impl Write for ProgressWriter {
         self.writer.flush()
     }
 }
-
 
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
@@ -1155,18 +1157,18 @@ pub fn package_conda(
     ));
     let file = File::create(&out_path)?;
 
-    // collect total number of bytes
-    let total_bytes = tmp_files
-        .iter()
-        .map(|p| fs::metadata(p).map(|m| m.len()))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .sum::<u64>();
-
-    let progress_writer = ProgressWriter::new(file, total_bytes);
-
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
+            // collect total number of bytes
+            let total_bytes = tmp_files
+                .iter()
+                .map(|p| fs::metadata(p).map(|m| m.len()))
+                .collect::<Result<Vec<_>, _>>()?
+                .iter()
+                .sum::<u64>();
+
+            let progress_writer = ProgressWriter::new(file, total_bytes);
+
             write_tar_bz2_package(
                 progress_writer,
                 tmp_dir_path,
@@ -1177,15 +1179,16 @@ pub fn package_conda(
         }
         ArchiveType::Conda => {
             // This is safe because we're just putting it together before
-            // write_conda_package(
-            //     progress_writer,
-            //     tmp_dir_path,
-            //     &tmp_files.into_iter().collect::<Vec<_>>(),
-            //     CompressionLevel::Numeric(packaging_settings.compression_level),
-            //     packaging_settings.compression_threads,
-            //     &identifier,
-            //     Some(&output.build_configuration.timestamp),
-            // )?;
+            let buf_writer = BufWriter::new(file);
+            write_conda_package(
+                buf_writer,
+                tmp_dir_path,
+                &tmp_files.into_iter().collect::<Vec<_>>(),
+                CompressionLevel::Numeric(packaging_settings.compression_level),
+                packaging_settings.compression_threads,
+                &identifier,
+                Some(&output.build_configuration.timestamp),
+            )?;
         }
     }
 
