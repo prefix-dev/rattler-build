@@ -166,7 +166,6 @@ impl Dylib {
 }
 
 fn codesign(path: &Path) -> Result<(), std::io::Error> {
-    tracing::info!("codesigning {:?}", path);
     Command::new("codesign")
         .arg("-f")
         .arg("-s")
@@ -232,7 +231,6 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
 
                 let path = PathBuf::from(&old_path);
                 if let Some(new_path) = changes.change_rpath.get(&path) {
-                    tracing::info!("Changing rpath from {:?} to {:?}", path, new_path);
                     overwrite_path(&mut data_mut, offset, new_path, &old_path);
                     modified = true;
                 }
@@ -245,9 +243,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
 
                 let path = PathBuf::from(&old_path);
                 if let Some(new_path) = changes.change_id.as_ref() {
-                    tracing::info!("Changing dylib id from {:?} to {:?}", path, new_path);
                     overwrite_path(&mut data_mut, offset, new_path, &old_path);
-
                     modified = true;
                 }
             }
@@ -261,9 +257,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
 
                 let path = PathBuf::from(&old_path);
                 if let Some(new_path) = changes.change_dylib.get(&path) {
-                    tracing::info!("Changing dylib from {:?} to {:?}", path, new_path);
                     overwrite_path(&mut data_mut, offset, new_path, &old_path);
-
                     modified = true;
                 }
             }
@@ -282,8 +276,6 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
 
 #[allow(dead_code)]
 fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
-    tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
-
     let install_name_tool_exe = which::which("install_name_tool")?;
 
     let mut cmd = std::process::Command::new(install_name_tool_exe);
