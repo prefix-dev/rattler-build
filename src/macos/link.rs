@@ -315,3 +315,46 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    use tempfile::tempdir_in;
+
+    use crate::macos::link::{Dylib, DylibChanges};
+
+    use super::RelinkError;
+
+    #[test]
+    fn test_relink_builtin() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path).unwrap();
+        let expected_rpath = PathBuf::from("/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib");
+
+        assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
+
+        let changes = DylibChanges {
+            change_rpath: vec![(expected_rpath.clone(), PathBuf::from("@loader_path/../lib"))]
+                .into_iter()
+                .collect(),
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        super::relink(&binary_path, &changes)?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
+
+        Ok(())
+    }
+}
