@@ -41,13 +41,13 @@ custom [prefix.dev](https://prefix.dev) private or public channel.
 Running rattler-build is straight-forward, just execute (on the command line):
 
 ```sh
-rattler-build --recipe-file myrecipe/recipe.yaml
+rattler-build build --recipe myrecipe/recipe.yaml
 ```
 
 Or add a custom channel that is not conda-forge which is the default one.
 
 ```sh
-rattler-build -c robostack --recipe-file myrecipe/recipe.yaml
+rattler -c robostack --recipe myrecipe/recipe.yaml
 ```
 
 ### Overview of a recipe.yaml
