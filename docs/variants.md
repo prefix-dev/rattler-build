@@ -35,7 +35,7 @@ We can pass a variant configuration file to `rattler-build` using a command line
 like this:
 
 ```sh
-rattler-build --variant-config ./variants.yaml --recipe-file myrecipe.yaml
+rattler-build build --variant-config ./variants.yaml --recipe myrecipe.yaml
 ```
 
 If we have a recipe, that has a `build`, `host` or `run` dependency on `python`
