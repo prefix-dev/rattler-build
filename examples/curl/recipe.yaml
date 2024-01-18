@@ -32,6 +32,10 @@ requirements:
       then:
         - openssl
 
+tests:
+  - script:
+      - curl --version
+
 about:
   homepage: http://curl.haxx.se/
   license: curl

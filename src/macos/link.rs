@@ -1,6 +1,9 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
-use std::collections::HashSet;
+use memmap2::MmapMut;
+use scroll::Pread;
+use std::collections::HashMap;
+use std::fmt;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -45,6 +48,9 @@ pub enum RelinkError {
 
     #[error("failed to get relative path from {from} to {to}")]
     PathDiffError { from: PathBuf, to: PathBuf },
+
+    #[error("failed to relink dylib with builtin relink (new path is longer than old path)")]
+    BuiltinRelinkFailed,
 }
 
 impl Dylib {
@@ -125,8 +131,7 @@ impl Dylib {
                 let new_rpath =
                     PathBuf::from(format!("@loader_path/{}", relpath.to_string_lossy()));
 
-                changes.add_rpath.insert(new_rpath);
-                changes.delete_rpath.insert(rpath.clone());
+                changes.change_rpath.insert(rpath.clone(), new_rpath);
                 modified = true;
             }
         }
@@ -149,13 +154,21 @@ impl Dylib {
 
         for lib in &self.libraries {
             if let Some(new_dylib) = exchange_dylib(lib) {
-                changes.change_dylib.push((lib.clone(), new_dylib));
+                changes.change_dylib.insert(lib.clone(), new_dylib);
                 modified = true;
             }
         }
 
         if modified {
-            install_name_tool(&self.path, &changes)?;
+            // run builtin relink. if it fails, try install_name_tool
+            if let Err(e) = relink(&self.path, &changes) {
+                tracing::warn!(
+                    "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
+                    &self.path.display(),
+                    e
+                );
+                install_name_tool(&self.path, &changes)?;
+            }
             codesign(&self.path)?;
         }
 
@@ -163,7 +176,7 @@ impl Dylib {
     }
 }
 
-fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
+fn codesign(path: &Path) -> Result<(), std::io::Error> {
     tracing::info!("codesigning {:?}", path);
     Command::new("codesign")
         .arg("-f")
@@ -181,18 +194,133 @@ fn codesign(path: &PathBuf) -> Result<(), std::io::Error> {
 /// Changes to apply to a dylib
 #[derive(Debug, Default)]
 struct DylibChanges {
-    // rpaths to delete
-    delete_rpath: HashSet<PathBuf>,
-    // rpaths to add
-    add_rpath: HashSet<PathBuf>,
+    // rpaths to change
+    change_rpath: HashMap<PathBuf, PathBuf>,
     // dylib id to change
     change_id: Option<PathBuf>,
     // dylibs to rewrite
-    change_dylib: Vec<(PathBuf, PathBuf)>,
+    change_dylib: HashMap<PathBuf, PathBuf>,
+}
+
+impl fmt::Display for DylibChanges {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
+        for (old, new) in &self.change_rpath {
+            writeln!(f, " - change rpath from {:?} to {:?}", old, new)?;
+        }
+
+        if let Some(id) = &self.change_id {
+            writeln!(f, " - change dylib id to {:?}", id)?;
+        }
+
+        for (old, new) in &self.change_dylib {
+            writeln!(f, " - change dylib from {:?} to {:?}", old, new)?;
+        }
+
+        Ok(())
+    }
+}
+
+/// The builtin relink function is used instead of calling out to `install_name_tool`.
+/// The function attempts to modify the dylib rpath, dylib id and dylib dependencies
+/// in order to make it more easily relocatable.
+fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
+    tracing::info!("builtin relink for {:?}:\n{}", dylib_path, changes);
+
+    let mut modified = false;
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(dylib_path)?;
+
+    let data = unsafe { memmap2::Mmap::map(&file) }?;
+
+    let object = match goblin::mach::Mach::parse(&data)? {
+        Mach::Binary(mach) => mach,
+        _ => {
+            tracing::error!("Not a valid Mach-O binary.");
+            return Err(RelinkError::FileTypeNotHandled);
+        }
+    };
+
+    // Reopen for the borrow checker
+    let mut data_mut = unsafe { memmap2::MmapMut::map_mut(&file) }?;
+
+    let overwrite_path = |data_mut: &mut MmapMut,
+                          offset: usize,
+                          new_path: &Path,
+                          old_path: &str|
+     -> Result<(), RelinkError> {
+        let new_path = new_path.to_string_lossy();
+        let new_path = new_path.as_bytes();
+
+        if new_path.len() > old_path.len() {
+            tracing::error!(
+                "new path is longer than old path: {} > {}",
+                new_path.len(),
+                old_path.len()
+            );
+            return Err(RelinkError::BuiltinRelinkFailed);
+        }
+
+        data_mut[offset..offset + new_path.len()].copy_from_slice(new_path);
+        // fill with null bytes
+        data_mut[offset + new_path.len()..offset + old_path.len()].fill(0);
+
+        Ok(())
+    };
+
+    for cmd in object.load_commands.iter() {
+        match cmd.command {
+            goblin::mach::load_command::CommandVariant::Rpath(ref rpath) => {
+                let offset = cmd.offset + rpath.path as usize;
+                let old_path = data.pread::<&str>(offset).unwrap().to_string();
+
+                let path = PathBuf::from(&old_path);
+                if let Some(new_path) = changes.change_rpath.get(&path) {
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path)?;
+                    modified = true;
+                }
+            }
+
+            // check dylib id
+            goblin::mach::load_command::CommandVariant::IdDylib(ref id) => {
+                let offset = cmd.offset + id.dylib.name as usize;
+                let old_path = data_mut.pread::<&str>(offset)?.to_string();
+
+                if let Some(new_path) = changes.change_id.as_ref() {
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path)?;
+                    modified = true;
+                }
+            }
+            goblin::mach::load_command::CommandVariant::LoadWeakDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LoadUpwardDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::ReexportDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LazyLoadDylib(ref id)
+            | goblin::mach::load_command::CommandVariant::LoadDylib(ref id) => {
+                let offset = cmd.offset + id.dylib.name as usize;
+                let old_path = data_mut.pread::<&str>(offset)?.to_string();
+
+                let path = PathBuf::from(&old_path);
+                if let Some(new_path) = changes.change_dylib.get(&path) {
+                    overwrite_path(&mut data_mut, offset, new_path, &old_path)?;
+                    modified = true;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // overwrite the file and resign
+    if modified {
+        data_mut.flush()?;
+    }
+
+    Ok(())
 }
 
 fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
-    tracing::info!("install_name_tool for {:?}: {:?}", dylib_path, changes);
+    tracing::info!("install_name_tool for {:?}:\n{}", dylib_path, changes);
 
     let install_name_tool_exe = which::which("install_name_tool")?;
 
@@ -206,12 +334,9 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    for rpath in &changes.delete_rpath {
-        cmd.arg("-delete_rpath").arg(rpath);
-    }
-
-    for rpath in &changes.add_rpath {
-        cmd.arg("-add_rpath").arg(rpath);
+    for (old, new) in &changes.change_rpath {
+        cmd.arg("-delete_rpath").arg(old);
+        cmd.arg("-add_rpath").arg(new);
     }
 
     cmd.arg(dylib_path);
@@ -227,4 +352,48 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+#[cfg(target_os = "macos")]
+mod tests {
+    use std::{
+        collections::HashMap,
+        fs,
+        path::{Path, PathBuf},
+    };
+
+    use tempfile::tempdir_in;
+
+    use crate::macos::link::{Dylib, DylibChanges};
+
+    use super::RelinkError;
+
+    #[test]
+    fn test_relink_builtin() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path).unwrap();
+        let expected_rpath = PathBuf::from("/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib");
+
+        assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
+
+        let changes = DylibChanges {
+            change_rpath: vec![(expected_rpath.clone(), PathBuf::from("@loader_path/../lib"))]
+                .into_iter()
+                .collect(),
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        super::relink(&binary_path, &changes)?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
+
+        Ok(())
+    }
 }

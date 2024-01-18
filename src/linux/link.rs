@@ -1,8 +1,13 @@
 //! Relink shared objects to use an relative path prefix
+
 use globset::GlobMatcher;
-use goblin::elf::Elf;
+use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
+use goblin::strtab::Strtab;
 use itertools::Itertools;
+use memmap2::MmapMut;
+use scroll::ctx::SizeWith;
+use scroll::Pwrite;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
@@ -22,6 +27,7 @@ pub struct SharedObject {
     pub has_dynamic: bool,
 }
 
+/// Possible relinking error.
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
     #[error("non-absolute or non-normalized base path")]
@@ -32,6 +38,9 @@ pub enum RelinkError {
 
     #[error("failed to run patchelf")]
     PatchElfFailed,
+
+    #[error("failed to relink with built-in relinker")]
+    BuiltinRelinkFailed,
 
     #[error("failed to find patchelf: please install patchelf on your system")]
     PatchElfNotFound(#[from] which::Error),
@@ -72,9 +81,9 @@ impl SharedObject {
         })
     }
 
-    /// find all RPATH and RUNPATH entries
-    /// replace them with the encoded prefix
-    /// if the rpath is outside of the prefix, it is removed
+    /// Find all RPATH and RUNPATH entries and replace them with the encoded prefix.
+    ///
+    /// If the rpath is outside of the prefix, it is removed.
     pub fn relink(
         &self,
         prefix: &Path,
@@ -131,12 +140,21 @@ impl SharedObject {
         // keep only first unique item
         final_rpath = final_rpath.into_iter().unique().collect();
 
-        call_patchelf(&self.path, &final_rpath)?;
+        // run builtin relink. if it fails, try patchelf
+        if let Err(e) = relink(&self.path, &final_rpath) {
+            tracing::warn!(
+                "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
+                &self.path.display(),
+                e
+            );
+            call_patchelf(&self.path, &final_rpath)?;
+        }
 
         Ok(())
     }
 }
 
+/// Calls `patchelf` utility for updating the rpath/runpath of the binary.
 fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
@@ -168,11 +186,139 @@ fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkErr
     }
 }
 
+/// Returns the binary parsing context for the given ELF binary.
+fn ctx(object: &Elf) -> goblin::container::Ctx {
+    let container = if object.is_64 {
+        goblin::container::Container::Big
+    } else {
+        goblin::container::Container::Little
+    };
+
+    let le = if object.little_endian {
+        goblin::container::Endian::Little
+    } else {
+        goblin::container::Endian::Big
+    };
+
+    goblin::container::Ctx { container, le }
+}
+
+/// To relink binaries we do the following operations:
+///
+/// - if the binary has both, a RUNPATH and a RPATH, we delete the RUNPATH
+/// - if the binary has only a RUNPATH, we turn the RUNPATH into an RPATH
+/// - if the binary has only a RPATH, we just rewrite the RPATH
+fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
+    let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
+
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(elf_path)?;
+
+    let data = unsafe { memmap2::Mmap::map(&file) }?;
+
+    let object = goblin::elf::Elf::parse(&data)?;
+
+    let dynamic = match object.dynamic.as_ref() {
+        Some(dynamic) => dynamic,
+        None => {
+            tracing::debug!("{} is not dynamically linked", elf_path.display());
+            return Ok(());
+        }
+    };
+
+    let dynstrtab =
+        Strtab::parse(&data, dynamic.info.strtab, dynamic.info.strsz, 0x0).map_err(|e| {
+            tracing::error!("Failed to parse strtab: {:?}", e);
+            RelinkError::BuiltinRelinkFailed
+        })?;
+
+    // reopen to please the borrow checker
+    let data = unsafe { memmap2::Mmap::map(&file) }?;
+
+    let has_rpath = dynamic
+        .dyns
+        .iter()
+        .any(|entry| entry.d_tag == goblin::elf::dynamic::DT_RPATH);
+
+    let mut data_mut = data.make_mut().expect("Failed to make data mutable");
+
+    let overwrite_strtab =
+        |data_mut: &mut MmapMut, offset: usize, new_value: &str| -> Result<(), RelinkError> {
+            let new_value = new_value.as_bytes();
+            let old_value = dynstrtab
+                .get_at(offset)
+                .ok_or(RelinkError::BuiltinRelinkFailed)?;
+
+            if new_value.len() > old_value.len() {
+                tracing::error!("new value is longer than old value");
+                return Err(RelinkError::BuiltinRelinkFailed);
+            }
+
+            let offset = offset + dynamic.info.strtab as usize;
+            data_mut[offset..offset + new_value.len()].copy_from_slice(new_value);
+            // pad with null bytes
+            data_mut[offset + new_value.len()..offset + old_value.len()].fill(0);
+
+            Ok(())
+        };
+
+    let mut new_dynamic = Vec::new();
+    let mut push_to_end = Vec::new();
+    let mut needs_rewrite = false;
+
+    for entry in dynamic.dyns.iter() {
+        if entry.d_tag == goblin::elf::dynamic::DT_RPATH {
+            overwrite_strtab(&mut data_mut, entry.d_val as usize, &new_rpath)?;
+            new_dynamic.push(entry.clone());
+        } else if entry.d_tag == goblin::elf::dynamic::DT_RUNPATH {
+            needs_rewrite = true;
+            if has_rpath {
+                // todo: clear value from strtab to avoid any mentions of placeholders in the binary
+                overwrite_strtab(&mut data_mut, entry.d_val as usize, "")?;
+                push_to_end.push(Dyn {
+                    d_tag: goblin::elf::dynamic::DT_RPATH,
+                    d_val: entry.d_val,
+                });
+            } else {
+                let mut new_entry = entry.clone();
+                new_entry.d_tag = goblin::elf::dynamic::DT_RPATH;
+                overwrite_strtab(&mut data_mut, entry.d_val as usize, &new_rpath)?;
+                new_dynamic.push(new_entry);
+            }
+        } else {
+            new_dynamic.push(entry.clone());
+        }
+    }
+    // add empty entries to the end to keep offsets correct
+    new_dynamic.extend(push_to_end);
+
+    if needs_rewrite {
+        // now we need to write the new dynamic section
+        let mut offset = object
+            .program_headers
+            .iter()
+            .find(|header| header.p_type == goblin::elf::program_header::PT_DYNAMIC)
+            .map(|header| header.p_offset)
+            .ok_or(RelinkError::PatchElfFailed)? as usize;
+        let ctx = ctx(&object);
+        for d in new_dynamic {
+            data_mut.pwrite_with::<goblin::elf::dynamic::Dyn>(d, offset, ctx)?;
+            offset += goblin::elf::dynamic::Dyn::size_with(&ctx);
+        }
+    }
+
+    tracing::info!("Patched dynamic section of {:?}", elf_path);
+
+    data_mut.flush()?;
+
+    Ok(())
+}
+
 #[cfg(test)]
-#[cfg(target_os = "linux")]
 mod test {
     use super::*;
-    use globset::Glob;
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -184,7 +330,9 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
-    fn relink() -> Result<(), RelinkError> {
+    #[cfg(target_os = "linux")]
+    fn relink_patchelf() -> Result<(), RelinkError> {
+        use globset::Glob;
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.into_path();
@@ -215,6 +363,70 @@ mod test {
         // manually clean up temporary directory because it was
         // persisted to disk by calling `into_path`
         fs::remove_dir_all(tmp_dir)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn relink_builtin() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
+
+        super::relink(
+            &binary_path,
+            &[
+                PathBuf::from("$ORIGIN/../lib"),
+                PathBuf::from("/usr/lib/custom_lib"),
+            ],
+        )?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn relink_builtin_runpath() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-runpath"), &binary_path)?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
+
+        super::relink(
+            &binary_path,
+            &[
+                PathBuf::from("$ORIGIN/../lib"),
+                PathBuf::from("/usr/lib/custom_lib"),
+            ],
+        )?;
+
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
 
         Ok(())
     }
