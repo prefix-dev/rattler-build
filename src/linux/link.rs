@@ -317,6 +317,7 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "linux")]
 mod test {
     use super::*;
     use std::{fs, path::Path};
