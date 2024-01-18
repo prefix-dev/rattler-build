@@ -878,12 +878,14 @@ package:
   name: ${{ name }} # correct
 ```
 
-For more information, see the [Jinja2 template
-documentation](http://jinja.pocoo.org/docs/dev/templates/) and the list of
-available environment variables \<env-vars\>.
+For more information, see the [Jinja template
+documentation](https://jinja.palletsprojects.com/en/3.1.x/) and the list of
+available environment variables [`env-vars`]().
 
-Jinja templates are evaluated during the build process. To retrieve a fully
-rendered `recipe.yaml`, use the commands/boa-render command.
+Jinja templates are evaluated during the build process.
+<!-- TODO: implement the command to do below
+To retrieve a fully rendered `recipe.yaml`, use the `` command.
+-->
 
 #### Additional Jinja2 functionality in rattler-build
 
@@ -984,6 +986,21 @@ This function matches the first argument(package's MatchSpec) against the second
 ```yaml
 cmp(python, '>=3.4')
 ```
+
+Example: [cmp usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+
+#### `cdt` function
+
+This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.
+
+```yaml
+# on x86_64 system
+cdt('package-name') # outputs: package-name-cos6-x86_64
+# on aarch64 system
+cdt('package-name') # outputs: package-name-cos6-aarch64
+```
+
+Example: [cdt usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
 
 Preprocessing selectors
 -----------------------
