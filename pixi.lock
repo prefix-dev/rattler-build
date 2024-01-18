@@ -4359,6 +4359,182 @@ package:
   size: 26076
   timestamp: 1701632335069
 - platform: linux-64
+  name: importlib-resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - importlib_resources >=6.1.1,<6.1.2.0a0
+  - python >=3.8
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib-resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: d04bd1b5bed9177dd7c3cef15e2b6710
+    sha256: 89492a6619776e83d30fcdc6915fcb3a657cd345abcf68fdf6655540494ab0f0
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 9695
+  timestamp: 1699364751365
+- platform: osx-64
+  name: importlib-resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - importlib_resources >=6.1.1,<6.1.2.0a0
+  - python >=3.8
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib-resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: d04bd1b5bed9177dd7c3cef15e2b6710
+    sha256: 89492a6619776e83d30fcdc6915fcb3a657cd345abcf68fdf6655540494ab0f0
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 9695
+  timestamp: 1699364751365
+- platform: osx-arm64
+  name: importlib-resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - importlib_resources >=6.1.1,<6.1.2.0a0
+  - python >=3.8
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib-resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: d04bd1b5bed9177dd7c3cef15e2b6710
+    sha256: 89492a6619776e83d30fcdc6915fcb3a657cd345abcf68fdf6655540494ab0f0
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 9695
+  timestamp: 1699364751365
+- platform: win-64
+  name: importlib-resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - importlib_resources >=6.1.1,<6.1.2.0a0
+  - python >=3.8
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib-resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: d04bd1b5bed9177dd7c3cef15e2b6710
+    sha256: 89492a6619776e83d30fcdc6915fcb3a657cd345abcf68fdf6655540494ab0f0
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 9695
+  timestamp: 1699364751365
+- platform: linux-64
+  name: importlib_resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - zipp >=3.1.0
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 3d5fa25cf42f3f32a12b2d874ace8574
+    sha256: e584f9ae08fb2d242af0ce7e19e3cd2f85f362d8523119e08f99edb962db99ed
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  constrains:
+  - importlib-resources >=6.1.1,<6.1.2.0a0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 29951
+  timestamp: 1699364734111
+- platform: osx-64
+  name: importlib_resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - zipp >=3.1.0
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 3d5fa25cf42f3f32a12b2d874ace8574
+    sha256: e584f9ae08fb2d242af0ce7e19e3cd2f85f362d8523119e08f99edb962db99ed
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  constrains:
+  - importlib-resources >=6.1.1,<6.1.2.0a0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 29951
+  timestamp: 1699364734111
+- platform: osx-arm64
+  name: importlib_resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - zipp >=3.1.0
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 3d5fa25cf42f3f32a12b2d874ace8574
+    sha256: e584f9ae08fb2d242af0ce7e19e3cd2f85f362d8523119e08f99edb962db99ed
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  constrains:
+  - importlib-resources >=6.1.1,<6.1.2.0a0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 29951
+  timestamp: 1699364734111
+- platform: win-64
+  name: importlib_resources
+  version: 6.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - zipp >=3.1.0
+  url: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-6.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 3d5fa25cf42f3f32a12b2d874ace8574
+    sha256: e584f9ae08fb2d242af0ce7e19e3cd2f85f362d8523119e08f99edb962db99ed
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  constrains:
+  - importlib-resources >=6.1.1,<6.1.2.0a0
+  license: Apache-2.0
+  license_family: APACHE
+  noarch: python
+  size: 29951
+  timestamp: 1699364734111
+- platform: linux-64
   name: iniconfig
   version: 2.0.0
   category: main
@@ -7417,6 +7593,114 @@ package:
   size: 9598
   timestamp: 1612711404414
 - platform: linux-64
+  name: mike
+  version: 2.0.0
+  category: main
+  manager: conda
+  dependencies:
+  - importlib-metadata
+  - importlib-resources
+  - jinja2 >=2.7
+  - mkdocs >=1.0
+  - pyaml >=5.1
+  - pyparsing >=3.0
+  - python >=3.6
+  - verspec
+  url: https://conda.anaconda.org/conda-forge/noarch/mike-2.0.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: e1f6f7682915f4d0a32b147ac8228515
+    sha256: b7246e31059f3d5680e5e649508421e4e1d64a7a1a400dec36afcbdbef3690e2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  license: BSD-3-Clause
+  license_family: BSD
+  noarch: python
+  size: 31590
+  timestamp: 1700921886104
+- platform: osx-64
+  name: mike
+  version: 2.0.0
+  category: main
+  manager: conda
+  dependencies:
+  - importlib-metadata
+  - importlib-resources
+  - jinja2 >=2.7
+  - mkdocs >=1.0
+  - pyaml >=5.1
+  - pyparsing >=3.0
+  - python >=3.6
+  - verspec
+  url: https://conda.anaconda.org/conda-forge/noarch/mike-2.0.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: e1f6f7682915f4d0a32b147ac8228515
+    sha256: b7246e31059f3d5680e5e649508421e4e1d64a7a1a400dec36afcbdbef3690e2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  license: BSD-3-Clause
+  license_family: BSD
+  noarch: python
+  size: 31590
+  timestamp: 1700921886104
+- platform: osx-arm64
+  name: mike
+  version: 2.0.0
+  category: main
+  manager: conda
+  dependencies:
+  - importlib-metadata
+  - importlib-resources
+  - jinja2 >=2.7
+  - mkdocs >=1.0
+  - pyaml >=5.1
+  - pyparsing >=3.0
+  - python >=3.6
+  - verspec
+  url: https://conda.anaconda.org/conda-forge/noarch/mike-2.0.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: e1f6f7682915f4d0a32b147ac8228515
+    sha256: b7246e31059f3d5680e5e649508421e4e1d64a7a1a400dec36afcbdbef3690e2
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  license: BSD-3-Clause
+  license_family: BSD
+  noarch: python
+  size: 31590
+  timestamp: 1700921886104
+- platform: win-64
+  name: mike
+  version: 2.0.0
+  category: main
+  manager: conda
+  dependencies:
+  - importlib-metadata
+  - importlib-resources
+  - jinja2 >=2.7
+  - mkdocs >=1.0
+  - pyaml >=5.1
+  - pyparsing >=3.0
+  - python >=3.6
+  - verspec
+  url: https://conda.anaconda.org/conda-forge/noarch/mike-2.0.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: e1f6f7682915f4d0a32b147ac8228515
+    sha256: b7246e31059f3d5680e5e649508421e4e1d64a7a1a400dec36afcbdbef3690e2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  license: BSD-3-Clause
+  license_family: BSD
+  noarch: python
+  size: 31590
+  timestamp: 1700921886104
+- platform: linux-64
   name: mkdocs
   version: 1.5.3
   category: main
@@ -9211,6 +9495,86 @@ package:
   size: 6417
   timestamp: 1606147814351
 - platform: linux-64
+  name: pyaml
+  version: 23.12.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - pyyaml
+  url: https://conda.anaconda.org/conda-forge/noarch/pyaml-23.12.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: f7d286f624804e533a84a9ece792fbae
+    sha256: 84eabba9815947760c113548f4482f2bbba41fa58134eeb9db2983fabb37218c
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  license: WTFPL
+  noarch: python
+  size: 26648
+  timestamp: 1704321062785
+- platform: osx-64
+  name: pyaml
+  version: 23.12.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - pyyaml
+  url: https://conda.anaconda.org/conda-forge/noarch/pyaml-23.12.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: f7d286f624804e533a84a9ece792fbae
+    sha256: 84eabba9815947760c113548f4482f2bbba41fa58134eeb9db2983fabb37218c
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  license: WTFPL
+  noarch: python
+  size: 26648
+  timestamp: 1704321062785
+- platform: osx-arm64
+  name: pyaml
+  version: 23.12.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - pyyaml
+  url: https://conda.anaconda.org/conda-forge/noarch/pyaml-23.12.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: f7d286f624804e533a84a9ece792fbae
+    sha256: 84eabba9815947760c113548f4482f2bbba41fa58134eeb9db2983fabb37218c
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  license: WTFPL
+  noarch: python
+  size: 26648
+  timestamp: 1704321062785
+- platform: win-64
+  name: pyaml
+  version: 23.12.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.8
+  - pyyaml
+  url: https://conda.anaconda.org/conda-forge/noarch/pyaml-23.12.0-pyhd8ed1ab_0.conda
+  hash:
+    md5: f7d286f624804e533a84a9ece792fbae
+    sha256: 84eabba9815947760c113548f4482f2bbba41fa58134eeb9db2983fabb37218c
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  license: WTFPL
+  noarch: python
+  size: 26648
+  timestamp: 1704321062785
+- platform: linux-64
   name: pycparser
   version: '2.21'
   category: main
@@ -9458,6 +9822,86 @@ package:
   noarch: python
   size: 152559
   timestamp: 1700937814926
+- platform: linux-64
+  name: pyparsing
+  version: 3.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 176f7d56f0cfe9008bdf1bccd7de02fb
+    sha256: 4a1332d634b6c2501a973655d68f08c9c42c0bd509c349239127b10572b8354b
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  license: MIT
+  license_family: MIT
+  noarch: python
+  size: 89521
+  timestamp: 1690737983548
+- platform: osx-64
+  name: pyparsing
+  version: 3.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 176f7d56f0cfe9008bdf1bccd7de02fb
+    sha256: 4a1332d634b6c2501a973655d68f08c9c42c0bd509c349239127b10572b8354b
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  license: MIT
+  license_family: MIT
+  noarch: python
+  size: 89521
+  timestamp: 1690737983548
+- platform: osx-arm64
+  name: pyparsing
+  version: 3.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 176f7d56f0cfe9008bdf1bccd7de02fb
+    sha256: 4a1332d634b6c2501a973655d68f08c9c42c0bd509c349239127b10572b8354b
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  license: MIT
+  license_family: MIT
+  noarch: python
+  size: 89521
+  timestamp: 1690737983548
+- platform: win-64
+  name: pyparsing
+  version: 3.1.1
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/pyparsing-3.1.1-pyhd8ed1ab_0.conda
+  hash:
+    md5: 176f7d56f0cfe9008bdf1bccd7de02fb
+    sha256: 4a1332d634b6c2501a973655d68f08c9c42c0bd509c349239127b10572b8354b
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  license: MIT
+  license_family: MIT
+  noarch: python
+  size: 89521
+  timestamp: 1690737983548
 - platform: linux-64
   name: pysocks
   version: 1.7.1
@@ -11638,6 +12082,86 @@ package:
   license_family: Proprietary
   size: 739437
   timestamp: 1694292382336
+- platform: linux-64
+  name: verspec
+  version: 0.1.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/verspec-0.1.0-pyhd8ed1ab_0.tar.bz2
+  hash:
+    md5: 64ebfc29e8399f3eeaf17cb2bd04e770
+    sha256: 64f01eaf34f0bc86a06a1d5f4ff4db9ba4eebbee37eea02de2a3be89dae0f1f2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: linux-64
+  build_number: 0
+  license: BSD-2-Clause
+  license_family: BSD
+  noarch: python
+  size: 19929
+  timestamp: 1618150464786
+- platform: osx-64
+  name: verspec
+  version: 0.1.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/verspec-0.1.0-pyhd8ed1ab_0.tar.bz2
+  hash:
+    md5: 64ebfc29e8399f3eeaf17cb2bd04e770
+    sha256: 64f01eaf34f0bc86a06a1d5f4ff4db9ba4eebbee37eea02de2a3be89dae0f1f2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: osx-64
+  build_number: 0
+  license: BSD-2-Clause
+  license_family: BSD
+  noarch: python
+  size: 19929
+  timestamp: 1618150464786
+- platform: osx-arm64
+  name: verspec
+  version: 0.1.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/verspec-0.1.0-pyhd8ed1ab_0.tar.bz2
+  hash:
+    md5: 64ebfc29e8399f3eeaf17cb2bd04e770
+    sha256: 64f01eaf34f0bc86a06a1d5f4ff4db9ba4eebbee37eea02de2a3be89dae0f1f2
+  build: pyhd8ed1ab_0
+  arch: aarch64
+  subdir: osx-arm64
+  build_number: 0
+  license: BSD-2-Clause
+  license_family: BSD
+  noarch: python
+  size: 19929
+  timestamp: 1618150464786
+- platform: win-64
+  name: verspec
+  version: 0.1.0
+  category: main
+  manager: conda
+  dependencies:
+  - python >=3.6
+  url: https://conda.anaconda.org/conda-forge/noarch/verspec-0.1.0-pyhd8ed1ab_0.tar.bz2
+  hash:
+    md5: 64ebfc29e8399f3eeaf17cb2bd04e770
+    sha256: 64f01eaf34f0bc86a06a1d5f4ff4db9ba4eebbee37eea02de2a3be89dae0f1f2
+  build: pyhd8ed1ab_0
+  arch: x86_64
+  subdir: win-64
+  build_number: 0
+  license: BSD-2-Clause
+  license_family: BSD
+  noarch: python
+  size: 19929
+  timestamp: 1618150464786
 - platform: linux-64
   name: virtualenv
   version: 20.24.4

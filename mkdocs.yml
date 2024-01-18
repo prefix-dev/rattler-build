@@ -1,3 +1,5 @@
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+
 site_name: "rattler-build"
 site_url: https://prefix-dev.github.io/rattler-build/
 
@@ -6,7 +8,6 @@ theme:
   custom_dir: docs/overrides
   # favicon: assets/pixi.png
   # logo: assets/pixi.png
-  site_url: https://prefix.dev
   font:
     text: Red Hat Text
     code: JetBrains Mono
@@ -67,7 +68,8 @@ extra:
       link: https://www.linkedin.com/company/prefix-dev
     - icon: fontawesome/brands/github
       link: https://github.com/prefix-dev
-
+  version:
+    provider: mike
 
 nav:
   - Home: index.md
@@ -93,3 +95,12 @@ nav:
 plugins:
   - search
   - social
+  - mike:
+      # These fields are all optional; the defaults are as below...
+      # alias_type: symlink
+      # redirect_template: null
+      # deploy_prefix: ''
+      # canonical_version: null
+      # version_selector: true
+      # css_dir: css
+      # javascript_dir: js
