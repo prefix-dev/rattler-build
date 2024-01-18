@@ -823,6 +823,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
+name = "drop_bomb"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bda8e21c04aca2ae33ffc2fd8c23134f3cac46db123ba97bd9d3f3b8a4a85e1"
+
+[[package]]
 name = "dunce"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2504,7 +2510,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2512,9 +2518,11 @@ dependencies = [
  "chrono",
  "digest",
  "dirs",
+ "drop_bomb",
  "futures 0.3.30",
  "fxhash",
  "hex",
+ "indexmap 2.1.0",
  "itertools 0.11.0",
  "memchr",
  "memmap2",
@@ -2618,7 +2626,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "chrono",
  "fxhash",
@@ -2647,7 +2655,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "blake2",
  "digest",
@@ -2662,7 +2670,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -2676,7 +2684,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "quote",
  "syn 2.0.48",
@@ -2685,7 +2693,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2709,7 +2717,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "bzip2",
  "chrono",
@@ -2734,7 +2742,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -2772,7 +2780,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.1.0",
@@ -2789,7 +2797,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2808,7 +2816,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.16.2"
-source = "git+https://github.com/mamba-org/rattler?branch=main#8d94237197c87b03e61c3d5efd39889409da8909"
+source = "git+https://github.com/mamba-org/rattler?branch=main#85ca4ef1ffcb0dbf6418ed938a9d43a09fe8ccfe"
 dependencies = [
  "cfg-if",
  "libloading",
