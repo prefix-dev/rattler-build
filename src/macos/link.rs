@@ -48,6 +48,9 @@ pub enum RelinkError {
 
     #[error("failed to get relative path from {from} to {to}")]
     PathDiffError { from: PathBuf, to: PathBuf },
+
+    #[error("failed to relink dylib with builtin relink (new path is longer than old path)")]
+    BuiltinRelinkFailed,
 }
 
 impl Dylib {
@@ -217,6 +220,9 @@ impl fmt::Display for DylibChanges {
     }
 }
 
+/// The builtin relink function is used instead of calling out to `install_name_tool`.
+/// The function attempts to modify the dylib rpath, dylib id and dylib dependencies
+/// in order to make it more easily relocatable.
 fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
     tracing::info!("builtin relink for {:?}:\n{}", dylib_path, changes);
 
@@ -247,7 +253,6 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
      -> Result<(), RelinkError> {
         let new_path = new_path.to_string_lossy();
         let new_path = new_path.as_bytes();
-        let old_path = old_path.as_bytes();
 
         if new_path.len() > old_path.len() {
             tracing::error!(
@@ -255,10 +260,9 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
                 new_path.len(),
                 old_path.len()
             );
-            return Err(RelinkError::FileTypeNotHandled);
+            return Err(RelinkError::BuiltinRelinkFailed);
         }
 
-        // extend with null bytes
         data_mut[offset..offset + new_path.len()].copy_from_slice(new_path);
         // fill with null bytes
         data_mut[offset + new_path.len()..offset + old_path.len()].fill(0);
