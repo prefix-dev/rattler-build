@@ -1,6 +1,7 @@
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
+use indicatif::ProgressBar;
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
@@ -27,13 +28,17 @@ use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
 
-use crate::macos;
 use crate::metadata::{Output, PackagingSettings};
 use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
+use crate::render::solver::default_bytes_style;
 use crate::{linux, post};
+use crate::{macos, tool_configuration};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
+    #[error("Unknown error: {0}")]
+    UnknownError(String),
+
     #[error("Serde error: {0}")]
     SerdeError(#[from] serde_yaml::Error),
 
@@ -950,6 +955,7 @@ pub fn package_conda(
     prefix: &Path,
     local_channel_dir: &Path,
     packaging_settings: &PackagingSettings,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -1124,6 +1130,16 @@ pub fn package_conda(
     ));
     let file = File::create(&out_path)?;
 
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        ProgressBar::new(1)
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Building package")
+            .with_style(
+                default_bytes_style().map_err(|e| PackagingError::UnknownError(e.to_string()))?,
+            ),
+    );
+
+    let file = progress_bar.wrap_write(file);
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
@@ -1147,6 +1163,7 @@ pub fn package_conda(
             )?;
         }
     }
+    progress_bar.finish_with_message("Built package.");
 
     Ok((out_path, paths_json_struct))
 }

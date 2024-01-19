@@ -317,6 +317,7 @@ pub async fn run_build(
         &directories.host_prefix,
         &directories.output_dir,
         &output.build_configuration.packaging_settings,
+        &tool_configuration,
     )
     .into_diagnostic()?;
 
