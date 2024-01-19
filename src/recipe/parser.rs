@@ -237,8 +237,8 @@ impl Recipe {
                 vec![_partialerror!(
                     *root_node.span(),
                     ErrorKind::MissingField(Cow::from("package")),
-                    label = "missing required key `package`",
-                    help = "add the required key `package`"
+                    label = "missing required field `package`",
+                    help = "add the required field `package`"
                 )]
             })?,
             build,
