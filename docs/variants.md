@@ -154,3 +154,30 @@ requirements:
   run:
   - libcurl >=8,<9
 ```
+
+### Compilers
+
+As part of the key value fields of the variant config file, they follow identical syntax.
+But provide control over compiler related packages/libraries rather than traditional packages.
+
+```yaml
+c_compiler:
+  - gcc
+```
+
+This when mixed with If conditional allows for robustly switching compilers based on platform and targets.
+
+```yaml
+c_compiler:
+  - if: win
+    then: m2w64-gcc # mingw compilers
+    else: gcc
+```
+
+Some of the compilers supported are,
+
+```yaml
+rust_compiler: ~
+cxx_compiler: ~
+fortran_compiler: ~ 
+```
