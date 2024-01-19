@@ -11,8 +11,10 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end -v"
 test = "cargo test"
 lint = "pre-commit run --all"
-docs = "mike serve"
 build-docs = "mkdocs build --strict"
+docs = "mike serve"
+deploy-latest = "mike deploy --push $RELEASE_VERSION latest"
+deploy-dev = "mike deploy --push dev devel"
 
 
 [dependencies]
