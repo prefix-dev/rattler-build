@@ -2,6 +2,8 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
+use std::borrow::Cow;
+
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -234,8 +236,9 @@ impl Recipe {
             package: package.ok_or_else(|| {
                 vec![_partialerror!(
                     *root_node.span(),
-                    ErrorKind::Other,
-                    label = "missing required key `package`"
+                    ErrorKind::MissingField(Cow::from("package")),
+                    label = "missing required key `package`",
+                    help = "add the required key `package`"
                 )]
             })?,
             build,
