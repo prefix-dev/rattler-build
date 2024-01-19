@@ -1,0 +1,2295 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/recipe_file/">
+      
+      
+        <link rel="prev" href="../highlevel/">
+      
+      
+        <link rel="next" href="../experimental_features/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.4">
+    
+    
+      
+        <title>Recipe file - rattler-build</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.bd3936ea.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Red+Hat+Text:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Red Hat Text";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+      
+        <meta  property="og:type"  content="website" >
+      
+        <meta  property="og:title"  content="Recipe file - rattler-build" >
+      
+        <meta  property="og:description"  content="None" >
+      
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_file.png" >
+      
+        <meta  property="og:image:type"  content="image/png" >
+      
+        <meta  property="og:image:width"  content="1200" >
+      
+        <meta  property="og:image:height"  content="630" >
+      
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/recipe_file/" >
+      
+        <meta  name="twitter:card"  content="summary_large_image" >
+      
+        <meta  name="twitter:title"  content="Recipe file - rattler-build" >
+      
+        <meta  name="twitter:description"  content="None" >
+      
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_file.png" >
+      
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="yellow" data-md-color-accent="yellow">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#the-recipe-spec" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rattler-build
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Recipe file
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/prefix-dev/rattler-build/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    rattler-build
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/prefix-dev/rattler-build/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../highlevel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Highlevel overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Recipe file
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Recipe file
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#history" class="md-nav__link">
+    History
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#major-differences-with-conda-build" class="md-nav__link">
+    Major differences with conda-build
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec" class="md-nav__link">
+    Spec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec-reference" class="md-nav__link">
+    Spec reference
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    Examples
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#package-section" class="md-nav__link">
+    Package section
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-section" class="md-nav__link">
+    Source section
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-section" class="md-nav__link">
+    Build section
+  </a>
+  
+    <nav class="md-nav" aria-label="Build section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    Script
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skipping-builds" class="md-nav__link">
+    Skipping builds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-independent-packages" class="md-nav__link">
+    Architecture independent packages
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements-section" class="md-nav__link">
+    Requirements section
+  </a>
+  
+    <nav class="md-nav" aria-label="Requirements section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    Host
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run" class="md-nav__link">
+    Run
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-constrained" class="md-nav__link">
+    Run constrained
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-exports" class="md-nav__link">
+    Run exports
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore-run-exports" class="md-nav__link">
+    Ignore run exports
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests-section" class="md-nav__link">
+    Tests section
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script-test" class="md-nav__link">
+    Script test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-tests" class="md-nav__link">
+    Python tests
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-for-package-contents" class="md-nav__link">
+    Check for package-contents
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downstream-tests" class="md-nav__link">
+    Downstream tests
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-section" class="md-nav__link">
+    Outputs section
+  </a>
+  
+    <nav class="md-nav" aria-label="Outputs section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subpackage-requirements" class="md-nav__link">
+    Subpackage requirements
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#about-section" class="md-nav__link">
+    About section
+  </a>
+  
+    <nav class="md-nav" aria-label="About section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#license-file" class="md-nav__link">
+    License file
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extra-section" class="md-nav__link">
+    Extra section
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#templating-with-jinja" class="md-nav__link">
+    Templating with Jinja
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preprocessing-selectors" class="md-nav__link">
+    Preprocessing selectors
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experimental-features" class="md-nav__link">
+    Experimental features
+  </a>
+  
+    <nav class="md-nav" aria-label="Experimental features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jinja-functions" class="md-nav__link">
+    Jinja functions
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../experimental_features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experimental features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../selectors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Selector syntax
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../build_script/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Build script
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../variants/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Variants
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compilers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compilers and cross compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli_usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CLI Usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../automatic_linting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic recipe linting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing packages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rebuild/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reproducible builds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../package_spec/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Package specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../internals/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Internals
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#history" class="md-nav__link">
+    History
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#major-differences-with-conda-build" class="md-nav__link">
+    Major differences with conda-build
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec" class="md-nav__link">
+    Spec
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#spec-reference" class="md-nav__link">
+    Spec reference
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    Examples
+  </a>
+  
+    <nav class="md-nav" aria-label="Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#package-section" class="md-nav__link">
+    Package section
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#source-section" class="md-nav__link">
+    Source section
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#build-section" class="md-nav__link">
+    Build section
+  </a>
+  
+    <nav class="md-nav" aria-label="Build section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script" class="md-nav__link">
+    Script
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#skipping-builds" class="md-nav__link">
+    Skipping builds
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#architecture-independent-packages" class="md-nav__link">
+    Architecture independent packages
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#requirements-section" class="md-nav__link">
+    Requirements section
+  </a>
+  
+    <nav class="md-nav" aria-label="Requirements section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    Build
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#host" class="md-nav__link">
+    Host
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run" class="md-nav__link">
+    Run
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-constrained" class="md-nav__link">
+    Run constrained
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-exports" class="md-nav__link">
+    Run exports
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ignore-run-exports" class="md-nav__link">
+    Ignore run exports
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tests-section" class="md-nav__link">
+    Tests section
+  </a>
+  
+    <nav class="md-nav" aria-label="Tests section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#script-test" class="md-nav__link">
+    Script test
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-tests" class="md-nav__link">
+    Python tests
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#check-for-package-contents" class="md-nav__link">
+    Check for package-contents
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#downstream-tests" class="md-nav__link">
+    Downstream tests
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#outputs-section" class="md-nav__link">
+    Outputs section
+  </a>
+  
+    <nav class="md-nav" aria-label="Outputs section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#subpackage-requirements" class="md-nav__link">
+    Subpackage requirements
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#about-section" class="md-nav__link">
+    About section
+  </a>
+  
+    <nav class="md-nav" aria-label="About section">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#license-file" class="md-nav__link">
+    License file
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extra-section" class="md-nav__link">
+    Extra section
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#templating-with-jinja" class="md-nav__link">
+    Templating with Jinja
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preprocessing-selectors" class="md-nav__link">
+    Preprocessing selectors
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#experimental-features" class="md-nav__link">
+    Experimental features
+  </a>
+  
+    <nav class="md-nav" aria-label="Experimental features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#jinja-functions" class="md-nav__link">
+    Jinja functions
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/recipe_file.md" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="the-recipe-spec">The recipe spec<a class="headerlink" href="#the-recipe-spec" title="Permanent link">#</a></h1>
+<p><code>rattler-build</code> implements a new recipe spec, different from the traditional
+"meta.yaml" used in <code>conda-build</code>. A recipe has to be stored as <code>recipe.yaml</code>
+file.</p>
+<h2 id="history">History<a class="headerlink" href="#history" title="Permanent link">#</a></h2>
+<p>A discussion was started on what a new recipe spec could or should look like.
+The fragments of this discussion can be found here:
+https://github.com/mamba-org/conda-specs/blob/master/proposed_specs/recipe.md
+The reason for a new spec are:</p>
+<ul>
+<li>Make it easier to parse ("pure yaml"). conda-build uses a mix of comments and
+  jinja to achieve a great deal of flexibility, but it's hard to parse the
+  recipe with a computer</li>
+<li>iron out some inconsistencies around multiple outputs (build vs. build/script
+  and more)</li>
+<li>remove any need for recursive parsing &amp; solving</li>
+<li>finally, the initial implementation in <code>boa</code> relied on conda-build.
+  <code>rattler-build</code> removes any dependency on Python or conda-build and
+  reimplements everything in Rust.</li>
+</ul>
+<h2 id="major-differences-with-conda-build">Major differences with conda-build<a class="headerlink" href="#major-differences-with-conda-build" title="Permanent link">#</a></h2>
+<ul>
+<li>recipe filename is <code>recipe.yaml</code>, not <code>meta.yaml</code></li>
+<li>outputs have less complicated behavior, keys are same as top-level recipe
+  (e.g. build/script, not just script), same for package/name, not just name)</li>
+<li>no implicit meta-packages in outputs</li>
+<li>no full Jinja2 support: no conditional or <code>{% set ...</code> support, only string
+  interpolation. Variables can be set in the toplevel "context" which is valid
+  YAML</li>
+<li>Jinja string interpolation needs to be preceded by a dollar sign at the
+  beginning of a string, e.g. <code>- ${{ version }}</code> in order for it to be valid
+  YAML</li>
+<li>Selectors use a YAML dictionary style (vs. comments in conda-build). Instead
+  of <code>- somepkg  #[osx]</code> we use
+   <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">osx</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">somepkg</span>
+</span></code></pre></div></li>
+<li>Skip instruction uses a list of skip conditions and not the selector syntax
+  from conda-build (e.g. <code>skip: ["osx", "win and py37"]</code>)</li>
+</ul>
+<h2 id="spec">Spec<a class="headerlink" href="#spec" title="Permanent link">#</a></h2>
+<p>The recipe spec has the following parts:</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>context</code>: to set up variables that can later be used in Jinja string
+  interpolation</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>package</code>: defines name, version etc. of the top-level package</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>source</code>: points to the sources that need to be downloaded in order to
+  build the recipe</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>build</code>: defines how to build the recipe and what build number to use</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>requirements</code>: defines requirements of the top-level package</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>test</code>: defines tests for the top-level package</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled checked/><span class="task-list-indicator"></span></label> <code>outputs</code>: a recipe can have multiple outputs. Each output can and should
+  have a <code>package</code>, <code>requirements</code> and <code>test</code> section</li>
+</ul>
+<h2 id="spec-reference">Spec reference<a class="headerlink" href="#spec-reference" title="Permanent link">#</a></h2>
+<p>The spec is also made available through a JSON Schema (which is used for
+validation).<br/>
+The schema (and pydantic source file) can be found in this repository:
+<a href="https://github.com/prefix-dev/recipe-format"><code>recipe-format</code></a>.</p>
+<details class="info" open="open">
+<summary>To use with VSCode(yaml-plugin) and other IDEs:</summary>
+<p>Either, start the document with the following line:
+<div class="language-html highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+</span></code></pre></div>
+Or, using <code>yaml.schemas</code>,
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">yaml.schemas</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="s">&quot;https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;**/recipe.yaml&quot;</span><span class="p p-Indicator">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="p p-Indicator">}</span>
+</span></code></pre></div>
+<a href="https://github.com/redhat-developer/yaml-language-server">Read more.</a></p>
+</details>
+<p>See more in the <a href="../automatic_linting/">automatic linting</a> chapter.</p>
+<!--
+Quick start (from conda-build)
+------------------------------
+
+You can use `boa convert meta.yaml` to convert an existing recipe from conda-build syntax to boa. The command will output the new recipe to stdout. To quickly save the result, you can use `boa convert meta.yaml > recipe.yaml` and run `boa build .`. Please note that the conversion process is working fine only for "simple" recipes and there will be some needed manual work to convert complex recipes.
+
+-->
+
+<h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h2>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># this sets up &quot;context variables&quot; (in this case name and version) that</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># can later be used in Jinja expressions</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.1.0</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">imagesize</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># top level package information (name and version)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ name }}</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1"># location to get the source from</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pypi.io/packages/source/${{ name[0] }}/${{ name }}/${{ name }}-${{ version }}.tar.gz</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">f3832918bc3c66617f92e35f5d70729187676313caa60c187eb0f28b8fe5e3b5</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="c1"># build number (should be incremented if a new build is made, but version is not incrementing)</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python -m pip install --no-deps --ignore-installed .</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="c1"># the requirements at build and runtime</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pip</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="c1"># tests to validate that the package works as expected</span>
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">      </span><span class="nt">imports</span><span class="p">:</span>
+</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">imagesize</span>
+</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>
+</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="c1"># information about the package</span>
+</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="nt">about</span><span class="p">:</span>
+</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shibukawa/imagesize_py</span>
+</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MIT</span>
+</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;Getting</span><span class="nv"> </span><span class="s">image</span><span class="nv"> </span><span class="s">size</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">png/jpeg/jpeg2000/gif</span><span class="nv"> </span><span class="s">file&#39;</span>
+</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a><span class="w">    </span><span class="no">This module analyzes jpeg/jpeg2000/png/gif image header and</span>
+</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a><span class="w">    </span><span class="no">return image size.</span>
+</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shibukawa/imagesize_py</span>
+</span><span id="__span-3-45"><a id="__codelineno-3-45" name="__codelineno-3-45" href="#__codelineno-3-45"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pypi.python.org/pypi/imagesize</span>
+</span><span id="__span-3-46"><a id="__codelineno-3-46" name="__codelineno-3-46" href="#__codelineno-3-46"></a>
+</span><span id="__span-3-47"><a id="__codelineno-3-47" name="__codelineno-3-47" href="#__codelineno-3-47"></a><span class="c1"># the below is conda-forge specific!</span>
+</span><span id="__span-3-48"><a id="__codelineno-3-48" name="__codelineno-3-48" href="#__codelineno-3-48"></a><span class="nt">extra</span><span class="p">:</span>
+</span><span id="__span-3-49"><a id="__codelineno-3-49" name="__codelineno-3-49" href="#__codelineno-3-49"></a><span class="w">  </span><span class="nt">recipe-maintainers</span><span class="p">:</span>
+</span><span id="__span-3-50"><a id="__codelineno-3-50" name="__codelineno-3-50" href="#__codelineno-3-50"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">somemaintainer</span>
+</span></code></pre></div>
+<h3 id="package-section">Package section<a class="headerlink" href="#package-section" title="Permanent link">#</a></h3>
+<p>Specifies package information.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2.1.4&quot;</span>
+</span></code></pre></div>
+<ul>
+<li><strong>name</strong>: The lower case name of the package. It may contain "-", but no
+  spaces.</li>
+<li><strong>version</strong>: The version number of the package. Use the PEP-386 verlib
+  conventions. Cannot contain "-". YAML interprets version numbers such as 1.0
+  as floats, meaning that 0.10 will be the same as 0.1. To avoid this, put the
+  version number in quotes so that it is interpreted as a string.</li>
+</ul>
+<h3 id="source-section">Source section<a class="headerlink" href="#source-section" title="Permanent link">#</a></h3>
+<p>Specifies where the source code of the package is coming from. The source may
+come from a tarball file, git, hg, or svn. It may be a local path and it may
+contain patches.</p>
+<h4 id="source-from-tarball-or-zip-archive">Source from tarball or zip archive<a class="headerlink" href="#source-from-tarball-or-zip-archive" title="Permanent link">#</a></h4>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">md5</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">29f6089290505fc1a852e176bd276c43</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span><span class="nt">sha1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">f0a2c9a30073449cfb7d171c57552f3109d93894</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5a022ff4c1d1de87232b1c70bde50afbb98212fd246be4a867d8737173cf1f8f</span>
+</span></code></pre></div>
+<p>If an extracted archive contains only 1 folder at its top level, its contents
+will be moved 1 level up, so that the extracted package contents sit in the root
+of the work folder.</p>
+<h4 id="source-from-git">Source from git<a class="headerlink" href="#source-from-git" title="Permanent link">#</a></h4>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4.git</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="c1"># branch: master # note: defaults to fetching the repo&#39;s default branch</span>
+</span></code></pre></div>
+<p>You can use <code>rev</code> to pin the commit version directly.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4.git</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;50a1f7ed6c168eb0815d424cba2df62790f168f0&quot;</span>
+</span></code></pre></div>
+<p>Or you can use the <code>tag</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4.git</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.4&quot;</span>
+</span></code></pre></div>
+<p>The <code>git</code> can also be a relative path to the recipe directory.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../../bsdiff4/.git</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.4&quot;</span>
+</span></code></pre></div>
+<p>Futhermore if you want to fetch just the current "HEAD"(this may result in non-deterministic builds)
+then you can use <code>depth</code>,</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4.git</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w"> </span><span class="c1"># note: the behaviour defaults to -1</span>
+</span></code></pre></div>
+<p>Note: <code>tag</code> or <code>rev</code> may not be available within commit depth range, hence we don't
+allow using <code>rev</code> or <code>tag</code> and <code>depth</code> of them together if not set to <code>-1</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4.git</span>
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.4&quot;</span>
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span><span class="w"> </span><span class="c1"># error: use of `depth` with `rev` is invalid, they are mutually exclusive</span>
+</span></code></pre></div>
+<p>When you want to use git-lfs, you need to set <code>lfs: true</code>. This will also pull
+the lfs files from the repository.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../../bsdiff4/.git</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.4&quot;</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">lfs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w"> </span><span class="c1"># note: defaults to false</span>
+</span></code></pre></div>
+<h4 id="source-from-a-local-path">Source from a local path<a class="headerlink" href="#source-from-a-local-path" title="Permanent link">#</a></h4>
+<p>If the path is relative, it is taken relative to the recipe directory. The
+source is copied to the work directory before building.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">../src</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">    </span><span class="nt">use_gitignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w"> </span><span class="c1"># note: defaults to true</span>
+</span></code></pre></div>
+<p>By default, all files in the local path that are ignored by git are also ignored
+by rattler-build. You can disable this behavior by setting <code>use_gitignore</code> to
+<code>false</code>.</p>
+<h4 id="patches">Patches<a class="headerlink" href="#patches" title="Permanent link">#</a></h4>
+<p>Patches may optionally be applied to the source.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="w">  </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="c1">#[source information here]</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">    </span><span class="nt">patches</span><span class="p">:</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my.patch</span><span class="w"> </span><span class="c1"># the patch file is expected to be found in the recipe</span>
+</span></code></pre></div>
+<!-- boa (conda-build) automatically determines the patch strip level. -->
+
+<h4 id="destination-path">Destination path<a class="headerlink" href="#destination-path" title="Permanent link">#</a></h4>
+<p>Within boa's work directory, you may specify a particular folder to place source
+into. <code>rattler-build</code> will always drop you into the same folder (build
+folder/work), but it's up to you whether you want your source extracted into
+that folder, or nested deeper. This feature is particularly useful when dealing
+with multiple sources, but can apply to recipes with single sources as well.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="c1">#[source information here]</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">target_directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my-destination/folder</span>
+</span></code></pre></div>
+<h4 id="source-from-multiple-sources">Source from multiple sources<a class="headerlink" href="#source-from-multiple-sources" title="Permanent link">#</a></h4>
+<p>Some software is most easily built by aggregating several pieces.</p>
+<p>The syntax is a list of source dictionaries. Each member of this list follows
+the same rules as the single source. All features for each member are supported.</p>
+<p>Example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://package1.com/a.tar.bz2</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">    </span><span class="nt">target_directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stuff</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://package1.com/b.tar.bz2</span>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">    </span><span class="nt">target_directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stuff</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/mamba-org/boa</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="nt">target_directory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">boa</span>
+</span></code></pre></div>
+<p>Here, the two URL tarballs will go into one folder, and the git repo is checked
+out into its own space. Git will not clone into a non-empty folder.</p>
+<h2 id="build-section">Build section<a class="headerlink" href="#build-section" title="Permanent link">#</a></h2>
+<p>Specifies build information.</p>
+<p>Each field that expects a path can also handle a glob pattern. The matching is
+performed from the top of the build environment, so to match files inside your
+project you can use a pattern similar to the following one:
+<code>"**/myproject/**/*.txt"</code>. This pattern will match any .txt file found in your
+project. Quotation marks (<code>""</code>) are required for patterns that start with a <code>*</code>.</p>
+<p>Recursive globbing using <code>**</code> is also supported.</p>
+<h4 id="build-number-and-string">Build number and string<a class="headerlink" href="#build-number-and-string" title="Permanent link">#</a></h4>
+<p>The build number should be incremented for new builds of the same version. The
+number defaults to <code>0</code>. The build string cannot contain "-". The string defaults
+to the default rattler-build build string plus the build number.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">abc</span>
+</span></code></pre></div>
+<p>A hash will appear when the package is affected by one or more variables from
+the conda_build_config.yaml file. The hash is made up from the "used" variables
+- if anything is used, you have a hash. If you don't use these variables then
+you won't have a hash. There are a few special cases that do not affect the
+hash, such as Python and R or anything that already had a place in the build
+string.</p>
+<p>The build hash will be added to the build string if these are true for any
+dependency:</p>
+<ul>
+<li>package is an explicit dependency in build, host, or run deps</li>
+<li>package has a matching entry in conda_build_config.yaml which is a pin to a
+    specific version, not a lower bound</li>
+<li>that package is not ignored by ignore_version</li>
+</ul>
+<p>OR</p>
+<ul>
+<li>package uses <code>{{ compiler() }}</code> jinja2 function</li>
+</ul>
+<h4 id="dynamic-linking">Dynamic linking<a class="headerlink" href="#dynamic-linking" title="Permanent link">#</a></h4>
+<p>This section contains settings for the shared libraries and executables.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">dynamic_linking</span><span class="p">:</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;/usr/lib/**&quot;</span><span class="p p-Indicator">]</span>
+</span></code></pre></div>
+<h4 id="python-entry-points">Python entry points<a class="headerlink" href="#python-entry-points" title="Permanent link">#</a></h4>
+<p>The following example creates a Python entry point named "bsdiff4" that calls
+<code>bsdiff4.cli.main_bsdiff4()</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">    </span><span class="nt">entry_points</span><span class="p">:</span>
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4 = bsdiff4.cli:main_bsdiff4</span>
+</span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bspatch4 = bsdiff4.cli:main_bspatch4</span>
+</span></code></pre></div>
+<h3 id="script">Script<a class="headerlink" href="#script" title="Permanent link">#</a></h3>
+<p>By default, rattler-build uses a <code>build.sh</code> file on Unix (macOS and Linux) and a
+<code>build.bat</code> file on Linux, if they exist in the same folder as the <code>recipe.yaml</code>
+file. With the script parameter you can either supply a different filename or
+write out short build scripts. You may need to use selectors to use different
+scripts for different platforms.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">python setup.py install --single-version-externally-managed --record=record.txt</span>
+</span></code></pre></div>
+<h3 id="skipping-builds">Skipping builds<a class="headerlink" href="#skipping-builds" title="Permanent link">#</a></h3>
+<p>List conditions under which boa should skip the build of this recipe.
+Particularly useful for defining recipes that are platform specific. By default,
+a build is never skipped.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">  </span><span class="nt">skip</span><span class="p">:</span>
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
+</span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span></code></pre></div>
+<h3 id="architecture-independent-packages">Architecture independent packages<a class="headerlink" href="#architecture-independent-packages" title="Permanent link">#</a></h3>
+<p>Allows you to specify "no architecture" when building a package, thus making it
+compatible with all platforms and architectures. Noarch packages can be
+installed on any platform.</p>
+<p>Assigning the noarch key as <code>generic</code> tells conda to not try any manipulation of
+the contents.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span><span class="nt">noarch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generic</span>
+</span></code></pre></div>
+<p><code>noarch: generic</code> is most useful for packages such as static javascript assets
+and source archives. For pure Python packages that can run on any Python
+version, you can use the <code>noarch: python</code> value instead:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span><span class="nt">noarch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>At the time of this writing, <code>noarch</code> packages should not make use
+of preprocess-selectors: <code>noarch</code> packages are built with the directives which
+evaluate to <code>true</code> in the platform it is built on, which probably will result
+in incorrect/incomplete installation in other platforms.</p>
+</div>
+<!--
+### Include build recipe
+
+The full boa recipe and rendered `recipe.yaml` file is included in
+the package\_metadata by default. You can disable this with:
+
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="w">  </span><span class="nt">include_recipe</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span></code></pre></div>
+-->
+
+<h2 id="requirements-section">Requirements section<a class="headerlink" href="#requirements-section" title="Permanent link">#</a></h2>
+<p>Specifies the build and runtime requirements. Dependencies of these requirements
+are included automatically.</p>
+<p>Versions for requirements must follow the conda/mamba match specification. See
+build-version-spec.</p>
+<h3 id="build">Build<a class="headerlink" href="#build" title="Permanent link">#</a></h3>
+<p>Tools required to build the package. These packages are run on the build system
+and include things such as revision control systems (Git, SVN) make tools (GNU
+make, Autotool, CMake) and compilers (real cross, pseudo-cross, or native when
+not cross-compiling), and any source pre-processors.</p>
+<p>Packages which provide "sysroot" files, like the <code>CDT</code> packages (see below) also
+belong in the build section.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">git</span>
+</span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
+</span></code></pre></div>
+<h3 id="host">Host<a class="headerlink" href="#host" title="Permanent link">#</a></h3>
+<p>It represents packages that need to be specific to the target platform when the
+target platform is not necessarily the same as the native build platform. For
+example, in order for a recipe to be "cross-capable", shared libraries
+requirements must be listed in the host section, rather than the build section,
+so that the shared libraries that get linked are ones for the target platform,
+rather than the native build platform. You should also include the base
+interpreter for packages that need one. In other words, a Python package would
+list <code>python</code> here and an R package would list <code>mro-base</code> or <code>r-base</code>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;c&#39;) }}</span>
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux</span>
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-26-6"><a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ cdt(&#39;xorg-x11-proto-devel&#39;) }}</span>
+</span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When both build and host sections are defined, the build section can
+be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
+For example, a cross-compiler that runs on linux-64, but targets linux-armv7.</p>
+</div>
+<p>The PREFIX environment variable points to the host prefix. With respect to
+activation during builds, both the host and build environments are activated.
+The build prefix is activated before the host prefix so that the host prefix has
+priority over the build prefix. Executables that don't exist in the host prefix
+should be found in the build prefix.</p>
+<p>The build and host prefixes are always separate when both are defined, or when
+<code>${{ compiler() }}</code> Jinja2 functions are used. The only time that build and host
+are merged is when the host section is absent, and no <code>${{ compiler() }}</code> Jinja2
+functions are used in meta.yaml.</p>
+<h3 id="run">Run<a class="headerlink" href="#run" title="Permanent link">#</a></h3>
+<p>Packages required to run the package. These are the dependencies that are
+installed automatically whenever the package is installed. Package names should
+follow the <a href="https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html#package-match-specifications">package match
+specifications</a>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-27-4"><a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">six &gt;=1.8.0</span>
+</span></code></pre></div>
+<p>To build a recipe against different versions of NumPy and ensure that each
+version is part of the package dependencies, list <code>numpy</code> as a requirement in
+<code>recipe.yaml</code> and use a <code>conda_build_config.yaml</code> file with multiple NumPy
+versions.</p>
+<h3 id="run-constrained">Run constrained<a class="headerlink" href="#run-constrained" title="Permanent link">#</a></h3>
+<p>Packages that are optional at runtime but must obey the supplied additional
+constraint if they are installed.</p>
+<p>Package names should follow the <a href="https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html#package-match-specifications">package match
+specifications</a>.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">  </span><span class="nt">run_constrained</span><span class="p">:</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional-subpackage ==${{ version }}</span>
+</span></code></pre></div>
+<p>For example, let's say we have an environment that has package "a" installed at
+version 1.0. If we install package "b" that has a run_constrained entry of
+"a&gt;1.0", then mamba would need to upgrade "a" in the environment in order to
+install "b".</p>
+<p>This is especially useful in the context of virtual packages, where the
+run_constrained dependency is not a package that mamba manages, but rather a
+<a href="https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html">virtual
+package</a>
+that represents a system property that mamba can't change. For example, a
+package on linux may impose a run_constrained dependency on __glibc&gt;=2.12.
+This is the version bound consistent with CentOS 6. Software built against glibc
+2.12 will be compatible with CentOS 6. This run_constrained dependency helps
+mamba tell the user that a given package can't be installed if their system
+glibc version is too old.</p>
+<h3 id="run-exports">Run exports<a class="headerlink" href="#run-exports" title="Permanent link">#</a></h3>
+<p>Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Such packages use <code>run_exports</code> for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.</p>
+<p>Example from zlib:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">    </span><span class="nt">run_exports</span><span class="p">:</span>
+</span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">pin_subpackage(&#39;libzlib&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">exact=True)</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</span></code></pre></div>
+<p>Run exports are weak by default. But you can also define strong run_exports.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">    </span><span class="nt">run_exports</span><span class="p">:</span>
+</span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">      </span><span class="nt">strong</span><span class="p">:</span>
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">pin_subpackage(&#39;libzlib&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">exact=True)</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</span></code></pre></div>
+<h3 id="ignore-run-exports">Ignore run exports<a class="headerlink" href="#ignore-run-exports" title="Permanent link">#</a></h3>
+<p>There maybe cases where an upstream package has a problematic <code>run_exports</code> constraint, you can ignore it in your recipe by listing the upstream package name in the <code>ignore_run_exports</code> section in <code>requirements</code>.</p>
+<p>You can ignore them by package name, or by naming the runtime dependency directly.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">    </span><span class="nt">ignore_run_exports</span><span class="p">:</span>
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">      </span><span class="nt">from_package</span><span class="p">:</span>
+</span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
+</span></code></pre></div>
+<p>Using, runtime depenedency name.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">    </span><span class="nt">ignore_run_exports</span><span class="p">:</span>
+</span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="w">      </span><span class="nt">from_name</span><span class="p">:</span>
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libzlib</span>
+</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code>ignore_run_exports</code> only applies to runtime dependencies coming from an upstream package.</p>
+</div>
+<h2 id="tests-section">Tests section<a class="headerlink" href="#tests-section" title="Permanent link">#</a></h2>
+<p>Rattler-build supports 4 different types of tests. The "script" test installs
+the package and runs a list of commands. The python test attempts to import a
+list of python modules and runs <code>pip check</code>. The downstream test runs the tests
+of a downstream package that reverse depends on the package being built.</p>
+<p>And lastly, the package content test checks if the built package contains the
+mentioned items.</p>
+<p>The tests section is a list of these items:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello world&quot;</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="w">      </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pytest</span>
+</span><span id="__span-33-7"><a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-33-8"><a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-33-9"><a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-data.txt</span>
+</span><span id="__span-33-10"><a id="__codelineno-33-10" name="__codelineno-33-10" href="#__codelineno-33-10"></a>
+</span><span id="__span-33-11"><a id="__codelineno-33-11" name="__codelineno-33-11" href="#__codelineno-33-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-33-12"><a id="__codelineno-33-12" name="__codelineno-33-12" href="#__codelineno-33-12"></a><span class="w">      </span><span class="nt">imports</span><span class="p">:</span>
+</span><span id="__span-33-13"><a id="__codelineno-33-13" name="__codelineno-33-13" href="#__codelineno-33-13"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4</span>
+</span><span id="__span-33-14"><a id="__codelineno-33-14" name="__codelineno-33-14" href="#__codelineno-33-14"></a><span class="w">      </span><span class="nt">pip_check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># this is the default</span>
+</span><span id="__span-33-15"><a id="__codelineno-33-15" name="__codelineno-33-15" href="#__codelineno-33-15"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">downstream</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy</span>
+</span></code></pre></div>
+<h3 id="script-test">Script test<a class="headerlink" href="#script-test" title="Permanent link">#</a></h3>
+<p>The script test has 3 top-level keys: <code>script</code>, <code>files</code> and <code>requirements</code>. Only
+the <code>script</code> key is required.</p>
+<h4 id="test-commands">Test commands<a class="headerlink" href="#test-commands" title="Permanent link">#</a></h4>
+<p>Commands that are run as part of the test.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello world&quot;</span>
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4 -h</span>
+</span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bspatch4 -h</span>
+</span></code></pre></div>
+<h4 id="extra-test-files">Extra Test Files<a class="headerlink" href="#extra-test-files" title="Permanent link">#</a></h4>
+<p>Test files that are copied from the source work directory into the temporary
+test directory and are needed during testing (note that the source work
+directory is otherwise not available at all during testing).</p>
+<p>You can also include files that come from the <code>recipe</code> folder. They are copied
+into the test directory as well.</p>
+<p>At test execution time, the test directory is the current working directory.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ls</span>
+</span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">    </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">      </span><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myfile.txt</span>
+</span><span id="__span-35-7"><a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tests/</span>
+</span><span id="__span-35-8"><a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some/directory/pattern*.sh</span>
+</span><span id="__span-35-9"><a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="w">      </span><span class="nt">recipe</span><span class="p">:</span>
+</span><span id="__span-35-10"><a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">extra-file.txt</span>
+</span></code></pre></div>
+<h4 id="test-requirements">Test requirements<a class="headerlink" href="#test-requirements" title="Permanent link">#</a></h4>
+<p>In addition to the runtime requirements, you can specify requirements needed
+during testing. The runtime requirements that you specified in the "run" section
+described above are automatically included during testing (because the built
+package is installed like regular).</p>
+<p>In the <code>build</code> section you can specify additional requirements that are only
+needed on the build system for cross-compilation (e.g. emulators or compilers).</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;hello world&quot;</span>
+</span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-36-5"><a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="w">      </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-36-6"><a id="__codelineno-36-6" name="__codelineno-36-6" href="#__codelineno-36-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">myemulator</span>
+</span><span id="__span-36-7"><a id="__codelineno-36-7" name="__codelineno-36-7" href="#__codelineno-36-7"></a><span class="w">      </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-36-8"><a id="__codelineno-36-8" name="__codelineno-36-8" href="#__codelineno-36-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nose</span>
+</span></code></pre></div>
+<h3 id="python-tests">Python tests<a class="headerlink" href="#python-tests" title="Permanent link">#</a></h3>
+<p>For this test type you can list a set of Python modules that need to be
+importable. The test will fail if any of the modules cannot be imported.</p>
+<p>The test will also automatically run <code>pip check</code> to check for any broken
+dependencies. This can be disabled by setting <code>pip_check: false</code> in the YAML.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-37-2"><a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-37-3"><a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="w">      </span><span class="nt">imports</span><span class="p">:</span>
+</span><span id="__span-37-4"><a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4</span>
+</span><span id="__span-37-5"><a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bspatch4</span>
+</span><span id="__span-37-6"><a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a><span class="w">      </span><span class="nt">pip_check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># can be left out because this is the default</span>
+</span></code></pre></div>
+<p>Internally this will write a small Python script that imports the modules:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="kn">import</span> <span class="nn">bsdiff4</span>
+</span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="kn">import</span> <span class="nn">bspatch4</span>
+</span></code></pre></div>
+<h3 id="check-for-package-contents">Check for package-contents<a class="headerlink" href="#check-for-package-contents" title="Permanent link">#</a></h3>
+<p>Checks if the built package contains the mentioned items. These checks are executed directly at
+the end of the build process to make sure that all expected files are present in the package.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package-contents</span><span class="p">:</span>
+</span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">      </span><span class="c1"># checks for the existence of files inside $PREFIX or %PREFIX%</span>
+</span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="w">      </span><span class="c1"># or, checks that there is at least one file matching the specified `glob`</span>
+</span><span id="__span-39-5"><a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">      </span><span class="c1"># pattern inside the prefix</span>
+</span><span id="__span-39-6"><a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-39-7"><a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etc/libmamba/test.txt</span>
+</span><span id="__span-39-8"><a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etc/libmamba</span>
+</span><span id="__span-39-9"><a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">etc/libmamba/*.mamba.txt</span>
+</span><span id="__span-39-10"><a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a>
+</span><span id="__span-39-11"><a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="w">      </span><span class="c1"># checks for the existence of `mamba/api/__init__.py` inside of the</span>
+</span><span id="__span-39-12"><a id="__codelineno-39-12" name="__codelineno-39-12" href="#__codelineno-39-12"></a><span class="w">      </span><span class="c1"># Python site-packages directory (note: also see Python import checks)</span>
+</span><span id="__span-39-13"><a id="__codelineno-39-13" name="__codelineno-39-13" href="#__codelineno-39-13"></a><span class="w">      </span><span class="nt">site_packages</span><span class="p">:</span>
+</span><span id="__span-39-14"><a id="__codelineno-39-14" name="__codelineno-39-14" href="#__codelineno-39-14"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mamba.api</span>
+</span><span id="__span-39-15"><a id="__codelineno-39-15" name="__codelineno-39-15" href="#__codelineno-39-15"></a>
+</span><span id="__span-39-16"><a id="__codelineno-39-16" name="__codelineno-39-16" href="#__codelineno-39-16"></a>
+</span><span id="__span-39-17"><a id="__codelineno-39-17" name="__codelineno-39-17" href="#__codelineno-39-17"></a><span class="w">      </span><span class="c1"># looks in $PREFIX/bin/mamba for unix and %PREFIX%\Library\bin\mamba.exe on Windows</span>
+</span><span id="__span-39-18"><a id="__codelineno-39-18" name="__codelineno-39-18" href="#__codelineno-39-18"></a><span class="w">      </span><span class="c1"># note: also check the `commands` and execute something like `mamba --help` to make</span>
+</span><span id="__span-39-19"><a id="__codelineno-39-19" name="__codelineno-39-19" href="#__codelineno-39-19"></a><span class="w">      </span><span class="c1"># sure things work fine</span>
+</span><span id="__span-39-20"><a id="__codelineno-39-20" name="__codelineno-39-20" href="#__codelineno-39-20"></a><span class="w">      </span><span class="nt">bin</span><span class="p">:</span>
+</span><span id="__span-39-21"><a id="__codelineno-39-21" name="__codelineno-39-21" href="#__codelineno-39-21"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mamba</span>
+</span><span id="__span-39-22"><a id="__codelineno-39-22" name="__codelineno-39-22" href="#__codelineno-39-22"></a>
+</span><span id="__span-39-23"><a id="__codelineno-39-23" name="__codelineno-39-23" href="#__codelineno-39-23"></a><span class="w">      </span><span class="c1"># searches for `$PREFIX/lib/libmamba.so` or `$PREFIX/lib/libmamba.dylib` on Linux or macOS,</span>
+</span><span id="__span-39-24"><a id="__codelineno-39-24" name="__codelineno-39-24" href="#__codelineno-39-24"></a><span class="w">      </span><span class="c1"># on Windows for %PREFIX%\Library\lib\mamba.dll &amp; %PREFIX%\Library\bin\mamba.bin</span>
+</span><span id="__span-39-25"><a id="__codelineno-39-25" name="__codelineno-39-25" href="#__codelineno-39-25"></a><span class="w">      </span><span class="nt">lib</span><span class="p">:</span>
+</span><span id="__span-39-26"><a id="__codelineno-39-26" name="__codelineno-39-26" href="#__codelineno-39-26"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mamba</span>
+</span><span id="__span-39-27"><a id="__codelineno-39-27" name="__codelineno-39-27" href="#__codelineno-39-27"></a>
+</span><span id="__span-39-28"><a id="__codelineno-39-28" name="__codelineno-39-28" href="#__codelineno-39-28"></a><span class="w">      </span><span class="c1"># searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and</span>
+</span><span id="__span-39-29"><a id="__codelineno-39-29" name="__codelineno-39-29" href="#__codelineno-39-29"></a><span class="w">      </span><span class="c1"># on Windows for `%PREFIX%\Library\include\mamba.hpp`</span>
+</span><span id="__span-39-30"><a id="__codelineno-39-30" name="__codelineno-39-30" href="#__codelineno-39-30"></a><span class="w">      </span><span class="nt">includes</span><span class="p">:</span>
+</span><span id="__span-39-31"><a id="__codelineno-39-31" name="__codelineno-39-31" href="#__codelineno-39-31"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libmamba/mamba.hpp</span>
+</span></code></pre></div>
+<h3 id="downstream-tests">Downstream tests<a class="headerlink" href="#downstream-tests" title="Permanent link">#</a></h3>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Downstream tests are not yet implemented in <code>rattler-build</code>.</p>
+</div>
+<p>A downstream test can mention a single package that has a dependency on the package being built.
+The test will install the package and run the tests of the downstream package with our current
+package as a dependency.</p>
+<p>Sometimes downstream packages do not resolve. In this case, the test is ignored.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">downstream</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy</span>
+</span></code></pre></div>
+<h2 id="outputs-section">Outputs section<a class="headerlink" href="#outputs-section" title="Permanent link">#</a></h2>
+<p>Explicitly specifies packaging steps. This section supports multiple outputs, as
+well as different package output types. The format is a list of mappings.</p>
+<p>When using multiple outputs, certain top-level keys are "forbidden": <code>package</code>
+and <code>requirements</code>. Instead of <code>package</code>, a top-level <code>recipe</code> key can be
+defined. The <code>recipe.name</code> is ignored but the <code>recipe.version</code> key is used as
+default version for each output. Other "top-level" keys are merged into each
+output (for example, the <code>about</code> section) to avoid repetition. Each output is a
+complete recipe, and can have its own <code>build</code>, <code>requirements</code>, and <code>test</code>
+sections.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="nt">recipe</span><span class="p">:</span>
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="w">  </span><span class="c1"># the recipe name is ignored</span>
+</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some</span>
+</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>
+</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a><span class="w">      </span><span class="c1"># version is taken from recipe.version (1.0)</span>
+</span><span id="__span-41-9"><a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-subpackage</span>
+</span><span id="__span-41-10"><a id="__codelineno-41-10" name="__codelineno-41-10" href="#__codelineno-41-10"></a>
+</span><span id="__span-41-11"><a id="__codelineno-41-11" name="__codelineno-41-11" href="#__codelineno-41-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-41-12"><a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-other-subpackage</span>
+</span><span id="__span-41-13"><a id="__codelineno-41-13" name="__codelineno-41-13" href="#__codelineno-41-13"></a><span class="w">      </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.0</span>
+</span></code></pre></div>
+<p>Each output acts like an independent recipe and can have their own <code>script</code>,
+<code>build_number</code>, and so on.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subpackage-name</span>
+</span><span id="__span-42-4"><a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-42-5"><a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a><span class="w">      </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">install-subpackage.sh</span>
+</span></code></pre></div>
+<p>Each output is built independently. You should take care of not packaging the
+same files twice.</p>
+<h3 id="subpackage-requirements">Subpackage requirements<a class="headerlink" href="#subpackage-requirements" title="Permanent link">#</a></h3>
+<p>Like a top-level recipe, a subpackage may have zero or more dependencies listed
+as build, host or run requirements.</p>
+<p>The dependencies listed as subpackage build requirements are available only
+during the packaging phase of that subpackage.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-43-3"><a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subpackage-name</span>
+</span><span id="__span-43-4"><a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a><span class="w">      </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-43-6"><a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-dep</span>
+</span><span id="__span-43-7"><a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a><span class="w">      </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-dep</span>
+</span></code></pre></div>
+<p>You can also use the <code>pin_subpackage</code> function to pin another output from the
+same recipe.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libtest</span>
+</span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-44-5"><a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span>
+</span><span id="__span-44-6"><a id="__codelineno-44-6" name="__codelineno-44-6" href="#__codelineno-44-6"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-44-7"><a id="__codelineno-44-7" name="__codelineno-44-7" href="#__codelineno-44-7"></a><span class="w">      </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-44-8"><a id="__codelineno-44-8" name="__codelineno-44-8" href="#__codelineno-44-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libtest&#39;, max_pin=&#39;x.x&#39;) }}</span>
+</span></code></pre></div>
+<p>The outputs are topologically sorted by the dependency graph which is taking the
+<code>pin_subpackage</code> invocations into account. When using <code>pin_subpackage(name,
+exact=True)</code> a special behavior is used where the <code>name</code> package is injected as
+a "variant" and the variant matrix is expanded appropriately. For example, when
+you have the following situation, with a <code>variant_config.yaml</code> file that
+contains <code>openssl: [1, 3]</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libtest</span>
+</span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="w">      </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-45-6"><a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openssl</span>
+</span><span id="__span-45-7"><a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-45-8"><a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span>
+</span><span id="__span-45-9"><a id="__codelineno-45-9" name="__codelineno-45-9" href="#__codelineno-45-9"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-45-10"><a id="__codelineno-45-10" name="__codelineno-45-10" href="#__codelineno-45-10"></a><span class="w">      </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-45-11"><a id="__codelineno-45-11" name="__codelineno-45-11" href="#__codelineno-45-11"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libtest&#39;, exact=True) }}</span>
+</span></code></pre></div>
+<p>Due to the variant config file, this will build two versions of <code>libtest</code>. We
+will also build two versions of <code>test</code>, one that depends on <code>libtest (openssl
+1)</code> and one that depends on <code>libtest (openssl 3)</code>.</p>
+<h2 id="about-section">About section<a class="headerlink" href="#about-section" title="Permanent link">#</a></h2>
+<p>Specifies identifying information about the package. The information displays in
+the package server.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a><span class="nt">about</span><span class="p">:</span>
+</span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/bsdiff4</span>
+</span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BSD</span>
+</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
+</span><span id="__span-46-5"><a id="__codelineno-46-5" name="__codelineno-46-5" href="#__codelineno-46-5"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">binary diff and patch using the BSDIFF4-format</span>
+</span><span id="__span-46-6"><a id="__codelineno-46-6" name="__codelineno-46-6" href="#__codelineno-46-6"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-46-7"><a id="__codelineno-46-7" name="__codelineno-46-7" href="#__codelineno-46-7"></a><span class="w">    </span><span class="no">Long description of bsdiff4 ...</span>
+</span><span id="__span-46-8"><a id="__codelineno-46-8" name="__codelineno-46-8" href="#__codelineno-46-8"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/ilanschnell/bsdiff4</span>
+</span><span id="__span-46-9"><a id="__codelineno-46-9" name="__codelineno-46-9" href="#__codelineno-46-9"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://docs.com</span>
+</span></code></pre></div>
+<h3 id="license-file">License file<a class="headerlink" href="#license-file" title="Permanent link">#</a></h3>
+<p>Add a file containing the software license to the package metadata. Many
+licenses require the license statement to be distributed with the package. The
+filename is relative to the source or recipe directory. The value can be a
+single filename or a YAML list for multiple license files. Values can also point
+to directories with license information. Directory entries must end with a <code>/</code>
+suffix (this is to lessen unintentional inclusion of non-license files; all the
+directory's contents will be unconditionally and recursively added).</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a><span class="nt">about</span><span class="p">:</span>
+</span><span id="__span-47-2"><a id="__codelineno-47-2" name="__codelineno-47-2" href="#__codelineno-47-2"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span>
+</span><span id="__span-47-3"><a id="__codelineno-47-3" name="__codelineno-47-3" href="#__codelineno-47-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
+</span><span id="__span-47-4"><a id="__codelineno-47-4" name="__codelineno-47-4" href="#__codelineno-47-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vendor-licenses/</span>
+</span></code></pre></div>
+<h2 id="extra-section">Extra section<a class="headerlink" href="#extra-section" title="Permanent link">#</a></h2>
+<p>A schema-free area for storing non-conda-specific metadata in standard YAML
+form.</p>
+<details class="example" open="open">
+<summary>Example: To store recipe maintainers information</summary>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="nt">extra</span><span class="p">:</span>
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="w">  </span><span class="nt">maintainers</span><span class="p">:</span>
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a><span class="w">   </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">name of maintainer</span>
+</span></code></pre></div>
+</details>
+<h2 id="templating-with-jinja">Templating with Jinja<a class="headerlink" href="#templating-with-jinja" title="Permanent link">#</a></h2>
+<p>rattler-build supports limited Jinja templating in the <code>recipe.yaml</code> file.</p>
+<p>You can set up Jinja variables in the context yaml section:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;test&quot;</span>
+</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;5.1.2&quot;</span>
+</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a><span class="w">  </span><span class="c1"># later keys can reference previous keys</span>
+</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="w">  </span><span class="c1"># and use jinja functions to compute new values</span>
+</span><span id="__span-49-6"><a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a><span class="w">  </span><span class="nt">major_version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version.split(&#39;.&#39;)[0] }}</span>
+</span></code></pre></div>
+<p>Later in your <code>recipe.yaml</code> you can use these values in string interpolation
+with Jinja. For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/mamba-org/${{ name }}/v${{ version }}.tar.gz</span>
+</span></code></pre></div>
+<p>Jinja has built-in support for some common string manipulations.</p>
+<p>In rattler-build, complex Jinja is completely disallowed as we try to produce
+YAML that is valid at all times. So you should not use any <code>{% if ... %}</code> or
+similar Jinja constructs that produce invalid yaml. Furthermore, instead of
+plain double curly brackets Jinja statements need to be prefixed by <code>$</code>, e.g.
+<code>${{ ... }}</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">name</span><span class="w"> </span><span class="p p-Indicator">}}</span><span class="w">   </span><span class="c1"># WRONG: invalid yaml</span>
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ name }}</span><span class="w"> </span><span class="c1"># correct</span>
+</span></code></pre></div>
+<p>For more information, see the <a href="https://jinja.palletsprojects.com/en/3.1.x/">Jinja template
+documentation</a> and the list of
+available environment variables <a href=""><code>env-vars</code></a>.</p>
+<p>Jinja templates are evaluated during the build process.</p>
+<!-- TODO: implement the command to do below
+To retrieve a fully rendered `recipe.yaml`, use the `` command.
+-->
+
+<h4 id="additional-jinja2-functionality-in-rattler-build">Additional Jinja2 functionality in rattler-build<a class="headerlink" href="#additional-jinja2-functionality-in-rattler-build" title="Permanent link">#</a></h4>
+<p>Besides the default Jinja2 functionality, additional Jinja functions are
+available during the rattler-build process: <code>pin_compatible</code>, <code>pin_subpackage</code>,
+and <code>compiler</code>.</p>
+<p>The compiler function takes <code>c</code>, <code>cxx</code>, <code>fortran</code> and other values as argument
+and automatically selects the right (cross-)compiler for the target platform.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>build:
+</span><span id="__span-52-2"><a id="__codelineno-52-2" name="__codelineno-52-2" href="#__codelineno-52-2"></a>  - ${{ compiler(&#39;c&#39;) }}
+</span></code></pre></div>
+<p>The <code>pin_subpackage</code> function pins another package produced by the recipe with
+the supplied parameters.</p>
+<p>Similarly, the <code>pin_compatible</code> function will pin a package according to the
+specified rules.</p>
+<h4 id="pin-expressions">Pin expressions<a class="headerlink" href="#pin-expressions" title="Permanent link">#</a></h4>
+<p><code>rattler-build</code> knows pin expressions. A pin expression can have a <code>min_pin</code>,
+<code>max_pin</code> and <code>exact</code> value. A <code>max_pin</code> and <code>min_pin</code> are specified with a
+string containing only <code>x</code> and <code>.</code>, e.g. <code>max_pin="x.x.x"</code> would signify to pin
+the given package to <code>&lt;1.2.3</code> (if the package version is <code>1.2.2</code>, for example).</p>
+<p>A pin with <code>min_pin="x.x",max_pin="x.x"</code> for a package of version <code>1.2.2</code> would
+evaluate to <code>&gt;=1.2.2,&lt;1.2.3</code>.</p>
+<p>If <code>exact=true</code>, then the <code>hash</code> is included, and the package is pinned exactly,
+e.g. <code>==1.2.2 h1234</code>. This is a unique package variant that cannot exist more
+than once, and thus is "exactly" pinned.</p>
+<h4 id="pin-subpackage">Pin subpackage<a class="headerlink" href="#pin-subpackage" title="Permanent link">#</a></h4>
+<p>Pin subpackage refers to another package from the same recipe file. It is
+commonly used in the <code>build/run_exports</code> section to export a run export from the
+package, or with multiple outputs to refer to a previous build.</p>
+<p>It looks something like:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypkg</span>
+</span><span id="__span-53-3"><a id="__codelineno-53-3" name="__codelineno-53-3" href="#__codelineno-53-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.2.3&quot;</span>
+</span><span id="__span-53-4"><a id="__codelineno-53-4" name="__codelineno-53-4" href="#__codelineno-53-4"></a>
+</span><span id="__span-53-5"><a id="__codelineno-53-5" name="__codelineno-53-5" href="#__codelineno-53-5"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-53-6"><a id="__codelineno-53-6" name="__codelineno-53-6" href="#__codelineno-53-6"></a><span class="w">  </span><span class="nt">run_exports</span><span class="p">:</span>
+</span><span id="__span-53-7"><a id="__codelineno-53-7" name="__codelineno-53-7" href="#__codelineno-53-7"></a><span class="w">    </span><span class="c1"># this will evaluate to `mypkg &lt;1.3`</span>
+</span><span id="__span-53-8"><a id="__codelineno-53-8" name="__codelineno-53-8" href="#__codelineno-53-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(name, max_pin=&#39;x.x&#39;) }}</span>
+</span></code></pre></div>
+<h4 id="pin-compatible">Pin compatible<a class="headerlink" href="#pin-compatible" title="Permanent link">#</a></h4>
+<p>Pin compatible lets you pin a package based on the version retrieved from the
+variant file (if the pinning from the variant file needs customization).</p>
+<p>E.g. if the variant specifies a pin for <code>numpy: 1.11</code>, one can use
+<code>pin_compatible</code> to relax it:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-54-2"><a id="__codelineno-54-2" name="__codelineno-54-2" href="#__codelineno-54-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-54-3"><a id="__codelineno-54-3" name="__codelineno-54-3" href="#__codelineno-54-3"></a><span class="w">    </span><span class="c1"># this will select nupy 1.11</span>
+</span><span id="__span-54-4"><a id="__codelineno-54-4" name="__codelineno-54-4" href="#__codelineno-54-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy</span>
+</span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-54-6"><a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a><span class="w">    </span><span class="c1"># this will export `numpy &gt;=1.11,&lt;2`, instead of the stricter `1.11` pin</span>
+</span><span id="__span-54-7"><a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, min_pin=&#39;x.x&#39;, max_pin=&#39;x&#39;) }}</span>
+</span></code></pre></div>
+<h4 id="the-env-jinja-functions">The env Jinja functions<a class="headerlink" href="#the-env-jinja-functions" title="Permanent link">#</a></h4>
+<p>You can access the current environment variables using the <code>env</code> object in
+Jinja.</p>
+<p>There are three functions:</p>
+<ul>
+<li><code>env.get("ENV_VAR")</code> will insert the value of "ENV_VAR" into the recipe.</li>
+<li><code>env.get_default("ENV_VAR", "undefined")</code> will insert the value of "ENV_VAR"
+  into the recipe or, if "ENV_VAR" is not defined, the specified default value
+  (in this case "undefined")</li>
+<li><code>env.exists("ENV_VAR")</code> returns a boolean true of false if the env var is set
+  to any value</li>
+</ul>
+<p>This can be used for some light templating, e.g.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ env.get(&quot;GIT_BUILD_STRING&quot;) }}_${{ PKG_HASH }}</span>
+</span></code></pre></div>
+<h4 id="cmp-function"><code>cmp</code> function<a class="headerlink" href="#cmp-function" title="Permanent link">#</a></h4>
+<p>This function matches the first argument(package's MatchSpec) against the second argument(the version spec) and returns the resulting boolean.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a><span class="l l-Scalar l-Scalar-Plain">cmp(python, &#39;&gt;=3.4&#39;)</span>
+</span></code></pre></div>
+<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml">cmp usage example</a></p>
+<h4 id="cdt-function"><code>cdt</code> function<a class="headerlink" href="#cdt-function" title="Permanent link">#</a></h4>
+<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a><span class="c1"># on x86_64 system</span>
+</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-x86_64</span>
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a><span class="c1"># on aarch64 system</span>
+</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
+</span></code></pre></div>
+<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml">cdt usage example</a></p>
+<h2 id="preprocessing-selectors">Preprocessing selectors<a class="headerlink" href="#preprocessing-selectors" title="Permanent link">#</a></h2>
+<p>You can add selectors to any item, and the selector is evaluated in a
+preprocessing stage. If a selector evaluates to <code>true</code>, the item is flattened
+into the parent element. If a selector evaluates to <code>false</code>, the item is
+removed.</p>
+<p>Selectors can use <code>if ... then ... else</code> as follows:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">not win</span>
+</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a><span class="w">    </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://path/to/unix/source</span>
+</span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a><span class="w">    </span><span class="nt">else</span><span class="p">:</span>
+</span><span id="__span-58-6"><a id="__codelineno-58-6" name="__codelineno-58-6" href="#__codelineno-58-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://path/to/windows/source</span>
+</span><span id="__span-58-7"><a id="__codelineno-58-7" name="__codelineno-58-7" href="#__codelineno-58-7"></a>
+</span><span id="__span-58-8"><a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a><span class="c1"># or the equivalent with two if conditions:</span>
+</span><span id="__span-58-9"><a id="__codelineno-58-9" name="__codelineno-58-9" href="#__codelineno-58-9"></a>
+</span><span id="__span-58-10"><a id="__codelineno-58-10" name="__codelineno-58-10" href="#__codelineno-58-10"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-58-11"><a id="__codelineno-58-11" name="__codelineno-58-11" href="#__codelineno-58-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
+</span><span id="__span-58-12"><a id="__codelineno-58-12" name="__codelineno-58-12" href="#__codelineno-58-12"></a><span class="w">    </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-58-13"><a id="__codelineno-58-13" name="__codelineno-58-13" href="#__codelineno-58-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://path/to/unix/source</span>
+</span><span id="__span-58-14"><a id="__codelineno-58-14" name="__codelineno-58-14" href="#__codelineno-58-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
+</span><span id="__span-58-15"><a id="__codelineno-58-15" name="__codelineno-58-15" href="#__codelineno-58-15"></a><span class="w">    </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-58-16"><a id="__codelineno-58-16" name="__codelineno-58-16" href="#__codelineno-58-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://path/to/windows/source</span>
+</span></code></pre></div>
+<p>A selector is a valid Python statement that is executed. The following variables
+are defined. Unless otherwise stated, the variables are booleans.</p>
+<p>The use of the Python version selectors, py27, py34, etc. is discouraged in
+favor of the more general comparison operators. Additional selectors in this
+series will not be added to conda-build.</p>
+<p>Because the selector is any valid Python expression, complicated logic is
+possible:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix and not win</span>
+</span><span id="__span-59-2"><a id="__codelineno-59-2" name="__codelineno-59-2" href="#__codelineno-59-2"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span><span id="__span-59-3"><a id="__codelineno-59-3" name="__codelineno-59-3" href="#__codelineno-59-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(win or linux) and not py27</span>
+</span><span id="__span-59-4"><a id="__codelineno-59-4" name="__codelineno-59-4" href="#__codelineno-59-4"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span></code></pre></div>
+<p>Lists are automatically "merged" upwards, so it is possible to group multiple
+items under a single selector:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-60-1"><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-60-2"><a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-60-3"><a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
+</span><span id="__span-60-4"><a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-60-5"><a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test -d ${PREFIX}/include/xtensor</span>
+</span><span id="__span-60-6"><a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake</span>
+</span><span id="__span-60-7"><a id="__codelineno-60-7" name="__codelineno-60-7" href="#__codelineno-60-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
+</span><span id="__span-60-8"><a id="__codelineno-60-8" name="__codelineno-60-8" href="#__codelineno-60-8"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-60-9"><a id="__codelineno-60-9" name="__codelineno-60-9" href="#__codelineno-60-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)</span>
+</span><span id="__span-60-10"><a id="__codelineno-60-10" name="__codelineno-60-10" href="#__codelineno-60-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)</span>
+</span><span id="__span-60-11"><a id="__codelineno-60-11" name="__codelineno-60-11" href="#__codelineno-60-11"></a>
+</span><span id="__span-60-12"><a id="__codelineno-60-12" name="__codelineno-60-12" href="#__codelineno-60-12"></a><span class="c1"># On unix this is rendered to:</span>
+</span><span id="__span-60-13"><a id="__codelineno-60-13" name="__codelineno-60-13" href="#__codelineno-60-13"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-60-14"><a id="__codelineno-60-14" name="__codelineno-60-14" href="#__codelineno-60-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-60-15"><a id="__codelineno-60-15" name="__codelineno-60-15" href="#__codelineno-60-15"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test -d ${PREFIX}/include/xtensor</span>
+</span><span id="__span-60-16"><a id="__codelineno-60-16" name="__codelineno-60-16" href="#__codelineno-60-16"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake</span>
+</span></code></pre></div>
+<h2 id="experimental-features">Experimental features<a class="headerlink" href="#experimental-features" title="Permanent link">#</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>These are experimental features of <code>rattler-build</code> and may change or go away completely.</p>
+</div>
+<h3 id="jinja-functions">Jinja functions<a class="headerlink" href="#jinja-functions" title="Permanent link">#</a></h3>
+<ul>
+<li><a href="../experimental_features/#load-from-files"><code>load_from_file</code></a></li>
+<li><a href="../experimental_features/#git-functions"><code>git.*</code> functions</a></li>
+</ul>
+<!--
+
+Experimental features
+---------------------
+
+### Build time features
+
+<div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a>This is an experimental feature of boa and may change or go away completely
+</span></code></pre></div>
+
+With boa, you can add "build-time" features. That makes building packages from
+source much more flexible and powerful and is a first step to enable a true "source"-distribution on top of conda packages.
+
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-62-1"><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libarchive</span>
+</span><span id="__span-62-2"><a id="__codelineno-62-2" name="__codelineno-62-2" href="#__codelineno-62-2"></a>
+</span><span id="__span-62-3"><a id="__codelineno-62-3" name="__codelineno-62-3" href="#__codelineno-62-3"></a><span class="nn">...</span>
+</span><span id="__span-62-4"><a id="__codelineno-62-4" name="__codelineno-62-4" href="#__codelineno-62-4"></a>
+</span><span id="__span-62-5"><a id="__codelineno-62-5" name="__codelineno-62-5" href="#__codelineno-62-5"></a><span class="nt">features</span><span class="p">:</span>
+</span><span id="__span-62-6"><a id="__codelineno-62-6" name="__codelineno-62-6" href="#__codelineno-62-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
+</span><span id="__span-62-7"><a id="__codelineno-62-7" name="__codelineno-62-7" href="#__codelineno-62-7"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-62-8"><a id="__codelineno-62-8" name="__codelineno-62-8" href="#__codelineno-62-8"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-62-9"><a id="__codelineno-62-9" name="__codelineno-62-9" href="#__codelineno-62-9"></a><span class="w">      </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-62-10"><a id="__codelineno-62-10" name="__codelineno-62-10" href="#__codelineno-62-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
+</span><span id="__span-62-11"><a id="__codelineno-62-11" name="__codelineno-62-11" href="#__codelineno-62-11"></a><span class="w">      </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-62-12"><a id="__codelineno-62-12" name="__codelineno-62-12" href="#__codelineno-62-12"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
+</span><span id="__span-62-13"><a id="__codelineno-62-13" name="__codelineno-62-13" href="#__codelineno-62-13"></a>
+</span><span id="__span-62-14"><a id="__codelineno-62-14" name="__codelineno-62-14" href="#__codelineno-62-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bzip2</span>
+</span><span id="__span-62-15"><a id="__codelineno-62-15" name="__codelineno-62-15" href="#__codelineno-62-15"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</span><span id="__span-62-16"><a id="__codelineno-62-16" name="__codelineno-62-16" href="#__codelineno-62-16"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-62-17"><a id="__codelineno-62-17" name="__codelineno-62-17" href="#__codelineno-62-17"></a><span class="w">      </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-62-18"><a id="__codelineno-62-18" name="__codelineno-62-18" href="#__codelineno-62-18"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bzip2</span>
+</span><span id="__span-62-19"><a id="__codelineno-62-19" name="__codelineno-62-19" href="#__codelineno-62-19"></a><span class="w">      </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-62-20"><a id="__codelineno-62-20" name="__codelineno-62-20" href="#__codelineno-62-20"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bzip2</span>
+</span></code></pre></div>
+
+This adds two "features" to the boa recipe. These features can be enabled / disabled when invoking boa:
+
+`boa build . --features [zlib, ~bzip2]`
+
+This would compile libarchive with the zlib compression mechanism enabled, and bzip2 disabled. If a feature is not specified, the default value is used.
+A feature can add additional requirements to the build/host/run section, and adds some environment variables to the build script invocation. In our example, the FEATURE_ZLIB environment variable will be set to `1`. This information can be used in the build script to enable or disable configuration and compilation flags.
+
+For this libarchive recipe, the `./configure` call might look like this:
+
+<div class="language-text highlight"><pre><span></span><code><span id="__span-63-1"><a id="__codelineno-63-1" name="__codelineno-63-1" href="#__codelineno-63-1"></a>${SRC_DIR}/configure --prefix=${PREFIX}                                           \
+</span><span id="__span-63-2"><a id="__codelineno-63-2" name="__codelineno-63-2" href="#__codelineno-63-2"></a>                     $(feature $FEATURE_ZLIB --with-zlib --without-zlib)          \
+</span><span id="__span-63-3"><a id="__codelineno-63-3" name="__codelineno-63-3" href="#__codelineno-63-3"></a>                     $(feature $FEATURE_BZIP2 --with-bz2lib --without-bz2lib) ...
+</span></code></pre></div>
+
+In this case we're using a special shell function `feature` to select between the enabled and disabled flag (similar to a ternary operator). The `feature` shell function is automatically added by boa into the shell environment.
+
+One could similarly use bash `if / else` to set flags based on the `$FEATURE_...` variable.
+
+If you want to depend on packages and require a specific set of features, you can use the following syntax:
+
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-64-2"><a id="__codelineno-64-2" name="__codelineno-64-2" href="#__codelineno-64-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-64-3"><a id="__codelineno-64-3" name="__codelineno-64-3" href="#__codelineno-64-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libarchive [static, zlib, bzip2]</span>
+</span></code></pre></div>
+
+Sometimes you might want to depend on the `static` build _only_ if the package we are compiling is also compiled as a static package. In that case, you can use the `&` modifier:
+
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-65-1"><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-65-2"><a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span>
+</span><span id="__span-65-3"><a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libarchive</span>
+</span><span id="__span-65-4"><a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a>
+</span><span id="__span-65-5"><a id="__codelineno-65-5" name="__codelineno-65-5" href="#__codelineno-65-5"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-65-6"><a id="__codelineno-65-6" name="__codelineno-65-6" href="#__codelineno-65-6"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-65-7"><a id="__codelineno-65-7" name="__codelineno-65-7" href="#__codelineno-65-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bzip2 [&amp;static]</span>
+</span><span id="__span-65-8"><a id="__codelineno-65-8" name="__codelineno-65-8" href="#__codelineno-65-8"></a><span class="w">    </span><span class="c1"># - bzip2 1.2.3 [&amp;static] is also valid</span>
+</span><span id="__span-65-9"><a id="__codelineno-65-9" name="__codelineno-65-9" href="#__codelineno-65-9"></a>
+</span><span id="__span-65-10"><a id="__codelineno-65-10" name="__codelineno-65-10" href="#__codelineno-65-10"></a><span class="nt">features</span><span class="p">:</span>
+</span><span id="__span-65-11"><a id="__codelineno-65-11" name="__codelineno-65-11" href="#__codelineno-65-11"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">static</span>
+</span><span id="__span-65-12"><a id="__codelineno-65-12" name="__codelineno-65-12" href="#__codelineno-65-12"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span></code></pre></div>
+
+Now, by default building `libarchive` will use the dynamic build of `bzip2`. When building `libarchive --features="[static]"` boa will instead use the `bzip2-static` package as requirement.
+
+### How we think features will work
+
+Features work by requiring a special build string. When compiling with features, the build string will be composed of all features and the build hash. For example, the following active features [zlib, bzip2] will be first alphabetically sorted and then concatenated to a build string of the form `+bzip2+zlib_h123123_0`. A deactivated feature will be prefixed with a `-`. To match packages against required build time features boa will compose a regex-based match string. E.g. when asking for at least `[bzip2]`, boa will use a build string of the form `+bzip2*`.
+
+-->
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- Footer -->
+<footer class="md-footer">
+    <!-- Link to previous and/or next page -->
+    
+      
+        
+        <nav
+          class="md-footer__inner md-grid"
+          aria-label="Footer"
+          
+        >
+
+          <!-- Link to previous page -->
+          
+            
+            <a
+              href="../highlevel/"
+              class="md-footer__link md-footer__link--prev"
+              aria-label="Previous: Highlevel overview"
+            >
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+              </div>
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Previous
+                </span>
+                <div class="md-ellipsis">
+                  Highlevel overview
+                </div>
+              </div>
+            </a>
+          
+
+          <!-- Link to next page -->
+          
+            
+            <a
+              href="../experimental_features/"
+              class="md-footer__link md-footer__link--next"
+              aria-label="Next: Experimental features"
+            >
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Next
+                </span>
+                <div class="md-ellipsis">
+                  Experimental features
+                </div>
+              </div>
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+              </div>
+            </a>
+          
+        </nav>
+      
+    
+
+    <!-- Further information -->
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+
+        <!-- prefix logo -->
+        <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
+            <a href="https://prefix.dev" target="_blank">
+                <img src="../assets/logo_dark.svg" alt="">
+            </a>
+        </div>
+
+        <!-- Social links -->
+        
+          <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://twitter.com/prefix_dev" target="_blank" rel="noopener" title="twitter.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://www.linkedin.com/company/prefix-dev" target="_blank" rel="noopener" title="www.linkedin.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/prefix-dev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+    </a>
+  
+</div>
+        
+      </div>
+    </div>
+  </footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.94c44541.min.js"></script>
+      
+    
+  </body>
+</html>

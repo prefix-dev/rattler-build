@@ -1,0 +1,1205 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/build_script/">
+      
+      
+        <link rel="prev" href="../selectors/">
+      
+      
+        <link rel="next" href="../variants/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.4">
+    
+    
+      
+        <title>Build script - rattler-build</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.bd3936ea.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.356b1318.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Red+Hat+Text:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Red Hat Text";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+      
+        <meta  property="og:type"  content="website" >
+      
+        <meta  property="og:title"  content="Build script - rattler-build" >
+      
+        <meta  property="og:description"  content="None" >
+      
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_script.png" >
+      
+        <meta  property="og:image:type"  content="image/png" >
+      
+        <meta  property="og:image:width"  content="1200" >
+      
+        <meta  property="og:image:height"  content="630" >
+      
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/build_script/" >
+      
+        <meta  name="twitter:card"  content="summary_large_image" >
+      
+        <meta  name="twitter:title"  content="Build script - rattler-build" >
+      
+        <meta  name="twitter:description"  content="None" >
+      
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_script.png" >
+      
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="yellow" data-md-color-accent="yellow">
+  
+    
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#build-scripts" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            rattler-build
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Build script
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/prefix-dev/rattler-build/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+
+    </a>
+    rattler-build
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/prefix-dev/rattler-build/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81z"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../highlevel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Highlevel overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../recipe_file/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Recipe file
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../experimental_features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experimental features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../selectors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Selector syntax
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Build script
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Build script
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    Environment variables
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment variables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables-set-during-the-build-process" class="md-nav__link">
+    Environment variables set during the build process
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unix" class="md-nav__link">
+    Unix
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../variants/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Variants
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compilers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compilers and cross compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cli_usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CLI Usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../automatic_linting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic recipe linting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../testing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing packages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rebuild/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reproducible builds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../package_spec/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Package specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../internals/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Internals
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#environment-variables" class="md-nav__link">
+    Environment variables
+  </a>
+  
+    <nav class="md-nav" aria-label="Environment variables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#environment-variables-set-during-the-build-process" class="md-nav__link">
+    Environment variables set during the build process
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#unix" class="md-nav__link">
+    Unix
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/build_script.md" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="build-scripts">Build scripts<a class="headerlink" href="#build-scripts" title="Permanent link">#</a></h1>
+<p>The <code>build.sh</code> file is the build script for Linux and macOS and <code>build.bat</code> is
+the build script for Windows. These scripts contain the logic that carries out
+your build steps. Anything that your build script copies into the <code>$PREFIX</code> or
+<code>%PREFIX%</code> folder will be included in your output package.</p>
+<p>For example, this <code>build.sh</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/bin
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cp<span class="w"> </span><span class="nv">$RECIPE_DIR</span>/my_script_with_recipe.sh<span class="w"> </span><span class="nv">$PREFIX</span>/bin/super-cool-script.sh
+</span></code></pre></div>
+<p>There are many environment variables defined for you to use in build.sh and
+build.bat. Please see <a href="#environment-variables">environment variables</a> for more
+information.</p>
+<p><code>build.sh</code> and <code>build.bat</code> are optional. You can instead use the <code>build/script</code>
+key in your <code>recipe.yaml</code>, with each value being either a string command or a
+list of string commands. Any commands you put there must be able to run on every
+platform for which you build. For example, you can't use the <code>cp</code> command
+because <code>cmd.exe</code> won't understand it on Windows.</p>
+<p><code>build.sh</code> is run with <code>bash</code> and <code>build.bat</code> is run with <code>cmd.exe</code>.</p>
+<h2 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">#</a></h2>
+<h3 id="environment-variables-set-during-the-build-process">Environment variables set during the build process<a class="headerlink" href="#environment-variables-set-during-the-build-process" title="Permanent link">#</a></h3>
+<p>During the build process, the following environment variables are set, on
+Windows with <code>build.bat</code> and on macOS and Linux with <code>build.sh</code>. By default,
+these are the only variables available to your build script. Unless otherwise
+noted, no variables are inherited from the shell environment in which you invoke
+<code>conda-build</code>. To override this behavior, see :ref:<code>inherited-env-vars</code>.</p>
+<dl>
+<dt><code>ARCH</code></dt>
+<dd>Either <code>32</code> or <code>64</code>, to specify whether the build is 32-bit or 64-bit. The value depends on the ARCH environment variable and defaults to the architecture the interpreter running conda was compiled with.</dd>
+<dt><code>CMAKE_GENERATOR</code></dt>
+<dd>The CMake generator string for the current build environment. On Linux systems, this is always <code>Unix Makefiles</code>. On Windows, it is generated according to the Visual Studio version activated at build time, for example, <code>Visual Studio 9 2008 Win64</code>.</dd>
+<dt><code>CONDA_BUILD=1</code></dt>
+<dd>Always set to indicate that the conda-build process is running.</dd>
+<dt><code>CPU_COUNT</code></dt>
+<dd>Represents the number of CPUs on the system.</dd>
+<dt><code>SHLIB_EXT</code></dt>
+<dd>Denotes the shared library extension specific to the operating system (e.g., .so for Linux, .dylib for macOS, and .dll for Windows).</dd>
+<dt><code>HTTP_PROXY</code></dt>
+<dd>Inherited from the user's shell environment, specifying the HTTP proxy settings.</dd>
+<dt><code>HTTPS_PROXY</code></dt>
+<dd>Similar to HTTP_PROXY, this is inherited from the user's shell environment and specifies the HTTPS proxy settings.</dd>
+<dt><code>LANG</code></dt>
+<dd>Inherited from the user's shell environment, defining the system language and locale settings.</dd>
+<dt><code>MAKEFLAGS</code></dt>
+<dd>Inherited from the user's shell environment. This can be used to set additional arguments for the make command, such as -j2 to utilize 2 CPU cores for building the recipe.</dd>
+<dt><code>PY_VER</code></dt>
+<dd>Specifies the Python version against which the build is occurring. This can be modified with a <code>variant_config.yaml</code> file.</dd>
+<dt><code>PATH</code></dt>
+<dd>Inherited from the user's shell environment and augmented with the activated host and build prefixes.</dd>
+<dt><code>PREFIX</code></dt>
+<dd>The build prefix to which the build script should install the software.</dd>
+<dt><code>PKG_BUILDNUM</code></dt>
+<dd>Indicates the build number of the package currently being built.</dd>
+<dt><code>PKG_NAME</code></dt>
+<dd>The name of the package that is being built.</dd>
+<dt><code>PKG_VERSION</code></dt>
+<dd>The version of the package currently under construction.</dd>
+<dt><code>PKG_BUILD_STRING</code></dt>
+<dd>The complete build string of the package being built, including the hash (e.g., py311h21422ab_0).</dd>
+<dt><code>PKG_HASH</code></dt>
+<dd>Represents the hash of the package being built, excluding the leading 'h' (e.g., 21422ab). This is applicable from Conda-build 3.0 onwards.</dd>
+<dt><code>PYTHON</code></dt>
+<dd>The path to the Python executable in the host prefix. Python is installed in the host prefix only when it is listed as a host requirement.</dd>
+<dt><code>R</code></dt>
+<dd>The path to the R executable in the build prefix. R is installed in the build prefix only when it is listed as a build requirement.</dd>
+<dt><code>RECIPE_DIR</code></dt>
+<dd>The directory where the recipe is located.</dd>
+<dt><code>SP_DIR</code></dt>
+<dd>The location of Python's site-packages, where Python libraries are installed.</dd>
+<dt><code>SRC_DIR</code></dt>
+<dd>The path to where the source code is unpacked or cloned. If the source file is not a recognized archive format, this directory contains a copy of the source file.</dd>
+<dt><code>STDLIB_DIR</code></dt>
+<dd>The location of Python's standard library.</dd>
+<dt><code>build_platform</code></dt>
+<dd>Represents the native subdirectory of the conda executable, indicating the platform for which the build is occurring.</dd>
+</dl>
+<p>Removed from <code>conda-build</code> are:
+- <code>NPY_VER</code>
+- <code>PY3K</code></p>
+<h4 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">#</a></h4>
+<p>Unix-style packages on Windows are built in a special <code>Library</code> directory under the build
+prefix. The environment variables listed in the following table are defined only
+on Windows.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LIBRARY_BIN</code></td>
+<td><code>&lt;build prefix&gt;\Library\bin</code>.</td>
+</tr>
+<tr>
+<td><code>LIBRARY_INC</code></td>
+<td><code>&lt;build prefix&gt;\Library\include</code>.</td>
+</tr>
+<tr>
+<td><code>LIBRARY_LIB</code></td>
+<td><code>&lt;build prefix&gt;\Library\lib</code>.</td>
+</tr>
+<tr>
+<td><code>LIBRARY_PREFIX</code></td>
+<td><code>&lt;build prefix&gt;\Library</code>.</td>
+</tr>
+<tr>
+<td><code>SCRIPTS</code></td>
+<td><code>&lt;build prefix&gt;\Scripts</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Not yet supported in <code>rattler-build</code>:</p>
+<ul>
+<li><code>CYGWIN_PREFIX</code></li>
+<li><code>VS_MAJOR</code></li>
+<li><code>VS_VERSION</code></li>
+<li><code>VS_YEAR</code></li>
+</ul>
+<p>Additionally, the following variables are forwarded from the environment:</p>
+<ul>
+<li><code>ALLUSERSPROFILE</code></li>
+<li><code>APPDATA</code></li>
+<li><code>CommonProgramFiles</code></li>
+<li><code>CommonProgramFiles(x86)</code></li>
+<li><code>CommonProgramW6432</code></li>
+<li><code>COMPUTERNAME</code></li>
+<li><code>ComSpec</code></li>
+<li><code>HOMEDRIVE</code></li>
+<li><code>HOMEPATH</code></li>
+<li><code>LOCALAPPDATA</code></li>
+<li><code>LOGONSERVER</code></li>
+<li><code>NUMBER_OF_PROCESSORS</code></li>
+<li><code>PATHEXT</code></li>
+<li><code>ProgramData</code></li>
+<li><code>ProgramFiles</code></li>
+<li><code>ProgramFiles(x86)</code></li>
+<li><code>ProgramW6432</code></li>
+<li><code>PROMPT</code></li>
+<li><code>PSModulePath</code></li>
+<li><code>PUBLIC</code></li>
+<li><code>SystemDrive</code></li>
+<li><code>SystemRoot</code></li>
+<li><code>TEMP</code></li>
+<li><code>TMP</code></li>
+<li><code>USERDOMAIN</code></li>
+<li><code>USERNAME</code></li>
+<li><code>USERPROFILE</code></li>
+<li><code>windir</code></li>
+<li><code>PROCESSOR_ARCHITEW6432</code></li>
+<li><code>PROCESSOR_ARCHITECTURE</code></li>
+<li><code>PROCESSOR_IDENTIFIER</code></li>
+</ul>
+<!--
+| `CYGWIN_PREFIX` | Same as PREFIX, but as a Unix-style path, such as `/cygdrive/c/path/to/prefix`.            |
+| `-------------` | T----------------------------------------------------------------------------------------. |
+| `VS_VERSION`    | The version number of the Visual Studio version activated within the build, such as `9.0`. |
+| `VS_YEAR`       | The release year of the Visual Studio version activated within the build, such as `2008`.  |
+-->
+
+<h3 id="unix">Unix<a class="headerlink" href="#unix" title="Permanent link">#</a></h3>
+<p>The environment variables listed in the following table are defined only on
+macOS and Linux.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>HOME</code></td>
+<td>Standard $HOME environment variable.</td>
+</tr>
+<tr>
+<td><code>PKG_CONFIG_PATH</code></td>
+<td>Path to <code>pkgconfig</code> directory, defaults to `$PREFIX/lib/pkgconfig</td>
+</tr>
+<tr>
+<td><code>SSL_CERT_FILE</code></td>
+<td>Path to <code>SSL_CERT_FILE</code> file.</td>
+</tr>
+<tr>
+<td><code>CFLAGS</code></td>
+<td>Empty, can be forwarded from env to set additional arguments to C compiler.</td>
+</tr>
+<tr>
+<td><code>CXXFLAGS</code></td>
+<td>Same as CFLAGS for C++ compiler.</td>
+</tr>
+<tr>
+<td><code>LDFLAGS</code></td>
+<td>Empty, additional flags to be passed to the linker when linking object files into an executable or shared object.</td>
+</tr>
+</tbody>
+</table>
+<h4 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">#</a></h4>
+<p>The environment variables listed in the following table are defined only on
+macOS.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MACOSX_DEPLOYMENT_TARGET</code></td>
+<td>Same as the Anaconda Python macOS deployment target. Currently <code>10.9</code> for intel 32- and 64bit macOS, and 11.0 for arm64.</td>
+</tr>
+<tr>
+<td><code>OSX_ARCH</code></td>
+<td><code>i386</code> or <code>x86_64</code> or <code>arm64</code>, depending on the target platform</td>
+</tr>
+</tbody>
+</table>
+<h4 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">#</a></h4>
+<p>The environment variable listed in the following table is defined only on Linux.</p>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LD_RUN_PATH</code></td>
+<td>Defaults to <code>&lt;build prefix&gt;/lib</code>.</td>
+</tr>
+<tr>
+<td><code>QEMU_LD_PREFIX</code></td>
+<td>The prefix used by QEMU's user mode emulation for library paths.</td>
+</tr>
+<tr>
+<td><code>QEMU_UNAME</code></td>
+<td>Set qemu uname release string to 'uname'.</td>
+</tr>
+<tr>
+<td><code>DEJAGNU</code></td>
+<td>The path to the dejagnu testing framework used by the GCC test suite.</td>
+</tr>
+<tr>
+<td><code>DISPLAY</code></td>
+<td>The X11 display to use for graphical applications.</td>
+</tr>
+<tr>
+<td><code>BUILD</code></td>
+<td>Target triple (<code>{build_arch}-conda_{build_distro}-linux-gnu</code>) where build_distro is one of <code>cos6</code> or <code>cos7</code>, for Centos 6 or 7</td>
+</tr>
+</tbody>
+</table>
+<!--
+
+## Dynamic behavior based on state of build process
+
+There are times when you may want to process a single file in different ways at
+more than 1 step in the render-build-test flow of conda-build. Conda-build sets
+the CONDA_BUILD_STATE environment variable during each of these phases. The
+possible values are:
+
+* `RENDER`: Set during evaluation of the `recipe.yaml` file.
+
+* `BUILD`: Set during processing of the `build.bat` or `build.sh` script
+  files.
+
+* `TEST`: Set during the running of any `run_test` scripts, which also
+  includes any commands defined in `meta.yaml` in the `test/commands`
+  section.
+
+The CONDA_BUILD_STATE variable is undefined outside of these locations.
+
+-->
+
+<!--
+### Git environment variables
+
+The environment variables listed in the following table are defined when the
+source is a git repository, specifying the source either with git_url or path.
+
+   * - GIT_BUILD_STR
+     - String that joins GIT_DESCRIBE_NUMBER and GIT_DESCRIBE_HASH by an
+       underscore.
+   * - GIT_DESCRIBE_HASH
+     - The current commit short-hash as displayed from `git describe --tags`.
+   * - GIT_DESCRIBE_NUMBER
+     - String denoting the number of commits since the most recent tag.
+   * - GIT_DESCRIBE_TAG
+     - String denoting the most recent tag from the current commit, based on the
+       output of `git describe --tags`.
+   * - GIT_FULL_HASH
+     - String with the full SHA1 of the current HEAD.
+
+These can be used in conjunction with templated `meta.yaml` files to set
+things---such as the build string---based on the state of the git repository.
+-->
+
+<!--
+Mercurial environment variables
+===============================
+
+The environment variables listed in the following table are defined when the
+source is a mercurial repository.
+
+   * - HG_BRANCH
+     - String denoting the presently active branch.
+   * - HG_BUILD_STR
+     - String that joins HG_NUM_ID and HG_SHORT_ID by an underscore.
+   * - HG_LATEST_TAG
+     - String denoting the most recent tag from the current commit.
+   * - HG_LATEST_TAG_DISTANCE
+     - String denoting number of commits since the most recent tag.
+   * - HG_NUM_ID
+     - String denoting the revision number.
+   * - HG_SHORT_ID
+     - String denoting the hash of the commit.
+-->
+
+<!--
+
+Inherited environment variables
+===============================
+
+Other than those mentioned above, no variables are inherited from the
+environment in which you invoke conda-build. You can choose to inherit
+additional environment variables by adding them to `recipe.yaml`:
+
+.. code-block:: yaml
+
+     build:
+       script_env:
+        - TMPDIR
+        - LD_LIBRARY_PATH # [linux]
+        - DYLD_LIBRARY_PATH # [osx]
+
+If an inherited variable is missing from your shell environment, it remains
+unassigned, but a warning is issued noting that it has no value assigned.
+
+Additionally, values can be set by including `=` followed by the desired
+value:
+
+.. code-block:: yaml
+
+     build:
+       script_env:
+        - MY_VAR=some value
+
+.. warning:: Inheriting environment variables can make it difficult for others
+   to reproduce binaries from source with your recipe. Use this feature with
+   caution or explicitly set values using the `=` syntax.
+
+.. note:: If you split your build and test phases with `--no-test` and
+   `--test`, you need to ensure that the environment variables present at
+   build time and test time match. If you do not, the package hashes may use
+   different values and your package may not be testable because the hashes will
+   differ.
+
+-->
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var tab,labels=set.querySelector(".tabbed-labels");for(tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12Z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <!--
+  Copyright (c) 2016-2023 Martin Donath <martin.donath@squidfunk.com>
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to
+  deal in the Software without restriction, including without limitation the
+  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  sell copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  IN THE SOFTWARE.
+-->
+
+<!-- Footer -->
+<footer class="md-footer">
+    <!-- Link to previous and/or next page -->
+    
+      
+        
+        <nav
+          class="md-footer__inner md-grid"
+          aria-label="Footer"
+          
+        >
+
+          <!-- Link to previous page -->
+          
+            
+            <a
+              href="../selectors/"
+              class="md-footer__link md-footer__link--prev"
+              aria-label="Previous: Selector syntax"
+            >
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+              </div>
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Previous
+                </span>
+                <div class="md-ellipsis">
+                  Selector syntax
+                </div>
+              </div>
+            </a>
+          
+
+          <!-- Link to next page -->
+          
+            
+            <a
+              href="../variants/"
+              class="md-footer__link md-footer__link--next"
+              aria-label="Next: Variants"
+            >
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Next
+                </span>
+                <div class="md-ellipsis">
+                  Variants
+                </div>
+              </div>
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+              </div>
+            </a>
+          
+        </nav>
+      
+    
+
+    <!-- Further information -->
+    <div class="md-footer-meta md-typeset">
+      <div class="md-footer-meta__inner md-grid">
+        <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+
+        <!-- prefix logo -->
+        <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
+            <a href="https://prefix.dev" target="_blank">
+                <img src="../assets/logo_dark.svg" alt="">
+            </a>
+        </div>
+
+        <!-- Social links -->
+        
+          <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://twitter.com/prefix_dev" target="_blank" rel="noopener" title="twitter.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M459.37 151.716c.325 4.548.325 9.097.325 13.645 0 138.72-105.583 298.558-298.558 298.558-59.452 0-114.68-17.219-161.137-47.106 8.447.974 16.568 1.299 25.34 1.299 49.055 0 94.213-16.568 130.274-44.832-46.132-.975-84.792-31.188-98.112-72.772 6.498.974 12.995 1.624 19.818 1.624 9.421 0 18.843-1.3 27.614-3.573-48.081-9.747-84.143-51.98-84.143-102.985v-1.299c13.969 7.797 30.214 12.67 47.431 13.319-28.264-18.843-46.781-51.005-46.781-87.391 0-19.492 5.197-37.36 14.294-52.954 51.655 63.675 129.3 105.258 216.365 109.807-1.624-7.797-2.599-15.918-2.599-24.04 0-57.828 46.782-104.934 104.934-104.934 30.213 0 57.502 12.67 76.67 33.137 23.715-4.548 46.456-13.32 66.599-25.34-7.798 24.366-24.366 44.833-46.132 57.827 21.117-2.273 41.584-8.122 60.426-16.243-14.292 20.791-32.161 39.308-52.628 54.253z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://www.linkedin.com/company/prefix-dev" target="_blank" rel="noopener" title="www.linkedin.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3zM135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5zm282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9V416z"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/prefix-dev" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg>
+    </a>
+  
+</div>
+        
+      </div>
+    </div>
+  </footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.94c44541.min.js"></script>
+      
+    
+  </body>
+</html>
