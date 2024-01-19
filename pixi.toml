@@ -11,8 +11,10 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end -v"
 test = "cargo test"
 lint = "pre-commit run --all"
-docs = "mkdocs serve"
-build-docs =  "mkdocs build --strict"
+build-docs = "mkdocs build --strict"
+docs = "mike serve"
+deploy-latest = "mike deploy --push $RELEASE_VERSION latest"
+deploy-dev = "mike deploy --push dev devel"
 
 
 [dependencies]
@@ -33,3 +35,4 @@ mkdocs = "1.5.3.*"
 mkdocs-material = "9.4.4.*"
 pillow = ">=9.4.0.*"
 cairosvg = "2.7.1.*"
+mike = "2.0.0.*"
