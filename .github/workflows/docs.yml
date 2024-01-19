@@ -46,7 +46,7 @@ jobs:
 
   docs-release:
     # Don't run on forks
-    if: github.repository == 'prefix-dev/rattler-build' && startsWith(github.event.ref, 'refs/tags/v') 
+    if: startsWith(github.event.ref, 'refs/tags/v') 
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -77,7 +77,7 @@ jobs:
 
   docs-dev:
     # Don't run on forks
-    if: github.repository == 'prefix-dev/rattler-build'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
