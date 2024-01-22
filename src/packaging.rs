@@ -29,7 +29,7 @@ use rattler_package_streaming::write::{
 
 use crate::macos;
 use crate::metadata::{Output, PackagingSettings};
-use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
+use crate::package_test::write_test_files;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -787,129 +787,6 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
         }
     }
     false
-}
-
-fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
-    let mut test_files = Vec::new();
-
-    for (idx, test) in output.recipe.tests().iter().enumerate() {
-        if let Some(files) = match test {
-            TestType::Python(python_test) => {
-                Some(serialize_python_test(python_test, idx, tmp_dir_path)?)
-            }
-            TestType::Command(command_test) => Some(serialize_command_test(
-                command_test,
-                idx,
-                output,
-                tmp_dir_path,
-            )?),
-            TestType::Downstream(downstream_test) => Some(serialize_downstream_test(
-                downstream_test,
-                idx,
-                tmp_dir_path,
-            )?),
-            TestType::PackageContents(_) => None,
-        } {
-            test_files.extend(files);
-        }
-    }
-
-    Ok(test_files)
-}
-
-fn serialize_downstream_test(
-    downstream_test: &DownstreamTest,
-    idx: usize,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&folder)?;
-
-    let path = folder.join("downstream_test.json");
-    let mut file = File::create(&path)?;
-    file.write_all(serde_json::to_string(downstream_test)?.as_bytes())?;
-
-    Ok(vec![path])
-}
-
-fn serialize_command_test(
-    command_test: &crate::recipe::parser::CommandsTest,
-    idx: usize,
-    output: &Output,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let mut command_files = vec![];
-    let mut test_files = vec![];
-
-    let test_folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&test_folder)?;
-
-    let target_platform = &output.build_configuration.target_platform;
-    if target_platform.is_windows() || target_platform == &Platform::NoArch {
-        command_files.push(test_folder.join("run_test.bat"));
-    }
-
-    if target_platform.is_unix() || target_platform == &Platform::NoArch {
-        command_files.push(test_folder.join("run_test.sh"));
-    }
-
-    for cf in command_files {
-        let mut file = File::create(&cf)?;
-        for el in &command_test.script {
-            writeln!(file, "{}\n", el)?;
-        }
-        test_files.push(cf);
-    }
-
-    if !command_test.requirements.is_empty() {
-        let test_dependencies = &command_test.requirements;
-        let test_file = test_folder.join("test_time_dependencies.json");
-        let mut file = File::create(&test_file)?;
-        file.write_all(serde_json::to_string(&test_dependencies)?.as_bytes())?;
-        test_files.push(test_file);
-    }
-
-    if !command_test.files.recipe.is_empty() {
-        let globs = &command_test.files.recipe;
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
-            &output.build_configuration.directories.recipe_dir,
-            &test_folder,
-        )
-        .with_parse_globs(globs.iter().map(AsRef::as_ref))
-        .use_gitignore(true)
-        .run()?;
-
-        test_files.extend(copy_dir.copied_paths().iter().cloned());
-    }
-
-    if !command_test.files.source.is_empty() {
-        let globs = &command_test.files.source;
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
-            &output.build_configuration.directories.work_dir,
-            &test_folder,
-        )
-        .with_parse_globs(globs.iter().map(AsRef::as_ref))
-        .use_gitignore(true)
-        .run()?;
-
-        test_files.extend(copy_dir.copied_paths().iter().cloned());
-    }
-
-    Ok(test_files)
-}
-
-fn serialize_python_test(
-    python_test: &PythonTest,
-    idx: usize,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&folder)?;
-
-    let path = folder.join("python_test.json");
-    serde_json::to_writer(&File::create(&path)?, python_test)?;
-
-    Ok(vec![path])
 }
 
 fn write_recipe_folder(
