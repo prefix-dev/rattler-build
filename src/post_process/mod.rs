@@ -85,7 +85,7 @@ pub fn linking_checks(
             // println!("so: {:?}", so);
             for lib in so.libraries {
                 println!("lib: {:?}", lib);
-                let libpath = PathBuf::from(lib);
+                let libpath = PathBuf::from("lib").join(lib);
                 if let Some(package) = path_to_package_map.get(&libpath) {
                     println!("package: {:?}", package);
                     if let Some(nature) = package_to_nature_map.get(package) {

@@ -40,10 +40,16 @@ pub enum PackageNature {
     InterpretedLibraryPythonAndR,
 }
 
+/// Returns true if the given file is a dynamic shared object.
 pub fn is_dso(file: &Path) -> bool {
     let ext = file.extension();
     let ext = ext.unwrap_or_default().to_string_lossy().to_string();
     matches!(ext.as_str(), "so" | "dylib" | "dll" | "pyd")
+        || file
+            .to_string_lossy()
+            .split('.')
+            .into_iter()
+            .any(|part| part.to_lowercase() == "so")
 }
 
 impl PackageNature {
@@ -119,5 +125,33 @@ impl PackageNature {
         }
 
         nature
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_is_dso() {
+        let file_path = PathBuf::from("example.so");
+        assert!(is_dso(&file_path));
+
+        let file_path = PathBuf::from("libquadmath.dylib");
+        assert!(is_dso(&file_path));
+
+        let file_path = PathBuf::from("library.dll");
+        assert!(is_dso(&file_path));
+
+        let file_path = PathBuf::from("module.pyd");
+        assert!(is_dso(&file_path));
+
+        let file_path = PathBuf::from("not_dso.txt");
+        assert!(!is_dso(&file_path));
+
+        let file_path = PathBuf::from("lib/libquadmath.so.0.0.0");
+        assert!(is_dso(&file_path));
+
+        let file_path = PathBuf::from("bin/executable");
+        assert!(!is_dso(&file_path));
     }
 }
