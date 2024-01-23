@@ -48,7 +48,6 @@ pub fn is_dso(file: &Path) -> bool {
         || file
             .to_string_lossy()
             .split('.')
-            .into_iter()
             .any(|part| part.to_lowercase() == "so")
 }
 
