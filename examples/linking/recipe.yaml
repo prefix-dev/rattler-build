@@ -24,12 +24,6 @@ requirements:
   host:
     - zlib
 
-test:
-  commands:
-    - zlink
-
-about:
-  homepage: https://github.com/killercup/cargo-edit
-  license: MIT
-  description: "A utility for managing cargo dependencies from the command line."
-  summary: "A utility for managing cargo dependencies from the command line."
+tests:
+  - script:
+      - zlink
