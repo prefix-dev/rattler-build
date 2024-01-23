@@ -76,6 +76,9 @@ pub enum PackagingError {
 
     #[error("could not create python entry point: {0}")]
     CannotCreateEntryPoint(String),
+
+    #[error("Linking check error: {0}")]
+    LinkingCheckError(#[from] crate::post_process::LinkingCheckError),
 }
 
 #[allow(unused_variables)]
@@ -917,7 +920,7 @@ pub fn package_conda(
             &rpath_allowlist,
         )?;
 
-        let _ = post_process::linking_checks(output, &tmp_files);
+        post_process::linking_checks(output, &binaries)?;
     }
 
     post_process::python::python(output.name(), output.version(), &tmp_files)?;

@@ -14,6 +14,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// A linux shared object (ELF)
+#[derive(Debug)]
 pub struct SharedObject {
     /// Path to the shared object
     pub path: PathBuf,

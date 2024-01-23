@@ -13,7 +13,16 @@ pub mod python;
 pub mod relink;
 
 #[derive(thiserror::Error, Debug)]
-pub enum LinkingCheckError {}
+pub enum LinkingCheckError {
+    #[error("Error reading file: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("Linux relink error: {0}")]
+    LinuxRelink(#[from] crate::linux::link::RelinkError),
+
+    #[error("macOS relink error: {0}")]
+    MacOSRelink(#[from] crate::macos::link::RelinkError),
+}
 
 pub fn linking_checks(
     output: &Output,
@@ -32,11 +41,11 @@ pub fn linking_checks(
 
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
-    for entry in conda_meta.read_dir().unwrap() {
-        let entry = entry.unwrap();
+    for entry in conda_meta.read_dir()? {
+        let entry = entry?;
         let path = entry.path();
-        if path.extension().unwrap() == "json" {
-            let record = PrefixRecord::from_path(path).unwrap();
+        if path.extension().and_then(|v| v.to_str()) == Some("json") {
+            let record = PrefixRecord::from_path(path)?;
             let package_nature = package_nature::PackageNature::from_prefix_record(&record);
             package_to_nature_map.insert(
                 record.repodata_record.package_record.name.clone(),
@@ -56,15 +65,15 @@ pub fn linking_checks(
         println!("file: {}", file.display());
         // Parse the DSO to get the list of libraries it links to
         if output.build_configuration.target_platform.is_osx() {
-            if Dylib::test_file(file).unwrap() {
+            if Dylib::test_file(file)? {
                 println!("dylib");
             } else {
                 println!("not dylib");
                 continue;
             }
 
-            let dylib = Dylib::new(file).unwrap();
-            // println!("dylib: {:?}", dylib);
+            let dylib = Dylib::new(file)?;
+            println!("dylib: {:?}", dylib);
             for lib in dylib.libraries {
                 println!("lib: {:?}", lib);
 
@@ -81,8 +90,8 @@ pub fn linking_checks(
                 }
             }
         } else {
-            let so = SharedObject::new(file).unwrap();
-            // println!("so: {:?}", so);
+            let so = SharedObject::new(file)?;
+            println!("so: {:?}", so);
             for lib in so.libraries {
                 println!("lib: {:?}", lib);
                 let libpath = PathBuf::from("lib").join(lib);

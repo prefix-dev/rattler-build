@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// A macOS dylib (Mach-O)
+#[derive(Debug)]
 pub struct Dylib {
     /// Path to the dylib
     pub path: PathBuf,
