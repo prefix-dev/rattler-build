@@ -108,8 +108,11 @@ pub fn linking_checks(
                     println!("package: {:?}", package);
                     if let Some(nature) = package_to_nature_map.get(package) {
                         println!("nature: {:?}", nature);
+                        // Only take shared libraries into account.
                         if nature == &PackageNature::DSOLibrary {
                             let package_name = package.as_normalized().to_string();
+                            // If the package that we are linking against does not exist in run
+                            // dependencies then it is "underlinking".
                             if let Some(package_pos) =
                                 run_dependencies.iter().position(|v| v == &package_name)
                             {
@@ -121,6 +124,7 @@ pub fn linking_checks(
                     }
                 }
             }
+            // If there are any unused run dependencies then it is "overlinking".
             if !run_dependencies.is_empty() {
                 tracing::warn!("Overlinking against {}", run_dependencies.join(","))
             }
