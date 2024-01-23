@@ -3,7 +3,9 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{linux::link::SharedObject, macos::link::Dylib};
+use crate::{
+    linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
+};
 use rattler_conda_types::PrefixRecord;
 
 use crate::metadata::Output;
@@ -39,6 +41,13 @@ pub fn linking_checks(
         return Ok(());
     }
 
+    let mut run_dependencies = output
+        .recipe
+        .requirements
+        .run()
+        .iter()
+        .flat_map(|v| v.name())
+        .collect::<Vec<String>>();
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
     for entry in conda_meta.read_dir()? {
@@ -99,8 +108,21 @@ pub fn linking_checks(
                     println!("package: {:?}", package);
                     if let Some(nature) = package_to_nature_map.get(package) {
                         println!("nature: {:?}", nature);
+                        if nature == &PackageNature::DSOLibrary {
+                            let package_name = package.as_normalized().to_string();
+                            if let Some(package_pos) =
+                                run_dependencies.iter().position(|v| v == &package_name)
+                            {
+                                run_dependencies.remove(package_pos);
+                            } else {
+                                tracing::warn!("Underlinking against {}", package_name)
+                            }
+                        }
                     }
                 }
+            }
+            if !run_dependencies.is_empty() {
+                tracing::warn!("Overlinking against {}", run_dependencies.join(","))
             }
         }
     }
