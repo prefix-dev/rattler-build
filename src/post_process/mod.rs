@@ -70,65 +70,58 @@ pub fn linking_checks(
     let host_prefix = &output.build_configuration.directories.host_prefix;
 
     // check all DSOs and what they are linking
+    let mut dsos = Vec::new();
     for file in new_files.iter() {
-        println!("file: {}", file.display());
         // Parse the DSO to get the list of libraries it links to
         if output.build_configuration.target_platform.is_osx() {
-            if Dylib::test_file(file)? {
-                println!("dylib");
-            } else {
-                println!("not dylib");
+            if !Dylib::test_file(file)? {
                 continue;
             }
-
             let dylib = Dylib::new(file)?;
-            println!("dylib: {:?}", dylib);
             for lib in dylib.libraries {
-                println!("lib: {:?}", lib);
-
                 let lib = match lib.strip_prefix("@rpath/").ok() {
                     Some(suffix) => host_prefix.join("lib").join(suffix),
                     None => lib,
                 };
-
                 if let Some(package) = path_to_package_map.get(&lib) {
-                    println!("package: {:?}", package);
                     if let Some(nature) = package_to_nature_map.get(package) {
-                        println!("nature: {:?}", nature);
+                        // Only take shared libraries into account.
+                        if nature == &PackageNature::DSOLibrary {
+                            dsos.push(package);
+                        }
                     }
                 }
             }
         } else {
             let so = SharedObject::new(file)?;
-            println!("so: {:?}", so);
             for lib in so.libraries {
-                println!("lib: {:?}", lib);
                 let libpath = PathBuf::from("lib").join(lib);
                 if let Some(package) = path_to_package_map.get(&libpath) {
-                    println!("package: {:?}", package);
                     if let Some(nature) = package_to_nature_map.get(package) {
-                        println!("nature: {:?}", nature);
                         // Only take shared libraries into account.
                         if nature == &PackageNature::DSOLibrary {
-                            let package_name = package.as_normalized().to_string();
-                            // If the package that we are linking against does not exist in run
-                            // dependencies then it is "underlinking".
-                            if let Some(package_pos) =
-                                run_dependencies.iter().position(|v| v == &package_name)
-                            {
-                                run_dependencies.remove(package_pos);
-                            } else {
-                                tracing::warn!("Underlinking against {}", package_name)
-                            }
+                            dsos.push(package);
                         }
                     }
                 }
             }
-            // If there are any unused run dependencies then it is "overlinking".
-            if !run_dependencies.is_empty() {
-                tracing::warn!("Overlinking against {}", run_dependencies.join(","))
-            }
         }
+    }
+
+    for package in &dsos {
+        let package_name = package.as_normalized().to_string();
+        // If the package that we are linking against does not exist in run
+        // dependencies then it is "underlinking".
+        if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
+            run_dependencies.remove(package_pos);
+        } else {
+            tracing::warn!("Underlinking against {}", package_name)
+        }
+    }
+
+    // If there are any unused run dependencies then it is "overlinking".
+    if !run_dependencies.is_empty() {
+        tracing::warn!("Overlinking against {}", run_dependencies.join(","))
     }
 
     Ok(())
