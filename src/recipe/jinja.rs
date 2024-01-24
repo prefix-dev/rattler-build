@@ -604,7 +604,7 @@ mod tests {
     fn git_setup(path: &Path) -> anyhow::Result<()> {
         let git_config = r#"
 [user]
-	name = John Doe 
+	name = John Doe
 	email = johndoe@example.ne
 "#;
         std::fs::write(path.join(".git/config"), git_config)?;
@@ -686,7 +686,7 @@ mod tests {
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 1").as_str(),
             Some("world"),
-        ); 
+        );
 
         let path = temp_dir.path().join("test.yaml");
         std::fs::write(&path, "hello: world").unwrap();
@@ -694,7 +694,7 @@ mod tests {
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
             Some("world"),
-        ); 
+        );
 
         let path = temp_dir.path().join("test.toml");
         let path_str = to_forward_slash_lossy(&path);
@@ -702,7 +702,7 @@ mod tests {
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
             Some("world"),
-        ); 
+        );
     }
 
     #[test]

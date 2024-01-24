@@ -29,8 +29,11 @@ class RattlerBuild:
         output_folder: Path,
         variant_config: Optional[Path] = None,
         custom_channels: list[str] | None = None,
+        extra_args: list[str] = None,
     ):
-        args = ["build", "--recipe", str(recipe_folder)]
+        if extra_args is None:
+            extra_args = []
+        args = ["build", "--recipe", str(recipe_folder), *extra_args]
         if variant_config is not None:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
@@ -67,7 +70,7 @@ def rattler_build():
 def test_functionality(rattler_build: RattlerBuild):
     suffix = ".exe" if os.name == "nt" else ""
     text = rattler_build("--help").splitlines()
-    assert text[2] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
+    assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
 
 
 @pytest.fixture
@@ -275,3 +278,39 @@ def test_anaconda_upload(
     )
 
     assert requests.get(URL).status_code == 200
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_cross_testing(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+) -> None:
+    native_platform = host_subdir()
+    if native_platform.startswith("linux"):
+        target_platform = "osx-64"
+    elif native_platform.startswith("osx"):
+        target_platform = "linux-64"
+
+    rattler_build.build(
+        recipes / "test-execution/recipe-test-succeed.yaml",
+        tmp_path,
+        extra_args=["--target-platform", target_platform],
+    )
+
+
+def test_additional_entrypoints(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "entry_points/additional_entrypoints.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "additional_entrypoints")
+
+    if os.name == "nt":
+        assert (pkg / "Scripts/additional_entrypoints-script.py").exists()
+        assert (pkg / "Scripts/additional_entrypoints.exe").exists()
+    else:
+        assert (pkg / "bin/additional_entrypoints").exists()

@@ -1,6 +1,7 @@
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
+use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
@@ -27,8 +28,8 @@ use rattler_package_streaming::write::{
 };
 
 use crate::macos;
-use crate::metadata::Output;
-use crate::recipe::parser::{DownstreamTest, PythonTest, TestType};
+use crate::metadata::{Output, PackagingSettings};
+use crate::package_test::write_test_files;
 use crate::{linux, post};
 
 #[derive(Debug, thiserror::Error)]
@@ -71,6 +72,9 @@ pub enum PackagingError {
 
     #[error(transparent)]
     SourceError(#[from] crate::source::SourceError),
+
+    #[error("could not create python entry point: {0}")]
+    CannotCreateEntryPoint(String),
 }
 
 #[allow(unused_variables)]
@@ -613,6 +617,90 @@ fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     Ok(Some(serde_json::to_string_pretty(&link_json)?))
 }
 
+/// Create the python entry point script for the recipe. Overwrites any existing entry points.
+fn create_entry_points(
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    if output.recipe.build().python().entry_points().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let target_platform = &output.build_configuration.target_platform;
+    let mut new_files = Vec::new();
+
+    let host_deps = output
+        .finalized_dependencies
+        .as_ref()
+        .ok_or_else(|| PackagingError::DependenciesNotFinalized)?
+        .host
+        .clone()
+        .ok_or_else(|| {
+            PackagingError::CannotCreateEntryPoint("Could not find host dependencies".to_string())
+        })?;
+
+    let python_record = host_deps
+        .resolved
+        .iter()
+        .find(|dep| dep.package_record.name.as_normalized() == "python");
+    let python_version = if let Some(python_record) = python_record {
+        python_record.package_record.version.version().clone()
+    } else {
+        return Err(PackagingError::CannotCreateEntryPoint(
+            "Could not find python in host dependencies".to_string(),
+        ));
+    };
+
+    for ep in output.recipe.build().python().entry_points() {
+        let script = python_entry_point_template(
+            &output
+                .build_configuration
+                .directories
+                .host_prefix
+                .to_string_lossy(),
+            ep,
+            &PythonInfo::from_version(&python_version, output.build_configuration.target_platform)
+                .map_err(|e| {
+                    PackagingError::CannotCreateEntryPoint(format!(
+                        "Could not create python info: {}",
+                        e
+                    ))
+                })?,
+        );
+
+        if target_platform.is_windows() {
+            fs::create_dir_all(tmp_dir_path.join("Scripts"))?;
+
+            let script_path = tmp_dir_path.join(format!("Scripts/{}-script.py", ep.command));
+            let mut file = File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            // write exe launcher as well
+            let exe_path = tmp_dir_path.join(format!("Scripts/{}.exe", ep.command));
+            let mut exe = File::create(&exe_path)?;
+            exe.write_all(get_windows_launcher(target_platform))?;
+
+            new_files.extend(vec![script_path, exe_path]);
+        } else {
+            fs::create_dir_all(tmp_dir_path.join("bin"))?;
+
+            let script_path = tmp_dir_path.join(format!("bin/{}", ep.command));
+            let mut file = File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            #[cfg(target_family = "unix")]
+            std::fs::set_permissions(
+                &script_path,
+                std::os::unix::fs::PermissionsExt::from_mode(0o775),
+            )?;
+
+            new_files.push(script_path);
+        }
+    }
+
+    Ok(new_files)
+}
+
 /// This function copies the license files to the info/licenses folder.
 fn copy_license_files(
     output: &Output,
@@ -701,129 +789,6 @@ fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
     false
 }
 
-fn write_test_files(output: &Output, tmp_dir_path: &Path) -> Result<Vec<PathBuf>, PackagingError> {
-    let mut test_files = Vec::new();
-
-    for (idx, test) in output.recipe.tests().iter().enumerate() {
-        if let Some(files) = match test {
-            TestType::Python(python_test) => {
-                Some(serialize_python_test(python_test, idx, tmp_dir_path)?)
-            }
-            TestType::Command(command_test) => Some(serialize_command_test(
-                command_test,
-                idx,
-                output,
-                tmp_dir_path,
-            )?),
-            TestType::Downstream(downstream_test) => Some(serialize_downstream_test(
-                downstream_test,
-                idx,
-                tmp_dir_path,
-            )?),
-            TestType::PackageContents(_) => None,
-        } {
-            test_files.extend(files);
-        }
-    }
-
-    Ok(test_files)
-}
-
-fn serialize_downstream_test(
-    downstream_test: &DownstreamTest,
-    idx: usize,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&folder)?;
-
-    let path = folder.join("downstream_test.json");
-    let mut file = File::create(&path)?;
-    file.write_all(serde_json::to_string(downstream_test)?.as_bytes())?;
-
-    Ok(vec![path])
-}
-
-fn serialize_command_test(
-    command_test: &crate::recipe::parser::CommandsTest,
-    idx: usize,
-    output: &Output,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let mut command_files = vec![];
-    let mut test_files = vec![];
-
-    let test_folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&test_folder)?;
-
-    let target_platform = &output.build_configuration.target_platform;
-    if target_platform.is_windows() || target_platform == &Platform::NoArch {
-        command_files.push(test_folder.join("run_test.bat"));
-    }
-
-    if target_platform.is_unix() || target_platform == &Platform::NoArch {
-        command_files.push(test_folder.join("run_test.sh"));
-    }
-
-    for cf in command_files {
-        let mut file = File::create(&cf)?;
-        for el in &command_test.script {
-            writeln!(file, "{}\n", el)?;
-        }
-        test_files.push(cf);
-    }
-
-    if !command_test.requirements.is_empty() {
-        let test_dependencies = &command_test.requirements;
-        let test_file = test_folder.join("test_time_dependencies.json");
-        let mut file = File::create(&test_file)?;
-        file.write_all(serde_json::to_string(&test_dependencies)?.as_bytes())?;
-        test_files.push(test_file);
-    }
-
-    if !command_test.files.recipe.is_empty() {
-        let globs = &command_test.files.recipe;
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
-            &output.build_configuration.directories.recipe_dir,
-            &test_folder,
-        )
-        .with_parse_globs(globs.iter().map(AsRef::as_ref))
-        .use_gitignore(true)
-        .run()?;
-
-        test_files.extend(copy_dir.copied_paths().iter().cloned());
-    }
-
-    if !command_test.files.source.is_empty() {
-        let globs = &command_test.files.source;
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
-            &output.build_configuration.directories.work_dir,
-            &test_folder,
-        )
-        .with_parse_globs(globs.iter().map(AsRef::as_ref))
-        .use_gitignore(true)
-        .run()?;
-
-        test_files.extend(copy_dir.copied_paths().iter().cloned());
-    }
-
-    Ok(test_files)
-}
-
-fn serialize_python_test(
-    python_test: &PythonTest,
-    idx: usize,
-    tmp_dir_path: &Path,
-) -> Result<Vec<PathBuf>, PackagingError> {
-    let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-    fs::create_dir_all(&folder)?;
-
-    let path = folder.join("python_test.json");
-    serde_json::to_writer(&File::create(&path)?, python_test)?;
-
-    Ok(vec![path])
-}
-
 fn write_recipe_folder(
     output: &Output,
     tmp_dir_path: &Path,
@@ -861,7 +826,7 @@ pub fn package_conda(
     new_files: &HashSet<PathBuf>,
     prefix: &Path,
     local_channel_dir: &Path,
-    package_format: ArchiveType,
+    packaging_settings: &PackagingSettings,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -948,6 +913,7 @@ pub fn package_conda(
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
+            &dynamic_linking.clone().unwrap_or_default().rpaths(),
             &rpath_allowlist,
         )?;
     }
@@ -998,12 +964,16 @@ pub fn package_conda(
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
 
+    // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
         if let Some(link) = create_link_json(output)? {
             let mut link_json = File::create(info_folder.join("link.json"))?;
             link_json.write_all(link.as_bytes())?;
             tmp_files.insert(info_folder.join("link.json"));
         }
+    } else {
+        let entry_points = create_entry_points(output, tmp_dir_path)?;
+        tmp_files.extend(entry_points);
     }
 
     // print sorted files
@@ -1025,16 +995,20 @@ pub fn package_conda(
     let identifier = output
         .identifier()
         .ok_or(PackagingError::BuildStringNotSet)?;
-    let out_path = output_folder.join(format!("{}{}", identifier, package_format.extension()));
+    let out_path = output_folder.join(format!(
+        "{}{}",
+        identifier,
+        packaging_settings.archive_type.extension()
+    ));
     let file = File::create(&out_path)?;
 
-    match package_format {
+    match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
             )?;
         }
@@ -1044,8 +1018,8 @@ pub fn package_conda(
                 file,
                 tmp_dir_path,
                 &tmp_files.into_iter().collect::<Vec<_>>(),
-                CompressionLevel::Default,
-                None,
+                CompressionLevel::Numeric(packaging_settings.compression_level),
+                packaging_settings.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
             )?;

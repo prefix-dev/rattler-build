@@ -167,27 +167,29 @@ fn run_process_with_replacements(
     args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> miette::Result<()> {
+    let (reader, writer) = os_pipe::pipe().expect("Could not get pipe");
+    let writer_clone = writer.try_clone().expect("Could not clone writer pipe");
+
     let mut child = Command::new(command)
         .current_dir(cwd)
         .args(args)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(writer)
+        .stderr(writer_clone)
         .spawn()
         .expect("Failed to execute command");
 
-    if let Some(ref mut stdout) = child.stdout {
-        let reader = BufReader::new(stdout);
+    let reader = BufReader::new(reader);
 
-        // Process the output line by line
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let filtered_line = replacements
-                    .iter()
-                    .fold(line, |acc, (from, to)| acc.replace(from, to));
-                tracing::info!("{}", filtered_line);
-            } else {
-                tracing::warn!("Error reading output: {:?}", line);
-            }
+    // Process the output line by line
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let filtered_line = replacements
+                .iter()
+                .fold(line, |acc, (from, to)| acc.replace(from, to));
+            tracing::info!("{}", filtered_line);
+        } else {
+            tracing::warn!("Error reading output: {:?}", line);
         }
     }
 
@@ -316,7 +318,7 @@ pub async fn run_build(
         &difference,
         &directories.host_prefix,
         &directories.output_dir,
-        output.build_configuration.package_format,
+        &output.build_configuration.packaging_settings,
     )
     .into_diagnostic()?;
 
@@ -324,7 +326,7 @@ pub async fn run_build(
     for test in output.recipe.tests() {
         // TODO we could also run each of the (potentially multiple) test scripts and collect the errors
         if let TestType::PackageContents(package_contents) = test {
-            package_test::run_package_content_tests(
+            package_test::run_package_content_test(
                 package_contents,
                 &paths_json,
                 &output.build_configuration.target_platform,
@@ -358,7 +360,7 @@ pub async fn run_build(
             &result,
             &TestConfiguration {
                 test_prefix: test_dir.clone(),
-                target_platform: Some(output.build_configuration.target_platform),
+                target_platform: Some(output.build_configuration.host_platform),
                 keep_test_prefix: tool_configuration.no_clean,
                 channels,
                 tool_configuration: tool_configuration.clone(),

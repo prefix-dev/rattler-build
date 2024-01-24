@@ -40,14 +40,16 @@ custom [prefix.dev](https://prefix.dev) private or public channel.
 
 Running rattler-build is straight-forward, just execute (on the command line):
 
-```
-rattler-build --recipe-file myrecipe/recipe.yaml
+```sh
+rattler-build build --recipe myrecipe/recipe.yaml
 ```
 
 Or add a custom channel that is not conda-forge which is the default one.
+
+```sh
+rattler-build build -c robostack --recipe myrecipe/recipe.yaml
 ```
-rattler-build -c robostack --recipe-file myrecipe/recipe.yaml
-```
+
 ### Overview of a recipe.yaml
 
 A recipe.yaml file is separated into multiple sections and can conditionally
@@ -56,8 +58,9 @@ string interpolation with `Jinja` (`minijinja` in our case).
 
 A simple example for the `zlib` package would look as follows:
 
-```yaml
-# variables from the context section can be used in the rest of the recipe in jinja expressions
+```yaml title="recipe.yaml"
+# variables from the context section can be used in the rest of the recipe
+# in jinja expressions
 context:
   version: 1.2.13
 
@@ -85,10 +88,10 @@ build:
 
 requirements:
   build:
-    # compiler is a special function. Also note the quoting around `{{` - this is necessary
-    # to make sure that we always have a valid YAML file.
+    # compiler is a special function.
     - ${{ compiler("c") }}
-    # The following two dependencies are only needed on Windows, and thus conditionally selected
+    # The following two dependencies are only needed on Windows,
+    # and thus conditionally selected
     - if: win
       then:
         - cmake
@@ -100,13 +103,10 @@ requirements:
 
 The sections of a recipe are:
 
-- context: in this section you can define variables that can be used in the
-  Jinja context later in the recipe (e.g. name and version are commonly
-  interpolated in strings)
-- package: this section defines the name and version of the package you are
-  currently building and will be the name of the final output
-- source: defines from where the source code is going to be downloaded from and
-  checksums
-- build: the settings for the build and the build script
-- requirements: allows the definition of build, host, run and run-constrained
-  dependencies.
+| sections       | description                                                                                                                                                     |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `context`      | in this section you can define variables that can be used in the Jinja context later in the recipe (e.g. name and version are commonly interpolated in strings) |
+| `package`      | this section defines the name and version of the package you are currently building and will be the name of the final output                                    |
+| `source`       | defines from where the source code is going to be downloaded from and checksums                                                                                 |
+| `build`        | the settings for the build and the build script                                                                                                                 |
+| `requirements` | allows the definition of build, host, run and run-constrained dependencies.                                                                                     |

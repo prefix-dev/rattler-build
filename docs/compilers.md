@@ -56,8 +56,8 @@ those are packages that we want to link against.
 build:
   - cmake
   - ${{ compiler('c') }}
-# packages that we want to link against in the architecture we are cross-compiling to
-# (the target_platform)
+# packages that we want to link against in the architecture we are
+# cross-compiling to the target_platform
 host:
   - libcurl
   - openssl

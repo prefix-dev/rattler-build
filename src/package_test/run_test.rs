@@ -16,10 +16,7 @@ use std::{
 
 use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::{
-    package::{ArchiveIdentifier, PathsJson},
-    MatchSpec, Platform,
-};
+use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
 use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
@@ -28,7 +25,7 @@ use rattler_shell::{
 
 use crate::{
     env_vars,
-    recipe::parser::{CommandsTestRequirements, PackageContents, PythonTest},
+    recipe::parser::{CommandsTestRequirements, PythonTest},
     render::solver::create_environment,
     tool_configuration,
 };
@@ -87,6 +84,7 @@ fn run_in_environment(
     cmd: String,
     cwd: &Path,
     environment: &Path,
+    build_environment: Option<PathBuf>,
 ) -> Result<(), TestError> {
     let current_path = std::env::var("PATH")
         .ok()
@@ -95,14 +93,34 @@ fn run_in_environment(
     // if we are in a conda environment, we need to deactivate it before activating the host / build prefix
     let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
 
-    let av = ActivationVariables {
+    let activation_vars = ActivationVariables {
         conda_prefix,
         path: current_path,
         path_modification_behavior: Default::default(),
     };
 
-    let activator = Activator::from_path(environment, shell.clone(), Platform::current())?;
-    let script = activator.activation(av)?;
+    let host_prefix_activator =
+        Activator::from_path(environment, shell.clone(), Platform::current())?;
+
+    let host_activation = host_prefix_activator
+        .activation(activation_vars)
+        .expect("Could not activate host prefix");
+
+    let build_activation_script = if let Some(build_environment) = build_environment {
+        // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
+        // prefix on top of the host prefix
+        let activation_vars = ActivationVariables {
+            conda_prefix: None,
+            path: Some(host_activation.path.clone()),
+            path_modification_behavior: Default::default(),
+        };
+
+        let activator =
+            Activator::from_path(&build_environment, shell.clone(), Platform::current())?;
+        activator.activation(activation_vars)?.script
+    } else {
+        String::new()
+    };
 
     let mut tmpfile = tempfile::Builder::new()
         .prefix("rattler-test-")
@@ -122,7 +140,8 @@ fn run_in_environment(
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
 
     writeln!(tmpfile, "{}", additional_script.contents)?;
-    writeln!(tmpfile, "{}", script.script)?;
+    writeln!(tmpfile, "{}", host_activation.script)?;
+    writeln!(tmpfile, "{}", build_activation_script)?;
     if matches!(shell, ShellEnum::Bash(_)) {
         writeln!(tmpfile, "set -x")?;
     }
@@ -163,10 +182,10 @@ impl Tests {
                     |ext: &str| path.extension().map(|s| s.eq(ext)).unwrap_or_default();
                 if Platform::current().is_windows() && is_path_ext("bat") {
                     tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment)
+                    run_in_environment(default_shell, contents, cwd, environment, None)
                 } else if Platform::current().is_unix() && is_path_ext("sh") {
                     tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment)
+                    run_in_environment(default_shell, contents, cwd, environment, None)
                 } else {
                     Ok(())
                 }
@@ -179,6 +198,7 @@ impl Tests {
                     format!("python {}", path.to_string_lossy()),
                     cwd,
                     environment,
+                    None,
                 )
             }
         }
@@ -414,10 +434,11 @@ async fn run_python_test(
         format!("python {}", test_file.path().to_string_lossy()),
         path,
         prefix,
+        None,
     )?;
 
     if test.pip_check {
-        run_in_environment(default_shell, "pip check".into(), path, prefix)
+        run_in_environment(default_shell, "pip check".into(), path, prefix, None)
     } else {
         Ok(())
     }
@@ -436,9 +457,29 @@ async fn run_shell_test(
         CommandsTestRequirements::default()
     };
 
-    if !deps.build.is_empty() {
-        todo!("build dependencies not implemented yet");
-    }
+    let build_env = if !deps.build.is_empty() {
+        tracing::info!("Installing build dependencies");
+        let build_prefix = prefix.join("bld");
+        let platform = Platform::current();
+        let build_dependencies = deps
+            .build
+            .iter()
+            .map(|s| MatchSpec::from_str(s))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        create_environment(
+            &build_dependencies,
+            &platform,
+            &build_prefix,
+            &config.channels,
+            &config.tool_configuration,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+        Some(build_prefix)
+    } else {
+        None
+    };
 
     let mut dependencies = deps
         .run
@@ -451,12 +492,13 @@ async fn run_shell_test(
         format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
     )?);
 
-    let platform = Platform::current();
+    let platform = config.target_platform.unwrap_or_else(Platform::current);
 
+    let run_env = prefix.join("run");
     create_environment(
         &dependencies,
         &platform,
-        prefix,
+        &run_env,
         &config.channels,
         &config.tool_configuration,
     )
@@ -474,7 +516,7 @@ async fn run_shell_test(
     let contents = fs::read_to_string(test_file_path)?;
 
     tracing::info!("Testing commands:");
-    run_in_environment(default_shell, contents, path, prefix)?;
+    run_in_environment(default_shell, contents, path, &run_env, build_env)?;
 
     Ok(())
 }
@@ -495,240 +537,4 @@ async fn run_individual_test(
     }
 
     Ok(())
-}
-
-/// <!-- TODO: better desc. --> Run package content tests.
-/// # Arguments
-///
-/// * `package_content` : The package content test format struct ref.
-///
-/// # Returns
-///
-/// * `Ok(())` if the test was successful
-/// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_package_content_tests(
-    package_content: &PackageContents,
-    paths_json: &PathsJson,
-    target_platform: &Platform,
-) -> Result<(), TestError> {
-    // files globset
-    let mut file_globs = vec![];
-    for file_path in package_content.files() {
-        file_globs.push((file_path, globset::Glob::new(file_path)?.compile_matcher()));
-    }
-
-    // site packages
-    let site_package_path = globset::Glob::new("**/site-packages/**")?.compile_matcher();
-    let mut site_packages = vec![];
-    for sp in package_content.site_packages() {
-        let mut s = String::new();
-        s.extend(sp.split('.').flat_map(|s| [s, "/"]));
-        s.push_str("/__init__.py");
-        site_packages.push((sp, s));
-    }
-
-    // binaries
-    let binary_dir = if target_platform.is_windows() {
-        "**/Library/bin/**"
-    } else {
-        "**/bin/**"
-    };
-    let binary_dir = globset::Glob::new(binary_dir)?.compile_matcher();
-    let mut binary_names = package_content
-        .bins()
-        .iter()
-        .map(|bin| {
-            if target_platform.is_windows() {
-                bin.to_owned() + ".exe"
-            } else {
-                bin.to_owned()
-            }
-        })
-        .collect::<Vec<_>>();
-
-    // libraries
-    let library_dir = if target_platform.is_windows() {
-        "Library"
-    } else {
-        "lib"
-    };
-    let mut libraries = vec![];
-    for lib in package_content.libs() {
-        if target_platform.is_windows() {
-            libraries.push((
-                lib,
-                globset::Glob::new(format!("**/{library_dir}/lib/{lib}.dll").as_str())?
-                    .compile_matcher(),
-                globset::Glob::new(format!("**/{library_dir}/bin/{lib}.lib").as_str())?
-                    .compile_matcher(),
-            ));
-        } else if target_platform.is_osx() {
-            libraries.push((
-                lib,
-                globset::Glob::new(format!("**/{library_dir}/{lib}.dylib").as_str())?
-                    .compile_matcher(),
-                globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?.compile_matcher(),
-            ));
-        } else if target_platform.is_unix() {
-            libraries.push((
-                lib,
-                globset::Glob::new(format!("**/{library_dir}/{lib}.so").as_str())?
-                    .compile_matcher(),
-                globset::Glob::new(format!("**/{library_dir}/{lib}.a").as_str())?.compile_matcher(),
-            ));
-        } else {
-            return Err(TestError::PackageContentTestFailedStr(
-                "Package test on target not supported.",
-            ));
-        }
-    }
-
-    // includes
-    let include_path = if target_platform.is_windows() {
-        "**/Library/include/**"
-    } else {
-        "**/include/**"
-    };
-    let include_path = globset::Glob::new(include_path)?.compile_matcher();
-    let mut includes = vec![];
-    for include in package_content.includes() {
-        includes.push((
-            include,
-            globset::Glob::new(include.as_str())?.compile_matcher(),
-        ));
-    }
-
-    for path in &paths_json.paths {
-        // check if all site_packages present
-        if !site_packages.is_empty() && site_package_path.is_match(&path.relative_path) {
-            let mut s = None;
-            for (i, sp) in site_packages.iter().enumerate() {
-                // this checks for exact component level match
-                if path.relative_path.ends_with(&sp.1) {
-                    s = Some(i);
-                    break;
-                }
-            }
-            if let Some(i) = s {
-                // can panic, but panic here is unreachable
-                site_packages.swap_remove(i);
-            }
-        }
-
-        // check if all file globs have a match
-        if !file_globs.is_empty() {
-            let mut s = None;
-            for (i, (_, fm)) in file_globs.iter().enumerate() {
-                if fm.is_match(&path.relative_path) {
-                    s = Some(i);
-                    break;
-                }
-            }
-            if let Some(i) = s {
-                // can panic, but panic here is unreachable
-                file_globs.swap_remove(i);
-            }
-        }
-
-        // check if all includes have a match
-        if !includes.is_empty() && include_path.is_match(&path.relative_path) {
-            let mut s = None;
-            for (i, inc) in includes.iter().enumerate() {
-                if inc.1.is_match(&path.relative_path) {
-                    s = Some(i);
-                    break;
-                }
-            }
-            if let Some(i) = s {
-                // can panic, but panic here is unreachable
-                includes.swap_remove(i);
-            }
-        }
-
-        // check if for all all, either a static or dynamic library have a match
-        if !libraries.is_empty() {
-            let mut s = None;
-            for (i, l) in libraries.iter().enumerate() {
-                if l.1.is_match(&path.relative_path) || l.2.is_match(&path.relative_path) {
-                    s = Some(i);
-                    break;
-                }
-            }
-            if let Some(i) = s {
-                // can panic, but panic here is unreachable
-                libraries.swap_remove(i);
-            }
-        }
-
-        // check if all binaries have a match
-        if !binary_names.is_empty() && binary_dir.is_match(&path.relative_path) {
-            let mut s = None;
-            for (i, b) in binary_names.iter().enumerate() {
-                // the matches component-wise as b is single level,
-                // it just matches the last component
-                if path.relative_path.ends_with(b) {
-                    s = Some(i);
-                    break;
-                }
-            }
-            if let Some(i) = s {
-                // can panic, but panic here is unreachable
-                binary_names.swap_remove(i);
-            }
-        }
-    }
-    let mut error = String::new();
-    if !file_globs.is_empty() {
-        error.push_str(&format!(
-            "Some file glob matches not found in package contents.\n{:?}",
-            file_globs
-                .into_iter()
-                .map(|s| s.0)
-                .collect::<Vec<&String>>()
-        ));
-    }
-    if !site_packages.is_empty() {
-        if !error.is_empty() {
-            error.push('\n');
-        }
-        error.push_str(&format!(
-            "Some site packages not found in package contents.\n{:?}",
-            site_packages
-                .into_iter()
-                .map(|s| s.0)
-                .collect::<Vec<&String>>()
-        ));
-    }
-    if !includes.is_empty() {
-        if !error.is_empty() {
-            error.push('\n');
-        }
-        error.push_str(&format!(
-            "Some includes not found in package contents.\n{:?}",
-            includes.into_iter().map(|s| s.0).collect::<Vec<&String>>()
-        ));
-    }
-    if !libraries.is_empty() {
-        if !error.is_empty() {
-            error.push('\n');
-        }
-        error.push_str(&format!(
-            "Some libraries not found in package contents.\n{:?}",
-            libraries.into_iter().map(|s| s.0).collect::<Vec<&String>>()
-        ));
-    }
-    if !binary_names.is_empty() {
-        if !error.is_empty() {
-            error.push('\n');
-        }
-        error.push_str(&format!(
-            "Some binaries not found in package contents.\n{:?}",
-            binary_names
-        ));
-    }
-    if error.is_empty() {
-        Ok(())
-    } else {
-        Err(TestError::PackageContentTestFailed(error))
-    }
 }

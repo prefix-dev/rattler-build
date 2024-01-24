@@ -147,6 +147,9 @@ impl TryConvertNode<Build> for RenderedMappingNode {
 /// Settings for shared libraries and executables.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DynamicLinking {
+    /// List of rpaths to use (linux only).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) rpaths: Vec<String>,
     /// Allow runpath / rpath to point to these locations outside of the environment.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) rpath_allowlist: Vec<String>,
@@ -156,6 +159,15 @@ pub struct DynamicLinking {
 }
 
 impl DynamicLinking {
+    /// Get the rpaths.
+    pub fn rpaths(&self) -> Vec<String> {
+        if self.rpaths.is_empty() {
+            vec![String::from("lib/")]
+        } else {
+            self.rpaths.clone()
+        }
+    }
+
     /// Get the rpath allow list.
     pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
         let mut matchers = Vec::new();
@@ -187,6 +199,9 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
         for (key, value) in self.iter() {
             let key_str = key.as_str();
             match key_str {
+                "rpaths" => {
+                    dynamic_linking.rpaths = value.try_convert(key_str)?;
+                }
                 "rpath_allowlist" => {
                     dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
                 }

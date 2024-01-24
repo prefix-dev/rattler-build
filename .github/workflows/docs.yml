@@ -7,6 +7,8 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+    tags:
+      - v**
   pull_request:
     branches:
       - main
@@ -24,9 +26,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    # Don't run on forks
-    if: github.repository == 'prefix-dev/rattler-build'
+  build-docs:
+    if: github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,42 +35,66 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: prefix-dev/setup-pixi@v0.4.1
+      - uses: prefix-dev/setup-pixi@v0.4.3
+        with:
+          pixi-version: v0.10.0
+          cache: true
+      
+      - name: Build docs for test
+        run: |
+          pixi run build-docs
+
+  docs-release:
+    # Don't run on forks
+    if: startsWith(github.event.ref, 'refs/tags/v') 
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: prefix-dev/setup-pixi@v0.4.3
         with:
           pixi-version: v0.10.0
           cache: true
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Build pixi Documentation
-        run: pixi run build-docs
-
-      #  This adds the following:
-      #   - A .nojekyll file to disable Jekyll GitHub Pages builds.
-      #   - Adds installation scripts to the pages webserver.
-      - name: Finalize documentation
+      - name: Configure Git user
         run: |
-          touch site/.nojekyll
-          # cp install/{install.sh,install.ps1} site
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
 
-      # https://github.com/actions/upload-pages-artifact#file-permissions
-      - run: chmod -c -R +rX site/
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=tag;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: "site"
+      - name: Deploy with mike 🚀
+        env:
+          RELEASE_VERSION: ${{ steps.extract_branch.outputs.tag }}
+        run: | 
+          pixi run deploy-latest
 
-  deploy:
+  docs-dev:
+    # Don't run on forks
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: build
-    if: github.repository == 'prefix-dev/rattler-build' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: prefix-dev/setup-pixi@v0.4.3
+        with:
+          pixi-version: v0.10.0
+          cache: true
+
+      - name: Configure Git user
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Deploy with mike 🚀
+        run: |
+          pixi run deploy-dev

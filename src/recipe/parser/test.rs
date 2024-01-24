@@ -94,47 +94,20 @@ pub enum TestType {
 pub struct PackageContents {
     /// file paths, direct and/or globs
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    files: Vec<String>,
+    pub files: Vec<String>,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    site_packages: Vec<String>,
+    pub site_packages: Vec<String>,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    bins: Vec<String>,
+    pub bin: Vec<String>,
     /// check for dynamic or static library file path
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    libs: Vec<String>,
+    pub lib: Vec<String>,
     /// check if include path contains the file, direct or glob?
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    includes: Vec<String>,
-}
-
-impl PackageContents {
-    /// Get the package files.
-    pub fn files(&self) -> &[String] {
-        &self.files
-    }
-
-    /// Get the site_packages.
-    pub fn site_packages(&self) -> &[String] {
-        &self.site_packages
-    }
-
-    /// Get the binaries.
-    pub fn bins(&self) -> &[String] {
-        &self.bins
-    }
-
-    /// Get the libraries.
-    pub fn libs(&self) -> &[String] {
-        &self.libs
-    }
-
-    /// Get the includes.
-    pub fn includes(&self) -> &[String] {
-        &self.includes
-    }
+    pub include: Vec<String>,
 }
 
 impl TryConvertNode<Vec<TestType>> for RenderedNode {
@@ -409,22 +382,22 @@ impl TryConvertNode<PackageContents> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<PackageContents, Vec<PartialParsingError>> {
         let mut files = vec![];
         let mut site_packages = vec![];
-        let mut libs = vec![];
-        let mut bins = vec![];
-        let mut includes = vec![];
+        let mut lib = vec![];
+        let mut bin = vec![];
+        let mut include = vec![];
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
             match key_str {
                 "files" => files = value.try_convert(key_str)?,
                 "site_packages" => site_packages = value.try_convert(key_str)?,
-                "lib" => libs = value.try_convert(key_str)?,
-                "bin" => bins = value.try_convert(key_str)?,
-                "include" => includes = value.try_convert(key_str)?,
+                "lib" => lib = value.try_convert(key_str)?,
+                "bin" => bin = value.try_convert(key_str)?,
+                "include" => include = value.try_convert(key_str)?,
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `files`, `site_packages`, `libs`, `bins`, `includes`")
+                    help = format!("expected fields for {name} is one of `files`, `site_packages`, `lib`, `bin`, `include`")
                 )])?
             }
             Ok(())
@@ -433,9 +406,9 @@ impl TryConvertNode<PackageContents> for RenderedMappingNode {
         Ok(PackageContents {
             files,
             site_packages,
-            bins,
-            libs,
-            includes,
+            bin,
+            lib,
+            include,
         })
     }
 }

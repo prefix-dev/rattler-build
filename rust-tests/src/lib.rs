@@ -190,9 +190,9 @@ mod tests {
         let help_text = help_test.split(|c| *c == b'\n').collect::<Vec<_>>();
 
         #[cfg(target_family = "unix")]
-        assert!(help_text[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        assert!(help_text[0].starts_with(b"Usage: rattler-build [OPTIONS]"));
         #[cfg(target_family = "windows")]
-        assert!(help_text[2].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
+        assert!(help_text[0].starts_with(b"Usage: rattler-build.exe [OPTIONS]"));
     }
 
     #[test]
@@ -203,7 +203,7 @@ mod tests {
 
         let help_text = help_text.stdout;
         let lines = help_text.split(|c| *c == b'\n').collect::<Vec<_>>();
-        assert!(lines[2].starts_with(b"Usage: rattler-build [OPTIONS]"));
+        assert!(lines[0].starts_with(b"Usage: rattler-build [OPTIONS]"));
     }
 
     #[test]
@@ -512,6 +512,47 @@ mod tests {
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("zip-source"), tmp.as_dir(), None);
 
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
+    fn test_dry_run_cf_upload() {
+        let tmp = tmp("test_polarify");
+        let variant = recipes().join("polarify").join("linux_64_.yaml");
+        let rattler_build = rattler().build::<_, _, PathBuf>(
+            recipes().join("polarify"),
+            tmp.as_dir(),
+            Some(variant),
+        );
+
+        assert!(rattler_build.status.success());
+
+        // try to upload the package using the rattler upload command
+        let pkg_path = get_package(tmp.as_dir(), "polarify".to_string());
+        let rattler_upload = rattler().with_args([
+            "upload",
+            "-vvv",
+            "conda-forge",
+            "--feedstock",
+            "polarify",
+            "--feedstock-token",
+            "fake-feedstock-token",
+            "--staging-token",
+            "fake-staging-token",
+            "--dry-run",
+            pkg_path.to_str().unwrap(),
+        ]);
+
+        let output = String::from_utf8(rattler_upload.stdout).unwrap();
+        assert!(rattler_upload.status.success());
+        assert!(output.contains("Done uploading packages to conda-forge"));
+    }
+
+    #[test]
+    fn test_correct_sha256() {
+        let tmp = tmp("correct-sha");
+        let rattler_build =
+            rattler().build::<_, _, &str>(recipes().join("correct-sha"), tmp.as_dir(), None);
         assert!(rattler_build.status.success());
     }
 }

@@ -1,6 +1,6 @@
 # Automatic linting in VSCode
 
-The enw recipe format comes with a strict JSON scheme. You can find the scheme
+The new recipe format comes with a strict JSON scheme. You can find the scheme
 [in this repository](https://github.com/prefix-dev/recipe-format).
 
 It's implemented with `pydantic` and renders to a JSON schema file. The [YAML

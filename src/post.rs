@@ -52,6 +52,7 @@ pub fn relink(
     prefix: &Path,
     encoded_prefix: &Path,
     target_platform: &Platform,
+    rpaths: &[String],
     rpath_allowlist: &[GlobMatcher],
 ) -> Result<(), RelinkError> {
     for p in paths {
@@ -75,7 +76,7 @@ pub fn relink(
         if target_platform.is_linux() {
             if SharedObject::test_file(p)? {
                 let so = SharedObject::new(p)?;
-                so.relink(prefix, encoded_prefix, rpath_allowlist)?;
+                so.relink(prefix, encoded_prefix, rpaths, rpath_allowlist)?;
             }
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;

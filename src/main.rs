@@ -9,6 +9,7 @@ use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_networking::AuthenticatedClient;
+use rattler_package_streaming::write::CompressionLevel;
 use std::{
     collections::BTreeMap,
     env::current_dir,
@@ -27,7 +28,7 @@ use url::Url;
 use rattler_build::{
     build::run_build,
     hash::HashInfo,
-    metadata::{BuildConfiguration, Directories, PackageIdentifier},
+    metadata::{BuildConfiguration, Directories, PackageIdentifier, PackagingSettings},
     package_test::{self, TestConfiguration},
     recipe::{parser::Recipe, ParsingError},
     selectors::SelectorConfig,
@@ -75,12 +76,6 @@ struct App {
     verbose: Verbosity<InfoLevel>,
 }
 
-#[derive(clap::ValueEnum, Clone)]
-enum PackageFormat {
-    TarBz2,
-    Conda,
-}
-
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
 #[derive(Parser)]
 struct CommonOpts {
@@ -103,6 +98,70 @@ struct CommonOpts {
     /// Path to an auth-file to read authentication information from
     #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
     auth_file: Option<PathBuf>,
+}
+
+/// Container for the CLI package format and compression level
+#[derive(Clone, PartialEq, Eq, Debug)]
+struct PackageFormatAndCompression {
+    /// The archive type that is selected
+    pub archive_type: ArchiveType,
+    /// The compression level that is selected
+    pub compression_level: CompressionLevel,
+}
+
+// deserializer for the package format and compression level
+impl FromStr for PackageFormatAndCompression {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut split = s.split(':');
+        let package_format = split.next().ok_or("invalid")?;
+
+        let compression = split.next().unwrap_or("default");
+
+        // remove all non-alphanumeric characters
+        let package_format = package_format
+            .chars()
+            .filter(|c| c.is_alphanumeric())
+            .collect::<String>();
+
+        let archive_type = match package_format.to_lowercase().as_str() {
+            "tarbz2" => ArchiveType::TarBz2,
+            "conda" => ArchiveType::Conda,
+            _ => return Err(format!("Unknown package format: {}", package_format)),
+        };
+
+        let compression_level = match compression {
+            "max" | "highest" => CompressionLevel::Highest,
+            "default" | "normal" => CompressionLevel::Default,
+            "fast" | "lowest" | "min" => CompressionLevel::Lowest,
+            number if number.parse::<i32>().is_ok() => {
+                let number = number.parse::<i32>().unwrap_or_default();
+                match archive_type {
+                    ArchiveType::TarBz2 => {
+                        if !(1..=9).contains(&number) {
+                            return Err("Compression level for .tar.bz2 must be between 1 and 9"
+                                .to_string());
+                        }
+                    }
+                    ArchiveType::Conda => {
+                        if !(-7..=22).contains(&number) {
+                            return Err(
+                                "Compression level for conda packages (zstd) must be between -7 and 22".to_string()
+                            );
+                        }
+                    }
+                }
+                CompressionLevel::Numeric(number)
+            }
+            _ => return Err(format!("Unknown compression level: {}", compression)),
+        };
+
+        Ok(PackageFormatAndCompression {
+            archive_type,
+            compression_level,
+        })
+    }
 }
 
 #[derive(Parser)]
@@ -139,7 +198,10 @@ struct BuildOpts {
     /// The package format to use for the build.
     /// Defaults to `.tar.bz2`.
     #[arg(long, default_value = "tar-bz2")]
-    package_format: PackageFormat,
+    package_format: PackageFormatAndCompression,
+
+    #[arg(long)]
+    compression_threads: Option<u32>,
 
     /// Do not store the recipe in the final package
     #[arg(long)]
@@ -205,6 +267,8 @@ enum ServerType {
     Artifactory(ArtifactoryOpts),
     Prefix(PrefixOpts),
     Anaconda(AnacondaOpts),
+    #[clap(hide = true)]
+    CondaForge(CondaForgeOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -294,6 +358,54 @@ struct AnacondaOpts {
     /// Replace files on conflict
     #[arg(long, short, env = "ANACONDA_FORCE", default_value = "false")]
     force: bool,
+}
+
+/// Options for uploading to conda-forge
+#[derive(Clone, Debug, PartialEq, Parser)]
+pub struct CondaForgeOpts {
+    /// The Anaconda API key
+    #[arg(long, env = "STAGING_BINSTAR_TOKEN", required = true)]
+    staging_token: String,
+
+    /// The feedstock name
+    #[arg(long, env = "FEEDSTOCK_NAME", required = true)]
+    feedstock: String,
+
+    /// The feedstock token
+    #[arg(long, env = "FEEDSTOCK_TOKEN", required = true)]
+    feedstock_token: String,
+
+    /// The staging channel name
+    #[arg(long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
+    staging_channel: String,
+
+    /// The Anaconda Server URL
+    #[arg(
+        long,
+        env = "ANACONDA_SERVER_URL",
+        default_value = "https://api.anaconda.org"
+    )]
+    anaconda_url: Url,
+
+    /// The validation endpoint url
+    #[arg(
+        long,
+        env = "VALIDATION_ENDPOINT",
+        default_value = "https://conda-forge.herokuapp.com/feedstock-outputs/copy"
+    )]
+    validation_endpoint: Url,
+
+    /// Post comment on promotion failure
+    #[arg(long, env = "POST_COMMENT_ON_ERROR", default_value = "true")]
+    post_comment_on_error: bool,
+
+    /// The CI provider
+    #[arg(long, env = "CI")]
+    provider: Option<String>,
+
+    /// Dry run, don't actually upload anything
+    #[arg(long, env = "DRY_RUN", default_value = "false")]
+    dry_run: bool,
 }
 
 #[tokio::main]
@@ -589,10 +701,11 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                 channels,
                 timestamp,
                 subpackages: subpackages.clone(),
-                package_format: match args.package_format {
-                    PackageFormat::TarBz2 => ArchiveType::TarBz2,
-                    PackageFormat::Conda => ArchiveType::Conda,
-                },
+                packaging_settings: PackagingSettings::from_args(
+                    args.package_format.archive_type,
+                    args.package_format.compression_level,
+                    args.compression_threads,
+                ),
                 store_recipe: !args.no_include_recipe,
                 force_colors: !args.no_force_colors,
             },
@@ -717,6 +830,13 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             )
             .await?;
         }
+        ServerType::CondaForge(conda_forge_opts) => {
+            upload::conda_forge::upload_packages_to_conda_forge(
+                conda_forge_opts,
+                &args.package_files,
+            )
+            .await?;
+        }
     }
 
     Ok(())
@@ -737,4 +857,96 @@ pub fn get_default_env_filter(
     }
 
     Ok(result)
+}
+
+#[cfg(test)]
+mod test {
+    use super::PackageFormatAndCompression;
+    use rattler_conda_types::package::ArchiveType;
+    use rattler_package_streaming::write::CompressionLevel;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_parse_packaging() {
+        let package_format = PackageFormatAndCompression::from_str("tar-bz2").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("tar-bz2:1").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Numeric(1)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str(".tar.bz2:max").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Highest
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("tarbz2:5").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Numeric(5)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:1").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Numeric(1)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:max").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Highest
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:-5").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Numeric(-5)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:fast").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Lowest
+            }
+        );
+    }
 }

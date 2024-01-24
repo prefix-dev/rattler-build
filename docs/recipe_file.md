@@ -62,13 +62,23 @@ Spec reference
 --------------
 
 The spec is also made available through a JSON Schema (which is used for
-validation). The schema (and pydantic source file) can be found in this
-repository: https://github.com/prefix-dev/recipe-format. To use with VSCode or
-other IDEs, start the document with the following line:
+validation).<br/>
+The schema (and pydantic source file) can be found in this repository:
+[`recipe-format`](https://github.com/prefix-dev/recipe-format).
 
-```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-```
+???+ info "To use with VSCode(yaml-plugin) and other IDEs:"
+    Either, start the document with the following line:
+    ```html
+    # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+    ```
+    Or, using `yaml.schemas`,
+    ```yaml
+    yaml.schemas: {
+      "https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json": "**/recipe.yaml",
+    }
+    ```
+    [Read more.](https://github.com/redhat-developer/yaml-language-server)
+
 
 See more in the [automatic linting](./automatic_linting.md) chapter.
 
@@ -83,7 +93,7 @@ You can use `boa convert meta.yaml` to convert an existing recipe from conda-bui
 Examples
 --------
 
-```yaml
+```yaml title="recipe.yaml"
 # this sets up "context variables" (in this case name and version) that
 # can later be used in Jinja expressions
 context:
@@ -380,7 +390,8 @@ scripts for different platforms.
 
 ```yaml
 build:
-  script: python setup.py install --single-version-externally-managed --record=record.txt
+  script:
+    python setup.py install --single-version-externally-managed --record=record.txt
 ```
 
 ### Skipping builds
@@ -485,11 +496,11 @@ requirements:
     - python
 ```
 
-```{note}
-When both build and host sections are defined, the build section can
-be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
-For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
-```
+!!! note
+    When both build and host sections are defined, the build section can
+    be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
+    For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
+
 
 The PREFIX environment variable points to the host prefix. With respect to
 activation during builds, both the host and build environments are activated.
@@ -595,9 +606,8 @@ Using, runtime depenedency name.
         - libzlib
 ```
 
-```{note}
-`ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
-```
+!!! note
+    `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
 Tests section
 -------------
@@ -670,8 +680,6 @@ tests:
       recipe:
         - extra-file.txt
 ```
-
--->
 
 #### Test requirements
 
@@ -917,13 +925,12 @@ Extra section
 A schema-free area for storing non-conda-specific metadata in standard YAML
 form.
 
-EXAMPLE: To store recipe maintainer information:
-
-```yaml
-extra:
-  maintainers:
-   - name of maintainer
-```
+???+ Example "Example: To store recipe maintainers information"
+    ```yaml
+    extra:
+      maintainers:
+       - name of maintainer
+    ```
 
 Templating with Jinja
 ---------------------
@@ -936,7 +943,8 @@ You can set up Jinja variables in the context yaml section:
 context:
   name: "test"
   version: "5.1.2"
-  # later keys can reference previous keys and use jinja functions to compute new values
+  # later keys can reference previous keys
+  # and use jinja functions to compute new values
   major_version: ${{ version.split('.')[0] }}
 ```
 
@@ -962,17 +970,19 @@ package:
   name: ${{ name }} # correct
 ```
 
-For more information, see the [Jinja2 template
-documentation](http://jinja.pocoo.org/docs/dev/templates/) and the list of
-available environment variables \<env-vars\>.
+For more information, see the [Jinja template
+documentation](https://jinja.palletsprojects.com/en/3.1.x/) and the list of
+available environment variables [`env-vars`]().
 
-Jinja templates are evaluated during the build process. To retrieve a fully
-rendered `recipe.yaml`, use the commands/boa-render command.
+Jinja templates are evaluated during the build process.
+<!-- TODO: implement the command to do below
+To retrieve a fully rendered `recipe.yaml`, use the `` command.
+-->
 
 #### Additional Jinja2 functionality in rattler-build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the conda-build process: `pin_compatible`, `pin_subpackage`,
+available during the rattler-build process: `pin_compatible`, `pin_subpackage`,
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
@@ -989,7 +999,7 @@ the supplied parameters.
 Similarly, the `pin_compatible` function will pin a package according to the
 specified rules.
 
-### Pin expressions
+#### Pin expressions
 
 `rattler-build` knows pin expressions. A pin expression can have a `min_pin`,
 `max_pin` and `exact` value. A `max_pin` and `min_pin` are specified with a
@@ -1061,6 +1071,29 @@ build:
   string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
 ```
 
+#### `cmp` function
+
+This function matches the first argument(package's MatchSpec) against the second argument(the version spec) and returns the resulting boolean.
+
+```yaml
+cmp(python, '>=3.4')
+```
+
+Example: [cmp usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+
+#### `cdt` function
+
+This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.
+
+```yaml
+# on x86_64 system
+cdt('package-name') # outputs: package-name-cos6-x86_64
+# on aarch64 system
+cdt('package-name') # outputs: package-name-cos6-aarch64
+```
+
+Example: [cdt usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+
 Preprocessing selectors
 -----------------------
 
@@ -1114,28 +1147,27 @@ items under a single selector:
 ```yaml
 tests:
   - script:
-      - if: unix
-        then:
-        - test -d ${PREFIX}/include/xtensor
-        - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
-      - if: win
-        then:
-        - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
-        - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
+    - if: unix
+      then:
+      - test -d ${PREFIX}/include/xtensor
+      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+    - if: win
+      then:
+      - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+      - if not exist %LIBRARY_PREFIX%\lib\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 # On unix this is rendered to:
 tests:
   - script:
-      - test -d ${PREFIX}/include/xtensor
-      - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
+    - test -d ${PREFIX}/include/xtensor
+    - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
 Experimental features
 ---------------------
 
-```{warning}
-These are experimental features of `rattler-build` and may change or go away completely.
-```
+!!! warning
+    These are experimental features of `rattler-build` and may change or go away completely.
 
 ### Jinja functions
 

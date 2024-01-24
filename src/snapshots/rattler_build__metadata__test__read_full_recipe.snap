@@ -67,7 +67,10 @@ build_configuration:
       name: rich
       version: 13.4.2
       build_string: pyh4616a5c_0
-  package_format: tar_bz2
+  packaging_settings:
+    archive_type: conda
+    compression_level: 21
+    compression_threads: 5
 finalized_dependencies:
   build: ~
   host:

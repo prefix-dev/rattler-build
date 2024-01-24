@@ -15,6 +15,7 @@ use crate::{
         },
         error::{ErrorKind, PartialParsingError},
     },
+    source::SourceError,
 };
 
 use super::FlattenErrors;
@@ -504,6 +505,30 @@ pub enum Checksum {
     /// A MD5 checksum
     Md5(#[serde_as(as = "SerializableHash::<rattler_digest::Md5>")] Md5Hash),
 }
+
+impl TryFrom<&UrlSource> for Checksum {
+    type Error = SourceError;
+
+    fn try_from(source: &UrlSource) -> Result<Self, Self::Error> {
+        if let Some(sha256) = source.sha256() {
+            Ok(Checksum::Sha256(*sha256))
+        } else if let Some(md5) = source.md5() {
+            Ok(Checksum::Md5(*md5))
+        } else {
+            return Err(SourceError::NoChecksum(source.url().clone()));
+        }
+    }
+}
+
+impl Checksum {
+    pub fn to_hex(&self) -> String {
+        match self {
+            Checksum::Sha256(sha256) => hex::encode(sha256),
+            Checksum::Md5(md5) => hex::encode(md5),
+        }
+    }
+}
+
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

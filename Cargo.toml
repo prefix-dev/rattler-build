@@ -16,7 +16,7 @@ documentation = "https://prefix-dev.github.io/rattler-build"
 [features]
 default = ['native-tls']
 native-tls = ['reqwest/native-tls', 'rattler/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
+rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls']
 
 [dependencies]
 serde = { version = "1.0.195", features = ["derive"] }
@@ -51,7 +51,7 @@ content_inspector = "0.2.4"
 serde_with = "3.4.0"
 url = "2.5.0"
 tracing = "0.1.40"
-clap = { version = "4.4.14", features = ["derive", "env", "cargo"] }
+clap = { version = "4.4.18", features = ["derive", "env", "cargo"] }
 minijinja = { version = "1.0.11", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -81,14 +81,14 @@ fs_extra = "1.3.0"
 ignore = "0.4.22"
 globset = "0.4.14"
 tracing-indicatif = "0.3.6"
-clap-verbosity-flag = "2.1.1"
+clap-verbosity-flag = "2.1.2"
 tracing-core = "0.1.32"
 petgraph = "0.6.4"
 indexmap = "2.1.0"
 dunce = "1.0.4"
 fs-err = "2.11.0"
-which = "5.0.0"
-clap_complete = "4.4.6"
+which = "6.0.0"
+clap_complete = "4.4.7"
 tokio-util = "0.7.10"
 
 tar = "0.4.40"
@@ -97,11 +97,13 @@ zip = { version = "0.6.6", default-features = false, features = [
     "deflate",
 ] }
 bzip2 = "0.4.4"
-base64 = "0.21.6"
+base64 = "0.21.7"
 flate2 = "1.0.28"
 xz2 = "0.1.7"
 zstd = "0.13.0"
 toml = "0.8.8"
+memmap2 = "0.9.3"
+os_pipe = "1.1.5"
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["yaml"] }
@@ -118,19 +120,21 @@ pre-build = [
 ]
 
 [patch.crates-io]
-# rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
 # rattler_digest = { path = "../rattler/crates/rattler_digest" }
+# rattler_index = { path = "../rattler/crates/rattler_index" }
 # rattler_networking = { path = "../rattler/crates/rattler_networking" }
 # rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
