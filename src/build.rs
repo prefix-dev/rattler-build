@@ -167,8 +167,8 @@ fn run_process_with_replacements(
     args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> miette::Result<()> {
-    let (reader, writer) = os_pipe::pipe().unwrap();
-    let writer_clone = writer.try_clone().unwrap();
+    let (reader, writer) = os_pipe::pipe().expect("Could not get pipe");
+    let writer_clone = writer.try_clone().expect("Could not clone writer pipe");
 
     let mut child = Command::new(command)
         .current_dir(cwd)
