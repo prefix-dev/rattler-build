@@ -917,6 +917,10 @@ pub fn package_conda(
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
+            &dynamic_linking
+                .as_ref()
+                .map(|v| v.rpaths())
+                .unwrap_or_default(),
             &rpath_allowlist,
         )?;
 

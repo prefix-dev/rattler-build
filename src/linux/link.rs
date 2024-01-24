@@ -54,6 +54,9 @@ pub enum RelinkError {
 
     #[error("failed to parse elf file: {0}")]
     ParseElfError(#[from] goblin::error::Error),
+
+    #[error("rpath not found in dynamic section")]
+    RpathNotFound,
 }
 
 impl SharedObject {
@@ -89,6 +92,7 @@ impl SharedObject {
         &self,
         prefix: &Path,
         encoded_prefix: &Path,
+        custom_rpaths: &[String],
         rpath_allowlist: &[GlobMatcher],
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
@@ -96,12 +100,18 @@ impl SharedObject {
             return Ok(());
         }
 
-        let rpaths = self
+        let mut rpaths = self
             .rpaths
             .iter()
             .flat_map(|r| r.split(':'))
             .map(PathBuf::from)
             .collect::<Vec<_>>();
+        rpaths.extend(
+            custom_rpaths
+                .iter()
+                .map(|v| encoded_prefix.join(v))
+                .collect::<Vec<PathBuf>>(),
+        );
 
         let runpaths = self
             .runpaths
@@ -243,6 +253,16 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
         .iter()
         .any(|entry| entry.d_tag == goblin::elf::dynamic::DT_RPATH);
 
+    let has_runpath = dynamic
+        .dyns
+        .iter()
+        .any(|entry| entry.d_tag == goblin::elf::dynamic::DT_RUNPATH);
+
+    // fallback to patchelf if there is no rpath found
+    if !has_rpath && !has_runpath {
+        return Err(RelinkError::RpathNotFound);
+    }
+
     let mut data_mut = data.make_mut().expect("Failed to make data mutable");
 
     let overwrite_strtab =
@@ -302,7 +322,7 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
             .iter()
             .find(|header| header.p_type == goblin::elf::program_header::PT_DYNAMIC)
             .map(|header| header.p_offset)
-            .ok_or(RelinkError::PatchElfFailed)? as usize;
+            .ok_or(RelinkError::BuiltinRelinkFailed)? as usize;
         let ctx = ctx(&object);
         for d in new_dynamic {
             data_mut.pwrite_with::<goblin::elf::dynamic::Dyn>(d, offset, ctx)?;
@@ -349,11 +369,46 @@ mod test {
         object.relink(
             &prefix,
             encoded_prefix,
+            &[],
             &[Glob::new("/usr/lib/custom**").unwrap().compile_matcher()],
         )?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(
             vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
+            object
+                .rpaths
+                .iter()
+                .flat_map(|r| r.split(':'))
+                .collect::<Vec<&str>>()
+        );
+
+        // manually clean up temporary directory because it was
+        // persisted to disk by calling `into_path`
+        fs::remove_dir_all(tmp_dir)?;
+
+        Ok(())
+    }
+
+    // rpath: none
+    // encoded prefix: "/rattler-build_zlink/host_env_placehold"
+    // binary path: test-data/binary_files/tmp/zlink
+    // prefix: "test-data/binary_files"
+    // new rpath: $ORIGIN/../lib
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn relink_add_rpath() -> Result<(), RelinkError> {
+        // copy binary to a temporary directory
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?.into_path();
+        let binary_path = tmp_dir.join("zlink-no-rpath");
+        fs::copy(prefix.join("zlink-no-rpath"), &binary_path)?;
+
+        let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
+        let object = SharedObject::new(&binary_path)?;
+        object.relink(&prefix, encoded_prefix, &[String::from("lib/")], &[])?;
+        let object = SharedObject::new(&binary_path)?;
+        assert_eq!(
+            vec!["$ORIGIN/../lib"],
             object
                 .rpaths
                 .iter()
