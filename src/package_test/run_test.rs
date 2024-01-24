@@ -84,6 +84,7 @@ fn run_in_environment(
     cmd: String,
     cwd: &Path,
     environment: &Path,
+    build_environment: Option<PathBuf>,
 ) -> Result<(), TestError> {
     let current_path = std::env::var("PATH")
         .ok()
@@ -92,14 +93,34 @@ fn run_in_environment(
     // if we are in a conda environment, we need to deactivate it before activating the host / build prefix
     let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
 
-    let av = ActivationVariables {
+    let activation_vars = ActivationVariables {
         conda_prefix,
         path: current_path,
         path_modification_behavior: Default::default(),
     };
 
-    let activator = Activator::from_path(environment, shell.clone(), Platform::current())?;
-    let script = activator.activation(av)?;
+    let host_prefix_activator =
+        Activator::from_path(environment, shell.clone(), Platform::current())?;
+
+    let host_activation = host_prefix_activator
+        .activation(activation_vars)
+        .expect("Could not activate host prefix");
+
+    let build_activation_script = if let Some(build_environment) = build_environment {
+        // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
+        // prefix on top of the host prefix
+        let activation_vars = ActivationVariables {
+            conda_prefix: None,
+            path: Some(host_activation.path.clone()),
+            path_modification_behavior: Default::default(),
+        };
+
+        let activator =
+            Activator::from_path(&build_environment, shell.clone(), Platform::current())?;
+        activator.activation(activation_vars)?.script
+    } else {
+        String::new()
+    };
 
     let mut tmpfile = tempfile::Builder::new()
         .prefix("rattler-test-")
@@ -119,7 +140,8 @@ fn run_in_environment(
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
 
     writeln!(tmpfile, "{}", additional_script.contents)?;
-    writeln!(tmpfile, "{}", script.script)?;
+    writeln!(tmpfile, "{}", host_activation.script)?;
+    writeln!(tmpfile, "{}", build_activation_script)?;
     if matches!(shell, ShellEnum::Bash(_)) {
         writeln!(tmpfile, "set -x")?;
     }
@@ -160,10 +182,10 @@ impl Tests {
                     |ext: &str| path.extension().map(|s| s.eq(ext)).unwrap_or_default();
                 if Platform::current().is_windows() && is_path_ext("bat") {
                     tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment)
+                    run_in_environment(default_shell, contents, cwd, environment, None)
                 } else if Platform::current().is_unix() && is_path_ext("sh") {
                     tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment)
+                    run_in_environment(default_shell, contents, cwd, environment, None)
                 } else {
                     Ok(())
                 }
@@ -176,6 +198,7 @@ impl Tests {
                     format!("python {}", path.to_string_lossy()),
                     cwd,
                     environment,
+                    None,
                 )
             }
         }
@@ -411,10 +434,11 @@ async fn run_python_test(
         format!("python {}", test_file.path().to_string_lossy()),
         path,
         prefix,
+        None,
     )?;
 
     if test.pip_check {
-        run_in_environment(default_shell, "pip check".into(), path, prefix)
+        run_in_environment(default_shell, "pip check".into(), path, prefix, None)
     } else {
         Ok(())
     }
@@ -433,9 +457,29 @@ async fn run_shell_test(
         CommandsTestRequirements::default()
     };
 
-    if !deps.build.is_empty() {
-        todo!("build dependencies not implemented yet");
-    }
+    let build_env = if !deps.build.is_empty() {
+        tracing::info!("Installing build dependencies");
+        let build_prefix = prefix.join("bld");
+        let platform = Platform::current();
+        let build_dependencies = deps
+            .build
+            .iter()
+            .map(|s| MatchSpec::from_str(s))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        create_environment(
+            &build_dependencies,
+            &platform,
+            &build_prefix,
+            &config.channels,
+            &config.tool_configuration,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+        Some(build_prefix)
+    } else {
+        None
+    };
 
     let mut dependencies = deps
         .run
@@ -450,10 +494,11 @@ async fn run_shell_test(
 
     let platform = config.target_platform.unwrap_or_else(Platform::current);
 
+    let run_env = prefix.join("run");
     create_environment(
         &dependencies,
         &platform,
-        prefix,
+        &run_env,
         &config.channels,
         &config.tool_configuration,
     )
@@ -471,7 +516,7 @@ async fn run_shell_test(
     let contents = fs::read_to_string(test_file_path)?;
 
     tracing::info!("Testing commands:");
-    run_in_environment(default_shell, contents, path, prefix)?;
+    run_in_environment(default_shell, contents, path, &run_env, build_env)?;
 
     Ok(())
 }
