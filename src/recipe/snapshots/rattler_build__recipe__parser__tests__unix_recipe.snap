@@ -93,6 +93,7 @@ Recipe {
         },
         dynamic_linking: Some(
             DynamicLinking {
+                rpaths: [],
                 rpath_allowlist: [
                     "/usr/lib/**",
                 ],
