@@ -73,14 +73,12 @@ pub fn relink(
             continue;
         }
 
-        if target_platform.is_linux() {
-            if SharedObject::test_file(p)? {
-                let so = SharedObject::new(p)?;
-                so.relink(prefix, encoded_prefix, rpaths, rpath_allowlist)?;
-            }
+        if target_platform.is_linux() && SharedObject::test_file(p)? {
+            let so = SharedObject::new(p)?;
+            so.relink(prefix, encoded_prefix, rpaths, rpath_allowlist)?;
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;
-            dylib.relink(prefix, encoded_prefix)?;
+            dylib.relink(prefix, encoded_prefix, rpaths, rpath_allowlist)?;
         }
     }
 

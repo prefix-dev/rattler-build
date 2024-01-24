@@ -1,4 +1,5 @@
 //! Relink a dylib to use relative paths for rpaths
+use globset::GlobMatcher;
 use goblin::mach::Mach;
 use memmap2::MmapMut;
 use scroll::Pread;
@@ -47,10 +48,13 @@ pub enum RelinkError {
     ReadStringError(#[from] scroll::Error),
 
     #[error("failed to get relative path from {from} to {to}")]
-    PathDiffError { from: PathBuf, to: PathBuf },
+    PathDiffFailed { from: PathBuf, to: PathBuf },
 
     #[error("failed to relink dylib with builtin relink (new path is longer than old path)")]
     BuiltinRelinkFailed,
+
+    #[error("shared library has no parent directory")]
+    NoParentDir,
 }
 
 impl Dylib {
@@ -110,30 +114,71 @@ impl Dylib {
     /// * `dylib_path` - Path to the dylib to modify
     /// * `prefix` - The prefix of the file (usually a temporary directory)
     /// * `encoded_prefix` - The prefix of the file as encoded in the dylib at build time (e.g. the host prefix)
-    pub fn relink(&self, prefix: &Path, encoded_prefix: &Path) -> Result<(), RelinkError> {
+    pub fn relink(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+        custom_rpaths: &[String],
+        rpath_allowlist: &[GlobMatcher],
+    ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
         let mut modified = false;
-        for rpath in &self.rpaths {
-            if rpath.is_absolute() {
-                let orig_path = encoded_prefix.join(
-                    self.path
-                        .strip_prefix(prefix)?
-                        .parent()
-                        .expect("Could not get parent"),
-                );
 
-                let relpath =
-                    pathdiff::diff_paths(rpath, &orig_path).ok_or(RelinkError::PathDiffError {
-                        from: orig_path.clone(),
-                        to: rpath.clone(),
-                    })?;
+        let mut rpaths = self.rpaths.clone();
+
+        rpaths.extend(
+            custom_rpaths
+                .iter()
+                .map(|v| encoded_prefix.join(v))
+                .collect::<Vec<PathBuf>>(),
+        );
+
+        let mut final_rpaths = Vec::new();
+
+        for rpath in &self.rpaths {
+            if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
+                let new_rpath = prefix.join(rel);
+
+                let parent = new_rpath.parent().ok_or(RelinkError::NoParentDir)?;
+                let relative_path = pathdiff::diff_paths(&new_rpath, parent).ok_or(
+                    RelinkError::PathDiffFailed {
+                        from: new_rpath.clone(),
+                        to: parent.to_path_buf(),
+                    },
+                )?;
 
                 let new_rpath =
-                    PathBuf::from(format!("@loader_path/{}", relpath.to_string_lossy()));
+                    PathBuf::from(format!("@loader_path/{}", relative_path.to_string_lossy()));
 
-                changes.change_rpath.insert(rpath.clone(), new_rpath);
-                modified = true;
+                final_rpaths.push(new_rpath.clone());
+                // changes.change_rpath.insert(rpath.clone(), new_rpath);
+                // modified = true;
+            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+                tracing::info!("Allowlisted rpath: {}", rpath.display());
+                final_rpaths.push(rpath.clone());
+            } else {
+                tracing::warn!("Rpath not in prefix: {} – removing it", rpath.display());
             }
+        }
+
+        if final_rpaths != self.rpaths {
+            for (old, new) in self.rpaths.iter().zip(final_rpaths.iter()) {
+                changes
+                    .change_rpath
+                    .push((Some(old.clone()), Some(new.clone())));
+            }
+
+            if self.rpaths.len() > final_rpaths.len() {
+                for old in self.rpaths.iter().skip(final_rpaths.len()) {
+                    changes.change_rpath.push((Some(old.clone()), None));
+                }
+            } else if self.rpaths.len() < final_rpaths.len() {
+                for new in final_rpaths.iter().skip(self.rpaths.len()) {
+                    changes.change_rpath.push((None, Some(new.clone())));
+                }
+            }
+
+            modified = true;
         }
 
         let exchange_dylib = |path: &Path| {
@@ -195,7 +240,7 @@ fn codesign(path: &Path) -> Result<(), std::io::Error> {
 #[derive(Debug, Default)]
 struct DylibChanges {
     // rpaths to change
-    change_rpath: HashMap<PathBuf, PathBuf>,
+    change_rpath: Vec<(Option<PathBuf>, Option<PathBuf>)>,
     // dylib id to change
     change_id: Option<PathBuf>,
     // dylibs to rewrite
@@ -204,8 +249,28 @@ struct DylibChanges {
 
 impl fmt::Display for DylibChanges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-        for (old, new) in &self.change_rpath {
-            writeln!(f, " - change rpath from {:?} to {:?}", old, new)?;
+
+        fn strip_placeholder_prefix(path: &Path) -> PathBuf {
+            path.components()
+                .skip_while(|c| c.as_os_str().to_string_lossy().starts_with("host_env_placehold_placehold"))
+                .skip(1)
+                .collect::<PathBuf>()
+        }
+
+
+        for change in &self.change_rpath {
+            match change {
+                (Some(old), Some(new)) => {
+                    writeln!(f, " - change rpath from {:?} to {:?}", strip_placeholder_prefix(old), new)?;
+                }
+                (Some(old), None) => {
+                    writeln!(f, " - delete rpath {:?}", strip_placeholder_prefix(old))?;
+                }
+                (None, Some(new)) => {
+                    writeln!(f, " - add rpath {:?}", new)?;
+                }
+                (None, None) => {}
+            }
         }
 
         if let Some(id) = &self.change_id {
@@ -224,6 +289,20 @@ impl fmt::Display for DylibChanges {
 /// The function attempts to modify the dylib rpath, dylib id and dylib dependencies
 /// in order to make it more easily relocatable.
 fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
+    // we can currently only deal with rpath changes internally if:
+    // - the new path is shorter than the old path
+    // - no removal or addition is performed
+    let can_deal_with_rpath = changes.change_rpath.iter().all(|(old, new)| {
+        old.is_some()
+            && new.is_some()
+            && old.as_ref().unwrap().to_string_lossy().len() >= new.as_ref().unwrap().to_string_lossy().len()
+    });
+
+    if !can_deal_with_rpath {
+        tracing::error!("builtin relink failed: cannot deal with rpath changes");
+        return Err(RelinkError::BuiltinRelinkFailed);
+    }
+
     tracing::info!("builtin relink for {:?}:\n{}", dylib_path, changes);
 
     let mut modified = false;
@@ -252,6 +331,9 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
                           old_path: &str|
      -> Result<(), RelinkError> {
         let new_path = new_path.to_string_lossy();
+        if new_path == old_path {
+            return Ok(());
+        }
         let new_path = new_path.as_bytes();
 
         if new_path.len() > old_path.len() {
@@ -270,6 +352,12 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         Ok(())
     };
 
+    let rpath_changes = changes
+        .change_rpath
+        .iter()
+        .map(|(old, new)| (old.as_ref().unwrap(), new.as_ref().unwrap()))
+        .collect::<HashMap<&PathBuf, &PathBuf>>();
+
     for cmd in object.load_commands.iter() {
         match cmd.command {
             goblin::mach::load_command::CommandVariant::Rpath(ref rpath) => {
@@ -277,7 +365,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
                 let old_path = data.pread::<&str>(offset).unwrap().to_string();
 
                 let path = PathBuf::from(&old_path);
-                if let Some(new_path) = changes.change_rpath.get(&path) {
+                if let Some(new_path) = rpath_changes.get(&path) {
                     overwrite_path(&mut data_mut, offset, new_path, &old_path)?;
                     modified = true;
                 }
@@ -334,9 +422,21 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
         cmd.arg("-change").arg(old).arg(new);
     }
 
-    for (old, new) in &changes.change_rpath {
-        cmd.arg("-delete_rpath").arg(old);
-        cmd.arg("-add_rpath").arg(new);
+    for change in &changes.change_rpath {
+        match change {
+            (Some(old), Some(new)) => {
+                cmd.arg("-delete_rpath").arg(old);
+                cmd.arg("-add_rpath").arg(new);
+            }
+            (Some(old), None) => {
+                cmd.arg("-delete_rpath").arg(old);
+            }
+            (None, Some(new)) => {
+                cmd.arg("-add_rpath").arg(new);
+            }
+            (None, None) => {}
+        }
+
     }
 
     cmd.arg(dylib_path);

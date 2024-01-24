@@ -30,8 +30,8 @@ pub struct SharedObject {
 /// Possible relinking error.
 #[derive(thiserror::Error, Debug)]
 pub enum RelinkError {
-    #[error("non-absolute or non-normalized base path")]
-    PathDiffFailed,
+    #[error("failed to get relative path from {from} to {to}")]
+    PathDiffFailed { from: PathBuf, to: PathBuf },
 
     #[error("failed to get parent directory")]
     NoParentDir,
@@ -124,11 +124,16 @@ impl SharedObject {
         for rpath in rpaths.iter().chain(runpaths.iter()) {
             if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
-                let relative_path = pathdiff::diff_paths(
-                    &new_rpath,
-                    self.path.parent().ok_or(RelinkError::NoParentDir)?,
-                )
-                .ok_or(RelinkError::PathDiffFailed)?;
+
+                let parent = new_rpath.parent().ok_or(RelinkError::NoParentDir)?;
+
+                let relative_path = pathdiff::diff_paths(&new_rpath, parent).ok_or(
+                    RelinkError::PathDiffFailed {
+                        from: new_rpath.clone(),
+                        to: parent.to_path_buf(),
+                    },
+                )?;
+
                 tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
                 final_rpath.push(PathBuf::from(format!(
                     "$ORIGIN/{}",
