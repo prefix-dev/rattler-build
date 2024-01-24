@@ -167,27 +167,29 @@ fn run_process_with_replacements(
     args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> miette::Result<()> {
+    let (reader, writer) = os_pipe::pipe().unwrap();
+    let writer_clone = writer.try_clone().unwrap();
+
     let mut child = Command::new(command)
         .current_dir(cwd)
         .args(args)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(writer)
+        .stderr(writer_clone)
         .spawn()
         .expect("Failed to execute command");
 
-    if let Some(ref mut stdout) = child.stdout {
-        let reader = BufReader::new(stdout);
+    let reader = BufReader::new(reader);
 
-        // Process the output line by line
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let filtered_line = replacements
-                    .iter()
-                    .fold(line, |acc, (from, to)| acc.replace(from, to));
-                tracing::info!("{}", filtered_line);
-            } else {
-                tracing::warn!("Error reading output: {:?}", line);
-            }
+    // Process the output line by line
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let filtered_line = replacements
+                .iter()
+                .fold(line, |acc, (from, to)| acc.replace(from, to));
+            tracing::info!("{}", filtered_line);
+        } else {
+            tracing::warn!("Error reading output: {:?}", line);
         }
     }
 
