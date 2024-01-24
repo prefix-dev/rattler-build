@@ -2,13 +2,13 @@
 # cdt in actual recipe code
 
 package:
-  name: async-cairo 
+  name: async-cairo
   version: dev
-    
+
 requirements:
   host:
     - if: linux
-      then: ${{ cdt("cairo") }} 
+      then: ${{ cdt("cairo") }}
   run:
     - if: cmp("python", "==3.3")
       then: asyncio

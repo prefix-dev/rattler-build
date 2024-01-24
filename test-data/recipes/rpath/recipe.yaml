@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  name: mssql-tools
+  version: '18.2.1.1'
+
+package:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  - url: https://packages.microsoft.com/rhel/7/prod/${{ name }}18-${{ version }}-1.x86_64.rpm
+    sha256: 98758f29f1b1aad13c5ce32a5cf1e849d35a97054d030ee5dccdab6aefd2aef9
+
+build:
+  number: 0
+  script:
+    - bsdtar xf mssql-tools18-${{ version }}-1.x86_64.rpm
+    - mkdir -p $PREFIX/bin
+    - cp opt/mssql-tools18/bin/* $PREFIX/bin
+
+requirements:
+  build:
+    - libarchive
+
+tests:
+  - package_contents:
+      bin:
+        - sqlcmd
+        - bcp
+  - script:
+      # both binaries come shipped from the source without rpath
+      # but rattler-build should add $ORIGIN/../lib to rpath
+      - patchelf --print-rpath $PREFIX/bin/bcp | grep -q \$ORIGIN/../lib
+      - patchelf --print-rpath $PREFIX/bin/sqlcmd | grep -q \$ORIGIN/../lib
+    requirements:
+      build:
+        - patchelf

@@ -95,7 +95,7 @@ impl SharedObject {
         rpath_allowlist: Option<&GlobSet>,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
-            tracing::debug!("{} is not dynamically linked", self.path.display());
+            tracing::info!("{} is not dynamically linked", self.path.display());
             return Ok(());
         }
 
