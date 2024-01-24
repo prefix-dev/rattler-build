@@ -16,7 +16,7 @@ documentation = "https://prefix-dev.github.io/rattler-build"
 [features]
 default = ['native-tls']
 native-tls = ['reqwest/native-tls', 'rattler/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'rattler/rustls-tls']
+rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls']
 
 [dependencies]
 serde = { version = "1.0.195", features = ["derive"] }
