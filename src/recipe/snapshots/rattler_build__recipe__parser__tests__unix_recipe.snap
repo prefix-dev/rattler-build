@@ -104,14 +104,8 @@ Recipe {
                 ),
             },
         ),
-        always_copy_files: GlobVec(
-            [],
-            None,
-        ),
-        always_include_files: GlobVec(
-            [],
-            None,
-        ),
+        always_copy_files: [],
+        always_include_files: [],
     },
     requirements: Requirements {
         build: [
