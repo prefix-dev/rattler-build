@@ -128,6 +128,7 @@ def check_info(folder: Path, expected: Path):
                 if "dist-info" not in p["_path"]:
                     assert c["sha256"] == p["sha256"]
                     assert c["size_in_bytes"] == p["size_in_bytes"]
+                assert c.get("no_link") is None
         else:
             if actual != cmp:
                 print(f"Expected {f} to be {cmp} but was {actual}")
@@ -314,3 +315,48 @@ def test_additional_entrypoints(
         assert (pkg / "Scripts/additional_entrypoints.exe").exists()
     else:
         assert (pkg / "bin/additional_entrypoints").exists()
+
+
+def test_always_copy_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "always-copy-files/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "always_copy_files")
+
+    assert (pkg / "info/paths.json").exists()
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "hello.txt"
+    assert paths["paths"][0]["no_link"] is True
+
+
+def test_always_include_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "always-include-files/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "force-include-base")
+
+    assert (pkg / "info/paths.json").exists()
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "hello.txt"
+    assert paths["paths"][0].get("no_link") is None
+    assert (pkg / "hello.txt").read_text() == "Hello, world!\n"
+
+    pkg_sanity = get_extracted_package(tmp_path, "force-include-sanity-check")
+    paths = json.loads((pkg_sanity / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 0
+
+    pkg_force = get_extracted_package(tmp_path, "force-include-forced")
+    paths = json.loads((pkg_force / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "hello.txt"
+    assert paths["paths"][0].get("no_link") is None
+    assert (pkg_force / "hello.txt").exists()
+    assert (pkg_force / "hello.txt").read_text() == "Force include new file\n"

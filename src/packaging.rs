@@ -935,7 +935,7 @@ pub fn package_conda(
         &tmp_files,
         tmp_dir_path,
         prefix,
-        output.recipe.build.always_copy(),
+        output.recipe.build.always_copy_files(),
     )?;
     paths_json.write_all(serde_json::to_string_pretty(&paths_json_struct)?.as_bytes())?;
     tmp_files.insert(info_folder.join("paths.json"));

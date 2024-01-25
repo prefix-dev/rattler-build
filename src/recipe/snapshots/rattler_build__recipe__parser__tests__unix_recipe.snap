@@ -104,7 +104,11 @@ Recipe {
                 ),
             },
         ),
-        always_copy: GlobVec(
+        always_copy_files: GlobVec(
+            [],
+            None,
+        ),
+        always_include_files: GlobVec(
             [],
             None,
         ),

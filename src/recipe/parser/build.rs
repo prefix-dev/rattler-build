@@ -51,8 +51,10 @@ pub struct Build {
     pub(super) dynamic_linking: Option<DynamicLinking>,
     /// Setting to control wether to always copy a file
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) always_copy: GlobVec,
-    // TODO: Add and parse the rest of the fields
+    pub(super) always_copy_files: GlobVec,
+    /// Setting to control wether to always include a file (even if it is already present in the host env)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_include_files: GlobVec,
 }
 
 impl Build {
@@ -96,8 +98,12 @@ impl Build {
         self.skip()
     }
 
-    pub fn always_copy(&self) -> Option<&GlobSet> {
-        self.always_copy.globset()
+    pub fn always_copy_files(&self) -> Option<&GlobSet> {
+        self.always_copy_files.globset()
+    }
+
+    pub fn always_include_files(&self) -> Option<&GlobSet> {
+        self.always_include_files.globset()
     }
 }
 
@@ -138,7 +144,10 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                         build.dynamic_linking = value.try_convert(key_str)?;
                     }
                     "always_copy_files" => {
-                        build.always_copy = value.try_convert(key_str)?;
+                        build.always_copy_files = value.try_convert(key_str)?;
+                    }
+                    "always_include_files" => {
+                        build.always_include_files = value.try_convert(key_str)?;
                     }
                     invalid => {
                         return Err(vec![_partialerror!(
