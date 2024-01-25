@@ -899,19 +899,16 @@ pub fn package_conda(
 
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let relocation_config = dynamic_linking
-        .clone()
         .and_then(|v| v.binary_relocation())
         .unwrap_or_default();
+
     if output.build_configuration.target_platform != Platform::NoArch
         && !relocation_config.no_relocation()
     {
-        let rpath_allowlist = dynamic_linking
-            .as_ref()
-            .map(|dl| dl.rpath_allowlist())
-            .flatten();
+        let rpath_allowlist = dynamic_linking.and_then(|dl| dl.rpath_allowlist());
         let mut binaries = tmp_files.clone();
-        if let Some(paths) = relocation_config.relocate_paths()? {
-            binaries.retain(|v| paths.iter().any(|glob| glob.is_match(v)));
+        if let Some(globs) = relocation_config.relocate_paths() {
+            binaries.retain(|v| globs.is_match(v));
         }
 
         post::relink(
@@ -919,7 +916,7 @@ pub fn package_conda(
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
-            &dynamic_linking.clone().unwrap_or_default().rpaths(),
+            &dynamic_linking.map(|dl| dl.rpaths()).unwrap_or_default(),
             rpath_allowlist,
         )?;
     }

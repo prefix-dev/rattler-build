@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use globset::{Glob, GlobMatcher, GlobSet};
+use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
@@ -89,8 +89,8 @@ impl Build {
     }
 
     /// Settings for shared libraries and executables
-    pub const fn dynamic_linking(&self) -> &Option<DynamicLinking> {
-        &self.dynamic_linking
+    pub const fn dynamic_linking(&self) -> Option<&DynamicLinking> {
+        self.dynamic_linking.as_ref()
     }
 
     /// Check if the build should be skipped.
@@ -243,7 +243,7 @@ pub enum BinaryRelocation {
     /// Relocate all binaries.
     All(bool),
     /// Relocate specific paths.
-    SpecificPaths(Vec<String>),
+    SpecificPaths(GlobVec),
 }
 
 impl Default for BinaryRelocation {
@@ -254,17 +254,10 @@ impl Default for BinaryRelocation {
 
 impl BinaryRelocation {
     /// Return the paths to relocate.
-    pub fn relocate_paths(&self) -> Result<Option<Vec<GlobMatcher>>, globset::Error> {
+    pub fn relocate_paths(&self) -> Option<&GlobSet> {
         match self {
-            BinaryRelocation::All(_) => Ok(None),
-            BinaryRelocation::SpecificPaths(paths) => {
-                let mut matchers = Vec::new();
-                for glob in paths {
-                    let glob = Glob::new(glob)?.compile_matcher();
-                    matchers.push(glob);
-                }
-                Ok(Some(matchers))
-            }
+            BinaryRelocation::All(_) => None,
+            BinaryRelocation::SpecificPaths(paths) => paths.globset(),
         }
     }
 
@@ -291,11 +284,8 @@ impl TryConvertNode<BinaryRelocation> for RenderedNode {
 
 impl TryConvertNode<BinaryRelocation> for RenderedSequenceNode {
     fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
-        let mut paths = Vec::with_capacity(self.len());
-        for item in self.iter() {
-            paths.push(item.try_convert(name)?)
-        }
-        Ok(BinaryRelocation::SpecificPaths(paths))
+        let globvec: GlobVec = self.try_convert(name)?;
+        Ok(BinaryRelocation::SpecificPaths(globvec))
     }
 }
 

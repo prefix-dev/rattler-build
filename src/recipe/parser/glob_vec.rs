@@ -1,4 +1,4 @@
-use std::fmt::{self, Formatter, Debug};
+use std::fmt::{self, Debug, Formatter};
 
 use globset::{Glob, GlobSet};
 
@@ -12,6 +12,14 @@ use crate::recipe::error::{ErrorKind, PartialParsingError};
 #[derive(Default, Clone)]
 pub struct GlobVec(Vec<Glob>, Option<GlobSet>);
 
+impl PartialEq for GlobVec {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for GlobVec {}
+
 impl Serialize for GlobVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
@@ -24,7 +32,9 @@ impl Serialize for GlobVec {
 
 impl Debug for GlobVec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_list().entries(self.0.iter().map(|glob| glob.glob())).finish()
+        f.debug_list()
+            .entries(self.0.iter().map(|glob| glob.glob()))
+            .finish()
     }
 }
 
