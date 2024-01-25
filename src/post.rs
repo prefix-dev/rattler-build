@@ -58,7 +58,7 @@ pub fn relink(
     for p in paths {
         let metadata = fs::symlink_metadata(p)?;
         if metadata.is_symlink() || metadata.is_dir() {
-            tracing::info!("Relink skipping symlink or directory: {}", p.display());
+            tracing::debug!("Relink skipping symlink or directory: {}", p.display());
             continue;
         }
 

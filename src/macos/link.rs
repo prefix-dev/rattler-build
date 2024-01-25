@@ -139,7 +139,8 @@ impl Dylib {
             if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
-                let parent = new_rpath.parent().ok_or(RelinkError::NoParentDir)?;
+                let parent = self.path.parent().ok_or(RelinkError::NoParentDir)?;
+
                 let relative_path = pathdiff::diff_paths(&new_rpath, parent).ok_or(
                     RelinkError::PathDiffFailed {
                         from: new_rpath.clone(),
@@ -222,7 +223,7 @@ impl Dylib {
 }
 
 fn codesign(path: &Path) -> Result<(), std::io::Error> {
-    tracing::info!("codesigning {:?}", path);
+    tracing::info!("codesigning {:?}", path.file_name().unwrap_or_default());
     Command::new("codesign")
         .arg("-f")
         .arg("-s")
@@ -250,14 +251,18 @@ struct DylibChanges {
 impl fmt::Display for DylibChanges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
         fn strip_placeholder_prefix(path: &Path) -> PathBuf {
-            path.components()
-                .skip_while(|c| {
-                    c.as_os_str()
-                        .to_string_lossy()
-                        .starts_with("host_env_placehold_placehold")
-                })
-                .skip(1)
-                .collect::<PathBuf>()
+            let placeholder_index = path.components().position(|c| {
+                c.as_os_str()
+                    .to_string_lossy()
+                    .starts_with("host_env_placehold_placehold")
+            });
+            if let Some(idx) = placeholder_index {
+                let mut pb = PathBuf::from("$PLACEHOLDER_PREFIX");
+                pb.extend(path.components().skip(idx + 1));
+                pb
+            } else {
+                path.to_path_buf()
+            }
         }
 
         for change in &self.change_rpath {
@@ -311,7 +316,11 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         return Err(RelinkError::BuiltinRelinkFailed);
     }
 
-    tracing::info!("builtin relink for {:?}:\n{}", dylib_path, changes);
+    tracing::info!(
+        "builtin relink for {:?}:\n{}",
+        dylib_path.file_name().unwrap_or_default(),
+        changes
+    );
 
     let mut modified = false;
 
