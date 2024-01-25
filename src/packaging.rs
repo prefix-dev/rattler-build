@@ -924,7 +924,23 @@ pub fn package_conda(
             &rpath_allowlist,
         )?;
 
-        post_process::linking_checks(output, &binaries)?;
+        let missing_dso_allowlist = match dynamic_linking {
+            Some(v) => v.missing_dso_allowlist()?,
+            None => Vec::new(),
+        };
+        post_process::linking_checks(
+            output,
+            &binaries,
+            &missing_dso_allowlist,
+            dynamic_linking
+                .as_ref()
+                .map(|v| v.error_on_overlinking())
+                .unwrap_or(true),
+            dynamic_linking
+                .as_ref()
+                .map(|v| v.error_on_overdepending())
+                .unwrap_or(true),
+        )?;
     }
 
     post_process::python::python(output.name(), output.version(), &tmp_files)?;

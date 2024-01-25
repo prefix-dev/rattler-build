@@ -94,14 +94,17 @@ Recipe {
         dynamic_linking: Some(
             DynamicLinking {
                 rpaths: [],
-                rpath_allowlist: [
-                    "/usr/lib/**",
-                ],
                 binary_relocation: Some(
                     All(
                         true,
                     ),
                 ),
+                missing_dso_allowlist: [],
+                rpath_allowlist: [
+                    "/usr/lib/**",
+                ],
+                overdepending_behavior: Error,
+                overlinking_behavior: Error,
             },
         ),
     },

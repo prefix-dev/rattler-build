@@ -6,6 +6,7 @@ use std::{
 use crate::{
     linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
 };
+use globset::GlobMatcher;
 use rattler_conda_types::PrefixRecord;
 
 use crate::metadata::Output;
@@ -24,11 +25,20 @@ pub enum LinkingCheckError {
 
     #[error("macOS relink error: {0}")]
     MacOSRelink(#[from] crate::macos::link::RelinkError),
+
+    #[error("Underlinking against: {package_name}")]
+    Underlinking { package_name: String },
+
+    #[error("Overlinking against: {packages}")]
+    Overlinking { packages: String },
 }
 
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
+    missing_dso_allowlist: &[GlobMatcher],
+    error_on_overlinking: bool,
+    error_on_underlinking: bool,
 ) -> Result<(), LinkingCheckError> {
     // collect all json files in prefix / conda-meta
     let conda_meta = output
@@ -114,6 +124,8 @@ pub fn linking_checks(
         // dependencies then it is "underlinking".
         if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
             run_dependencies.remove(package_pos);
+        } else if error_on_underlinking {
+            return Err(LinkingCheckError::Underlinking { package_name });
         } else {
             tracing::warn!("Underlinking against {}", package_name)
         }
@@ -121,7 +133,13 @@ pub fn linking_checks(
 
     // If there are any unused run dependencies then it is "overlinking".
     if !run_dependencies.is_empty() {
-        tracing::warn!("Overlinking against {}", run_dependencies.join(","))
+        if error_on_overlinking {
+            return Err(LinkingCheckError::Overlinking {
+                packages: run_dependencies.join(","),
+            });
+        } else {
+            tracing::warn!("Overlinking against {}", run_dependencies.join(","));
+        }
     }
 
     Ok(())
