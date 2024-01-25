@@ -1,5 +1,5 @@
 //! Relink a dylib to use relative paths for rpaths
-use globset::GlobMatcher;
+use globset::GlobSet;
 use goblin::mach::Mach;
 use memmap2::MmapMut;
 use scroll::Pread;
@@ -119,19 +119,19 @@ impl Dylib {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: &[GlobMatcher],
+        rpath_allowlist: Option<&GlobSet>,
     ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
         let mut modified = false;
 
         let mut rpaths = self.rpaths.clone();
 
-        rpaths.extend(
-            custom_rpaths
-                .iter()
-                .map(|v| encoded_prefix.join(v))
-                .collect::<Vec<PathBuf>>(),
-        );
+        for rpath in custom_rpaths.iter().rev() {
+            let rpath = encoded_prefix.join(rpath);
+            if !rpaths.contains(&rpath) {
+                rpaths.insert(0, rpath);
+            }
+        }
 
         let mut final_rpaths = Vec::new();
 
@@ -153,7 +153,7 @@ impl Dylib {
                 final_rpaths.push(new_rpath.clone());
                 // changes.change_rpath.insert(rpath.clone(), new_rpath);
                 // modified = true;
-            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+            } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
                 tracing::info!("Allowlisted rpath: {}", rpath.display());
                 final_rpaths.push(rpath.clone());
             } else {
@@ -172,7 +172,7 @@ impl Dylib {
                 for old in self.rpaths.iter().skip(final_rpaths.len()) {
                     changes.change_rpath.push((Some(old.clone()), None));
                 }
-            } else if self.rpaths.len() < final_rpaths.len() {
+            } else {
                 for new in final_rpaths.iter().skip(self.rpaths.len()) {
                     changes.change_rpath.push((None, Some(new.clone())));
                 }
@@ -249,19 +249,26 @@ struct DylibChanges {
 
 impl fmt::Display for DylibChanges {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> std::fmt::Result {
-
         fn strip_placeholder_prefix(path: &Path) -> PathBuf {
             path.components()
-                .skip_while(|c| c.as_os_str().to_string_lossy().starts_with("host_env_placehold_placehold"))
+                .skip_while(|c| {
+                    c.as_os_str()
+                        .to_string_lossy()
+                        .starts_with("host_env_placehold_placehold")
+                })
                 .skip(1)
                 .collect::<PathBuf>()
         }
 
-
         for change in &self.change_rpath {
             match change {
                 (Some(old), Some(new)) => {
-                    writeln!(f, " - change rpath from {:?} to {:?}", strip_placeholder_prefix(old), new)?;
+                    writeln!(
+                        f,
+                        " - change rpath from {:?} to {:?}",
+                        strip_placeholder_prefix(old),
+                        new
+                    )?;
                 }
                 (Some(old), None) => {
                     writeln!(f, " - delete rpath {:?}", strip_placeholder_prefix(old))?;
@@ -295,7 +302,8 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     let can_deal_with_rpath = changes.change_rpath.iter().all(|(old, new)| {
         old.is_some()
             && new.is_some()
-            && old.as_ref().unwrap().to_string_lossy().len() >= new.as_ref().unwrap().to_string_lossy().len()
+            && old.as_ref().unwrap().to_string_lossy().len()
+                >= new.as_ref().unwrap().to_string_lossy().len()
     });
 
     if !can_deal_with_rpath {
@@ -436,7 +444,6 @@ fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), Re
             }
             (None, None) => {}
         }
-
     }
 
     cmd.arg(dylib_path);
@@ -467,7 +474,7 @@ mod tests {
 
     use crate::macos::link::{Dylib, DylibChanges};
 
-    use super::RelinkError;
+    use super::{install_name_tool, RelinkError};
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
@@ -482,9 +489,10 @@ mod tests {
         assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
 
         let changes = DylibChanges {
-            change_rpath: vec![(expected_rpath.clone(), PathBuf::from("@loader_path/../lib"))]
-                .into_iter()
-                .collect(),
+            change_rpath: vec![(
+                Some(expected_rpath.clone()),
+                Some(PathBuf::from("@loader_path/../lib")),
+            )],
             change_id: None,
             change_dylib: HashMap::default(),
         };
@@ -493,6 +501,51 @@ mod tests {
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_relink_add_path() -> Result<(), RelinkError> {
+        // check if install_name_tool is installed
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink-force-rpath");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path).unwrap();
+
+        let delete_paths = object
+            .rpaths
+            .iter()
+            .map(|p| (Some(p.clone()), None))
+            .collect();
+        let changes = DylibChanges {
+            change_rpath: delete_paths,
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+        install_name_tool(&binary_path, &changes)?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert!(object.rpaths.is_empty());
+
+        let expected_rpath = PathBuf::from("/Users/blabla/myrpath");
+        let changes = DylibChanges {
+            change_rpath: vec![(None, Some(expected_rpath.clone()))],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        install_name_tool(&binary_path, &changes)?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(vec![expected_rpath], object.rpaths);
 
         Ok(())
     }
