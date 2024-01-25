@@ -1,9 +1,10 @@
 #[cfg(test)]
 mod tests {
+    use duct::cmd;
     use rattler_package_streaming::read::extract_tar_bz2;
     use std::{
         collections::HashMap,
-        ffi::OsStr,
+        ffi::{OsStr, OsString},
         fs::File,
         path::{Component, Path, PathBuf},
         process::{Command, Output},
@@ -24,22 +25,13 @@ mod tests {
                 .exists()
                 .then(|| Self::WithBinary(path.as_ref().display().to_string()))
         }
-        fn _get_command(&self) -> Command {
-            match self {
-                RattlerBuild::WithCargo(path) => {
-                    let mut c = Command::new("cargo");
-                    c.current_dir(path);
-                    c
-                }
-                RattlerBuild::WithBinary(binary) => Command::new(binary),
-            }
-        }
+
         fn build<K: AsRef<Path>, T: AsRef<Path>, N: AsRef<Path>>(
             &self,
             recipe: K,
             output_dir: T,
             variant_config: Option<N>,
-        ) -> std::io::Result<Output> {
+        ) -> Output {
             let rs = recipe.as_ref().display().to_string();
             let od = output_dir.as_ref().display().to_string();
             let iter = [
@@ -58,27 +50,47 @@ mod tests {
                 self.with_args(iter)
             }
         }
-        fn with_args(
-            &self,
-            args: impl IntoIterator<Item = impl AsRef<OsStr>>,
-        ) -> std::io::Result<Output> {
-            let mut command = self._get_command();
-            if matches!(self, RattlerBuild::WithCargo(_)) {
-                // cargo runs with quite (-q) to ensure we don't mix any additional output from our side
-                command.args(["run", "--release", "-q", "-p", "rattler-build", "--"]);
+        fn with_args(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Output {
+            let (command, dir, cmd_args) = match self {
+                RattlerBuild::WithCargo(path) => (
+                    "cargo",
+                    Some(path),
+                    vec!["run", "--release", "-q", "-p", "rattler-build", "--"],
+                ),
+                RattlerBuild::WithBinary(binary) => (binary.as_str(), None, vec![]),
             };
-            command.args(args);
-            // this makes it easy to debug issues, consider using --nocapture to get output with test
-            // command
-            //     .stderr(std::process::Stdio::inherit())
-            //     .stdout(std::process::Stdio::inherit());
-            // use itertools::Itertools;
-            // println!(
-            //     "{} {}",
-            //     command.get_program().to_string_lossy(),
-            //     command.get_args().map(|s| s.to_string_lossy()).join(" ")
-            // );
-            command.output()
+
+            let mut args_vec: Vec<OsString> = cmd_args.into_iter().map(OsString::from).collect();
+
+            args_vec.extend(args.into_iter().map(|s| s.as_ref().to_os_string()));
+
+            let mut expression = cmd(command, &args_vec).stderr_to_stdout().stdout_capture();
+
+            if let Some(dir) = dir {
+                expression = expression.dir(dir);
+            }
+
+            let output = expression
+                .unchecked()
+                .run()
+                .expect("failed to execute rattler-build");
+
+            let stdout = String::from_utf8(output.stdout.clone())
+                .expect("Failed to convert output to UTF-8");
+
+            println!(
+                "Running: {} {}",
+                command,
+                args_vec
+                    .iter()
+                    .map(|s| s.to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            );
+
+            println!("{}", stdout);
+
+            output
         }
     }
 
@@ -170,8 +182,11 @@ mod tests {
 
     #[test]
     fn test_help() {
-        let help_test = rattler().with_args(["help"]).map(|out| out.stdout).unwrap();
+        let help_test = rattler().with_args(["help"]);
 
+        assert!(help_test.status.success());
+
+        let help_test = help_test.stdout;
         let help_text = help_test.split(|c| *c == b'\n').collect::<Vec<_>>();
 
         #[cfg(target_family = "unix")]
@@ -182,10 +197,11 @@ mod tests {
 
     #[test]
     fn test_no_cmd() {
-        let help_text = rattler()
-            .with_args(Vec::<&str>::new())
-            .map(|out| out.stdout)
-            .unwrap();
+        let help_text = rattler().with_args(Vec::<&str>::new());
+
+        assert!(help_text.status.success());
+
+        let help_text = help_text.stdout;
         let lines = help_text.split(|c| *c == b'\n').collect::<Vec<_>>();
         assert!(lines[0].starts_with(b"Usage: rattler-build [OPTIONS]"));
     }
@@ -197,7 +213,7 @@ mod tests {
         let rattler_build =
             rattler().build::<_, _, &str>(recipes.join("run_exports_from"), tmp.as_dir(), None);
         // ensure rattler build succeeded
-        assert!(rattler_build.is_ok());
+        assert!(rattler_build.status.success());
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
         assert!(pkg.join("info/run_exports.json").exists());
         let actual_run_export: HashMap<String, Vec<String>> =
@@ -220,7 +236,7 @@ mod tests {
         let rattler_build =
             rattler().build::<_, _, &str>(recipes.join("run_exports"), tmp.as_dir(), None);
         // ensure rattler build succeeded
-        assert!(rattler_build.is_ok());
+        assert!(rattler_build.status.success());
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
         assert!(pkg.join("info/run_exports.json").exists());
         let actual_run_export: HashMap<String, Vec<String>> =
@@ -277,7 +293,9 @@ mod tests {
         let tmp = tmp("test_pkg_hash");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("pkg_hash"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
+
+        assert!(rattler_build.status.success());
+
         let pkg = get_package(tmp.as_dir(), "pkg_hash".to_string());
         // yes this was broken because in rust default formatting for map does include that one space in the middle!
         let expected_hash = variant_hash(format!("{{\"target_platform\": \"{}\"}}", host_subdir()));
@@ -291,7 +309,9 @@ mod tests {
         let tmp = tmp("test_license_glob");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("globtest"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
+
+        assert!(rattler_build.status.success());
+
         let pkg = get_extracted_package(tmp.as_dir(), "globtest");
         assert!(pkg.join("info/licenses/LICENSE").exists());
         assert!(pkg.join("info/licenses/cmake/FindTBB.cmake").exists());
@@ -355,7 +375,9 @@ mod tests {
         let tmp = tmp("test_python_noarch");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("toml"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
+
+        assert!(rattler_build.status.success());
+
         let pkg = get_extracted_package(tmp.as_dir(), "toml");
         assert!(pkg.join("info/licenses/LICENSE").exists());
         let installer = pkg.join("site-packages/toml-0.10.2.dist-info/INSTALLER");
@@ -369,7 +391,9 @@ mod tests {
         let tmp = tmp("test_git_source");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("llamacpp"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
+
+        assert!(rattler_build.status.success());
+
         let pkg = get_extracted_package(tmp.as_dir(), "llama.cpp");
         // this is to ensure that the clone happens correctly
         let license = pkg.join("info/licenses/LICENSE");
@@ -386,31 +410,33 @@ mod tests {
         //     tmp.as_dir(),
         //     None,
         // );
-        // assert!(rattler_build.is_ok());
-        // assert!(rattler_build.unwrap().status.success());
+        //
+
+        // assert!(rattler_build.status.success());
 
         // let rattler_build = rattler().build( recipes().join("package-content-tests/llama-recipe.yaml"),
         //     tmp.as_dir(),
         //     Some(recipes().join("package-content-tests/variant-config.yaml")),
         // );
-        // assert!(rattler_build.is_ok());
-        // assert!(rattler_build.unwrap().status.success());
+        //
+
+        // assert!(rattler_build.status.success());
 
         let rattler_build = rattler().build::<_, _, &str>(
             recipes().join("package-content-tests/recipe-test-succeed.yaml"),
             tmp.as_dir(),
             None,
         );
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
 
         let rattler_build = rattler().build::<_, _, &str>(
             recipes().join("package-content-tests/recipe-test-fail.yaml"),
             tmp.as_dir(),
             None,
         );
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.code().unwrap() == 1);
+
+        assert!(rattler_build.status.code() == Some(1));
     }
 
     #[test]
@@ -421,16 +447,16 @@ mod tests {
             tmp.as_dir(),
             None,
         );
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
 
         let rattler_build = rattler().build::<_, _, &str>(
             recipes().join("test-execution/recipe-test-fail.yaml"),
             tmp.as_dir(),
             None,
         );
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.code().unwrap() == 1);
+
+        assert!(rattler_build.status.code().unwrap() == 1);
     }
 
     #[test]
@@ -438,8 +464,8 @@ mod tests {
         let tmp = tmp("test_noarch_flask");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("flask"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
 
         let pkg = get_extracted_package(tmp.as_dir(), "flask");
         // this is to ensure that the clone happens correctly
@@ -467,8 +493,8 @@ mod tests {
         let tmp = tmp("test-sources");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("test-sources"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
     }
 
     #[test]
@@ -476,8 +502,8 @@ mod tests {
         let tmp = tmp("test_tar_source");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("tar-source"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
     }
 
     #[test]
@@ -485,8 +511,8 @@ mod tests {
         let tmp = tmp("test_zip_source");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("zip-source"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+
+        assert!(rattler_build.status.success());
     }
 
     #[test]
@@ -499,28 +525,25 @@ mod tests {
             Some(variant),
         );
 
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+        assert!(rattler_build.status.success());
 
         // try to upload the package using the rattler upload command
         let pkg_path = get_package(tmp.as_dir(), "polarify".to_string());
-        let rattler_upload = rattler()
-            .with_args([
-                "upload",
-                "-vvv",
-                "conda-forge",
-                "--feedstock",
-                "polarify",
-                "--feedstock-token",
-                "fake-feedstock-token",
-                "--staging-token",
-                "fake-staging-token",
-                "--dry-run",
-                pkg_path.to_str().unwrap(),
-            ])
-            .expect("failed to run rattler upload");
+        let rattler_upload = rattler().with_args([
+            "upload",
+            "-vvv",
+            "conda-forge",
+            "--feedstock",
+            "polarify",
+            "--feedstock-token",
+            "fake-feedstock-token",
+            "--staging-token",
+            "fake-staging-token",
+            "--dry-run",
+            pkg_path.to_str().unwrap(),
+        ]);
 
-        let output = String::from_utf8(rattler_upload.stderr).unwrap();
+        let output = String::from_utf8(rattler_upload.stdout).unwrap();
         assert!(rattler_upload.status.success());
         assert!(output.contains("Done uploading packages to conda-forge"));
     }
@@ -530,7 +553,6 @@ mod tests {
         let tmp = tmp("correct-sha");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("correct-sha"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-        assert!(rattler_build.unwrap().status.success());
+        assert!(rattler_build.status.success());
     }
 }
