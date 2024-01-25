@@ -124,10 +124,15 @@ pub fn linking_checks(
         // dependencies then it is "underlinking".
         if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
             run_dependencies.remove(package_pos);
+        } else if missing_dso_allowlist
+            .iter()
+            .any(|v| v.is_match(&package_name))
+        {
+            tracing::warn!("{package_name} found in allow list, skipping");
         } else if error_on_underlinking {
             return Err(LinkingCheckError::Underlinking { package_name });
         } else {
-            tracing::warn!("Underlinking against {}", package_name)
+            tracing::warn!("Underlinking against {package_name}");
         }
     }
 
