@@ -77,7 +77,9 @@ jobs:
       - name: Extract version
         shell: bash
         id: metadata
-        run: |
+        run: | # also call this step outside of $(...) to make sure the status code is propagated
+          ${{ startsWith(matrix.os, 'windows') && 'choco install yq' || '' }}
+          yq '.package.version' Cargo.toml
           echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
 
       - name: Assert version in release
@@ -193,3 +195,13 @@ jobs:
             ${{ steps.package.outputs.pkg-path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create issue on failure
+        if: startsWith(github.ref, 'refs/tags/v') && failure()
+        uses: dacbd/create-issue-action@ba4d1c45cccf9c483f2720cefb40e437f0ee6f7d
+        with:
+          token: ${{ github.token }}
+          title: GitHub release failed
+          body: |
+            Creating a release failed. Please check the logs for more information.
+            [Failed Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
