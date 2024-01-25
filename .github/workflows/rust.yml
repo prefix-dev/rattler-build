@@ -74,11 +74,14 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
+      - name: Install yq
+        if: startsWith(matrix.os, 'windows')
+        run: choco install yq
+
       - name: Extract version
         shell: bash
         id: metadata
         run: | # also call this step outside of $(...) to make sure the status code is propagated
-          ${{ startsWith(matrix.os, 'windows') && 'winget install -e --id MikeFarah.yq' || '' }}
           yq '.package.version' Cargo.toml
           echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
 
