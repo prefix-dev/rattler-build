@@ -167,27 +167,29 @@ fn run_process_with_replacements(
     args: &[OsString],
     replacements: &[(&str, &str)],
 ) -> miette::Result<()> {
+    let (reader, writer) = os_pipe::pipe().expect("Could not get pipe");
+    let writer_clone = writer.try_clone().expect("Could not clone writer pipe");
+
     let mut child = Command::new(command)
         .current_dir(cwd)
         .args(args)
         .stdin(Stdio::null())
-        .stdout(Stdio::piped())
+        .stdout(writer)
+        .stderr(writer_clone)
         .spawn()
         .expect("Failed to execute command");
 
-    if let Some(ref mut stdout) = child.stdout {
-        let reader = BufReader::new(stdout);
+    let reader = BufReader::new(reader);
 
-        // Process the output line by line
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                let filtered_line = replacements
-                    .iter()
-                    .fold(line, |acc, (from, to)| acc.replace(from, to));
-                tracing::info!("{}", filtered_line);
-            } else {
-                tracing::warn!("Error reading output: {:?}", line);
-            }
+    // Process the output line by line
+    for line in reader.lines() {
+        if let Ok(line) = line {
+            let filtered_line = replacements
+                .iter()
+                .fold(line, |acc, (from, to)| acc.replace(from, to));
+            tracing::info!("{}", filtered_line);
+        } else {
+            tracing::warn!("Error reading output: {:?}", line);
         }
     }
 
@@ -306,10 +308,22 @@ pub async fn run_build(
 
     let files_after = record_files(&directories.host_prefix).expect("Could not record files");
 
-    let difference = files_after
+    let mut difference = files_after
         .difference(&files_before)
         .cloned()
         .collect::<HashSet<_>>();
+
+    if let Some(always_include_files) = output.recipe.build().always_include_files() {
+        for file in files_after {
+            let file_without_prefix = file
+                .strip_prefix(&directories.host_prefix)
+                .into_diagnostic()?;
+            if always_include_files.is_match(file_without_prefix) {
+                tracing::info!("Forcing inclusion of file: {:?}", file);
+                difference.insert(file.clone());
+            }
+        }
+    }
 
     let (result, paths_json) = package_conda(
         &output,

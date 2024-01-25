@@ -6,7 +6,7 @@ use std::{
 use crate::{
     linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
 };
-use globset::GlobMatcher;
+use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
 
 use crate::metadata::Output;
@@ -36,7 +36,7 @@ pub enum LinkingCheckError {
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
-    missing_dso_allowlist: &[GlobMatcher],
+    missing_dso_allowlist: Option<&GlobSet>,
     error_on_overlinking: bool,
     error_on_underlinking: bool,
 ) -> Result<(), LinkingCheckError> {
@@ -125,8 +125,8 @@ pub fn linking_checks(
         if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
             run_dependencies.remove(package_pos);
         } else if missing_dso_allowlist
-            .iter()
-            .any(|v| v.is_match(&package_name))
+            .map(|v| v.is_match(&package_name))
+            .unwrap_or(false)
         {
             tracing::warn!(
                 "{package_name} is missing in run dependencies, \

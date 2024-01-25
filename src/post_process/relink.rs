@@ -6,7 +6,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use globset::GlobMatcher;
+use globset::GlobSet;
 use rattler_conda_types::Platform;
 
 use crate::{linux::link::SharedObject, macos::link::Dylib};
@@ -47,7 +47,7 @@ pub fn relink(
     encoded_prefix: &Path,
     target_platform: &Platform,
     rpaths: &[String],
-    rpath_allowlist: &[GlobMatcher],
+    rpath_allowlist: Option<&GlobSet>,
 ) -> Result<(), RelinkError> {
     for p in paths {
         let metadata = fs::symlink_metadata(p)?;

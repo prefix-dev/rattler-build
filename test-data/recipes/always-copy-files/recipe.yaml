@@ -1,0 +1,14 @@
+package:
+  name: always_copy_files
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "Hello, world!" > $PREFIX/hello.txt
+      else:
+        - echo "Hello, world!" > %PREFIX%\hello.txt
+
+  always_copy_files:
+    - hello.txt

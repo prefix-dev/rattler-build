@@ -107,6 +107,8 @@ Recipe {
                 overlinking_behavior: Error,
             },
         ),
+        always_copy_files: [],
+        always_include_files: [],
     },
     requirements: Requirements {
         build: [

@@ -11,3 +11,4 @@ itertools = "0.12.0"
 rattler_package_streaming = { version = "0.16.2", default-features = false }
 serde_json = "1.0.111"
 sha1 = "0.10.6"
+duct = "0.13.7"

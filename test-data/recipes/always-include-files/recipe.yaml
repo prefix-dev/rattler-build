@@ -1,0 +1,42 @@
+recipe:
+  version: 0.1.0
+
+outputs:
+  - package:
+      name: force-include-base
+    build:
+      script:
+        - if: unix
+          then:
+            - echo "Hello, world!" > $PREFIX/hello.txt
+          else:
+            - echo "Hello, world!" > %PREFIX%\hello.txt
+
+  - package:
+      name: force-include-sanity-check
+    requirements:
+      host:
+        - force-include-base
+    build:
+      script:
+        - if: unix
+          then:
+            - echo "Force include sanity check" > $PREFIX/hello.txt
+          else:
+            - echo "Force include sanity check" > %PREFIX%\hello.txt
+
+  - package:
+      name: force-include-forced
+    requirements:
+      host:
+        - force-include-base
+    build:
+      script:
+        - if: unix
+          then:
+            - echo "Force include new file" > $PREFIX/hello.txt
+          else:
+            - echo "Force include new file" > %PREFIX%\hello.txt
+
+      always_include_files:
+        - hello.txt

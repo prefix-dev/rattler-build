@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use globset::{Glob, GlobMatcher};
+use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
+use super::glob_vec::GlobVec;
 use super::{Dependency, FlattenErrors};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
@@ -48,7 +49,12 @@ pub struct Build {
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) dynamic_linking: Option<DynamicLinking>,
-    // TODO: Add and parse the rest of the fields
+    /// Setting to control wether to always copy a file
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_copy_files: GlobVec,
+    /// Setting to control wether to always include a file (even if it is already present in the host env)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_include_files: GlobVec,
 }
 
 impl Build {
@@ -83,13 +89,21 @@ impl Build {
     }
 
     /// Settings for shared libraries and executables
-    pub const fn dynamic_linking(&self) -> &Option<DynamicLinking> {
-        &self.dynamic_linking
+    pub const fn dynamic_linking(&self) -> Option<&DynamicLinking> {
+        self.dynamic_linking.as_ref()
     }
 
     /// Check if the build should be skipped.
     pub fn is_skip_build(&self) -> bool {
         self.skip()
+    }
+
+    pub fn always_copy_files(&self) -> Option<&GlobSet> {
+        self.always_copy_files.globset()
+    }
+
+    pub fn always_include_files(&self) -> Option<&GlobSet> {
+        self.always_include_files.globset()
     }
 }
 
@@ -129,6 +143,12 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     "dynamic_linking" => {
                         build.dynamic_linking = value.try_convert(key_str)?;
                     }
+                    "always_copy_files" => {
+                        build.always_copy_files = value.try_convert(key_str)?;
+                    }
+                    "always_include_files" => {
+                        build.always_include_files = value.try_convert(key_str)?;
+                    }
                     invalid => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -154,11 +174,11 @@ pub struct DynamicLinking {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) binary_relocation: Option<BinaryRelocation>,
     /// Allow linking against libraries that are not in the run requirements
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) missing_dso_allowlist: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) missing_dso_allowlist: GlobVec,
     /// Allow runpath / rpath to point to these locations outside of the environment.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) rpath_allowlist: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) rpath_allowlist: GlobVec,
     /// What to do when detecting overdepending.
     #[serde(default)]
     pub(super) overdepending_behavior: LinkingCheckBehavior,
@@ -183,23 +203,13 @@ impl DynamicLinking {
     }
 
     /// Get the missing DSO allowlist.
-    pub fn missing_dso_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
-        let mut matchers = Vec::new();
-        for glob in self.missing_dso_allowlist.iter() {
-            let glob = Glob::new(glob)?.compile_matcher();
-            matchers.push(glob);
-        }
-        Ok(matchers)
+    pub fn missing_dso_allowlist(&self) -> Option<&GlobSet> {
+        self.missing_dso_allowlist.globset()
     }
 
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
-        let mut matchers = Vec::new();
-        for glob in self.rpath_allowlist.iter() {
-            let glob = Glob::new(glob)?.compile_matcher();
-            matchers.push(glob);
-        }
-        Ok(matchers)
+    pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
+        self.rpath_allowlist.globset()
     }
 
     /// Get the overdepending behavior.
@@ -298,7 +308,7 @@ pub enum BinaryRelocation {
     /// Relocate all binaries.
     All(bool),
     /// Relocate specific paths.
-    SpecificPaths(Vec<String>),
+    SpecificPaths(GlobVec),
 }
 
 impl Default for BinaryRelocation {
@@ -309,17 +319,10 @@ impl Default for BinaryRelocation {
 
 impl BinaryRelocation {
     /// Return the paths to relocate.
-    pub fn relocate_paths(&self) -> Result<Option<Vec<GlobMatcher>>, globset::Error> {
+    pub fn relocate_paths(&self) -> Option<&GlobSet> {
         match self {
-            BinaryRelocation::All(_) => Ok(None),
-            BinaryRelocation::SpecificPaths(paths) => {
-                let mut matchers = Vec::new();
-                for glob in paths {
-                    let glob = Glob::new(glob)?.compile_matcher();
-                    matchers.push(glob);
-                }
-                Ok(Some(matchers))
-            }
+            BinaryRelocation::All(_) => None,
+            BinaryRelocation::SpecificPaths(paths) => paths.globset(),
         }
     }
 
@@ -346,11 +349,8 @@ impl TryConvertNode<BinaryRelocation> for RenderedNode {
 
 impl TryConvertNode<BinaryRelocation> for RenderedSequenceNode {
     fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
-        let mut paths = Vec::with_capacity(self.len());
-        for item in self.iter() {
-            paths.push(item.try_convert(name)?)
-        }
-        Ok(BinaryRelocation::SpecificPaths(paths))
+        let globvec: GlobVec = self.try_convert(name)?;
+        Ok(BinaryRelocation::SpecificPaths(globvec))
     }
 }
 

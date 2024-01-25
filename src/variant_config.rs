@@ -388,7 +388,7 @@ impl VariantConfig {
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
             // in the recipe which are captured by the `used vars`
-            let used_vars = used_vars_from_expressions(output, recipe).map_err(|e| {
+            let mut used_vars = used_vars_from_expressions(output, recipe).map_err(|e| {
                 let errs: ParseErrors = e.into();
                 errs
             })?;
@@ -402,6 +402,17 @@ impl VariantConfig {
                     errs
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
+
+            // add in any host and build dependencies
+            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
+                match dep {
+                    Dependency::Spec(spec) => spec
+                        .name
+                        .as_ref()
+                        .and_then(|name| name.as_normalized().to_string().into()),
+                    _ => None,
+                }
+            }));
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
@@ -520,12 +531,9 @@ impl VariantConfig {
         for (_, (_, _, used_vars, _)) in outputs_map.iter() {
             all_variables.extend(used_vars.clone());
         }
+
         // remove all existing outputs from all_variables
         let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
-        let all_variables = all_variables
-            .difference(&output_names)
-            .cloned()
-            .collect::<HashSet<_>>();
         let mut all_variables = all_variables
             .difference(&output_names)
             .cloned()

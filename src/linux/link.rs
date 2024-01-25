@@ -1,6 +1,6 @@
 //! Relink shared objects to use an relative path prefix
 
-use globset::GlobMatcher;
+use globset::GlobSet;
 use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
@@ -93,7 +93,7 @@ impl SharedObject {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: &[GlobMatcher],
+        rpath_allowlist: Option<&GlobSet>,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::debug!("{} is not dynamically linked", self.path.display());
@@ -135,7 +135,10 @@ impl SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
-            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+            } else if rpath_allowlist
+                .map(|glob| glob.is_match(rpath))
+                .unwrap_or(false)
+            {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpath.push(rpath.clone());
             } else {
@@ -340,6 +343,7 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use globset::{Glob, GlobSetBuilder};
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -351,14 +355,22 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
-    #[cfg(target_os = "linux")]
     fn relink_patchelf() -> Result<(), RelinkError> {
-        use globset::Glob;
+        if which::which("patchelf").is_err() {
+            tracing::warn!("patchelf not found, skipping test");
+            return Ok(());
+        }
+
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.into_path();
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
+
+        let globset = GlobSetBuilder::new()
+            .add(Glob::new("/usr/lib/custom**").unwrap())
+            .build()
+            .unwrap();
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib
@@ -366,12 +378,7 @@ mod test {
         // so we are expecting it to keep the host prefix and discard the build prefix
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(
-            &prefix,
-            encoded_prefix,
-            &[],
-            &[Glob::new("/usr/lib/custom**").unwrap().compile_matcher()],
-        )?;
+        object.relink(&prefix, encoded_prefix, &[], Some(&globset))?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(
             vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
@@ -395,8 +402,12 @@ mod test {
     // prefix: "test-data/binary_files"
     // new rpath: $ORIGIN/../lib
     #[test]
-    #[cfg(target_os = "linux")]
     fn relink_add_rpath() -> Result<(), RelinkError> {
+        if which::which("patchelf").is_err() {
+            tracing::warn!("patchelf not found, skipping test");
+            return Ok(());
+        }
+
         // copy binary to a temporary directory
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?.into_path();
@@ -405,7 +416,7 @@ mod test {
 
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(&prefix, encoded_prefix, &[String::from("lib/")], &[])?;
+        object.relink(&prefix, encoded_prefix, &[String::from("lib/")], None)?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(
             vec!["$ORIGIN/../lib"],
