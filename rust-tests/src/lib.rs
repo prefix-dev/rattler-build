@@ -562,12 +562,8 @@ mod tests {
         let tmp = tmp("test_underlink_check");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("underlinking"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-
-        let output = rattler_build.unwrap();
-        assert!(!output.status.success());
-
-        let output = String::from_utf8(output.stderr).unwrap();
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("Linking check error: Underlinking against: libzlib"));
     }
 
@@ -577,12 +573,8 @@ mod tests {
         let tmp = tmp("test_overlink_check");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("overlinking"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-
-        let output = rattler_build.unwrap();
-        assert!(!output.status.success());
-
-        let output = String::from_utf8(output.stderr).unwrap();
+        assert!(!rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("Linking check error: Overlinking against: yaml,curl"));
     }
 
@@ -592,12 +584,8 @@ mod tests {
         let tmp = tmp("test_allow_missing_dsok");
         let rattler_build =
             rattler().build::<_, _, &str>(recipes().join("allow_missing_dso"), tmp.as_dir(), None);
-        assert!(rattler_build.is_ok());
-
-        let output = rattler_build.unwrap();
-        assert!(output.status.success());
-
-        let output = String::from_utf8(output.stderr).unwrap();
+        assert!(rattler_build.status.success());
+        let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("libzlib is missing in run dependencies, yet it is included in the allow list. Skipping..."));
     }
 }
