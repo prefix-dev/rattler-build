@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use globset::{Glob, GlobMatcher};
+use globset::{Glob, GlobMatcher, GlobSet};
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
+use super::glob_vec::GlobVec;
 use super::{Dependency, FlattenErrors};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
@@ -48,6 +49,9 @@ pub struct Build {
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) dynamic_linking: Option<DynamicLinking>,
+    /// Setting to control wether to always copy a file
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_copy: GlobVec,
     // TODO: Add and parse the rest of the fields
 }
 
@@ -91,6 +95,10 @@ impl Build {
     pub fn is_skip_build(&self) -> bool {
         self.skip()
     }
+
+    pub fn always_copy(&self) -> Option<&GlobSet> {
+        self.always_copy.globset()
+    }
 }
 
 impl TryConvertNode<Build> for RenderedNode {
@@ -128,6 +136,9 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     }
                     "dynamic_linking" => {
                         build.dynamic_linking = value.try_convert(key_str)?;
+                    }
+                    "always_copy_files" => {
+                        build.always_copy = value.try_convert(key_str)?;
                     }
                     invalid => {
                         return Err(vec![_partialerror!(

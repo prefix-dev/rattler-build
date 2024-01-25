@@ -104,6 +104,10 @@ Recipe {
                 ),
             },
         ),
+        always_copy: GlobVec(
+            [],
+            None,
+        ),
     },
     requirements: Requirements {
         build: [
