@@ -20,6 +20,7 @@ use crate::{
 
 mod about;
 mod build;
+mod glob_vec;
 mod output;
 mod package;
 mod requirements;

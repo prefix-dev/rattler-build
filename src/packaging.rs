@@ -1,6 +1,7 @@
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
+use globset::GlobSet;
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
 use std::io::{BufReader, Read, Write};
@@ -227,6 +228,7 @@ fn create_paths_json(
     paths: &HashSet<PathBuf>,
     path_prefix: &Path,
     encoded_prefix: &Path,
+    always_copy_files: Option<&GlobSet>,
 ) -> Result<PathsJson, PackagingError> {
     let mut paths_json = PathsJson {
         paths: Vec::new(),
@@ -269,13 +271,16 @@ fn create_paths_json(
             let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
 
             let digest = compute_file_digest::<sha2::Sha256>(p)?;
-
+            let no_link = always_copy_files
+                .as_ref()
+                .map(|g| g.is_match(&relative_path))
+                .unwrap_or(false);
             paths_json.paths.push(PathsEntry {
                 sha256: Some(digest),
                 relative_path,
                 path_type: PathType::HardLink,
                 prefix_placeholder,
-                no_link: false,
+                no_link,
                 size_in_bytes: Some(meta.len()),
             });
         } else if meta.file_type().is_symlink() {
@@ -926,7 +931,12 @@ pub fn package_conda(
     fs::create_dir_all(&info_folder)?;
 
     let mut paths_json = File::create(info_folder.join("paths.json"))?;
-    let paths_json_struct = create_paths_json(&tmp_files, tmp_dir_path, prefix)?;
+    let paths_json_struct = create_paths_json(
+        &tmp_files,
+        tmp_dir_path,
+        prefix,
+        output.recipe.build.always_copy_files(),
+    )?;
     paths_json.write_all(serde_json::to_string_pretty(&paths_json_struct)?.as_bytes())?;
     tmp_files.insert(info_folder.join("paths.json"));
 

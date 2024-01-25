@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
-use globset::{Glob, GlobMatcher};
+use globset::{Glob, GlobMatcher, GlobSet};
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
+use super::glob_vec::GlobVec;
 use super::{Dependency, FlattenErrors};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
@@ -48,7 +49,12 @@ pub struct Build {
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) dynamic_linking: Option<DynamicLinking>,
-    // TODO: Add and parse the rest of the fields
+    /// Setting to control wether to always copy a file
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_copy_files: GlobVec,
+    /// Setting to control wether to always include a file (even if it is already present in the host env)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) always_include_files: GlobVec,
 }
 
 impl Build {
@@ -91,6 +97,14 @@ impl Build {
     pub fn is_skip_build(&self) -> bool {
         self.skip()
     }
+
+    pub fn always_copy_files(&self) -> Option<&GlobSet> {
+        self.always_copy_files.globset()
+    }
+
+    pub fn always_include_files(&self) -> Option<&GlobSet> {
+        self.always_include_files.globset()
+    }
 }
 
 impl TryConvertNode<Build> for RenderedNode {
@@ -128,6 +142,12 @@ impl TryConvertNode<Build> for RenderedMappingNode {
                     }
                     "dynamic_linking" => {
                         build.dynamic_linking = value.try_convert(key_str)?;
+                    }
+                    "always_copy_files" => {
+                        build.always_copy_files = value.try_convert(key_str)?;
+                    }
+                    "always_include_files" => {
+                        build.always_include_files = value.try_convert(key_str)?;
                     }
                     invalid => {
                         return Err(vec![_partialerror!(
