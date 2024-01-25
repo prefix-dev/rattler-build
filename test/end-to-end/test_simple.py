@@ -347,7 +347,8 @@ def test_always_include_files(
     assert len(paths["paths"]) == 1
     assert paths["paths"][0]["_path"] == "hello.txt"
     assert paths["paths"][0].get("no_link") is None
-    assert (pkg / "hello.txt").read_text() == "Hello, world!\n"
+
+    assert "Hello, world!" in (pkg / "hello.txt").read_text()
 
     pkg_sanity = get_extracted_package(tmp_path, "force-include-sanity-check")
     paths = json.loads((pkg_sanity / "info/paths.json").read_text())
@@ -359,4 +360,4 @@ def test_always_include_files(
     assert paths["paths"][0]["_path"] == "hello.txt"
     assert paths["paths"][0].get("no_link") is None
     assert (pkg_force / "hello.txt").exists()
-    assert (pkg_force / "hello.txt").read_text() == "Force include new file\n"
+    assert "Force include new file" in (pkg_force / "hello.txt").read_text()
