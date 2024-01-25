@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+context:
+  version: "0.1.0"
+
+package:
+  name: zlink
+  version: ${{ version }}
+
+source:
+  path: ../../../examples/linking/zlink/
+
+build:
+  script:
+    - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+    - cmake --build build --config Release
+    - cmake --install build --prefix ${PREFIX}
+  dynamic_linking:
+    overdepending_behavior: error
+    overlinking_behavior: error
+    missing_dso_allowlist: ["*zlib"]
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ninja
+    - cmake
+  host:
+    - zlib
+
+tests:
+  - script:
+      - zlink

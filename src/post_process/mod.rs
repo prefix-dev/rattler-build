@@ -128,7 +128,10 @@ pub fn linking_checks(
             .iter()
             .any(|v| v.is_match(&package_name))
         {
-            tracing::warn!("{package_name} found in allow list, skipping");
+            tracing::warn!(
+                "{package_name} is missing in run dependencies, \
+            yet it is included in the allow list. Skipping..."
+            );
         } else if error_on_underlinking {
             return Err(LinkingCheckError::Underlinking { package_name });
         } else {
