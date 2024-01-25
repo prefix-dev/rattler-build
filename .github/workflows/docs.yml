@@ -39,14 +39,14 @@ jobs:
         with:
           pixi-version: v0.10.0
           cache: true
-      
+
       - name: Build docs for test
         run: |
           pixi run build-docs
 
   docs-release:
     # Don't run on forks
-    if: startsWith(github.event.ref, 'refs/tags/v') 
+    if: startsWith(github.event.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -72,7 +72,7 @@ jobs:
       - name: Deploy with mike 🚀
         env:
           RELEASE_VERSION: ${{ steps.extract_branch.outputs.tag }}
-        run: | 
+        run: |
           pixi run deploy-latest
 
   docs-dev:

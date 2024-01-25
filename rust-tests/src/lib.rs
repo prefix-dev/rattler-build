@@ -26,30 +26,33 @@ mod tests {
                 .then(|| Self::WithBinary(path.as_ref().display().to_string()))
         }
 
-        fn build<K: AsRef<Path>, T: AsRef<Path>, N: AsRef<Path>>(
+        fn build<K: AsRef<Path>, T: AsRef<Path>>(
             &self,
             recipe: K,
             output_dir: T,
-            variant_config: Option<N>,
+            variant_config: Option<&str>,
+            target_platform: Option<&str>,
         ) -> Output {
             let rs = recipe.as_ref().display().to_string();
             let od = output_dir.as_ref().display().to_string();
-            let iter = [
+            let mut iter = vec![
                 "build",
                 "--recipe",
                 rs.as_str(),
                 "--output-dir",
                 od.as_str(),
             ];
-            if let Some(variant_config_path) = variant_config {
-                self.with_args(iter.into_iter().chain([
-                    "--variant-config",
-                    variant_config_path.as_ref().display().to_string().as_str(),
-                ]))
-            } else {
-                self.with_args(iter)
+            if let Some(target_platform) = target_platform {
+                iter.push("--target-platform");
+                iter.push(target_platform);
             }
+            if let Some(variant_config_path) = variant_config {
+                iter.push("--variant-config");
+                iter.push(variant_config_path);
+            }
+            self.with_args(iter)
         }
+
         fn with_args(&self, args: impl IntoIterator<Item = impl AsRef<OsStr>>) -> Output {
             let (command, dir, cmd_args) = match self {
                 RattlerBuild::WithCargo(path) => (
@@ -211,7 +214,7 @@ mod tests {
         let recipes = recipes();
         let tmp = tmp("test_run_exports_from");
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes.join("run_exports_from"), tmp.as_dir(), None);
+            rattler().build::<_, _>(recipes.join("run_exports_from"), tmp.as_dir(), None, None);
         // ensure rattler build succeeded
         assert!(rattler_build.status.success());
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
@@ -233,8 +236,7 @@ mod tests {
     fn test_run_exports() {
         let recipes = recipes();
         let tmp = tmp("test_run_exports");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes.join("run_exports"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes.join("run_exports"), tmp.as_dir(), None, None);
         // ensure rattler build succeeded
         assert!(rattler_build.status.success());
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
@@ -291,8 +293,7 @@ mod tests {
     #[test]
     fn test_pkg_hash() {
         let tmp = tmp("test_pkg_hash");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("pkg_hash"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("pkg_hash"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
 
@@ -307,8 +308,7 @@ mod tests {
     #[test]
     fn test_license_glob() {
         let tmp = tmp("test_license_glob");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("globtest"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("globtest"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
 
@@ -373,8 +373,7 @@ mod tests {
     #[test]
     fn test_python_noarch() {
         let tmp = tmp("test_python_noarch");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("toml"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("toml"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
 
@@ -389,8 +388,7 @@ mod tests {
     #[test]
     fn test_git_source() {
         let tmp = tmp("test_git_source");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("llamacpp"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("llamacpp"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
 
@@ -405,7 +403,7 @@ mod tests {
     #[test]
     fn test_package_content_test_execution() {
         let tmp = tmp("test_package_content_test_execution");
-        // let rattler_build = rattler().build::<_, _, &str>(
+        // let rattler_build = rattler().build(
         //     recipes().join("package-content-tests/rich-recipe.yaml"),
         //     tmp.as_dir(),
         //     None,
@@ -422,17 +420,19 @@ mod tests {
 
         // assert!(rattler_build.status.success());
 
-        let rattler_build = rattler().build::<_, _, &str>(
+        let rattler_build = rattler().build(
             recipes().join("package-content-tests/recipe-test-succeed.yaml"),
             tmp.as_dir(),
+            None,
             None,
         );
 
         assert!(rattler_build.status.success());
 
-        let rattler_build = rattler().build::<_, _, &str>(
+        let rattler_build = rattler().build(
             recipes().join("package-content-tests/recipe-test-fail.yaml"),
             tmp.as_dir(),
+            None,
             None,
         );
 
@@ -442,17 +442,19 @@ mod tests {
     #[test]
     fn test_test_execution() {
         let tmp = tmp("test_test_execution");
-        let rattler_build = rattler().build::<_, _, &str>(
+        let rattler_build = rattler().build(
             recipes().join("test-execution/recipe-test-succeed.yaml"),
             tmp.as_dir(),
+            None,
             None,
         );
 
         assert!(rattler_build.status.success());
 
-        let rattler_build = rattler().build::<_, _, &str>(
+        let rattler_build = rattler().build(
             recipes().join("test-execution/recipe-test-fail.yaml"),
             tmp.as_dir(),
+            None,
             None,
         );
 
@@ -462,8 +464,7 @@ mod tests {
     #[test]
     fn test_noarch_flask() {
         let tmp = tmp("test_noarch_flask");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("flask"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("flask"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
 
@@ -492,7 +493,7 @@ mod tests {
         }
         let tmp = tmp("test-sources");
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("test-sources"), tmp.as_dir(), None);
+            rattler().build(recipes().join("test-sources"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
     }
@@ -500,8 +501,7 @@ mod tests {
     #[test]
     fn test_tar_source() {
         let tmp = tmp("test_tar_source");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("tar-source"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("tar-source"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
     }
@@ -509,8 +509,7 @@ mod tests {
     #[test]
     fn test_zip_source() {
         let tmp = tmp("test_zip_source");
-        let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("zip-source"), tmp.as_dir(), None);
+        let rattler_build = rattler().build(recipes().join("zip-source"), tmp.as_dir(), None, None);
 
         assert!(rattler_build.status.success());
     }
@@ -519,10 +518,11 @@ mod tests {
     fn test_dry_run_cf_upload() {
         let tmp = tmp("test_polarify");
         let variant = recipes().join("polarify").join("linux_64_.yaml");
-        let rattler_build = rattler().build::<_, _, PathBuf>(
+        let rattler_build = rattler().build(
             recipes().join("polarify"),
             tmp.as_dir(),
-            Some(variant),
+            variant.to_str(),
+            None,
         );
 
         assert!(rattler_build.status.success());
@@ -552,7 +552,21 @@ mod tests {
     fn test_correct_sha256() {
         let tmp = tmp("correct-sha");
         let rattler_build =
-            rattler().build::<_, _, &str>(recipes().join("correct-sha"), tmp.as_dir(), None);
+            rattler().build(recipes().join("correct-sha"), tmp.as_dir(), None, None);
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    fn test_rpath() {
+        let tmp = tmp("test_rpath");
+        let rattler_build = rattler().build(
+            recipes().join("rpath"),
+            tmp.as_dir(),
+            None,
+            Some("linux-64"),
+        );
+
         assert!(rattler_build.status.success());
     }
 }

@@ -34,6 +34,8 @@ jobs:
       - uses: prefix-dev/setup-pixi@v0.4.3
         with:
           pixi-version: v0.10.0
+      - if: runner.os == 'macOS'
+        run: pixi global install patchelf
       # build in release mode so that it's reasonably fast to run the tests
       - run: cargo build --release
       - run: cargo test --release -p rust-tests -- --test-threads 1
