@@ -171,8 +171,8 @@ pub struct DynamicLinking {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) rpaths: Vec<String>,
     /// Allow runpath / rpath to point to these locations outside of the environment.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) rpath_allowlist: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) rpath_allowlist: GlobVec,
     /// Whether to relocate binaries or not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) binary_relocation: Option<BinaryRelocation>,
@@ -189,13 +189,8 @@ impl DynamicLinking {
     }
 
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Result<Vec<GlobMatcher>, globset::Error> {
-        let mut matchers = Vec::new();
-        for glob in self.rpath_allowlist.iter() {
-            let glob = Glob::new(glob)?.compile_matcher();
-            matchers.push(glob);
-        }
-        Ok(matchers)
+    pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
+        self.rpath_allowlist.globset()
     }
 
     // Get the binary relocation settings.

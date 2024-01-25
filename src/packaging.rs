@@ -905,21 +905,22 @@ pub fn package_conda(
     if output.build_configuration.target_platform != Platform::NoArch
         && !relocation_config.no_relocation()
     {
-        let rpath_allowlist = match dynamic_linking {
-            Some(v) => v.rpath_allowlist()?,
-            None => Vec::new(),
-        };
+        let rpath_allowlist = dynamic_linking
+            .as_ref()
+            .map(|dl| dl.rpath_allowlist())
+            .flatten();
         let mut binaries = tmp_files.clone();
         if let Some(paths) = relocation_config.relocate_paths()? {
             binaries.retain(|v| paths.iter().any(|glob| glob.is_match(v)));
         }
+
         post::relink(
             &binaries,
             tmp_dir_path,
             prefix,
             &output.build_configuration.target_platform,
             &dynamic_linking.clone().unwrap_or_default().rpaths(),
-            &rpath_allowlist,
+            rpath_allowlist,
         )?;
     }
 

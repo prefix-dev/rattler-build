@@ -1,6 +1,6 @@
 //! Relink shared objects to use an relative path prefix
 
-use globset::GlobMatcher;
+use globset::GlobSet;
 use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
@@ -92,7 +92,7 @@ impl SharedObject {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: &[GlobMatcher],
+        rpath_allowlist: Option<&GlobSet>,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::debug!("{} is not dynamically linked", self.path.display());
@@ -134,7 +134,10 @@ impl SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
-            } else if rpath_allowlist.iter().any(|glob| glob.is_match(rpath)) {
+            } else if rpath_allowlist
+                .map(|glob| glob.is_match(rpath))
+                .unwrap_or(false)
+            {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpath.push(rpath.clone());
             } else {

@@ -1,3 +1,5 @@
+use std::fmt::{self, Formatter, Debug};
+
 use globset::{Glob, GlobSet};
 
 use serde::ser::SerializeSeq;
@@ -7,7 +9,7 @@ use crate::_partialerror;
 use crate::recipe::custom_yaml::{HasSpan, RenderedNode, RenderedSequenceNode, TryConvertNode};
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Clone)]
 pub struct GlobVec(Vec<Glob>, Option<GlobSet>);
 
 impl Serialize for GlobVec {
@@ -17,6 +19,12 @@ impl Serialize for GlobVec {
             seq.serialize_element(glob.glob())?;
         }
         seq.end()
+    }
+}
+
+impl Debug for GlobVec {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_list().entries(self.0.iter().map(|glob| glob.glob())).finish()
     }
 }
 
