@@ -125,7 +125,7 @@ impl SharedObject {
             if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
-                let parent = new_rpath.parent().ok_or(RelinkError::NoParentDir)?;
+                let parent = self.path.parent().ok_or(RelinkError::NoParentDir)?;
 
                 let relative_path = pathdiff::diff_paths(&new_rpath, parent).ok_or(
                     RelinkError::PathDiffFailed {
