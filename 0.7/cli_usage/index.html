@@ -110,10 +110,6 @@
       
     </div>
     
-      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
-        
-      </div>
-    
     
       
 
@@ -313,44 +309,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../available_jinja/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Available Jinja
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../experimental_features/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Experimental features
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../selectors/" class="md-nav__link">
         
   
@@ -475,13 +433,6 @@
         <li class="md-nav__item">
   <a href="#shell-completions" class="md-nav__link">
     Shell Completions
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#package-format" class="md-nav__link">
-    Package format
   </a>
   
 </li>
@@ -622,13 +573,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#package-format" class="md-nav__link">
-    Package format
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -656,10 +600,10 @@
 <h2 id="shell-completions">Shell Completions<a class="headerlink" href="#shell-completions" title="Permanent link">#</a></h2>
 <p>We support shell completions through clap-complete.
 You can generate them for your shell using the <code>completion</code> command.</p>
-<p>E.g.,</p>
+<p>Eg,
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>zsh<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">ZSH_COMPLETIONS_PATH</span><span class="p">:~/.zsh/completions</span><span class="si">}</span>/_rattler-build
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>compinit
-</span></code></pre></div>
+</span></code></pre></div></p>
 <p>Ensure that whereever you install the is pointed to by your FPATH (for zsh or equivalent in other shells).
 Now you can use TAB or your configured completion key. :3</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>rattler-build<span class="w"> </span>&lt;TAB&gt;
@@ -671,16 +615,6 @@ Now you can use TAB or your configured completion key. :3</p>
 <p>Example for Fish Shell just generate the <code>completions.fish</code> and add to <code>~/.config/fish/completions</code>.
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>fish<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">ZSH_COMPLETIONS_PATH</span><span class="p">:~/.config/fish/completions</span><span class="si">}</span>/rattler-build.fish
 </span></code></pre></div></p>
-<h2 id="package-format">Package format<a class="headerlink" href="#package-format" title="Permanent link">#</a></h2>
-<p>You can specify the package format (either <code>.tar.bz2</code> or <code>.conda</code>) by using the <code>--package-format</code> flag.
-You can also set the compression level with <code>:&lt;level&gt;</code> after the package format. The <code>&lt;level&gt;</code> can be <code>max</code>, <code>min</code>, <code>default</code> or a number corresponding to the compression level.
-<code>.tar.bz2</code> supports compression levels between <code>1</code> and <code>9</code> while <code>.conda</code> supports compression levels between <code>-7</code> and <code>22</code>.
-For <code>.conda</code>, you can also set the <code>--compression-threads</code> flag to specify the number of threads to use for compression.</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># default</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>tarbz2<span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># maximum compression</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>conda:max<span class="w"> </span>--compression-threads<span class="w"> </span><span class="m">10</span><span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
-</span></code></pre></div>
 
 
 
@@ -857,7 +791,7 @@ For <code>.conda</code>, you can also set the <code>--compression-threads</code>
       <div class="md-progress" data-md-component="progress" role="progressbar"></div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../assets/javascripts/bundle.94c44541.min.js"></script>

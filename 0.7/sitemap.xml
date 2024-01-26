@@ -31,11 +31,6 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://prefix-dev.github.io/rattler-build/0.7/experimental_features/</loc>
-         <lastmod>2024-01-26</lastmod>
-         <changefreq>daily</changefreq>
-    </url>
-    <url>
          <loc>https://prefix-dev.github.io/rattler-build/0.7/highlevel/</loc>
          <lastmod>2024-01-26</lastmod>
          <changefreq>daily</changefreq>
