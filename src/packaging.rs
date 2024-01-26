@@ -28,10 +28,11 @@ use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
 
+use crate::linux;
 use crate::macos;
 use crate::metadata::{Output, PackagingSettings};
 use crate::package_test::write_test_files;
-use crate::{linux, post};
+use crate::post_process;
 
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
@@ -69,13 +70,16 @@ pub enum PackagingError {
     MacOSRelinkError(#[from] macos::link::RelinkError),
 
     #[error("Relink error: {0}")]
-    RelinkError(#[from] crate::post::RelinkError),
+    RelinkError(#[from] crate::post_process::relink::RelinkError),
 
     #[error(transparent)]
     SourceError(#[from] crate::source::SourceError),
 
     #[error("could not create python entry point: {0}")]
     CannotCreateEntryPoint(String),
+
+    #[error("Linking check error: {0}")]
+    LinkingCheckError(#[from] crate::post_process::LinkingCheckError),
 }
 
 #[allow(unused_variables)]
@@ -913,8 +917,8 @@ pub fn package_conda(
         if let Some(globs) = relocation_config.relocate_paths() {
             binaries.retain(|v| globs.is_match(v));
         }
-        println!("Rpaths: {:?}", dynamic_linking.rpaths());
-        post::relink(
+
+        post_process::relink::relink(
             &binaries,
             tmp_dir_path,
             prefix,
@@ -922,9 +926,17 @@ pub fn package_conda(
             &dynamic_linking.rpaths(),
             rpath_allowlist,
         )?;
+
+        post_process::linking_checks(
+            output,
+            &binaries,
+            dynamic_linking.missing_dso_allowlist(),
+            dynamic_linking.error_on_overlinking(),
+            dynamic_linking.error_on_overdepending(),
+        )?;
     }
 
-    post::python(output.name(), output.version(), &tmp_files)?;
+    post_process::python::python(output.name(), output.version(), &tmp_files)?;
 
     tracing::info!("Relink done!");
 

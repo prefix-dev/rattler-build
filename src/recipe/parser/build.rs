@@ -170,12 +170,21 @@ pub struct DynamicLinking {
     /// List of rpaths to use (linux only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) rpaths: Vec<String>,
-    /// Allow runpath / rpath to point to these locations outside of the environment.
-    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) rpath_allowlist: GlobVec,
     /// Whether to relocate binaries or not.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) binary_relocation: Option<BinaryRelocation>,
+    /// Allow linking against libraries that are not in the run requirements
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) missing_dso_allowlist: GlobVec,
+    /// Allow runpath / rpath to point to these locations outside of the environment.
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) rpath_allowlist: GlobVec,
+    /// What to do when detecting overdepending.
+    #[serde(default)]
+    pub(super) overdepending_behavior: LinkingCheckBehavior,
+    /// What to do when detecting overlinking.
+    #[serde(default)]
+    pub(super) overlinking_behavior: LinkingCheckBehavior,
 }
 
 impl DynamicLinking {
@@ -188,14 +197,61 @@ impl DynamicLinking {
         }
     }
 
+    // Get the binary relocation settings.
+    pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
+        self.binary_relocation.clone()
+    }
+
+    /// Get the missing DSO allowlist.
+    pub fn missing_dso_allowlist(&self) -> Option<&GlobSet> {
+        self.missing_dso_allowlist.globset()
+    }
+
     /// Get the rpath allow list.
     pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
         self.rpath_allowlist.globset()
     }
 
-    // Get the binary relocation settings.
-    pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
-        self.binary_relocation.clone()
+    /// Get the overdepending behavior.
+    pub fn error_on_overdepending(&self) -> bool {
+        self.overdepending_behavior == LinkingCheckBehavior::Error
+    }
+
+    /// Get the overlinking behavior.
+    pub fn error_on_overlinking(&self) -> bool {
+        self.overlinking_behavior == LinkingCheckBehavior::Error
+    }
+}
+
+/// What to do during linking checks.
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkingCheckBehavior {
+    #[default]
+    Ignore,
+    Error,
+}
+
+impl TryConvertNode<LinkingCheckBehavior> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<LinkingCheckBehavior, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .cloned()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<LinkingCheckBehavior> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<LinkingCheckBehavior, Vec<PartialParsingError>> {
+        match self.as_str() {
+            "ignore" => Ok(LinkingCheckBehavior::Ignore),
+            "error" => Ok(LinkingCheckBehavior::Error),
+            _ => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                help = format!("expected a string value for `{name}`")
+            )]),
+        }
     }
 }
 
@@ -217,11 +273,20 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
                 "rpaths" => {
                     dynamic_linking.rpaths = value.try_convert(key_str)?;
                 }
+                "binary_relocation" => {
+                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
+                }
+                "missing_dso_allowlist" => {
+                    dynamic_linking.missing_dso_allowlist = value.try_convert(key_str)?;
+                }
                 "rpath_allowlist" => {
                     dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
                 }
-                "binary_relocation" => {
-                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
+                "overdepending_behavior" => {
+                    dynamic_linking.overdepending_behavior = value.try_convert(key_str)?;
+                }
+                "overlinking_behavior" => {
+                    dynamic_linking.overlinking_behavior = value.try_convert(key_str)?;
                 }
                 invalid => {
                     return Err(vec![_partialerror!(
