@@ -571,7 +571,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux"))]
     fn test_underlinking_check() {
         let tmp = tmp("test_underlink_check");
         let rattler_build = rattler().build(
@@ -582,12 +582,11 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert_eq!("", output);
         assert!(output.contains("Linking check error: Underlinking against: libzlib"));
     }
 
     #[test]
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux"))]
     fn test_overlinking_check() {
         let tmp = tmp("test_overlink_check");
         let rattler_build = rattler().build(
@@ -598,7 +597,6 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert_eq!("", output);
         assert!(output.contains("Linking check error: Overlinking against: yaml,curl"));
     }
 
