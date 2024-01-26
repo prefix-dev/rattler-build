@@ -180,6 +180,10 @@ jobs:
           echo "pkg-name=${PKG_NAME}" >> $GITHUB_OUTPUT
           echo pkg-path="${ARCHIVE_DIR}" >> $GITHUB_OUTPUT
 
+          mkdir -p binaries
+          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "binaries/pixi-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}"
+          echo "binary-path=binaries/pixi-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -193,6 +197,7 @@ jobs:
           draft: true
           files: |
             ${{ steps.package.outputs.pkg-path }}
+            ${{ steps.package.outputs.binary-path }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
