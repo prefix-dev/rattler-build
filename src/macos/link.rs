@@ -312,7 +312,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     });
 
     if !can_deal_with_rpath {
-        tracing::error!("builtin relink failed: cannot deal with rpath changes");
+        tracing::debug!("Builtin relink can't deal with rpath changes");
         return Err(RelinkError::BuiltinRelinkFailed);
     }
 
@@ -354,7 +354,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         let new_path = new_path.as_bytes();
 
         if new_path.len() > old_path.len() {
-            tracing::error!(
+            tracing::debug!(
                 "new path is longer than old path: {} > {}",
                 new_path.len(),
                 old_path.len()
