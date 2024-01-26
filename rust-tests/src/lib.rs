@@ -601,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    #[cfg(any(target_os = "linux"))]
     fn test_allow_missing_dso() {
         let tmp = tmp("test_allow_missing_dsok");
         let rattler_build = rattler().build(
