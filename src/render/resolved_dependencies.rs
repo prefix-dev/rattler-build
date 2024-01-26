@@ -553,7 +553,16 @@ pub async fn resolve_dependencies(
         }
     }
 
-    let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+    let match_specs = specs
+        .iter()
+        .map(|s| s.spec().clone())
+        .chain(
+            build_env
+                .iter()
+                .flat_map(|be| be.specs.iter().map(|s| s.spec()))
+                .cloned(),
+        )
+        .collect::<Vec<_>>();
 
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
@@ -594,31 +603,6 @@ pub async fn resolve_dependencies(
         fs::create_dir_all(&output.build_configuration.directories.host_prefix)
             .expect("Could not create host prefix");
         None
-    };
-
-    let host_env = if merge_build_host {
-        let host_env = host_env.map(|he| {
-            let ResolvedDependencies {
-                mut resolved,
-                mut run_exports,
-                mut specs,
-            } = he;
-            if let Some(build_env) = &build_env {
-                resolved.extend(build_env.resolved.clone());
-                specs.extend(build_env.specs.clone());
-                // merge run exports using extend will overwrite keys
-                // but it shouldn't matter as values should be the same for both
-                run_exports.extend(build_env.run_exports.clone());
-            }
-            ResolvedDependencies {
-                resolved,
-                run_exports,
-                specs,
-            }
-        });
-        host_env.or_else(|| build_env.clone())
-    } else {
-        host_env
     };
 
     let depends = apply_variant(&reqs.run, &output.build_configuration, &compatibility_specs)?;
