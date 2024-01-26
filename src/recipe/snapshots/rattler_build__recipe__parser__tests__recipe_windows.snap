@@ -101,8 +101,8 @@ Recipe {
                 rpath_allowlist: [
                     "/usr/lib/**",
                 ],
-                overdepending_behavior: Error,
-                overlinking_behavior: Error,
+                overdepending_behavior: Ignore,
+                overlinking_behavior: Ignore,
             },
         ),
         always_copy_files: [],

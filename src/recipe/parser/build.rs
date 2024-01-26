@@ -227,8 +227,8 @@ impl DynamicLinking {
 #[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum LinkingCheckBehavior {
-    Ignore,
     #[default]
+    Ignore,
     Error,
 }
 
