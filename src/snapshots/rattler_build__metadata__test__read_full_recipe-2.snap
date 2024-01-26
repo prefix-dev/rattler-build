@@ -12,7 +12,6 @@ recipe:
   build:
     number: 0
     string: h60d57d3_0
-    merge_build_and_host_envs: false
   requirements:
     build:
       - compiler: c
