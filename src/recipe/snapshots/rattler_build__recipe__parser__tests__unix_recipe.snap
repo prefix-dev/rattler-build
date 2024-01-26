@@ -79,10 +79,8 @@ Recipe {
             interpreter: None,
             env: {},
             secrets: [],
-            content: Commands(
-                [
-                    "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
-                ],
+            content: CommandOrPath(
+                "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
             ),
         },
         noarch: NoArchType(

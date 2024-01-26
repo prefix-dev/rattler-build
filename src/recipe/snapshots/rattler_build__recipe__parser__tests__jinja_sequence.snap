@@ -7,7 +7,6 @@ package:
   version: 0.1.0
 build:
   number: 0
-  script:
-    - test succeeded
+  script: test succeeded
 requirements: {}
 
