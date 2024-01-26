@@ -51,9 +51,16 @@ pub struct Build {
     /// Setting to control wether to always include a file (even if it is already present in the host env)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) always_include_files: GlobVec,
+    /// Merge the build and host envs
+    pub(super) merge_build_and_host_envs: bool,
 }
 
 impl Build {
+    /// Get the merge build host flag.
+    pub const fn merge_build_and_host_envs(&self) -> bool {
+        self.merge_build_and_host_envs
+    }
+
     /// Get the build number.
     pub const fn number(&self) -> u64 {
         self.number
@@ -126,7 +133,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             python,
             dynamic_linking,
             always_copy_files,
-            always_include_files
+            always_include_files,
+            merge_build_and_host_envs
         }
 
         Ok(build)

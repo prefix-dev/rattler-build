@@ -448,6 +448,8 @@ pub async fn resolve_dependencies(
     channels: &[String],
     tool_configuration: tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
+    let merge_build_host = output.recipe.build().merge_build_and_host_envs();
+
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
 
@@ -594,6 +596,31 @@ pub async fn resolve_dependencies(
         None
     };
 
+    let host_env = if merge_build_host {
+        let host_env = host_env.map(|he| {
+            let ResolvedDependencies {
+                mut resolved,
+                mut run_exports,
+                mut specs,
+            } = he;
+            if let Some(build_env) = &build_env {
+                resolved.extend(build_env.resolved.clone());
+                specs.extend(build_env.specs.clone());
+                // merge run exports using extend will overwrite keys
+                // but it shouldn't matter as values should be the same for both
+                run_exports.extend(build_env.run_exports.clone());
+            }
+            ResolvedDependencies {
+                resolved,
+                run_exports,
+                specs,
+            }
+        });
+        host_env.or_else(|| build_env.clone())
+    } else {
+        host_env
+    };
+
     let depends = apply_variant(&reqs.run, &output.build_configuration, &compatibility_specs)?;
 
     let constrains = apply_variant(
@@ -663,20 +690,23 @@ pub async fn resolve_dependencies(
         }
     }
 
-    // We also have to propagate the _strong_ run exports of the build environment to the run environment
-    if let Some(build_env) = &build_env {
-        match output.build_configuration.target_platform {
-            Platform::NoArch => {}
-            _ => {
-                for (name, rex) in &build_env.run_exports {
-                    run_specs
-                        .depends
-                        .extend(clone_specs(name, "build", &rex.strong)?);
-                    run_specs.constrains.extend(clone_specs(
-                        name,
-                        "build",
-                        &rex.strong_constrains,
-                    )?);
+    // if already merged don't redo
+    if !merge_build_host {
+        // We also have to propagate the _strong_ run exports of the build environment to the run environment
+        if let Some(build_env) = &build_env {
+            match output.build_configuration.target_platform {
+                Platform::NoArch => {}
+                _ => {
+                    for (name, rex) in &build_env.run_exports {
+                        run_specs
+                            .depends
+                            .extend(clone_specs(name, "build", &rex.strong)?);
+                        run_specs.constrains.extend(clone_specs(
+                            name,
+                            "build",
+                            &rex.strong_constrains,
+                        )?);
+                    }
                 }
             }
         }
