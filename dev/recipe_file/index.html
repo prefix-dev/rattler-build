@@ -14,7 +14,7 @@
         <link rel="prev" href="../highlevel/">
       
       
-        <link rel="next" href="../available_jinja/">
+        <link rel="next" href="../experimental_features/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -507,7 +507,7 @@
         
           <li class="md-nav__item">
   <a href="#check-for-package-contents" class="md-nav__link">
-    Check for package-contents
+    Check for package contents
   </a>
   
 </li>
@@ -609,25 +609,6 @@
   
 </nav>
       
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../available_jinja/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Available Jinja
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1035,7 +1016,7 @@
         
           <li class="md-nav__item">
   <a href="#check-for-package-contents" class="md-nav__link">
-    Check for package-contents
+    Check for package contents
   </a>
   
 </li>
@@ -1706,11 +1687,11 @@ dependencies. This can be disabled by setting <code>pip_check: false</code> in t
 <div class="language-python highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a><span class="kn">import</span> <span class="nn">bsdiff4</span>
 </span><span id="__span-38-2"><a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="kn">import</span> <span class="nn">bspatch4</span>
 </span></code></pre></div>
-<h3 id="check-for-package-contents">Check for package-contents<a class="headerlink" href="#check-for-package-contents" title="Permanent link">#</a></h3>
+<h3 id="check-for-package-contents">Check for package contents<a class="headerlink" href="#check-for-package-contents" title="Permanent link">#</a></h3>
 <p>Checks if the built package contains the mentioned items. These checks are executed directly at
 the end of the build process to make sure that all expected files are present in the package.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="nt">tests</span><span class="p">:</span>
-</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package-contents</span><span class="p">:</span>
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package_contents</span><span class="p">:</span>
 </span><span id="__span-39-3"><a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">      </span><span class="c1"># checks for the existence of files inside $PREFIX or %PREFIX%</span>
 </span><span id="__span-39-4"><a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="w">      </span><span class="c1"># or, checks that there is at least one file matching the specified `glob`</span>
 </span><span id="__span-39-5"><a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">      </span><span class="c1"># pattern inside the prefix</span>
@@ -1737,8 +1718,8 @@ the end of the build process to make sure that all expected files are present in
 </span><span id="__span-39-26"><a id="__codelineno-39-26" name="__codelineno-39-26" href="#__codelineno-39-26"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mamba</span>
 </span><span id="__span-39-27"><a id="__codelineno-39-27" name="__codelineno-39-27" href="#__codelineno-39-27"></a>
 </span><span id="__span-39-28"><a id="__codelineno-39-28" name="__codelineno-39-28" href="#__codelineno-39-28"></a><span class="w">      </span><span class="c1"># searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and</span>
-</span><span id="__span-39-29"><a id="__codelineno-39-29" name="__codelineno-39-29" href="#__codelineno-39-29"></a><span class="w">      </span><span class="c1"># on Windows for `%PREFIX%\Library\include\mamba.hpp`</span>
-</span><span id="__span-39-30"><a id="__codelineno-39-30" name="__codelineno-39-30" href="#__codelineno-39-30"></a><span class="w">      </span><span class="nt">includes</span><span class="p">:</span>
+</span><span id="__span-39-29"><a id="__codelineno-39-29" name="__codelineno-39-29" href="#__codelineno-39-29"></a><span class="w">      </span><span class="c1"># on Windows for `%PREFIX%\Library\include\libmamba\mamba.hpp`</span>
+</span><span id="__span-39-30"><a id="__codelineno-39-30" name="__codelineno-39-30" href="#__codelineno-39-30"></a><span class="w">      </span><span class="nt">include</span><span class="p">:</span>
 </span><span id="__span-39-31"><a id="__codelineno-39-31" name="__codelineno-39-31" href="#__codelineno-39-31"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libmamba/mamba.hpp</span>
 </span></code></pre></div>
 <h3 id="downstream-tests">Downstream tests<a class="headerlink" href="#downstream-tests" title="Permanent link">#</a></h3>
@@ -2211,16 +2192,16 @@ Features work by requiring a special build string. When compiling with features,
           
             
             <a
-              href="../available_jinja/"
+              href="../experimental_features/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Available Jinja"
+              aria-label="Next: Experimental features"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Available Jinja
+                  Experimental features
                 </div>
               </div>
               <div class="md-footer__button md-icon">
