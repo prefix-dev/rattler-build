@@ -52,6 +52,7 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) always_include_files: GlobVec,
     /// Merge the build and host envs
+    #[serde(default)]
     pub(super) merge_build_and_host_envs: bool,
 }
 

@@ -13,5 +13,6 @@ build:
       - /etc
     overdepending_behavior: ignore
     overlinking_behavior: ignore
+  merge_build_and_host_envs: false
 requirements: {}
 

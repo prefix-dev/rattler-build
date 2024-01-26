@@ -23,6 +23,7 @@ recipe:
     script:
       - test -f README.md
       - cat ./initial_version/build.sh
+    merge_build_and_host_envs: false
   requirements: {}
 build_configuration:
   target_platform: osx-arm64

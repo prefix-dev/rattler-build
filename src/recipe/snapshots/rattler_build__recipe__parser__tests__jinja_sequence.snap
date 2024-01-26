@@ -8,5 +8,6 @@ package:
 build:
   number: 0
   script: test succeeded
+  merge_build_and_host_envs: false
 requirements: {}
 
