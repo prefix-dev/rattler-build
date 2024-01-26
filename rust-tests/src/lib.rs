@@ -593,7 +593,7 @@ mod tests {
             recipes().join("overlinking"),
             tmp.as_dir(),
             None,
-            Some("linux-x64"),
+            Some("linux-64"),
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
@@ -608,7 +608,7 @@ mod tests {
             recipes().join("allow_missing_dso"),
             tmp.as_dir(),
             None,
-            Some("linux-x64"),
+            Some("linux-64"),
         );
         assert!(rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
