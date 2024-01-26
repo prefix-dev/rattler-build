@@ -582,6 +582,7 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert_eq!("", output);
         assert!(output.contains("Linking check error: Underlinking against: libzlib"));
     }
 
@@ -597,6 +598,7 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
+        assert_eq!("", output);
         assert!(output.contains("Linking check error: Overlinking against: yaml,curl"));
     }
 
