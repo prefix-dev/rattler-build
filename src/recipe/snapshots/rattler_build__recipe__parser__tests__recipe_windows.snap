@@ -109,6 +109,7 @@ Recipe {
         always_copy_files: [],
         always_include_files: [],
         merge_build_and_host_envs: false,
+        variant: None,
     },
     requirements: Requirements {
         build: [

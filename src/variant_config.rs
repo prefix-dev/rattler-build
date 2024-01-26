@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
 
-use crate::recipe::parser::{find_outputs_from_src, Dependency};
+use crate::recipe::parser::Dependency;
 use crate::{
     _partialerror,
     hash::HashInfo,
@@ -377,13 +377,12 @@ impl VariantConfig {
     /// 5. The used variant config.
     pub fn find_variants(
         &self,
+        outputs: &[Node],
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
-        // First find all outputs from the recipe
-        let outputs = find_outputs_from_src(recipe)?;
-
         let mut outputs_map = HashMap::new();
+
         // sort the outputs by topological order
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
@@ -413,6 +412,10 @@ impl VariantConfig {
                     _ => None,
                 }
             }));
+
+            let variants = parsed_recipe.build().variant();
+            let use_keys = variants.map(|a| &a.use_keys);
+            used_vars.extend(use_keys.cloned().unwrap_or_default().into_iter());
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
@@ -700,8 +703,14 @@ impl VariantConfig {
                         used_filtered.clone(),
                     ),
                 );
-
                 let version = parsed_recipe.package().version().to_string();
+
+                let variants = parsed_recipe.build().variant();
+                let ignore_keys = variants.map(|v| &v.ignore_keys);
+                if let Some(ignore_keys) = ignore_keys {
+                    used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
+                }
+
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,
@@ -911,6 +920,34 @@ mod tests {
         let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
 
         insta::assert_yaml_snapshot!(variant);
+    }
+
+    #[test]
+    fn test_load_config_and_find_variants() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = test_data_dir.join("recipes/variants/variant_config.yaml");
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        // First find all outputs from the recipe
+        let recipe_text =
+            std::fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
+        let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let outputs_and_variants = variant_config
+            .find_variants(&outputs, &recipe_text, &selector_config)
+            .unwrap();
+
+        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+            .as_slice()
+            .into_iter()
+            .map(|s| &s.used_vars)
+            .collect();
+
+        insta::assert_yaml_snapshot!(used_variables_all);
     }
 
     use super::*;
