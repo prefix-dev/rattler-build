@@ -80,6 +80,9 @@ pub enum PackagingError {
 
     #[error("Linking check error: {0}")]
     LinkingCheckError(#[from] crate::post_process::LinkingCheckError),
+
+    #[error("Failed to compile Python bytecode: {0}")]
+    PythonCompileError(String),
 }
 
 #[allow(unused_variables)]
@@ -936,7 +939,11 @@ pub fn package_conda(
         )?;
     }
 
-    post_process::python::python(output.name(), output.version(), &tmp_files)?;
+    tmp_files.extend(post_process::python::python(
+        output,
+        &tmp_files,
+        tmp_dir_path,
+    )?);
 
     tracing::info!("Relink done!");
 

@@ -1,0 +1,40 @@
+package:
+  name: python_compilation
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - echo "print('hello world')" > $PREFIX/test.py
+        - echo "print('hello world')" > $PREFIX/test_skippy.py
+        - mkdir -p $PREFIX/cmd
+        - echo "print('hello world')" > $PREFIX/cmd/test.py
+    - if: win
+      then:
+        - echo "print('hello world')" > %PREFIX%\test.py
+        - echo "print('hello world')" > %PREFIX%\test_skippy.py
+        - mkdir %PREFIX%\cmd
+        - echo "print('hello world')" > %PREFIX%\cmd\test.py
+
+  python:
+    skip_pyc_compilation:
+      - test_skippy.py
+
+requirements:
+  host:
+    - python 3.11.*
+
+tests:
+  - script:
+      - if: unix
+        then:
+          - test -f $PREFIX/__pycache__/test.cpython-311.pyc
+          - test -f $PREFIX/cmd/__pycache__/test.cpython-311.pyc
+          - test ! -f $PREFIX/__pycache__/test_skippy.cpython-311.pyc
+      - if: win
+        then:
+          - if not exist %PREFIX%\__pycache__\test.cpython-311.pyc exit 1
+          - if not exist %PREFIX%\cmd\__pycache__\test.cpython-311.pyc exit 1
+          - if exist %PREFIX%\__pycache__\test_skippy.cpython-311.pyc exit 1

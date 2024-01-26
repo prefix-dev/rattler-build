@@ -428,3 +428,17 @@ def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     assert hash_input["some_option"] == "DEF"
     hash_input = json.loads((v2 / "info/hash_input.json").read_text())
     assert hash_input["some_option"] == "ABC"
+
+def test_compile_python(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "python_compilation/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "python_compilation")
+
+    assert (pkg / "info/paths.json").exists()
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert (
+        len([p for p in paths["paths"] if p["_path"].endswith(".cpython-311.pyc")]) == 2
+    )

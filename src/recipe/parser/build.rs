@@ -321,12 +321,18 @@ pub struct Python {
     /// These contain the name of the executable and the module + function that should be executed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub entry_points: Vec<EntryPoint>,
+
+    /// Skip pyc compilation for these files.
+    /// This is useful for files that are not meant to be imported.
+    /// Only relevant for non-noarch Python packages.
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub skip_pyc_compilation: GlobVec,
 }
 
 impl Python {
     /// Returns true if this is the default python configuration.
     pub fn is_default(&self) -> bool {
-        self.entry_points.is_empty()
+        self.entry_points.is_empty() && self.skip_pyc_compilation.is_empty()
     }
 }
 
@@ -341,7 +347,7 @@ impl TryConvertNode<Python> for RenderedNode {
 impl TryConvertNode<Python> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Python, Vec<PartialParsingError>> {
         let mut python = Python::default();
-        validate_keys!(python, self.iter(), entry_points);
+        validate_keys!(python, self.iter(), entry_points, skip_pyc_compilation);
         Ok(python)
     }
 }
