@@ -103,6 +103,9 @@ pub fn linking_checks(
                 }
             }
         } else {
+            if !SharedObject::test_file(file)? {
+                continue;
+            }
             let so = SharedObject::new(file)?;
             for lib in so.libraries {
                 let libpath = PathBuf::from("lib").join(lib);
