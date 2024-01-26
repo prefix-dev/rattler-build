@@ -603,7 +603,7 @@ mod tests {
     #[test]
     #[cfg(any(target_os = "linux"))]
     fn test_allow_missing_dso() {
-        let tmp = tmp("test_allow_missing_dsok");
+        let tmp = tmp("test_allow_missing_dso");
         let rattler_build = rattler().build(
             recipes().join("allow_missing_dso"),
             tmp.as_dir(),
