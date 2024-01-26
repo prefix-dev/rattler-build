@@ -1,0 +1,10 @@
+platform: linux-64
+package_contents:
+  lib:
+    - test
+    - testb
+    - testc
+paths:
+  - lib/libtest.so
+  - lib/testb.so
+  - lib/testc.so.1.0.0

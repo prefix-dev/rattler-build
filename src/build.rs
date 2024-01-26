@@ -338,13 +338,9 @@ pub async fn run_build(
     for test in output.recipe.tests() {
         // TODO we could also run each of the (potentially multiple) test scripts and collect the errors
         if let TestType::PackageContents(package_contents) = test {
-            package_test::run_package_content_test(
-                package_contents,
-                &paths_json,
-                &output.build_configuration.target_platform,
-            )
-            .await
-            .into_diagnostic()?;
+            package_contents
+                .run_test(&paths_json, &output.build_configuration.target_platform)
+                .into_diagnostic()?;
         }
     }
 

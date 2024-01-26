@@ -1,0 +1,13 @@
+platform: win-64
+package_contents:
+  lib:
+    - test
+    - testb
+    - testc
+paths:
+  - Library/lib/test.lib
+  - Library/bin/test.dll
+  - Library/lib/testb.lib
+  - Library/bin/testb.dll
+  - Library/lib/testc.lib
+  - Library/bin/testc.dll

@@ -86,12 +86,12 @@ pub enum TestType {
     /// A test that runs the tests of a downstream package
     Downstream(DownstreamTest),
     /// A test that checks the contents of the package
-    PackageContents(PackageContents),
+    PackageContents(PackageContentsTest),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 /// PackageContent
-pub struct PackageContents {
+pub struct PackageContentsTest {
     /// file paths, direct and/or globs
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub files: Vec<String>,
@@ -142,7 +142,7 @@ impl TryConvertNode<TestType> for RenderedNode {
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(TestType::PackageContents(PackageContents::default())),
+            RenderedNode::Null(_) => Ok(TestType::PackageContents(PackageContentsTest::default())),
         }
     }
 }
@@ -162,7 +162,7 @@ pub fn as_mapping(
 
 impl TryConvertNode<TestType> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<TestType, Vec<PartialParsingError>> {
-        let mut test = TestType::PackageContents(PackageContents::default());
+        let mut test = TestType::PackageContents(PackageContentsTest::default());
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
@@ -365,21 +365,21 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
 /// Package Contents    ///
 ///////////////////////////
 
-impl TryConvertNode<PackageContents> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<PackageContents, Vec<PartialParsingError>> {
+impl TryConvertNode<PackageContentsTest> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Mapping(map) => map.try_convert(name),
             RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(PackageContents::default()),
+            RenderedNode::Null(_) => Ok(PackageContentsTest::default()),
         }
     }
 }
 
-impl TryConvertNode<PackageContents> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<PackageContents, Vec<PartialParsingError>> {
+impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
         let mut files = vec![];
         let mut site_packages = vec![];
         let mut lib = vec![];
@@ -403,7 +403,7 @@ impl TryConvertNode<PackageContents> for RenderedMappingNode {
             Ok(())
         }).flatten_errors()?;
 
-        Ok(PackageContents {
+        Ok(PackageContentsTest {
             files,
             site_packages,
             bin,
