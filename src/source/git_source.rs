@@ -175,7 +175,7 @@ pub fn git_src(
     // Resolve the reference and set the head to the specified revision.
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", "HEAD"])
+        .args(["rev-parse", rev.as_str()])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
 
