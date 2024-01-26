@@ -79,10 +79,8 @@ Recipe {
             interpreter: None,
             env: {},
             secrets: [],
-            content: Commands(
-                [
-                    "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install",
-                ],
+            content: CommandOrPath(
+                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install",
             ),
         },
         noarch: NoArchType(
