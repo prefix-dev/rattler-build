@@ -287,6 +287,20 @@ Recipe {
         },
     },
     tests: [
+        PackageContents(
+            PackageContentsTest {
+                files: [
+                    "share/cmake/xtensor/xtensorConfig.cmake",
+                    "share/cmake/xtensor/xtensorConfigVersion.cmake",
+                ],
+                site_packages: [],
+                bin: [],
+                lib: [],
+                include: [
+                    "xtensor/xarray.hpp",
+                ],
+            },
+        ),
         Command(
             CommandsTest {
                 script: [

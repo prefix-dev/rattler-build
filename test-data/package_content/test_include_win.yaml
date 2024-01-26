@@ -1,0 +1,8 @@
+platform: win-64
+package_contents:
+  include:
+    - xtensor.hpp
+    - xtensor/xarray.hpp
+paths:
+  - Library/include/xtensor.hpp
+  - Library/include/xtensor/xarray.hpp

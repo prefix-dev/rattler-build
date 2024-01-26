@@ -39,8 +39,8 @@ pub use self::{
     script::{Script, ScriptContent},
     source::{Checksum, GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
-        CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest, PackageContents,
-        PythonTest, TestType,
+        CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
+        PackageContentsTest, PythonTest, TestType,
     },
 };
 

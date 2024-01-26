@@ -1,0 +1,8 @@
+platform: linux-64
+package_contents:
+  include:
+    - xtensor.hpp
+    - xtensor/xarray.hpp
+paths:
+  - include/xtensor.hpp
+  - include/xtensor/xarray.hpp

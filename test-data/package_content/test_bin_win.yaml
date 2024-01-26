@@ -1,0 +1,16 @@
+platform: win-64
+package_contents:
+  bin:
+    - curl
+    - curl-mingw2
+    - python-entry-point
+    - noextension
+    - oldschool
+    - batch
+paths:
+  - Library/bin/curl.exe
+  - Library/bin/noextension
+  - Library/mingw-w64/bin/curl.exe
+  - Scripts/python-entry-point.exe
+  - oldschool.com
+  - batch.bat

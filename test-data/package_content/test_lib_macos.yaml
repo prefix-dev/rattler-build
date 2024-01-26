@@ -1,0 +1,10 @@
+platform: osx-64
+package_contents:
+  lib:
+    - test
+    - testb
+    - testc
+paths:
+  - lib/libtest.dylib
+  - lib/testb.4.dylib
+  - lib/libtestc.1.0.0.dylib

@@ -1,0 +1,13 @@
+platform: linux-64
+package_contents:
+  site_packages:
+    - numpy
+    - numpy.superfunc
+    - numpy.xfunc
+    - numpy.blabla
+    - numpy/blabla*
+
+paths:
+  - lib/python3.8/site-packages/numpy/__init__.py
+  - lib/python3.8/site-packages/numpy/blabla.py
+  - lib/python3.8/site-packages/numpy/superfunc/__init__.py

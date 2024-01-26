@@ -727,14 +727,14 @@ import bsdiff4
 import bspatch4
 ```
 
-### Check for package-contents
+### Check for package contents
 
 Checks if the built package contains the mentioned items. These checks are executed directly at
 the end of the build process to make sure that all expected files are present in the package.
 
 ```yaml
 tests:
-  - package-contents:
+  - package_contents:
       # checks for the existence of files inside $PREFIX or %PREFIX%
       # or, checks that there is at least one file matching the specified `glob`
       # pattern inside the prefix
@@ -761,8 +761,8 @@ tests:
         - mamba
 
       # searches for `$PREFIX/include/libmamba/mamba.hpp` on unix, and
-      # on Windows for `%PREFIX%\Library\include\mamba.hpp`
-      includes:
+      # on Windows for `%PREFIX%\Library\include\libmamba\mamba.hpp`
+      include:
         - libmamba/mamba.hpp
 ```
 

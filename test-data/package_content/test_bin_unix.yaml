@@ -1,0 +1,6 @@
+platform: linux-64
+package_contents:
+  bin:
+    - curl
+paths:
+  - bin/curl

@@ -1,0 +1,11 @@
+platform: win-64
+package_contents:
+  site_packages:
+    - numpy
+    - numpy.superfunc
+    - numpy.blabla
+
+paths:
+  - Lib/site-packages/numpy/__init__.py
+  - Lib/site-packages/numpy/blabla.py
+  - Lib/site-packages/numpy/superfunc/__init__.py
