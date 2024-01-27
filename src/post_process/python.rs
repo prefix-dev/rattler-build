@@ -7,9 +7,12 @@
 
 use fs_err as fs;
 use globset::GlobSet;
+use itertools::Itertools;
 use std::collections::HashSet;
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use tokio_util::bytes::buf;
 
 use rattler_conda_types::Platform;
 
@@ -205,4 +208,90 @@ pub fn python(
     }
 
     Ok(result)
+}
+
+fn python_in_prefix(prefix: &str, osx_is_app: bool) -> String {
+    if osx_is_app {
+        format!("/bin/bash {}/bin/pythonw", prefix)
+    } else {
+        format!("{}/bin/python", prefix)
+    }
+}
+
+fn replace_shebang(shebang: &str, prefix: &str, osx_is_app: bool) -> String {
+    // skip first two characters
+    let shebang = &shebang[2..];
+    // split the shebang into its components
+    let parts = shebang.split_whitespace().collect::<Vec<_>>();
+
+    let mut parts = parts.iter().map(|p| {
+        if p.ends_with("/python") || p.ends_with("/pythonw") {
+            python_in_prefix(prefix, osx_is_app)
+        } else {
+            p.to_string()
+        }
+    });
+
+    format!("#!{}", parts.join(" "))
+}
+
+fn fix_shebang(path: &Path) -> Result<(), io::Error> {
+    let file = fs::File::open(path)?;
+    let reader = BufReader::new(file);
+
+    // read first line of file
+    let mut reader_iter = reader.lines();
+
+    // TODO better error handling & make sure it's not a binary file
+    let line = if let Some(Ok(l)) = reader_iter.next() {
+        l
+    } else {
+        return Ok(());
+    };
+
+    // check if it starts with #!
+    if !line.starts_with("#!") {
+        return Ok(());
+    }
+
+    let osx_is_app = true;
+    let prefix_str = "/Users/runner/miniforge3";
+
+    let new_shebang = replace_shebang(&line, prefix_str, osx_is_app);
+
+    let file = fs::File::open(path)?;
+    let mut buf_writer = io::BufWriter::new(file);
+
+    buf_writer.write(new_shebang.as_bytes())?;
+    buf_writer.write(b"\n")?;
+    for line in reader_iter {
+        buf_writer.write(line?.as_bytes())?;
+        buf_writer.write(b"\n")?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replace_shebang() {
+        let shebang = "#!/some/path/to/python";
+        let prefix = "/Users/runner/miniforge3";
+        let new_shebang = replace_shebang(shebang, prefix, true);
+
+        assert_eq!(
+            new_shebang,
+            "#!/bin/bash /Users/runner/miniforge3/bin/pythonw"
+        );
+
+        let new_shebang = replace_shebang(shebang, prefix, false);
+        assert_eq!(new_shebang, "#!/Users/runner/miniforge3/bin/python");
+
+        let shebang = "#!/some/path/to/ruby";
+        let new_shebang = replace_shebang(shebang, prefix, false);
+        assert_eq!(new_shebang, "#!/some/path/to/ruby");
+    }
 }
