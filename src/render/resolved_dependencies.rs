@@ -553,16 +553,15 @@ pub async fn resolve_dependencies(
         }
     }
 
-    let match_specs = specs
-        .iter()
-        .map(|s| s.spec().clone())
-        .chain(
+    let mut match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+    if merge_build_host {
+        match_specs.extend(
             build_env
                 .iter()
                 .flat_map(|be| be.specs.iter().map(|s| s.spec()))
                 .cloned(),
-        )
-        .collect::<Vec<_>>();
+        );
+    }
 
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
