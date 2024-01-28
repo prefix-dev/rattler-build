@@ -413,9 +413,8 @@ impl VariantConfig {
                 }
             }));
 
-            let variants = parsed_recipe.build().variant();
-            let use_keys = variants.map(|a| &a.use_keys);
-            used_vars.extend(use_keys.cloned().unwrap_or_default().into_iter());
+            let use_keys = &parsed_recipe.build().variant().use_keys;
+            used_vars.extend(use_keys.into_iter().cloned());
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
@@ -705,11 +704,8 @@ impl VariantConfig {
                 );
                 let version = parsed_recipe.package().version().to_string();
 
-                let variants = parsed_recipe.build().variant();
-                let ignore_keys = variants.map(|v| &v.ignore_keys);
-                if let Some(ignore_keys) = ignore_keys {
-                    used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
-                }
+                let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
+                used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
 
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),

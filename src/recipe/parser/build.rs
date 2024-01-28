@@ -65,6 +65,16 @@ impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
     }
 }
 
+impl VariantKeyUsage {
+    fn is_default(&self) -> bool {
+        let VariantKeyUsage {
+            use_keys,
+            ignore_keys,
+        } = self;
+        use_keys.is_empty() && ignore_keys.is_empty()
+    }
+}
+
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -101,8 +111,8 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(super) merge_build_and_host_envs: bool,
     /// Variant ignore and use keys
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) variant: Option<VariantKeyUsage>,
+    #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
+    pub(super) variant: VariantKeyUsage,
 }
 
 impl Build {
@@ -112,8 +122,8 @@ impl Build {
     }
 
     /// Variant ignore and use keys
-    pub const fn variant(&self) -> Option<&VariantKeyUsage> {
-        self.variant.as_ref()
+    pub(crate) const fn variant(&self) -> &VariantKeyUsage {
+        &self.variant
     }
 
     /// Get the build number.
