@@ -222,7 +222,7 @@ impl TryConvertNode<Script> for RenderedSequenceNode {
 impl TryConvertNode<Script> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
         let invalid = self.keys().find(|k| {
-            matches!(
+            !matches!(
                 k.as_str(),
                 "env" | "secrets" | "interpreter" | "content" | "file"
             )
