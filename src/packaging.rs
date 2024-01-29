@@ -451,35 +451,11 @@ fn write_to_dest(
         return Ok(None);
     }
 
-    let ext = path.extension().unwrap_or_default();
-    // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
-    if ext == "pyo" {
-        return Ok(None); // skip .pyo files
-    }
-
-    if ext == "py" || ext == "pyc" {
-        // if we have a .so file of the same name, skip this path
-        let so_path = path.with_extension("so");
-        let pyd_path = path.with_extension("pyd");
-        if so_path.exists() || pyd_path.exists() {
-            return Ok(None);
-        }
+    if post_process::python::filter_file(path_rel, noarch_type.is_python()) {
+        return Ok(None);
     }
 
     if noarch_type.is_python() {
-        // skip .pyc or .pyo or .egg-info files
-        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
-            return Ok(None); // skip .pyc files
-        }
-
-        // if any part of the path is __pycache__ skip it
-        if path_rel
-            .components()
-            .any(|c| c == Component::Normal("__pycache__".as_ref()))
-        {
-            return Ok(None);
-        }
-
         if path_rel
             .components()
             .any(|c| c == Component::Normal("site-packages".as_ref()))

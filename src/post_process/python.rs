@@ -6,7 +6,7 @@
 //!   of the package, or linking to system libraries that are not part of the allowed list)
 
 use fs_err as fs;
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, path::{Component, Path, PathBuf}};
 
 use rattler_conda_types::PackageName;
 
@@ -48,4 +48,38 @@ pub fn python(
     }
 
     Ok(())
+}
+
+pub fn filter_file(path: &Path, noarch_python: bool) -> bool {
+    let ext = path.extension().unwrap_or_default();
+    // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
+    if ext == "pyo" {
+        return true; // skip .pyo files
+    }
+
+    if ext == "py" || ext == "pyc" {
+        // if we have a .so file of the same name, skip this path
+        let so_path = path.with_extension("so");
+        let pyd_path = path.with_extension("pyd");
+        if so_path.exists() || pyd_path.exists() {
+            return true;
+        }
+    }
+
+    if noarch_python {
+        // skip .pyc or .pyo or .egg-info files
+        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
+            return true; // skip .pyc files
+        }
+
+        // if any part of the path is __pycache__ skip it
+        if path
+            .components()
+            .any(|c| c == Component::Normal("__pycache__".as_ref()))
+        {
+            return true;
+        }
+    }
+
+    false
 }
