@@ -410,6 +410,26 @@ impl VariantConfig {
                         .name
                         .as_ref()
                         .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::PinSubpackage(pin_sub) => {
+                        println!("pin_sub: {:?}", pin_sub);
+                        let pin = pin_sub.pin_value();
+                        Some(pin.name.as_normalized().to_string())
+                    },
+                    _ => None,
+                }
+            }));
+
+            used_vars.extend(parsed_recipe.requirements().run().iter().filter_map(|dep| {
+                match dep {
+                    Dependency::Spec(spec) => spec
+                        .name
+                        .as_ref()
+                        .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::PinSubpackage(pin_sub) => {
+                        println!("pin_sub: {:?}", pin_sub);
+                        let pin = pin_sub.pin_value();
+                        Some(pin.name.as_normalized().to_string())
+                    },
                     _ => None,
                 }
             }));
@@ -449,6 +469,9 @@ impl VariantConfig {
 
         // Add an edge for each pair of outputs where one uses a variable defined by the other
         for (output, (_, used_vars, _)) in &outputs_map {
+            println!("output: {}", output);
+            println!("used_vars: {:?}", used_vars);
+
             let output_node_index = *node_indices
                 .get(output)
                 .expect("unreachable, we insert keys in the loop above");
