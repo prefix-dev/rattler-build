@@ -1,0 +1,13 @@
+package:
+  name: script_env
+  version: 0.1.0
+
+build:
+  script:
+    env:
+      FOO: Hello World!
+    content:
+      - if: unix
+        then: echo "FOO is $FOO" > $PREFIX/hello.txt
+      - if: win
+        then: echo "FOO is %FOO%" > %PREFIX%\hello.txt
