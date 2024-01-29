@@ -374,4 +374,5 @@ def test_script_env_in_recipe(
 
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
-    assert content.startswith("FOO is Hello World!")
+    # Windows adds quotes to the string so we just check with `in`
+    assert "FOO is Hello World!" in content
