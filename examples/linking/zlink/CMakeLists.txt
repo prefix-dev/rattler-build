@@ -15,4 +15,3 @@ target_link_libraries(zlink ${ZLIB_LIBRARIES})
 
 # Install the executable to bin/zlink
 install(TARGETS zlink DESTINATION bin/)
-
