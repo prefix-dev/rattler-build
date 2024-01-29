@@ -306,25 +306,6 @@ pub async fn run_build(
         ],
     )?;
 
-    let files_after = record_files(&directories.host_prefix).expect("Could not record files");
-
-    let mut difference = files_after
-        .difference(&files_before)
-        .cloned()
-        .collect::<HashSet<_>>();
-
-    if let Some(always_include_files) = output.recipe.build().always_include_files() {
-        for file in files_after {
-            let file_without_prefix = file
-                .strip_prefix(&directories.host_prefix)
-                .into_diagnostic()?;
-            if always_include_files.is_match(file_without_prefix) {
-                tracing::info!("Forcing inclusion of file: {:?}", file);
-                difference.insert(file.clone());
-            }
-        }
-    }
-
     let (result, paths_json) = package_conda(
         &output,
         &difference,

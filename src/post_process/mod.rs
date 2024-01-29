@@ -14,6 +14,9 @@ use crate::metadata::Output;
 pub mod package_nature;
 pub mod python;
 pub mod relink;
+pub mod package_files;
+
+pub use package_files::PackageFiles;
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {

@@ -416,15 +416,6 @@ fn create_run_exports_json(output: &Output) -> Result<Option<String>, PackagingE
     }
 }
 
-/// This function returns a HashSet of (recursively) all the files in the given directory.
-pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>, PackagingError> {
-    let mut res = HashSet::new();
-    for entry in WalkDir::new(directory) {
-        res.insert(entry?.path().to_owned());
-    }
-    Ok(res)
-}
-
 /// This function copies the given file to the destination folder and
 /// transforms it on the way if needed.
 ///
