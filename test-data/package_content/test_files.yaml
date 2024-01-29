@@ -13,4 +13,3 @@ paths:
   - pkg-config/bla.pc
 fail_paths:
   - assets/music/track1.ogg
-

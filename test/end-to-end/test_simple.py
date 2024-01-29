@@ -361,3 +361,17 @@ def test_always_include_files(
     assert paths["paths"][0].get("no_link") is None
     assert (pkg_force / "hello.txt").exists()
     assert "Force include new file" in (pkg_force / "hello.txt").read_text()
+
+
+def test_script_env_in_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "script_env/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "script_env")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert content.startswith("FOO is Hello World!")
