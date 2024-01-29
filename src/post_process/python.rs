@@ -13,6 +13,11 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tokio_util::bytes::buf;
+use std::{
+    collections::HashSet,
+    io::{self, BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+};
 
 use rattler_conda_types::Platform;
 
@@ -210,15 +215,7 @@ pub fn python(
     Ok(result)
 }
 
-fn python_in_prefix(prefix: &str, osx_is_app: bool) -> String {
-    if osx_is_app {
-        format!("/bin/bash {}/bin/pythonw", prefix)
-    } else {
-        format!("{}/bin/python", prefix)
-    }
-}
-
-fn replace_shebang(shebang: &str, prefix: &str, osx_is_app: bool) -> String {
+fn replace_shebang(shebang: &str, prefix: &Path, osx_is_app: bool) -> String {
     // skip first two characters
     let shebang = &shebang[2..];
     // split the shebang into its components
@@ -226,7 +223,7 @@ fn replace_shebang(shebang: &str, prefix: &str, osx_is_app: bool) -> String {
 
     let mut parts = parts.iter().map(|p| {
         if p.ends_with("/python") || p.ends_with("/pythonw") {
-            python_in_prefix(prefix, osx_is_app)
+            python_bin(prefix, osx_is_app)
         } else {
             p.to_string()
         }
@@ -235,7 +232,12 @@ fn replace_shebang(shebang: &str, prefix: &str, osx_is_app: bool) -> String {
     format!("#!{}", parts.join(" "))
 }
 
-fn fix_shebang(path: &Path) -> Result<(), io::Error> {
+fn fix_shebang(path: &Path, encoded_prefix: &Path, osx_is_app: bool) -> Result<(), io::Error> {
+    // make sure that path is a regular file
+    if path.is_symlink() || !path.is_file() {
+        return Ok(());
+    }
+
     let file = fs::File::open(path)?;
     let reader = BufReader::new(file);
 
@@ -243,31 +245,35 @@ fn fix_shebang(path: &Path) -> Result<(), io::Error> {
     let mut reader_iter = reader.lines();
 
     // TODO better error handling & make sure it's not a binary file
-    let line = if let Some(Ok(l)) = reader_iter.next() {
+    let line = if let Some(l) = reader_iter.next().transpose()? {
         l
     } else {
         return Ok(());
     };
-
+    println!("Line: {}", line);
     // check if it starts with #!
     if !line.starts_with("#!") {
+        println!("Skipping file because it does not start with #!");
         return Ok(());
     }
 
-    let osx_is_app = true;
-    let prefix_str = "/Users/runner/miniforge3";
+    let new_shebang = replace_shebang(&line, encoded_prefix, osx_is_app);
+    println!("New shebang: {}", new_shebang);
+    let tmp_path = path.with_extension("tmp");
+    {
+        let file = fs::File::create(&tmp_path)?;
+        let mut buf_writer = io::BufWriter::new(file);
 
-    let new_shebang = replace_shebang(&line, prefix_str, osx_is_app);
-
-    let file = fs::File::open(path)?;
-    let mut buf_writer = io::BufWriter::new(file);
-
-    buf_writer.write(new_shebang.as_bytes())?;
-    buf_writer.write(b"\n")?;
-    for line in reader_iter {
-        buf_writer.write(line?.as_bytes())?;
-        buf_writer.write(b"\n")?;
+        buf_writer.write_all(new_shebang.as_bytes())?;
+        buf_writer.write_all(b"\n")?;
+        for line in reader_iter {
+            buf_writer.write_all(line?.as_bytes())?;
+            buf_writer.write_all(b"\n")?;
+        }
+        buf_writer.flush()?;
     }
+
+    fs::rename(tmp_path, path)?;
 
     Ok(())
 }
@@ -279,19 +285,35 @@ mod tests {
     #[test]
     fn test_replace_shebang() {
         let shebang = "#!/some/path/to/python";
-        let prefix = "/Users/runner/miniforge3";
-        let new_shebang = replace_shebang(shebang, prefix, true);
+        let prefix = PathBuf::from("/Users/runner/miniforge3");
+        let new_shebang = replace_shebang(shebang, &prefix, true);
 
         assert_eq!(
             new_shebang,
             "#!/bin/bash /Users/runner/miniforge3/bin/pythonw"
         );
 
-        let new_shebang = replace_shebang(shebang, prefix, false);
+        let new_shebang = replace_shebang(shebang, &prefix, false);
         assert_eq!(new_shebang, "#!/Users/runner/miniforge3/bin/python");
 
         let shebang = "#!/some/path/to/ruby";
-        let new_shebang = replace_shebang(shebang, prefix, false);
+        let new_shebang = replace_shebang(shebang, &prefix, false);
         assert_eq!(new_shebang, "#!/some/path/to/ruby");
+    }
+
+    #[test]
+    fn test_replace_shebang_in_file() {
+        let tempdir = tempfile::tempdir().unwrap();
+        let test_data_folder = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/shebang");
+
+        // copy file
+        let dest = tempdir.path().join("test.py");
+        fs::copy(test_data_folder.join("replace_shebang_1.py"), &dest).unwrap();
+        fix_shebang(&dest, &PathBuf::from("/super/prefix"), false).unwrap();
+        insta::assert_snapshot!(fs::read_to_string(&dest).unwrap());
+
+        fs::copy(test_data_folder.join("replace_shebang_2.py"), &dest).unwrap();
+        fix_shebang(&dest, &PathBuf::from("/super/prefix"), true).unwrap();
+        insta::assert_snapshot!(fs::read_to_string(&dest).unwrap());
     }
 }
