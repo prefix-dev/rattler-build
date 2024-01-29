@@ -456,7 +456,7 @@ pub async fn resolve_dependencies(
     let reqs = &output.recipe.requirements();
     let mut compatibility_specs = HashMap::new();
 
-    let build_env = if !reqs.build.is_empty() {
+    let build_env = if !reqs.build.is_empty() && !merge_build_host {
         let specs = apply_variant(
             reqs.build(),
             &output.build_configuration,
@@ -555,12 +555,13 @@ pub async fn resolve_dependencies(
 
     let mut match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
     if merge_build_host {
-        match_specs.extend(
-            build_env
-                .iter()
-                .flat_map(|be| be.specs.iter().map(|s| s.spec()))
-                .cloned(),
-        );
+        // add the reqs of build to host
+        let specs = apply_variant(
+            reqs.build(),
+            &output.build_configuration,
+            &compatibility_specs,
+        )?;
+        match_specs.extend(specs.iter().map(|s| s.spec().clone()));
     }
 
     let host_env = if !match_specs.is_empty() {
@@ -696,6 +697,7 @@ pub async fn resolve_dependencies(
     }
 
     Ok(FinalizedDependencies {
+        // build_env is empty now!
         build: build_env,
         host: host_env,
         run: run_specs,
