@@ -1,0 +1,30 @@
+package:
+  name: crazy_characters
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - python $RECIPE_DIR/test.py
+
+requirements:
+  build:
+    - python
+
+tests:
+  - package_contents:
+      files:
+        - files/File(Glob …).tmSnippet
+        - files/a $random_crazy file name with spaces and (parentheses).txt
+        - files/a_really_long_placeholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholder.txt
+  - script:
+      - if: unix
+        then:
+          - test -f "$PREFIX/files/File(Glob …).tmSnippet"
+          - test -f $PREFIX'/files/a $random_crazy file name with spaces and (parentheses).txt'
+          - test -f "$PREFIX/files/a_really_long_placeholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholder.txt"
+      - if: win
+        then:
+          - if not exist %PREFIX%\files\File(Glob …).tmSnippet exit 1
+          - if not exist %PREFIX%\files\a $random_crazy file name with spaces and (parentheses).txt exit 1
+          - if not exist %PREFIX%\files\a_really_long_placeholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholder.txt exit 1

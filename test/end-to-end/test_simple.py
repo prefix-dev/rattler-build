@@ -376,3 +376,23 @@ def test_script_env_in_recipe(
     content = (pkg / "hello.txt").read_text()
     # Windows adds quotes to the string so we just check with `in`
     assert "FOO is Hello World!" in content
+
+
+def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "crazy_characters/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "crazy_characters")
+    assert (pkg / "info/paths.json").exists()
+
+    file_1 = pkg / "files" / "File(Glob …).tmSnippet"
+    assert file_1.read_text() == file_1.name
+
+    file_2 = (
+        pkg / "files" / "a $random_crazy file name with spaces and (parentheses).txt"
+    )
+    assert file_2.read_text() == file_2.name
+
+    file_3 = pkg / "files" / ("a_really_long_" + ("placeholder" * 20) + ".txt")
+    assert file_3.read_text() == file_3.name
