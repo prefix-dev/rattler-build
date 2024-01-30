@@ -8,12 +8,12 @@
 //! * `files` - check if a list of files exist
 
 use fs_err as fs;
+use std::fmt::Write as fmt_write;
 use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
-use std::fmt::Write as fmt_write;
 
 use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
@@ -123,12 +123,7 @@ fn run_in_environment(
         String::new()
     };
 
-    let mut tmpstring  = String::new();
-    let mut tmpfile = tempfile::Builder::new()
-        .prefix("rattler-test-")
-        .suffix(&format!(".{}", shell.extension()))
-        .tempfile()?;
-
+    let mut script_content = String::new();
     let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
 
     let os_vars = env_vars::os_vars(environment, &Platform::current());
@@ -140,21 +135,29 @@ fn run_in_environment(
     }
 
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
-    writeln!(tmpstring, "chcp 65001 > nul").unwrap();
-    writeln!(tmpstring, "{}", additional_script.contents).unwrap();
-    writeln!(tmpstring, "{}", host_activation.script).unwrap();
-    writeln!(tmpstring, "{}", build_activation_script).unwrap();
+    writeln!(script_content, "{}", additional_script.contents).unwrap();
+    writeln!(script_content, "{}", host_activation.script).unwrap();
+    writeln!(script_content, "{}", build_activation_script).unwrap();
     if matches!(shell, ShellEnum::Bash(_)) {
-        writeln!(tmpstring, "set -x").unwrap();
+        writeln!(script_content, "set -x").unwrap();
     }
-    writeln!(tmpstring, "{}", cmd).unwrap();
-    tmpstring = tmpstring.replace("\n", "\r\n");
-    tmpfile.write_all(tmpstring.as_bytes())?;
+    writeln!(script_content, "{}", cmd).unwrap();
+
+    let mut tmpfile = tempfile::Builder::new()
+        .prefix("rattler-test-")
+        .suffix(&format!(".{}", shell.extension()))
+        .tempfile()?;
+
+    if matches!(shell, ShellEnum::CmdExe(_)) {
+        script_content = format!("chcp 65001 > nul\n{script_content}").replace('\n', "\r\n");
+        tmpfile.write_all(script_content.as_bytes())?;
+    } else {
+        tmpfile.write_all(script_content.as_bytes())?;
+    }
 
     let tmpfile_path = tmpfile.into_temp_path();
 
-    // print the contents of tmpfile
-    tracing::info!("Running test script:\n{}", fs::read_to_string(&tmpfile_path)?);
+    tracing::info!("Running test script:\n{}", script_content);
 
     let executable = shell.executable();
     let status = match shell {
@@ -171,9 +174,8 @@ fn run_in_environment(
             .status()?,
         _ => todo!("No shells implemented beyond cmd.exe and bash"),
     };
-    println!("test status: {}", status);
+
     if !status.success() {
-        println!("test failed");
         return Err(TestError::TestFailed);
     }
 
@@ -391,6 +393,11 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             println!("test {:?}", entry.path());
             run_individual_test(&pkg, &entry.path(), &prefix, config).await?;
         }
+
+        tracing::info!(
+            "{} all tests passed!",
+            console::style(console::Emoji("✔", "")).green()
+        );
     }
 
     fs::remove_dir_all(prefix)?;
@@ -544,6 +551,11 @@ async fn run_individual_test(
     } else {
         // no test found
     }
+
+    println!(
+        "{} test passed!",
+        console::style(console::Emoji("✔", "")).green()
+    );
 
     Ok(())
 }
