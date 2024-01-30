@@ -195,12 +195,13 @@ struct BuildOpts {
     #[arg(long)]
     no_build_id: bool,
 
-    /// The package format to use for the build.
-    /// Defaults to `.tar.bz2`.
+    /// The package format to use for the build. Can be one of `tar-bz2` or `conda`.
+    /// You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
     #[arg(long, default_value = "tar-bz2")]
     package_format: PackageFormatAndCompression,
 
     #[arg(long)]
+    /// The number of threads to use for compression (only relevant when also using `--package-format conda`)
     compression_threads: Option<u32>,
 
     /// Do not store the recipe in the final package

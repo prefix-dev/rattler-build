@@ -1196,6 +1196,10 @@ where
         let mut map = BTreeMap::new();
         for (key, value) in self.iter() {
             let key = key.try_convert(name)?;
+            // skip over null values
+            if matches!(value, RenderedNode::Null(_)) {
+                continue;
+            }
             let value = value.try_convert(name)?;
             map.insert(key, value);
         }

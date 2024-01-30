@@ -1,0 +1,15 @@
+package:
+  name: bla
+  version: "0.1.0"
+
+build:
+  noarch: generic
+  script:
+    env:
+      FOO: ${{ some_option }}
+    content:
+      - if: unix
+        then:
+          - echo $FOO > $PREFIX/foo.txt
+        else:
+          - echo %FOO% > %PREFIX%\foo.txt
