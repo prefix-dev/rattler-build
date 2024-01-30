@@ -256,7 +256,7 @@ impl PackageContentsTest {
             let matches = match_glob(&glob.1, &paths);
 
             if !matches.is_empty() {
-                display_success(&matches, &glob.0, "bin");
+                display_success(&matches, &glob.0, "lib");
             }
 
             if matches.is_empty() {
@@ -268,7 +268,7 @@ impl PackageContentsTest {
             let matches = match_glob(&glob.1, &paths);
 
             if !matches.is_empty() {
-                display_success(&matches, &glob.0, "bin");
+                display_success(&matches, &glob.0, "site_packages");
             }
 
             if matches.is_empty() {
@@ -280,11 +280,11 @@ impl PackageContentsTest {
             let matches = match_glob(&glob.1, &paths);
 
             if !matches.is_empty() {
-                display_success(&matches, &glob.0, "bin");
+                display_success(&matches, &glob.0, "file");
             }
 
             if matches.is_empty() {
-                collected_issues.push(format!("No match for site_package glob: {}", glob.0));
+                collected_issues.push(format!("No match for file glob: {}", glob.0));
             }
         }
 

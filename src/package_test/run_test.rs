@@ -8,6 +8,7 @@
 //! * `files` - check if a list of files exist
 
 use fs_err as fs;
+use std::fmt::Write as fmt_write;
 use std::{
     io::Write,
     path::{Path, PathBuf},
@@ -33,43 +34,46 @@ use crate::{
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
-    #[error("Failed package content tests: {0}")]
+    #[error("failed package content tests: {0}")]
     PackageContentTestFailed(String),
 
-    #[error("Failed package content tests: {0}")]
+    #[error("failed package content tests: {0}")]
     PackageContentTestFailedStr(&'static str),
 
-    #[error("Failed to get environment `PREFIX` variable")]
+    #[error("failed to get environment `PREFIX` variable")]
     PrefixEnvironmentVariableNotFound,
 
-    #[error("Failed to build glob from pattern")]
+    #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
 
     #[error("failed to run test")]
     TestFailed,
 
-    #[error("Failed to read package: {0}")]
+    #[error("failed to read package: {0}")]
     PackageRead(#[from] std::io::Error),
 
-    #[error("Failed to parse MatchSpec: {0}")]
+    #[error("failed to write testing script: {0}")]
+    FailedToWriteScript(#[from] std::fmt::Error),
+
+    #[error("failed to parse MatchSpec: {0}")]
     MatchSpecParse(String),
 
-    #[error("Failed to setup test environment: {0}")]
+    #[error("failed to setup test environment: {0}")]
     TestEnvironmentSetup(#[from] anyhow::Error),
 
-    #[error("Failed to setup test environment: {0}")]
+    #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
 
-    #[error("Failed to parse JSON from test files: {0}")]
+    #[error("failed to parse JSON from test files: {0}")]
     TestJSONParseError(#[from] serde_json::Error),
 
-    #[error("Failed to parse MatchSpec from test files: {0}")]
+    #[error("failed to parse MatchSpec from test files: {0}")]
     TestMatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
 
-    #[error("Missing package file name")]
+    #[error("missing package file name")]
     MissingPackageFileName,
 
-    #[error("Archive type not supported")]
+    #[error("archive type not supported")]
     ArchiveTypeNotSupported,
 }
 
@@ -122,11 +126,7 @@ fn run_in_environment(
         String::new()
     };
 
-    let mut tmpfile = tempfile::Builder::new()
-        .prefix("rattler-test-")
-        .suffix(&format!(".{}", shell.extension()))
-        .tempfile()?;
-
+    let mut script_content = String::new();
     let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
 
     let os_vars = env_vars::os_vars(environment, &Platform::current());
@@ -138,16 +138,30 @@ fn run_in_environment(
     }
 
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
-
-    writeln!(tmpfile, "{}", additional_script.contents)?;
-    writeln!(tmpfile, "{}", host_activation.script)?;
-    writeln!(tmpfile, "{}", build_activation_script)?;
+    writeln!(script_content, "{}", additional_script.contents)?;
+    writeln!(script_content, "{}", host_activation.script)?;
+    writeln!(script_content, "{}", build_activation_script)?;
     if matches!(shell, ShellEnum::Bash(_)) {
-        writeln!(tmpfile, "set -x")?;
+        writeln!(script_content, "set -x")?;
     }
-    writeln!(tmpfile, "{}", cmd)?;
+    writeln!(script_content, "{}", cmd)?;
+
+    let mut tmpfile = tempfile::Builder::new()
+        .prefix("rattler-test-")
+        .suffix(&format!(".{}", shell.extension()))
+        .tempfile()?;
+
+    if matches!(shell, ShellEnum::CmdExe(_)) {
+        script_content = format!("chcp 65001 > nul\n{script_content}").replace('\n', "\r\n");
+        tmpfile.write_all(script_content.as_bytes())?;
+    } else {
+        tmpfile.write_all(script_content.as_bytes())?;
+    }
 
     let tmpfile_path = tmpfile.into_temp_path();
+
+    tracing::info!("Running test script:\n{}", script_content);
+
     let executable = shell.executable();
     let status = match shell {
         ShellEnum::Bash(_) => std::process::Command::new(executable)
@@ -382,6 +396,11 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             println!("test {:?}", entry.path());
             run_individual_test(&pkg, &entry.path(), &prefix, config).await?;
         }
+
+        tracing::info!(
+            "{} all tests passed!",
+            console::style(console::Emoji("✔", "")).green()
+        );
     }
 
     fs::remove_dir_all(prefix)?;
@@ -535,6 +554,11 @@ async fn run_individual_test(
     } else {
         // no test found
     }
+
+    println!(
+        "{} test passed!",
+        console::style(console::Emoji("✔", "")).green()
+    );
 
     Ok(())
 }
