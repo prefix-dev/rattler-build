@@ -395,5 +395,5 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert file_2.read_text() == file_2.name
 
     # limit on Windows is 260 chars 
-    file_3 = pkg / "files" / ("a_really_long_" + ("a" * 260) + ".txt")
+    file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
     assert file_3.read_text() == file_3.name

@@ -13,5 +13,5 @@ file_2 = (
 )
 file_2.write_text(file_2.name)
 
-file_3 = prefix / "files" / ("a_really_long_" + ("placeholder" * 20) + ".txt")
+file_3 = prefix / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
 file_3.write_text(file_3.name)

@@ -34,43 +34,46 @@ use crate::{
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
 pub enum TestError {
-    #[error("Failed package content tests: {0}")]
+    #[error("failed package content tests: {0}")]
     PackageContentTestFailed(String),
 
-    #[error("Failed package content tests: {0}")]
+    #[error("failed package content tests: {0}")]
     PackageContentTestFailedStr(&'static str),
 
-    #[error("Failed to get environment `PREFIX` variable")]
+    #[error("failed to get environment `PREFIX` variable")]
     PrefixEnvironmentVariableNotFound,
 
-    #[error("Failed to build glob from pattern")]
+    #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
 
     #[error("failed to run test")]
     TestFailed,
 
-    #[error("Failed to read package: {0}")]
+    #[error("failed to read package: {0}")]
     PackageRead(#[from] std::io::Error),
 
-    #[error("Failed to parse MatchSpec: {0}")]
+    #[error("failed to write testing script: {0}")]
+    FailedToWriteScript(#[from] std::fmt::Error),
+
+    #[error("failed to parse MatchSpec: {0}")]
     MatchSpecParse(String),
 
-    #[error("Failed to setup test environment: {0}")]
+    #[error("failed to setup test environment: {0}")]
     TestEnvironmentSetup(#[from] anyhow::Error),
 
-    #[error("Failed to setup test environment: {0}")]
+    #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
 
-    #[error("Failed to parse JSON from test files: {0}")]
+    #[error("failed to parse JSON from test files: {0}")]
     TestJSONParseError(#[from] serde_json::Error),
 
-    #[error("Failed to parse MatchSpec from test files: {0}")]
+    #[error("failed to parse MatchSpec from test files: {0}")]
     TestMatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
 
-    #[error("Missing package file name")]
+    #[error("missing package file name")]
     MissingPackageFileName,
 
-    #[error("Archive type not supported")]
+    #[error("archive type not supported")]
     ArchiveTypeNotSupported,
 }
 
@@ -135,13 +138,13 @@ fn run_in_environment(
     }
 
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
-    writeln!(script_content, "{}", additional_script.contents).unwrap();
-    writeln!(script_content, "{}", host_activation.script).unwrap();
-    writeln!(script_content, "{}", build_activation_script).unwrap();
+    writeln!(script_content, "{}", additional_script.contents)?;
+    writeln!(script_content, "{}", host_activation.script)?;
+    writeln!(script_content, "{}", build_activation_script)?;
     if matches!(shell, ShellEnum::Bash(_)) {
-        writeln!(script_content, "set -x").unwrap();
+        writeln!(script_content, "set -x")?;
     }
-    writeln!(script_content, "{}", cmd).unwrap();
+    writeln!(script_content, "{}", cmd)?;
 
     let mut tmpfile = tempfile::Builder::new()
         .prefix("rattler-test-")
