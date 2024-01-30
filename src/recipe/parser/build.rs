@@ -249,7 +249,7 @@ impl TryConvertNode<LinkingCheckBehavior> for RenderedScalarNode {
             _ => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedScalar,
-                help = format!("expected a string value for `{name}`")
+                help = format!("valid options for {name} are `ignore` or `error`")
             )]),
         }
     }

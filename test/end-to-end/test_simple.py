@@ -89,7 +89,13 @@ def get_package(folder: Path, glob="*.tar.bz2"):
 
 def get_extracted_package(folder: Path, glob="*.tar.bz2"):
     package_path = get_package(folder, glob)
-    extract_path = folder / "extract"
+
+    if package_path.name.endswith(".tar.bz2"):
+        package_without_extension = package_path.name[: -len(".tar.bz2")]
+    elif package_path.name.endswith(".conda"):
+        package_without_extension = package_path.name[: -len(".conda")]
+
+    extract_path = folder / "extract" / package_without_extension
     extract(str(package_path), dest_dir=str(extract_path))
     return extract_path
 
@@ -394,6 +400,31 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     )
     assert file_2.read_text() == file_2.name
 
-    # limit on Windows is 260 chars 
+    # limit on Windows is 260 chars
     file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
     assert file_3.read_text() == file_3.name
+
+
+def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "variant_config/recipe.yaml",
+        tmp_path,
+        variant_config=recipes / "variant_config/variant_config.yaml",
+    )
+    v1 = get_extracted_package(tmp_path, "bla-0.1.0-h2c65b68_0")
+    v2 = get_extracted_package(tmp_path, "bla-0.1.0-h48a45df_0")
+
+    assert (v1 / "info/paths.json").exists()
+    assert (v2 / "info/paths.json").exists()
+
+    assert (v1 / "info/hash_input.json").exists()
+    assert (v2 / "info/hash_input.json").exists()
+    print(v1)
+    print(v2)
+    print((v1 / "info/hash_input.json").read_text())
+    print((v2 / "info/hash_input.json").read_text())
+
+    hash_input = json.loads((v1 / "info/hash_input.json").read_text())
+    assert hash_input["some_option"] == "DEF"
+    hash_input = json.loads((v2 / "info/hash_input.json").read_text())
+    assert hash_input["some_option"] == "ABC"
