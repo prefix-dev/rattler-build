@@ -5,7 +5,11 @@ package:
 build:
   number: 0
   script:
-    - python $RECIPE_DIR/test.py
+    - if: unix
+      then:
+       - python $RECIPE_DIR/test.py
+      else:
+       - python %RECIPE_DIR%\test.py
 
 requirements:
   build:
@@ -25,6 +29,6 @@ tests:
           - test -f "$PREFIX/files/a_really_long_placeholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholder.txt"
       - if: win
         then:
-          - if not exist %PREFIX%\files\File(Glob …).tmSnippet exit 1
-          - if not exist %PREFIX%\files\a $random_crazy file name with spaces and (parentheses).txt exit 1
+          - if not exist "%PREFIX%\files\File(Glob …).tmSnippet" exit 1
+          - if not exist "%PREFIX%\files\a $random_crazy file name with spaces and (parentheses).txt" exit 1
           - if not exist %PREFIX%\files\a_really_long_placeholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholderplaceholder.txt exit 1

@@ -13,6 +13,7 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
+use std::fmt::Write as fmt_write;
 
 use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
@@ -122,6 +123,7 @@ fn run_in_environment(
         String::new()
     };
 
+    let mut tmpstring  = String::new();
     let mut tmpfile = tempfile::Builder::new()
         .prefix("rattler-test-")
         .suffix(&format!(".{}", shell.extension()))
@@ -138,16 +140,22 @@ fn run_in_environment(
     }
 
     additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
-
-    writeln!(tmpfile, "{}", additional_script.contents)?;
-    writeln!(tmpfile, "{}", host_activation.script)?;
-    writeln!(tmpfile, "{}", build_activation_script)?;
+    writeln!(tmpstring, "chcp 65001 > nul").unwrap();
+    writeln!(tmpstring, "{}", additional_script.contents).unwrap();
+    writeln!(tmpstring, "{}", host_activation.script).unwrap();
+    writeln!(tmpstring, "{}", build_activation_script).unwrap();
     if matches!(shell, ShellEnum::Bash(_)) {
-        writeln!(tmpfile, "set -x")?;
+        writeln!(tmpstring, "set -x").unwrap();
     }
-    writeln!(tmpfile, "{}", cmd)?;
+    writeln!(tmpstring, "{}", cmd).unwrap();
+    tmpstring = tmpstring.replace("\n", "\r\n");
+    tmpfile.write_all(tmpstring.as_bytes())?;
 
     let tmpfile_path = tmpfile.into_temp_path();
+
+    // print the contents of tmpfile
+    tracing::info!("Running test script:\n{}", fs::read_to_string(&tmpfile_path)?);
+
     let executable = shell.executable();
     let status = match shell {
         ShellEnum::Bash(_) => std::process::Command::new(executable)
@@ -163,8 +171,9 @@ fn run_in_environment(
             .status()?,
         _ => todo!("No shells implemented beyond cmd.exe and bash"),
     };
-
+    println!("test status: {}", status);
     if !status.success() {
+        println!("test failed");
         return Err(TestError::TestFailed);
     }
 
