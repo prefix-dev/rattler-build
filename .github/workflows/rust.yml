@@ -2,8 +2,15 @@ on:
   push:
     branches: [main]
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
+    paths:
+      - "src/**"
+      - "Cargo.*"
   pull_request:
+    paths:
+      - "src/**"
+      - "Cargo.*"
+
   workflow_dispatch:
 
 name: CI
@@ -31,7 +38,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.73.0'
+          toolchain: "1.73.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check
@@ -44,7 +51,7 @@ jobs:
         run: cargo fmt --all -- --check
       - uses: giraffate/clippy-action@v1
         with:
-          reporter: 'github-pr-check'
+          reporter: "github-pr-check"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
   build:
@@ -77,7 +84,8 @@ jobs:
       - name: Extract version
         shell: bash
         id: metadata
-        run: | # also call this step outside of $(...) to make sure the status code is propagated
+        run:
+          | # also call this step outside of $(...) to make sure the status code is propagated
           ${{ startsWith(matrix.os, 'windows') && 'choco install yq' || '' }}
           yq '.package.version' Cargo.toml
           echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
@@ -94,7 +102,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.73.0'
+          toolchain: "1.73.0"
           targets: ${{ matrix.target }}
 
       - name: Install musl-gcc
