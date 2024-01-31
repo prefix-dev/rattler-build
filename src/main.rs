@@ -8,14 +8,12 @@ use fs_err as fs;
 use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, Platform};
-use rattler_networking::AuthenticatedClient;
 use rattler_package_streaming::write::CompressionLevel;
 use std::{
     collections::BTreeMap,
     env::current_dir,
     path::PathBuf,
     str::{self, FromStr},
-    sync::Arc,
 };
 use tracing_subscriber::{
     filter::{Directive, ParseError},
@@ -453,33 +451,12 @@ async fn main() -> miette::Result<()> {
     }
 }
 
-fn get_auth_store(auth_file: Option<PathBuf>) -> rattler_networking::AuthenticationStorage {
-    match auth_file {
-        Some(auth_file) => {
-            let mut store = rattler_networking::AuthenticationStorage::new();
-            store.add_backend(Arc::from(
-                rattler_networking::authentication_storage::backends::file::FileStorage::new(
-                    auth_file,
-                ),
-            ));
-            store
-        }
-        None => rattler_networking::AuthenticationStorage::default(),
-    }
-}
-
 async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
     let test_prefix = PathBuf::from("test-prefix");
     fs::create_dir_all(&test_prefix).into_diagnostic()?;
 
-    let client = AuthenticatedClient::from_client(
-        reqwest::Client::builder()
-            .no_gzip()
-            .build()
-            .expect("failed to create client"),
-        get_auth_store(args.common.auth_file),
-    );
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
 
     let test_options = TestConfiguration {
         test_prefix,
@@ -601,13 +578,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         tracing::info!("{}\n", table);
     }
 
-    let client = AuthenticatedClient::from_client(
-        reqwest::Client::builder()
-            .no_gzip()
-            .build()
-            .expect("failed to create client"),
-        get_auth_store(args.common.auth_file),
-    );
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
 
     let tool_config = tool_configuration::Configuration {
         client,
@@ -751,8 +722,10 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
     output.build_configuration.directories.output_dir =
         canonicalize(output_dir).into_diagnostic()?;
 
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+
     let tool_config = tool_configuration::Configuration {
-        client: AuthenticatedClient::default(),
+        client,
         multi_progress_indicator: MultiProgress::new(),
         no_clean: true,
         no_test: args.no_test,
@@ -785,7 +758,7 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
         }
     }
 
-    let store = get_auth_store(args.common.auth_file);
+    let store = tool_configuration::get_auth_store(args.common.auth_file);
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {

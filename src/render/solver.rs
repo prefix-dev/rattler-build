@@ -11,12 +11,12 @@ use rattler_conda_types::{
     Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
     RepoDataRecord,
 };
-use rattler_networking::AuthenticatedClient;
 use rattler_repodata_gateway::fetch::{
     CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
+use reqwest_middleware::ClientWithMiddleware;
 
 use std::{
     borrow::Cow,
@@ -178,6 +178,7 @@ pub async fn create_environment(
         virtual_packages,
         specs: specs.to_vec(),
         pinned_packages: Vec::new(),
+        timeout: None,
     };
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
@@ -242,7 +243,7 @@ async fn execute_transaction(
     transaction: Transaction<PrefixRecord, RepoDataRecord>,
     target_prefix: &Path,
     cache_dir: &Path,
-    download_client: AuthenticatedClient,
+    download_client: ClientWithMiddleware,
     multi_progress: indicatif::MultiProgress,
 ) -> anyhow::Result<()> {
     // Open the package cache
@@ -326,7 +327,7 @@ async fn execute_transaction(
 #[allow(clippy::too_many_arguments)]
 async fn execute_operation(
     target_prefix: &Path,
-    download_client: AuthenticatedClient,
+    download_client: ClientWithMiddleware,
     package_cache: &PackageCache,
     install_driver: &InstallDriver,
     download_pb: Option<&ProgressBar>,
@@ -520,7 +521,7 @@ async fn fetch_repo_data_records_with_progress(
     channel: Channel,
     platform: Platform,
     repodata_cache: &Path,
-    client: AuthenticatedClient,
+    client: ClientWithMiddleware,
     multi_progress: indicatif::MultiProgress,
     allow_not_found: bool,
 ) -> anyhow::Result<Option<SparseRepoData>> {
