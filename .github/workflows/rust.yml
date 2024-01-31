@@ -178,7 +178,7 @@ jobs:
           popd >/dev/null
 
           echo "pkg-name=${PKG_NAME}" >> $GITHUB_OUTPUT
-          echo pkg-path="${ARCHIVE_DIR}" >> $GITHUB_OUTPUT
+          echo pkg-path="${ARCHIVE_DIR}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}" >> $GITHUB_OUTPUT
 
           mkdir -p binaries
           cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}"
