@@ -8,6 +8,7 @@ use super::glob_vec::GlobVec;
 use super::{Dependency, FlattenErrors};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
+use crate::validate_keys;
 use crate::{
     _partialerror,
     recipe::{
@@ -119,46 +120,19 @@ impl TryConvertNode<Build> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Build, Vec<PartialParsingError>> {
         let mut build = Build::default();
 
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "number" => {
-                        build.number = value.try_convert(key_str)?;
-                    }
-                    "string" => {
-                        build.string = value.try_convert(key_str)?;
-                    }
-                    "skip" => {
-                        let conds: Vec<bool> = value.try_convert(key_str)?;
-                        build.skip = conds.iter().any(|&v| v);
-                    }
-                    "script" => build.script = value.try_convert(key_str)?,
-                    "noarch" => {
-                        build.noarch = value.try_convert(key_str)?;
-                    }
-                    "python" => {
-                        build.python = value.try_convert(key_str)?;
-                    }
-                    "dynamic_linking" => {
-                        build.dynamic_linking = value.try_convert(key_str)?;
-                    }
-                    "always_copy_files" => {
-                        build.always_copy_files = value.try_convert(key_str)?;
-                    }
-                    "always_include_files" => {
-                        build.always_include_files = value.try_convert(key_str)?;
-                    }
-                    invalid => {
-                        return Err(vec![_partialerror!(
-                            *key.span(),
-                            ErrorKind::InvalidField(invalid.to_string().into()),
-                        )]);
-                    }
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
+        validate_keys! {
+            build,
+            self.iter(),
+            number,
+            string,
+            skip,
+            script,
+            noarch,
+            python,
+            dynamic_linking,
+            always_copy_files,
+            always_include_files
+        }
 
         Ok(build)
     }

@@ -1,6 +1,7 @@
 //! Module to define an `Node` type that is specific to the first stage of the
 //! new Conda recipe format parser.
 
+use core::fmt::Display;
 use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
@@ -1168,7 +1169,7 @@ where
 
 impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedNode
 where
-    K: Ord,
+    K: Ord + Display,
     RenderedScalarNode: TryConvertNode<K>,
     RenderedNode: TryConvertNode<V>,
 {
@@ -1188,7 +1189,7 @@ where
 
 impl<K, V> TryConvertNode<BTreeMap<K, V>> for RenderedMappingNode
 where
-    K: Ord,
+    K: Ord + Display,
     RenderedScalarNode: TryConvertNode<K>,
     RenderedNode: TryConvertNode<V>,
 {

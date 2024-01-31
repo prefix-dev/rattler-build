@@ -21,6 +21,7 @@ use crate::{
 mod about;
 mod build;
 mod glob_vec;
+mod helper;
 mod output;
 mod package;
 mod requirements;

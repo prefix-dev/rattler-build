@@ -16,6 +16,7 @@ use crate::{
         },
         error::{ErrorKind, PartialParsingError},
     },
+    validate_keys,
 };
 
 use super::FlattenErrors;
@@ -24,81 +25,31 @@ use super::FlattenErrors;
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct About {
     #[serde(skip_serializing_if = "Option::is_none")]
-    homepage: Option<Url>,
+    pub homepage: Option<Url>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    repository: Option<Url>,
+    pub repository: Option<Url>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    documentation: Option<Url>,
+    pub documentation: Option<Url>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    license: Option<License>,
+    pub license: Option<License>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    license_family: Option<String>,
+    pub license_family: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    license_files: Vec<String>,
+    pub license_file: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    license_url: Option<Url>,
+    pub license_url: Option<Url>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    summary: Option<String>,
+    pub summary: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    description: Option<String>,
+    pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    prelink_message: Option<String>,
+    pub prelink_message: Option<String>,
 }
 
 impl About {
     /// Returns true if the about has its default configuration.
     pub fn is_default(&self) -> bool {
         self == &Self::default()
-    }
-
-    /// Get the homepage.
-    pub const fn homepage(&self) -> Option<&Url> {
-        self.homepage.as_ref()
-    }
-
-    /// Get the repository.
-    pub const fn repository(&self) -> Option<&Url> {
-        self.repository.as_ref()
-    }
-
-    /// Get the documentation.
-    pub const fn documentation(&self) -> Option<&Url> {
-        self.documentation.as_ref()
-    }
-
-    /// Get the license.
-    pub fn license(&self) -> Option<&License> {
-        self.license.as_ref()
-    }
-
-    /// Get the license family.
-    pub fn license_family(&self) -> Option<&str> {
-        self.license_family.as_deref()
-    }
-
-    /// Get the license file.
-    pub fn license_files(&self) -> &[String] {
-        self.license_files.as_slice()
-    }
-
-    /// Get the license url.
-    pub const fn license_url(&self) -> Option<&Url> {
-        self.license_url.as_ref()
-    }
-
-    /// Get the summary.
-    pub fn summary(&self) -> Option<&str> {
-        self.summary.as_deref()
-    }
-
-    /// Get the description.
-    pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
-    }
-
-    /// Get the prelink message.
-    pub fn prelink_message(&self) -> Option<&str> {
-        self.prelink_message.as_deref()
     }
 }
 
@@ -111,39 +62,23 @@ impl TryConvertNode<About> for RenderedNode {
 }
 
 impl TryConvertNode<About> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<About, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<About, Vec<PartialParsingError>> {
         let mut about = About::default();
-        self.iter().map(|(key, value)| {
-            let key_str = key.as_str();
-            match key_str {
-                "homepage" => about.homepage = value.try_convert(key_str)?,
-                "repository" => {
-                    about.repository = value.try_convert(key_str)?
-                }
-                "documentation" => {
-                    about.documentation = value.try_convert(key_str)?
-                }
-                "license" => about.license = value.try_convert(key_str)?,
-                "license_family" => {
-                    about.license_family = value.try_convert(key_str)?
-                }
-                "license_file" => about.license_files = value.try_convert(key_str)?,
-                "license_url" => about.license_url = value.try_convert(key_str)?,
-                "summary" => about.summary = value.try_convert(key_str)?,
-                "description" => about.description = value.try_convert(key_str)?,
-                "prelink_message" => {
-                    about.prelink_message = value.try_convert(key_str)?
-                }
-                invalid_key => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid_key.to_string().into()),
-                        help = format!("expected for `{name}` one of `homepage`, `repository`, `documentation`, `license`, `license_family`, `license_file`, `license_url`, `summary`, `description` or `prelink_message`")
-                    )])
-                }
-            }
-            Ok(())
-        }).flatten_errors()?;
+
+        validate_keys!(
+            about,
+            self.iter(),
+            homepage,
+            repository,
+            documentation,
+            license,
+            license_family,
+            license_file,
+            license_url,
+            summary,
+            description,
+            prelink_message
+        );
 
         Ok(about)
     }

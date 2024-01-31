@@ -36,7 +36,7 @@ recipe:
     repository: https://github.com/Textualize/rich
     documentation: https://rich.readthedocs.io/
     license: MIT
-    license_files:
+    license_file:
     - LICENSE
     summary: Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal
     description: |-

@@ -382,7 +382,7 @@ Recipe {
             },
         ),
         license_family: None,
-        license_files: [
+        license_file: [
             "LICENSE",
         ],
         license_url: None,
