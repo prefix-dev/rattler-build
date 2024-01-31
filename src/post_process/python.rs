@@ -87,6 +87,15 @@ pub fn compile_pyc(
         }
     }
 
+    py_files.retain(|f| {
+        // bin files are generally not imported
+        if output.build_configuration.target_platform.is_windows() {
+            !f.starts_with("Library/bin") && !f.starts_with("Scripts")
+        } else {
+            !f.starts_with("bin")
+        }
+    });
+
     if let Some(skip_paths) = skip_paths {
         py_files.retain(|p| {
             !skip_paths.is_match(
@@ -111,39 +120,28 @@ pub fn compile_pyc(
     if !pyc_files_to_compile.is_empty() {
         tracing::info!("Compiling {} .py files to .pyc", pyc_files_to_compile.len());
 
-        // write files to a temporary file
-        let temp_file = tempfile::NamedTempFile::new()?;
-        fs::write(
-            temp_file.path(),
-            pyc_files_to_compile
-                .iter()
-                .map(|p| p.to_string_lossy())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        )?;
+        for f in &pyc_files_to_compile {
+            let command = Command::new(&python_interpreter)
+                .args(["-Wi", "-m", "py_compile"])
+                .arg(f)
+                .output();
 
-        let command = Command::new(&python_interpreter)
-            .args(["-m", "compileall", "-i"])
-            .arg(temp_file.path())
-            .output();
+            if command.is_err() {
+                let stderr = String::from_utf8_lossy(&command.as_ref().unwrap().stderr);
+                tracing::error!("Error compiling .py files to .pyc: {}", stderr);
+                return Err(PackagingError::PythonCompileError(stderr.to_string()));
+            }
 
-        if command.is_err() {
-            let stderr = String::from_utf8_lossy(&command.as_ref().unwrap().stderr);
-            tracing::error!("Error compiling .py files to .pyc: {}", stderr);
-            return Err(PackagingError::PythonCompileError(stderr.to_string()));
-        }
-
-        let command = command.unwrap();
-        if !command.status.success() {
-            let stderr = String::from_utf8_lossy(&command.stderr);
-            tracing::error!("Error compiling .py files to .pyc: {}", stderr);
-            return Err(PackagingError::PythonCompileError(stderr.to_string()));
+            let command = command.unwrap();
+            if !command.status.success() {
+                let stderr = String::from_utf8_lossy(&command.stderr);
+                tracing::warn!("Error compiling {:?} to .pyc:\n{}", f, stderr);
+            }
         }
 
         for file in pyc_files_to_compile {
             let pyc_file = file_with_cache_tag(&file);
             if pyc_file.exists() {
-                println!("yes");
                 result.insert(pyc_file);
             }
         }

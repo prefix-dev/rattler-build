@@ -11,12 +11,14 @@ build:
         - echo "print('hello world')" > $PREFIX/test_skippy.py
         - mkdir -p $PREFIX/cmd
         - echo "print('hello world')" > $PREFIX/cmd/test.py
+        - echo "broken python {{ template }}" > $PREFIX/cmd/broken.py
     - if: win
       then:
         - echo "print('hello world')" > %PREFIX%\test.py
         - echo "print('hello world')" > %PREFIX%\test_skippy.py
         - mkdir %PREFIX%\cmd
         - echo "print('hello world')" > %PREFIX%\cmd\test.py
+        - echo "broken python {{ template }}" > %PREFIX%\cmd\broken.py
 
   python:
     skip_pyc_compilation:
