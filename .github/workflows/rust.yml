@@ -169,7 +169,7 @@ jobs:
         id: package
         shell: bash
         run: |
-          PKG_BASENAME=rattler-build-v${{ steps.metadata.outputs.project-version }}-${{ matrix.target }}
+          PKG_BASENAME=rattler-build-${{ matrix.target }}
           PKG_NAME=${PKG_BASENAME}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}
 
           ARCHIVE_DIR="pkg/${PKG_BASENAME}"
@@ -186,11 +186,11 @@ jobs:
           popd >/dev/null
 
           echo "pkg-name=${PKG_NAME}" >> $GITHUB_OUTPUT
-          echo pkg-path="${ARCHIVE_DIR}" >> $GITHUB_OUTPUT
+          echo pkg-path="${ARCHIVE_DIR}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}" >> $GITHUB_OUTPUT
 
           mkdir -p binaries
-          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "binaries/pixi-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}"
-          echo "binary-path=binaries/pixi-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
+          cp "target/${{ matrix.target }}/release/rattler-build${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" "binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}"
+          echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
