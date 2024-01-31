@@ -70,7 +70,7 @@ The `rebuild` command can be used to attempt a reproducible rebuild of an existi
 
 ### The recipe format
 
-> **Note** You can find all examples below in the [`examples`](./examples/)
+> **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
 > folder and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
