@@ -1,7 +1,10 @@
 //! Configuration for the rattler-build tool
 //! This is useful when using rattler-build as a library
 
-use rattler_networking::AuthenticatedClient;
+use std::{path::PathBuf, sync::Arc};
+
+use rattler_networking::{authentication_storage, AuthenticationMiddleware, AuthenticationStorage};
+use reqwest_middleware::ClientWithMiddleware;
 
 /// Global configuration for the build
 #[derive(Clone)]
@@ -10,7 +13,7 @@ pub struct Configuration {
     pub multi_progress_indicator: indicatif::MultiProgress,
 
     /// The authenticated reqwest download client to use
-    pub client: AuthenticatedClient,
+    pub client: ClientWithMiddleware,
 
     /// Set this to true if you want to keep the build folder after the build is done
     pub no_clean: bool,
@@ -25,17 +28,44 @@ pub struct Configuration {
     pub use_bz2: bool,
 }
 
+pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
+    match auth_file {
+        Some(auth_file) => {
+            let mut store = AuthenticationStorage::new();
+            store.add_backend(Arc::from(
+                authentication_storage::backends::file::FileStorage::new(auth_file),
+            ));
+            store
+        }
+        None => rattler_networking::AuthenticationStorage::default(),
+    }
+}
+
+pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWithMiddleware {
+    let auth_storage = get_auth_store(auth_file);
+    reqwest_middleware::ClientBuilder::new(
+        reqwest::Client::builder()
+            .no_gzip()
+            .build()
+            .expect("failed to create client"),
+    )
+    .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
+    .build()
+}
+
 impl Default for Configuration {
     fn default() -> Self {
+        let auth_storage = AuthenticationStorage::default();
         Self {
             multi_progress_indicator: indicatif::MultiProgress::new(),
-            client: AuthenticatedClient::from_client(
+            client: reqwest_middleware::ClientBuilder::new(
                 reqwest::Client::builder()
                     .no_gzip()
                     .build()
                     .expect("failed to create client"),
-                rattler_networking::AuthenticationStorage::default(),
-            ),
+            )
+            .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
+            .build(),
             no_clean: false,
             no_test: false,
             use_zstd: true,
