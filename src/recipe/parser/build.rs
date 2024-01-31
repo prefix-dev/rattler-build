@@ -505,7 +505,7 @@ impl TryConvertNode<NoArchType> for RenderedScalarNode {
             invalid => {
                 return Err(vec![_partialerror!(
                     *self.span(),
-                    ErrorKind::InvalidField(invalid.to_owned().into()),
+                    ErrorKind::InvalidValue((name.to_string(), invalid.to_owned().into())),
                     help = format!("expected `python` or `generic` for {name}"),
                 )]);
             }

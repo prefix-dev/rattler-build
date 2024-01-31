@@ -108,6 +108,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::invalid_field))]
     InvalidField(Cow<'static, str>),
 
+    /// Error when a value is invalid.
+    #[diagnostic(code(error::invalid_value))]
+    InvalidValue((String, Cow<'static, str>)),
+
     /// Error rendering a Jinja expression.
     #[diagnostic(code(error::jinja_rendering))]
     JinjaRendering(#[from] minijinja::Error),
@@ -213,6 +217,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::InvalidMd5 => write!(f, "invalid MD5 checksum."),
             ErrorKind::InvalidSha256 => write!(f, "invalid SHA256 checksum."),
             ErrorKind::InvalidField(s) => write!(f, "invalid field `{s}`."),
+            ErrorKind::InvalidValue((key, s)) => write!(f, "invalid value for `{key}`: `{s}`."),
             ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
                 write!(f, "failed to render Jinja expression: {}", err.kind())
