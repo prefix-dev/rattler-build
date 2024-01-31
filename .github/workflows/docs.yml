@@ -5,20 +5,24 @@ on:
     branches:
       - main
     paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
+      - "docs/**"
+      - "mkdocs.yml"
     tags:
       - v**
   pull_request:
     branches:
       - main
     paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
-      - 'mkdocs.yml'
-      - 'pixi.*'
+      - "docs/**"
+      - ".github/workflows/docs.yml"
+      - "mkdocs.yml"
+      - "pixi.*"
   workflow_dispatch:
-
+    inputs:
+      tag:
+        description: "Tag to deploy"
+        required: true
+        default: "v0.0.0"
 
 # Allow one concurrent deployment
 concurrency:
@@ -27,7 +31,7 @@ concurrency:
 
 jobs:
   build-docs:
-    if: github.ref != 'refs/heads/main'
+    if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -46,13 +50,21 @@ jobs:
 
   docs-release:
     # Don't run on forks
-    if: startsWith(github.event.ref, 'refs/tags/v')
+    if: startsWith(github.event.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # fetch everything so we can checkout the tag
+          fetch-depth: 0
           submodules: recursive
+
+      # check out tag if workflow_dispatch
+      - name: Checkout tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git checkout tags/${{ github.event.inputs.tag }}
 
       - uses: prefix-dev/setup-pixi@v0.4.3
         with:
@@ -64,16 +76,17 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Extract branch name
-        shell: bash
-        run: echo "##[set-output name=tag;]$(echo ${GITHUB_REF#refs/heads/})"
-        id: extract_branch
+      - name: Extract tag name
+        if: github.event_name != 'workflow_dispatch'
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
+      - name: Tag from workflow_dispatch
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "RELEASE_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
 
       - name: Deploy with mike 🚀
-        env:
-          RELEASE_VERSION: ${{ steps.extract_branch.outputs.tag }}
         run: |
-          pixi run deploy-latest
+          pixi run mike deploy --push --update-aliases $RELEASE_VERSION latest
 
   docs-dev:
     # Don't run on forks

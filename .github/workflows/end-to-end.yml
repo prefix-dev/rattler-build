@@ -1,7 +1,15 @@
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "Cargo.*"
+      - "rust-tests/**"
   pull_request:
+    paths:
+      - "src/**"
+      - "Cargo.*"
+      - "rust-tests/**"
 
 name: End-to-End testing
 
@@ -30,7 +38,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: '1.73.0'
+          toolchain: "1.73.0"
       - uses: prefix-dev/setup-pixi@v0.4.3
         with:
           pixi-version: v0.10.0

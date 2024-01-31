@@ -13,9 +13,8 @@ test = "cargo test"
 lint = "pre-commit run --all"
 build-docs = "mkdocs build --strict"
 docs = "mike serve"
-deploy-latest = "mike deploy --push $RELEASE_VERSION latest"
+deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
 deploy-dev = "mike deploy --push dev devel"
-
 
 [dependencies]
 openssl = "3.*"
