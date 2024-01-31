@@ -87,6 +87,10 @@ impl RenderedNode {
         matches!(self, Self::Sequence(_))
     }
 
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null(_))
+    }
+
     /// Retrieve the scalar from this node if there is one
     pub fn as_scalar(&self) -> Option<&RenderedScalarNode> {
         match self {
@@ -655,8 +659,10 @@ impl Render<RenderedMappingNode> for MappingNode {
 
         for (key, value) in self.iter() {
             let key = RenderedScalarNode::new(*key.span(), key.as_str().to_owned());
-            let value = value.render(jinja, &format!("{name}.{}", key.as_str()))?;
-
+            let value: RenderedNode = value.render(jinja, &format!("{name}.{}", key.as_str()))?;
+            if value.is_null() {
+                continue;
+            }
             rendered.insert(key, value);
         }
 
