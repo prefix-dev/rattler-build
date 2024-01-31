@@ -161,7 +161,7 @@ jobs:
         id: package
         shell: bash
         run: |
-          PKG_BASENAME=rattler-build-v${{ steps.metadata.outputs.project-version }}-${{ matrix.target }}
+          PKG_BASENAME=rattler-build-${{ matrix.target }}
           PKG_NAME=${PKG_BASENAME}${{ contains(matrix.target, 'pc-windows') && '.zip' || '.tar.gz' }}
 
           ARCHIVE_DIR="pkg/${PKG_BASENAME}"
