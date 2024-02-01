@@ -1,0 +1,111 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
+# a recipe with all possible fields
+package:
+  name: single_output
+  version: "0.1.0"
+
+source:
+  # url source
+  - url: https://github.com/test/test-package.tar.gz
+    sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    md5: 1234567890abcdef1234567890abcdef
+    file_name: test-package.tar.gz
+    target_directory: test-package
+    patches:
+      - file.patch
+  # path source
+  - path: ./some-file.tar.gz
+    # currently not valid
+    # sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    # md5: 1234567890abcdef1234567890abcdef
+    patches:
+      - file.patch
+    file_name: test-package.tar.gz
+    target_directory: test-package
+  - git: https://github.com/test/package
+    depth: 10
+    patches:
+      - file.patch
+    lfs: false
+    target_directory: test-package-git
+  
+build:
+  number: 0
+  string: "blabla"
+  skip: false
+  noarch: generic
+
+  script:
+    env:
+      TEST: 1
+    secrets:
+      - SECRET_VARIABLE
+    content:
+      - test
+  python:
+    entry_points:
+      - test = test:main
+
+  always_copy_files:
+    - file1
+    - file2/**/*
+  always_include_files: 
+    - file1
+    - file2/**/*
+
+  dynamic_linking:
+    rpaths: ["lib/"]
+    binary_relocation:
+      - lib/*
+    missing_dso_allowlist:
+      - /all/lib/**/*
+    rpath_allowlist:
+      - bla/*
+    overdepending_behavior: error
+    overlinking_behavior: ignore
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - cmake
+  host:
+    - openssl
+  run:
+    - python >=3.11
+    - perl
+  run_constraints:
+    - python * *cpython
+  run_exports:
+    weak:
+      - python
+    strong:
+      - python
+    weak_constraints:
+      - python
+    strong_constraints:
+      - python
+    noarch: 
+      - python
+  ignore_run_exports:
+    from_package: 
+      - python
+    by_name: 
+      - python
+  
+
+about:
+  homepage: https://cool-website.com
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: A summary
+  description: |
+    More description
+  documentation: https://cool-docs.com
+  repository: https://github.com/some-repo/some-package
+
+extra:
+  recipe-maintainers:
+    - some-maintainer
+  random_keys:
+    with: random_value
