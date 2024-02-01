@@ -388,9 +388,7 @@ mod tests {
 
     #[test]
     fn test_complete_recipe() {
-        let recipe = include_str!(
-            "../../test-data/recipes/test-parsing/single_output.yaml"
-        );
+        let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
     }
