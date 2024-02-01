@@ -167,7 +167,12 @@ pub fn python(
             output,
             paths,
             base_path,
-            output.recipe.build().python().skip_pyc_compilation.globset(),
+            output
+                .recipe
+                .build()
+                .python()
+                .skip_pyc_compilation
+                .globset(),
         )?);
     }
 
