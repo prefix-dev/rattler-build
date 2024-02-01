@@ -1,6 +1,5 @@
 ---
 source: src/recipe/parser/package.rs
-assertion_line: 196
 expression: err
 ---
   × Failed to parse recipe

@@ -448,13 +448,15 @@ pub async fn resolve_dependencies(
     channels: &[String],
     tool_configuration: tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
+    let merge_build_host = output.recipe.build().merge_build_and_host_envs();
+
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
 
     let reqs = &output.recipe.requirements();
     let mut compatibility_specs = HashMap::new();
 
-    let build_env = if !reqs.build.is_empty() {
+    let build_env = if !reqs.build.is_empty() && !merge_build_host {
         let specs = apply_variant(
             reqs.build(),
             &output.build_configuration,
@@ -551,7 +553,16 @@ pub async fn resolve_dependencies(
         }
     }
 
-    let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+    let mut match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+    if merge_build_host {
+        // add the reqs of build to host
+        let specs = apply_variant(
+            reqs.build(),
+            &output.build_configuration,
+            &compatibility_specs,
+        )?;
+        match_specs.extend(specs.iter().map(|s| s.spec().clone()));
+    }
 
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
@@ -683,6 +694,7 @@ pub async fn resolve_dependencies(
     }
 
     Ok(FinalizedDependencies {
+        // build_env is empty now!
         build: build_env,
         host: host_env,
         run: run_specs,

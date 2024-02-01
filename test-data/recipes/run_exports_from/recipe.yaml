@@ -4,8 +4,11 @@ package:
   name: run_exports_test
   version: "1.0.0"
 
+build:
+  merge_build_and_host_envs: true
+
 requirements:
-  host:
+  build:
     - zlib
   run_exports:
     - ${{ pin_subpackage("run_exports_test", exact=True) }}

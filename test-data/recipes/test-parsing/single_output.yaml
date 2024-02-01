@@ -29,13 +29,13 @@ source:
       - file.patch
     lfs: false
     target_directory: test-package-git
-  
+
 build:
   number: 0
   string: "blabla"
   skip: false
   noarch: generic
-
+  merge_build_and_host_envs: true
   script:
     env:
       TEST: 1
@@ -52,7 +52,7 @@ build:
   always_copy_files:
     - file1
     - file2/**/*
-  always_include_files: 
+  always_include_files:
     - file1
     - file2/**/*
 
@@ -87,14 +87,14 @@ requirements:
       - python
     strong_constraints:
       - python
-    noarch: 
+    noarch:
       - python
   ignore_run_exports:
-    from_package: 
+    from_package:
       - python
-    by_name: 
+    by_name:
       - python
-  
+
 
 about:
   homepage: https://cool-website.com
