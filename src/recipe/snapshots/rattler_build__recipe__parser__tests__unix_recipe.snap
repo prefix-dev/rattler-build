@@ -236,7 +236,7 @@ Recipe {
                 },
             ),
         ],
-        run_constrained: [
+        run_constraints: [
             Spec(
                 MatchSpec {
                     name: Some(
@@ -280,9 +280,9 @@ Recipe {
         run_exports: RunExports {
             noarch: [],
             strong: [],
-            strong_constrains: [],
+            strong_constraints: [],
             weak: [],
-            weak_constrains: [],
+            weak_constraints: [],
         },
         ignore_run_exports: IgnoreRunExports {
             by_name: {},
@@ -382,7 +382,7 @@ Recipe {
             },
         ),
         license_family: None,
-        license_files: [
+        license_file: [
             "LICENSE",
         ],
         license_url: None,

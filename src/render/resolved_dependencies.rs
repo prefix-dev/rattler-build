@@ -597,7 +597,7 @@ pub async fn resolve_dependencies(
     let depends = apply_variant(&reqs.run, &output.build_configuration, &compatibility_specs)?;
 
     let constrains = apply_variant(
-        &reqs.run_constrained,
+        &reqs.run_constraints,
         &output.build_configuration,
         &compatibility_specs,
     )?;
@@ -621,8 +621,8 @@ pub async fn resolve_dependencies(
             strong: render_run_exports(run_exports.strong())?,
             weak: render_run_exports(run_exports.weak())?,
             noarch: render_run_exports(run_exports.noarch())?,
-            strong_constrains: render_run_exports(run_exports.strong_constrains())?,
-            weak_constrains: render_run_exports(run_exports.weak_constrains())?,
+            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
+            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
         })
     } else {
         None

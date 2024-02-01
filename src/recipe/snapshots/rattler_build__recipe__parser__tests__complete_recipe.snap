@@ -1,0 +1,93 @@
+---
+source: src/recipe/parser.rs
+expression: "serde_yaml::to_string(&recipe).unwrap()"
+---
+package:
+  name: single_output
+  version: 0.1.0
+source:
+- url: https://github.com/test/test-package.tar.gz
+  sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+  md5: 1234567890abcdef1234567890abcdef
+  file_name: test-package.tar.gz
+  patches:
+  - file.patch
+  target_directory: test-package
+- path: ./some-file.tar.gz
+  patches:
+  - file.patch
+  target_directory: test-package
+  file_name: test-package.tar.gz
+- git: https://github.com/test/package
+  depth: 10
+  patches:
+  - file.patch
+  target_directory: test-package-git
+build:
+  number: 0
+  string: blabla
+  script:
+    env:
+      TEST: '1'
+    secrets:
+    - SECRET_VARIABLE
+    content:
+    - test
+  noarch: generic
+  python:
+    entry_points:
+    - test = test:main
+  dynamic_linking:
+    rpaths:
+    - lib/
+    binary_relocation:
+    - lib/*
+    missing_dso_allowlist:
+    - /all/lib/**/*
+    rpath_allowlist:
+    - bla/*
+    overdepending_behavior: error
+    overlinking_behavior: ignore
+  always_copy_files:
+  - file1
+  - file2/**/*
+  always_include_files:
+  - file1
+  - file2/**/*
+requirements:
+  build:
+  - compiler: c
+  - cmake
+  host:
+  - openssl
+  run:
+  - python >=3.11
+  - perl
+  run_constraints:
+  - python * *cpython
+  run_exports:
+    noarch:
+    - python
+    strong:
+    - python
+    strong_constraints:
+    - python
+    weak:
+    - python
+    weak_constraints:
+    - python
+  ignore_run_exports:
+    by_name:
+    - python
+    from_package:
+    - python
+about:
+  homepage: https://cool-website.com/
+  repository: https://github.com/some-repo/some-package
+  documentation: https://cool-docs.com/
+  license: BSD-3-Clause
+  license_file:
+  - LICENSE
+  summary: A summary
+  description: More description
+

@@ -30,7 +30,7 @@ impl PackageContentsTest {
         target_platform: &Platform,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
-        for include in &self.include {
+        for include in self.include.globs() {
             let glob = if target_platform.is_windows() {
                 format!("Library/include/{include}")
             } else {
@@ -38,7 +38,7 @@ impl PackageContentsTest {
             };
 
             result.push((
-                include.clone(),
+                include.glob().to_string(),
                 GlobSet::builder().add(build_glob(glob)?).build()?,
             ));
         }
@@ -52,7 +52,7 @@ impl PackageContentsTest {
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for bin in &self.bin {
+        for bin in self.bin.globs() {
             let globset = if target_platform.is_windows() {
                 // This is usually encoded as `PATHEXT` in the environment
                 let path_ext = "{,.exe,.bat,.cmd,.com,.ps1}";
@@ -72,7 +72,7 @@ impl PackageContentsTest {
                     .build()
             }?;
 
-            result.push((bin.clone(), globset));
+            result.push((bin.glob().to_string(), globset));
         }
 
         Ok(result)
@@ -86,30 +86,30 @@ impl PackageContentsTest {
 
         if target_platform.is_windows() {
             // Windows is special because it requires both a `.dll` and a `.bin` file
-            for lib in &self.lib {
-                if lib.ends_with(".dll") {
+            for lib in self.lib.globs() {
+                if lib.glob().ends_with(".dll") {
                     result.push((
-                        lib.clone(),
+                        lib.glob().to_string(),
                         GlobSet::builder()
                             .add(Glob::new(&format!("bin/{lib}"))?)
                             .build()?,
                     ));
-                } else if lib.ends_with(".lib") {
+                } else if lib.glob().ends_with(".lib") {
                     result.push((
-                        lib.clone(),
+                        lib.glob().to_string(),
                         GlobSet::builder()
                             .add(Glob::new(&format!("lib/{lib}"))?)
                             .build()?,
                     ));
                 } else {
                     result.push((
-                        lib.clone(),
+                        lib.glob().to_string(),
                         GlobSet::builder()
                             .add(Glob::new(&format!("Library/bin/{lib}.dll"))?)
                             .build()?,
                     ));
                     result.push((
-                        lib.clone(),
+                        lib.glob().to_string(),
                         GlobSet::builder()
                             .add(Glob::new(&format!("Library/lib/{lib}.lib"))?)
                             .build()?,
@@ -117,9 +117,9 @@ impl PackageContentsTest {
                 }
             }
         } else {
-            for lib in &self.lib {
+            for lib in self.lib.globs() {
                 let globset = if target_platform.is_osx() {
-                    if lib.ends_with(".dylib") || lib.ends_with(".a") {
+                    if lib.glob().ends_with(".dylib") || lib.glob().ends_with(".a") {
                         GlobSet::builder()
                             .add(Glob::new(&format!("lib/{lib}"))?)
                             .build()
@@ -130,7 +130,10 @@ impl PackageContentsTest {
                             .build()
                     }
                 } else if target_platform.is_linux() {
-                    if lib.ends_with(".so") || lib.contains(".so.") || lib.ends_with(".a") {
+                    if lib.glob().ends_with(".so")
+                        || lib.glob().contains(".so.")
+                        || lib.glob().ends_with(".a")
+                    {
                         GlobSet::builder()
                             .add(Glob::new(&format!("lib/{lib}"))?)
                             .build()
@@ -144,7 +147,7 @@ impl PackageContentsTest {
                     // TODO
                     unimplemented!("lib_as_globs for target platform: {:?}", target_platform)
                 }?;
-                result.push((lib.clone(), globset));
+                result.push((lib.glob().to_string(), globset));
             }
         }
 
@@ -165,13 +168,13 @@ impl PackageContentsTest {
             "lib/python*/site-packages"
         };
 
-        for site_package in &self.site_packages {
+        for site_package in self.site_packages.globs() {
             let mut globset = GlobSet::builder();
 
-            if site_package.contains('/') {
+            if site_package.glob().contains('/') {
                 globset.add(build_glob(format!("{site_packages_base}/{site_package}"))?);
             } else {
-                let mut splitted = site_package.split('.').collect::<Vec<_>>();
+                let mut splitted = site_package.glob().split('.').collect::<Vec<_>>();
                 let last_elem = splitted.pop().unwrap_or_default();
                 let mut site_package_path = splitted.join("/");
                 if !site_package_path.is_empty() {
@@ -185,8 +188,9 @@ impl PackageContentsTest {
                     "{site_packages_base}/{site_package_path}{last_elem}/__init__.py"
                 ))?);
             };
+
             let globset = globset.build()?;
-            result.push((site_package.clone(), globset));
+            result.push((site_package.glob().to_string(), globset));
         }
 
         Ok(result)
@@ -195,9 +199,9 @@ impl PackageContentsTest {
     pub fn files_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        for file in &self.files {
-            let globset = GlobSet::builder().add(Glob::new(file)?).build()?;
-            result.push((file.clone(), globset));
+        for file in self.files.globs() {
+            let globset = GlobSet::builder().add(file.clone()).build()?;
+            result.push((file.glob().to_string(), globset));
         }
 
         Ok(result)
@@ -312,6 +316,7 @@ mod tests {
     use std::path::Path;
 
     use super::PackageContentsTest;
+    use crate::recipe::parser::GlobVec;
     use globset::GlobSet;
     use rattler_conda_types::Platform;
     use serde::Deserialize;
@@ -347,7 +352,7 @@ mod tests {
     #[test]
     fn test_include_globs() {
         let package_contents = PackageContentsTest {
-            include: vec!["foo".into(), "bar".into()],
+            include: GlobVec::from_vec(vec!["foo", "bar"]),
             ..Default::default()
         };
 
@@ -359,7 +364,7 @@ mod tests {
         test_glob_matches(&globs, paths).unwrap();
 
         let package_contents = PackageContentsTest {
-            include: vec!["foo".into(), "bar".into()],
+            include: GlobVec::from_vec(vec!["foo", "bar"]),
             ..Default::default()
         };
 

@@ -1,9 +1,9 @@
 ---
 source: src/recipe/parser/test.rs
-expression: "serde_yaml::to_string(&tests).unwrap()"
+expression: yaml_serde
 ---
 - test_type: python
   imports:
-  - import os
-  - import sys
+  - numpy.testing
+  - numpy.matrix
 

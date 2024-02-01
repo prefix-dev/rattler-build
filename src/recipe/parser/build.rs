@@ -8,6 +8,7 @@ use super::glob_vec::GlobVec;
 use super::{Dependency, FlattenErrors};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
+use crate::validate_keys;
 use crate::{
     _partialerror,
     recipe::{
@@ -17,11 +18,6 @@ use crate::{
         error::{ErrorKind, PartialParsingError},
     },
 };
-
-/// A helper method to skip serializing the `skip` field if it's false.
-fn should_not_serialize_skip(skip: &bool) -> bool {
-    !skip
-}
 
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
@@ -34,7 +30,7 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) string: Option<String>,
     /// List of conditions under which to skip the build of the package.
-    #[serde(default, skip_serializing_if = "should_not_serialize_skip")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(super) skip: bool,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
@@ -119,46 +115,19 @@ impl TryConvertNode<Build> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Build, Vec<PartialParsingError>> {
         let mut build = Build::default();
 
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "number" => {
-                        build.number = value.try_convert(key_str)?;
-                    }
-                    "string" => {
-                        build.string = value.try_convert(key_str)?;
-                    }
-                    "skip" => {
-                        let conds: Vec<bool> = value.try_convert(key_str)?;
-                        build.skip = conds.iter().any(|&v| v);
-                    }
-                    "script" => build.script = value.try_convert(key_str)?,
-                    "noarch" => {
-                        build.noarch = value.try_convert(key_str)?;
-                    }
-                    "python" => {
-                        build.python = value.try_convert(key_str)?;
-                    }
-                    "dynamic_linking" => {
-                        build.dynamic_linking = value.try_convert(key_str)?;
-                    }
-                    "always_copy_files" => {
-                        build.always_copy_files = value.try_convert(key_str)?;
-                    }
-                    "always_include_files" => {
-                        build.always_include_files = value.try_convert(key_str)?;
-                    }
-                    invalid => {
-                        return Err(vec![_partialerror!(
-                            *key.span(),
-                            ErrorKind::InvalidField(invalid.to_string().into()),
-                        )]);
-                    }
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
+        validate_keys! {
+            build,
+            self.iter(),
+            number,
+            string,
+            skip,
+            script,
+            noarch,
+            python,
+            dynamic_linking,
+            always_copy_files,
+            always_include_files
+        }
 
         Ok(build)
     }
@@ -267,35 +236,16 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
         let mut dynamic_linking = DynamicLinking::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "rpaths" => {
-                    dynamic_linking.rpaths = value.try_convert(key_str)?;
-                }
-                "binary_relocation" => {
-                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
-                }
-                "missing_dso_allowlist" => {
-                    dynamic_linking.missing_dso_allowlist = value.try_convert(key_str)?;
-                }
-                "rpath_allowlist" => {
-                    dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
-                }
-                "overdepending_behavior" => {
-                    dynamic_linking.overdepending_behavior = value.try_convert(key_str)?;
-                }
-                "overlinking_behavior" => {
-                    dynamic_linking.overlinking_behavior = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    )]);
-                }
-            }
-        }
+        validate_keys!(
+            dynamic_linking,
+            self.iter(),
+            rpaths,
+            binary_relocation,
+            missing_dso_allowlist,
+            rpath_allowlist,
+            overdepending_behavior,
+            overlinking_behavior
+        );
 
         Ok(dynamic_linking)
     }
@@ -370,15 +320,10 @@ pub struct Python {
     /// For a Python noarch package to have executables it is necessary to specify the python entry points.
     /// These contain the name of the executable and the module + function that should be executed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) entry_points: Vec<EntryPoint>,
+    pub entry_points: Vec<EntryPoint>,
 }
 
 impl Python {
-    /// Get the entry points.
-    pub fn entry_points(&self) -> &[EntryPoint] {
-        self.entry_points.as_slice()
-    }
-
     /// Returns true if this is the default python configuration.
     pub fn is_default(&self) -> bool {
         self.entry_points.is_empty()
@@ -396,22 +341,7 @@ impl TryConvertNode<Python> for RenderedNode {
 impl TryConvertNode<Python> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Python, Vec<PartialParsingError>> {
         let mut python = Python::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "entry_points" => {
-                    python.entry_points = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    )]);
-                }
-            }
-        }
-
+        validate_keys!(python, self.iter(), entry_points);
         Ok(python)
     }
 }
@@ -420,15 +350,15 @@ impl TryConvertNode<Python> for RenderedMappingNode {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports are the only ones looked at when building noarch packages.
-    pub(super) noarch: Vec<Dependency>,
+    pub noarch: Vec<Dependency>,
     /// Strong run exports apply from the build and host env to the run env.
-    pub(super) strong: Vec<Dependency>,
+    pub strong: Vec<Dependency>,
     /// Strong run constrains add run_constrains from the build and host env.
-    pub(super) strong_constrains: Vec<Dependency>,
+    pub strong_constraints: Vec<Dependency>,
     /// Weak run exports apply from the host env to the run env.
-    pub(super) weak: Vec<Dependency>,
+    pub weak: Vec<Dependency>,
     /// Weak run constrains add run_constrains from the host env.
-    pub(super) weak_constrains: Vec<Dependency>,
+    pub weak_constraints: Vec<Dependency>,
 }
 
 impl RunExports {
@@ -436,9 +366,9 @@ impl RunExports {
     pub fn is_empty(&self) -> bool {
         self.noarch.is_empty()
             && self.strong.is_empty()
-            && self.strong_constrains.is_empty()
+            && self.strong_constraints.is_empty()
             && self.weak.is_empty()
-            && self.weak_constrains.is_empty()
+            && self.weak_constraints.is_empty()
     }
 
     /// Get all run exports from all configurations
@@ -446,34 +376,9 @@ impl RunExports {
         self.noarch
             .iter()
             .chain(self.strong.iter())
-            .chain(self.strong_constrains.iter())
+            .chain(self.strong_constraints.iter())
             .chain(self.weak.iter())
-            .chain(self.weak_constrains.iter())
-    }
-
-    /// Get the noarch run exports.
-    pub fn noarch(&self) -> &[Dependency] {
-        self.noarch.as_slice()
-    }
-
-    /// Get the strong run exports.
-    pub fn strong(&self) -> &[Dependency] {
-        self.strong.as_slice()
-    }
-
-    /// Get the strong run constrains.
-    pub fn strong_constrains(&self) -> &[Dependency] {
-        self.strong_constrains.as_slice()
-    }
-
-    /// Get the weak run exports.
-    pub fn weak(&self) -> &[Dependency] {
-        self.weak.as_slice()
-    }
-
-    /// Get the weak run constrains.
-    pub fn weak_constrains(&self) -> &[Dependency] {
-        self.weak_constrains.as_slice()
+            .chain(self.weak_constraints.iter())
     }
 }
 

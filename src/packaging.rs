@@ -335,8 +335,8 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         arch,
         platform,
         subdir: Some(output.build_configuration.target_platform.to_string()),
-        license: recipe.about().license().map(|l| l.to_string()),
-        license_family: recipe.about().license_family().map(|l| l.to_owned()),
+        license: recipe.about().license.as_ref().map(|l| l.to_string()),
+        license_family: recipe.about().license_family.clone(),
         timestamp: Some(output.build_configuration.timestamp),
         depends: output
             .finalized_dependencies
@@ -369,29 +369,29 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
 /// Create the about.json file for the given output.
 fn create_about_json(output: &Output) -> Result<String, PackagingError> {
     let recipe = &output.recipe;
-    // FIXME: Updated recipe specs don't allow for vectors in any of the About fields except license_files
+
     let about_json = AboutJson {
         home: recipe
             .about()
-            .homepage()
-            .cloned()
+            .homepage
+            .clone()
             .map(|s| vec![s])
             .unwrap_or_default(),
-        license: recipe.about().license().map(|s| s.to_string()),
-        license_family: recipe.about().license_family().map(|s| s.to_owned()),
-        summary: recipe.about().summary().map(|s| s.to_owned()),
-        description: recipe.about().description().map(|s| s.to_owned()),
+        license: recipe.about().license.as_ref().map(|l| l.to_string()),
+        license_family: recipe.about().license_family.clone(),
+        summary: recipe.about().summary.clone(),
+        description: recipe.about().description.clone(),
         doc_url: recipe
             .about()
-            .documentation()
-            .cloned()
+            .documentation
+            .clone()
             .map(|url| vec![url])
             .unwrap_or_default(),
         dev_url: recipe
             .about()
-            .repository()
-            .cloned()
-            .map(|url| vec![url])
+            .repository
+            .as_ref()
+            .map(|url| vec![url.clone()])
             .unwrap_or_default(),
         // TODO ?
         source_url: None,
@@ -615,7 +615,7 @@ fn write_to_dest(
 /// This function creates a link.json file for the given output.
 fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     let noarch_links = PythonEntryPoints {
-        entry_points: output.recipe.build().python().entry_points().to_owned(),
+        entry_points: output.recipe.build().python().entry_points.to_owned(),
     };
 
     let link_json = LinkJson {
@@ -631,7 +631,7 @@ fn create_entry_points(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Vec<PathBuf>, PackagingError> {
-    if output.recipe.build().python().entry_points().is_empty() {
+    if output.recipe.build().python().entry_points.is_empty() {
         return Ok(Vec::new());
     }
 
@@ -660,7 +660,7 @@ fn create_entry_points(
         ));
     };
 
-    for ep in output.recipe.build().python().entry_points() {
+    for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
             &output
                 .build_configuration
@@ -715,10 +715,10 @@ fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Option<Vec<PathBuf>>, PackagingError> {
-    if output.recipe.about().license_files().is_empty() {
+    if output.recipe.about().license_file.is_empty() {
         Ok(None)
     } else {
-        let license_globs = output.recipe.about().license_files();
+        let license_globs = output.recipe.about().license_file.clone();
 
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
@@ -860,7 +860,7 @@ pub fn package_conda(
                         .recipe
                         .build()
                         .python()
-                        .entry_points()
+                        .entry_points
                         .iter()
                         .any(|ep| ep.command == name.to_string_lossy())
                     {
@@ -875,7 +875,7 @@ pub fn package_conda(
                         .recipe
                         .build()
                         .python()
-                        .entry_points()
+                        .entry_points
                         .iter()
                         .any(|ep| {
                             format!("{}.exe", ep.command) == name.to_string_lossy()

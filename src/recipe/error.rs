@@ -104,6 +104,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::missing_field))]
     MissingField(Cow<'static, str>),
 
+    /// Error when we encounter a duplicate key in a mapping.
+    #[diagnostic(code(error::duplicate_key))]
+    DuplicateKey(String),
+
     /// Error when there is a invalid field in a mapping.
     #[diagnostic(code(error::invalid_field))]
     InvalidField(Cow<'static, str>),
@@ -216,6 +220,7 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::InvalidMd5 => write!(f, "invalid MD5 checksum."),
             ErrorKind::InvalidSha256 => write!(f, "invalid SHA256 checksum."),
+            ErrorKind::DuplicateKey(s) => write!(f, "duplicate key `{}`.", s),
             ErrorKind::InvalidField(s) => write!(f, "invalid field `{s}`."),
             ErrorKind::InvalidValue((key, s)) => write!(f, "invalid value for `{key}`: `{s}`."),
             ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),

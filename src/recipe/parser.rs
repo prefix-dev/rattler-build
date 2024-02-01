@@ -21,6 +21,7 @@ use crate::{
 mod about;
 mod build;
 mod glob_vec;
+mod helper;
 mod output;
 mod package;
 mod requirements;
@@ -30,7 +31,8 @@ mod test;
 
 pub use self::{
     about::About,
-    build::Build,
+    build::{Build, DynamicLinking},
+    glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
     requirements::{
@@ -285,7 +287,7 @@ impl Recipe {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_yaml_snapshot;
+    use insta::{assert_snapshot, assert_yaml_snapshot};
     use rattler_conda_types::Platform;
 
     use crate::{assert_miette_snapshot, variant_config::ParseErrors};
@@ -293,13 +295,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn parsing_unix() {
         let recipe = include_str!("../../examples/xtensor/recipe.yaml");
-
-        let selector_config_win = SelectorConfig {
-            target_platform: Platform::Win64,
-            ..SelectorConfig::default()
-        };
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -307,11 +304,21 @@ mod tests {
         };
 
         let unix_recipe = Recipe::from_yaml(recipe, selector_config_unix);
-        let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
         assert!(unix_recipe.is_ok());
-        assert!(win_recipe.is_ok());
-
         insta::assert_debug_snapshot!("unix_recipe", unix_recipe.unwrap());
+    }
+
+    #[test]
+    fn parsing_win() {
+        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+
+        let selector_config_win = SelectorConfig {
+            target_platform: Platform::Win64,
+            ..SelectorConfig::default()
+        };
+
+        let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
+        assert!(win_recipe.is_ok());
         insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
     }
 
@@ -377,5 +384,12 @@ mod tests {
         );
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
         assert_yaml_snapshot!(recipe);
+    }
+
+    #[test]
+    fn test_complete_recipe() {
+        let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
     }
 }

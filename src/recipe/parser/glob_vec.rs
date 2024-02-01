@@ -43,23 +43,23 @@ impl<'de> Deserialize<'de> for GlobVec {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut vec = Vec::deserialize(deserializer)?;
-        let mut glob_vec = Vec::with_capacity(vec.len());
-        for glob in vec.drain(..) {
-            let glob = Glob::new(glob).map_err(serde::de::Error::custom)?;
-            glob_vec.push(glob);
+        let mut raw_globs: Vec<String> = Vec::deserialize(deserializer)?;
+        let mut globs = Vec::with_capacity(raw_globs.len());
+        for raw in raw_globs.drain(..) {
+            let glob = Glob::new(&raw).map_err(serde::de::Error::custom)?;
+            globs.push(glob);
         }
 
-        if glob_vec.is_empty() {
-            Ok(Self(glob_vec, None))
+        if globs.is_empty() {
+            Ok(Self(globs, None))
         } else {
             let mut globset_builder = globset::GlobSetBuilder::new();
-            for glob in glob_vec.iter() {
+            for glob in globs.iter() {
                 globset_builder.add(glob.clone());
             }
             let globset = globset_builder.build().map_err(serde::de::Error::custom)?;
 
-            Ok(Self(glob_vec, Some(globset)))
+            Ok(Self(globs, Some(globset)))
         }
     }
 }
@@ -69,8 +69,33 @@ impl GlobVec {
         self.0.is_empty()
     }
 
+    pub fn globs(&self) -> impl Iterator<Item = &Glob> {
+        self.0.iter()
+    }
+
     pub fn globset(&self) -> Option<&GlobSet> {
         self.1.as_ref()
+    }
+
+    /// Only used for testing
+    #[cfg(test)]
+    pub fn from_vec(vec: Vec<&str>) -> Self {
+        let mut glob_vec = Vec::with_capacity(vec.len());
+        for glob in vec.into_iter() {
+            glob_vec.push(Glob::new(glob).unwrap());
+        }
+
+        if glob_vec.is_empty() {
+            Self(glob_vec, None)
+        } else {
+            let mut globset_builder = globset::GlobSetBuilder::new();
+            for glob in glob_vec.iter() {
+                globset_builder.add(glob.clone());
+            }
+            let globset = globset_builder.build().unwrap();
+
+            Self(glob_vec, Some(globset))
+        }
     }
 }
 

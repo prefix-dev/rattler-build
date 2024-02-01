@@ -20,7 +20,7 @@ recipe:
     repository: https://github.com/curl/curl
     documentation: https://curl.haxx.se/docs/
     license: curl
-    license_files:
+    license_file:
     - COPYING
     summary: tool and library for transferring data with URL syntax
     description: |-
