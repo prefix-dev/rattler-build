@@ -31,7 +31,7 @@ mod test;
 
 pub use self::{
     about::About,
-    build::Build,
+    build::{Build, DynamicLinking},
     glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},

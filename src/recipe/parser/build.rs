@@ -320,15 +320,10 @@ pub struct Python {
     /// For a Python noarch package to have executables it is necessary to specify the python entry points.
     /// These contain the name of the executable and the module + function that should be executed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) entry_points: Vec<EntryPoint>,
+    pub entry_points: Vec<EntryPoint>,
 }
 
 impl Python {
-    /// Get the entry points.
-    pub fn entry_points(&self) -> &[EntryPoint] {
-        self.entry_points.as_slice()
-    }
-
     /// Returns true if this is the default python configuration.
     pub fn is_default(&self) -> bool {
         self.entry_points.is_empty()
@@ -346,22 +341,7 @@ impl TryConvertNode<Python> for RenderedNode {
 impl TryConvertNode<Python> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Python, Vec<PartialParsingError>> {
         let mut python = Python::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "entry_points" => {
-                    python.entry_points = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    )]);
-                }
-            }
-        }
-
+        validate_keys!(python, self.iter(), entry_points);
         Ok(python)
     }
 }
@@ -370,15 +350,15 @@ impl TryConvertNode<Python> for RenderedMappingNode {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct RunExports {
     /// Noarch run exports are the only ones looked at when building noarch packages.
-    pub(super) noarch: Vec<Dependency>,
+    pub noarch: Vec<Dependency>,
     /// Strong run exports apply from the build and host env to the run env.
-    pub(super) strong: Vec<Dependency>,
+    pub strong: Vec<Dependency>,
     /// Strong run constrains add run_constrains from the build and host env.
-    pub(super) strong_constraints: Vec<Dependency>,
+    pub strong_constraints: Vec<Dependency>,
     /// Weak run exports apply from the host env to the run env.
-    pub(super) weak: Vec<Dependency>,
+    pub weak: Vec<Dependency>,
     /// Weak run constrains add run_constrains from the host env.
-    pub(super) weak_constraints: Vec<Dependency>,
+    pub weak_constraints: Vec<Dependency>,
 }
 
 impl RunExports {
@@ -399,31 +379,6 @@ impl RunExports {
             .chain(self.strong_constraints.iter())
             .chain(self.weak.iter())
             .chain(self.weak_constraints.iter())
-    }
-
-    /// Get the noarch run exports.
-    pub fn noarch(&self) -> &[Dependency] {
-        self.noarch.as_slice()
-    }
-
-    /// Get the strong run exports.
-    pub fn strong(&self) -> &[Dependency] {
-        self.strong.as_slice()
-    }
-
-    /// Get the strong run constrains.
-    pub fn strong_constraints(&self) -> &[Dependency] {
-        self.strong_constraints.as_slice()
-    }
-
-    /// Get the weak run exports.
-    pub fn weak(&self) -> &[Dependency] {
-        self.weak.as_slice()
-    }
-
-    /// Get the weak run constrains.
-    pub fn weak_constraints(&self) -> &[Dependency] {
-        self.weak_constraints.as_slice()
     }
 }
 

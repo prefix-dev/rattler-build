@@ -615,7 +615,7 @@ fn write_to_dest(
 /// This function creates a link.json file for the given output.
 fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
     let noarch_links = PythonEntryPoints {
-        entry_points: output.recipe.build().python().entry_points().to_owned(),
+        entry_points: output.recipe.build().python().entry_points.to_owned(),
     };
 
     let link_json = LinkJson {
@@ -631,7 +631,7 @@ fn create_entry_points(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Vec<PathBuf>, PackagingError> {
-    if output.recipe.build().python().entry_points().is_empty() {
+    if output.recipe.build().python().entry_points.is_empty() {
         return Ok(Vec::new());
     }
 
@@ -660,7 +660,7 @@ fn create_entry_points(
         ));
     };
 
-    for ep in output.recipe.build().python().entry_points() {
+    for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
             &output
                 .build_configuration
@@ -860,7 +860,7 @@ pub fn package_conda(
                         .recipe
                         .build()
                         .python()
-                        .entry_points()
+                        .entry_points
                         .iter()
                         .any(|ep| ep.command == name.to_string_lossy())
                     {
@@ -875,7 +875,7 @@ pub fn package_conda(
                         .recipe
                         .build()
                         .python()
-                        .entry_points()
+                        .entry_points
                         .iter()
                         .any(|ep| {
                             format!("{}.exe", ep.command) == name.to_string_lossy()
