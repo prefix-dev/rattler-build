@@ -46,6 +46,8 @@ build:
   python:
     entry_points:
       - test = test:main
+    skip_pyc_compilation: 
+      - test/bla/**/*.py
 
   always_copy_files:
     - file1

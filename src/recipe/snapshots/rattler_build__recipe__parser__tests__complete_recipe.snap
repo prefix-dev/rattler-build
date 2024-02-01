@@ -37,6 +37,8 @@ build:
   python:
     entry_points:
     - test = test:main
+    skip_pyc_compilation:
+    - test/bla/**/*.py
   dynamic_linking:
     rpaths:
     - lib/
