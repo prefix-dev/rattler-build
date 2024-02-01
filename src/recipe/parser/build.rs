@@ -241,35 +241,16 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<DynamicLinking, Vec<PartialParsingError>> {
         let mut dynamic_linking = DynamicLinking::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "rpaths" => {
-                    dynamic_linking.rpaths = value.try_convert(key_str)?;
-                }
-                "binary_relocation" => {
-                    dynamic_linking.binary_relocation = value.try_convert(key_str)?;
-                }
-                "missing_dso_allowlist" => {
-                    dynamic_linking.missing_dso_allowlist = value.try_convert(key_str)?;
-                }
-                "rpath_allowlist" => {
-                    dynamic_linking.rpath_allowlist = value.try_convert(key_str)?;
-                }
-                "overdepending_behavior" => {
-                    dynamic_linking.overdepending_behavior = value.try_convert(key_str)?;
-                }
-                "overlinking_behavior" => {
-                    dynamic_linking.overlinking_behavior = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    )]);
-                }
-            }
-        }
+        validate_keys!(
+            dynamic_linking,
+            self.iter(),
+            rpaths,
+            binary_relocation,
+            missing_dso_allowlist,
+            rpath_allowlist,
+            overdepending_behavior,
+            overlinking_behavior
+        );
 
         Ok(dynamic_linking)
     }

@@ -10,9 +10,10 @@ use crate::{
         },
         error::{ErrorKind, PartialParsingError},
     },
+    validate_keys,
 };
 
-use super::FlattenErrors;
+use super::{glob_vec::GlobVec, FlattenErrors};
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestRequirements {
@@ -53,7 +54,7 @@ impl CommandsTestFiles {
     }
 }
 
-fn default_pip_check() -> bool {
+fn pip_check_true() -> bool {
     true
 }
 
@@ -66,11 +67,20 @@ pub struct PythonTest {
     /// List of imports to test
     pub imports: Vec<String>,
     /// Wether to run `pip check` or not (default to true)
-    #[serde(default = "default_pip_check", skip_serializing_if = "is_true")]
+    #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+impl Default for PythonTest {
+    fn default() -> Self {
+        Self {
+            imports: Vec::new(),
+            pip_check: true,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
     pub downstream: String,
 }
@@ -93,21 +103,21 @@ pub enum TestType {
 /// PackageContent
 pub struct PackageContentsTest {
     /// file paths, direct and/or globs
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub files: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub files: GlobVec,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub site_packages: Vec<String>,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub bin: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub bin: GlobVec,
     /// check for dynamic or static library file path
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub lib: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub lib: GlobVec,
     /// check if include path contains the file, direct or glob?
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub include: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub include: GlobVec,
 }
 
 impl TryConvertNode<Vec<TestType>> for RenderedNode {
@@ -202,27 +212,12 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 ///////////////////////////
 
 impl TryConvertNode<PythonTest> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
-        let mut imports = vec![];
-        let mut pip_check = true;
+    fn try_convert(&self, _name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
+        let mut python_test = PythonTest::default();
 
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "imports" => imports = value.try_convert(key_str)?,
-                    "pip_check" => pip_check = value.try_convert(key_str)?,
-                    invalid => Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("expected fields for {name} is one of `imports`")
-                    )])?,
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
+        validate_keys!(python_test, self.iter(), imports, pip_check);
 
-        if imports.is_empty() {
+        if python_test.imports.is_empty() {
             Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("imports".into()),
@@ -230,7 +225,7 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
             )])?;
         }
 
-        Ok(PythonTest { imports, pip_check })
+        Ok(python_test)
     }
 }
 
@@ -239,25 +234,10 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
 ///////////////////////////
 
 impl TryConvertNode<DownstreamTest> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<DownstreamTest, Vec<PartialParsingError>> {
-        let mut downstream = String::new();
-
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "downstream" => downstream = value.try_convert(key_str)?,
-                    invalid => Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("expected fields for {name} is one of `downstream`")
-                    )])?,
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
-
-        Ok(DownstreamTest { downstream })
+    fn try_convert(&self, _name: &str) -> Result<DownstreamTest, Vec<PartialParsingError>> {
+        let mut downstream = DownstreamTest::default();
+        validate_keys!(downstream, self.iter(), downstream);
+        Ok(downstream)
     }
 }
 
@@ -268,53 +248,19 @@ impl TryConvertNode<DownstreamTest> for RenderedMappingNode {
 impl TryConvertNode<CommandsTestRequirements> for RenderedMappingNode {
     fn try_convert(
         &self,
-        name: &str,
+        _name: &str,
     ) -> Result<CommandsTestRequirements, Vec<PartialParsingError>> {
-        let mut run = vec![];
-        let mut build = vec![];
-
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "run" => run = value.try_convert(key_str)?,
-                    "build" => build = value.try_convert(key_str)?,
-                    invalid => Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("expected fields for {name} is one of `run`, `build`")
-                    )])?,
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
-
-        Ok(CommandsTestRequirements { run, build })
+        let mut requirements = CommandsTestRequirements::default();
+        validate_keys!(requirements, self.iter(), run, build);
+        Ok(requirements)
     }
 }
 
 impl TryConvertNode<CommandsTestFiles> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<CommandsTestFiles, Vec<PartialParsingError>> {
-        let mut source = vec![];
-        let mut recipe = vec![];
-
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "source" => source = value.try_convert(key_str)?,
-                    "recipe" => recipe = value.try_convert(key_str)?,
-                    invalid => Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!("expected fields for {name} is one of `source`, `build`")
-                    )])?,
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
-
-        Ok(CommandsTestFiles { source, recipe })
+    fn try_convert(&self, _name: &str) -> Result<CommandsTestFiles, Vec<PartialParsingError>> {
+        let mut files = CommandsTestFiles::default();
+        validate_keys!(files, self.iter(), source, recipe);
+        Ok(files)
     }
 }
 
@@ -379,37 +325,18 @@ impl TryConvertNode<PackageContentsTest> for RenderedNode {
 }
 
 impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
-        let mut files = vec![];
-        let mut site_packages = vec![];
-        let mut lib = vec![];
-        let mut bin = vec![];
-        let mut include = vec![];
-
-        self.iter().map(|(key, value)| {
-            let key_str = key.as_str();
-            match key_str {
-                "files" => files = value.try_convert(key_str)?,
-                "site_packages" => site_packages = value.try_convert(key_str)?,
-                "lib" => lib = value.try_convert(key_str)?,
-                "bin" => bin = value.try_convert(key_str)?,
-                "include" => include = value.try_convert(key_str)?,
-                invalid => Err(vec![_partialerror!(
-                    *key.span(),
-                    ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `files`, `site_packages`, `lib`, `bin`, `include`")
-                )])?
-            }
-            Ok(())
-        }).flatten_errors()?;
-
-        Ok(PackageContentsTest {
+    fn try_convert(&self, _name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
+        let mut package_contents = PackageContentsTest::default();
+        validate_keys!(
+            package_contents,
+            self.iter(),
             files,
             site_packages,
-            bin,
             lib,
-            include,
-        })
+            bin,
+            include
+        );
+        Ok(package_contents)
     }
 }
 
@@ -426,8 +353,8 @@ mod test {
         tests:
           - python:
               imports:
-                - import os
-                - import sys
+                - numpy.testing
+                - numpy.matrix
         "#;
 
         // parse the YAML
@@ -437,6 +364,19 @@ mod test {
         let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
         let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
 
-        assert_snapshot!(serde_yaml::to_string(&tests).unwrap());
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
+
+        // from yaml
+        let tests: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
+        let t = tests.get(0);
+
+        match t {
+            Some(TestType::Python(python_test)) => {
+                assert_eq!(python_test.imports, vec!["numpy.testing", "numpy.matrix"]);
+                assert_eq!(python_test.pip_check, true);
+            }
+            _ => panic!("expected python test"),
+        }
     }
 }
