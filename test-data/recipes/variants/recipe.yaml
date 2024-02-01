@@ -14,9 +14,9 @@ source:
 
 build:
   variant:
-    use_keys: 
+    use_keys:
       - libblas
-    ignore_keys: 
+    ignore_keys:
       - libcblas
   number: 0
   script: |

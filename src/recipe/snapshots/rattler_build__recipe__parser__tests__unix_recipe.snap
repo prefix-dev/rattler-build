@@ -110,8 +110,8 @@ Recipe {
         always_include_files: [],
         merge_build_and_host_envs: false,
         variant: VariantKeyUsage {
-            use_keys: {},
-            ignore_keys: {},
+            use_keys: [],
+            ignore_keys: [],
         },
     },
     requirements: Requirements {

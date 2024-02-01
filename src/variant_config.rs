@@ -414,7 +414,7 @@ impl VariantConfig {
             }));
 
             let use_keys = &parsed_recipe.build().variant().use_keys;
-            used_vars.extend(use_keys.into_iter().cloned());
+            used_vars.extend(use_keys.iter().cloned());
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform

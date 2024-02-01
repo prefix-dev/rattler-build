@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::str::FromStr;
 
 use globset::GlobSet;
@@ -24,9 +23,9 @@ use crate::{
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
     /// The keys to use
-    pub use_keys: HashSet<String>,
+    pub(crate) use_keys: Vec<String>,
     /// The keys to ignore
-    pub ignore_keys: HashSet<String>,
+    pub(crate) ignore_keys: Vec<String>,
 }
 
 impl TryConvertNode<VariantKeyUsage> for RenderedNode {
@@ -40,38 +39,14 @@ impl TryConvertNode<VariantKeyUsage> for RenderedNode {
 impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
         let mut variantkeyusage = VariantKeyUsage::default();
-
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "use_keys" => {
-                    let vec: Vec<String> = value.try_convert(key_str)?;
-                    variantkeyusage.use_keys = HashSet::from_iter(vec);
-                }
-                "ignore_keys" => {
-                    let vec: Vec<String> = value.try_convert(key_str)?;
-                    variantkeyusage.ignore_keys = HashSet::from_iter(vec);
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                    )]);
-                }
-            }
-        }
-
+        validate_keys!(variantkeyusage, self.iter(), use_keys, ignore_keys);
         Ok(variantkeyusage)
     }
 }
 
 impl VariantKeyUsage {
     fn is_default(&self) -> bool {
-        let VariantKeyUsage {
-            use_keys,
-            ignore_keys,
-        } = self;
-        use_keys.is_empty() && ignore_keys.is_empty()
+        self.use_keys.is_empty() && self.ignore_keys.is_empty()
     }
 }
 
