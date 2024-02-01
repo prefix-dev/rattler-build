@@ -8,6 +8,7 @@
 //! * `files` - check if a list of files exist
 
 use fs_err as fs;
+use rattler_conda_types::package::IndexJson;
 use std::fmt::Write as fmt_write;
 use std::{
     io::Write,
@@ -75,6 +76,9 @@ pub enum TestError {
 
     #[error("archive type not supported")]
     ArchiveTypeNotSupported,
+
+    #[error("could not determine target platform from package file (no index.json?)")]
+    CouldNotDetermineTargetPlatform,
 }
 
 #[derive(Debug)]
@@ -251,7 +255,7 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), T
 }
 
 /// The configuration for a test
-#[derive(Default)]
+#[derive(Default, Clone, Debug)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
@@ -290,7 +294,18 @@ pub struct TestConfiguration {
 /// * `Err(TestError::TestFailed)` if the test failed
 pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
-    let target_platform = config.target_platform.unwrap_or_else(Platform::current);
+
+    let target_platform = if let Some(tp) = config.target_platform {
+        tp
+    } else {
+        let index_json: IndexJson =
+            rattler_package_streaming::seek::read_package_file(package_file)
+                .map_err(|_| TestError::CouldNotDetermineTargetPlatform)?;
+        let subdir = index_json
+            .subdir
+            .ok_or(TestError::CouldNotDetermineTargetPlatform)?;
+        Platform::from_str(&subdir).map_err(|_| TestError::CouldNotDetermineTargetPlatform)?
+    };
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
     std::fs::create_dir_all(&subdir)?;
@@ -333,6 +348,12 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let mut channels = config.channels.clone();
     channels.insert(0, tmp_repo.path().to_string_lossy().to_string());
 
+    let config = TestConfiguration {
+        target_platform: Some(target_platform),
+        channels,
+        ..config.clone()
+    };
+
     tracing::info!("Collecting tests from {:?}", package_folder);
 
     rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
@@ -367,7 +388,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             &dependencies,
             &platform,
             &prefix,
-            &channels,
+            &config.channels,
             &config.tool_configuration,
         )
         .await
@@ -394,7 +415,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         // for each enumerated test, we load and run it
         while let Some(entry) = read_dir.next_entry().await? {
             println!("test {:?}", entry.path());
-            run_individual_test(&pkg, &entry.path(), &prefix, config).await?;
+            run_individual_test(&pkg, &entry.path(), &prefix, &config).await?;
         }
 
         tracing::info!(
