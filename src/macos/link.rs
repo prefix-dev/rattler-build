@@ -64,7 +64,12 @@ impl Dylib {
     pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
         let mut file = File::open(path)?;
         let mut buf: [u8; 4] = [0; 4];
-        file.read_exact(&mut buf)?;
+        match file.read_exact(&mut buf) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(e) => return Err(e),
+        }
+
         let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
         match ctx_res {
             Ok((_, Some(_))) => Ok(true),

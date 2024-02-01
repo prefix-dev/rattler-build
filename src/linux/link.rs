@@ -64,7 +64,11 @@ impl SharedObject {
     pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
         let mut file = File::open(path)?;
         let mut signature: [u8; 4] = [0; 4];
-        file.read_exact(&mut signature)?;
+        match file.read_exact(&mut signature) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(e) => return Err(e),
+        }
         Ok(ELFMAG.iter().eq(signature.iter()))
     }
 
