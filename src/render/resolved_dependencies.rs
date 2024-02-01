@@ -674,23 +674,20 @@ pub async fn resolve_dependencies(
         }
     }
 
-    // if already merged don't redo
-    if !merge_build_host {
-        // We also have to propagate the _strong_ run exports of the build environment to the run environment
-        if let Some(build_env) = &build_env {
-            match output.build_configuration.target_platform {
-                Platform::NoArch => {}
-                _ => {
-                    for (name, rex) in &build_env.run_exports {
-                        run_specs
-                            .depends
-                            .extend(clone_specs(name, "build", &rex.strong)?);
-                        run_specs.constrains.extend(clone_specs(
-                            name,
-                            "build",
-                            &rex.strong_constrains,
-                        )?);
-                    }
+    // We also have to propagate the _strong_ run exports of the build environment to the run environment
+    if let Some(build_env) = &build_env {
+        match output.build_configuration.target_platform {
+            Platform::NoArch => {}
+            _ => {
+                for (name, rex) in &build_env.run_exports {
+                    run_specs
+                        .depends
+                        .extend(clone_specs(name, "build", &rex.strong)?);
+                    run_specs.constrains.extend(clone_specs(
+                        name,
+                        "build",
+                        &rex.strong_constrains,
+                    )?);
                 }
             }
         }
