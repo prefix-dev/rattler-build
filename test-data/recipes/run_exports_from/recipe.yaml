@@ -5,7 +5,7 @@ package:
   version: "1.0.0"
 
 build:
-  merge_build_and_host_envs: true 
+  merge_build_and_host_envs: true
 
 requirements:
   build:

@@ -1,6 +1,6 @@
 ---
 source: src/recipe/parser/glob_vec.rs
-expression: "serde_yaml::to_string(&globvec).unwrap()"
+expression: "&as_yaml"
 ---
 - foo
 - bar

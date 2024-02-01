@@ -1,7 +1,0 @@
----
-source: src/selectors.rs
-expression: res
----
-build:
-  script: build_ament_cmake.sh
-  number: 3
