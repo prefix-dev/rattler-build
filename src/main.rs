@@ -460,7 +460,7 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
 
     let test_options = TestConfiguration {
         test_prefix,
-        target_platform: Some(Platform::current()),
+        target_platform: None,
         keep_test_prefix: false,
         channels: args
             .channel

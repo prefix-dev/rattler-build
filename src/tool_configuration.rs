@@ -7,7 +7,7 @@ use rattler_networking::{authentication_storage, AuthenticationMiddleware, Authe
 use reqwest_middleware::ClientWithMiddleware;
 
 /// Global configuration for the build
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Configuration {
     /// If set to a value, a progress bar will be shown
     pub multi_progress_indicator: indicatif::MultiProgress,
