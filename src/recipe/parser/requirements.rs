@@ -1,11 +1,11 @@
 //! Parsing for the requirements section of the recipe.
 
+use crate::recipe::parser::FlattenErrors;
 use indexmap::IndexSet;
-use std::str::FromStr;
-
 use rattler_conda_types::{MatchSpec, PackageName};
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::{
@@ -46,7 +46,7 @@ pub struct Requirements {
     /// environment that is resolved. They are not installed by default, but when
     /// installed they will have to conform to the constrains specified here.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub run_constrained: Vec<Dependency>,
+    pub run_constraints: Vec<Dependency>,
 
     /// The recipe can specify a list of run exports that it provides.
     #[serde(default, skip_serializing_if = "RunExports::is_empty")]
@@ -73,9 +73,9 @@ impl Requirements {
         self.run.as_slice()
     }
 
-    /// Get the run constrained requirements.
-    pub fn run_constrained(&self) -> &[Dependency] {
-        self.run_constrained.as_slice()
+    /// Get the run constraints requirements.
+    pub fn run_constraints(&self) -> &[Dependency] {
+        self.run_constraints.as_slice()
     }
 
     /// Get run exports.
@@ -99,7 +99,7 @@ impl Requirements {
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
-            .chain(self.run_constrained.iter())
+            .chain(self.run_constraints.iter())
     }
 
     /// Check if all requirements are empty.
@@ -107,7 +107,7 @@ impl Requirements {
         self.build.is_empty()
             && self.host.is_empty()
             && self.run.is_empty()
-            && self.run_constrained.is_empty()
+            && self.run_constraints.is_empty()
     }
 }
 
@@ -127,43 +127,20 @@ impl TryConvertNode<Requirements> for RenderedNode {
 
 impl TryConvertNode<Requirements> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Requirements, Vec<PartialParsingError>> {
-        let mut build = Vec::new();
-        let mut host = Vec::new();
-        let mut run = Vec::new();
-        let mut run_constrained = Vec::new();
-        let mut run_exports = RunExports::default();
-        let mut ignore_run_exports = IgnoreRunExports::default();
+        let mut requirements = Requirements::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "build" => build = value.try_convert(key_str)?,
-                "host" => host = value.try_convert(key_str)?,
-                "run" => run = value.try_convert(key_str)?,
-                "run_constrained" => run_constrained = value.try_convert(key_str)?,
-                "run_exports" => {
-                    run_exports = value.try_convert(key_str)?;
-                }
-                "ignore_run_exports" => {
-                    ignore_run_exports = value.try_convert(key_str)?;
-                }
-                invalid_key => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid_key.to_string().into()),
-                    )])
-                }
-            }
-        }
-
-        Ok(Requirements {
+        crate::validate_keys!(
+            requirements,
+            self.iter(),
             build,
             host,
             run,
-            run_constrained,
+            run_constraints,
             run_exports,
-            ignore_run_exports,
-        })
+            ignore_run_exports
+        );
+
+        Ok(requirements)
     }
 }
 
@@ -413,13 +390,13 @@ pub struct RunExports {
     pub strong: Vec<Dependency>,
     /// Strong run constrains add run_constrains from the build and host env.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub strong_constrains: Vec<Dependency>,
+    pub strong_constraints: Vec<Dependency>,
     /// Weak run exports apply from the host env to the run env.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub weak: Vec<Dependency>,
     /// Weak run constrains add run_constrains from the host env.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub weak_constrains: Vec<Dependency>,
+    pub weak_constraints: Vec<Dependency>,
 }
 
 impl RunExports {
@@ -427,9 +404,9 @@ impl RunExports {
     pub fn is_empty(&self) -> bool {
         self.noarch.is_empty()
             && self.strong.is_empty()
-            && self.strong_constrains.is_empty()
+            && self.strong_constraints.is_empty()
             && self.weak.is_empty()
-            && self.weak_constrains.is_empty()
+            && self.weak_constraints.is_empty()
     }
 
     /// Get all run exports from all configurations
@@ -437,9 +414,9 @@ impl RunExports {
         self.noarch
             .iter()
             .chain(self.strong.iter())
-            .chain(self.strong_constrains.iter())
+            .chain(self.strong_constraints.iter())
             .chain(self.weak.iter())
-            .chain(self.weak_constrains.iter())
+            .chain(self.weak_constraints.iter())
     }
 
     /// Get the noarch run exports.
@@ -453,8 +430,8 @@ impl RunExports {
     }
 
     /// Get the strong run constrains.
-    pub fn strong_constrains(&self) -> &[Dependency] {
-        self.strong_constrains.as_slice()
+    pub fn strong_constraints(&self) -> &[Dependency] {
+        self.strong_constraints.as_slice()
     }
 
     /// Get the weak run exports.
@@ -463,8 +440,8 @@ impl RunExports {
     }
 
     /// Get the weak run constrains.
-    pub fn weak_constrains(&self) -> &[Dependency] {
-        self.weak_constrains.as_slice()
+    pub fn weak_constraints(&self) -> &[Dependency] {
+        self.weak_constraints.as_slice()
     }
 }
 
@@ -504,40 +481,18 @@ impl TryConvertNode<RunExports> for RenderedSequenceNode {
 }
 
 impl TryConvertNode<RunExports> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<RunExports, Vec<PartialParsingError>> {
         let mut run_exports = RunExports::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "noarch" => {
-                    run_exports.noarch = value.try_convert(key_str)?;
-                }
-                "strong" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.strong = deps;
-                }
-                "strong_constrains" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.strong_constrains = deps;
-                }
-                "weak" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.weak = deps;
-                }
-                "weak_constrains" => {
-                    let deps = value.try_convert(key_str)?;
-                    run_exports.weak_constrains = deps;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_owned().into()),
-                        help = format!("fields for {name} should be one of: `weak`, `strong`, `noarch`, `strong_constrains`, or `weak_constrains`")
-                    )]);
-                }
-            }
-        }
+        crate::validate_keys!(
+            run_exports,
+            self.iter(),
+            noarch,
+            strong,
+            strong_constraints,
+            weak,
+            weak_constraints
+        );
 
         Ok(run_exports)
     }
@@ -580,29 +535,10 @@ impl TryConvertNode<IgnoreRunExports> for RenderedNode {
 }
 
 impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
         let mut ignore_run_exports = IgnoreRunExports::default();
 
-        for (key, value) in self.iter() {
-            let key_str = key.as_str();
-            match key_str {
-                "by_name" => {
-                    ignore_run_exports.by_name = value.try_convert(key_str)?;
-                }
-                "from_package" => {
-                    ignore_run_exports.from_package = value.try_convert(key_str)?;
-                }
-                invalid => {
-                    return Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_owned().into()),
-                        help = format!(
-                            "fields for {name} should be one of: `by_name`, or `from_package`"
-                        )
-                    )]);
-                }
-            }
-        }
+        crate::validate_keys!(ignore_run_exports, self.iter(), by_name, from_package);
 
         Ok(ignore_run_exports)
     }

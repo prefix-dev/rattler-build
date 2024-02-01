@@ -40,7 +40,7 @@ requirements:
     - xtl >=0.7,<0.8
   run:
     - xtl >=0.7,<0.8
-  run_constrained:
+  run_constraints:
     - xsimd >=8.0.3,<10
 
 tests:

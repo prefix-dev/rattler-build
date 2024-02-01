@@ -398,11 +398,11 @@ pub struct RunExports {
     /// Strong run exports apply from the build and host env to the run env.
     pub(super) strong: Vec<Dependency>,
     /// Strong run constrains add run_constrains from the build and host env.
-    pub(super) strong_constrains: Vec<Dependency>,
+    pub(super) strong_constraints: Vec<Dependency>,
     /// Weak run exports apply from the host env to the run env.
     pub(super) weak: Vec<Dependency>,
     /// Weak run constrains add run_constrains from the host env.
-    pub(super) weak_constrains: Vec<Dependency>,
+    pub(super) weak_constraints: Vec<Dependency>,
 }
 
 impl RunExports {
@@ -410,9 +410,9 @@ impl RunExports {
     pub fn is_empty(&self) -> bool {
         self.noarch.is_empty()
             && self.strong.is_empty()
-            && self.strong_constrains.is_empty()
+            && self.strong_constraints.is_empty()
             && self.weak.is_empty()
-            && self.weak_constrains.is_empty()
+            && self.weak_constraints.is_empty()
     }
 
     /// Get all run exports from all configurations
@@ -420,9 +420,9 @@ impl RunExports {
         self.noarch
             .iter()
             .chain(self.strong.iter())
-            .chain(self.strong_constrains.iter())
+            .chain(self.strong_constraints.iter())
             .chain(self.weak.iter())
-            .chain(self.weak_constrains.iter())
+            .chain(self.weak_constraints.iter())
     }
 
     /// Get the noarch run exports.
@@ -436,8 +436,8 @@ impl RunExports {
     }
 
     /// Get the strong run constrains.
-    pub fn strong_constrains(&self) -> &[Dependency] {
-        self.strong_constrains.as_slice()
+    pub fn strong_constraints(&self) -> &[Dependency] {
+        self.strong_constraints.as_slice()
     }
 
     /// Get the weak run exports.
@@ -446,8 +446,8 @@ impl RunExports {
     }
 
     /// Get the weak run constrains.
-    pub fn weak_constrains(&self) -> &[Dependency] {
-        self.weak_constrains.as_slice()
+    pub fn weak_constraints(&self) -> &[Dependency] {
+        self.weak_constraints.as_slice()
     }
 }
 

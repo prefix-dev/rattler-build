@@ -638,7 +638,7 @@ impl VariantConfig {
                 requirements
                     .run
                     .iter()
-                    .chain(requirements.run_constrained.iter())
+                    .chain(requirements.run_constraints.iter())
                     .chain(requirements.run_exports().all())
                     .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
