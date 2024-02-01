@@ -12,7 +12,7 @@ end_to_end_test = "pytest test/end-to-end -v"
 test = "cargo test"
 lint = "pre-commit run --all"
 build-docs = "mkdocs build --strict"
-docs = "mike serve"
+docs = "mkdocs serve"
 deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
 deploy-dev = "mike deploy --push dev devel"
 

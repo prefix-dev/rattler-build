@@ -39,6 +39,15 @@ A conda package conforms to the following filename:
 <name>-<version>-<hash>.tar.bz2 OR <name>-<version>-<hash>.conda
 ```
 
+## Special files in packages
+
+There are some special files in a package:
+
+- activation and deactivation scripts that are executed when the environment is activated or deactivated
+- post-link and pre-unlink scripts that are executed when the package is installed or uninstalled
+
+You can read more about these files in the [activation scripts and other special files](./special_files) section.
+
 ## Package metadata
 
 The `info/` directory contains all metadata about a package. Files in this

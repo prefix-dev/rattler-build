@@ -75,6 +75,7 @@ nav:
   - Home: index.md
   - Highlevel overview: highlevel.md
   - Recipe file: recipe_file.md
+  - Jinja functions: available_jinja.md
   - Experimental features: experimental_features.md
 
   - Selector syntax: selectors.md
@@ -90,6 +91,7 @@ nav:
   - Reproducible builds: rebuild.md
 
   - Package specification: package_spec.md
+  - Activation scripts: special_files.md
   - Internals: internals.md
 
 plugins:
