@@ -54,6 +54,7 @@ build:
   always_include_files:
   - file1
   - file2/**/*
+  merge_build_and_host_envs: true
 requirements:
   build:
   - compiler: c

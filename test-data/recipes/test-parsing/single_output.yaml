@@ -35,7 +35,7 @@ build:
   string: "blabla"
   skip: false
   noarch: generic
-
+  merge_build_and_host_envs: true
   script:
     env:
       TEST: 1
