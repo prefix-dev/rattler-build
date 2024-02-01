@@ -28,7 +28,10 @@ use rattler_build::{
     hash::HashInfo,
     metadata::{BuildConfiguration, Directories, PackageIdentifier, PackagingSettings},
     package_test::{self, TestConfiguration},
-    recipe::{parser::Recipe, ParsingError},
+    recipe::{
+        parser::{find_outputs_from_src, Recipe},
+        ParsingError,
+    },
     selectors::SelectorConfig,
     tool_configuration,
     variant_config::{ParseErrors, VariantConfig},
@@ -553,10 +556,14 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         experimental: args.common.experimental,
     };
 
+    // First find all outputs from the recipe
+    let outputs = find_outputs_from_src(&recipe_text)?;
+
     let variant_config =
         VariantConfig::from_files(&args.variant_config, &selector_config).into_diagnostic()?;
 
-    let outputs_and_variants = variant_config.find_variants(&recipe_text, &selector_config)?;
+    let outputs_and_variants =
+        variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
 
     tracing::info!("Found variants:\n");
     for discovered_output in &outputs_and_variants {

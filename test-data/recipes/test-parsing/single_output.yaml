@@ -67,6 +67,14 @@ build:
     overdepending_behavior: error
     overlinking_behavior: ignore
 
+  variant:
+    use_keys:
+      - key1
+      - key2
+    ignore_keys:
+      - python
+      - numpy
+
 requirements:
   build:
     - ${{ compiler('c') }}

@@ -19,6 +19,37 @@ use crate::{
     },
 };
 
+/// The config for using or ignoring variant keys
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct VariantKeyUsage {
+    /// The keys to use
+    pub(crate) use_keys: Vec<String>,
+    /// The keys to ignore
+    pub(crate) ignore_keys: Vec<String>,
+}
+
+impl TryConvertNode<VariantKeyUsage> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
+        let mut variantkeyusage = VariantKeyUsage::default();
+        validate_keys!(variantkeyusage, self.iter(), use_keys, ignore_keys);
+        Ok(variantkeyusage)
+    }
+}
+
+impl VariantKeyUsage {
+    fn is_default(&self) -> bool {
+        self.use_keys.is_empty() && self.ignore_keys.is_empty()
+    }
+}
+
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -54,12 +85,20 @@ pub struct Build {
     /// Merge the build and host envs
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(super) merge_build_and_host_envs: bool,
+    /// Variant ignore and use keys
+    #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
+    pub(super) variant: VariantKeyUsage,
 }
 
 impl Build {
     /// Get the merge build host flag.
     pub const fn merge_build_and_host_envs(&self) -> bool {
         self.merge_build_and_host_envs
+    }
+
+    /// Variant ignore and use keys
+    pub(crate) const fn variant(&self) -> &VariantKeyUsage {
+        &self.variant
     }
 
     /// Get the build number.
@@ -135,7 +174,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             dynamic_linking,
             always_copy_files,
             always_include_files,
-            merge_build_and_host_envs
+            merge_build_and_host_envs,
+            variant
         }
 
         Ok(build)

@@ -57,6 +57,13 @@ build:
   - file1
   - file2/**/*
   merge_build_and_host_envs: true
+  variant:
+    use_keys:
+    - key1
+    - key2
+    ignore_keys:
+    - python
+    - numpy
 requirements:
   build:
   - compiler: c

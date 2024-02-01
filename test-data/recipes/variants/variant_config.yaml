@@ -1,0 +1,5 @@
+# blas
+libblas:
+  - 3.9 *netlib
+libcblas:
+  - 3.9 *netlib
