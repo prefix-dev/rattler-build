@@ -46,7 +46,7 @@ There are some special files in a package:
 - activation and deactivation scripts that are executed when the environment is activated or deactivated
 - post-link and pre-unlink scripts that are executed when the package is installed or uninstalled
 
-You can read more about these files in the [activation scripts and other special files](./special_files) section.
+You can read more about these files in the [activation scripts and other special files](./special_files.md) section.
 
 ## Package metadata
 
