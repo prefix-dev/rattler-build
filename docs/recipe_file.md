@@ -278,7 +278,7 @@ Patches may optionally be applied to the source.
 
 #### Destination path
 
-Within boa's work directory, you may specify a particular folder to place source
+Within rattler-build's work directory, you may specify a particular folder to place source
 into. `rattler-build` will always drop you into the same folder (build
 folder/work), but it's up to you whether you want your source extracted into
 that folder, or nested deeper. This feature is particularly useful when dealing
@@ -396,7 +396,7 @@ build:
 
 ### Skipping builds
 
-List conditions under which boa should skip the build of this recipe.
+List conditions under which rattler-build should skip the build of this recipe.
 Particularly useful for defining recipes that are platform specific. By default,
 a build is never skipped.
 
