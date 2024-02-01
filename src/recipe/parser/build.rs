@@ -19,11 +19,6 @@ use crate::{
     },
 };
 
-/// A helper method to skip serializing the `skip` field if it's false.
-fn should_not_serialize_skip(skip: &bool) -> bool {
-    !skip
-}
-
 /// The build options contain information about how to build the package and some additional
 /// metadata about the package.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -35,7 +30,7 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) string: Option<String>,
     /// List of conditions under which to skip the build of the package.
-    #[serde(default, skip_serializing_if = "should_not_serialize_skip")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub(super) skip: bool,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.

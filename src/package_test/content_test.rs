@@ -168,13 +168,13 @@ impl PackageContentsTest {
             "lib/python*/site-packages"
         };
 
-        for site_package in &self.site_packages {
+        for site_package in self.site_packages.globs() {
             let mut globset = GlobSet::builder();
 
-            if site_package.contains('/') {
+            if site_package.glob().contains('/') {
                 globset.add(build_glob(format!("{site_packages_base}/{site_package}"))?);
             } else {
-                let mut splitted = site_package.split('.').collect::<Vec<_>>();
+                let mut splitted = site_package.glob().split('.').collect::<Vec<_>>();
                 let last_elem = splitted.pop().unwrap_or_default();
                 let mut site_package_path = splitted.join("/");
                 if !site_package_path.is_empty() {
@@ -188,8 +188,9 @@ impl PackageContentsTest {
                     "{site_packages_base}/{site_package_path}{last_elem}/__init__.py"
                 ))?);
             };
+
             let globset = globset.build()?;
-            result.push((site_package.clone(), globset));
+            result.push((site_package.glob().to_string(), globset));
         }
 
         Ok(result)

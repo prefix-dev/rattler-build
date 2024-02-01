@@ -33,7 +33,7 @@ pub struct CommandsTestFiles {
     pub recipe: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
     pub script: Vec<String>,
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
@@ -107,8 +107,8 @@ pub struct PackageContentsTest {
     pub files: GlobVec,
     /// checks existence of package init in env python site packages dir
     /// eg: mamba.api -> ${SITE_PACKAGES}/mamba/api/__init__.py
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub site_packages: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub site_packages: GlobVec,
     /// search for binary in prefix path: eg, %PREFIX%/bin/mamba
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub bin: GlobVec,
@@ -245,6 +245,17 @@ impl TryConvertNode<DownstreamTest> for RenderedMappingNode {
 /// Commands Test       ///
 ///////////////////////////
 
+impl TryConvertNode<CommandsTestRequirements> for RenderedNode {
+    fn try_convert(
+        &self,
+        name: &str,
+    ) -> Result<CommandsTestRequirements, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
 impl TryConvertNode<CommandsTestRequirements> for RenderedMappingNode {
     fn try_convert(
         &self,
@@ -253,6 +264,14 @@ impl TryConvertNode<CommandsTestRequirements> for RenderedMappingNode {
         let mut requirements = CommandsTestRequirements::default();
         validate_keys!(requirements, self.iter(), run, build);
         Ok(requirements)
+    }
+}
+
+impl TryConvertNode<CommandsTestFiles> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<CommandsTestFiles, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
+            .and_then(|m| m.try_convert(name))
     }
 }
 
@@ -265,33 +284,12 @@ impl TryConvertNode<CommandsTestFiles> for RenderedMappingNode {
 }
 
 impl TryConvertNode<CommandsTest> for RenderedMappingNode {
-    fn try_convert(&self, name: &str) -> Result<CommandsTest, Vec<PartialParsingError>> {
-        let mut script = vec![];
-        let mut requirements = CommandsTestRequirements::default();
-        let mut files = CommandsTestFiles::default();
+    fn try_convert(&self, _name: &str) -> Result<CommandsTest, Vec<PartialParsingError>> {
+        let mut commands_test = CommandsTest::default();
 
-        self.iter()
-            .map(|(key, value)| {
-                let key_str = key.as_str();
-                match key_str {
-                    "script" => script = value.try_convert(key_str)?,
-                    "requirements" => {
-                        requirements = as_mapping(value, key_str)?.try_convert(key_str)?
-                    }
-                    "files" => files = as_mapping(value, key_str)?.try_convert(key_str)?,
-                    invalid => Err(vec![_partialerror!(
-                        *key.span(),
-                        ErrorKind::InvalidField(invalid.to_string().into()),
-                        help = format!(
-                        "expected fields for {name} is one of `script`, `requirements`, `files`"
-                    )
-                    )])?,
-                }
-                Ok(())
-            })
-            .flatten_errors()?;
+        validate_keys!(commands_test, self.iter(), script, requirements, files);
 
-        if script.is_empty() {
+        if commands_test.script.is_empty() {
             Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("script".into()),
@@ -299,11 +297,7 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
             )])?;
         }
 
-        Ok(CommandsTest {
-            script,
-            requirements,
-            files,
-        })
+        Ok(commands_test)
     }
 }
 
