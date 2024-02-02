@@ -22,18 +22,32 @@ pub fn record_files(directory: &Path) -> Result<HashSet<PathBuf>, io::Error> {
 }
 
 impl Files {
+    /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
+    /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
+    /// in the new_files set.
     pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>) -> Result<Self, io::Error> {
-        let prefix_records = PrefixRecord::collect_from_prefix(prefix)?;
-        let mut previous_files =
-            prefix_records
-                .into_iter()
-                .fold(HashSet::new(), |mut acc, record| {
-                    acc.extend(record.files.iter().map(|f| prefix.join(f)));
-                    acc
-                });
+        if !prefix.exists() {
+            return Ok(Files {
+                new_files: HashSet::new(),
+            });
+        }
 
-        // Also include the existing conda-meta (PrefixRecord) files themselves
-        previous_files.extend(record_files(&prefix.join("conda-meta"))?);
+        let previous_files = if prefix.join("conda-meta").exists() {
+            let prefix_records = PrefixRecord::collect_from_prefix(prefix)?;
+            let mut previous_files =
+                prefix_records
+                    .into_iter()
+                    .fold(HashSet::new(), |mut acc, record| {
+                        acc.extend(record.files.iter().map(|f| prefix.join(f)));
+                        acc
+                    });
+
+            // Also include the existing conda-meta (PrefixRecord) files themselves
+            previous_files.extend(record_files(&prefix.join("conda-meta"))?);
+            previous_files
+        } else {
+            HashSet::new()
+        };
 
         let current_files = record_files(prefix)?;
 
