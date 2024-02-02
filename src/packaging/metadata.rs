@@ -85,6 +85,7 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
 pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
     {
+        use std::path::Component;
         let mut buf = String::new();
         for c in path.components() {
             match c {

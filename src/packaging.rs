@@ -1,4 +1,5 @@
 use fs_err as fs;
+#[cfg(target_family = "unix")]
 use fs_err::os::unix::fs::symlink;
 use fs_err::File;
 use std::collections::HashSet;
