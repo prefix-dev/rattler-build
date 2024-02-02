@@ -1,31 +1,24 @@
-use content_inspector::ContentType;
 use fs_err as fs;
+#[cfg(target_family = "unix")]
+use fs_err::os::unix::fs::symlink;
 use fs_err::File;
-use globset::GlobSet;
 use std::collections::HashSet;
-use std::io::{BufReader, Read, Write};
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
-
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::OsStrExt;
-
-#[cfg(target_family = "unix")]
-use std::os::unix::fs::symlink;
 
 use itertools::Itertools;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use rattler_conda_types::package::{
-    AboutJson, ArchiveType, FileMode, LinkJson, NoArchLinks, PathType, PathsEntry,
-    PrefixPlaceholder, PythonEntryPoints,
-};
-use rattler_conda_types::package::{IndexJson, PathsJson};
+use rattler_conda_types::package::PathsJson;
+use rattler_conda_types::package::{ArchiveType, PackageFile};
 use rattler_conda_types::{NoArchType, Platform};
-use rattler_digest::compute_file_digest;
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
+
+mod metadata;
+pub use metadata::{create_prefix_placeholder, to_forward_slash_lossy};
 
 use crate::linux;
 use crate::macos;
@@ -82,357 +75,6 @@ pub enum PackagingError {
 
     #[error("Failed to compile Python bytecode: {0}")]
     PythonCompileError(String),
-}
-
-#[allow(unused_variables)]
-fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
-    // Convert the prefix to a Vec<u8> for binary comparison
-    // TODO on Windows check both ascii and utf-8 / 16?
-    #[cfg(target_family = "windows")]
-    {
-        tracing::warn!("Windows is not supported yet for binary prefix checking.");
-        Ok(false)
-    }
-
-    #[cfg(target_family = "unix")]
-    {
-        let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
-
-        // Open the file
-        let file = File::open(file_path)?;
-        let mut buf_reader = BufReader::new(file);
-
-        // Read the file's content
-        let mut content = Vec::new();
-        buf_reader.read_to_end(&mut content)?;
-
-        // Check if the content contains the prefix bytes
-        let contains_prefix = content
-            .windows(prefix_bytes.len())
-            .any(|window| window == prefix_bytes.as_slice());
-
-        Ok(contains_prefix)
-    }
-}
-
-/// This function requires we know the file content we are matching against is UTF-8
-/// In case the source is non utf-8 it will fail with a read error
-fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
-    // Open the file
-    let file = File::open(file_path)?;
-    let mut buf_reader = BufReader::new(file);
-
-    // Read the file's content
-    let mut content = String::new();
-    buf_reader.read_to_string(&mut content)?;
-
-    // Check if the content contains the prefix
-    let src = prefix.to_string_lossy();
-    let contains_prefix = content.contains(&src.to_string());
-
-    #[cfg(target_os = "windows")]
-    {
-        // absolute and unc paths will break but it,
-        // will break either way as C:/ can't be converted
-        // to something meaningful in unix either way
-        let s = to_forward_slash_lossy(prefix);
-        return Ok(contains_prefix || content.contains(s.to_string().as_str()));
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    Ok(contains_prefix)
-}
-
-#[allow(dead_code)]
-pub(crate) fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
-    #[cfg(target_os = "windows")]
-    {
-        let mut buf = String::new();
-        for c in path.components() {
-            match c {
-                Component::RootDir => { /* root on windows can be skipped */ }
-                Component::CurDir => buf.push('.'),
-                Component::ParentDir => buf.push_str(".."),
-                Component::Prefix(prefix) => {
-                    buf.push_str(&prefix.as_os_str().to_string_lossy());
-                    continue;
-                }
-                Component::Normal(s) => buf.push_str(&s.to_string_lossy()),
-            }
-            // use `/` instead of `\`
-            buf.push('/');
-        }
-
-        fn ends_with_main_sep(p: &Path) -> bool {
-            use std::os::windows::ffi::OsStrExt as _;
-            p.as_os_str().encode_wide().last() == Some(std::path::MAIN_SEPARATOR as u16)
-        }
-        if buf != "/" && !ends_with_main_sep(path) && buf.ends_with('/') {
-            buf.pop();
-        }
-
-        std::borrow::Cow::Owned(buf)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        path.to_string_lossy()
-    }
-}
-
-fn create_prefix_placeholder(
-    file_path: &Path,
-    prefix: &Path,
-) -> Result<Option<PrefixPlaceholder>, PackagingError> {
-    // exclude pyc and pyo files from prefix replacement
-    if let Some(ext) = file_path.extension() {
-        if ext == "pyc" || ext == "pyo" {
-            return Ok(None);
-        }
-    }
-    // read first 1024 bytes to determine file type
-    let mut file = File::open(file_path)?;
-    let mut buffer = [0; 1024];
-    let n = file.read(&mut buffer)?;
-    let buffer = &buffer[..n];
-
-    let content_type = content_inspector::inspect(buffer);
-    let mut has_prefix = None;
-
-    let file_mode = if content_type.is_text()
-        // treat everything else as binary for now!
-        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM)
-    {
-        match contains_prefix_text(file_path, prefix) {
-            Ok(true) => {
-                has_prefix = Some(prefix.to_path_buf());
-                FileMode::Text
-            }
-            Ok(false) => FileMode::Text,
-            Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
-                FileMode::Binary
-            }
-            Err(e) => return Err(e),
-        }
-    } else {
-        FileMode::Binary
-    };
-
-    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, prefix)? {
-        has_prefix = Some(prefix.to_path_buf());
-    }
-
-    Ok(has_prefix.map(|prefix_placeholder| PrefixPlaceholder {
-        file_mode,
-        placeholder: prefix_placeholder.to_string_lossy().to_string(),
-    }))
-}
-
-/// Create a `paths.json` file structure for the given paths.
-/// Paths should be given as absolute paths under the `path_prefix` directory.
-/// This function will also determine if the file is binary or text, and if it contains the prefix.
-fn create_paths_json(
-    paths: &HashSet<PathBuf>,
-    path_prefix: &Path,
-    encoded_prefix: &Path,
-    always_copy_files: Option<&GlobSet>,
-) -> Result<PathsJson, PackagingError> {
-    let mut paths_json = PathsJson {
-        paths: Vec::new(),
-        paths_version: 1,
-    };
-
-    for p in itertools::sorted(paths) {
-        let meta = fs::symlink_metadata(p)?;
-
-        let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
-
-        if !p.exists() {
-            if p.is_symlink() {
-                tracing::warn!(
-                    "Symlink target does not exist: {:?} -> {:?}",
-                    &p,
-                    fs::read_link(p)?
-                );
-                continue;
-            }
-            tracing::warn!("File does not exist: {:?} (TODO)", &p);
-            continue;
-        }
-
-        if meta.is_dir() {
-            // check if dir is empty, and only then add it to paths.json
-            let mut entries = fs::read_dir(p)?;
-            if entries.next().is_none() {
-                let path_entry = PathsEntry {
-                    sha256: None,
-                    relative_path,
-                    path_type: PathType::Directory,
-                    prefix_placeholder: None,
-                    no_link: false,
-                    size_in_bytes: None,
-                };
-                paths_json.paths.push(path_entry);
-            }
-        } else if meta.is_file() {
-            let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
-
-            let digest = compute_file_digest::<sha2::Sha256>(p)?;
-            let no_link = always_copy_files
-                .as_ref()
-                .map(|g| g.is_match(&relative_path))
-                .unwrap_or(false);
-            paths_json.paths.push(PathsEntry {
-                sha256: Some(digest),
-                relative_path,
-                path_type: PathType::HardLink,
-                prefix_placeholder,
-                no_link,
-                size_in_bytes: Some(meta.len()),
-            });
-        } else if meta.file_type().is_symlink() {
-            let digest = compute_file_digest::<sha2::Sha256>(p)?;
-
-            paths_json.paths.push(PathsEntry {
-                sha256: Some(digest),
-                relative_path,
-                path_type: PathType::SoftLink,
-                prefix_placeholder: None,
-                no_link: false,
-                size_in_bytes: Some(meta.len()),
-            });
-        }
-    }
-
-    Ok(paths_json)
-}
-
-/// Create the index.json file for the given output.
-fn create_index_json(output: &Output) -> Result<String, PackagingError> {
-    let recipe = &output.recipe;
-
-    let (platform, arch) = match output.build_configuration.target_platform {
-        Platform::NoArch => (None, None),
-        p => {
-            // TODO add better functions in rattler for this
-            let pstring = p.to_string();
-            let parts: Vec<&str> = pstring.split('-').collect();
-            let (platform, arch) = (String::from(parts[0]), String::from(parts[1]));
-
-            match arch.as_str() {
-                "64" => (Some(platform), Some("x86_64".to_string())),
-                "32" => (Some(platform), Some("x86".to_string())),
-                _ => (Some(platform), Some(arch)),
-            }
-        }
-    };
-
-    // Track features are exclusively used to down-prioritize packages
-    // Each feature contributes "1 point" to the down-priorization. So we add a feature for each
-    // down-priorization level.
-    let track_features = output
-        .recipe
-        .build()
-        .variant()
-        .down_prioritize_variant
-        .map(|down_prioritize| {
-            let mut track_features = Vec::new();
-            for i in 0..down_prioritize.abs() {
-                track_features.push(format!("{}-p-{}", output.name().as_normalized(), i));
-            }
-            track_features
-        })
-        .unwrap_or_default();
-
-    let index_json = IndexJson {
-        name: output.name().clone(),
-        version: output.version().parse()?,
-        build: output
-            .build_string()
-            .ok_or(PackagingError::BuildStringNotSet)?
-            .to_string(),
-        build_number: recipe.build().number(),
-        arch,
-        platform,
-        subdir: Some(output.build_configuration.target_platform.to_string()),
-        license: recipe.about().license.as_ref().map(|l| l.to_string()),
-        license_family: recipe.about().license_family.clone(),
-        timestamp: Some(output.build_configuration.timestamp),
-        depends: output
-            .finalized_dependencies
-            .as_ref()
-            .ok_or(PackagingError::DependenciesNotFinalized)?
-            .run
-            .depends
-            .iter()
-            .map(|dep| dep.spec().to_string())
-            .dedup()
-            .collect(),
-        constrains: output
-            .finalized_dependencies
-            .as_ref()
-            .ok_or(PackagingError::DependenciesNotFinalized)?
-            .run
-            .constrains
-            .iter()
-            .map(|dep| dep.spec().to_string())
-            .dedup()
-            .collect(),
-        noarch: *recipe.build().noarch(),
-        track_features,
-        features: None,
-    };
-
-    Ok(serde_json::to_string_pretty(&index_json)?)
-}
-
-/// Create the about.json file for the given output.
-fn create_about_json(output: &Output) -> Result<String, PackagingError> {
-    let recipe = &output.recipe;
-
-    let about_json = AboutJson {
-        home: recipe
-            .about()
-            .homepage
-            .clone()
-            .map(|s| vec![s])
-            .unwrap_or_default(),
-        license: recipe.about().license.as_ref().map(|l| l.to_string()),
-        license_family: recipe.about().license_family.clone(),
-        summary: recipe.about().summary.clone(),
-        description: recipe.about().description.clone(),
-        doc_url: recipe
-            .about()
-            .documentation
-            .clone()
-            .map(|url| vec![url])
-            .unwrap_or_default(),
-        dev_url: recipe
-            .about()
-            .repository
-            .as_ref()
-            .map(|url| vec![url.clone()])
-            .unwrap_or_default(),
-        // TODO ?
-        source_url: None,
-        channels: output.build_configuration.channels.clone(),
-    };
-
-    Ok(serde_json::to_string_pretty(&about_json)?)
-}
-
-/// Create the run_exports.json file for the given output.
-fn create_run_exports_json(output: &Output) -> Result<Option<String>, PackagingError> {
-    if let Some(run_exports) = &output
-        .finalized_dependencies
-        .as_ref()
-        .ok_or(PackagingError::DependenciesNotFinalized)?
-        .run
-        .run_exports
-    {
-        Ok(Some(serde_json::to_string_pretty(run_exports)?))
-    } else {
-        Ok(None)
-    }
 }
 
 /// This function returns a HashSet of (recursively) all the files in the given directory.
@@ -629,20 +271,6 @@ fn write_to_dest(
         fs::copy(path, &dest_path)?;
         Ok(Some(dest_path))
     }
-}
-
-/// This function creates a link.json file for the given output.
-fn create_link_json(output: &Output) -> Result<Option<String>, PackagingError> {
-    let noarch_links = PythonEntryPoints {
-        entry_points: output.recipe.build().python().entry_points.to_owned(),
-    };
-
-    let link_json = LinkJson {
-        noarch: NoArchLinks::Python(noarch_links),
-        package_metadata_version: 1,
-    };
-
-    Ok(Some(serde_json::to_string_pretty(&link_json)?))
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -880,43 +508,13 @@ pub fn package_conda(
     tracing::info!("Relink done!");
 
     let info_folder = tmp_dir_path.join("info");
-    fs::create_dir_all(&info_folder)?;
 
-    let mut paths_json = File::create(info_folder.join("paths.json"))?;
-    let paths_json_struct = create_paths_json(
-        &tmp_files,
-        tmp_dir_path,
-        prefix,
-        output.recipe.build.always_copy_files(),
-    )?;
-    paths_json.write_all(serde_json::to_string_pretty(&paths_json_struct)?.as_bytes())?;
-    tmp_files.insert(info_folder.join("paths.json"));
+    tmp_files.extend(output.write_metadata(tmp_dir_path, &tmp_files)?);
 
-    let mut index_json = File::create(info_folder.join("index.json"))?;
-    index_json.write_all(create_index_json(output)?.as_bytes())?;
-    tmp_files.insert(info_folder.join("index.json"));
-
-    let mut hash_input_json = File::create(info_folder.join("hash_input.json"))?;
-    hash_input_json.write_all(output.build_configuration.hash.hash_input.as_bytes())?;
-    tmp_files.insert(info_folder.join("hash_input.json"));
-
-    let mut about_json = File::create(info_folder.join("about.json"))?;
-    about_json.write_all(create_about_json(output)?.as_bytes())?;
-    tmp_files.insert(info_folder.join("about.json"));
-
-    if let Some(run_exports) = create_run_exports_json(output)? {
-        let mut run_exports_json = File::create(info_folder.join("run_exports.json"))?;
-        run_exports_json.write_all(run_exports.as_bytes())?;
-        tmp_files.insert(info_folder.join("run_exports.json"));
-    }
-
+    // TODO move things below also to metadata.rs
     if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
         tmp_files.extend(license_files);
     }
-
-    let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
-    variant_config
-        .write_all(serde_json::to_string_pretty(&output.build_configuration.variant)?.as_bytes())?;
 
     if output.build_configuration.store_recipe {
         let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
@@ -928,11 +526,9 @@ pub fn package_conda(
 
     // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
-        if let Some(link) = create_link_json(output)? {
-            let mut link_json = File::create(info_folder.join("link.json"))?;
-            link_json.write_all(link.as_bytes())?;
-            tmp_files.insert(info_folder.join("link.json"));
-        }
+        let link_json = File::create(info_folder.join("link.json"))?;
+        serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
+        tmp_files.insert(info_folder.join("link.json"));
     } else {
         let entry_points = post_process::python::create_entry_points(output, tmp_dir_path)?;
         tmp_files.extend(entry_points);
@@ -988,12 +584,13 @@ pub fn package_conda(
         }
     }
 
-    Ok((out_path, paths_json_struct))
+    let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
+    Ok((out_path, paths_json))
 }
 
 #[cfg(test)]
 mod test {
-    use super::create_prefix_placeholder;
+    use super::metadata::create_prefix_placeholder;
 
     #[test]
     fn detect_prefix() {
