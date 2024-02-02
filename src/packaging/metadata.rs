@@ -390,7 +390,7 @@ impl Output {
 
         let paths_json = File::create(info_folder.join("paths.json"))?;
         let paths_json_struct = self.paths_json(
-            &package_files,
+            package_files,
             tmp_dir_path,
             &self.build_configuration.directories.host_prefix,
         )?;
