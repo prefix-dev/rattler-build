@@ -23,9 +23,14 @@ use crate::{
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct VariantKeyUsage {
     /// The keys to use
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) use_keys: Vec<String>,
     /// The keys to ignore
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) ignore_keys: Vec<String>,
+    /// Down-prioritize variant by setting the priority to a negative value
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) down_prioritize: Option<i32>,
 }
 
 impl TryConvertNode<VariantKeyUsage> for RenderedNode {
@@ -38,9 +43,9 @@ impl TryConvertNode<VariantKeyUsage> for RenderedNode {
 
 impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
-        let mut variantkeyusage = VariantKeyUsage::default();
-        validate_keys!(variantkeyusage, self.iter(), use_keys, ignore_keys);
-        Ok(variantkeyusage)
+        let mut variant = VariantKeyUsage::default();
+        validate_keys!(variant, self.iter(), use_keys, ignore_keys, down_prioritize);
+        Ok(variant)
     }
 }
 

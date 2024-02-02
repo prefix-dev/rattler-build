@@ -327,6 +327,23 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         }
     };
 
+    // Track features are exclusively used to down-prioritize packages
+    // Each feature contributes "1 point" to the down-priorization. So we add a feature for each
+    // down-priorization level.
+    let track_features = output
+        .recipe
+        .build()
+        .variant()
+        .down_prioritize
+        .map(|down_prioritize| {
+            let mut track_features = Vec::new();
+            for i in 0..down_prioritize.abs() {
+                track_features.push(format!("{}-p-{}", output.name().as_normalized(), i));
+            }
+            track_features
+        })
+        .unwrap_or_default();
+
     let index_json = IndexJson {
         name: output.name().clone(),
         version: output.version().parse()?,
@@ -362,7 +379,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
             .dedup()
             .collect(),
         noarch: *recipe.build().noarch(),
-        track_features: vec![],
+        track_features,
         features: None,
     };
 
