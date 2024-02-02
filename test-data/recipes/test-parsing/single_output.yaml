@@ -38,7 +38,7 @@ build:
   merge_build_and_host_envs: true
   script:
     env:
-      TEST: 1
+      TEST: MYENV_VAR
     secrets:
       - SECRET_VARIABLE
     content:
@@ -46,8 +46,9 @@ build:
   python:
     entry_points:
       - test = test:main
-    skip_pyc_compilation: 
+    skip_pyc_compilation:
       - test/bla/**/*.py
+    use_python_app_entrypoint: true
 
   always_copy_files:
     - file1

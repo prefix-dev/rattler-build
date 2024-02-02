@@ -89,6 +89,7 @@ Recipe {
         python: Python {
             entry_points: [],
             skip_pyc_compilation: [],
+            use_python_app_entrypoint: false,
         },
         dynamic_linking: Some(
             DynamicLinking {
