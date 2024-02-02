@@ -210,7 +210,10 @@ pub fn python(
 
 fn python_in_prefix(prefix: &Path, use_python_app_entrypoint: bool) -> String {
     if use_python_app_entrypoint {
-        format!("/bin/bash {}", to_forward_slash_lossy(&prefix.join("bin/pythonw")))
+        format!(
+            "/bin/bash {}",
+            to_forward_slash_lossy(&prefix.join("bin/pythonw"))
+        )
     } else {
         format!("{}", to_forward_slash_lossy(&prefix.join("bin/python")))
     }
