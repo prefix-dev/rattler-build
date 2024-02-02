@@ -15,7 +15,7 @@ use std::process::Command;
 use rattler_conda_types::Platform;
 
 use crate::metadata::Output;
-use crate::packaging::PackagingError;
+use crate::packaging::{to_forward_slash_lossy, PackagingError};
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
     if target_platform.is_windows() {
@@ -210,9 +210,9 @@ pub fn python(
 
 fn python_in_prefix(prefix: &Path, use_python_app_entrypoint: bool) -> String {
     if use_python_app_entrypoint {
-        format!("/bin/bash {}", prefix.join("bin/pythonw").to_string_lossy())
+        format!("/bin/bash {}", to_forward_slash_lossy(&prefix.join("bin/pythonw")))
     } else {
-        format!("{}", prefix.join("bin/python").to_string_lossy())
+        format!("{}", to_forward_slash_lossy(&prefix.join("bin/python")))
     }
 }
 
