@@ -2,6 +2,7 @@
 
 use content_inspector::ContentType;
 use fs_err as fs;
+use fs_err::File;
 use itertools::Itertools;
 use rattler_conda_types::package::{
     AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PathType, PathsEntry, PathsJson,
@@ -10,7 +11,7 @@ use rattler_conda_types::package::{
 use rattler_digest::compute_file_digest;
 use std::{
     collections::HashSet,
-    io::{BufReader, Read},
+    io::{BufReader, Read, Write},
     path::{Path, PathBuf},
 };
 
@@ -36,7 +37,7 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
         let prefix_bytes = prefix.as_os_str().as_bytes().to_vec();
 
         // Open the file
-        let file = fs::File::open(file_path)?;
+        let file = File::open(file_path)?;
         let mut buf_reader = BufReader::new(file);
 
         // Read the file's content
@@ -56,7 +57,7 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
 /// In case the source is non utf-8 it will fail with a read error
 fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Open the file
-    let file = fs::File::open(file_path)?;
+    let file = File::open(file_path)?;
     let mut buf_reader = BufReader::new(file);
 
     // Read the file's content
@@ -129,7 +130,7 @@ pub fn create_prefix_placeholder(
         }
     }
     // read first 1024 bytes to determine file type
-    let mut file = fs::File::open(file_path)?;
+    let mut file = File::open(file_path)?;
     let mut buffer = [0; 1024];
     let n = file.read(&mut buffer)?;
     let buffer = &buffer[..n];
@@ -375,5 +376,50 @@ impl Output {
         }
 
         Ok(paths_json)
+    }
+
+    /// Create the metadata for the given output and place it in the temporary directory
+    pub fn write_metadata(
+        &self,
+        tmp_dir_path: &Path,
+        package_files: &HashSet<PathBuf>,
+    ) -> Result<HashSet<PathBuf>, PackagingError> {
+        let mut new_files = HashSet::new();
+        let info_folder = tmp_dir_path.join("info");
+        fs::create_dir_all(&info_folder)?;
+
+        let paths_json = File::create(info_folder.join("paths.json"))?;
+        let paths_json_struct = self.paths_json(
+            &package_files,
+            tmp_dir_path,
+            &self.build_configuration.directories.host_prefix,
+        )?;
+        serde_json::to_writer_pretty(paths_json, &paths_json_struct)?;
+        new_files.insert(info_folder.join("paths.json"));
+
+        let index_json = File::create(info_folder.join("index.json"))?;
+        serde_json::to_writer_pretty(index_json, &self.index_json()?)?;
+        new_files.insert(info_folder.join("index.json"));
+
+        let hash_input_json = File::create(info_folder.join("hash_input.json"))?;
+        serde_json::to_writer_pretty(hash_input_json, &self.build_configuration.hash.hash_input)?;
+        new_files.insert(info_folder.join("hash_input.json"));
+
+        let about_json = File::create(info_folder.join("about.json"))?;
+        serde_json::to_writer_pretty(about_json, &self.about_json())?;
+        new_files.insert(info_folder.join("about.json"));
+
+        if let Some(run_exports) = self.run_exports_json()? {
+            let run_exports_json = File::create(info_folder.join("run_exports.json"))?;
+            serde_json::to_writer_pretty(run_exports_json, &run_exports)?;
+            new_files.insert(info_folder.join("run_exports.json"));
+        }
+
+        let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
+        variant_config.write_all(
+            serde_json::to_string_pretty(&self.build_configuration.variant)?.as_bytes(),
+        )?;
+
+        Ok(new_files)
     }
 }

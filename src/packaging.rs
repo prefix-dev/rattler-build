@@ -9,8 +9,8 @@ use itertools::Itertools;
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use rattler_conda_types::package::ArchiveType;
 use rattler_conda_types::package::PathsJson;
+use rattler_conda_types::package::{ArchiveType, PackageFile};
 use rattler_conda_types::{NoArchType, Platform};
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
@@ -507,38 +507,13 @@ pub fn package_conda(
     tracing::info!("Relink done!");
 
     let info_folder = tmp_dir_path.join("info");
-    fs::create_dir_all(&info_folder)?;
 
-    let paths_json = File::create(info_folder.join("paths.json"))?;
-    let paths_json_struct = output.paths_json(&tmp_files, tmp_dir_path, prefix)?;
-    serde_json::to_writer_pretty(paths_json, &paths_json_struct)?;
-    tmp_files.insert(info_folder.join("paths.json"));
+    tmp_files.extend(output.write_metadata(tmp_dir_path, &tmp_files)?);
 
-    let index_json = File::create(info_folder.join("index.json"))?;
-    serde_json::to_writer_pretty(index_json, &output.index_json()?)?;
-    tmp_files.insert(info_folder.join("index.json"));
-
-    let hash_input_json = File::create(info_folder.join("hash_input.json"))?;
-    serde_json::to_writer_pretty(hash_input_json, &output.build_configuration.hash.hash_input)?;
-    tmp_files.insert(info_folder.join("hash_input.json"));
-
-    let about_json = File::create(info_folder.join("about.json"))?;
-    serde_json::to_writer_pretty(about_json, &output.about_json())?;
-    tmp_files.insert(info_folder.join("about.json"));
-
-    if let Some(run_exports) = output.run_exports_json()? {
-        let run_exports_json = File::create(info_folder.join("run_exports.json"))?;
-        serde_json::to_writer_pretty(run_exports_json, &run_exports)?;
-        tmp_files.insert(info_folder.join("run_exports.json"));
-    }
-
+    // TODO move things below also to metadata.rs
     if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
         tmp_files.extend(license_files);
     }
-
-    let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
-    variant_config
-        .write_all(serde_json::to_string_pretty(&output.build_configuration.variant)?.as_bytes())?;
 
     if output.build_configuration.store_recipe {
         let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
@@ -608,7 +583,8 @@ pub fn package_conda(
         }
     }
 
-    Ok((out_path, paths_json_struct))
+    let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
+    Ok((out_path, paths_json))
 }
 
 #[cfg(test)]
