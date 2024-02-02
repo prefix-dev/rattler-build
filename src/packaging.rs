@@ -334,7 +334,7 @@ fn create_index_json(output: &Output) -> Result<String, PackagingError> {
         .recipe
         .build()
         .variant()
-        .down_prioritize
+        .down_prioritize_variant
         .map(|down_prioritize| {
             let mut track_features = Vec::new();
             for i in 0..down_prioritize.abs() {

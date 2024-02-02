@@ -5,4 +5,4 @@ package:
 build:
   number: 0
   variant:
-    down_prioritize: 4
+    down_prioritize_variant: 4

@@ -30,7 +30,7 @@ pub struct VariantKeyUsage {
     pub(crate) ignore_keys: Vec<String>,
     /// Down-prioritize variant by setting the priority to a negative value
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(crate) down_prioritize: Option<i32>,
+    pub(crate) down_prioritize_variant: Option<i32>,
 }
 
 impl TryConvertNode<VariantKeyUsage> for RenderedNode {
@@ -44,14 +44,14 @@ impl TryConvertNode<VariantKeyUsage> for RenderedNode {
 impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
         let mut variant = VariantKeyUsage::default();
-        validate_keys!(variant, self.iter(), use_keys, ignore_keys, down_prioritize);
+        validate_keys!(variant, self.iter(), use_keys, ignore_keys, down_prioritize_variant);
         Ok(variant)
     }
 }
 
 impl VariantKeyUsage {
     fn is_default(&self) -> bool {
-        self.use_keys.is_empty() && self.ignore_keys.is_empty()
+        self.use_keys.is_empty() && self.ignore_keys.is_empty() && self.down_prioritize_variant.is_none()
     }
 }
 
