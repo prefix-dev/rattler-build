@@ -28,7 +28,7 @@ build:
   string: blabla
   script:
     env:
-      TEST: '1'
+      TEST: MYENV_VAR
     secrets:
     - SECRET_VARIABLE
     content:
@@ -39,6 +39,7 @@ build:
     - test = test:main
     skip_pyc_compilation:
     - test/bla/**/*.py
+    use_python_app_entrypoint: true
   dynamic_linking:
     rpaths:
     - lib/
