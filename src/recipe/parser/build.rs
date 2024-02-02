@@ -376,6 +376,11 @@ pub struct Python {
     /// Only relevant for non-noarch Python packages.
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub skip_pyc_compilation: GlobVec,
+
+    /// Wether to use the "app" entry point for Python (which hooks into the macOS GUI)
+    /// This is only relevant for macOS.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub use_python_app_entrypoint: bool,
 }
 
 impl Python {
@@ -396,7 +401,13 @@ impl TryConvertNode<Python> for RenderedNode {
 impl TryConvertNode<Python> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Python, Vec<PartialParsingError>> {
         let mut python = Python::default();
-        validate_keys!(python, self.iter(), entry_points, skip_pyc_compilation);
+        validate_keys!(
+            python,
+            self.iter(),
+            entry_points,
+            skip_pyc_compilation,
+            use_python_app_entrypoint
+        );
         Ok(python)
     }
 }

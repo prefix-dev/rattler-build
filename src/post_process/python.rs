@@ -1,13 +1,14 @@
-//! Functions to post-process packages after building
-//! This includes:
+//! Functions to post-process python files after building the package
 //!
-//! - relinking of shared libraries to be relocatable
-//! - checking for "overlinking" (i.e. linking to libraries that are not dependencies
-//!   of the package, or linking to system libraries that are not part of the allowed list)
-
+//! This includes:
+//!   - Fixing up the shebangs in scripts
+//!   - Compiling `.py` files to `.pyc` files
+//!   - Replacing the contents of `.dist-info/INSTALLER` files with "conda"
 use fs_err as fs;
 use globset::GlobSet;
+use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use std::collections::HashSet;
+use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -205,4 +206,207 @@ pub fn python(
     }
 
     Ok(result)
+}
+
+fn python_in_prefix(prefix: &Path, use_python_app_entrypoint: bool) -> String {
+    if use_python_app_entrypoint {
+        format!("/bin/bash {}", prefix.join("bin/pythonw").to_string_lossy())
+    } else {
+        format!("{}", prefix.join("bin/python").to_string_lossy())
+    }
+}
+
+fn replace_shebang(
+    shebang: &str,
+    prefix: &Path,
+    use_python_app_entrypoint: bool,
+) -> (bool, String) {
+    // skip first two characters
+    let shebang = &shebang[2..];
+    // split the shebang into its components
+    let parts = shebang.split_whitespace().collect::<Vec<_>>();
+
+    let replaced = parts
+        .iter()
+        .map(|p| {
+            if p.ends_with("/python") || p.ends_with("/pythonw") {
+                python_in_prefix(prefix, use_python_app_entrypoint)
+            } else {
+                p.to_string()
+            }
+        })
+        .collect::<Vec<_>>();
+
+    println!("replaced: {:?}", replaced);
+    println!("parts: {:?}", parts);
+
+    let modified = parts != replaced;
+
+    (modified, format!("#!{}", replaced.join(" ")))
+}
+
+fn fix_shebang(
+    path: &Path,
+    prefix: &Path,
+    use_python_app_entrypoint: bool,
+) -> Result<(), io::Error> {
+    let file = fs::File::open(path)?;
+    let reader = BufReader::new(file);
+
+    // read first line of file
+    let mut reader_iter = reader.lines();
+
+    // TODO better error handling & make sure it's not a binary file
+    let line = if let Some(Ok(l)) = reader_iter.next() {
+        l
+    } else {
+        return Ok(());
+    };
+
+    // check if it starts with #!
+    if !line.starts_with("#!") {
+        return Ok(());
+    }
+
+    let (modified, new_shebang) = replace_shebang(&line, prefix, use_python_app_entrypoint);
+    // no modification needed
+    if !modified {
+        return Ok(());
+    }
+
+    let file = fs::File::open(path)?;
+    let mut buf_writer = io::BufWriter::new(file);
+
+    buf_writer.write_all(new_shebang.as_bytes())?;
+    buf_writer.write_all(b"\n")?;
+    for line in reader_iter {
+        buf_writer.write_all(line?.as_bytes())?;
+        buf_writer.write_all(b"\n")?;
+    }
+
+    Ok(())
+}
+
+/// Create the python entry point script for the recipe. Overwrites any existing entry points.
+pub(crate) fn create_entry_points(
+    output: &Output,
+    tmp_dir_path: &Path,
+) -> Result<Vec<PathBuf>, PackagingError> {
+    if output.recipe.build().python().entry_points.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let target_platform = &output.build_configuration.target_platform;
+    let mut new_files = Vec::new();
+
+    let host_deps = output
+        .finalized_dependencies
+        .as_ref()
+        .ok_or_else(|| PackagingError::DependenciesNotFinalized)?
+        .host
+        .clone()
+        .ok_or_else(|| {
+            PackagingError::CannotCreateEntryPoint("Could not find host dependencies".to_string())
+        })?;
+
+    let python_record = host_deps
+        .resolved
+        .iter()
+        .find(|dep| dep.package_record.name.as_normalized() == "python");
+    let python_version = if let Some(python_record) = python_record {
+        python_record.package_record.version.version().clone()
+    } else {
+        return Err(PackagingError::CannotCreateEntryPoint(
+            "Could not find python in host dependencies".to_string(),
+        ));
+    };
+
+    for ep in &output.recipe.build().python().entry_points {
+        let script = python_entry_point_template(
+            &output
+                .build_configuration
+                .directories
+                .host_prefix
+                .to_string_lossy(),
+            ep,
+            &PythonInfo::from_version(&python_version, output.build_configuration.target_platform)
+                .map_err(|e| {
+                    PackagingError::CannotCreateEntryPoint(format!(
+                        "Could not create python info: {}",
+                        e
+                    ))
+                })?,
+        );
+
+        if target_platform.is_windows() {
+            fs::create_dir_all(tmp_dir_path.join("Scripts"))?;
+
+            let script_path = tmp_dir_path.join(format!("Scripts/{}-script.py", ep.command));
+            let mut file = fs::File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            // write exe launcher as well
+            let exe_path = tmp_dir_path.join(format!("Scripts/{}.exe", ep.command));
+            let mut exe = fs::File::create(&exe_path)?;
+            exe.write_all(get_windows_launcher(target_platform))?;
+
+            new_files.extend(vec![script_path, exe_path]);
+        } else {
+            fs::create_dir_all(tmp_dir_path.join("bin"))?;
+
+            let script_path = tmp_dir_path.join(format!("bin/{}", ep.command));
+            let mut file = fs::File::create(&script_path)?;
+            file.write_all(script.as_bytes())?;
+
+            #[cfg(target_family = "unix")]
+            std::fs::set_permissions(
+                &script_path,
+                std::os::unix::fs::PermissionsExt::from_mode(0o775),
+            )?;
+
+            if output.build_configuration.target_platform.is_osx()
+                && output.recipe.build().python().use_python_app_entrypoint
+            {
+                fix_shebang(
+                    &script_path,
+                    &output.build_configuration.directories.host_prefix,
+                    output.recipe.build().python().use_python_app_entrypoint,
+                )?;
+            }
+
+            new_files.push(script_path);
+        }
+    }
+
+    Ok(new_files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_replace_shebang() {
+        let shebang = "#!/some/path/to/python";
+        let prefix = PathBuf::from("/Users/runner/miniforge3");
+        let new_shebang = replace_shebang(shebang, &prefix, true);
+
+        assert_eq!(
+            new_shebang,
+            (
+                true,
+                "#!/bin/bash /Users/runner/miniforge3/bin/pythonw".to_string()
+            )
+        );
+
+        let new_shebang = replace_shebang(shebang, &prefix, false);
+        assert_eq!(
+            new_shebang,
+            (true, "#!/Users/runner/miniforge3/bin/python".to_string())
+        );
+
+        let shebang = "#!/some/path/to/ruby";
+        let new_shebang = replace_shebang(shebang, &prefix, false);
+        assert_eq!(new_shebang, (false, "#!/some/path/to/ruby".to_string()));
+    }
 }
