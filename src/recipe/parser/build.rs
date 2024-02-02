@@ -44,14 +44,22 @@ impl TryConvertNode<VariantKeyUsage> for RenderedNode {
 impl TryConvertNode<VariantKeyUsage> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
         let mut variant = VariantKeyUsage::default();
-        validate_keys!(variant, self.iter(), use_keys, ignore_keys, down_prioritize_variant);
+        validate_keys!(
+            variant,
+            self.iter(),
+            use_keys,
+            ignore_keys,
+            down_prioritize_variant
+        );
         Ok(variant)
     }
 }
 
 impl VariantKeyUsage {
     fn is_default(&self) -> bool {
-        self.use_keys.is_empty() && self.ignore_keys.is_empty() && self.down_prioritize_variant.is_none()
+        self.use_keys.is_empty()
+            && self.ignore_keys.is_empty()
+            && self.down_prioritize_variant.is_none()
     }
 }
 
