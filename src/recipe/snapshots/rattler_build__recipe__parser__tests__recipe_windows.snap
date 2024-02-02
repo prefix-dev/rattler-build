@@ -112,6 +112,7 @@ Recipe {
         variant: VariantKeyUsage {
             use_keys: [],
             ignore_keys: [],
+            down_prioritize_variant: None,
         },
     },
     requirements: Requirements {

@@ -1,0 +1,8 @@
+package:
+  name: down_prioritize
+  version: 0.1.0
+
+build:
+  number: 0
+  variant:
+    down_prioritize_variant: 4

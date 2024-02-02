@@ -64,6 +64,7 @@ build:
     ignore_keys:
     - python
     - numpy
+    down_prioritize_variant: 5
 requirements:
   build:
   - compiler: c

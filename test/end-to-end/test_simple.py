@@ -448,3 +448,17 @@ def test_compile_python(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     # make sure that we include the `info/recipe/recipe.py` file
     py_files = list(pkg.glob(f"**/*.py"))
     assert len(py_files) == 5
+
+
+def test_down_prioritize(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "down_prioritize/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "down_prioritize")
+
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert len(index["track_features"]) == 4
+    assert index["track_features"][0] == "down_prioritize-p-0"
