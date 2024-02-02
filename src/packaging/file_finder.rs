@@ -24,12 +24,16 @@ pub fn record_files(directory: &Path) -> Result<HashSet<PathBuf>, io::Error> {
 impl Files {
     pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>) -> Result<Self, io::Error> {
         let prefix_records = PrefixRecord::collect_from_prefix(prefix)?;
-        let previous_files = prefix_records
-            .into_iter()
-            .fold(HashSet::new(), |mut acc, record| {
-                acc.extend(record.files);
-                acc
-            });
+        let mut previous_files =
+            prefix_records
+                .into_iter()
+                .fold(HashSet::new(), |mut acc, record| {
+                    acc.extend(record.files.iter().map(|f| prefix.join(f)));
+                    acc
+                });
+
+        // Also include the existing conda-meta (PrefixRecord) files themselves
+        previous_files.extend(record_files(&prefix.join("conda-meta"))?);
 
         let current_files = record_files(prefix)?;
 
