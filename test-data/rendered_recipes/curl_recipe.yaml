@@ -640,3 +640,5 @@ finalized_dependencies:
     depends: []
     constrains: []
     run_exports: null
+system_tools:
+  rattler_build: 0.6.0

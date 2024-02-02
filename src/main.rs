@@ -33,6 +33,7 @@ use rattler_build::{
         ParsingError,
     },
     selectors::SelectorConfig,
+    system_tools::SystemTools,
     tool_configuration,
     variant_config::{ParseErrors, VariantConfig},
 };
@@ -690,6 +691,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             },
             finalized_dependencies: None,
             finalized_sources: None,
+            system_tools: SystemTools::new(),
         };
 
         run_build(&output, tool_config.clone()).await?;
