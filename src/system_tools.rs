@@ -7,7 +7,7 @@ use std::{
     process::Command,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
     RattlerBuild,
@@ -30,16 +30,16 @@ impl ToString for Tool {
 #[derive(Debug, Clone)]
 pub struct SystemTools {
     rattler_build_version: String,
-    used_tools: RefCell<BTreeMap<Tool, String>>,
-    found_tools: RefCell<BTreeMap<Tool, PathBuf>>,
+    used_tools: RefCell<HashMap<Tool, String>>,
+    found_tools: RefCell<HashMap<Tool, PathBuf>>,
 }
 
 impl Default for SystemTools {
     fn default() -> Self {
         Self {
             rattler_build_version: env!("CARGO_PKG_VERSION").to_string(),
-            used_tools: RefCell::new(BTreeMap::new()),
-            found_tools: RefCell::new(BTreeMap::new()),
+            used_tools: RefCell::new(HashMap::new()),
+            found_tools: RefCell::new(HashMap::new()),
         }
     }
 }
@@ -51,7 +51,7 @@ impl SystemTools {
 
     pub fn from_previous_run(
         rattler_build_version: String,
-        used_tools: BTreeMap<Tool, String>,
+        used_tools: HashMap<Tool, String>,
     ) -> Self {
         if rattler_build_version != env!("CARGO_PKG_VERSION") {
             tracing::warn!(
@@ -64,7 +64,7 @@ impl SystemTools {
         Self {
             rattler_build_version,
             used_tools: RefCell::new(used_tools),
-            found_tools: RefCell::new(BTreeMap::new()),
+            found_tools: RefCell::new(HashMap::new()),
         }
     }
 
@@ -152,7 +152,7 @@ impl Serialize for SystemTools {
 
 impl<'de> serde::Deserialize<'de> for SystemTools {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let mut map = BTreeMap::<Tool, String>::deserialize(deserializer)?;
+        let mut map = HashMap::<Tool, String>::deserialize(deserializer)?;
         // remove rattler build version
         let rattler_build_version = map.remove(&Tool::RattlerBuild).unwrap_or_else(|| {
             tracing::warn!(
@@ -185,7 +185,7 @@ mod tests {
         assert!(used_tools.get(&Tool::Patchelf).unwrap() == &version);
 
         // fix versions in used tools to test deserialization
-        let mut used_tools = BTreeMap::new();
+        let mut used_tools = HashMap::new();
         used_tools.insert(Tool::Patchelf, "1.0.0".to_string());
         used_tools.insert(Tool::InstallNameTool, "2.0.0".to_string());
         used_tools.insert(Tool::Git, "3.0.0".to_string());
@@ -193,7 +193,7 @@ mod tests {
         let system_tool = SystemTools {
             rattler_build_version: "0.0.0".to_string(),
             used_tools: RefCell::new(used_tools),
-            found_tools: RefCell::new(BTreeMap::new()),
+            found_tools: RefCell::new(HashMap::new()),
         };
 
         let json = serde_json::to_string_pretty(&system_tool).unwrap();
