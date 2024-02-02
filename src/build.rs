@@ -1,6 +1,4 @@
 //! The build module contains the code for running the build process for a given [`Output`]
-
-use std::collections::HashSet;
 use std::ffi::OsString;
 
 use std::io::{BufRead, BufReader, ErrorKind, Write};
@@ -20,7 +18,7 @@ use rattler_shell::shell;
 use crate::env_vars::write_env_script;
 use crate::metadata::{Directories, Output};
 use crate::package_test::TestConfiguration;
-use crate::packaging::{package_conda, record_files};
+use crate::packaging::{package_conda, Files};
 use crate::recipe::parser::{ScriptContent, TestType};
 use crate::render::resolved_dependencies::{install_environments, resolve_dependencies};
 use crate::source::fetch_sources;
@@ -273,8 +271,6 @@ pub async fn run_build(
     tracing::info!("Work dir: {:?}", &directories.work_dir);
     tracing::info!("Build script: {:?}", build_script);
 
-    let files_before = record_files(&directories.host_prefix).expect("Could not record files");
-
     let (interpreter, args) = if cfg!(unix) {
         (
             "/bin/bash",
@@ -306,28 +302,16 @@ pub async fn run_build(
         ],
     )?;
 
-    let files_after = record_files(&directories.host_prefix).expect("Could not record files");
-
-    let mut difference = files_after
-        .difference(&files_before)
-        .cloned()
-        .collect::<HashSet<_>>();
-
-    if let Some(always_include_files) = output.recipe.build().always_include_files() {
-        for file in files_after {
-            let file_without_prefix = file
-                .strip_prefix(&directories.host_prefix)
-                .into_diagnostic()?;
-            if always_include_files.is_match(file_without_prefix) {
-                tracing::info!("Forcing inclusion of file: {:?}", file);
-                difference.insert(file.clone());
-            }
-        }
-    }
+    let files_after = Files::from_prefix(
+        &directories.host_prefix,
+        output.recipe.build().always_include_files(),
+    )
+    .into_diagnostic()?
+    .new_files;
 
     let (result, paths_json) = package_conda(
         &output,
-        &difference,
+        &files_after,
         &directories.host_prefix,
         &directories.output_dir,
         &output.build_configuration.packaging_settings,

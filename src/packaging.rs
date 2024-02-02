@@ -8,7 +8,6 @@ use std::path::{Component, Path, PathBuf};
 
 use itertools::Itertools;
 use tempfile::TempDir;
-use walkdir::WalkDir;
 
 use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{ArchiveType, PackageFile};
@@ -17,7 +16,9 @@ use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
 
+mod file_finder;
 mod metadata;
+pub use file_finder::Files;
 pub use metadata::{create_prefix_placeholder, to_forward_slash_lossy};
 
 use crate::linux;
@@ -75,15 +76,6 @@ pub enum PackagingError {
 
     #[error("Failed to compile Python bytecode: {0}")]
     PythonCompileError(String),
-}
-
-/// This function returns a HashSet of (recursively) all the files in the given directory.
-pub fn record_files(directory: &PathBuf) -> Result<HashSet<PathBuf>, PackagingError> {
-    let mut res = HashSet::new();
-    for entry in WalkDir::new(directory) {
-        res.insert(entry?.path().to_owned());
-    }
-    Ok(res)
 }
 
 /// This function copies the given file to the destination folder and
