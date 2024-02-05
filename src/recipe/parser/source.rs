@@ -521,6 +521,7 @@ impl TryFrom<&UrlSource> for Checksum {
 }
 
 impl Checksum {
+    /// Get the checksum as a hex string.
     pub fn to_hex(&self) -> String {
         match self {
             Checksum::Sha256(sha256) => hex::encode(sha256),

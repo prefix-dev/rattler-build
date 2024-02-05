@@ -28,6 +28,7 @@ pub struct Configuration {
     pub use_bz2: bool,
 }
 
+/// Get the authentication storage from the given file
 pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
     match auth_file {
         Some(auth_file) => {
@@ -41,6 +42,7 @@ pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
     }
 }
 
+/// Create a reqwest client with the authentication middleware
 pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWithMiddleware {
     let auth_storage = get_auth_store(auth_file);
     reqwest_middleware::ClientBuilder::new(

@@ -1,3 +1,4 @@
+/// A special macro to validate keys and assign values to a struct.
 #[macro_export]
 macro_rules! validate_keys {
     ($name:expr, $map:expr, $($key:ident),*) => {

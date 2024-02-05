@@ -25,6 +25,7 @@ fn display_success(matches: &Vec<&PathBuf>, glob: &str, section: &str) {
 }
 
 impl PackageContentsTest {
+    /// Retrieve the include globs as a vector of (glob, GlobSet) tuples
     pub fn include_as_globs(
         &self,
         target_platform: &Platform,
@@ -46,6 +47,7 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Retrieve the globs for the bin section as a vector of (glob, GlobSet) tuples
     pub fn bin_as_globs(
         &self,
         target_platform: &Platform,
@@ -78,6 +80,7 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Retrieve the globs for the lib section as a vector of (glob, GlobSet) tuples
     pub fn lib_as_globs(
         &self,
         target_platform: &Platform,
@@ -154,6 +157,7 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Retrieve the globs for the site_packages section as a vector of (glob, GlobSet) tuples
     pub fn site_packages_as_globs(
         &self,
         target_platform: &Platform,
@@ -196,6 +200,7 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Retrieve the globs for the files section as a vector of (glob, GlobSet) tuples
     pub fn files_as_globs(&self) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
@@ -207,6 +212,7 @@ impl PackageContentsTest {
         Ok(result)
     }
 
+    /// Run the package content test
     pub fn run_test(&self, paths: &PathsJson, target_platform: &Platform) -> Result<(), TestError> {
         let paths = paths
             .paths

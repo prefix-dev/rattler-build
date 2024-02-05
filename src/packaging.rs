@@ -1,32 +1,30 @@
+//! This module contains the functions to package a conda package from a given output.
 use fs_err as fs;
-#[cfg(target_family = "unix")]
-use fs_err::os::unix::fs::symlink;
 use fs_err::File;
-use std::collections::HashSet;
 use std::io::Write;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
-use tempfile::TempDir;
 
 use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{ArchiveType, PackageFile};
-use rattler_conda_types::{NoArchType, Platform};
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
 
 mod file_finder;
+mod file_mapper;
 mod metadata;
-pub use file_finder::Files;
+pub use file_finder::{Files, TempFiles};
 pub use metadata::{create_prefix_placeholder, to_forward_slash_lossy};
 
 use crate::linux;
 use crate::macos;
-use crate::metadata::{Output, PackagingSettings};
+use crate::metadata::Output;
 use crate::package_test::write_test_files;
 use crate::post_process;
 
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
     #[error("Serde error: {0}")]
@@ -76,193 +74,6 @@ pub enum PackagingError {
 
     #[error("Failed to compile Python bytecode: {0}")]
     PythonCompileError(String),
-}
-
-/// This function copies the given file to the destination folder and
-/// transforms it on the way if needed.
-///
-/// * For `noarch: python` packages, the "lib/pythonX.X" prefix is stripped so that only
-///   the "site-packages" part is kept. Additionally, any `__pycache__` directories or
-///  `.pyc` files are skipped.
-/// * For `noarch: python` packages, furthermore `bin` is replaced with `python-scripts`, and
-///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
-///   as-is.
-/// * Absolute symlinks are made relative so that they are easily relocatable.
-fn write_to_dest(
-    path: &Path,
-    prefix: &Path,
-    dest_folder: &Path,
-    target_platform: &Platform,
-    noarch_type: &NoArchType,
-) -> Result<Option<PathBuf>, PackagingError> {
-    let path_rel = path.strip_prefix(prefix)?;
-    let mut dest_path = dest_folder.join(path_rel);
-
-    // skip the share/info/dir file because multiple packages would write
-    // to the same index file
-    if path_rel == Path::new("share/info/dir") {
-        return Ok(None);
-    }
-
-    let ext = path.extension().unwrap_or_default();
-    // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
-    if ext == "pyo" {
-        return Ok(None); // skip .pyo files
-    }
-
-    if ext == "py" || ext == "pyc" {
-        // if we have a .so file of the same name, skip this path
-        let so_path = path.with_extension("so");
-        let pyd_path = path.with_extension("pyd");
-        if so_path.exists() || pyd_path.exists() {
-            return Ok(None);
-        }
-    }
-
-    if noarch_type.is_python() {
-        // skip .pyc or .pyo or .egg-info files
-        if ["pyc", "egg-info", "pyo"].iter().any(|s| ext.eq(*s)) {
-            return Ok(None); // skip .pyc files
-        }
-
-        // if any part of the path is __pycache__ skip it
-        if path_rel
-            .components()
-            .any(|c| c == Component::Normal("__pycache__".as_ref()))
-        {
-            return Ok(None);
-        }
-
-        if path_rel
-            .components()
-            .any(|c| c == Component::Normal("site-packages".as_ref()))
-        {
-            // check if site-packages is in the path and strip everything before it
-            let pat = std::path::Component::Normal("site-packages".as_ref());
-            let parts = path_rel.components();
-            let mut new_parts = Vec::new();
-            let mut found = false;
-            for part in parts {
-                if part == pat {
-                    found = true;
-                }
-                if found {
-                    new_parts.push(part);
-                }
-            }
-
-            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
-        } else if path_rel.starts_with("bin") || path_rel.starts_with("Scripts") {
-            // Replace bin with python-scripts. These should really be encoded
-            // as entrypoints but sometimes recipe authors forget or don't know
-            // how to do that. Maybe sometimes it's also not actually an
-            // entrypoint. The reason for this is that on Windows, the
-            // entrypoints are in `Scripts/...` folder, and on Unix they are in
-            // the `bin/...` folder. So we need to make sure that the
-            // entrypoints are in the right place.
-            let mut new_parts = path_rel.components().collect::<Vec<_>>();
-            new_parts[0] = Component::Normal("python-scripts".as_ref());
-
-            // on Windows, if the file ends with -script.py, remove the -script.py suffix
-            if let Some(Component::Normal(name)) = new_parts.last_mut() {
-                if let Some(name_str) = name.to_str() {
-                    if target_platform.is_windows() {
-                        if let Some(stripped_suffix) = name_str.strip_suffix("-script.py") {
-                            *name = stripped_suffix.as_ref();
-                        }
-                    }
-                }
-            }
-
-            dest_path = dest_folder.join(PathBuf::from_iter(new_parts));
-        } else {
-            // keep everything else as-is
-            dest_path = dest_folder.join(path_rel);
-        }
-    }
-
-    match dest_path.parent() {
-        Some(parent) => {
-            if fs::metadata(parent).is_err() {
-                fs::create_dir_all(parent)?;
-            }
-        }
-        None => {
-            return Err(PackagingError::IoError(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Could not get parent directory",
-            )));
-        }
-    }
-
-    let metadata = fs::symlink_metadata(path)?;
-
-    // make absolute symlinks relative
-    if metadata.is_symlink() {
-        if target_platform.is_windows() {
-            tracing::warn!("Symlinks need administrator privileges on Windows");
-        }
-
-        if let Result::Ok(link) = fs::read_link(path) {
-            tracing::trace!("Copying link: {:?} -> {:?}", path, link);
-        } else {
-            tracing::warn!("Could not read link at {:?}", path);
-        }
-
-        #[cfg(target_family = "unix")]
-        fs::read_link(path).and_then(|target| {
-            if target.is_absolute() && target.starts_with(prefix) {
-                let rel_target = pathdiff::diff_paths(
-                    target,
-                    path.parent().ok_or(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "Could not get parent directory",
-                    ))?,
-                )
-                .ok_or(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Could not get relative path",
-                ))?;
-
-                tracing::trace!(
-                    "Making symlink relative {:?} -> {:?}",
-                    dest_path,
-                    rel_target
-                );
-                symlink(&rel_target, &dest_path).map_err(|e| {
-                    tracing::error!(
-                        "Could not create symlink from {:?} to {:?}: {:?}",
-                        rel_target,
-                        dest_path,
-                        e
-                    );
-                    e
-                })?;
-            } else {
-                if target.is_absolute() {
-                    tracing::warn!("Symlink {:?} points outside of the prefix", path);
-                }
-                symlink(&target, &dest_path).map_err(|e| {
-                    tracing::error!(
-                        "Could not create symlink from {:?} to {:?}: {:?}",
-                        target,
-                        dest_path,
-                        e
-                    );
-                    e
-                })?;
-            }
-            Result::Ok(())
-        })?;
-        Ok(Some(dest_path))
-    } else if metadata.is_dir() {
-        // skip directories for now
-        Ok(None)
-    } else {
-        tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
-        fs::copy(path, &dest_path)?;
-        Ok(Some(dest_path))
-    }
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -318,41 +129,6 @@ fn copy_license_files(
     }
 }
 
-/// We check that each `pyc` file in the package is also present as a `py` file.
-/// This is a temporary measure to avoid packaging `pyc` files that are not
-/// generated by the build process.
-fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
-    if let (Some(ext), Some(parent)) = (path.extension(), path.parent()) {
-        if ext == "pyc" {
-            let has_pycache = parent.ends_with("__pycache__");
-            let pyfile = if has_pycache {
-                // a pyc file with a pycache parent should be removed
-                // replace two last dots with .py
-                // these paths look like .../__pycache__/file_dependency.cpython-311.pyc
-                // where the `file_dependency.py` path would be found in the parent directory from __pycache__
-                let stem = path
-                    .file_name()
-                    .expect("unreachable as extension doesn't exist without filename")
-                    .to_string_lossy()
-                    .to_string();
-                let py_stem = stem.rsplitn(3, '.').last().unwrap_or_default();
-                if let Some(pp) = parent.parent() {
-                    pp.join(format!("{}.py", py_stem))
-                } else {
-                    return true;
-                }
-            } else {
-                path.with_extension("py")
-            };
-
-            if !new_files.contains(&pyfile) {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 fn write_recipe_folder(
     output: &Output,
     tmp_dir_path: &Path,
@@ -387,150 +163,56 @@ fn write_recipe_folder(
 /// The `local_channel_dir` is the path to the local channel / output directory.
 pub fn package_conda(
     output: &Output,
-    new_files: &HashSet<PathBuf>,
-    prefix: &Path,
-    local_channel_dir: &Path,
-    packaging_settings: &PackagingSettings,
+    files: &Files,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
+    let local_channel_dir = &output.build_configuration.directories.output_dir;
+    let packaging_settings = &output.build_configuration.packaging_settings;
+
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
     }
 
-    let tmp_dir = TempDir::with_prefix(output.name().as_normalized())?;
-    let tmp_dir_path = tmp_dir.path();
-
-    let mut tmp_files = HashSet::new();
-    for f in new_files {
-        let stripped = f.strip_prefix(prefix)?;
-        // temporary measure to remove pyc files that are not supposed to be there
-        if filter_pyc(f, new_files) {
-            continue;
-        }
-
-        if output.recipe.build().noarch().is_python() {
-            // we need to remove files in bin/ that are registered as entry points
-            if stripped.starts_with("bin") {
-                if let Some(name) = stripped.file_name() {
-                    if output
-                        .recipe
-                        .build()
-                        .python()
-                        .entry_points
-                        .iter()
-                        .any(|ep| ep.command == name.to_string_lossy())
-                    {
-                        continue;
-                    }
-                }
-            }
-            // Windows
-            else if stripped.starts_with("Scripts") {
-                if let Some(name) = stripped.file_name() {
-                    if output
-                        .recipe
-                        .build()
-                        .python()
-                        .entry_points
-                        .iter()
-                        .any(|ep| {
-                            format!("{}.exe", ep.command) == name.to_string_lossy()
-                                || format!("{}-script.py", ep.command) == name.to_string_lossy()
-                        })
-                    {
-                        continue;
-                    }
-                }
-            }
-        }
-
-        if let Some(dest_file) = write_to_dest(
-            f,
-            prefix,
-            tmp_dir_path,
-            &output.build_configuration.target_platform,
-            output.recipe.build().noarch(),
-        )? {
-            tmp_files.insert(dest_file);
-        }
-    }
+    let mut tmp = files.to_temp_folder(output)?;
 
     tracing::info!("Copying done!");
 
-    let dynamic_linking = output
-        .recipe
-        .build()
-        .dynamic_linking()
-        .cloned()
-        .unwrap_or_default();
-    let relocation_config = dynamic_linking.binary_relocation().unwrap_or_default();
+    post_process::relink::relink(&tmp, output)?;
 
-    if output.build_configuration.target_platform != Platform::NoArch
-        && !relocation_config.no_relocation()
-    {
-        let rpath_allowlist = dynamic_linking.rpath_allowlist();
-        let mut binaries = tmp_files.clone();
-        if let Some(globs) = relocation_config.relocate_paths() {
-            binaries.retain(|v| globs.is_match(v));
-        }
+    tmp.add_files(post_process::python::python(output, &tmp)?);
 
-        post_process::relink::relink(
-            &binaries,
-            tmp_dir_path,
-            prefix,
-            &output.build_configuration.target_platform,
-            &dynamic_linking.rpaths(),
-            rpath_allowlist,
-        )?;
+    tracing::info!("Post-processing done!");
 
-        post_process::linking_checks(
-            output,
-            &binaries,
-            dynamic_linking.missing_dso_allowlist(),
-            dynamic_linking.error_on_overlinking(),
-            dynamic_linking.error_on_overdepending(),
-        )?;
-    }
+    let info_folder = tmp.temp_dir.path().join("info");
 
-    tmp_files.extend(post_process::python::python(
-        output,
-        &tmp_files,
-        tmp_dir_path,
-    )?);
+    tracing::info!("Writing metadata for package");
 
-    tracing::info!("Relink done!");
-
-    let info_folder = tmp_dir_path.join("info");
-
-    tmp_files.extend(output.write_metadata(tmp_dir_path, &tmp_files)?);
+    tmp.add_files(output.write_metadata(&tmp)?);
 
     // TODO move things below also to metadata.rs
-    if let Some(license_files) = copy_license_files(output, tmp_dir_path)? {
-        tmp_files.extend(license_files);
+    if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
+        tmp.add_files(license_files);
     }
 
     if output.build_configuration.store_recipe {
-        let recipe_files = write_recipe_folder(output, tmp_dir_path)?;
-        tmp_files.extend(recipe_files);
+        let recipe_files = write_recipe_folder(output, tmp.temp_dir.path())?;
+        tmp.add_files(recipe_files);
     }
 
-    let test_files = write_test_files(output, tmp_dir_path)?;
-    tmp_files.extend(test_files);
+    let test_files = write_test_files(output, tmp.temp_dir.path())?;
+    tmp.add_files(test_files);
 
     // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
-        tmp_files.insert(info_folder.join("link.json"));
-    } else {
-        let entry_points = post_process::python::create_entry_points(output, tmp_dir_path)?;
-        tmp_files.extend(entry_points);
+        tmp.add_files(vec![info_folder.join("link.json")]);
     }
 
     // print sorted files
     tracing::info!("\nFiles in package:\n");
-    tmp_files
+    tmp.files
         .iter()
-        .map(|x| x.strip_prefix(tmp_dir_path))
+        .map(|x| x.strip_prefix(tmp.temp_dir.path()))
         .collect::<Result<Vec<_>, _>>()?
         .iter()
         .sorted()
@@ -552,22 +234,23 @@ pub fn package_conda(
     ));
     let file = File::create(&out_path)?;
 
+    tracing::info!("Compressing archive...");
+
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
                 file,
-                tmp_dir_path,
-                &tmp_files.into_iter().collect::<Vec<_>>(),
+                tmp.temp_dir.path(),
+                &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
             )?;
         }
         ArchiveType::Conda => {
-            // This is safe because we're just putting it together before
             write_conda_package(
                 file,
-                tmp_dir_path,
-                &tmp_files.into_iter().collect::<Vec<_>>(),
+                tmp.temp_dir.path(),
+                &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
                 packaging_settings.compression_threads,
                 &identifier,
@@ -576,12 +259,16 @@ pub fn package_conda(
         }
     }
 
+    tracing::info!("Archive written to {:?}", out_path);
+
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))
 }
 
 #[cfg(test)]
 mod test {
+    use content_inspector::ContentType;
+
     use super::metadata::create_prefix_placeholder;
 
     #[test]
@@ -590,6 +277,6 @@ mod test {
             .join("test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        create_prefix_placeholder(&test_data, prefix).unwrap();
+        create_prefix_placeholder(&test_data, prefix, &ContentType::BINARY).unwrap();
     }
 }

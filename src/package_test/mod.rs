@@ -1,3 +1,4 @@
+//! Tests that are run as part of the package build process.
 mod content_test;
 mod run_test;
 mod serialize_test;

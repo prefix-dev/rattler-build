@@ -9,6 +9,8 @@ use crate::_partialerror;
 use crate::recipe::custom_yaml::{HasSpan, RenderedNode, RenderedSequenceNode, TryConvertNode};
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
+/// A vector of globs that is also immediately converted to a globset
+/// to enhance parser errors.
 #[derive(Default, Clone)]
 pub struct GlobVec(Vec<Glob>, Option<GlobSet>);
 
@@ -65,14 +67,17 @@ impl<'de> Deserialize<'de> for GlobVec {
 }
 
 impl GlobVec {
+    /// Returns true if the globvec is empty
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
+    /// Returns an iterator over the globs
     pub fn globs(&self) -> impl Iterator<Item = &Glob> {
         self.0.iter()
     }
 
+    /// Returns the globset if it exists
     pub fn globset(&self) -> Option<&GlobSet> {
         self.1.as_ref()
     }

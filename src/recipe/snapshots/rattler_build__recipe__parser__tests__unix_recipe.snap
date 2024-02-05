@@ -91,22 +91,20 @@ Recipe {
             skip_pyc_compilation: [],
             use_python_app_entrypoint: false,
         },
-        dynamic_linking: Some(
-            DynamicLinking {
-                rpaths: [],
-                binary_relocation: Some(
-                    All(
-                        true,
-                    ),
+        dynamic_linking: DynamicLinking {
+            rpaths: [],
+            binary_relocation: Some(
+                All(
+                    true,
                 ),
-                missing_dso_allowlist: [],
-                rpath_allowlist: [
-                    "/usr/lib/**",
-                ],
-                overdepending_behavior: Ignore,
-                overlinking_behavior: Ignore,
-            },
-        ),
+            ),
+            missing_dso_allowlist: [],
+            rpath_allowlist: [
+                "/usr/lib/**",
+            ],
+            overdepending_behavior: Ignore,
+            overlinking_behavior: Ignore,
+        },
         always_copy_files: [],
         always_include_files: [],
         merge_build_and_host_envs: false,
