@@ -184,7 +184,7 @@ pub fn package_conda(
 
     tracing::info!("Writing metadata for package");
 
-    tmp.add_files(output.write_metadata(tmp.temp_dir.path(), &tmp.files)?);
+    tmp.add_files(output.write_metadata(&tmp)?);
 
     // TODO move things below also to metadata.rs
     if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
@@ -265,6 +265,8 @@ pub fn package_conda(
 
 #[cfg(test)]
 mod test {
+    use content_inspector::ContentType;
+
     use super::metadata::create_prefix_placeholder;
 
     #[test]
@@ -273,6 +275,6 @@ mod test {
             .join("test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        create_prefix_placeholder(&test_data, prefix).unwrap();
+        create_prefix_placeholder(&test_data, prefix, &ContentType::BINARY).unwrap();
     }
 }

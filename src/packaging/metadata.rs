@@ -20,7 +20,7 @@ use std::os::unix::prelude::OsStrExt;
 
 use crate::metadata::Output;
 
-use super::PackagingError;
+use super::{PackagingError, TempFiles};
 
 #[allow(unused_variables)]
 fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
@@ -123,6 +123,7 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
 pub fn create_prefix_placeholder(
     file_path: &Path,
     prefix: &Path,
+    content_type: &ContentType,
 ) -> Result<Option<PrefixPlaceholder>, PackagingError> {
     // exclude pyc and pyo files from prefix replacement
     if let Some(ext) = file_path.extension() {
@@ -130,13 +131,7 @@ pub fn create_prefix_placeholder(
             return Ok(None);
         }
     }
-    // read first 1024 bytes to determine file type
-    let mut file = File::open(file_path)?;
-    let mut buffer = [0; 1024];
-    let n = file.read(&mut buffer)?;
-    let buffer = &buffer[..n];
 
-    let content_type = content_inspector::inspect(buffer);
     let mut has_prefix = None;
 
     let file_mode = if content_type.is_text()
@@ -301,12 +296,7 @@ impl Output {
     /// Create a `paths.json` file structure for the given paths.
     /// Paths should be given as absolute paths under the `path_prefix` directory.
     /// This function will also determine if the file is binary or text, and if it contains the prefix.
-    pub fn paths_json(
-        &self,
-        paths: &HashSet<PathBuf>,
-        path_prefix: &Path,
-        encoded_prefix: &Path,
-    ) -> Result<PathsJson, PackagingError> {
+    pub fn paths_json(&self, temp_files: &TempFiles) -> Result<PathsJson, PackagingError> {
         let always_copy_files = self.recipe.build().always_copy_files();
 
         let mut paths_json = PathsJson {
@@ -314,10 +304,15 @@ impl Output {
             paths_version: 1,
         };
 
-        for p in itertools::sorted(paths) {
+        let sorted = temp_files
+            .content_type_map
+            .iter()
+            .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2));
+
+        for (p, content_type) in sorted {
             let meta = fs::symlink_metadata(p)?;
 
-            let relative_path = p.strip_prefix(path_prefix)?.to_path_buf();
+            let relative_path = p.strip_prefix(temp_files.temp_dir.path())?.to_path_buf();
 
             if !p.exists() {
                 if p.is_symlink() {
@@ -347,7 +342,8 @@ impl Output {
                     paths_json.paths.push(path_entry);
                 }
             } else if meta.is_file() {
-                let prefix_placeholder = create_prefix_placeholder(p, encoded_prefix)?;
+                let prefix_placeholder =
+                    create_prefix_placeholder(p, &temp_files.encoded_prefix, content_type)?;
 
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
                 let no_link = always_copy_files
@@ -382,19 +378,14 @@ impl Output {
     /// Create the metadata for the given output and place it in the temporary directory
     pub fn write_metadata(
         &self,
-        tmp_dir_path: &Path,
-        package_files: &HashSet<PathBuf>,
+        temp_files: &TempFiles,
     ) -> Result<HashSet<PathBuf>, PackagingError> {
         let mut new_files = HashSet::new();
-        let info_folder = tmp_dir_path.join("info");
+        let info_folder = temp_files.temp_dir.path().join("info");
         fs::create_dir_all(&info_folder)?;
 
         let paths_json = File::create(info_folder.join("paths.json"))?;
-        let paths_json_struct = self.paths_json(
-            package_files,
-            tmp_dir_path,
-            &self.build_configuration.directories.host_prefix,
-        )?;
+        let paths_json_struct = self.paths_json(temp_files)?;
         serde_json::to_writer_pretty(paths_json, &paths_json_struct)?;
         new_files.insert(info_folder.join("paths.json"));
 
