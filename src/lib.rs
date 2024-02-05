@@ -3,6 +3,7 @@
 //! The library pieces of rattler-build
 
 pub mod build;
+pub mod console_utils;
 pub mod metadata;
 pub mod package_test;
 pub mod packaging;

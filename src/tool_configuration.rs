@@ -3,14 +3,14 @@
 
 use std::{path::PathBuf, sync::Arc};
 
+use crate::console_utils::LoggingOutputHandler;
 use rattler_networking::{authentication_storage, AuthenticationMiddleware, AuthenticationStorage};
 use reqwest_middleware::ClientWithMiddleware;
-
 /// Global configuration for the build
 #[derive(Clone, Debug)]
 pub struct Configuration {
     /// If set to a value, a progress bar will be shown
-    pub multi_progress_indicator: indicatif::MultiProgress,
+    pub fancy_log_handler: LoggingOutputHandler,
 
     /// The authenticated reqwest download client to use
     pub client: ClientWithMiddleware,
@@ -57,16 +57,17 @@ pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWit
 
 impl Default for Configuration {
     fn default() -> Self {
-        let auth_storage = AuthenticationStorage::default();
         Self {
-            multi_progress_indicator: indicatif::MultiProgress::new(),
+            fancy_log_handler: LoggingOutputHandler::default(),
             client: reqwest_middleware::ClientBuilder::new(
                 reqwest::Client::builder()
                     .no_gzip()
                     .build()
                     .expect("failed to create client"),
             )
-            .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
+            .with_arc(Arc::new(AuthenticationMiddleware::new(
+                AuthenticationStorage::default(),
+            )))
             .build(),
             no_clean: false,
             no_test: false,

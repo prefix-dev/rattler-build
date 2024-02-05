@@ -6,9 +6,9 @@ use std::{
 };
 
 use crate::{
-    metadata::Directories,
+    console_utils::LoggingOutputHandler,
+    metadata::{Directories, Output},
     recipe::parser::{GitRev, GitSource, Source},
-    render::solver::default_bytes_style,
     tool_configuration,
 };
 
@@ -93,6 +93,7 @@ pub async fn fetch_sources(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
+        tracing::info!("No sources to fetch");
         return Ok(Vec::new());
     }
 
@@ -154,11 +155,7 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .contains(".tar")
                 {
-                    extract_tar(
-                        &res,
-                        &dest_dir,
-                        tool_configuration.multi_progress_indicator.clone(),
-                    )?;
+                    extract_tar(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if res
                     .file_name()
@@ -166,11 +163,7 @@ pub async fn fetch_sources(
                     .to_string_lossy()
                     .ends_with(".zip")
                 {
-                    extract_zip(
-                        &res,
-                        &dest_dir,
-                        tool_configuration.multi_progress_indicator.clone(),
-                    )?;
+                    extract_zip(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else {
                     if let Some(file_name) = src.file_name() {
@@ -190,6 +183,7 @@ pub async fn fetch_sources(
             }
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
+                tracing::info!("Fetching source from path: {:?}", src_path);
 
                 let dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
@@ -309,18 +303,16 @@ fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
 fn extract_tar(
     archive: impl AsRef<Path>,
     target_directory: impl AsRef<Path>,
-    multi_progress_indicator: indicatif::MultiProgress,
+    log_handler: &LoggingOutputHandler,
 ) -> Result<(), SourceError> {
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
 
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
-    let progress_bar = multi_progress_indicator.add(
+    let progress_bar = log_handler.add_progress_bar(
         indicatif::ProgressBar::new(len)
             .with_prefix("Extracting tar")
-            .with_style(default_bytes_style().map_err(|_| {
-                SourceError::UnknownError("Failed to get progress bar style".to_string())
-            })?),
+            .with_style(log_handler.default_bytes_style()),
     );
 
     let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
@@ -348,19 +340,17 @@ fn extract_tar(
 fn extract_zip(
     archive: impl AsRef<Path>,
     target_directory: impl AsRef<Path>,
-    multi_progress_indicator: indicatif::MultiProgress,
+    log_handler: &LoggingOutputHandler,
 ) -> Result<(), SourceError> {
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
 
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
-    let progress_bar = multi_progress_indicator.add(
+    let progress_bar = log_handler.add_progress_bar(
         indicatif::ProgressBar::new(len)
             .with_finish(indicatif::ProgressFinish::AndLeave)
             .with_prefix("Extracting zip")
-            .with_style(default_bytes_style().map_err(|_| {
-                SourceError::UnknownError("Failed to get progress bar style".to_string())
-            })?),
+            .with_style(log_handler.default_bytes_style()),
     );
 
     let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
@@ -379,11 +369,47 @@ fn extract_zip(
     Ok(())
 }
 
+impl Output {
+    /// Fetches the sources for the given output and returns a new output with the finalized sources attached
+    pub async fn fetch_sources(
+        self,
+        tool_configuration: &tool_configuration::Configuration,
+    ) -> Result<Self, SourceError> {
+        let span = tracing::info_span!("Fetching source code");
+        let _enter = span.enter();
+
+        if let Some(finalized_sources) = &self.finalized_sources {
+            fetch_sources(
+                finalized_sources,
+                &self.build_configuration.directories,
+                &self.system_tools,
+                tool_configuration,
+            )
+            .await?;
+
+            Ok(self)
+        } else {
+            let rendered_sources = fetch_sources(
+                self.recipe.sources(),
+                &self.build_configuration.directories,
+                &self.system_tools,
+                tool_configuration,
+            )
+            .await?;
+
+            Ok(Output {
+                finalized_sources: Some(rendered_sources),
+                ..self
+            })
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::{fs::File, io::Write};
 
-    use crate::source::SourceError;
+    use crate::{console_utils::LoggingOutputHandler, source::SourceError};
 
     use super::extract_zip;
 
@@ -410,7 +436,8 @@ mod test {
         let mut file = File::create(&file_path).unwrap();
         _ = file.write_all(HELLOW_ZIP_FILE);
 
-        let res = extract_zip(file_path, tempdir.path(), multi_progress.clone());
+        let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
+        let res = extract_zip(file_path, tempdir.path(), &fancy_log);
         assert!(term.contents().trim().starts_with(
             "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
         ));
@@ -423,19 +450,19 @@ mod test {
 
     #[test]
     fn test_extract_fail() {
-        let multi_progress = indicatif::MultiProgress::new();
+        let fancy_log = LoggingOutputHandler::default();
         let tempdir = tempfile::tempdir().unwrap();
-        let res = extract_zip("", tempdir.path(), multi_progress.clone());
+        let res = extract_zip("", tempdir.path(), &fancy_log);
         assert!(matches!(res.err(), Some(SourceError::FileNotFound(_))));
     }
 
     #[test]
     fn test_extract_fail_2() {
-        let multi_progress = indicatif::MultiProgress::new();
+        let fancy_log = LoggingOutputHandler::default();
         let tempdir = tempfile::tempdir().unwrap();
         let file = tempdir.path().join("test.zip");
         _ = File::create(&file);
-        let res = extract_zip(file, tempdir.path(), multi_progress.clone());
+        let res = extract_zip(file, tempdir.path(), &fancy_log);
         assert!(matches!(res.err(), Some(SourceError::InvalidZip(_))));
     }
 }

@@ -48,7 +48,7 @@ impl fmt::Display for PackageLinkInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,
-            "[{}] links against:",
+            "\n[{}] links against:",
             console::style(self.file.display()).white().bold()
         )?;
         for (i, package) in self.linked_packages.iter().enumerate() {
@@ -81,11 +81,7 @@ impl fmt::Display for LinkedPackage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.link_origin {
             LinkOrigin::System => {
-                write!(
-                    f,
-                    "{} (system)",
-                    console::style(self.name.display()).black().bright()
-                )
+                write!(f, "{} (system)", console::style(self.name.display()).dim())
             }
             LinkOrigin::PackageItself => {
                 write!(
@@ -348,7 +344,7 @@ pub fn perform_linking_checks(
                 .map(|v| v.is_match(lib))
                 .unwrap_or(false)
             {
-                tracing::warn!(
+                tracing::info!(
                     "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",
                     package.file
@@ -361,7 +357,7 @@ pub fn perform_linking_checks(
                 });
                 linked_packages.push(link_info);
                 linked_packages.iter().for_each(|linked_package| {
-                    println!("\n{linked_package}");
+                    tracing::info!("\n{linked_package}");
                 });
 
                 return Err(LinkingCheckError::Overlinking {
@@ -369,7 +365,9 @@ pub fn perform_linking_checks(
                     file: package.file.clone(),
                 });
             } else {
-                tracing::warn!("Overlinking against {lib:?} for {:?}", package.file);
+                let warn_str = format!("Overlinking against {lib:?} for {:?}", package.file);
+                tracing::warn!(warn_str);
+                output.record_warning(&warn_str);
             }
 
             link_info.linked_packages.push(LinkedPackage {
@@ -380,9 +378,8 @@ pub fn perform_linking_checks(
         linked_packages.push(link_info);
     }
 
-    println!();
     linked_packages.iter().for_each(|linked_package| {
-        println!("{linked_package}");
+        tracing::info!("{linked_package}");
     });
 
     // If there are any unused run dependencies then it is "overdepending".
@@ -402,9 +399,9 @@ pub fn perform_linking_checks(
                 return Err(LinkingCheckError::Overdepending {
                     package: PathBuf::from(run_dependency),
                 });
-            } else {
-                tracing::warn!("Overdepending against {run_dependency}");
             }
+            tracing::warn!("Overdepending against {run_dependency}");
+            output.record_warning(&format!("Overdepending against {run_dependency}"));
         }
     }
 

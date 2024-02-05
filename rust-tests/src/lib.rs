@@ -36,6 +36,7 @@ mod tests {
             let rs = recipe.as_ref().display().to_string();
             let od = output_dir.as_ref().display().to_string();
             let mut iter = vec![
+                "--log-style=plain",
                 "build",
                 "--recipe",
                 rs.as_str(),
@@ -571,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     fn test_overlinking_check() {
         let tmp = tmp("test_overlink_check");
         let rattler_build = rattler().build(
@@ -586,7 +587,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     fn test_overdepending_check() {
         let tmp = tmp("test_overdepending_check");
         let rattler_build = rattler().build(
@@ -601,7 +602,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux"))]
+    #[cfg(target_os = "linux")]
     fn test_allow_missing_dso() {
         let tmp = tmp("test_allow_missing_dso");
         let rattler_build = rattler().build(

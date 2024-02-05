@@ -2,18 +2,26 @@
 use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
+    sync::{Arc, Mutex},
 };
 
 use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
-use rattler_conda_types::{package::ArchiveType, PackageName, Platform};
+use indicatif::HumanBytes;
+use rattler_conda_types::{
+    package::{ArchiveType, PathType, PathsEntry, PathsJson},
+    PackageName, Platform,
+};
+use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    console_utils::github_integration_enabled,
     hash::HashInfo,
     recipe::parser::{Recipe, Source},
     render::resolved_dependencies::FinalizedDependencies,
@@ -254,6 +262,24 @@ pub struct PackageIdentifier {
     pub build_string: String,
 }
 
+/// The summary of a build
+#[derive(Debug, Clone, Default)]
+pub struct BuildSummary {
+    /// The start time of the build
+    pub build_start: Option<DateTime<Utc>>,
+    /// The end time of the build
+    pub build_end: Option<DateTime<Utc>>,
+
+    /// The path to the artifact
+    pub artifact: Option<PathBuf>,
+    /// Any warnings that were recorded during the build
+    pub warnings: Vec<String>,
+    /// The paths that are packaged in the artifact
+    pub paths: Option<PathsJson>,
+    ///  Whether the build was successful or not
+    pub failed: bool,
+}
+
 /// A output. This is the central element that is passed to the `run_build` function
 /// and fully specifies all the options and settings to run the build.
 #[derive(Clone, Serialize, Deserialize)]
@@ -268,6 +294,10 @@ pub struct Output {
     /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
     /// to build this output.
     pub finalized_sources: Option<Vec<Source>>,
+
+    /// Summary of the build
+    #[serde(skip)]
+    pub build_summary: Arc<Mutex<BuildSummary>>,
     /// The system tools that are used to build this output
     pub system_tools: SystemTools,
 }
@@ -288,6 +318,17 @@ impl Output {
         self.recipe.build().string()
     }
 
+    /// The channels to use when resolving dependencies
+    pub fn reindex_channels(&self) -> Result<Vec<String>, std::io::Error> {
+        let output_dir = &self.build_configuration.directories.output_dir;
+
+        index(output_dir, Some(&self.build_configuration.target_platform))?;
+
+        let mut channels = vec![output_dir.to_string_lossy().to_string()];
+        channels.extend(self.build_configuration.channels.clone());
+        Ok(channels)
+    }
+
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
     pub fn identifier(&self) -> Option<String> {
         Some(format!(
@@ -297,77 +338,211 @@ impl Output {
             self.build_string()?
         ))
     }
+
+    /// Record a warning during the build
+    pub fn record_warning(&self, warning: &str) {
+        self.build_summary
+            .lock()
+            .unwrap()
+            .warnings
+            .push(warning.to_string());
+    }
+
+    /// Record the start of the build
+    pub fn record_build_start(&self) {
+        self.build_summary.lock().unwrap().build_start = Some(chrono::Utc::now());
+    }
+
+    /// Record the artifact that was created during the build
+    pub fn record_artifact(&self, artifact: &Path, paths: &PathsJson) {
+        let mut summary = self.build_summary.lock().unwrap();
+        summary.artifact = Some(artifact.to_path_buf());
+        summary.paths = Some(paths.clone());
+    }
+
+    /// Record the end of the build
+    pub fn record_build_end(&self) {
+        let mut summary = self.build_summary.lock().unwrap();
+        summary.build_end = Some(chrono::Utc::now());
+    }
+
+    /// Print a nice summary of the build
+    pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
+        let summary = self.build_summary.lock().unwrap();
+        let identifier = self.identifier().unwrap_or_default();
+        let span = tracing::info_span!("Build summary for", recipe = identifier);
+        let _enter = span.enter();
+
+        if let Some(artifact) = &summary.artifact {
+            let bytes = HumanBytes(fs::metadata(artifact).map(|m| m.len()).unwrap_or(0));
+            tracing::info!("Artifact: {} ({})", artifact.display(), bytes);
+        } else {
+            tracing::info!("No artifact was created");
+        }
+        tracing::info!("{}", self);
+
+        if !summary.warnings.is_empty() {
+            tracing::warn!("Warnings:");
+            for warning in &summary.warnings {
+                tracing::warn!("{}", warning);
+            }
+        }
+
+        if let Ok(github_summary) = std::env::var("GITHUB_STEP_SUMMARY") {
+            if !github_integration_enabled() {
+                return Ok(());
+            }
+            // append to the summary file
+            let mut summary_file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(github_summary)?;
+
+            writeln!(summary_file, "### Build summary for {}", identifier)?;
+            if let Some(article) = &summary.artifact {
+                let bytes = HumanBytes(fs::metadata(article).map(|m| m.len()).unwrap_or(0));
+                writeln!(
+                    summary_file,
+                    "**Artifact**: {} ({})",
+                    article.display(),
+                    bytes
+                )?;
+            } else {
+                writeln!(summary_file, "**No artifact was created**")?;
+            }
+
+            if let Some(paths) = &summary.paths {
+                if paths.paths.is_empty() {
+                    writeln!(summary_file, "Included files: **No files included**")?;
+                } else {
+                    /// Github detail expander
+                    fn format_entry(entry: &PathsEntry) -> String {
+                        let mut extra_info = Vec::new();
+                        if entry.prefix_placeholder.is_some() {
+                            extra_info.push("contains prefix");
+                        }
+                        if entry.no_link {
+                            extra_info.push("no link");
+                        }
+                        match entry.path_type {
+                            PathType::SoftLink => extra_info.push("soft link"),
+                            // skip default
+                            PathType::HardLink => {}
+                            PathType::Directory => extra_info.push("directory"),
+                        }
+                        let bytes = entry.size_in_bytes.unwrap_or(0);
+
+                        format!(
+                            "| `{}` | {} | {} |",
+                            entry.relative_path.to_string_lossy(),
+                            HumanBytes(bytes),
+                            extra_info.join(", ")
+                        )
+                    }
+
+                    writeln!(summary_file, "<details>")?;
+                    writeln!(
+                        summary_file,
+                        "<summary>Included files ({} files)</summary>\n",
+                        paths.paths.len()
+                    )?;
+                    writeln!(summary_file, "| Path | Size | Extra info |")?;
+                    writeln!(summary_file, "| --- | --- | --- |")?;
+                    for path in &paths.paths {
+                        writeln!(summary_file, "{}", format_entry(path))?;
+                    }
+                    writeln!(summary_file, "\n</details>\n")?;
+                }
+            }
+
+            if !summary.warnings.is_empty() {
+                writeln!(summary_file, "> [!WARNING]")?;
+                writeln!(summary_file, "> **Warnings during build:**\n>")?;
+                for warning in &summary.warnings {
+                    writeln!(summary_file, "> - {}", warning)?;
+                }
+                writeln!(summary_file)?;
+            }
+
+            writeln!(
+                summary_file,
+                "<details><summary>Resolved dependencies</summary>\n\n{}\n</details>",
+                self.format_as_markdown()
+            )?;
+        }
+        Ok(())
+    }
 }
 
-impl Display for Output {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl Output {
+    /// Format the output as a markdown table
+    pub fn format_as_markdown(&self) -> String {
+        let mut output = String::new();
+        self.format_table_with_option(&mut output, comfy_table::presets::ASCII_MARKDOWN, true)
+            .expect("Could not format table");
+        output
+    }
+
+    fn format_table_with_option(
+        &self,
+        f: &mut impl fmt::Write,
+        table_format: &str,
+        long: bool,
+    ) -> std::fmt::Result {
+        let template = || -> comfy_table::Table {
+            let mut table = comfy_table::Table::new();
+            if table_format == comfy_table::presets::UTF8_FULL {
+                table
+                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+            } else {
+                table.load_preset(table_format);
+            }
+            table
+        };
+
         writeln!(
             f,
-            "\nOutput: {}-{}-{}\n",
-            self.name().as_normalized(),
-            self.version(),
-            self.build_string().unwrap_or("{build-string-not-set}")
+            "Variant configuration (hash: {}):",
+            self.build_string().unwrap_or_default()
         )?;
-
-        // make a table of the variant configuration
-        writeln!(f, "Variant configuration:")?;
-
-        let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL)
-            .set_header(vec!["Variant", "Version"]);
-
+        let mut table = template();
+        if table_format != comfy_table::presets::UTF8_FULL {
+            table.set_header(vec!["Key", "Value"]);
+        }
         self.build_configuration.variant.iter().for_each(|(k, v)| {
             table.add_row(vec![k, v]);
         });
-
         writeln!(f, "{}\n", table)?;
 
         if let Some(finalized_dependencies) = &self.finalized_dependencies {
-            // create a table with the finalized dependencies
-            if let Some(host) = &finalized_dependencies.build {
+            if let Some(build) = &finalized_dependencies.build {
                 writeln!(f, "Build dependencies:")?;
-                writeln!(f, "{}\n", host)?;
+                writeln!(f, "{}\n", build.to_table(template(), long))?;
             }
 
             if let Some(host) = &finalized_dependencies.host {
                 writeln!(f, "Host dependencies:")?;
-                writeln!(f, "{}\n", host)?;
+                writeln!(f, "{}\n", host.to_table(template(), long))?;
             }
 
             if !finalized_dependencies.run.depends.is_empty() {
                 writeln!(f, "Run dependencies:")?;
-                let mut table = comfy_table::Table::new();
-                table
-                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-                    .set_header(vec!["Name", "Spec"]);
-
-                finalized_dependencies.run.depends.iter().for_each(|d| {
-                    let rendered = d.render();
-                    table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
-                });
-
-                writeln!(f, "{}\n", table)?;
-            }
-
-            if !finalized_dependencies.run.constrains.is_empty() {
-                writeln!(f, "Run constraints:")?;
-                let mut table = comfy_table::Table::new();
-                table
-                    .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-                    .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-                    .set_header(vec!["Name", "Spec"]);
-
-                finalized_dependencies.run.constrains.iter().for_each(|d| {
-                    let rendered = d.render();
-                    table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
-                });
-
-                writeln!(f, "{}\n", table)?;
+                writeln!(
+                    f,
+                    "{}\n",
+                    finalized_dependencies.run.to_table(template(), long)
+                )?;
             }
         }
-        writeln!(f, "\n")
+
+        Ok(())
+    }
+}
+
+impl Display for Output {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.format_table_with_option(f, comfy_table::presets::UTF8_FULL, false)
     }
 }
 
@@ -485,7 +660,7 @@ mod test {
         let parsed_yaml3: resolved_dependencies::ResolvedDependencies =
             serde_yaml::from_str(&yaml3).unwrap();
 
-        assert_eq!("pip", parsed_yaml3.specs[0].render());
+        assert_eq!("pip", parsed_yaml3.specs[0].render(false));
     }
 
     #[test]

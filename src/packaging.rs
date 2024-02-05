@@ -20,7 +20,6 @@ pub use metadata::create_prefix_placeholder;
 
 use crate::metadata::Output;
 use crate::package_test::write_test_files;
-use crate::render::solver::default_bytes_style;
 use crate::{post_process, tool_configuration};
 
 #[allow(missing_docs)]
@@ -248,10 +247,10 @@ pub fn package_conda(
 
     tracing::info!("Compressing archive...");
 
-    let progress_bar = tool_configuration.multi_progress_indicator.add(
+    let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
         indicatif::ProgressBar::new(0)
             .with_prefix("Compressing ")
-            .with_style(default_bytes_style().unwrap()),
+            .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
     );
 
     match packaging_settings.archive_type {
@@ -283,4 +282,22 @@ pub fn package_conda(
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))
+}
+
+impl Output {
+    /// Create a conda package from any new files in the host prefix. Note: the previous stages should have been
+    /// completed before calling this function.
+    pub async fn create_package(
+        &self,
+        tool_configuration: &tool_configuration::Configuration,
+    ) -> Result<(PathBuf, PathsJson), PackagingError> {
+        let span = tracing::info_span!("Packaging new files");
+        let _enter = span.enter();
+        let files_after = Files::from_prefix(
+            &self.build_configuration.directories.host_prefix,
+            self.recipe.build().always_include_files(),
+        )?;
+
+        package_conda(self, tool_configuration, &files_after)
+    }
 }

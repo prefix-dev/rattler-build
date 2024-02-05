@@ -79,18 +79,36 @@ impl DependencyInfo {
         }
     }
 
-    pub fn render(&self) -> String {
-        match self {
-            DependencyInfo::Variant { spec, .. } => format!("{} (V)", spec),
-            DependencyInfo::Compiler { spec } => format!("{} (C)", spec),
-            DependencyInfo::PinSubpackage { spec } => format!("{} (PS)", spec),
-            DependencyInfo::PinCompatible { spec } => format!("{} (PC)", spec),
-            DependencyInfo::RunExport {
-                spec,
-                from,
-                source_package,
-            } => format!("{} (RE of [{}: {}])", spec, from, source_package),
-            DependencyInfo::Raw { spec } => spec.to_string(),
+    pub fn render(&self, long: bool) -> String {
+        if !long {
+            match self {
+                DependencyInfo::Variant { spec, .. } => format!("{} (V)", spec),
+                DependencyInfo::Compiler { spec } => format!("{} (C)", spec),
+                DependencyInfo::PinSubpackage { spec } => format!("{} (PS)", spec),
+                DependencyInfo::PinCompatible { spec } => format!("{} (PC)", spec),
+                DependencyInfo::RunExport {
+                    spec,
+                    from,
+                    source_package,
+                } => format!("{} (RE of [{}: {}])", spec, from, source_package),
+                DependencyInfo::Raw { spec } => spec.to_string(),
+            }
+        } else {
+            match self {
+                DependencyInfo::Variant { spec, .. } => format!("{} (from variant config)", spec),
+                DependencyInfo::Compiler { spec } => format!("{} (from compiler)", spec),
+                DependencyInfo::PinSubpackage { spec } => format!("{} (from pin subpackage)", spec),
+                DependencyInfo::PinCompatible { spec } => format!("{} (from pin compatible)", spec),
+                DependencyInfo::RunExport {
+                    spec,
+                    from,
+                    source_package,
+                } => format!(
+                    "{} (run export by {} in {} env)",
+                    spec, source_package, from
+                ),
+                DependencyInfo::Raw { spec } => spec.to_string(),
+            }
         }
     }
 }
@@ -121,15 +139,12 @@ fn short_channel(channel: &str) -> String {
     }
 }
 
-impl Display for ResolvedDependencies {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut table = comfy_table::Table::new();
-        table
-            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
-            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
-            .set_header(vec![
-                "Package", "Spec", "Version", "Build", "Channel", "Size",
-            ]);
+impl ResolvedDependencies {
+    pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
+        let mut table = table;
+        table.set_header(vec![
+            "Package", "Spec", "Version", "Build", "Channel", "Size",
+        ]);
         let column = table.column_mut(5).expect("This should be column two");
         column.set_cell_alignment(comfy_table::CellAlignment::Right);
 
@@ -161,7 +176,7 @@ impl Display for ResolvedDependencies {
                 record.package_record.name.as_normalized().to_string(),
                 dep_info
                     .expect("partition contains only values with Some")
-                    .render(),
+                    .render(long),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
                 short_channel(&record.channel),
@@ -186,10 +201,54 @@ impl Display for ResolvedDependencies {
                     .unwrap_or_default(),
             ]);
         }
+        table
+    }
+}
 
-        write!(f, "{}", table)?;
+impl FinalizedRunDependencies {
+    pub fn to_table(&self, table: comfy_table::Table, long: bool) -> comfy_table::Table {
+        let mut table = table;
+        table
+            .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
+            .set_header(vec!["Name", "Spec"]);
 
-        Ok(())
+        if !self.depends.is_empty() {
+            let mut row = comfy_table::Row::new();
+            row.add_cell(
+                comfy_table::Cell::new("Depends").add_attribute(comfy_table::Attribute::Bold),
+            );
+            table.add_row(row);
+
+            self.depends.iter().for_each(|d| {
+                let rendered = d.render(long);
+                table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
+            });
+        }
+
+        if !self.constrains.is_empty() {
+            let mut row = comfy_table::Row::new();
+            row.add_cell(
+                comfy_table::Cell::new("Constrains").add_attribute(comfy_table::Attribute::Bold),
+            );
+            table.add_row(row);
+
+            self.constrains.iter().for_each(|d| {
+                let rendered = d.render(long);
+                table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
+            });
+        }
+
+        table
+    }
+}
+
+impl Display for FinalizedRunDependencies {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
+            .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS);
+        write!(f, "{}", self.to_table(table, false))
     }
 }
 
@@ -231,6 +290,9 @@ pub enum ResolveError {
 
     #[error("Compiler configuration error: {0}")]
     CompilerError(String),
+
+    #[error("Could not reindex channels: {0}")]
+    RefreshChannelError(std::io::Error),
 }
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
@@ -400,7 +462,7 @@ fn collect_run_exports_from_env(
 
 pub async fn install_environments(
     output: &Output,
-    tool_configuration: tool_configuration::Configuration,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
 
@@ -415,7 +477,7 @@ pub async fn install_environments(
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             &cache_dir,
-            &tool_configuration,
+            tool_configuration,
         )
         .await?;
     }
@@ -426,7 +488,7 @@ pub async fn install_environments(
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
             &cache_dir,
-            &tool_configuration,
+            tool_configuration,
         )
         .await?;
     }
@@ -443,10 +505,10 @@ pub async fn install_environments(
 /// 4. Download the packages
 /// 5. Extract the run exports from the downloaded packages (for the next environment)
 #[allow(clippy::for_kv_map)]
-pub async fn resolve_dependencies(
+async fn resolve_dependencies(
     output: &Output,
     channels: &[String],
-    tool_configuration: tool_configuration::Configuration,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();
 
@@ -470,7 +532,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             channels,
-            &tool_configuration,
+            tool_configuration,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -570,7 +632,7 @@ pub async fn resolve_dependencies(
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
             channels,
-            &tool_configuration,
+            tool_configuration,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -693,12 +755,47 @@ pub async fn resolve_dependencies(
         }
     }
 
+    // log a table of the rendered run dependencies
+    tracing::info!("\nFinalized run dependencies:\n{}", run_specs);
+
     Ok(FinalizedDependencies {
         // build_env is empty now!
         build: build_env,
         host: host_env,
         run: run_specs,
     })
+}
+
+impl Output {
+    /// Resolve the dependencies for this output
+    pub async fn resolve_dependencies(
+        self,
+        tool_configuration: &tool_configuration::Configuration,
+    ) -> Result<Output, ResolveError> {
+        let span = tracing::info_span!("Resolving environments");
+        let _enter = span.enter();
+
+        let output = if self.finalized_dependencies.is_some() {
+            tracing::info!("Using finalized dependencies");
+
+            // The output already has the finalized dependencies, so we can just use it as-is
+            install_environments(&self, tool_configuration).await?;
+            self.clone()
+        } else {
+            let channels = self
+                .reindex_channels()
+                .map_err(ResolveError::RefreshChannelError)?;
+            let finalized_dependencies =
+                resolve_dependencies(&self, &channels, tool_configuration).await?;
+
+            // The output with the resolved dependencies
+            Output {
+                finalized_dependencies: Some(finalized_dependencies),
+                ..self.clone()
+            }
+        };
+        Ok(output)
+    }
 }
 
 #[cfg(test)]

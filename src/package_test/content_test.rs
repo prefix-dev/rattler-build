@@ -12,12 +12,12 @@ fn build_glob(glob: String) -> Result<Glob, globset::Error> {
 
 fn display_success(matches: &Vec<&PathBuf>, glob: &str, section: &str) {
     tracing::info!(
-        "{} {section}: {} matched:",
+        "{} {section}: \"{}\" matched:",
         console::style(console::Emoji("✔", "")).green(),
         glob
     );
     for m in matches[0..std::cmp::min(5, matches.len())].iter() {
-        tracing::info!("-  {}", m.display());
+        tracing::info!("  - {}", m.display());
     }
     if matches.len() > 5 {
         tracing::info!("... and {} more", matches.len() - 5);
@@ -214,6 +214,9 @@ impl PackageContentsTest {
 
     /// Run the package content test
     pub fn run_test(&self, paths: &PathsJson, target_platform: &Platform) -> Result<(), TestError> {
+        let span = tracing::info_span!("Package content test");
+        let _enter = span.enter();
+
         let paths = paths
             .paths
             .iter()

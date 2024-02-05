@@ -206,6 +206,9 @@ pub struct TestConfiguration {
 pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
 
+    // create the test prefix
+    fs::create_dir_all(&config.test_prefix)?;
+
     let target_platform = if let Some(tp) = config.target_platform {
         tp
     } else {

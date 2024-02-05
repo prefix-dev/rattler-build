@@ -5,7 +5,6 @@ use clap::{arg, crate_version, CommandFactory, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use dunce::canonicalize;
 use fs_err as fs;
-use indicatif::MultiProgress;
 use miette::IntoDiagnostic;
 use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_package_streaming::write::CompressionLevel;
@@ -14,19 +13,18 @@ use std::{
     env::current_dir,
     path::PathBuf,
     str::{self, FromStr},
+    sync::{Arc, Mutex},
 };
-use tracing_subscriber::{
-    filter::{Directive, ParseError},
-    fmt,
-    prelude::*,
-    EnvFilter,
-};
+
 use url::Url;
 
 use rattler_build::{
     build::run_build,
+    console_utils::{init_logging, LogStyle, LoggingOutputHandler},
     hash::HashInfo,
-    metadata::{BuildConfiguration, Directories, PackageIdentifier, PackagingSettings},
+    metadata::{
+        BuildConfiguration, BuildSummary, Directories, PackageIdentifier, PackagingSettings,
+    },
     package_test::{self, TestConfiguration},
     recipe::{
         parser::{find_outputs_from_src, Recipe},
@@ -39,11 +37,8 @@ use rattler_build::{
     variant_config::{ParseErrors, VariantConfig},
 };
 
-mod console_utils;
 mod rebuild;
 mod upload;
-
-use crate::console_utils::{IndicatifWriter, TracingFormatter};
 
 #[derive(Parser)]
 enum SubCommands {
@@ -80,6 +75,15 @@ struct App {
 
     #[command(flatten)]
     verbose: Verbosity<InfoLevel>,
+
+    /// Logging style
+    #[clap(
+        long,
+        env = "RATTLER_BUILD_LOG_STYLE",
+        default_value = "fancy",
+        global = true
+    )]
+    log_style: LogStyle,
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
@@ -419,17 +423,7 @@ pub struct CondaForgeOpts {
 async fn main() -> miette::Result<()> {
     let args = App::parse();
 
-    let multi_progress = MultiProgress::new();
-
-    // Setup tracing subscriber
-    tracing_subscriber::registry()
-        .with(get_default_env_filter(args.verbose.log_level_filter()).into_diagnostic()?)
-        .with(
-            fmt::layer()
-                .with_writer(IndicatifWriter::new(multi_progress.clone()))
-                .event_format(TracingFormatter),
-        )
-        .init();
+    let fancy_log_handler = init_logging(&args.log_style, &args.verbose).into_diagnostic()?;
 
     match args.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
@@ -448,9 +442,9 @@ async fn main() -> miette::Result<()> {
             print_completions(shell, &mut cmd);
             Ok(())
         }
-        Some(SubCommands::Build(args)) => run_build_from_args(args, multi_progress).await,
-        Some(SubCommands::Test(args)) => run_test_from_args(args).await,
-        Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
+        Some(SubCommands::Build(args)) => run_build_from_args(args, fancy_log_handler).await,
+        Some(SubCommands::Test(args)) => run_test_from_args(args, fancy_log_handler).await,
+        Some(SubCommands::Rebuild(args)) => rebuild_from_args(args, fancy_log_handler).await,
         Some(SubCommands::Upload(args)) => upload_from_args(args).await,
         Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
         None => {
@@ -460,15 +454,17 @@ async fn main() -> miette::Result<()> {
     }
 }
 
-async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
+async fn run_test_from_args(
+    args: TestOpts,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
-    let test_prefix = PathBuf::from("test-prefix");
-    fs::create_dir_all(&test_prefix).into_diagnostic()?;
-
     let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
 
+    let tempdir = tempfile::tempdir().into_diagnostic()?;
+
     let test_options = TestConfiguration {
-        test_prefix,
+        test_prefix: tempdir.path().to_path_buf(),
         target_platform: None,
         keep_test_prefix: false,
         channels: args
@@ -476,13 +472,21 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
             .unwrap_or_else(|| vec!["conda-forge".to_string()]),
         tool_configuration: tool_configuration::Configuration {
             client,
-            multi_progress_indicator: MultiProgress::new(),
+            fancy_log_handler,
             // duplicate from `keep_test_prefix`?
             no_clean: false,
             ..Default::default()
         },
     };
 
+    let package_name = package_file
+        .file_name()
+        .ok_or_else(|| miette::miette!("Could not get file name from package file"))?
+        .to_string_lossy()
+        .to_string();
+
+    let span = tracing::info_span!("Running tests for ", recipe = %package_name);
+    let _enter = span.enter();
     package_test::run_test(&package_file, &test_options)
         .await
         .into_diagnostic()?;
@@ -490,7 +494,10 @@ async fn run_test_from_args(args: TestOpts) -> miette::Result<()> {
     Ok(())
 }
 
-async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> miette::Result<()> {
+async fn run_build_from_args(
+    args: BuildOpts,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
     let recipe_path = canonicalize(&args.recipe);
     if let Err(e) = &recipe_path {
         match e.kind() {
@@ -549,7 +556,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let host_platform = if let Some(target_platform) = args.target_platform {
         Platform::from_str(&target_platform).into_diagnostic()?
     } else {
-        tracing::info!("No target platform specified, using current platform");
         Platform::current()
     };
 
@@ -562,6 +568,9 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         experimental: args.common.experimental,
     };
 
+    let span = tracing::info_span!("Finding outputs from recipe");
+    tracing::info!("Target platform: {}", host_platform);
+    let enter = span.enter();
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
 
@@ -571,10 +580,10 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
 
-    tracing::info!("Found variants:\n");
+    tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
         tracing::info!(
-            "{}-{}-{}",
+            "Build variant: {}-{}-{}",
             discovered_output.name,
             discovered_output.version,
             discovered_output.build_string
@@ -590,12 +599,13 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
         }
         tracing::info!("{}\n", table);
     }
+    drop(enter);
 
     let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
 
     let tool_config = tool_configuration::Configuration {
         client,
-        multi_progress_indicator: multi_progress,
+        fancy_log_handler: fancy_log_handler.clone(),
         no_clean: args.keep_build,
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
@@ -603,6 +613,7 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
     };
 
     let mut subpackages = BTreeMap::new();
+    let mut outputs = Vec::new();
     for discovered_output in outputs_and_variants {
         let hash =
             HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
@@ -624,18 +635,6 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
                     .into();
                 errs
             })?;
-
-        if args.render_only {
-            tracing::info!(
-                "Name: {} {}",
-                recipe.package().name().as_normalized(),
-                recipe.package().version()
-            );
-            tracing::info!("Variant: {:#?}", discovered_output.used_vars);
-            tracing::info!("Hash: {:#?}", recipe.build().string());
-            tracing::info!("Skip?: {}\n", recipe.build().skip());
-            continue;
-        }
 
         if recipe.build().skip() {
             tracing::info!(
@@ -697,15 +696,48 @@ async fn run_build_from_args(args: BuildOpts, multi_progress: MultiProgress) -> 
             finalized_dependencies: None,
             finalized_sources: None,
             system_tools: SystemTools::new(),
+            build_summary: Arc::new(Mutex::new(BuildSummary::default())),
         };
 
-        run_build(&output, tool_config.clone()).await?;
+        if args.render_only {
+            let resolved = output
+                .resolve_dependencies(&tool_config)
+                .await
+                .into_diagnostic()?;
+            println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
+            continue;
+        }
+
+        let output = match run_build(output, tool_config.clone()).await {
+            Ok((output, _archive)) => {
+                output.record_build_end();
+                output
+            }
+            Err(e) => {
+                tracing::error!("Error building package: {}", e);
+                return Err(e);
+            }
+        };
+        outputs.push(output);
+    }
+
+    let span = tracing::info_span!("Build summary");
+    let _enter = span.enter();
+    for output in outputs {
+        // print summaries for each output
+        let _ = output.log_build_summary().map_err(|e| {
+            tracing::error!("Error writing build summary: {}", e);
+            e
+        });
     }
 
     Ok(())
 }
 
-async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
+async fn rebuild_from_args(
+    args: RebuildOpts,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
     tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original build
@@ -740,7 +772,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
 
     let tool_config = tool_configuration::Configuration {
         client,
-        multi_progress_indicator: MultiProgress::new(),
+        fancy_log_handler,
         no_clean: true,
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
@@ -753,7 +785,7 @@ async fn rebuild_from_args(args: RebuildOpts) -> miette::Result<()> {
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(&output, tool_config.clone()).await?;
+    run_build(output, tool_config.clone()).await?;
 
     Ok(())
 }
@@ -828,30 +860,6 @@ async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
     }
 
     Ok(())
-}
-
-/// Constructs a default [`EnvFilter`] that is used when the user did not specify a custom RUST_LOG.
-pub fn get_default_env_filter(
-    verbose: clap_verbosity_flag::LevelFilter,
-) -> Result<EnvFilter, ParseError> {
-    let mut result = EnvFilter::new(format!("rattler_build={verbose}"));
-
-    if verbose >= clap_verbosity_flag::LevelFilter::Trace {
-        result = result.add_directive(Directive::from_str("resolvo=info")?);
-        result = result.add_directive(Directive::from_str("rattler=info")?);
-        result = result.add_directive(Directive::from_str(
-            "rattler_networking::authentication_storage=info",
-        )?);
-    } else {
-        result = result.add_directive(Directive::from_str("resolvo=warn")?);
-        result = result.add_directive(Directive::from_str("rattler=warn")?);
-        result = result.add_directive(Directive::from_str("rattler_repodata_gateway::fetch=off")?);
-        result = result.add_directive(Directive::from_str(
-            "rattler_networking::authentication_storage=off",
-        )?);
-    }
-
-    Ok(result)
 }
 
 #[cfg(test)]

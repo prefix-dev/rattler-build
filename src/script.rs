@@ -354,6 +354,9 @@ impl Script {
 
 impl Output {
     pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
+        let span = tracing::info_span!("Running build script");
+        let _enter = span.enter();
+
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");

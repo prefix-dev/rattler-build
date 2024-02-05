@@ -306,7 +306,7 @@ impl fmt::Display for DylibChanges {
                     .starts_with("host_env_placehold_placehold")
             });
             if let Some(idx) = placeholder_index {
-                let mut pb = PathBuf::from("$PLACEHOLDER_PREFIX");
+                let mut pb = PathBuf::from("$PREFIX");
                 pb.extend(path.components().skip(idx + 1));
                 pb
             } else {
@@ -319,7 +319,7 @@ impl fmt::Display for DylibChanges {
                 (Some(old), Some(new)) => {
                     writeln!(
                         f,
-                        " - change rpath from {:?} to {:?}",
+                        " - changing absolute rpath from {:?} to {:?}",
                         strip_placeholder_prefix(old),
                         new
                     )?;
