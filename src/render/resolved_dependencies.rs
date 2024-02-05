@@ -1,10 +1,11 @@
 use std::{
     collections::HashMap,
     fmt::{Display, Formatter},
-    fs,
     path::Path,
     str::FromStr,
 };
+
+use fs_err as fs;
 
 use crate::{
     metadata::{BuildConfiguration, Output},
@@ -130,7 +131,7 @@ impl Display for ResolvedDependencies {
             .set_header(vec![
                 "Package", "Spec", "Version", "Build", "Channel", "Size",
             ]);
-        let column = table.column_mut(5).expect("This should be column two");
+        let column = table.column_mut(5).expect("column exists");
         column.set_cell_alignment(comfy_table::CellAlignment::Right);
 
         let resolved_w_specs = self
@@ -231,6 +232,9 @@ pub enum ResolveError {
 
     #[error("Compiler configuration error: {0}")]
     CompilerError(String),
+
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 /// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
@@ -500,8 +504,7 @@ pub async fn resolve_dependencies(
             run_exports,
         })
     } else {
-        fs::create_dir_all(&output.build_configuration.directories.build_prefix)
-            .expect("Could not create build prefix");
+        fs::create_dir_all(&output.build_configuration.directories.build_prefix)?;
         None
     };
 
@@ -600,8 +603,7 @@ pub async fn resolve_dependencies(
             run_exports,
         })
     } else {
-        fs::create_dir_all(&output.build_configuration.directories.host_prefix)
-            .expect("Could not create host prefix");
+        fs::create_dir_all(&output.build_configuration.directories.host_prefix)?;
         None
     };
 
@@ -690,6 +692,23 @@ pub async fn resolve_dependencies(
                     )?);
                 }
             }
+        }
+    }
+
+    // finally, if `use_python_app_entrypoint` is true, we need to add `pythonw` to the run deps
+    if output.build_configuration.target_platform.is_osx()
+        && output.recipe.build().python().use_python_app_entrypoint
+    {
+        if !run_specs.depends.iter().any(|d| {
+            d.spec()
+                .name
+                .as_ref()
+                .map(|n| n.as_normalized() == "python.app")
+                .unwrap_or_default()
+        }) {
+            run_specs.depends.push(DependencyInfo::Raw {
+                spec: MatchSpec::from_str("python.app")?,
+            });
         }
     }
 

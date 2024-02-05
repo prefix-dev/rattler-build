@@ -501,6 +501,18 @@ pub fn package_conda(
 
     let info_folder = tmp_dir_path.join("info");
 
+    // create any entry points or link.json for noarch packages
+    // We have to do this before writing the metadata, because the entry points
+    // can be overwritten!
+    if output.recipe.build().noarch().is_python() {
+        let link_json = File::create(info_folder.join("link.json"))?;
+        serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
+        tmp_files.insert(info_folder.join("link.json"));
+    } else {
+        let entry_points = post_process::python::create_entry_points(output, tmp_dir_path)?;
+        tmp_files.extend(entry_points);
+    }
+
     tmp_files.extend(output.write_metadata(tmp_dir_path, &tmp_files)?);
 
     // TODO move things below also to metadata.rs
@@ -515,16 +527,6 @@ pub fn package_conda(
 
     let test_files = write_test_files(output, tmp_dir_path)?;
     tmp_files.extend(test_files);
-
-    // create any entry points or link.json for noarch packages
-    if output.recipe.build().noarch().is_python() {
-        let link_json = File::create(info_folder.join("link.json"))?;
-        serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
-        tmp_files.insert(info_folder.join("link.json"));
-    } else {
-        let entry_points = post_process::python::create_entry_points(output, tmp_dir_path)?;
-        tmp_files.extend(entry_points);
-    }
 
     // print sorted files
     tracing::info!("\nFiles in package:\n");

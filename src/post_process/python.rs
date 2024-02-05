@@ -331,6 +331,7 @@ pub(crate) fn create_entry_points(
     };
 
     for ep in &output.recipe.build().python().entry_points {
+        tracing::info!("Creating entry point for {}", ep.command);
         let script = python_entry_point_template(
             &output
                 .build_configuration
