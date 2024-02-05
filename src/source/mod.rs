@@ -6,6 +6,7 @@ use std::{
 };
 
 use crate::{
+    metadata::Directories,
     recipe::parser::{GitRev, GitSource, Source},
     render::solver::default_bytes_style,
     tool_configuration,
@@ -86,16 +87,17 @@ pub enum SourceError {
 /// Fetches all sources in a list of sources and applies specified patches
 pub async fn fetch_sources(
     sources: &[Source],
-    work_dir: &Path,
-    recipe_dir: &Path,
-    cache_dir: &Path,
+    directories: &Directories,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
         return Ok(Vec::new());
     }
 
-    let cache_src = cache_dir.join("src_cache");
+    // Figure out the directories we need
+    let work_dir = &directories.work_dir;
+    let recipe_dir = &directories.recipe_dir;
+    let cache_src = directories.output_dir.join("src_cache");
     fs::create_dir_all(&cache_src)?;
 
     let mut rendered_sources = Vec::new();

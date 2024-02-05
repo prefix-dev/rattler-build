@@ -87,8 +87,8 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Python::is_default")]
     pub(super) python: Python,
     /// Settings for shared libraries and executables
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) dynamic_linking: Option<DynamicLinking>,
+    #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
+    pub(super) dynamic_linking: DynamicLinking,
     /// Setting to control wether to always copy a file
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) always_copy_files: GlobVec,
@@ -145,8 +145,8 @@ impl Build {
     }
 
     /// Settings for shared libraries and executables
-    pub const fn dynamic_linking(&self) -> Option<&DynamicLinking> {
-        self.dynamic_linking.as_ref()
+    pub const fn dynamic_linking(&self) -> &DynamicLinking {
+        &self.dynamic_linking
     }
 
     /// Check if the build should be skipped.
@@ -219,6 +219,15 @@ pub struct DynamicLinking {
 }
 
 impl DynamicLinking {
+    pub fn is_default(&self) -> bool {
+        self.rpaths.is_empty()
+            && self.binary_relocation.is_none()
+            && self.missing_dso_allowlist.is_empty()
+            && self.rpath_allowlist.is_empty()
+            && self.overdepending_behavior == LinkingCheckBehavior::default()
+            && self.overlinking_behavior == LinkingCheckBehavior::default()
+    }
+
     /// Get the rpaths.
     pub fn rpaths(&self) -> Vec<String> {
         if self.rpaths.is_empty() {

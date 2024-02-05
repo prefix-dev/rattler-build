@@ -6,7 +6,6 @@ use std::{
 use crate::{
     linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
 };
-use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
 
 use crate::metadata::Output;
@@ -36,10 +35,12 @@ pub enum LinkingCheckError {
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
-    missing_dso_allowlist: Option<&GlobSet>,
-    error_on_overlinking: bool,
-    error_on_underlinking: bool,
+    // missing_dso_allowlist: Option<&GlobSet>,
+    // error_on_overlinking: bool,
+    // error_on_underlinking: bool,
 ) -> Result<(), LinkingCheckError> {
+    let dynamic_linking = output.recipe.build().dynamic_linking();
+
     // collect all json files in prefix / conda-meta
     let conda_meta = output
         .build_configuration
@@ -127,7 +128,8 @@ pub fn linking_checks(
         // dependencies then it is "underlinking".
         if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
             run_dependencies.remove(package_pos);
-        } else if missing_dso_allowlist
+        } else if dynamic_linking
+            .missing_dso_allowlist()
             .map(|v| v.is_match(&package_name))
             .unwrap_or(false)
         {
@@ -135,7 +137,7 @@ pub fn linking_checks(
                 "{package_name} is missing in run dependencies, \
             yet it is included in the allow list. Skipping..."
             );
-        } else if error_on_underlinking {
+        } else if dynamic_linking.error_on_overdepending() {
             return Err(LinkingCheckError::Underlinking { package_name });
         } else {
             tracing::warn!("Underlinking against {package_name}");
@@ -144,7 +146,7 @@ pub fn linking_checks(
 
     // If there are any unused run dependencies then it is "overlinking".
     if !run_dependencies.is_empty() {
-        if error_on_overlinking {
+        if dynamic_linking.error_on_overlinking() {
             return Err(LinkingCheckError::Overlinking {
                 packages: run_dependencies.join(","),
             });

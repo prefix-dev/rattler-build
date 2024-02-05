@@ -217,28 +217,18 @@ pub async fn run_build(
     // Add the local channel to the list of channels
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
+
     let output = if let Some(finalized_sources) = &output.finalized_sources {
-        fetch_sources(
-            finalized_sources,
-            &directories.work_dir,
-            &directories.recipe_dir,
-            &directories.output_dir,
-            &tool_configuration,
-        )
-        .await
-        .into_diagnostic()?;
+        fetch_sources(finalized_sources, &directories, &tool_configuration)
+            .await
+            .into_diagnostic()?;
 
         output.clone()
     } else {
-        let rendered_sources = fetch_sources(
-            output.recipe.sources(),
-            &directories.work_dir,
-            &directories.recipe_dir,
-            &directories.output_dir,
-            &tool_configuration,
-        )
-        .await
-        .into_diagnostic()?;
+        let rendered_sources =
+            fetch_sources(output.recipe.sources(), &directories, &tool_configuration)
+                .await
+                .into_diagnostic()?;
 
         Output {
             finalized_sources: Some(rendered_sources),
@@ -306,17 +296,9 @@ pub async fn run_build(
         &directories.host_prefix,
         output.recipe.build().always_include_files(),
     )
-    .into_diagnostic()?
-    .new_files;
-
-    let (result, paths_json) = package_conda(
-        &output,
-        &files_after,
-        &directories.host_prefix,
-        &directories.output_dir,
-        &output.build_configuration.packaging_settings,
-    )
     .into_diagnostic()?;
+
+    let (result, paths_json) = package_conda(&output, &files_after).into_diagnostic()?;
 
     // We run all the package content tests
     for test in output.recipe.tests() {

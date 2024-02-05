@@ -6,10 +6,28 @@ use std::{
 
 use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
+use tempfile::TempDir;
 use walkdir::WalkDir;
 
+use crate::metadata::Output;
+
+use super::{file_mapper, PackagingError};
+
 pub struct Files {
+    /// The files that are new in the prefix
     pub new_files: HashSet<PathBuf>,
+
+    /// The prefix that we are dealing with
+    pub prefix: PathBuf,
+}
+
+pub struct TempFiles {
+    /// The files that are copied to the temporary directory
+    pub files: HashSet<PathBuf>,
+    /// The temporary directory where the files are copied to
+    pub temp_dir: tempfile::TempDir,
+    /// The prefix which is encoded in the files (the long placeholder for the actual prefix, e.g. /home/user/bld_placeholder...)
+    pub encoded_prefix: PathBuf,
 }
 
 /// This function returns a HashSet of (recursively) all the files in the given directory.
@@ -29,6 +47,7 @@ impl Files {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),
+                prefix: prefix.to_owned(),
             });
         }
 
@@ -69,6 +88,38 @@ impl Files {
 
         Ok(Files {
             new_files: difference,
+            prefix: prefix.to_owned(),
         })
+    }
+
+    /// Copy the new files to a temporary directory and return the temporary directory and the files that were copied.
+    pub fn to_temp_folder(&self, output: &Output) -> Result<TempFiles, PackagingError> {
+        let temp_dir = TempDir::with_prefix(output.name().as_normalized())?;
+        let mut files = HashSet::new();
+        for f in &self.new_files {
+            // temporary measure to remove pyc files that are not supposed to be there
+            if file_mapper::filter_pyc(f, &self.new_files) {
+                continue;
+            }
+
+            if let Some(dest_file) = output.write_to_dest(f, &self.prefix, temp_dir.path())? {
+                files.insert(dest_file);
+            }
+        }
+
+        Ok(TempFiles {
+            files,
+            temp_dir,
+            encoded_prefix: self.prefix.clone(),
+        })
+    }
+}
+
+impl TempFiles {
+    pub fn add_files<I>(&mut self, files: I)
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        self.files.extend(files);
     }
 }
