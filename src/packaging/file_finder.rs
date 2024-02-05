@@ -1,11 +1,12 @@
-use std::{
-    collections::HashSet,
-    io,
-    path::{Path, PathBuf},
-};
-
+use content_inspector::ContentType;
+use fs_err as fs;
 use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
+use std::{
+    collections::{HashMap, HashSet},
+    io::{self, Read},
+    path::{Path, PathBuf},
+};
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
@@ -24,10 +25,24 @@ pub struct Files {
 pub struct TempFiles {
     /// The files that are copied to the temporary directory
     pub files: HashSet<PathBuf>,
+    /// The info files that are copied to the temporary directory
+    pub info_files: HashSet<PathBuf>,
     /// The temporary directory where the files are copied to
     pub temp_dir: tempfile::TempDir,
     /// The prefix which is encoded in the files (the long placeholder for the actual prefix, e.g. /home/user/bld_placeholder...)
     pub encoded_prefix: PathBuf,
+    /// The content type of the files
+    pub content_type_map: HashMap<PathBuf, ContentType>,
+}
+
+pub fn content_type(path: &Path) -> Result<ContentType, io::Error> {
+    // read first 1024 bytes to determine file type
+    let mut file = fs::File::open(path)?;
+    let mut buffer = [0; 1024];
+    let n = file.read(&mut buffer)?;
+    let buffer = &buffer[..n];
+
+    Ok(content_inspector::inspect(buffer))
 }
 
 /// This function returns a HashSet of (recursively) all the files in the given directory.
@@ -96,6 +111,7 @@ impl Files {
     pub fn to_temp_folder(&self, output: &Output) -> Result<TempFiles, PackagingError> {
         let temp_dir = TempDir::with_prefix(output.name().as_normalized())?;
         let mut files = HashSet::new();
+        let mut content_type_map = HashMap::new();
         for f in &self.new_files {
             // temporary measure to remove pyc files that are not supposed to be there
             if file_mapper::filter_pyc(f, &self.new_files) {
@@ -103,6 +119,7 @@ impl Files {
             }
 
             if let Some(dest_file) = output.write_to_dest(f, &self.prefix, temp_dir.path())? {
+                content_type_map.insert(dest_file.clone(), content_type(f)?);
                 files.insert(dest_file);
             }
         }
@@ -111,6 +128,8 @@ impl Files {
             files,
             temp_dir,
             encoded_prefix: self.prefix.clone(),
+            content_type_map,
+            info_files: HashSet::new(),
         })
     }
 }
@@ -120,6 +139,12 @@ impl TempFiles {
     where
         I: IntoIterator<Item = PathBuf>,
     {
-        self.files.extend(files);
+        for f in files {
+            self.content_type_map.insert(
+                f.clone(),
+                content_type(&f).expect("Could not determine content type"),
+            );
+            self.files.insert(f);
+        }
     }
 }

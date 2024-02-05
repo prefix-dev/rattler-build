@@ -7,7 +7,6 @@ use itertools::Itertools;
 
 use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{ArchiveType, PackageFile};
-use rattler_conda_types::Platform;
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
@@ -15,7 +14,7 @@ use rattler_package_streaming::write::{
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::Files;
+pub use file_finder::{Files, TempFiles};
 pub use metadata::{create_prefix_placeholder, to_forward_slash_lossy};
 
 use crate::linux;
@@ -166,7 +165,6 @@ pub fn package_conda(
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     let local_channel_dir = &output.build_configuration.directories.output_dir;
     let packaging_settings = &output.build_configuration.packaging_settings;
-    let prefix = &output.build_configuration.directories.host_prefix;
 
     if output.finalized_dependencies.is_none() {
         return Err(PackagingError::DependenciesNotFinalized);
@@ -176,39 +174,15 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    let dynamic_linking = output.recipe.build().dynamic_linking();
-    let relocation_config = dynamic_linking.binary_relocation().unwrap_or_default();
+    post_process::relink::relink(&tmp, &output)?;
 
-    if output.build_configuration.target_platform != Platform::NoArch
-        && !relocation_config.no_relocation()
-    {
-        let rpath_allowlist = dynamic_linking.rpath_allowlist();
-        let mut binaries = tmp.files.clone();
-        if let Some(globs) = relocation_config.relocate_paths() {
-            binaries.retain(|v| globs.is_match(v));
-        }
+    tmp.add_files(post_process::python::python(output, &tmp)?);
 
-        post_process::relink::relink(
-            &binaries,
-            tmp.temp_dir.path(),
-            prefix,
-            &output.build_configuration.target_platform,
-            &dynamic_linking.rpaths(),
-            rpath_allowlist,
-        )?;
-
-        post_process::linking_checks(output, &binaries)?;
-    }
-
-    tmp.add_files(post_process::python::python(
-        output,
-        &tmp.files,
-        tmp.temp_dir.path(),
-    )?);
-
-    tracing::info!("Relink done!");
+    tracing::info!("Post-processing done!");
 
     let info_folder = tmp.temp_dir.path().join("info");
+
+    tracing::info!("Writing metadata for package");
 
     tmp.add_files(output.write_metadata(tmp.temp_dir.path(), &tmp.files)?);
 
@@ -230,9 +204,6 @@ pub fn package_conda(
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);
-    } else {
-        let entry_points = post_process::python::create_entry_points(output, tmp.temp_dir.path())?;
-        tmp.add_files(entry_points);
     }
 
     // print sorted files
@@ -261,6 +232,8 @@ pub fn package_conda(
     ));
     let file = File::create(&out_path)?;
 
+    tracing::info!("Compressing archive...");
+
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
@@ -272,7 +245,6 @@ pub fn package_conda(
             )?;
         }
         ArchiveType::Conda => {
-            // This is safe because we're just putting it together before
             write_conda_package(
                 file,
                 tmp.temp_dir.path(),
@@ -284,6 +256,8 @@ pub fn package_conda(
             )?;
         }
     }
+
+    tracing::info!("Archive written to {:?}", out_path);
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))

@@ -7,15 +7,14 @@
 use fs_err as fs;
 use globset::GlobSet;
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
+use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use rattler_conda_types::Platform;
-
 use crate::metadata::Output;
-use crate::packaging::{to_forward_slash_lossy, PackagingError};
+use crate::packaging::{to_forward_slash_lossy, PackagingError, TempFiles};
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
     if target_platform.is_windows() {
@@ -153,12 +152,7 @@ pub fn compile_pyc(
 
 /// Find any .dist-info/INSTALLER files and replace the contents with "conda"
 /// This is to prevent pip from trying to uninstall the package when it is installed with conda
-pub fn python(
-    output: &Output,
-    // TODO maybe introduce a new type to represent the set of paths & prefix
-    paths: &HashSet<PathBuf>,
-    base_path: &Path,
-) -> Result<HashSet<PathBuf>, PackagingError> {
+pub fn python(output: &Output, temp_files: &TempFiles) -> Result<HashSet<PathBuf>, PackagingError> {
     let name = output.name();
     let version = output.version();
     let mut result = HashSet::new();
@@ -166,8 +160,8 @@ pub fn python(
     if !output.recipe.build().noarch().is_python() {
         result.extend(compile_pyc(
             output,
-            paths,
-            base_path,
+            &temp_files.files,
+            temp_files.temp_dir.path(),
             output
                 .recipe
                 .build()
@@ -175,11 +169,14 @@ pub fn python(
                 .skip_pyc_compilation
                 .globset(),
         )?);
+
+        // create entry points if it is not a noarch package
+        result.extend(create_entry_points(output, temp_files.temp_dir.path())?);
     }
 
     let metadata_glob = globset::Glob::new("**/*.dist-info/METADATA")?.compile_matcher();
 
-    if let Some(p) = paths.iter().find(|p| metadata_glob.is_match(p)) {
+    if let Some(p) = temp_files.files.iter().find(|p| metadata_glob.is_match(p)) {
         // unwraps are OK because we already globbed
         let distinfo = p
             .parent()
@@ -199,7 +196,7 @@ pub fn python(
     }
 
     let glob = globset::Glob::new("**/*.dist-info/INSTALLER")?.compile_matcher();
-    for p in paths {
+    for p in temp_files.files.iter() {
         if glob.is_match(p) {
             fs::write(p, "conda\n")?;
         }
