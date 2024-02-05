@@ -15,6 +15,7 @@ use crate::{
 use fs_err as fs;
 use fs_err::File;
 
+use crate::system_tools::SystemTools;
 pub mod copy_dir;
 pub mod git_source;
 pub mod patch;
@@ -88,6 +89,7 @@ pub enum SourceError {
 pub async fn fetch_sources(
     sources: &[Source],
     directories: &Directories,
+    system_tools: &SystemTools,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<Source>, SourceError> {
     if sources.is_empty() {
@@ -106,7 +108,7 @@ pub async fn fetch_sources(
         match &src {
             Source::Git(src) => {
                 tracing::info!("Fetching source from git repo: {}", src.url());
-                let result = git_source::git_src(src, &cache_src, recipe_dir)?;
+                let result = git_source::git_src(system_tools, src, &cache_src, recipe_dir)?;
                 let dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
                 } else {
@@ -122,7 +124,7 @@ pub async fn fetch_sources(
                     .use_gitignore(false)
                     .run()?;
                 if !src.patches().is_empty() {
-                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
@@ -181,7 +183,7 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Url(src.clone()));
@@ -225,7 +227,7 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Path(src.clone()));

@@ -11,7 +11,9 @@ use std::{
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
     RattlerBuild,
+    Patch,
     Patchelf,
+    Codesign,
     InstallNameTool,
     Git,
 }
@@ -20,6 +22,8 @@ impl ToString for Tool {
     fn to_string(&self) -> String {
         match self {
             Tool::RattlerBuild => "rattler_build".to_string(),
+            Tool::Codesign => "codesign".to_string(),
+            Tool::Patch => "patch".to_string(),
             Tool::Patchelf => "patchelf".to_string(),
             Tool::InstallNameTool => "install_name_tool".to_string(),
             Tool::Git => "git".to_string(),
@@ -68,10 +72,10 @@ impl SystemTools {
         }
     }
 
-    pub fn find_tool(&self, tool: Tool) -> PathBuf {
+    pub fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let (tool_path, found_version) = match tool {
             Tool::Patchelf => {
-                let path = which::which("patchelf").expect("patchelf not found");
+                let path = which::which("patchelf")?;
                 // patchelf version
                 let output = std::process::Command::new(&path)
                     .arg("--version")
@@ -82,11 +86,15 @@ impl SystemTools {
                 (path, found_version.to_string())
             }
             Tool::InstallNameTool => {
-                let path = which::which("install_name_tool").expect("install_name_tool not found");
+                let path = which::which("install_name_tool")?;
+                (path, "".to_string())
+            }
+            Tool::Codesign => {
+                let path = which::which("codesign")?;
                 (path, "".to_string())
             }
             Tool::Git => {
-                let path = which::which("git").expect("git not found");
+                let path = which::which("git")?;
                 let output = std::process::Command::new(&path)
                     .arg("--version")
                     .output()
@@ -94,6 +102,15 @@ impl SystemTools {
                 let found_version = String::from_utf8_lossy(&output.stdout);
 
                 (path, found_version.to_string())
+            }
+            Tool::Patch => {
+                let path = which::which("patch")?;
+                let version = std::process::Command::new(&path)
+                    .arg("--version")
+                    .output()
+                    .expect("Failed to execute `patch` command");
+                let version = String::from_utf8_lossy(&version.stdout);
+                (path, version.to_string())
             }
             Tool::RattlerBuild => {
                 let path = std::env::current_exe().expect("Failed to get current executable path");
@@ -120,20 +137,18 @@ impl SystemTools {
             self.used_tools.borrow_mut().insert(tool, found_version);
         }
 
-        tool_path
+        Ok(tool_path)
     }
 
-    pub fn call(&self, tool: Tool, args: Vec<&str>) -> Command {
+    pub fn call(&self, tool: Tool) -> Result<Command, which::Error> {
         let found_tool = self.found_tools.borrow().get(&tool).cloned();
         let tool_path = if let Some(tool) = found_tool {
             tool
         } else {
-            self.find_tool(tool)
+            self.find_tool(tool)?
         };
 
-        let mut command = std::process::Command::new(tool_path);
-        command.args(args);
-        command
+        Ok(std::process::Command::new(tool_path))
     }
 }
 
@@ -170,6 +185,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_system_tool() {
         let system_tool = SystemTools::new();
         let mut output = system_tool.call(Tool::Patchelf, vec!["--version"]);
@@ -183,7 +199,10 @@ mod tests {
         assert!(used_tools.contains_key(&Tool::Patchelf));
 
         assert!(used_tools.get(&Tool::Patchelf).unwrap() == &version);
+    }
 
+    #[test]
+    fn test_serialize() {
         // fix versions in used tools to test deserialization
         let mut used_tools = HashMap::new();
         used_tools.insert(Tool::Patchelf, "1.0.0".to_string());
