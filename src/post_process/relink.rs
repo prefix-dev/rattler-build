@@ -20,7 +20,7 @@ pub enum RelinkError {
     #[error("Error relinking dylib: {0}")]
     Dylib(#[from] crate::macos::link::RelinkError),
 
-    #[error("Link checking error: {0}")]
+    #[error("Linking check error: {0}")]
     LinkingCheck(#[from] LinkingCheckError),
 }
 
