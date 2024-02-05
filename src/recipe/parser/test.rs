@@ -15,40 +15,57 @@ use crate::{
 
 use super::{glob_vec::GlobVec, FlattenErrors};
 
+/// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestRequirements {
+    /// Extra run requirements for the test.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run: Vec<String>,
 
+    /// Extra build requirements for the test (e.g. emulators, compilers, ...).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub build: Vec<String>,
 }
 
+/// The files that should be copied to the test directory (they are stored in the package)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
     // TODO parse as globs
+    /// Files to be copied from the source directory to the test directory.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<String>,
+
+    /// Files to be copied from the recipe directory to the test directory.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub recipe: Vec<String>,
 }
 
+/// A test that executes a script in a freshly created environment
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
+    /// The script to run
     pub script: Vec<String>,
+    /// The (extra) requirements for the test.
+    /// Similar to the `requirements` section in the recipe the `build` requirements
+    /// are of the build-computer architecture and the `run` requirements are of the
+    /// target_platform architecture. The current package is implictly added to the
+    /// `run` requirements.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
     pub requirements: CommandsTestRequirements,
+    /// Extra files to include in the test
     #[serde(default, skip_serializing_if = "CommandsTestFiles::is_empty")]
     pub files: CommandsTestFiles,
 }
 
 impl CommandsTestRequirements {
+    /// Check if the requirements are empty
     pub fn is_empty(&self) -> bool {
         self.run.is_empty() && self.build.is_empty()
     }
 }
 
 impl CommandsTestFiles {
+    /// Check if the files are empty
     pub fn is_empty(&self) -> bool {
         self.source.is_empty() && self.recipe.is_empty()
     }
@@ -62,6 +79,7 @@ fn is_true(value: &bool) -> bool {
     *value
 }
 
+/// A special Python test that checks if the imports are available and runs `pip check`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
     /// List of imports to test
@@ -80,8 +98,10 @@ impl Default for PythonTest {
     }
 }
 
+/// A test that runs the tests of a downstream package.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
+    /// The name of the downstream package
     pub downstream: String,
 }
 

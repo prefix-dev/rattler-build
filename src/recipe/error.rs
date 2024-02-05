@@ -148,6 +148,7 @@ pub enum ErrorKind {
     #[diagnostic(code(error::entry_point_parsing))]
     EntryPointParsing(String),
 
+    /// Error when parsing a glob.
     #[diagnostic(code(error::glob_parsing))]
     GlobParsing(#[from] globset::Error),
 

@@ -24,24 +24,34 @@ use super::FlattenErrors;
 /// About information.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct About {
+    /// The homepage of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub homepage: Option<Url>,
+    /// The repository of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub repository: Option<Url>,
+    /// The documentation of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub documentation: Option<Url>,
+    /// The license of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license: Option<License>,
+    /// The license family of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_family: Option<String>,
+    /// The license file(s) of the package.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub license_file: Vec<String>,
+    /// The license URL of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_url: Option<Url>,
+    /// The summary of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub summary: Option<String>,
+    /// The description of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+    /// The prelink message of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prelink_message: Option<String>,
 }

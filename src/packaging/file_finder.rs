@@ -14,19 +14,20 @@ use crate::metadata::Output;
 
 use super::{file_mapper, PackagingError};
 
+/// This struct keeps a record of all the files that are new in the prefix (i.e. not present in the previous
+/// conda environment).
 pub struct Files {
     /// The files that are new in the prefix
     pub new_files: HashSet<PathBuf>,
-
     /// The prefix that we are dealing with
     pub prefix: PathBuf,
 }
 
+/// This struct keeps a record of all the files that are moved into a temporary directory
+/// for further post-processing (before they are packaged into a tarball).
 pub struct TempFiles {
     /// The files that are copied to the temporary directory
     pub files: HashSet<PathBuf>,
-    /// The info files that are copied to the temporary directory
-    pub info_files: HashSet<PathBuf>,
     /// The temporary directory where the files are copied to
     pub temp_dir: tempfile::TempDir,
     /// The prefix which is encoded in the files (the long placeholder for the actual prefix, e.g. /home/user/bld_placeholder...)
@@ -129,12 +130,12 @@ impl Files {
             temp_dir,
             encoded_prefix: self.prefix.clone(),
             content_type_map,
-            info_files: HashSet::new(),
         })
     }
 }
 
 impl TempFiles {
+    /// Add files to the TempFiles struct
     pub fn add_files<I>(&mut self, files: I)
     where
         I: IntoIterator<Item = PathBuf>,

@@ -81,6 +81,8 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
     Ok(contains_prefix)
 }
 
+/// Convert a path to a string with forward slashes (only on windows). Otherwise,
+/// just return the path as a string.
 #[allow(dead_code)]
 pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]

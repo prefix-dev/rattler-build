@@ -35,9 +35,6 @@ pub enum LinkingCheckError {
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
-    // missing_dso_allowlist: Option<&GlobSet>,
-    // error_on_overlinking: bool,
-    // error_on_underlinking: bool,
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
 

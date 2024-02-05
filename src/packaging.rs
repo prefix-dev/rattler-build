@@ -1,3 +1,4 @@
+//! This module contains the functions to package a conda package from a given output.
 use fs_err as fs;
 use fs_err::File;
 use std::io::Write;
@@ -23,6 +24,7 @@ use crate::metadata::Output;
 use crate::package_test::write_test_files;
 use crate::post_process;
 
+#[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum PackagingError {
     #[error("Serde error: {0}")]

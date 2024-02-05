@@ -154,10 +154,12 @@ impl Build {
         self.skip()
     }
 
+    /// Get the always copy files settings.
     pub fn always_copy_files(&self) -> Option<&GlobSet> {
         self.always_copy_files.globset()
     }
 
+    /// Get the always include files settings.
     pub fn always_include_files(&self) -> Option<&GlobSet> {
         self.always_include_files.globset()
     }
@@ -219,6 +221,7 @@ pub struct DynamicLinking {
 }
 
 impl DynamicLinking {
+    /// Returns true if this is the default dynamic linking configuration.
     pub fn is_default(&self) -> bool {
         self.rpaths.is_empty()
             && self.binary_relocation.is_none()
@@ -237,7 +240,7 @@ impl DynamicLinking {
         }
     }
 
-    // Get the binary relocation settings.
+    /// Get the binary relocation settings.
     pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
         self.binary_relocation.clone()
     }

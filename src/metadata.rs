@@ -171,6 +171,8 @@ pub struct PackagingSettings {
 }
 
 impl PackagingSettings {
+    /// Create a new `PackagingSettings` from the command line arguments
+    /// and the selected archive type.
     pub fn from_args(
         archive_type: ArchiveType,
         compression_level: CompressionLevel,
