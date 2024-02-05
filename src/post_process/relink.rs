@@ -82,11 +82,11 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
         if target_platform.is_linux() && SharedObject::test_file(p)? {
             let so = SharedObject::new(p)?;
-            so.relink(tmp_prefix, &encoded_prefix, &rpaths, rpath_allowlist)?;
+            so.relink(tmp_prefix, encoded_prefix, &rpaths, rpath_allowlist)?;
             binaries.insert(p.clone());
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;
-            dylib.relink(tmp_prefix, &encoded_prefix, &rpaths, rpath_allowlist)?;
+            dylib.relink(tmp_prefix, encoded_prefix, &rpaths, rpath_allowlist)?;
             binaries.insert(p.clone());
         }
     }

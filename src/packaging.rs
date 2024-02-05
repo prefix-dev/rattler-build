@@ -174,7 +174,7 @@ pub fn package_conda(
 
     tracing::info!("Copying done!");
 
-    post_process::relink::relink(&tmp, &output)?;
+    post_process::relink::relink(&tmp, output)?;
 
     tmp.add_files(post_process::python::python(output, &tmp)?);
 
