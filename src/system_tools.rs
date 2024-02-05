@@ -188,8 +188,8 @@ mod tests {
     #[cfg(target_os = "linux")]
     fn test_system_tool() {
         let system_tool = SystemTools::new();
-        let mut output = system_tool.call(Tool::Patchelf, vec!["--version"]);
-        let stdout = output.output().unwrap().stdout;
+        let mut cmd = system_tool.call(Tool::Patchelf).unwrap();
+        let stdout = cmd.arg("--version").output().unwrap().stdout;
         let version = String::from_utf8_lossy(&stdout).trim().to_string();
 
         let found_tools = system_tool.found_tools.borrow();
