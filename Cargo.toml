@@ -105,6 +105,8 @@ toml = "0.8.10"
 memmap2 = "0.9.4"
 os_pipe = "1.1.5"
 reqwest-middleware = "0.2.4"
+rattler_installs_packages = "0.7.0"
+async-once-cell = "0.5.3"
 
 [dev-dependencies]
 insta = { version = "1.34.0", features = ["yaml"] }

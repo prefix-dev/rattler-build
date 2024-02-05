@@ -21,5 +21,6 @@ pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
+pub mod recipe_generator;
 mod unix;
 mod windows;
