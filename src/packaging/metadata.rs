@@ -4,9 +4,12 @@ use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
-use rattler_conda_types::package::{
-    AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PathType, PathsEntry, PathsJson,
-    PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
+use rattler_conda_types::{
+    package::{
+        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PathType, PathsEntry, PathsJson,
+        PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
+    },
+    Platform,
 };
 use rattler_digest::compute_file_digest;
 use std::{
@@ -123,6 +126,7 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
 /// Create a prefix placeholder object for the given file and prefix.
 /// This function will also search in the file for the prefix and determine if the file is binary or text.
 pub fn create_prefix_placeholder(
+    target_platform: &Platform,
     file_path: &Path,
     prefix: &Path,
     encoded_prefix: &Path,
@@ -184,16 +188,26 @@ pub fn create_prefix_placeholder(
         FileMode::Binary
     };
 
-    if file_mode == FileMode::Binary && prefix_detection.ignore_binary_files {
-        tracing::info!(
-            "Ignoring binary file for prefix-replacement: {:?}",
-            relative_path
-        );
-        return Ok(None);
-    }
+    if file_mode == FileMode::Binary {
+        if prefix_detection.ignore_binary_files {
+            tracing::info!(
+                "Ignoring binary file for prefix-replacement: {:?}",
+                relative_path
+            );
+            return Ok(None);
+        }
 
-    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, encoded_prefix)? {
-        has_prefix = Some(encoded_prefix.to_path_buf());
+        if target_platform.is_windows() {
+            tracing::debug!(
+                "Binary prefix replacement is not performed fors Windows: {:?}",
+                relative_path
+            );
+            return Ok(None);
+        }
+
+        if contains_prefix_binary(file_path, encoded_prefix)? {
+            has_prefix = Some(encoded_prefix.to_path_buf());
+        }
     }
 
     let file_mode = forced_file_type.unwrap_or(file_mode);
@@ -383,6 +397,7 @@ impl Output {
                 }
             } else if meta.is_file() {
                 let prefix_placeholder = create_prefix_placeholder(
+                    &self.build_configuration.target_platform,
                     p,
                     temp_files.temp_dir.path(),
                     &temp_files.encoded_prefix,
@@ -458,5 +473,32 @@ impl Output {
         )?;
 
         Ok(new_files)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use content_inspector::ContentType;
+    use rattler_conda_types::Platform;
+
+    use crate::recipe::parser::PrefixDetection;
+
+    use super::create_prefix_placeholder;
+
+    #[test]
+    fn detect_prefix() {
+        let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("test-data/binary_files/binary_file_fallback");
+        let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+        create_prefix_placeholder(
+            &Platform::Linux64,
+            &test_data,
+            prefix,
+            prefix,
+            &ContentType::BINARY,
+            &PrefixDetection::default(),
+        )
+        .unwrap();
     }
 }
