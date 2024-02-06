@@ -832,9 +832,15 @@ pub fn get_default_env_filter(
     if verbose >= clap_verbosity_flag::LevelFilter::Trace {
         result = result.add_directive(Directive::from_str("resolvo=info")?);
         result = result.add_directive(Directive::from_str("rattler=info")?);
+        result = result.add_directive(Directive::from_str(
+            "rattler_networking::authentication_storage=info",
+        )?);
     } else {
         result = result.add_directive(Directive::from_str("resolvo=warn")?);
         result = result.add_directive(Directive::from_str("rattler=warn")?);
+        result = result.add_directive(Directive::from_str(
+            "rattler_networking::authentication_storage=off",
+        )?);
     }
 
     Ok(result)
