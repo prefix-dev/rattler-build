@@ -56,6 +56,18 @@ pub fn linking_checks(
         .iter()
         .flat_map(|v| v.name())
         .collect::<Vec<String>>();
+
+    let resolved_run_dependencies: Vec<String> = output
+        .finalized_dependencies
+        .clone()
+        .unwrap()
+        .run
+        .depends
+        .iter()
+        .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
+        .collect();
+
+    // spec.name.to_owned().map(|v| v.as_normalized().to_owned())
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
     for entry in conda_meta.read_dir()? {
@@ -126,14 +138,19 @@ pub fn linking_checks(
     for (file, dsos) in file_to_dso_map {
         let mut run_dependencies = run_dependencies.clone();
         for dso in &dsos {
-            let package_name = dso.as_normalized().to_string();
+            let package_name = dso.as_source().to_string();
             // If the package that we are linking against does not exist in run
             // dependencies then it is "underlinking".
-            if let Some(package_pos) = run_dependencies
+            if let Some(package) = resolved_run_dependencies
                 .iter()
-                .position(|v| v == &package_name.trim_start_matches("lib"))
+                .find(|v| v.trim_start_matches("lib") == package_name.trim_start_matches("lib"))
             {
-                run_dependencies.remove(package_pos);
+                if let Some(package_pos) = run_dependencies
+                    .iter()
+                    .position(|v| v.trim_start_matches("lib") == package.trim_start_matches("lib"))
+                {
+                    run_dependencies.remove(package_pos);
+                }
             } else if dynamic_linking
                 .missing_dso_allowlist()
                 .map(|v| v.is_match(&package_name))
@@ -154,7 +171,7 @@ pub fn linking_checks(
             }
         }
 
-        // If there are any unused run/host dependencies then it is "overlinking".
+        // If there are any unused run dependencies then it is "overlinking".
         if !run_dependencies.is_empty() {
             if dynamic_linking.error_on_overlinking() {
                 return Err(LinkingCheckError::Overlinking {
