@@ -13,6 +13,8 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use crate::system_tools::{SystemTools, Tool};
+
 /// A linux shared object (ELF)
 #[derive(Debug)]
 pub struct SharedObject {
@@ -98,6 +100,7 @@ impl SharedObject {
         encoded_prefix: &Path,
         custom_rpaths: &[String],
         rpath_allowlist: Option<&GlobSet>,
+        system_tools: &SystemTools,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
             tracing::info!("{} is not dynamically linked", self.path.display());
@@ -170,7 +173,7 @@ impl SharedObject {
                 &self.path.display(),
                 e
             );
-            call_patchelf(&self.path, &final_rpath)?;
+            call_patchelf(&self.path, &final_rpath, system_tools)?;
         }
 
         Ok(())
@@ -178,14 +181,16 @@ impl SharedObject {
 }
 
 /// Calls `patchelf` utility for updating the rpath/runpath of the binary.
-fn call_patchelf(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
+fn call_patchelf(
+    elf_path: &Path,
+    new_rpath: &[PathBuf],
+    system_tools: &SystemTools,
+) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
     tracing::info!("patchelf for {:?}: {:?}", elf_path, new_rpath);
 
-    let patchelf_exe = which::which("patchelf")?;
-
-    let mut cmd = std::process::Command::new(patchelf_exe);
+    let mut cmd = system_tools.call(Tool::Patchelf)?;
 
     // prefer using RPATH over RUNPATH because RPATH takes precedence when
     // searching for shared libraries and cannot be overriden with
