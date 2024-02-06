@@ -10,6 +10,7 @@ use fs_extra::dir::remove;
 use url::Url;
 
 use crate::recipe::parser::{GitSource, GitUrl};
+use crate::system_tools::{SystemTools, Tool};
 
 use super::SourceError;
 
@@ -68,22 +69,11 @@ fn git_command(sub_cmd: &str) -> Command {
 
 /// Fetch the git repository specified by the given source and place it in the cache directory.
 pub fn git_src(
+    system_tools: &SystemTools,
     source: &GitSource,
     cache_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<(PathBuf, String), SourceError> {
-    // test if git is available locally as we fetch the git from PATH,
-    if !Command::new("git")
-        .arg("--version")
-        .output()?
-        .status
-        .success()
-    {
-        return Err(SourceError::GitErrorStr(
-            "`git` command not found in `PATH`",
-        ));
-    }
-
     // depth == -1, fetches the entire git history
     if !source.rev().is_head() && (source.depth().is_some() && source.depth() != Some(-1)) {
         return Err(SourceError::GitErrorStr(
@@ -115,10 +105,12 @@ pub fn git_src(
             if cache_path.exists() {
                 fetch_repo(&cache_path, url, &rev)?;
             } else {
-                let mut command = git_command("clone");
+                let mut command = system_tools
+                    .call(Tool::Git)
+                    .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
 
                 command
-                    .args(["--recursive", source.url().to_string().as_str()])
+                    .args(["clone", "--recursive", source.url().to_string().as_str()])
                     .arg(cache_path.as_os_str());
 
                 if let Some(depth) = source.depth() {
@@ -299,8 +291,11 @@ mod tests {
                 "rattler-build",
             ),
         ];
+        let system_tools = crate::system_tools::SystemTools::new();
+
         for (source, repo_name) in cases {
             let res = git_src(
+                &system_tools,
                 &source,
                 cache_dir.as_ref(),
                 // TODO: this test assumes current dir is the root folder of the project which may

@@ -219,16 +219,25 @@ pub async fn run_build(
     channels.extend(output.build_configuration.channels.clone());
 
     let output = if let Some(finalized_sources) = &output.finalized_sources {
-        fetch_sources(finalized_sources, directories, &tool_configuration)
-            .await
-            .into_diagnostic()?;
+        fetch_sources(
+            finalized_sources,
+            directories,
+            &output.system_tools,
+            &tool_configuration,
+        )
+        .await
+        .into_diagnostic()?;
 
         output.clone()
     } else {
-        let rendered_sources =
-            fetch_sources(output.recipe.sources(), directories, &tool_configuration)
-                .await
-                .into_diagnostic()?;
+        let rendered_sources = fetch_sources(
+            output.recipe.sources(),
+            directories,
+            &output.system_tools,
+            &tool_configuration,
+        )
+        .await
+        .into_diagnostic()?;
 
         Output {
             finalized_sources: Some(rendered_sources),

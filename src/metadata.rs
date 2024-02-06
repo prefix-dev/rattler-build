@@ -17,6 +17,7 @@ use crate::{
     hash::HashInfo,
     recipe::parser::{Recipe, Source},
     render::resolved_dependencies::FinalizedDependencies,
+    system_tools::SystemTools,
 };
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -267,6 +268,8 @@ pub struct Output {
     /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
     /// to build this output.
     pub finalized_sources: Option<Vec<Source>>,
+    /// The system tools that are used to build this output
+    pub system_tools: SystemTools,
 }
 
 impl Output {

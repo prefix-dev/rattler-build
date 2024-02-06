@@ -8,7 +8,8 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+
+use crate::system_tools::{SystemTools, Tool};
 
 /// A macOS dylib (Mach-O)
 #[derive(Debug)]
@@ -126,6 +127,7 @@ impl Dylib {
         encoded_prefix: &Path,
         custom_rpaths: &[String],
         rpath_allowlist: Option<&GlobSet>,
+        system_tools: &SystemTools,
     ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
         let mut modified = false;
@@ -219,18 +221,19 @@ impl Dylib {
                     &self.path.display(),
                     e
                 );
-                install_name_tool(&self.path, &changes)?;
+                install_name_tool(&self.path, &changes, system_tools)?;
             }
-            codesign(&self.path)?;
+            codesign(&self.path, system_tools)?;
         }
 
         Ok(())
     }
 }
 
-fn codesign(path: &Path) -> Result<(), std::io::Error> {
+fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
     tracing::info!("codesigning {:?}", path.file_name().unwrap_or_default());
-    Command::new("codesign")
+    system_tools
+        .call(Tool::Codesign)?
         .arg("-f")
         .arg("-s")
         .arg("-")
@@ -240,7 +243,8 @@ fn codesign(path: &Path) -> Result<(), std::io::Error> {
         .map_err(|e| {
             tracing::error!("codesign failed: {}", e);
             e
-        })
+        })?;
+    Ok(())
 }
 
 /// Changes to apply to a dylib
@@ -430,12 +434,14 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
     Ok(())
 }
 
-fn install_name_tool(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> {
+fn install_name_tool(
+    dylib_path: &Path,
+    changes: &DylibChanges,
+    system_tools: &SystemTools,
+) -> Result<(), RelinkError> {
     tracing::info!("install_name_tool for {:?}:\n{}", dylib_path, changes);
 
-    let install_name_tool_exe = which::which("install_name_tool")?;
-
-    let mut cmd = std::process::Command::new(install_name_tool_exe);
+    let mut cmd = system_tools.call(Tool::InstallNameTool)?;
 
     if let Some(id) = &changes.change_id {
         cmd.arg("-id").arg(id);
@@ -487,7 +493,10 @@ mod tests {
 
     use tempfile::tempdir_in;
 
-    use crate::macos::link::{Dylib, DylibChanges};
+    use crate::{
+        macos::link::{Dylib, DylibChanges},
+        system_tools::SystemTools,
+    };
 
     use super::{install_name_tool, RelinkError};
 
@@ -545,7 +554,8 @@ mod tests {
             change_id: None,
             change_dylib: HashMap::default(),
         };
-        install_name_tool(&binary_path, &changes)?;
+
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
 
         let object = Dylib::new(&binary_path)?;
         assert!(object.rpaths.is_empty());
@@ -557,7 +567,7 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes)?;
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![expected_rpath], object.rpaths);

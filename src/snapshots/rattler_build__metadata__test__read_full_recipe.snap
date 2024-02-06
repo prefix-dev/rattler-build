@@ -389,4 +389,6 @@ finalized_dependencies:
     constrains: []
     run_exports: ~
 finalized_sources: ~
+system_tools:
+  rattler_build: 0.6.0
 
