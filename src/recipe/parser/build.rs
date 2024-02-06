@@ -1,13 +1,11 @@
-use std::path::Path;
 use std::str::FromStr;
 
 use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
-use super::glob_vec::GlobVec;
+use super::glob_vec::{AllOrGlobVec, GlobVec};
 use super::{Dependency, FlattenErrors};
-use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::validate_keys;
 use crate::{
@@ -328,80 +326,6 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
         );
 
         Ok(dynamic_linking)
-    }
-}
-
-/// A GlobVec or a boolean to select all, none, or specific paths.
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-#[serde(untagged)]
-pub enum AllOrGlobVec {
-    /// Relocate all binaries.
-    All(bool),
-    /// Relocate specific paths.
-    SpecificPaths(GlobVec),
-}
-
-impl Default for AllOrGlobVec {
-    fn default() -> Self {
-        Self::All(true)
-    }
-}
-
-impl AllOrGlobVec {
-    /// Returns true if everything will be selected
-    pub fn is_all(&self) -> bool {
-        self == &Self::All(true)
-    }
-
-    /// Returns true if no path will be selected
-    pub fn is_none(&self) -> bool {
-        self == &Self::All(false)
-    }
-
-    /// Returns true if the path matches any of the globs or if all is selected
-    pub fn is_match(&self, p: &Path) -> bool {
-        match self {
-            AllOrGlobVec::All(val) => *val,
-            AllOrGlobVec::SpecificPaths(globs) => globs.is_match(p),
-        }
-    }
-}
-
-impl TryConvertNode<AllOrGlobVec> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
-        if let Some(sequence) = self.as_sequence() {
-            sequence.try_convert(name)
-        } else if let Some(scalar) = self.as_scalar() {
-            scalar.try_convert(name)
-        } else {
-            Err(vec![
-                _partialerror!(*self.span(), ErrorKind::ExpectedScalar),
-                _partialerror!(*self.span(), ErrorKind::ExpectedSequence),
-            ])
-        }
-    }
-}
-
-impl TryConvertNode<AllOrGlobVec> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
-        let globvec: GlobVec = self.try_convert(name)?;
-        Ok(AllOrGlobVec::SpecificPaths(globvec))
-    }
-}
-
-impl TryConvertNode<AllOrGlobVec> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
-        if let Some(value) = self.as_bool() {
-            Ok(AllOrGlobVec::All(value))
-        } else {
-            Err(vec![_partialerror!(
-                *self.span(),
-                ErrorKind::InvalidValue((
-                    "Expected a boolean value or a sequence of globs".to_string(),
-                    self.as_str().to_owned().into()
-                ))
-            )])
-        }
     }
 }
 
