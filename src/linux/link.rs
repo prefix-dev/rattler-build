@@ -392,7 +392,13 @@ mod test {
         // so we are expecting it to keep the host prefix and discard the build prefix
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(&prefix, encoded_prefix, &[], Some(&globset))?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[],
+            Some(&globset),
+            &SystemTools::default(),
+        )?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(
             vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
@@ -430,7 +436,13 @@ mod test {
 
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
-        object.relink(&prefix, encoded_prefix, &[String::from("lib/")], None)?;
+        object.relink(
+            &prefix,
+            encoded_prefix,
+            &[String::from("lib/")],
+            None,
+            &SystemTools::default(),
+        )?;
         let object = SharedObject::new(&binary_path)?;
         assert_eq!(
             vec!["$ORIGIN/../lib"],

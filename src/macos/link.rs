@@ -493,7 +493,10 @@ mod tests {
 
     use tempfile::tempdir_in;
 
-    use crate::macos::link::{Dylib, DylibChanges};
+    use crate::{
+        macos::link::{Dylib, DylibChanges},
+        system_tools::SystemTools,
+    };
 
     use super::{install_name_tool, RelinkError};
 
@@ -551,7 +554,8 @@ mod tests {
             change_id: None,
             change_dylib: HashMap::default(),
         };
-        install_name_tool(&binary_path, &changes)?;
+
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
 
         let object = Dylib::new(&binary_path)?;
         assert!(object.rpaths.is_empty());
@@ -563,7 +567,7 @@ mod tests {
             change_dylib: HashMap::default(),
         };
 
-        install_name_tool(&binary_path, &changes)?;
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![expected_rpath], object.rpaths);
