@@ -7,7 +7,9 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 
 use crate::_partialerror;
-use crate::recipe::custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, RenderedSequenceNode, TryConvertNode};
+use crate::recipe::custom_yaml::{
+    HasSpan, RenderedNode, RenderedScalarNode, RenderedSequenceNode, TryConvertNode,
+};
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
 /// A vector of globs that is also immediately converted to a globset
