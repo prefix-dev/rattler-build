@@ -6,7 +6,7 @@ use std::{
 use crate::{
     linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
 };
-use rattler_conda_types::PrefixRecord;
+use rattler_conda_types::{PackageName, PrefixRecord};
 
 use crate::metadata::Output;
 
@@ -25,11 +25,11 @@ pub enum LinkingCheckError {
     #[error("macOS relink error: {0}")]
     MacOSRelink(#[from] crate::macos::link::RelinkError),
 
-    #[error("Underlinking against: {package_name}")]
-    Underlinking { package_name: String },
+    #[error("Underlinking against: {package_name} (file: {file:?})")]
+    Underlinking { package_name: String, file: PathBuf },
 
-    #[error("Overlinking against: {packages}")]
-    Overlinking { packages: String },
+    #[error("Overlinking against: {packages} (file: {file:?})")]
+    Overlinking { packages: String, file: PathBuf },
 }
 
 pub fn linking_checks(
@@ -49,7 +49,7 @@ pub fn linking_checks(
         return Ok(());
     }
 
-    let mut run_dependencies = output
+    let run_dependencies = output
         .recipe
         .requirements
         .run()
@@ -78,7 +78,7 @@ pub fn linking_checks(
     let host_prefix = &output.build_configuration.directories.host_prefix;
 
     // check all DSOs and what they are linking
-    let mut dsos = Vec::new();
+    let mut file_to_dso_map = HashMap::<&PathBuf, Vec<&PackageName>>::new();
     for file in new_files.iter() {
         // Parse the DSO to get the list of libraries it links to
         if output.build_configuration.target_platform.is_osx() {
@@ -86,6 +86,7 @@ pub fn linking_checks(
                 continue;
             }
             let dylib = Dylib::new(file)?;
+            let mut dsos = Vec::new();
             for lib in dylib.libraries {
                 let lib = match lib.strip_prefix("@rpath/").ok() {
                     Some(suffix) => host_prefix.join("lib").join(suffix),
@@ -100,11 +101,13 @@ pub fn linking_checks(
                     }
                 }
             }
+            file_to_dso_map.insert(file, dsos);
         } else {
             if !SharedObject::test_file(file)? {
                 continue;
             }
             let so = SharedObject::new(file)?;
+            let mut dsos = Vec::new();
             for lib in so.libraries {
                 let libpath = PathBuf::from("lib").join(lib);
                 if let Some(package) = path_to_package_map.get(&libpath) {
@@ -116,39 +119,55 @@ pub fn linking_checks(
                     }
                 }
             }
+            file_to_dso_map.insert(file, dsos);
         }
     }
 
-    for package in &dsos {
-        let package_name = package.as_normalized().to_string();
-        // If the package that we are linking against does not exist in run
-        // dependencies then it is "underlinking".
-        if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
-            run_dependencies.remove(package_pos);
-        } else if dynamic_linking
-            .missing_dso_allowlist()
-            .map(|v| v.is_match(&package_name))
-            .unwrap_or(false)
-        {
-            tracing::warn!(
-                "{package_name} is missing in run dependencies, \
-            yet it is included in the allow list. Skipping..."
-            );
-        } else if dynamic_linking.error_on_overdepending() {
-            return Err(LinkingCheckError::Underlinking { package_name });
-        } else {
-            tracing::warn!("Underlinking against {package_name}");
+    for (file, dsos) in file_to_dso_map {
+        let mut run_dependencies = run_dependencies.clone();
+        for dso in &dsos {
+            let package_name = dso.as_normalized().to_string();
+            // If the package that we are linking against does not exist in run
+            // dependencies then it is "underlinking".
+            if let Some(package_pos) = run_dependencies
+                .iter()
+                .position(|v| v == &package_name.trim_start_matches("lib"))
+            {
+                run_dependencies.remove(package_pos);
+            } else if dynamic_linking
+                .missing_dso_allowlist()
+                .map(|v| v.is_match(&package_name))
+                .unwrap_or(false)
+            {
+                tracing::warn!(
+                    "{package_name} is missing in run dependencies for {:?}, \
+            yet it is included in the allow list. Skipping...",
+                    file
+                );
+            } else if dynamic_linking.error_on_overdepending() {
+                return Err(LinkingCheckError::Underlinking {
+                    package_name,
+                    file: file.clone(),
+                });
+            } else {
+                tracing::warn!("Underlinking against {package_name} for {:?}", file);
+            }
         }
-    }
 
-    // If there are any unused run dependencies then it is "overlinking".
-    if !run_dependencies.is_empty() {
-        if dynamic_linking.error_on_overlinking() {
-            return Err(LinkingCheckError::Overlinking {
-                packages: run_dependencies.join(","),
-            });
-        } else {
-            tracing::warn!("Overlinking against {}", run_dependencies.join(","));
+        // If there are any unused run/host dependencies then it is "overlinking".
+        if !run_dependencies.is_empty() {
+            if dynamic_linking.error_on_overlinking() {
+                return Err(LinkingCheckError::Overlinking {
+                    packages: run_dependencies.join(","),
+                    file: file.clone(),
+                });
+            } else {
+                tracing::warn!(
+                    "Overlinking against {} for {:?}",
+                    run_dependencies.join(","),
+                    file
+                );
+            }
         }
     }
 
