@@ -269,6 +269,8 @@ pub fn package_conda(
 mod test {
     use content_inspector::ContentType;
 
+    use crate::recipe::parser::PrefixDetection;
+
     use super::metadata::create_prefix_placeholder;
 
     #[test]
@@ -277,6 +279,13 @@ mod test {
             .join("test-data/binary_files/binary_file_fallback");
         let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
 
-        create_prefix_placeholder(&test_data, prefix, &ContentType::BINARY).unwrap();
+        create_prefix_placeholder(
+            &test_data,
+            prefix,
+            prefix,
+            &ContentType::BINARY,
+            &PrefixDetection::default(),
+        )
+        .unwrap();
     }
 }

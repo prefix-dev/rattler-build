@@ -164,6 +164,11 @@ impl Build {
     pub fn always_include_files(&self) -> Option<&GlobSet> {
         self.always_include_files.globset()
     }
+
+    /// Get the prefix detection settings.
+    pub const fn prefix_detection(&self) -> &PrefixDetection {
+        &self.prefix_detection
+    }
 }
 
 impl TryConvertNode<Build> for RenderedNode {
@@ -475,11 +480,11 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
 pub struct ForceFileType {
     /// Force these files to be detected as text files (just replace the string without padding)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    text: GlobVec,
+    pub text: GlobVec,
     /// Force these files to be detected as binary files for prefix replacement
     /// (pad strings with null bytes to the right to match the length of the original file)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    binary: GlobVec,
+    pub binary: GlobVec,
 }
 
 impl ForceFileType {
@@ -492,16 +497,18 @@ impl ForceFileType {
 ///
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixDetection {
+    /// Options to force if a file is detected as text or binary
     #[serde(default, skip_serializing_if = "ForceFileType::is_default")]
-    force_file_type: ForceFileType,
+    pub force_file_type: ForceFileType,
 
+    /// Ignore these files for prefix replacement
     #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
-    ignore: AllOrGlobVec,
+    pub ignore: AllOrGlobVec,
 
     /// Ignore binary files for prefix replacement (ignored on Windows)
     /// This option defaults to false on Unix
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    ignore_binary_files: bool,
+    pub ignore_binary_files: bool,
 }
 
 impl Default for PrefixDetection {

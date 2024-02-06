@@ -18,7 +18,7 @@ use std::{
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::OsStrExt;
 
-use crate::metadata::Output;
+use crate::{metadata::Output, recipe::parser::PrefixDetection};
 
 use super::{PackagingError, TempFiles};
 
@@ -125,7 +125,9 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
 pub fn create_prefix_placeholder(
     file_path: &Path,
     prefix: &Path,
+    encoded_prefix: &Path,
     content_type: &ContentType,
+    prefix_detection: &PrefixDetection,
 ) -> Result<Option<PrefixPlaceholder>, PackagingError> {
     // exclude pyc and pyo files from prefix replacement
     if let Some(ext) = file_path.extension() {
@@ -134,15 +136,42 @@ pub fn create_prefix_placeholder(
         }
     }
 
-    let mut has_prefix = None;
+    let relative_path = file_path.strip_prefix(prefix)?;
+    if prefix_detection.ignore.is_match(relative_path) {
+        tracing::info!("Ignoring prefix-detection for file: {:?}", relative_path);
+        return Ok(None);
+    }
 
-    let file_mode = if content_type.is_text()
-        // treat everything else as binary for now!
-        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM)
-    {
-        match contains_prefix_text(file_path, prefix) {
+    let force_binary = &prefix_detection.force_file_type.binary;
+    let force_text = &prefix_detection.force_file_type.text;
+
+    let forced_file_type = if force_binary.is_match(relative_path) {
+        tracing::info!(
+            "Forcing binary prefix replacement mode for file: {:?}",
+            relative_path
+        );
+        Some(FileMode::Binary)
+    } else if force_text.is_match(relative_path) {
+        tracing::info!(
+            "Forcing text prefix replacement mode for file: {:?}",
+            relative_path
+        );
+        Some(FileMode::Text)
+    } else {
+        None
+    };
+
+    let mut has_prefix = None;
+    // treat everything except for utf8 / utf8-bom as binary for now!
+    let detected_is_text = content_type.is_text()
+        && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
+
+    // Even if we force the replacement mode to be text we still cannot handle it like a text file
+    // since it likely contains NULL bytes etc.
+    let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
+        match contains_prefix_text(file_path, encoded_prefix) {
             Ok(true) => {
-                has_prefix = Some(prefix.to_path_buf());
+                has_prefix = Some(encoded_prefix.to_path_buf());
                 FileMode::Text
             }
             Ok(false) => FileMode::Text,
@@ -155,10 +184,19 @@ pub fn create_prefix_placeholder(
         FileMode::Binary
     };
 
-    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, prefix)? {
-        has_prefix = Some(prefix.to_path_buf());
+    if file_mode == FileMode::Binary && prefix_detection.ignore_binary_files {
+        tracing::info!(
+            "Ignoring binary file for prefix-replacement: {:?}",
+            relative_path
+        );
+        return Ok(None);
     }
 
+    if file_mode == FileMode::Binary && contains_prefix_binary(file_path, encoded_prefix)? {
+        has_prefix = Some(encoded_prefix.to_path_buf());
+    }
+
+    let file_mode = forced_file_type.unwrap_or(file_mode);
     Ok(has_prefix.map(|prefix_placeholder| PrefixPlaceholder {
         file_mode,
         placeholder: prefix_placeholder.to_string_lossy().to_string(),
@@ -344,8 +382,13 @@ impl Output {
                     paths_json.paths.push(path_entry);
                 }
             } else if meta.is_file() {
-                let prefix_placeholder =
-                    create_prefix_placeholder(p, &temp_files.encoded_prefix, content_type)?;
+                let prefix_placeholder = create_prefix_placeholder(
+                    p,
+                    temp_files.temp_dir.path(),
+                    &temp_files.encoded_prefix,
+                    content_type,
+                    self.recipe.build().prefix_detection(),
+                )?;
 
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
                 let no_link = always_copy_files

@@ -462,3 +462,49 @@ def test_down_prioritize(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     index = json.loads((pkg / "info/index.json").read_text())
     assert len(index["track_features"]) == 4
     assert index["track_features"][0] == "down_prioritize-p-0"
+
+
+def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "prefix_detection/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "prefix_detection")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/paths.json").exists()
+
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    for p in paths["paths"]:
+        path = p["_path"]
+        if path == "is_binary/file_with_prefix":
+            assert p["file_mode"] == "binary"
+            assert len(p["prefix_placeholder"]) > 10
+        elif path == "is_text/file_with_prefix":
+            assert p["file_mode"] == "text"
+            assert len(p["prefix_placeholder"]) > 10
+        elif path == "is_binary/file_without_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
+        elif path == "is_text/file_without_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
+        elif path == "force_text/file_with_prefix":
+            assert p["file_mode"] == "text"
+            assert len(p["prefix_placeholder"]) > 10
+        elif path == "force_text/file_without_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
+        elif path == "force_binary/file_with_prefix":
+            assert p["file_mode"] == "binary"
+            assert len(p["prefix_placeholder"]) > 10
+        elif path == "force_binary/file_without_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
+        elif path == "ignore/file_with_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
+        elif path == "ignore/text_with_prefix":
+            assert "file_mode" not in p
+            assert "prefix_placeholder" not in p
