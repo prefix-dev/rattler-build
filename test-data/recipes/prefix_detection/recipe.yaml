@@ -1,0 +1,25 @@
+package:
+  name: prefix_detection
+  version: 0.1.0
+
+build:
+  number: 0
+  script:
+    - if: unix
+      then:
+        - python $RECIPE_DIR/create_files_with_prefix.py
+    - if: win
+      then:
+        - python %RECIPE_DIR%\create_files_with_prefix.py
+  prefix_detection:
+    ignore:
+      - ignore/*  # ignore all files in this directory
+    force_file_type:
+      binary:
+        - force_binary/*
+      text:
+        - force_text/*
+
+requirements:
+  host:
+    - python 3.11.*

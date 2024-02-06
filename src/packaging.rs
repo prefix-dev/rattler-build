@@ -264,19 +264,3 @@ pub fn package_conda(
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))
 }
-
-#[cfg(test)]
-mod test {
-    use content_inspector::ContentType;
-
-    use super::metadata::create_prefix_placeholder;
-
-    #[test]
-    fn detect_prefix() {
-        let test_data = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("test-data/binary_files/binary_file_fallback");
-        let prefix = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-
-        create_prefix_placeholder(&test_data, prefix, &ContentType::BINARY).unwrap();
-    }
-}
