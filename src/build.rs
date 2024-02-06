@@ -218,18 +218,26 @@ pub async fn run_build(
     let mut channels = vec![directories.output_dir.to_string_lossy().to_string()];
     channels.extend(output.build_configuration.channels.clone());
 
-    let system_tools = &output.system_tools;
     let output = if let Some(finalized_sources) = &output.finalized_sources {
-        fetch_sources(finalized_sources, directories, system_tools, &tool_configuration)
-            .await
-            .into_diagnostic()?;
+        fetch_sources(
+            finalized_sources,
+            directories,
+            &output.system_tools,
+            &tool_configuration,
+        )
+        .await
+        .into_diagnostic()?;
 
         output.clone()
     } else {
-        let rendered_sources =
-            fetch_sources(output.recipe.sources(), directories, system_tools, &tool_configuration)
-                .await
-                .into_diagnostic()?;
+        let rendered_sources = fetch_sources(
+            output.recipe.sources(),
+            directories,
+            &output.system_tools,
+            &tool_configuration,
+        )
+        .await
+        .into_diagnostic()?;
 
         Output {
             finalized_sources: Some(rendered_sources),

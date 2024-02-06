@@ -7,14 +7,22 @@ use std::{
     process::Command,
 };
 
+/// Any third party tool that is used by rattler build should be added here
+/// and the tool should be invoked through the system tools object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
+    /// The rattler build tool itself
     RattlerBuild,
+    /// The patch tool
     Patch,
+    /// The patchelf tool (for Linux / ELF targets)
     Patchelf,
+    /// The codesign tool (for macOS targets)
     Codesign,
+    /// The install_name_tool (for macOS / MachO targets)
     InstallNameTool,
+    /// The git tool
     Git,
 }
 
@@ -31,6 +39,8 @@ impl ToString for Tool {
     }
 }
 
+/// The system tools object is used to find and call system tools. It also keeps track of the
+/// versions of the tools that are used.
 #[derive(Debug, Clone)]
 pub struct SystemTools {
     rattler_build_version: String,
@@ -49,10 +59,13 @@ impl Default for SystemTools {
 }
 
 impl SystemTools {
+    /// Create a new system tools object
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Create a new system tools object from a previous run so that we can warn if the versions
+    /// of the tools have changed
     pub fn from_previous_run(
         rattler_build_version: String,
         used_tools: HashMap<Tool, String>,
@@ -72,6 +85,7 @@ impl SystemTools {
         }
     }
 
+    /// Find the tool in the system and return the path to the tool
     pub fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let (tool_path, found_version) = match tool {
             Tool::Patchelf => {
@@ -140,6 +154,8 @@ impl SystemTools {
         Ok(tool_path)
     }
 
+    /// Create a new `std::process::Command` for the given tool. The command is created with the
+    /// path to the tool and can be further configured with arguments and environment variables.
     pub fn call(&self, tool: Tool) -> Result<Command, which::Error> {
         let found_tool = self.found_tools.borrow().get(&tool).cloned();
         let tool_path = if let Some(tool) = found_tool {
