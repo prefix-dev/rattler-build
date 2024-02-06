@@ -45,11 +45,11 @@ pub enum RelinkError {
 pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let target_platform = output.build_configuration.target_platform;
-    let relocation_config = dynamic_linking.binary_relocation().unwrap_or_default();
+    let relocation_config = dynamic_linking.binary_relocation();
 
     if target_platform == Platform::NoArch
         || target_platform.is_windows()
-        || relocation_config.no_relocation()
+        || relocation_config.is_none()
     {
         return Ok(());
     }
@@ -73,11 +73,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             continue;
         }
 
-        if let Some(globs) = relocation_config.relocate_paths() {
-            // TODO should we still execute the relink checks?
-            if globs.is_match(p) {
-                continue;
-            }
+        if !relocation_config.is_match(p) {
+            continue;
         }
 
         if target_platform.is_linux() && SharedObject::test_file(p)? {

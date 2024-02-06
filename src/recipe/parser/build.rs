@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::str::FromStr;
 
 use globset::GlobSet;
@@ -101,6 +102,8 @@ pub struct Build {
     /// Variant ignore and use keys
     #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
     pub(super) variant: VariantKeyUsage,
+    #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
+    pub(super) prefix_detection: PrefixDetection,
 }
 
 impl Build {
@@ -190,7 +193,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             always_copy_files,
             always_include_files,
             merge_build_and_host_envs,
-            variant
+            variant,
+            prefix_detection
         }
 
         Ok(build)
@@ -198,14 +202,14 @@ impl TryConvertNode<Build> for RenderedMappingNode {
 }
 
 /// Settings for shared libraries and executables.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct DynamicLinking {
     /// List of rpaths to use (linux only).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) rpaths: Vec<String>,
     /// Whether to relocate binaries or not.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) binary_relocation: Option<BinaryRelocation>,
+    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_all")]
+    pub(super) binary_relocation: AllOrGlobVec,
     /// Allow linking against libraries that are not in the run requirements
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) missing_dso_allowlist: GlobVec,
@@ -213,22 +217,17 @@ pub struct DynamicLinking {
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) rpath_allowlist: GlobVec,
     /// What to do when detecting overdepending.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_default")]
     pub(super) overdepending_behavior: LinkingCheckBehavior,
     /// What to do when detecting overlinking.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "LinkingCheckBehavior::is_default")]
     pub(super) overlinking_behavior: LinkingCheckBehavior,
 }
 
 impl DynamicLinking {
     /// Returns true if this is the default dynamic linking configuration.
     pub fn is_default(&self) -> bool {
-        self.rpaths.is_empty()
-            && self.binary_relocation.is_none()
-            && self.missing_dso_allowlist.is_empty()
-            && self.rpath_allowlist.is_empty()
-            && self.overdepending_behavior == LinkingCheckBehavior::default()
-            && self.overlinking_behavior == LinkingCheckBehavior::default()
+        self == &DynamicLinking::default()
     }
 
     /// Get the rpaths.
@@ -241,8 +240,8 @@ impl DynamicLinking {
     }
 
     /// Get the binary relocation settings.
-    pub fn binary_relocation(&self) -> Option<BinaryRelocation> {
-        self.binary_relocation.clone()
+    pub fn binary_relocation(&self) -> &AllOrGlobVec {
+        &self.binary_relocation
     }
 
     /// Get the missing DSO allowlist.
@@ -273,6 +272,13 @@ pub enum LinkingCheckBehavior {
     #[default]
     Ignore,
     Error,
+}
+
+impl LinkingCheckBehavior {
+    /// Returns true if this is the default linking check behavior.
+    pub fn is_default(&self) -> bool {
+        self == &LinkingCheckBehavior::default()
+    }
 }
 
 impl TryConvertNode<LinkingCheckBehavior> for RenderedNode {
@@ -325,39 +331,44 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
     }
 }
 
-/// Settings for relocating binaries.
+/// A GlobVec or a boolean to select all, none, or specific paths.
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(untagged)]
-pub enum BinaryRelocation {
+pub enum AllOrGlobVec {
     /// Relocate all binaries.
     All(bool),
     /// Relocate specific paths.
     SpecificPaths(GlobVec),
 }
 
-impl Default for BinaryRelocation {
+impl Default for AllOrGlobVec {
     fn default() -> Self {
         Self::All(true)
     }
 }
 
-impl BinaryRelocation {
-    /// Return the paths to relocate.
-    pub fn relocate_paths(&self) -> Option<&GlobSet> {
-        match self {
-            BinaryRelocation::All(_) => None,
-            BinaryRelocation::SpecificPaths(paths) => paths.globset(),
-        }
+impl AllOrGlobVec {
+    /// Returns true if everything will be selected
+    pub fn is_all(&self) -> bool {
+        self == &Self::All(true)
     }
 
-    /// Returns true if there will be no relocation.
-    pub fn no_relocation(&self) -> bool {
+    /// Returns true if no path will be selected
+    pub fn is_none(&self) -> bool {
         self == &Self::All(false)
+    }
+
+    /// Returns true if the path matches any of the globs or if all is selected
+    pub fn is_match(&self, p: &Path) -> bool {
+        match self {
+            AllOrGlobVec::All(val) => *val,
+            AllOrGlobVec::SpecificPaths(globs) => globs.is_match(p),
+        }
     }
 }
 
-impl TryConvertNode<BinaryRelocation> for RenderedNode {
-    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+impl TryConvertNode<AllOrGlobVec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
         if let Some(sequence) = self.as_sequence() {
             sequence.try_convert(name)
         } else if let Some(scalar) = self.as_scalar() {
@@ -371,20 +382,26 @@ impl TryConvertNode<BinaryRelocation> for RenderedNode {
     }
 }
 
-impl TryConvertNode<BinaryRelocation> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
+impl TryConvertNode<AllOrGlobVec> for RenderedSequenceNode {
+    fn try_convert(&self, name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
         let globvec: GlobVec = self.try_convert(name)?;
-        Ok(BinaryRelocation::SpecificPaths(globvec))
+        Ok(AllOrGlobVec::SpecificPaths(globvec))
     }
 }
 
-impl TryConvertNode<BinaryRelocation> for RenderedScalarNode {
-    fn try_convert(&self, _name: &str) -> Result<BinaryRelocation, Vec<PartialParsingError>> {
-        let mut binary_relocation = BinaryRelocation::default();
-        if let Some(relocate) = self.as_bool() {
-            binary_relocation = BinaryRelocation::All(relocate);
+impl TryConvertNode<AllOrGlobVec> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<AllOrGlobVec, Vec<PartialParsingError>> {
+        if let Some(value) = self.as_bool() {
+            Ok(AllOrGlobVec::All(value))
+        } else {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::InvalidValue((
+                    "Expected a boolean value or a sequence of globs".to_string(),
+                    self.as_str().to_owned().into()
+                ))
+            )])
         }
-        Ok(binary_relocation)
     }
 }
 
@@ -526,5 +543,94 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
                 ErrorKind::EntryPointParsing(err),
             )]
         })
+    }
+}
+
+/// Options to control the prefix replacement behavior at installation time
+#[derive(Debug, Default, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct ForceFileType {
+    /// Force these files to be detected as text files (just replace the string without padding)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    text: GlobVec,
+    /// Force these files to be detected as binary files for prefix replacement
+    /// (pad strings with null bytes to the right to match the length of the original file)
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    binary: GlobVec,
+}
+
+impl ForceFileType {
+    /// Returns true if this is the default force file type configuration.
+    pub fn is_default(&self) -> bool {
+        self.text.is_empty() && self.binary.is_empty()
+    }
+}
+
+///
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrefixDetection {
+    #[serde(default, skip_serializing_if = "ForceFileType::is_default")]
+    force_file_type: ForceFileType,
+
+    #[serde(default, skip_serializing_if = "AllOrGlobVec::is_none")]
+    ignore: AllOrGlobVec,
+
+    /// Ignore binary files for prefix replacement (ignored on Windows)
+    /// This option defaults to false on Unix
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    ignore_binary_files: bool,
+}
+
+impl Default for PrefixDetection {
+    fn default() -> Self {
+        Self {
+            force_file_type: ForceFileType::default(),
+            ignore: AllOrGlobVec::All(false),
+            ignore_binary_files: false,
+        }
+    }
+}
+
+impl PrefixDetection {
+    /// Returns true if this is the default prefix detection configuration.
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
+impl TryConvertNode<PrefixDetection> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PrefixDetection, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PrefixDetection> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PrefixDetection, Vec<PartialParsingError>> {
+        let mut prefix_detection = PrefixDetection::default();
+        validate_keys!(
+            prefix_detection,
+            self.iter(),
+            force_file_type,
+            ignore,
+            ignore_binary_files
+        );
+        Ok(prefix_detection)
+    }
+}
+
+impl TryConvertNode<ForceFileType> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<ForceFileType, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<ForceFileType> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<ForceFileType, Vec<PartialParsingError>> {
+        let mut force_file_type = ForceFileType::default();
+        validate_keys!(force_file_type, self.iter(), text, binary);
+        Ok(force_file_type)
     }
 }

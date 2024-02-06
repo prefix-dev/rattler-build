@@ -11,7 +11,5 @@ build:
     binary_relocation:
       - /usr/lib/**
       - /etc
-    overdepending_behavior: ignore
-    overlinking_behavior: ignore
 requirements: {}
 

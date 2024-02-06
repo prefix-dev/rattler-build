@@ -93,10 +93,8 @@ Recipe {
         },
         dynamic_linking: DynamicLinking {
             rpaths: [],
-            binary_relocation: Some(
-                All(
-                    true,
-                ),
+            binary_relocation: All(
+                true,
             ),
             missing_dso_allowlist: [],
             rpath_allowlist: [
@@ -112,6 +110,16 @@ Recipe {
             use_keys: [],
             ignore_keys: [],
             down_prioritize_variant: None,
+        },
+        prefix_detection: PrefixDetection {
+            force_file_type: ForceFileType {
+                text: [],
+                binary: [],
+            },
+            ignore: All(
+                false,
+            ),
+            ignore_binary_files: false,
         },
     },
     requirements: Requirements {

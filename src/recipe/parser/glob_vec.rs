@@ -1,4 +1,5 @@
 use std::fmt::{self, Debug, Formatter};
+use std::path::Path;
 
 use globset::{Glob, GlobSet};
 
@@ -80,6 +81,15 @@ impl GlobVec {
     /// Returns the globset if it exists
     pub fn globset(&self) -> Option<&GlobSet> {
         self.1.as_ref()
+    }
+
+    /// Returns true if the path matches any of the globs
+    pub fn is_match(&self, path: &Path) -> bool {
+        if let Some(globset) = self.1.as_ref() {
+            globset.is_match(path)
+        } else {
+            false
+        }
     }
 
     /// Only used for testing

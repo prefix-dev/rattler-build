@@ -50,7 +50,6 @@ build:
     rpath_allowlist:
     - bla/*
     overdepending_behavior: error
-    overlinking_behavior: ignore
   always_copy_files:
   - file1
   - file2/**/*
@@ -66,6 +65,14 @@ build:
     - python
     - numpy
     down_prioritize_variant: 5
+  prefix_detection:
+    force_file_type:
+      text:
+      - bla/*.txt
+      binary:
+      - bla/*.so
+    ignore: true
+    ignore_binary_files: true
 requirements:
   build:
   - compiler: c
