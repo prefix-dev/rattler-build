@@ -5,5 +5,8 @@ expression: "fs::read_to_string(&dest).unwrap()"
 #!/bin/bash /super/prefix/bin/pythonw
 # -*- coding: utf-8 -*-
 import sys
+
+print(sys.argv)
+
 # etc
 

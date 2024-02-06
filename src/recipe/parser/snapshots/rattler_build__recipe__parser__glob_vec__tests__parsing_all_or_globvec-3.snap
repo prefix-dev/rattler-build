@@ -1,0 +1,6 @@
+---
+source: src/recipe/parser/glob_vec.rs
+expression: "&globs_none"
+---
+globs: false
+
