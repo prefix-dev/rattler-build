@@ -16,7 +16,7 @@ mod file_finder;
 mod file_mapper;
 mod metadata;
 pub use file_finder::{Files, TempFiles};
-pub use metadata::{create_prefix_placeholder, to_forward_slash_lossy};
+pub use metadata::create_prefix_placeholder;
 
 use crate::linux;
 use crate::macos;
