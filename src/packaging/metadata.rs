@@ -73,6 +73,7 @@ fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, Packagi
 
     #[cfg(target_os = "windows")]
     {
+        use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way

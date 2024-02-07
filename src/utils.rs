@@ -30,7 +30,6 @@ pub fn to_lexical_absolute(p: &Path, base_path: &Path) -> PathBuf {
 pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(target_os = "windows")]
     {
-        use std::path::Component;
         let mut buf = String::new();
         for c in path.components() {
             match c {
