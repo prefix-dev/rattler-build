@@ -387,6 +387,14 @@ mod tests {
     }
 
     #[test]
+    fn map_null_values() {
+        let recipe =
+            include_str!("../../test-data/recipes/test-parsing/map_jinja_null_values.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        assert_yaml_snapshot!(recipe);
+    }
+
+    #[test]
     fn test_complete_recipe() {
         let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
