@@ -188,7 +188,9 @@ pub fn linking_checks(
                 (
                     package.file.clone(),
                     package
-                        .linked_dsos.values().map(|v| v.as_source().to_string())
+                        .linked_dsos
+                        .values()
+                        .map(|v| v.as_source().to_string())
                         .collect(),
                 )
             })
