@@ -513,3 +513,23 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             check_path(p, None)
         elif path == "ignore/text_with_prefix":
             check_path(p, None)
+
+def test_empty_folder(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "empty_folder/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "empty_folder")
+
+    assert (pkg / "info/index.json").exists()
+    assert (pkg / "info/recipe/empty_folder_in_recipe").exists()
+    assert (pkg / "info/recipe/empty_folder_in_recipe").is_dir()
+
+    assert not (pkg / "empty_folder").exists()
+    assert not (pkg / "empty_folder").is_dir()
+
+    # read paths json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 0
+

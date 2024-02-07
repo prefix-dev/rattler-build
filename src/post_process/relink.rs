@@ -62,14 +62,14 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
     let mut binaries = HashSet::new();
 
-    for (p, content_type) in &temp_files.content_type_map {
+    for (p, content_type) in temp_files.content_type_map() {
         let metadata = fs::symlink_metadata(p)?;
         if metadata.is_symlink() || metadata.is_dir() {
             tracing::debug!("Relink skipping symlink or directory: {}", p.display());
             continue;
         }
 
-        if content_type != &content_inspector::ContentType::BINARY {
+        if content_type != &Some(content_inspector::ContentType::BINARY) {
             continue;
         }
 

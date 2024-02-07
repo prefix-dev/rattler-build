@@ -33,17 +33,21 @@ pub struct TempFiles {
     /// The prefix which is encoded in the files (the long placeholder for the actual prefix, e.g. /home/user/bld_placeholder...)
     pub encoded_prefix: PathBuf,
     /// The content type of the files
-    pub content_type_map: HashMap<PathBuf, ContentType>,
+    content_type_map: HashMap<PathBuf, Option<ContentType>>,
 }
 
-pub fn content_type(path: &Path) -> Result<ContentType, io::Error> {
+pub fn content_type(path: &Path) -> Result<Option<ContentType>, io::Error> {
+    if path.is_dir() || path.is_symlink() {
+        return Ok(None);
+    }
+
     // read first 1024 bytes to determine file type
     let mut file = fs::File::open(path)?;
     let mut buffer = [0; 1024];
     let n = file.read(&mut buffer)?;
     let buffer = &buffer[..n];
 
-    Ok(content_inspector::inspect(buffer))
+    Ok(Some(content_inspector::inspect(buffer)))
 }
 
 /// This function returns a HashSet of (recursively) all the files in the given directory.
@@ -132,6 +136,7 @@ impl Files {
             content_type_map,
         })
     }
+
 }
 
 impl TempFiles {
@@ -143,9 +148,14 @@ impl TempFiles {
         for f in files {
             self.content_type_map.insert(
                 f.clone(),
-                content_type(&f).expect("Could not determine content type"),
+                content_type(&f).unwrap_or(None),
             );
             self.files.insert(f);
         }
+    }
+
+    /// Return the content type map
+    pub const fn content_type_map(&self) -> &HashMap<PathBuf, Option<ContentType>> {
+        &self.content_type_map
     }
 }
