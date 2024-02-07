@@ -101,10 +101,16 @@ impl Dylib {
     }
 
     /// Find libraries in the dylib and resolve them by taking into account the rpaths
-    pub fn resolve_libraries(&self, prefix: &Path, encoded_prefix: &Path) -> HashMap<PathBuf, Option<PathBuf>> {
-        let resolved_rpaths = self.rpaths.iter().map(|rpath| {
-            self.resolve_rpath(rpath, prefix, encoded_prefix)
-        });
+    pub fn resolve_libraries(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+    ) -> HashMap<PathBuf, Option<PathBuf>> {
+        let resolved_rpaths = self
+            .rpaths
+            .iter()
+            .map(|rpath| self.resolve_rpath(rpath, prefix, encoded_prefix));
+
         let mut resolved_libraries = HashMap::new();
         for lib in self.libraries.iter() {
             resolved_libraries.insert(lib.clone(), None);
@@ -120,9 +126,9 @@ impl Dylib {
                 resolved_libraries.insert(lib.clone(), Some(lib.clone()));
             }
         }
+
         resolved_libraries
     }
-
 
     /// Resolve the rpath and replace `@loader_path` with the path of the dylib
     pub fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
