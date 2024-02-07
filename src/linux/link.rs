@@ -103,16 +103,14 @@ impl SharedObject {
         let resolved_rpaths = self
             .rpaths
             .iter()
-            .map(|r| std::env::split_paths(r))
-            .flatten()
+            .flat_map(|r| std::env::split_paths(r))
             .map(|r| self.resolve_rpath(&r, prefix, encoded_prefix))
             .collect::<Vec<_>>();
 
         let resolved_runpaths = self
             .runpaths
             .iter()
-            .map(|r| std::env::split_paths(r))
-            .flatten()
+            .flat_map(|r| std::env::split_paths(r))
             .map(|r| self.resolve_rpath(&r, prefix, encoded_prefix))
             .collect::<Vec<_>>();
 
