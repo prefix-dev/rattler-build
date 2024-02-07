@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     path::PathBuf,
 };
 
@@ -37,6 +38,21 @@ struct PackageFile {
     pub file: PathBuf,
     pub linked_dsos: HashMap<PathBuf, PackageName>,
     pub shared_libraries: Vec<PathBuf>,
+}
+
+impl fmt::Display for PackageFile {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[{}] links against:\n", self.file.display())?;
+        for (library, package) in &self.linked_dsos {
+            write!(
+                f,
+                " -> {} (from {})\n",
+                library.display(),
+                package.as_source()
+            )?;
+        }
+        Ok(())
+    }
 }
 
 pub fn linking_checks(
@@ -151,6 +167,8 @@ pub fn linking_checks(
     );
 
     for package in package_files.iter() {
+        println!("\n{}\n", package);
+
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
         for shared_library in package.shared_libraries.iter() {
