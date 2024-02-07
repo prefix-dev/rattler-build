@@ -8,7 +8,7 @@ use itertools::Itertools;
 use memmap2::MmapMut;
 use scroll::ctx::SizeWith;
 use scroll::Pwrite;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -90,6 +90,52 @@ impl SharedObject {
             runpaths: elf.runpaths.iter().map(|s| s.to_string()).collect(),
             has_dynamic: elf.dynamic.is_some(),
         })
+    }
+
+    /// Resolve the libraries, taking into account the rpath / runpath of the binary
+    #[allow(dead_code)]
+    pub fn resolve_libraries(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+    ) -> HashMap<PathBuf, Option<PathBuf>> {
+        // TODO this does not yet check in the global / system library paths
+        let resolved_rpaths = self
+            .rpaths
+            .iter()
+            .flat_map(|r| std::env::split_paths(r))
+            .map(|r| self.resolve_rpath(&r, prefix, encoded_prefix))
+            .collect::<Vec<_>>();
+
+        let resolved_runpaths = self
+            .runpaths
+            .iter()
+            .flat_map(|r| std::env::split_paths(r))
+            .map(|r| self.resolve_rpath(&r, prefix, encoded_prefix))
+            .collect::<Vec<_>>();
+
+        let mut libraries = HashMap::new();
+        for library in self.libraries.iter() {
+            let library_path = Path::new(library);
+            let resolved_library_path = if library_path.is_absolute() {
+                Some(library_path.to_path_buf())
+            } else {
+                let library_path = Path::new(library);
+                let mut resolved_library_path = None;
+                // Note: this treats rpaths and runpaths equally, which is not quite correct
+                for rpath in resolved_rpaths.iter().chain(resolved_runpaths.iter()) {
+                    let candidate = rpath.join(library_path);
+                    if candidate.exists() {
+                        resolved_library_path = Some(candidate);
+                        break;
+                    }
+                }
+                resolved_library_path
+            };
+            libraries.insert(library_path.to_path_buf(), resolved_library_path);
+        }
+
+        libraries
     }
 
     /// Resolve the rpath and replace `@loader_path` with the path of the dylib
