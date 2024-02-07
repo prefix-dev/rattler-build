@@ -321,7 +321,7 @@ impl Output {
         };
 
         let sorted = temp_files
-            .content_type_map
+            .content_type_map()
             .iter()
             .sorted_by(|(k1, _), (k2, _)| k1.cmp(k2));
 
@@ -358,12 +358,14 @@ impl Output {
                     paths_json.paths.push(path_entry);
                 }
             } else if meta.is_file() {
+                let content_type =
+                    content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
                 let prefix_placeholder = create_prefix_placeholder(
                     &self.build_configuration.target_platform,
                     p,
                     temp_files.temp_dir.path(),
                     &temp_files.encoded_prefix,
-                    content_type,
+                    &content_type,
                     self.recipe.build().prefix_detection(),
                 )?;
 
@@ -380,7 +382,7 @@ impl Output {
                     no_link,
                     size_in_bytes: Some(meta.len()),
                 });
-            } else if meta.file_type().is_symlink() {
+            } else if meta.is_symlink() {
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
 
                 paths_json.paths.push(PathsEntry {

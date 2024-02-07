@@ -74,6 +74,9 @@ pub enum PackagingError {
 
     #[error("Failed to compile Python bytecode: {0}")]
     PythonCompileError(String),
+
+    #[error("Failed to find content type for file: {0:?}")]
+    ContentTypeNotFound(PathBuf),
 }
 
 /// This function copies the license files to the info/licenses folder.
