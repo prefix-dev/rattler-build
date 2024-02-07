@@ -358,8 +358,8 @@ impl Output {
                     paths_json.paths.push(path_entry);
                 }
             } else if meta.is_file() {
-                let content_type = content_type
-                    .ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
+                let content_type =
+                    content_type.ok_or_else(|| PackagingError::ContentTypeNotFound(p.clone()))?;
                 let prefix_placeholder = create_prefix_placeholder(
                     &self.build_configuration.target_platform,
                     p,
