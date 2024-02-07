@@ -662,7 +662,7 @@ fn errored_progress_style() -> Result<indicatif::ProgressStyle, TemplateError> {
     Ok(indicatif::ProgressStyle::default_bar()
         .template(&format!(
             "{} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.red}}",
-            console::style(console::Emoji("❌", " ")).red()
+            console::style(console::Emoji("×", " ")).red()
         ))?
         .progress_chars("━━╾─"))
 }
