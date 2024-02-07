@@ -42,11 +42,11 @@ struct PackageFile {
 
 impl fmt::Display for PackageFile {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] links against:\n", self.file.display())?;
+        writeln!(f, "[{}] links against:", self.file.display())?;
         for (library, package) in &self.linked_dsos {
-            write!(
+            writeln!(
                 f,
-                " -> {} (from {})\n",
+                " -> {} (from {})",
                 library.display(),
                 package.as_source()
             )?;
