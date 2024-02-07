@@ -23,9 +23,8 @@ requirements:
     - cmake
   host:
     - zlib
-  run:
-    - libzlib
 
 tests:
   - script:
       - zlink
+      - ldd $PREFIX/bin/zlink

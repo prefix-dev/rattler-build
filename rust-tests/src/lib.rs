@@ -573,31 +573,31 @@ mod tests {
     #[test]
     #[cfg(any(target_os = "linux"))]
     fn test_underlinking_check() {
-        let tmp = tmp("test_underlink_check");
+        let tmp = tmp("test_overlink_check");
         let rattler_build = rattler().build(
-            recipes().join("underlinking"),
+            recipes().join("overlink"),
             tmp.as_dir(),
             None,
             Some("linux-64"),
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert!(output.contains("Linking check error: Underlinking against: libzlib"));
+        assert!(output.contains("Linking check error: Overlinking against"));
     }
 
     #[test]
     #[cfg(any(target_os = "linux"))]
-    fn test_overlinking_check() {
-        let tmp = tmp("test_overlink_check");
+    fn test_overdepending_check() {
+        let tmp = tmp("test_overdepending_check");
         let rattler_build = rattler().build(
-            recipes().join("overlinking"),
+            recipes().join("overdepending"),
             tmp.as_dir(),
             None,
             Some("linux-64"),
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert!(output.contains("Linking check error: Overlinking against: yaml,curl"));
+        assert!(output.contains("Linking check error: Overdepending against"));
     }
 
     #[test]

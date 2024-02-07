@@ -210,24 +210,6 @@ pub enum Dependency {
     Compiler(Compiler),
 }
 
-impl Dependency {
-    /// Returns the name of the dependency.
-    pub fn name(&self) -> Option<String> {
-        match self {
-            Dependency::Spec(spec) => spec.name.to_owned().map(|v| v.as_normalized().to_owned()),
-            Dependency::PinSubpackage(pin_sub) => {
-                let pin = pin_sub.pin_value();
-                Some(pin.name.as_normalized().to_owned())
-            }
-            Dependency::PinCompatible(pin_compatible) => {
-                let pin = pin_compatible.pin_value();
-                Some(pin.name.as_normalized().to_owned())
-            }
-            Dependency::Compiler(_) => None,
-        }
-    }
-}
-
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Vec<Dependency>, Vec<PartialParsingError>> {
         match self {
