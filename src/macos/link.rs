@@ -162,16 +162,17 @@ impl Dylib {
         for rpath in &self.rpaths {
             if rpath.starts_with("@loader_path") {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
-                if resolved.starts_with(prefix) {
+                if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
                 } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
-                    tracing::warn!("Rpath not in prefix: {} – removing it", rpath.display());
+                    tracing::info!("Rpath in allow list: {}", rpath.display());
+                    final_rpaths.push(rpath.clone());
                 }
-
-                continue;
-            }
-
-            if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
+                tracing::info!(
+                    "Rpath not in prefix or allow-listed: {} – removing it",
+                    rpath.display()
+                );
+            } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
                 let parent = self.path.parent().ok_or(RelinkError::NoParentDir)?;
@@ -193,7 +194,10 @@ impl Dylib {
                 tracing::info!("Allowlisted rpath: {}", rpath.display());
                 final_rpaths.push(rpath.clone());
             } else {
-                tracing::warn!("Rpath not in prefix: {} – removing it", rpath.display());
+                tracing::info!(
+                    "Rpath not in prefix or allow-listed: {} – removing it",
+                    rpath.display()
+                );
             }
         }
 
@@ -598,6 +602,63 @@ mod tests {
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![expected_rpath], object.rpaths);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_keep_relative_rpath() -> Result<(), RelinkError> {
+        // check if install_name_tool is installed
+        if which::which("install_name_tool").is_err() {
+            println!("install_name_tool not found, skipping test");
+            return Ok(());
+        }
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let bin_dir = tmp_dir.path().join("bin");
+        fs::create_dir(&bin_dir)?;
+        let binary_path = tmp_dir.path().join("bin/zlink-relink-relative");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path).unwrap();
+
+        let delete_paths = object
+            .rpaths
+            .iter()
+            .map(|p| (Some(p.clone()), None))
+            .chain(std::iter::once((
+                None,
+                Some(PathBuf::from("@loader_path/../lib")),
+            )))
+            .collect();
+
+        let changes = DylibChanges {
+            change_rpath: delete_paths,
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        install_name_tool(&binary_path, &changes, &SystemTools::default())?;
+
+        let object = Dylib::new(&binary_path)?;
+        assert!(object.rpaths == vec![PathBuf::from("@loader_path/../lib")]);
+
+        let tmp_prefix = tmp_dir.path();
+        let encoded_prefix = PathBuf::from("/encoded/long_install_prefix/bla/bin");
+
+        object
+            .relink(
+                tmp_prefix,
+                &encoded_prefix,
+                &[],
+                None,
+                &SystemTools::default(),
+            )
+            .unwrap();
+
+        let object = Dylib::new(&binary_path)?;
+        assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
 
         Ok(())
     }
