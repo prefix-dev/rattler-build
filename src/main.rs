@@ -840,6 +840,7 @@ pub fn get_default_env_filter(
     } else {
         result = result.add_directive(Directive::from_str("resolvo=warn")?);
         result = result.add_directive(Directive::from_str("rattler=warn")?);
+        result = result.add_directive(Directive::from_str("rattler_repodata_gateway::fetch=off")?);
         result = result.add_directive(Directive::from_str(
             "rattler_networking::authentication_storage=off",
         )?);
