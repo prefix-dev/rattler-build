@@ -575,7 +575,7 @@ mod tests {
     fn test_underlinking_check() {
         let tmp = tmp("test_overlink_check");
         let rattler_build = rattler().build(
-            recipes().join("overlink"),
+            recipes().join("overlinking"),
             tmp.as_dir(),
             None,
             Some("linux-64"),
