@@ -107,7 +107,7 @@ impl Dylib {
             encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
         if let Ok(rpath_without_loader) = rpath.strip_prefix("@loader_path") {
             if let Some(library_parent) = self_path.parent() {
-                return to_lexical_absolute(&rpath_without_loader, library_parent);
+                return to_lexical_absolute(rpath_without_loader, library_parent);
             } else {
                 tracing::warn!("shared library {:?} has no parent directory", self.path);
             }
