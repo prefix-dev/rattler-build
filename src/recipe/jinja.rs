@@ -589,7 +589,7 @@ mod tests {
 
     use rattler_conda_types::Platform;
 
-    use crate::packaging::to_forward_slash_lossy;
+    use crate::utils::to_forward_slash_lossy;
 
     use super::*;
 

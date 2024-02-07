@@ -10,6 +10,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::system_tools::{SystemTools, Tool};
+use crate::utils::to_lexical_absolute;
 
 /// A macOS dylib (Mach-O)
 #[derive(Debug)]
@@ -99,6 +100,21 @@ impl Dylib {
         }
     }
 
+    /// Resolve the rpath and replace `@loader_path` with the path of the dylib
+    pub fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
+        // get self path in "encoded prefix"
+        let self_path =
+            encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
+        if let Ok(rpath_without_loader) = rpath.strip_prefix("@loader_path") {
+            if let Some(library_parent) = self_path.parent() {
+                return to_lexical_absolute(&rpath_without_loader, library_parent);
+            } else {
+                tracing::warn!("shared library {:?} has no parent directory", self.path);
+            }
+        }
+        rpath.to_path_buf()
+    }
+
     /// Modify a dylib to use relative paths for rpaths and dylibs
     /// This makes the dylib relocatable and allows it to be used in a conda environment.
     ///
@@ -144,6 +160,17 @@ impl Dylib {
         let mut final_rpaths = Vec::new();
 
         for rpath in &self.rpaths {
+            if rpath.starts_with("@loader_path") {
+                let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
+                if resolved.starts_with(prefix) {
+                    final_rpaths.push(rpath.clone());
+                } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+                    tracing::warn!("Rpath not in prefix: {} – removing it", rpath.display());
+                }
+
+                continue;
+            }
+
             if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
@@ -573,5 +600,25 @@ mod tests {
         assert_eq!(vec![expected_rpath], object.rpaths);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_rpath_resolve() {
+        let dylib = Dylib {
+            path: PathBuf::from("/foo/prefix/bar.dylib"),
+            id: None,
+            rpaths: vec![PathBuf::from("@loader_path/../lib")],
+            libraries: vec![],
+        };
+
+        let prefix = PathBuf::from("/foo/prefix");
+        let encoded_prefix = PathBuf::from("/foo/very_long_encoded_prefix/bin");
+
+        let resolved = dylib.resolve_rpath(
+            &PathBuf::from("@loader_path/../lib"),
+            &prefix,
+            &encoded_prefix,
+        );
+        assert_eq!(resolved, PathBuf::from("/foo/very_long_encoded_prefix/lib"));
     }
 }

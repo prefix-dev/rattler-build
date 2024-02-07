@@ -14,7 +14,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::metadata::Output;
-use crate::packaging::{to_forward_slash_lossy, PackagingError, TempFiles};
+use crate::packaging::{PackagingError, TempFiles};
+use crate::utils::to_forward_slash_lossy;
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
     if target_platform.is_windows() {
