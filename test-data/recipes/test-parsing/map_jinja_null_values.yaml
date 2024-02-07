@@ -1,0 +1,25 @@
+package:
+  name: zlib
+  version: 0.1.0
+
+build:
+  # should be filtered
+  number: ${{ 2 if false }}
+  string: ${{ "bs" if false }}
+  script:
+    - ${{ "echo 'hello'" if false }}
+    - ${{ "echo 'world'" if true }}
+  prefix_detection:
+    force_file_type:
+      text: ~
+      binary:
+        - ${{ "remove" if false }}
+        - ${{ "zlib" if true }}
+  noarch: ${{ "python" if false }}
+  dynamic_linking: ~
+
+requirements:
+  run:
+    - ${{ "zlib" if true }}
+    # should be filtered
+    - ${{ "remove" if false }}
