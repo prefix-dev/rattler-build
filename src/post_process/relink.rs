@@ -86,6 +86,9 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                 rpath_allowlist,
                 &output.system_tools,
             )?;
+            let resolved_libs = so.resolve_libraries(tmp_prefix, encoded_prefix);
+
+            println!("Resolved libs: {:?}", resolved_libs);
             binaries.insert(p.clone());
         } else if target_platform.is_osx() && Dylib::test_file(p)? {
             let dylib = Dylib::new(p)?;
