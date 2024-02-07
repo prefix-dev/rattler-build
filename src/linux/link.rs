@@ -93,11 +93,13 @@ impl SharedObject {
     }
 
     /// Resolve the libraries, taking into account the rpath / runpath of the binary
+    #[allow(dead_code)]
     pub fn resolve_libraries(
         &self,
         prefix: &Path,
         encoded_prefix: &Path,
     ) -> HashMap<PathBuf, Option<PathBuf>> {
+        // TODO this does not yet check in the global / system library paths
         let resolved_rpaths = self
             .rpaths
             .iter()

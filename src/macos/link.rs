@@ -101,6 +101,7 @@ impl Dylib {
     }
 
     /// Find libraries in the dylib and resolve them by taking into account the rpaths
+    #[allow(dead_code)]
     pub fn resolve_libraries(
         &self,
         prefix: &Path,
