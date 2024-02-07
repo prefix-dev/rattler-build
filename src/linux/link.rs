@@ -14,6 +14,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::system_tools::{SystemTools, Tool};
+use crate::utils::to_lexical_absolute;
 
 /// A linux shared object (ELF)
 #[derive(Debug)]
@@ -91,6 +92,24 @@ impl SharedObject {
         })
     }
 
+    /// Resolve the rpath and replace `@loader_path` with the path of the dylib
+    pub fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
+        // get self path in "encoded prefix"
+        let self_path = encoded_prefix.join(
+            self.path
+                .strip_prefix(prefix)
+                .expect("library not in prefix"),
+        );
+        if let Ok(rpath_without_loader) = rpath.strip_prefix("$ORIGIN") {
+            if let Some(library_parent) = self_path.parent() {
+                return to_lexical_absolute(rpath_without_loader, library_parent);
+            } else {
+                tracing::warn!("shared library {:?} has no parent directory", self.path);
+            }
+        }
+        rpath.to_path_buf()
+    }
+
     /// Find all RPATH and RUNPATH entries and replace them with the encoded prefix.
     ///
     /// If the rpath is outside of the prefix, it is removed.
@@ -127,10 +146,22 @@ impl SharedObject {
             .map(PathBuf::from)
             .collect::<Vec<_>>();
 
-        let mut final_rpath = Vec::new();
+        let mut final_rpaths = Vec::new();
 
         for rpath in rpaths.iter().chain(runpaths.iter()) {
-            if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
+            if rpath.starts_with("$ORIGIN") {
+                let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
+                if resolved.starts_with(encoded_prefix) {
+                    final_rpaths.push(rpath.clone());
+                } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+                    tracing::info!("Rpath in allow list: {}", rpath.display());
+                    final_rpaths.push(rpath.clone());
+                }
+                tracing::info!(
+                    "Rpath not in prefix or allow-listed: {} – removing it",
+                    rpath.display()
+                );
+            } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
                 let parent = self.path.parent().ok_or(RelinkError::NoParentDir)?;
@@ -143,7 +174,7 @@ impl SharedObject {
                 )?;
 
                 tracing::info!("New relative path: $ORIGIN/{}", relative_path.display());
-                final_rpath.push(PathBuf::from(format!(
+                final_rpaths.push(PathBuf::from(format!(
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
@@ -152,7 +183,7 @@ impl SharedObject {
                 .unwrap_or(false)
             {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
-                final_rpath.push(rpath.clone());
+                final_rpaths.push(rpath.clone());
             } else {
                 tracing::warn!(
                     "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
@@ -164,16 +195,16 @@ impl SharedObject {
         }
 
         // keep only first unique item
-        final_rpath = final_rpath.into_iter().unique().collect();
+        final_rpaths = final_rpaths.into_iter().unique().collect();
 
         // run builtin relink. if it fails, try patchelf
-        if let Err(e) = relink(&self.path, &final_rpath) {
+        if let Err(e) = relink(&self.path, &final_rpaths) {
             tracing::warn!(
                 "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
                 &self.path.display(),
                 e
             );
-            call_patchelf(&self.path, &final_rpath, system_tools)?;
+            call_patchelf(&self.path, &final_rpaths, system_tools)?;
         }
 
         Ok(())
