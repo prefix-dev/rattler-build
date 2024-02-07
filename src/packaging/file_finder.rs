@@ -136,7 +136,6 @@ impl Files {
             content_type_map,
         })
     }
-
 }
 
 impl TempFiles {
@@ -146,10 +145,8 @@ impl TempFiles {
         I: IntoIterator<Item = PathBuf>,
     {
         for f in files {
-            self.content_type_map.insert(
-                f.clone(),
-                content_type(&f).unwrap_or(None),
-            );
+            self.content_type_map
+                .insert(f.clone(), content_type(&f).unwrap_or(None));
             self.files.insert(f);
         }
     }
