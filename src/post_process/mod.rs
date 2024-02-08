@@ -1,18 +1,19 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::PathBuf,
-};
-
-use crate::{
-    linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
-};
-use rattler_conda_types::PrefixRecord;
-
-use crate::metadata::Output;
-
 pub mod package_nature;
 pub mod python;
 pub mod relink;
+
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
+
+use crate::metadata::Output;
+use crate::{
+    linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
+};
+
+use owo_colors::*;
+use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -25,16 +26,56 @@ pub enum LinkingCheckError {
     #[error("macOS relink error: {0}")]
     MacOSRelink(#[from] crate::macos::link::RelinkError),
 
-    #[error("Underlinking against: {package_name}")]
-    Underlinking { package_name: String },
+    #[error("Overlinking against: {package} (file: {file:?})")]
+    Overlinking { package: PathBuf, file: PathBuf },
 
-    #[error("Overlinking against: {packages}")]
-    Overlinking { packages: String },
+    #[error("Overdepending against: {package} (file: {file:?})")]
+    Overdepending { package: PathBuf, file: PathBuf },
+}
+
+#[derive(Debug)]
+struct PackageFile {
+    pub file: PathBuf,
+    pub linked_dsos: HashMap<PathBuf, PackageName>,
+    pub shared_libraries: Vec<PathBuf>,
+}
+
+impl PackageFile {
+    fn pretty_print(&self) {
+        let mut linked_libraries = Vec::new();
+        self.shared_libraries.iter().for_each(|shared_library| {
+            linked_libraries.push((shared_library, self.linked_dsos.get(shared_library)));
+        });
+        if linked_libraries.is_empty() {
+            return;
+        }
+        println!("\n[{}] links against:", self.file.display().white().bold());
+        for (i, (library, package)) in linked_libraries.iter().enumerate() {
+            println!(
+                " {} {}{}",
+                if i != linked_libraries.len() - 1 {
+                    "├─"
+                } else {
+                    "└─"
+                },
+                if package.is_some() {
+                    library.display().green().to_string()
+                } else {
+                    library.display().red().to_string()
+                },
+                package
+                    .map(|v| format!(" (from {})", v.as_normalized().italic()))
+                    .unwrap_or_default()
+            );
+        }
+        println!();
+    }
 }
 
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
+    tmp_prefix: &Path,
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
 
@@ -49,13 +90,16 @@ pub fn linking_checks(
         return Ok(());
     }
 
-    let mut run_dependencies = output
-        .recipe
-        .requirements
-        .run()
+    let resolved_run_dependencies: Vec<String> = output
+        .finalized_dependencies
+        .clone()
+        .unwrap()
+        .run
+        .depends
         .iter()
-        .flat_map(|v| v.name())
-        .collect::<Vec<String>>();
+        .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
+        .collect();
+
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
     for entry in conda_meta.read_dir()? {
@@ -76,9 +120,11 @@ pub fn linking_checks(
     }
 
     let host_prefix = &output.build_configuration.directories.host_prefix;
+    tracing::trace!("Path-package map: {:#?}", path_to_package_map);
+    tracing::trace!("Package-nature map: {:#?}", package_to_nature_map);
 
     // check all DSOs and what they are linking
-    let mut dsos = Vec::new();
+    let mut package_files = Vec::new();
     for file in new_files.iter() {
         // Parse the DSO to get the list of libraries it links to
         if output.build_configuration.target_platform.is_osx() {
@@ -86,69 +132,123 @@ pub fn linking_checks(
                 continue;
             }
             let dylib = Dylib::new(file)?;
-            for lib in dylib.libraries {
+            let mut file_dsos = Vec::new();
+            for lib in &dylib.libraries {
                 let lib = match lib.strip_prefix("@rpath/").ok() {
                     Some(suffix) => host_prefix.join("lib").join(suffix),
-                    None => lib,
+                    None => lib.to_path_buf(),
                 };
                 if let Some(package) = path_to_package_map.get(&lib) {
                     if let Some(nature) = package_to_nature_map.get(package) {
                         // Only take shared libraries into account.
                         if nature == &PackageNature::DSOLibrary {
-                            dsos.push(package);
+                            file_dsos.push((lib, package.clone()));
                         }
                     }
                 }
             }
+            package_files.push(PackageFile {
+                file: file
+                    .clone()
+                    .strip_prefix(tmp_prefix)
+                    .unwrap_or(file)
+                    .to_path_buf(),
+                linked_dsos: file_dsos.into_iter().collect(),
+                shared_libraries: dylib.libraries.clone().iter().map(PathBuf::from).collect(),
+            });
         } else {
             if !SharedObject::test_file(file)? {
                 continue;
             }
             let so = SharedObject::new(file)?;
-            for lib in so.libraries {
-                let libpath = PathBuf::from("lib").join(lib);
+            let mut file_dsos = Vec::new();
+            for lib in so.libraries.iter().map(PathBuf::from) {
+                let libpath = PathBuf::from("lib").join(&lib);
                 if let Some(package) = path_to_package_map.get(&libpath) {
                     if let Some(nature) = package_to_nature_map.get(package) {
                         // Only take shared libraries into account.
                         if nature == &PackageNature::DSOLibrary {
-                            dsos.push(package);
+                            file_dsos.push((lib, package.clone()));
                         }
                     }
                 }
             }
-        }
-    }
-
-    for package in &dsos {
-        let package_name = package.as_normalized().to_string();
-        // If the package that we are linking against does not exist in run
-        // dependencies then it is "underlinking".
-        if let Some(package_pos) = run_dependencies.iter().position(|v| v == &package_name) {
-            run_dependencies.remove(package_pos);
-        } else if dynamic_linking
-            .missing_dso_allowlist()
-            .map(|v| v.is_match(&package_name))
-            .unwrap_or(false)
-        {
-            tracing::warn!(
-                "{package_name} is missing in run dependencies, \
-            yet it is included in the allow list. Skipping..."
-            );
-        } else if dynamic_linking.error_on_overdepending() {
-            return Err(LinkingCheckError::Underlinking { package_name });
-        } else {
-            tracing::warn!("Underlinking against {package_name}");
-        }
-    }
-
-    // If there are any unused run dependencies then it is "overlinking".
-    if !run_dependencies.is_empty() {
-        if dynamic_linking.error_on_overlinking() {
-            return Err(LinkingCheckError::Overlinking {
-                packages: run_dependencies.join(","),
+            package_files.push(PackageFile {
+                file: file
+                    .clone()
+                    .strip_prefix(tmp_prefix)
+                    .unwrap_or(file)
+                    .to_path_buf(),
+                linked_dsos: file_dsos.into_iter().collect(),
+                shared_libraries: so.libraries.iter().map(PathBuf::from).collect(),
             });
-        } else {
-            tracing::warn!("Overlinking against {}", run_dependencies.join(","));
+        }
+    }
+
+    tracing::trace!("Package files: {:#?}", package_files);
+    tracing::trace!(
+        "Resolved run dependencies: {:#?}",
+        resolved_run_dependencies
+    );
+
+    for package in package_files.iter() {
+        package.pretty_print();
+        // If the package that we are linking against does not exist in run
+        // dependencies then it is "overlinking".
+        for shared_library in package.shared_libraries.iter() {
+            if package.linked_dsos.get(shared_library).is_some() {
+                continue;
+            } else if dynamic_linking
+                .missing_dso_allowlist()
+                .map(|v| v.is_match(shared_library))
+                .unwrap_or(false)
+            {
+                tracing::warn!(
+                    "{shared_library:?} is missing in run dependencies for {:?}, \
+                    yet it is included in the allow list. Skipping...",
+                    package.file
+                );
+            } else if dynamic_linking.error_on_overlinking() {
+                return Err(LinkingCheckError::Overlinking {
+                    package: shared_library.clone(),
+                    file: package.file.clone(),
+                });
+            } else {
+                tracing::warn!(
+                    "Overlinking against {shared_library:?} for {:?}",
+                    package.file
+                );
+            }
+        }
+    }
+
+    // If there are any unused run dependencies then it is "overdepending".
+    for run_dependency in resolved_run_dependencies.iter() {
+        let linked_libraries: Vec<(PathBuf, String)> = package_files
+            .iter()
+            .map(|package| {
+                (
+                    package.file.clone(),
+                    package
+                        .linked_dsos
+                        .values()
+                        .map(|v| v.as_source().to_string())
+                        .collect(),
+                )
+            })
+            .collect();
+        if let Some((file, _)) = linked_libraries
+            .into_iter()
+            .find(|(_, l)| !l.contains(run_dependency))
+        {
+            if dynamic_linking.error_on_overdepending() {
+                return Err(LinkingCheckError::Overdepending {
+                    package: PathBuf::from(run_dependency),
+                    file,
+                });
+            } else {
+                tracing::warn!("Overdepending against {run_dependency} for {file:?}");
+            }
         }
     }
 

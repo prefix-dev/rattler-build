@@ -100,7 +100,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         }
     }
 
-    linking_checks(output, &binaries)?;
+    linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())
 }

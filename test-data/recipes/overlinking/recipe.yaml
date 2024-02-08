@@ -12,9 +12,10 @@ source:
 
 build:
   script:
-    - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-    - cmake --build build --config Release
-    - cmake --install build --prefix ${PREFIX}
+    - mkdir -p build
+    - cd build
+    - cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PREFIX
+    - ninja install
   dynamic_linking:
     overdepending_behavior: ignore
     overlinking_behavior: error
@@ -24,12 +25,9 @@ requirements:
     - ${{ compiler('c') }}
     - ninja
     - cmake
-  host:
     - zlib
-  run:
-    - yaml
-    - curl
 
 tests:
   - script:
       - zlink
+      - ldd $PREFIX/bin/zlink
