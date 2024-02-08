@@ -3,12 +3,13 @@ use globset::GlobSet;
 use goblin::mach::Mach;
 use memmap2::MmapMut;
 use scroll::Pread;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use crate::post_process::relink::{RelinkError, Relinker};
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
 
@@ -16,60 +17,25 @@ use crate::utils::to_lexical_absolute;
 #[derive(Debug)]
 pub struct Dylib {
     /// Path to the dylib
-    pub path: PathBuf,
-    /// ID of the dylib (encoded)
-    pub id: Option<PathBuf>,
-    /// rpaths in the dlib
-    pub rpaths: Vec<PathBuf>,
+    path: PathBuf,
     /// all dependencies of the dylib
-    pub libraries: Vec<PathBuf>,
+    libraries: HashSet<PathBuf>,
+    /// rpaths in the dlib
+    rpaths: Vec<PathBuf>,
+    /// ID of the dylib (encoded)
+    id: Option<PathBuf>,
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum RelinkError {
-    #[error("failed to run install_name_tool")]
-    InstallNameToolFailed,
-
-    #[error(
-        "failed to find install_name_tool: please install xcode / install_name_tool on your system"
-    )]
-    InstallNameToolNotFound(#[from] which::Error),
-
-    #[error("failed to read or write MachO file: {0}")]
-    IoError(#[from] std::io::Error),
-
-    #[error("failed to strip prefix from path: {0}")]
-    StripPrefixError(#[from] std::path::StripPrefixError),
-
-    #[error("failed to parse MachO file: {0}")]
-    ParseMachOError(#[from] goblin::error::Error),
-
-    #[error("filetype not handled")]
-    FileTypeNotHandled,
-
-    #[error("could not read string from MachO file: {0}")]
-    ReadStringError(#[from] scroll::Error),
-
-    #[error("failed to get relative path from {from} to {to}")]
-    PathDiffFailed { from: PathBuf, to: PathBuf },
-
-    #[error("failed to relink dylib with builtin relink (new path is longer than old path)")]
-    BuiltinRelinkFailed,
-
-    #[error("shared library has no parent directory")]
-    NoParentDir,
-}
-
-impl Dylib {
+impl Relinker for Dylib {
     /// only parse the magic number of a file and check if it
     /// is a Mach-O file
-    pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
+    fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
         let mut buf: [u8; 4] = [0; 4];
         match file.read_exact(&mut buf) {
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
 
         let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
@@ -81,7 +47,7 @@ impl Dylib {
     }
 
     /// parse the Mach-O file and extract all relevant information
-    pub fn new(path: &Path) -> Result<Self, RelinkError> {
+    fn new(path: &Path) -> Result<Self, RelinkError> {
         let data = fs::read(path)?;
 
         match goblin::mach::Mach::parse(&data)? {
@@ -100,9 +66,13 @@ impl Dylib {
         }
     }
 
+    /// Returns the shared libraries contained in the file.
+    fn libraries(&self) -> HashSet<PathBuf> {
+        self.libraries.clone()
+    }
+
     /// Find libraries in the dylib and resolve them by taking into account the rpaths
-    #[allow(dead_code)]
-    pub fn resolve_libraries(
+    fn resolve_libraries(
         &self,
         prefix: &Path,
         encoded_prefix: &Path,
@@ -132,7 +102,7 @@ impl Dylib {
     }
 
     /// Resolve the rpath and replace `@loader_path` with the path of the dylib
-    pub fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
+    fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
         // get self path in "encoded prefix"
         let self_path =
             encoded_prefix.join(self.path.strip_prefix(prefix).expect("dylib not in prefix"));
@@ -168,7 +138,7 @@ impl Dylib {
     /// * `dylib_path` - Path to the dylib to modify
     /// * `prefix` - The prefix of the file (usually a temporary directory)
     /// * `encoded_prefix` - The prefix of the file as encoded in the dylib at build time (e.g. the host prefix)
-    pub fn relink(
+    fn relink(
         &self,
         prefix: &Path,
         encoded_prefix: &Path,

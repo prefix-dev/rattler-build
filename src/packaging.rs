@@ -18,8 +18,6 @@ mod metadata;
 pub use file_finder::{Files, TempFiles};
 pub use metadata::create_prefix_placeholder;
 
-use crate::linux;
-use crate::macos;
 use crate::metadata::Output;
 use crate::package_test::write_test_files;
 use crate::post_process;
@@ -54,12 +52,6 @@ pub enum PackagingError {
     #[error("Failed to parse version {0}")]
     VersionParseError(#[from] rattler_conda_types::ParseVersionError),
 
-    #[error("Failed to relink ELF file: {0}")]
-    LinuxRelinkError(#[from] linux::link::RelinkError),
-
-    #[error("Failed to relink MachO file: {0}")]
-    MacOSRelinkError(#[from] macos::link::RelinkError),
-
     #[error("Relink error: {0}")]
     RelinkError(#[from] crate::post_process::relink::RelinkError),
 
@@ -70,7 +62,7 @@ pub enum PackagingError {
     CannotCreateEntryPoint(String),
 
     #[error("Linking check error: {0}")]
-    LinkingCheckError(#[from] crate::post_process::LinkingCheckError),
+    LinkingCheckError(#[from] crate::post_process::checks::LinkingCheckError),
 
     #[error("Failed to compile Python bytecode: {0}")]
     PythonCompileError(String),
