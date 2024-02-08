@@ -5,9 +5,7 @@
 use std::{fmt, hash::Hash, ops};
 
 use indexmap::IndexMap;
-use marked_yaml::loader::LoaderOptions;
-use marked_yaml::Span;
-use marked_yaml::{loader::parse_yaml_with_options, types::MarkedScalarNode};
+use marked_yaml::{types::MarkedScalarNode, Span};
 
 use crate::{
     _partialerror,
@@ -18,7 +16,9 @@ use crate::{
     },
 };
 
-use super::{HasSpan, MappingNode, Node, ScalarNode, SequenceNode, SequenceNodeInternal};
+use super::{
+    parse_yaml, HasSpan, MappingNode, Node, ScalarNode, SequenceNode, SequenceNodeInternal,
+};
 
 /// A span-marked new Conda Recipe YAML node
 ///
@@ -71,11 +71,7 @@ impl RenderedNode {
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
     pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
-        let options = LoaderOptions {
-            error_on_duplicate_keys: true,
-        };
-        let yaml = parse_yaml_with_options(init_span_index, src, options)
-            .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
+        let yaml = parse_yaml(init_span_index, src)?;
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 

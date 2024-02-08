@@ -59,6 +59,17 @@ pub enum Node {
     Null(ScalarNode),
 }
 
+/// Parse YAML from a string and return a Node representing the content.
+pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<marked_yaml::Node, ParsingError> {
+    let options = LoaderOptions {
+        error_on_duplicate_keys: true,
+    };
+    let yaml = parse_yaml_with_options(init_span_index, src, options)
+        .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
+
+    Ok(yaml)
+}
+
 impl Node {
     /// Parse YAML from a string and return a Node representing
     /// the content.
@@ -73,11 +84,7 @@ impl Node {
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
     pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
-        let options = LoaderOptions {
-            error_on_duplicate_keys: true,
-        };
-        let yaml = parse_yaml_with_options(init_span_index, src, options)
-            .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
+        let yaml = parse_yaml(init_span_index, src)?;
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 
