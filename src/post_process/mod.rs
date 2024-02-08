@@ -1,19 +1,19 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt,
-    path::PathBuf,
-};
-
-use crate::{
-    linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
-};
-use rattler_conda_types::{PackageName, PrefixRecord};
-
-use crate::metadata::Output;
-
 pub mod package_nature;
 pub mod python;
 pub mod relink;
+
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
+
+use crate::metadata::Output;
+use crate::{
+    linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
+};
+
+use owo_colors::*;
+use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
 pub enum LinkingCheckError {
@@ -40,24 +40,42 @@ struct PackageFile {
     pub shared_libraries: Vec<PathBuf>,
 }
 
-impl fmt::Display for PackageFile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "[{}] links against:", self.file.display())?;
-        for (library, package) in &self.linked_dsos {
-            writeln!(
-                f,
-                " -> {} (from {})",
-                library.display(),
-                package.as_source()
-            )?;
+impl PackageFile {
+    fn pretty_print(&self) {
+        let mut linked_libraries = Vec::new();
+        self.shared_libraries.iter().for_each(|shared_library| {
+            linked_libraries.push((shared_library, self.linked_dsos.get(shared_library)));
+        });
+        if linked_libraries.is_empty() {
+            return;
         }
-        Ok(())
+        println!("\n[{}] links against:", self.file.display().white().bold());
+        for (i, (library, package)) in linked_libraries.iter().enumerate() {
+            println!(
+                " {} {}{}",
+                if i != linked_libraries.len() - 1 {
+                    "├─"
+                } else {
+                    "└─"
+                },
+                if package.is_some() {
+                    library.display().green().to_string()
+                } else {
+                    library.display().red().to_string()
+                },
+                package
+                    .map(|v| format!(" (from {})", v.as_normalized().italic()))
+                    .unwrap_or_default()
+            );
+        }
+        println!();
     }
 }
 
 pub fn linking_checks(
     output: &Output,
     new_files: &HashSet<PathBuf>,
+    tmp_prefix: &Path,
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
 
@@ -102,7 +120,6 @@ pub fn linking_checks(
     }
 
     let host_prefix = &output.build_configuration.directories.host_prefix;
-
     tracing::trace!("Path-package map: {:#?}", path_to_package_map);
     tracing::trace!("Package-nature map: {:#?}", package_to_nature_map);
 
@@ -131,7 +148,11 @@ pub fn linking_checks(
                 }
             }
             package_files.push(PackageFile {
-                file: file.clone(),
+                file: file
+                    .clone()
+                    .strip_prefix(&tmp_prefix)
+                    .unwrap_or(file)
+                    .to_path_buf(),
                 linked_dsos: file_dsos.into_iter().collect(),
                 shared_libraries: dylib.libraries.clone().iter().map(PathBuf::from).collect(),
             });
@@ -153,7 +174,11 @@ pub fn linking_checks(
                 }
             }
             package_files.push(PackageFile {
-                file: file.clone(),
+                file: file
+                    .clone()
+                    .strip_prefix(&tmp_prefix)
+                    .unwrap_or(file)
+                    .to_path_buf(),
                 linked_dsos: file_dsos.into_iter().collect(),
                 shared_libraries: so.libraries.iter().map(PathBuf::from).collect(),
             });
@@ -167,8 +192,7 @@ pub fn linking_checks(
     );
 
     for package in package_files.iter() {
-        println!("\n{}\n", package);
-
+        package.pretty_print();
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
         for shared_library in package.shared_libraries.iter() {

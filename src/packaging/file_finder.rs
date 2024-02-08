@@ -16,6 +16,7 @@ use super::{file_mapper, PackagingError};
 
 /// This struct keeps a record of all the files that are new in the prefix (i.e. not present in the previous
 /// conda environment).
+#[derive(Debug)]
 pub struct Files {
     /// The files that are new in the prefix
     pub new_files: HashSet<PathBuf>,
@@ -25,6 +26,7 @@ pub struct Files {
 
 /// This struct keeps a record of all the files that are moved into a temporary directory
 /// for further post-processing (before they are packaged into a tarball).
+#[derive(Debug)]
 pub struct TempFiles {
     /// The files that are copied to the temporary directory
     pub files: HashSet<PathBuf>,
