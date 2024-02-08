@@ -5,7 +5,7 @@ expression: err
   × Failed to parse recipe
 
 Error:   × Parsing: failed to parse SPDX license: invalid character(s)
-   ╭─[6:1]
+   ╭─[7:22]
  6 │         about:
  7 │             license: MIT/X derivate
    ·                      ───────┬──────

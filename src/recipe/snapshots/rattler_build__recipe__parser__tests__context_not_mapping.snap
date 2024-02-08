@@ -5,7 +5,7 @@ expression: err
   × Failed to parse recipe
 
 Error:   × Parsing: expected a mapping.
-   ╭─[1:1]
+   ╭─[2:18]
  1 │ 
  2 │         context: "not-mapping"
    ·                  ──────┬──────

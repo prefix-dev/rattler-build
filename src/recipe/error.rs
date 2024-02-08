@@ -210,6 +210,12 @@ impl fmt::Display for ErrorKind {
 
                 write!(f, "failed to parse YAML: {}", e.description())
             }
+            ErrorKind::YamlParsing(LoadError::DuplicateKey(_)) => {
+                write!(f, "failed to parse YAML: duplicate key.")
+            }
+            ErrorKind::YamlParsing(_) => {
+                write!(f, "failed to parse YAML.")
+            }
             ErrorKind::ExpectedMapping => write!(f, "expected a mapping."),
             ErrorKind::ExpectedScalar => write!(f, "expected a scalar value."),
             ErrorKind::ExpectedSequence => write!(f, "expected a sequence."),
@@ -359,6 +365,7 @@ pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Pars
             marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
             marked_yaml::LoadError::UnexpectedAnchor(_) => "unexpected anchor here",
             marked_yaml::LoadError::UnexpectedTag(_) => "unexpected tag here",
+            marked_yaml::LoadError::DuplicateKey(_) => "duplicate key here",
             _ => "here",
         })
     )
@@ -367,10 +374,9 @@ pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Pars
 /// Convert a [`marked_yaml::Marker`] to a [`SourceSpan`].
 pub(super) fn marker_to_span(src: &str, mark: marked_yaml::Marker) -> SourceSpan {
     let start = SourceOffset::from_location(src, mark.line(), mark.column());
-
     SourceSpan::new(
         start,
-        SourceOffset::from(find_length(src, start)), //::from_location(src, mark.line(), mark.column()),
+        find_length(src, start)
     )
 }
 
@@ -383,6 +389,8 @@ pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
         MappingKeyMustBeScalar(m) => *m,
         UnexpectedTag(m) => *m,
         ScanError(m, _) => *m,
+        DuplicateKey(m) => m.key.span().start().cloned().unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
+        _ => marked_yaml::Marker::new(0, 0, 0),
     }
 }
 
@@ -425,7 +433,7 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
         }
     };
 
-    SourceSpan::new(start, SourceOffset::from(length))
+    SourceSpan::new(start, length)
 }
 
 #[allow(dead_code)]
