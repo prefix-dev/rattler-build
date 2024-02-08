@@ -150,7 +150,7 @@ pub fn linking_checks(
             package_files.push(PackageFile {
                 file: file
                     .clone()
-                    .strip_prefix(&tmp_prefix)
+                    .strip_prefix(tmp_prefix)
                     .unwrap_or(file)
                     .to_path_buf(),
                 linked_dsos: file_dsos.into_iter().collect(),
@@ -176,7 +176,7 @@ pub fn linking_checks(
             package_files.push(PackageFile {
                 file: file
                     .clone()
-                    .strip_prefix(&tmp_prefix)
+                    .strip_prefix(tmp_prefix)
                     .unwrap_or(file)
                     .to_path_buf(),
                 linked_dsos: file_dsos.into_iter().collect(),
