@@ -12,7 +12,6 @@ use crate::{
     linux::link::SharedObject, macos::link::Dylib, post_process::package_nature::PackageNature,
 };
 
-use owo_colors::*;
 use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
@@ -49,7 +48,7 @@ impl PackageFile {
         if linked_libraries.is_empty() {
             return;
         }
-        println!("\n[{}] links against:", self.file.display().white().bold());
+        println!("\n[{}] links against:", console::style(self.file.display()).white().bold());
         for (i, (library, package)) in linked_libraries.iter().enumerate() {
             println!(
                 " {} {}{}",
@@ -59,12 +58,12 @@ impl PackageFile {
                     "└─"
                 },
                 if package.is_some() {
-                    library.display().green().to_string()
+                    console::style(library.display()).green().to_string()
                 } else {
-                    library.display().red().to_string()
+                    console::style(library.display()).red().to_string()
                 },
                 package
-                    .map(|v| format!(" (from {})", v.as_normalized().italic()))
+                    .map(|v| format!(" (from {})", console::style(v.as_normalized()).italic()))
                     .unwrap_or_default()
             );
         }

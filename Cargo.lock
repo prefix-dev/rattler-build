@@ -2563,7 +2563,6 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "os_pipe",
- "owo-colors",
  "pathdiff",
  "petgraph",
  "rattler",
