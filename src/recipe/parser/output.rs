@@ -3,12 +3,14 @@
 //! The reason for this is that the `outputs` field is a list of mappings, and
 //! each mapping can have its own `package`, `source`, `build`, `requirements`,
 //! `test`, and `about` fields.
-//!
-//! (GrayJack): I think that the best way to do the merges are in the original Node
 
 use crate::{
     _partialerror,
-    recipe::{custom_yaml::Node, error::ErrorKind, ParsingError},
+    recipe::{
+        custom_yaml::{parse_yaml, Node},
+        error::ErrorKind,
+        ParsingError,
+    },
 };
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
@@ -18,9 +20,7 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 7] = [
 
 /// Retrieve all outputs from the recipe source (YAML)
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
-    let root_node = marked_yaml::parse_yaml(0, src)
-        .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
-
+    let root_node = parse_yaml(0, src)?;
     let root_map = root_node.as_mapping().ok_or_else(|| {
         ParsingError::from_partial(
             src,

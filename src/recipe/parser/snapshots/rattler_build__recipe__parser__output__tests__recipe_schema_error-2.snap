@@ -3,7 +3,7 @@ source: src/recipe/parser/output.rs
 expression: find_outputs_from_src(&src).unwrap_err()
 ---
   × Parsing: invalid field `requirements`.
-   ╭─[4:1]
+   ╭─[5:1]
  4 │ 
  5 │ requirements:
    · ──────┬─────

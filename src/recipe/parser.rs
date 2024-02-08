@@ -362,6 +362,15 @@ mod tests {
     }
 
     #[test]
+    fn duplicate_keys_error() {
+        let recipe =
+            include_str!("../../test-data/recipes/test-parsing/recipe_duplicate_keys.yaml");
+        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
+        let err: ParseErrors = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
     fn jinja_sequence() {
         let recipe = include_str!("../../test-data/recipes/test-parsing/recipe_inline_jinja.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
