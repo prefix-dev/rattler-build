@@ -48,7 +48,10 @@ impl PackageFile {
         if linked_libraries.is_empty() {
             return;
         }
-        println!("\n[{}] links against:", console::style(self.file.display()).white().bold());
+        println!(
+            "\n[{}] links against:",
+            console::style(self.file.display()).white().bold()
+        );
         for (i, (library, package)) in linked_libraries.iter().enumerate() {
             println!(
                 " {} {}{}",

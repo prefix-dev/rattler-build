@@ -374,10 +374,7 @@ pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> Pars
 /// Convert a [`marked_yaml::Marker`] to a [`SourceSpan`].
 pub(super) fn marker_to_span(src: &str, mark: marked_yaml::Marker) -> SourceSpan {
     let start = SourceOffset::from_location(src, mark.line(), mark.column());
-    SourceSpan::new(
-        start,
-        find_length(src, start)
-    )
+    SourceSpan::new(start, find_length(src, start))
 }
 
 /// Get the [`marked_yaml::Marker`] from a [`marked_yaml::LoadError`].
@@ -389,7 +386,12 @@ pub(super) fn marker(err: &marked_yaml::LoadError) -> marked_yaml::Marker {
         MappingKeyMustBeScalar(m) => *m,
         UnexpectedTag(m) => *m,
         ScanError(m, _) => *m,
-        DuplicateKey(m) => m.key.span().start().cloned().unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
+        DuplicateKey(m) => m
+            .key
+            .span()
+            .start()
+            .cloned()
+            .unwrap_or_else(|| marked_yaml::Marker::new(0, 0, 0)),
         _ => marked_yaml::Marker::new(0, 0, 0),
     }
 }

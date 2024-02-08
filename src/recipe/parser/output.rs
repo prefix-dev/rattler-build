@@ -6,6 +6,8 @@
 //!
 //! (GrayJack): I think that the best way to do the merges are in the original Node
 
+use marked_yaml::loader::{parse_yaml_with_options, LoaderOptions};
+
 use crate::{
     _partialerror,
     recipe::{custom_yaml::Node, error::ErrorKind, ParsingError},
@@ -18,7 +20,10 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 7] = [
 
 /// Retrieve all outputs from the recipe source (YAML)
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
-    let root_node = marked_yaml::parse_yaml(0, src)
+    let options = LoaderOptions {
+        error_on_duplicate_keys: true,
+    };
+    let root_node = parse_yaml_with_options(0, src, options)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
 
     let root_map = root_node.as_mapping().ok_or_else(|| {

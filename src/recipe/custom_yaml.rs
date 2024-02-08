@@ -5,6 +5,7 @@ use core::fmt::Display;
 use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
 
 use indexmap::{IndexMap, IndexSet};
+use marked_yaml::loader::{parse_yaml_with_options, LoaderOptions};
 use marked_yaml::{types::MarkedScalarNode, Span};
 use url::Url;
 
@@ -72,7 +73,10 @@ impl Node {
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
     pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
-        let yaml = marked_yaml::parse_yaml(init_span_index, src)
+        let options = LoaderOptions {
+            error_on_duplicate_keys: true,
+        };
+        let yaml = parse_yaml_with_options(init_span_index, src, options)
             .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
