@@ -3,8 +3,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::post_process::{package_nature::PackageNature, relink};
 use crate::{metadata::Output, post_process::relink::RelinkError};
+use crate::{
+    post_process::{package_nature::PackageNature, relink},
+    render::resolved_dependencies::DependencyInfo,
+};
 
 use globset::Glob;
 use rattler_conda_types::{PackageName, PrefixRecord};
@@ -131,6 +134,13 @@ pub fn perform_linking_checks(
         .run
         .depends
         .iter()
+        .filter(|v| {
+            if let DependencyInfo::RunExport { from, .. } = v {
+                from != &String::from("build")
+            } else {
+                true
+            }
+        })
         .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
         .collect();
 
@@ -214,7 +224,6 @@ pub fn perform_linking_checks(
         "Resolved run dependencies: {:#?}",
         resolved_run_dependencies
     );
-    tracing::trace!("System libraries: {:#?}", system_libs);
 
     for package in package_files.iter() {
         package.pretty_print();
