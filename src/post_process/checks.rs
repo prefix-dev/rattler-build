@@ -200,7 +200,6 @@ pub fn perform_linking_checks(
                     console::style(package.as_normalized()).italic()
                 );
                 continue;
-
             // Check if the library is one of the system libraries (i.e. comes from sysroot).
             } else if system_libs.iter().any(|v| v.file_name() == lib.file_name()) {
                 println!(
@@ -208,7 +207,6 @@ pub fn perform_linking_checks(
                     console::style(lib.display()).black().bright()
                 );
                 continue;
-
             // Check if the package itself has the shared library.
             } else if package_files.iter().any(|package| {
                 lib.file_name()
