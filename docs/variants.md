@@ -154,3 +154,92 @@ requirements:
   run:
   - libcurl >=8,<9
 ```
+
+## Prioritizing variants
+
+You might produce multiple variants for a package, but want to define a _priority_ for a given variant.
+The variant with the highest priority would be the default package that is selected by the resolver.
+
+There are two mechanisms to make this possible: `mutex` packages and the `down_prioritize_variant` option in the recipe.
+
+### The "down_prioritize_variant" option
+
+!!! note
+    It is not always necessary to use the `down_prioritize_variant` option - only if the solver has no other way to
+    prefer a given variant. For example, if you have a package that has multiple variants for different Python versions,
+    the solver will automatically prefer the variant with the highest Python version.
+
+The `down_prioritize_variant` option allows you to specify a variant that should be _down-prioritized_. For example:
+
+```yaml
+build:
+  variant_config:
+    use_keys:
+      # use cuda from the variant config, e.g. to build multiple CUDA variants
+      - cuda
+    down_prioritize_variant: ${{ -1 if cuda else 0}}  # this will down-prioritize the cuda variant versus other variants of the package
+```
+
+### Mutex packages
+
+Another way to make sure the right variants are selected are "mutex" packages. A mutex package is a package that is
+mutually exclusive. We use the fact that only one package of a given name can be installed at a time (the solver has to choose).
+
+A mutex package might be useful to make sure that all packages that depend on BLAS are compiled against the same BLAS implementation.
+The mutex package will serve the purpose that "openblas" and "mkl" can never be installed at the same time.
+
+We could define a BLAS mutex package like this:
+
+```yaml title="variant_config.yaml"
+blas_variant:
+  - "openblas"
+  - "mkl"
+```
+
+And then the `recipe.yaml` for the `mutex` package could look like this:
+
+```yaml title="recipe.yaml"
+package:
+  name: blas_mutex
+  version: 1.0
+
+build:
+  string: ${{ blas_variant }}
+  variant_config:
+    # make sure that `openblas` is preferred over `mkl`
+    down_prioritize_variant: ${{ -1 if blas_variant == "mkl" else 0}}
+```
+
+This will create two package: `blas_mutex-1.0-openblas` and `blas_mutex-1.0-mkl`.
+Only one of these packages can be installed at a time because they share the same name.
+The solver will then only select one of these two packages.
+
+The `blas` package in turn should have a `run_export` for the `blas_mutex` package, so that any package
+that links against `blas` also has a dependency on the correct `blas_mutex` package.
+
+```yaml title="recipe.yaml"
+package:
+  name: openblas
+  version: 1.0
+
+requirements:
+  # any package depending on openblas should also depend on the correct blas_mutex package
+  run_export:
+    - blas_mutex * openblas
+```
+
+And then the recipe of a package that wants to build two variants, one for `openblas` and one for `mkl` could look like this:
+
+```yaml title="recipe.yaml"
+package:
+  name: fastnumerics
+  version: 1.0
+
+requirements:
+  host:
+    # build against both openblas and mkl
+    - ${{ blas_variant }}
+  run:
+    # implicitly adds the correct blas_mutex package through run exports
+    # - blas_mutex * ${{ blas_variant }}
+```
