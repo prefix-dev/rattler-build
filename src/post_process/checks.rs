@@ -23,8 +23,8 @@ pub enum LinkingCheckError {
     #[error("Overlinking against: {package} (file: {file:?})")]
     Overlinking { package: PathBuf, file: PathBuf },
 
-    #[error("Overdepending against: {package} (file: {file:?})")]
-    Overdepending { package: PathBuf, file: PathBuf },
+    #[error("Overdepending against: {package}")]
+    Overdepending { package: PathBuf },
 
     #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
@@ -262,30 +262,23 @@ pub fn perform_linking_checks(
 
     // If there are any unused run dependencies then it is "overdepending".
     for run_dependency in resolved_run_dependencies.iter() {
-        let linked_libraries: Vec<(PathBuf, String)> = package_files
+        if !package_files
             .iter()
             .map(|package| {
-                (
-                    package.file.clone(),
-                    package
-                        .linked_dsos
-                        .values()
-                        .map(|v| v.as_source().to_string())
-                        .collect(),
-                )
+                package
+                    .linked_dsos
+                    .values()
+                    .map(|v| v.as_source().to_string())
+                    .collect::<Vec<String>>()
             })
-            .collect();
-        if let Some((file, _)) = linked_libraries
-            .into_iter()
-            .find(|(_, l)| !l.contains(run_dependency))
+            .any(|libraries| libraries.contains(run_dependency))
         {
             if dynamic_linking.error_on_overdepending() {
                 return Err(LinkingCheckError::Overdepending {
                     package: PathBuf::from(run_dependency),
-                    file,
                 });
             } else {
-                tracing::warn!("Overdepending against {run_dependency} for {file:?}");
+                tracing::warn!("Overdepending against {run_dependency}");
             }
         }
     }
