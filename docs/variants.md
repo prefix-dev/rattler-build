@@ -171,13 +171,14 @@ There are two mechanisms to make this possible: `mutex` packages and the `down_p
 
 The `down_prioritize_variant` option allows you to specify a variant that should be _down-prioritized_. For example:
 
-```yaml
+```yaml title="recipe.yaml" hl_lines="7"
 build:
   variant_config:
     use_keys:
       # use cuda from the variant config, e.g. to build multiple CUDA variants
       - cuda
-    down_prioritize_variant: ${{ -1 if cuda else 0}}  # this will down-prioritize the cuda variant versus other variants of the package
+    # this will down-prioritize the cuda variant versus other variants of the package
+    down_prioritize_variant: ${{ -1 if cuda else 0 }}
 ```
 
 ### Mutex packages
@@ -198,7 +199,7 @@ blas_variant:
 
 And then the `recipe.yaml` for the `mutex` package could look like this:
 
-```yaml title="recipe.yaml"
+```yaml title="recipe.yaml" hl_lines="6 9"
 package:
   name: blas_mutex
   version: 1.0
@@ -217,7 +218,7 @@ The solver will then only select one of these two packages.
 The `blas` package in turn should have a `run_export` for the `blas_mutex` package, so that any package
 that links against `blas` also has a dependency on the correct `blas_mutex` package.
 
-```yaml title="recipe.yaml"
+```yaml title="recipe.yaml" hl_lines="2 8"
 package:
   name: openblas
   version: 1.0
@@ -230,7 +231,7 @@ requirements:
 
 And then the recipe of a package that wants to build two variants, one for `openblas` and one for `mkl` could look like this:
 
-```yaml title="recipe.yaml"
+```yaml title="recipe.yaml" hl_lines="8"
 package:
   name: fastnumerics
   version: 1.0
