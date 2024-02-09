@@ -178,7 +178,7 @@ build:
       # use cuda from the variant config, e.g. to build multiple CUDA variants
       - cuda
     # this will down-prioritize the cuda variant versus other variants of the package
-    down_prioritize_variant: ${{ -1 if cuda else 0 }}
+    down_prioritize_variant: ${{ 1 if cuda else 0 }}
 ```
 
 ### Mutex packages
@@ -205,10 +205,10 @@ package:
   version: 1.0
 
 build:
-  string: ${{ blas_variant }}
+  string: ${{ blas_variant }}${{ hash }}_${{ build_number }}
   variant_config:
     # make sure that `openblas` is preferred over `mkl`
-    down_prioritize_variant: ${{ -1 if blas_variant == "mkl" else 0}}
+    down_prioritize_variant: ${{ 1 if blas_variant == "mkl" else 0 }}
 ```
 
 This will create two package: `blas_mutex-1.0-openblas` and `blas_mutex-1.0-mkl`.
@@ -226,7 +226,8 @@ package:
 requirements:
   # any package depending on openblas should also depend on the correct blas_mutex package
   run_export:
-    - blas_mutex * openblas
+    # Add a run export on _any_ version of the blas_mutex package whose build string starts with "openblas"
+    - blas_mutex * openblas*
 ```
 
 And then the recipe of a package that wants to build two variants, one for `openblas` and one for `mkl` could look like this:
@@ -242,5 +243,5 @@ requirements:
     - ${{ blas_variant }}
   run:
     # implicitly adds the correct blas_mutex package through run exports
-    # - blas_mutex * ${{ blas_variant }}
+    # - blas_mutex * ${{ blas_variant }}*
 ```
