@@ -518,9 +518,9 @@ fn install_name_tool(
 #[cfg(target_os = "macos")]
 mod tests {
     use std::{
+        collections::{HashMap, HashSet},
         fs,
         path::{Path, PathBuf},
-        std::collections::{HashMap, HashSet},
     };
 
     use tempfile::tempdir_in;
