@@ -1,27 +1,127 @@
 use fs_err as fs;
-use std::collections::HashSet;
-
-use rattler_conda_types::Platform;
 
 use crate::metadata::Output;
 use crate::packaging::TempFiles;
-use crate::{linux::link::SharedObject, macos::link::Dylib};
 
-use super::{linking_checks, LinkingCheckError};
+use crate::linux::link::SharedObject;
+use crate::macos::link::Dylib;
+use crate::system_tools::SystemTools;
+use globset::GlobSet;
+use rattler_conda_types::Platform;
+use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
+use thiserror::Error;
 
-#[derive(Debug, thiserror::Error)]
+use super::checks::{perform_linking_checks, LinkingCheckError};
+
+#[derive(Error, Debug)]
+#[allow(missing_docs)]
 pub enum RelinkError {
-    #[error("Error reading file: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("Error relinking shared object: {0}")]
-    SharedObject(#[from] crate::linux::link::RelinkError),
-
-    #[error("Error relinking dylib: {0}")]
-    Dylib(#[from] crate::macos::link::RelinkError),
-
-    #[error("Linking check error: {0}")]
+    #[error("linking check error: {0}")]
     LinkingCheck(#[from] LinkingCheckError),
+
+    #[error("failed to run install_name_tool")]
+    InstallNameToolFailed,
+
+    #[error("failed to find relinking tool: {0}")]
+    ToolNotFound(#[from] which::Error),
+
+    #[error("failed to read or write file: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("failed to strip prefix from path: {0}")]
+    StripPrefixError(#[from] std::path::StripPrefixError),
+
+    #[error("failed to parse dynamic file: {0}")]
+    ParseError(#[from] goblin::error::Error),
+
+    #[error("filetype not handled")]
+    FileTypeNotHandled,
+
+    #[error("could not read string from MachO file: {0}")]
+    ReadStringError(#[from] scroll::Error),
+
+    #[error("failed to get relative path from {from} to {to}")]
+    PathDiffFailed { from: PathBuf, to: PathBuf },
+
+    #[error("failed to relink with built-in relinker")]
+    BuiltinRelinkFailed,
+
+    #[error("shared library has no parent directory")]
+    NoParentDir,
+
+    #[error("failed to run patchelf")]
+    PatchElfFailed,
+
+    #[error("rpath not found in dynamic section")]
+    RpathNotFound,
+
+    #[error("unknown platform for relinking")]
+    UnknownPlatform,
+
+    #[error("unknown file format for relinking")]
+    UnknownFileFormat,
+}
+
+/// Platform specific relinker.
+pub trait Relinker {
+    /// Returns true if the file is valid (i.e. ELF or Mach-o)
+    fn test_file(path: &Path) -> Result<bool, RelinkError>
+    where
+        Self: Sized;
+
+    /// Creates a new relinker.
+    fn new(path: &Path) -> Result<Self, RelinkError>
+    where
+        Self: Sized;
+
+    /// Returns the shared libraries.
+    fn libraries(&self) -> HashSet<PathBuf>;
+
+    /// Find libraries in the shared library and resolve them by taking into account the rpaths.
+    fn resolve_libraries(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+    ) -> HashMap<PathBuf, Option<PathBuf>>;
+
+    /// Resolve the rpath with the path of the dylib.
+    fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf;
+
+    /// Relinks the file.
+    fn relink(
+        &self,
+        prefix: &Path,
+        encoded_prefix: &Path,
+        custom_rpaths: &[String],
+        rpath_allowlist: Option<&GlobSet>,
+        system_tools: &SystemTools,
+    ) -> Result<(), RelinkError>;
+}
+
+/// Returns true if the file is valid (i.e. ELF or Mach-o)
+pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkError> {
+    if platform.is_linux() {
+        SharedObject::test_file(path)
+    } else if platform.is_osx() {
+        Dylib::test_file(path)
+    } else {
+        Err(RelinkError::UnknownPlatform)
+    }
+}
+
+/// Returns the relink helper for the current platform.
+pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
+    if !is_valid_file(platform, path)? {
+        return Err(RelinkError::UnknownFileFormat);
+    }
+    if platform.is_linux() {
+        Ok(Box::new(SharedObject::new(path)?))
+    } else if platform.is_osx() {
+        Ok(Box::new(Dylib::new(path)?))
+    } else {
+        Err(RelinkError::UnknownPlatform)
+    }
 }
 
 /// Relink dynamic libraries in the given paths to be relocatable
@@ -76,20 +176,9 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         if !relocation_config.is_match(p) {
             continue;
         }
-
-        if target_platform.is_linux() && SharedObject::test_file(p)? {
-            let so = SharedObject::new(p)?;
-            so.relink(
-                tmp_prefix,
-                encoded_prefix,
-                &rpaths,
-                rpath_allowlist,
-                &output.system_tools,
-            )?;
-            binaries.insert(p.clone());
-        } else if target_platform.is_osx() && Dylib::test_file(p)? {
-            let dylib = Dylib::new(p)?;
-            dylib.relink(
+        if is_valid_file(target_platform, p)? {
+            let relinker = get_relinker(target_platform, p)?;
+            relinker.relink(
                 tmp_prefix,
                 encoded_prefix,
                 &rpaths,
@@ -100,7 +189,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         }
     }
 
-    linking_checks(output, &binaries, tmp_prefix)?;
+    perform_linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())
 }

@@ -13,6 +13,7 @@ use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
+use crate::post_process::relink::{RelinkError, Relinker};
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
 
@@ -20,63 +21,32 @@ use crate::utils::to_lexical_absolute;
 #[derive(Debug)]
 pub struct SharedObject {
     /// Path to the shared object
-    pub path: PathBuf,
+    path: PathBuf,
     /// Libraries that this shared object depends on
-    pub libraries: HashSet<String>,
+    libraries: HashSet<PathBuf>,
     /// RPATH entries
-    pub rpaths: Vec<String>,
+    rpaths: Vec<String>,
     /// RUNPATH entries
-    pub runpaths: Vec<String>,
+    runpaths: Vec<String>,
     /// Whether the shared object is dynamically linked
-    pub has_dynamic: bool,
+    has_dynamic: bool,
 }
 
-/// Possible relinking error.
-#[derive(thiserror::Error, Debug)]
-pub enum RelinkError {
-    #[error("failed to get relative path from {from} to {to}")]
-    PathDiffFailed { from: PathBuf, to: PathBuf },
-
-    #[error("failed to get parent directory")]
-    NoParentDir,
-
-    #[error("failed to run patchelf")]
-    PatchElfFailed,
-
-    #[error("failed to relink with built-in relinker")]
-    BuiltinRelinkFailed,
-
-    #[error("failed to find patchelf: please install patchelf on your system")]
-    PatchElfNotFound(#[from] which::Error),
-
-    #[error("failed to read or write elf file: {0}")]
-    IoError(#[from] std::io::Error),
-
-    #[error("failed to strip prefix from path: {0}")]
-    StripPrefixError(#[from] std::path::StripPrefixError),
-
-    #[error("failed to parse elf file: {0}")]
-    ParseElfError(#[from] goblin::error::Error),
-
-    #[error("rpath not found in dynamic section")]
-    RpathNotFound,
-}
-
-impl SharedObject {
+impl Relinker for SharedObject {
     /// Check if the file is an ELF file by reading the first 4 bytes
-    pub fn test_file(path: &Path) -> Result<bool, std::io::Error> {
+    fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
         let mut signature: [u8; 4] = [0; 4];
         match file.read_exact(&mut signature) {
             Ok(_) => {}
             Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
         Ok(ELFMAG.iter().eq(signature.iter()))
     }
 
     /// Create a new shared object from a path
-    pub fn new(path: &Path) -> Result<Self, RelinkError> {
+    fn new(path: &Path) -> Result<Self, RelinkError> {
         let mut buffer = Vec::new();
         let mut file = File::open(path).expect("Failed to open the DLL file");
         file.read_to_end(&mut buffer)
@@ -85,16 +55,20 @@ impl SharedObject {
 
         Ok(Self {
             path: path.to_path_buf(),
-            libraries: elf.libraries.iter().map(|s| s.to_string()).collect(),
+            libraries: elf.libraries.iter().map(PathBuf::from).collect(),
             rpaths: elf.rpaths.iter().map(|s| s.to_string()).collect(),
             runpaths: elf.runpaths.iter().map(|s| s.to_string()).collect(),
             has_dynamic: elf.dynamic.is_some(),
         })
     }
 
+    /// Returns the shared libraries contained in the file.
+    fn libraries(&self) -> HashSet<PathBuf> {
+        self.libraries.clone()
+    }
+
     /// Resolve the libraries, taking into account the rpath / runpath of the binary
-    #[allow(dead_code)]
-    pub fn resolve_libraries(
+    fn resolve_libraries(
         &self,
         prefix: &Path,
         encoded_prefix: &Path,
@@ -138,8 +112,8 @@ impl SharedObject {
         libraries
     }
 
-    /// Resolve the rpath and replace `@loader_path` with the path of the dylib
-    pub fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
+    /// Resolve the rpath with the path of the dylib
+    fn resolve_rpath(&self, rpath: &Path, prefix: &Path, encoded_prefix: &Path) -> PathBuf {
         // get self path in "encoded prefix"
         let self_path = encoded_prefix.join(
             self.path
@@ -159,7 +133,7 @@ impl SharedObject {
     /// Find all RPATH and RUNPATH entries and replace them with the encoded prefix.
     ///
     /// If the rpath is outside of the prefix, it is removed.
-    pub fn relink(
+    fn relink(
         &self,
         prefix: &Path,
         encoded_prefix: &Path,
@@ -244,7 +218,7 @@ impl SharedObject {
         final_rpaths = final_rpaths.into_iter().unique().collect();
 
         // run builtin relink. if it fails, try patchelf
-        if let Err(e) = relink(&self.path, &final_rpaths) {
+        if let Err(e) = builtin_relink(&self.path, &final_rpaths) {
             tracing::warn!(
                 "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
                 &self.path.display(),
@@ -292,7 +266,7 @@ fn call_patchelf(
 }
 
 /// Returns the binary parsing context for the given ELF binary.
-fn ctx(object: &Elf) -> goblin::container::Ctx {
+fn get_context(object: &Elf) -> goblin::container::Ctx {
     let container = if object.is_64 {
         goblin::container::Container::Big
     } else {
@@ -313,7 +287,7 @@ fn ctx(object: &Elf) -> goblin::container::Ctx {
 /// - if the binary has both, a RUNPATH and a RPATH, we delete the RUNPATH
 /// - if the binary has only a RUNPATH, we turn the RUNPATH into an RPATH
 /// - if the binary has only a RPATH, we just rewrite the RPATH
-fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
+fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
     let new_rpath = new_rpath.iter().map(|p| p.to_string_lossy()).join(":");
 
     let file = std::fs::OpenOptions::new()
@@ -417,7 +391,7 @@ fn relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkError> {
             .find(|header| header.p_type == goblin::elf::program_header::PT_DYNAMIC)
             .map(|header| header.p_offset)
             .ok_or(RelinkError::BuiltinRelinkFailed)? as usize;
-        let ctx = ctx(&object);
+        let ctx = get_context(&object);
         for d in new_dynamic {
             data_mut.pwrite_with::<goblin::elf::dynamic::Dyn>(d, offset, ctx)?;
             offset += goblin::elf::dynamic::Dyn::size_with(&ctx);
@@ -548,7 +522,7 @@ mod test {
         let object = SharedObject::new(&binary_path)?;
         assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
 
-        super::relink(
+        super::builtin_relink(
             &binary_path,
             &[
                 PathBuf::from("$ORIGIN/../lib"),
@@ -580,7 +554,7 @@ mod test {
         let object = SharedObject::new(&binary_path)?;
         assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
 
-        super::relink(
+        super::builtin_relink(
             &binary_path,
             &[
                 PathBuf::from("$ORIGIN/../lib"),
