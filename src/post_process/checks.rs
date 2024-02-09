@@ -151,9 +151,7 @@ pub fn perform_linking_checks(
                     shared_libraries: relinker.libraries(),
                 });
             }
-            Err(RelinkError::IoError(e)) => {
-                tracing::error!("Relinker error: {e}");
-            }
+            Err(RelinkError::UnknownFileFormat) => {}
             Err(e) => return Err(LinkingCheckError::SharedObject(e.to_string())),
         }
     }

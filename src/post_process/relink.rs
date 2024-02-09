@@ -58,6 +58,9 @@ pub enum RelinkError {
 
     #[error("unknown platform for relinking")]
     UnknownPlatform,
+
+    #[error("unknown file format for relinking")]
+    UnknownFileFormat,
 }
 
 /// Platform specific relinker.
@@ -98,10 +101,18 @@ pub trait Relinker {
 
 /// Returns the relink helper for the current platform.
 pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
-    if platform.is_linux() && SharedObject::test_file(path)? {
-        Ok(Box::new(SharedObject::new(path)?))
-    } else if platform.is_osx() && Dylib::test_file(path)? {
-        Ok(Box::new(Dylib::new(path)?))
+    if platform.is_linux() {
+        if SharedObject::test_file(path)? {
+            Ok(Box::new(SharedObject::new(path)?))
+        } else {
+            Err(RelinkError::UnknownFileFormat)
+        }
+    } else if platform.is_osx() {
+        if Dylib::test_file(path)? {
+            Ok(Box::new(Dylib::new(path)?))
+        } else {
+            Err(RelinkError::UnknownFileFormat)
+        }
     } else {
         Err(RelinkError::UnknownPlatform)
     }
