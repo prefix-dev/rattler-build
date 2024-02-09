@@ -75,7 +75,7 @@ build:
     ignore_keys:
       - python
       - numpy
-    down_prioritize_variant: 5
+    down_prioritize_variant: -5
 
   prefix_detection:
     force_file_type:
