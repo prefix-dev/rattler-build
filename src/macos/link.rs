@@ -518,19 +518,19 @@ fn install_name_tool(
 #[cfg(target_os = "macos")]
 mod tests {
     use std::{
-        collections::HashMap,
         fs,
         path::{Path, PathBuf},
+        std::collections::{HashMap, HashSet},
     };
 
     use tempfile::tempdir_in;
 
+    use super::{install_name_tool, RelinkError};
+    use crate::post_process::relink::Relinker;
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,
     };
-
-    use super::{install_name_tool, RelinkError};
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
@@ -670,7 +670,7 @@ mod tests {
             path: PathBuf::from("/foo/prefix/bar.dylib"),
             id: None,
             rpaths: vec![PathBuf::from("@loader_path/../lib")],
-            libraries: vec![],
+            libraries: HashSet::new(),
         };
 
         let prefix = PathBuf::from("/foo/prefix");
