@@ -582,7 +582,7 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert!(output.contains("Linking check error: Overlinking against"));
+        assert!(output.contains("linking check error: Overlinking against"));
     }
 
     #[test]
@@ -597,7 +597,7 @@ mod tests {
         );
         assert!(!rattler_build.status.success());
         let output = String::from_utf8(rattler_build.stdout).unwrap();
-        assert!(output.contains("Linking check error: Overdepending against"));
+        assert!(output.contains("linking check error: Overdepending against"));
     }
 
     #[test]

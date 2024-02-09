@@ -17,7 +17,7 @@ use super::checks::{perform_linking_checks, LinkingCheckError};
 #[derive(Error, Debug)]
 #[allow(missing_docs)]
 pub enum RelinkError {
-    #[error("failed to perform linking checks: {0}")]
+    #[error("linking check error: {0}")]
     LinkingCheck(#[from] LinkingCheckError),
 
     #[error("failed to run install_name_tool")]

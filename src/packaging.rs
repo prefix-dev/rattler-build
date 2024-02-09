@@ -61,7 +61,7 @@ pub enum PackagingError {
     #[error("could not create python entry point: {0}")]
     CannotCreateEntryPoint(String),
 
-    #[error("Linking check error: {0}")]
+    #[error("linking check error: {0}")]
     LinkingCheckError(#[from] crate::post_process::checks::LinkingCheckError),
 
     #[error("Failed to compile Python bytecode: {0}")]
