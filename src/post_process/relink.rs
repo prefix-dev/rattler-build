@@ -65,7 +65,7 @@ pub enum RelinkError {
 
 /// Platform specific relinker.
 pub trait Relinker {
-    /// Returns true if the file is a valid (i.e. ELF or Mach-o)
+    /// Returns true if the file is valid (i.e. ELF or Mach-o)
     fn test_file(path: &Path) -> Result<bool, RelinkError>
     where
         Self: Sized;
@@ -99,20 +99,26 @@ pub trait Relinker {
     ) -> Result<(), RelinkError>;
 }
 
+/// Returns true if the file is valid (i.e. ELF or Mach-o)
+pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkError> {
+    if platform.is_linux() {
+        SharedObject::test_file(path)
+    } else if platform.is_osx() {
+        Dylib::test_file(path)
+    } else {
+        Err(RelinkError::UnknownPlatform)
+    }
+}
+
 /// Returns the relink helper for the current platform.
 pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>, RelinkError> {
+    if !is_valid_file(platform, path)? {
+        return Err(RelinkError::UnknownFileFormat);
+    }
     if platform.is_linux() {
-        if SharedObject::test_file(path)? {
-            Ok(Box::new(SharedObject::new(path)?))
-        } else {
-            Err(RelinkError::UnknownFileFormat)
-        }
+        Ok(Box::new(SharedObject::new(path)?))
     } else if platform.is_osx() {
-        if Dylib::test_file(path)? {
-            Ok(Box::new(Dylib::new(path)?))
-        } else {
-            Err(RelinkError::UnknownFileFormat)
-        }
+        Ok(Box::new(Dylib::new(path)?))
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -170,15 +176,17 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         if !relocation_config.is_match(p) {
             continue;
         }
-        let relinker = get_relinker(target_platform, p)?;
-        relinker.relink(
-            tmp_prefix,
-            encoded_prefix,
-            &rpaths,
-            rpath_allowlist,
-            &output.system_tools,
-        )?;
-        binaries.insert(p.clone());
+        if is_valid_file(target_platform, p)? {
+            let relinker = get_relinker(target_platform, p)?;
+            relinker.relink(
+                tmp_prefix,
+                encoded_prefix,
+                &rpaths,
+                rpath_allowlist,
+                &output.system_tools,
+            )?;
+            binaries.insert(p.clone());
+        }
     }
 
     perform_linking_checks(output, &binaries, tmp_prefix)?;

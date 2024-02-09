@@ -151,7 +151,9 @@ pub fn perform_linking_checks(
                     shared_libraries: relinker.libraries(),
                 });
             }
-            Err(RelinkError::UnknownFileFormat) => {}
+            Err(RelinkError::UnknownFileFormat) => {
+                continue;
+            }
             Err(e) => return Err(LinkingCheckError::SharedObject(e.to_string())),
         }
     }
