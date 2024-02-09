@@ -6,6 +6,7 @@ use std::{
 use crate::post_process::{package_nature::PackageNature, relink};
 use crate::{metadata::Output, post_process::relink::RelinkError};
 
+use globset::Glob;
 use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
@@ -21,6 +22,9 @@ pub enum LinkingCheckError {
 
     #[error("Overdepending against: {package} (file: {file:?})")]
     Overdepending { package: PathBuf, file: PathBuf },
+
+    #[error("failed to build glob from pattern")]
+    GlobError(#[from] globset::Error),
 }
 
 #[derive(Debug)]
@@ -28,6 +32,7 @@ struct PackageFile {
     pub file: PathBuf,
     pub linked_dsos: HashMap<PathBuf, PackageName>,
     pub shared_libraries: HashSet<PathBuf>,
+    pub system_libs: HashSet<PathBuf>,
 }
 
 impl PackageFile {
@@ -45,24 +50,70 @@ impl PackageFile {
         );
         for (i, (library, package)) in linked_libraries.iter().enumerate() {
             println!(
-                " {} {}{}",
+                " {} {}",
                 if i != linked_libraries.len() - 1 {
                     "├─"
                 } else {
                     "└─"
                 },
-                if package.is_some() {
-                    console::style(library.display()).green().to_string()
+                if let Some(package) = package {
+                    format!(
+                        "{} (from {})",
+                        console::style(library.display()).green(),
+                        console::style(package.as_normalized()).italic()
+                    )
+                } else if self
+                    .system_libs
+                    .iter()
+                    .any(|v| v.file_name() == library.file_name())
+                {
+                    console::style(library.display())
+                        .black()
+                        .bright()
+                        .to_string()
                 } else {
                     console::style(library.display()).red().to_string()
                 },
-                package
-                    .map(|v| format!(" (from {})", console::style(v.as_normalized()).italic()))
-                    .unwrap_or_default()
             );
         }
         println!();
     }
+}
+
+/// Returns the system libraries found in sysroot.
+fn find_system_libs(output: &Output) -> Result<HashSet<PathBuf>, LinkingCheckError> {
+    let mut system_libs = HashSet::new();
+    if let Some(sysroot_package) = output
+        .finalized_dependencies
+        .clone()
+        .expect("failed to get the finalized dependencies")
+        .build
+        .and_then(|deps| {
+            deps.resolved.into_iter().find(|v| {
+                v.file_name.starts_with(&format!(
+                    "sysroot_{}",
+                    output.build_configuration.target_platform
+                ))
+            })
+        })
+    {
+        let sysroot_path = output
+            .build_configuration
+            .directories
+            .build_prefix
+            .join("conda-meta")
+            .join(sysroot_package.file_name.replace("conda", "json"));
+        let record = PrefixRecord::from_path(sysroot_path)?;
+        let so_glob = Glob::new("*.so*")?.compile_matcher();
+        for file in record.files {
+            if let Some(file_name) = file.file_name() {
+                if so_glob.is_match(file_name) {
+                    system_libs.insert(file);
+                }
+            }
+        }
+    }
+    Ok(system_libs)
 }
 
 pub fn perform_linking_checks(
@@ -72,7 +123,17 @@ pub fn perform_linking_checks(
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
 
-    // collect all json files in prefix / conda-meta
+    let system_libs = find_system_libs(output)?;
+    let resolved_run_dependencies: Vec<String> = output
+        .finalized_dependencies
+        .clone()
+        .expect("failed to get the finalized dependencies")
+        .run
+        .depends
+        .iter()
+        .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
+        .collect();
+
     let conda_meta = output
         .build_configuration
         .directories
@@ -82,16 +143,6 @@ pub fn perform_linking_checks(
     if !conda_meta.exists() {
         return Ok(());
     }
-
-    let resolved_run_dependencies: Vec<String> = output
-        .finalized_dependencies
-        .clone()
-        .unwrap()
-        .run
-        .depends
-        .iter()
-        .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
-        .collect();
 
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
@@ -113,7 +164,6 @@ pub fn perform_linking_checks(
     }
 
     let host_prefix = &output.build_configuration.directories.host_prefix;
-    tracing::trace!("Path-package map: {:#?}", path_to_package_map);
     tracing::trace!("Package-nature map: {:#?}", package_to_nature_map);
 
     // check all DSOs and what they are linking
@@ -149,6 +199,7 @@ pub fn perform_linking_checks(
                         .to_path_buf(),
                     linked_dsos: file_dsos.into_iter().collect(),
                     shared_libraries: relinker.libraries(),
+                    system_libs: system_libs.clone(),
                 });
             }
             Err(RelinkError::UnknownFileFormat) => {
@@ -163,13 +214,18 @@ pub fn perform_linking_checks(
         "Resolved run dependencies: {:#?}",
         resolved_run_dependencies
     );
+    tracing::trace!("System libraries: {:#?}", system_libs);
 
     for package in package_files.iter() {
         package.pretty_print();
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
         for shared_library in package.shared_libraries.iter() {
-            if package.linked_dsos.get(shared_library).is_some() {
+            if package.linked_dsos.get(shared_library).is_some()
+                || system_libs
+                    .iter()
+                    .any(|v| v.file_name() == shared_library.file_name())
+            {
                 continue;
             } else if dynamic_linking
                 .missing_dso_allowlist()
