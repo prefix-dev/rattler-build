@@ -35,52 +35,6 @@ struct PackageFile {
     pub file: PathBuf,
     pub linked_dsos: HashMap<PathBuf, PackageName>,
     pub shared_libraries: HashSet<PathBuf>,
-    pub system_libs: HashSet<PathBuf>,
-}
-
-impl PackageFile {
-    fn pretty_print(&self) {
-        let mut linked_libraries = Vec::new();
-        self.shared_libraries.iter().for_each(|shared_library| {
-            linked_libraries.push((shared_library, self.linked_dsos.get(shared_library)));
-        });
-        if linked_libraries.is_empty() {
-            return;
-        }
-        println!(
-            "\n[{}] links against:",
-            console::style(self.file.display()).white().bold()
-        );
-        for (i, (library, package)) in linked_libraries.iter().enumerate() {
-            println!(
-                " {} {}",
-                if i != linked_libraries.len() - 1 {
-                    "├─"
-                } else {
-                    "└─"
-                },
-                if let Some(package) = package {
-                    format!(
-                        "{} (from {})",
-                        console::style(library.display()).green(),
-                        console::style(package.as_normalized()).italic()
-                    )
-                } else if self
-                    .system_libs
-                    .iter()
-                    .any(|v| v.file_name() == library.file_name())
-                {
-                    console::style(library.display())
-                        .black()
-                        .bright()
-                        .to_string()
-                } else {
-                    console::style(library.display()).red().to_string()
-                },
-            );
-        }
-        println!();
-    }
 }
 
 /// Returns the system libraries found in sysroot.
@@ -209,7 +163,6 @@ pub fn perform_linking_checks(
                         .to_path_buf(),
                     linked_dsos: file_dsos.into_iter().collect(),
                     shared_libraries: relinker.libraries(),
-                    system_libs: system_libs.clone(),
                 });
             }
             Err(RelinkError::UnknownFileFormat) => {
@@ -225,39 +178,82 @@ pub fn perform_linking_checks(
         resolved_run_dependencies
     );
 
+    let mut warnings = Vec::new();
     for package in package_files.iter() {
-        package.pretty_print();
+        println!(
+            "\n[{}] links against:",
+            console::style(package.file.display()).white().bold()
+        );
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
-        for shared_library in package.shared_libraries.iter() {
-            if package.linked_dsos.get(shared_library).is_some()
-                || system_libs
-                    .iter()
-                    .any(|v| v.file_name() == shared_library.file_name())
-            {
+        for (i, lib) in package.shared_libraries.iter().enumerate() {
+            let connector = if i != package.shared_libraries.len() - 1 {
+                " ├─"
+            } else {
+                " └─"
+            };
+            //  Check if the package has the library linked.
+            if let Some(package) = package.linked_dsos.get(lib) {
+                println!(
+                    "{connector} {} ({})",
+                    console::style(lib.display()).green(),
+                    console::style(package.as_normalized()).italic()
+                );
+                continue;
+
+            // Check if the library is one of the system libraries (i.e. comes from sysroot).
+            } else if system_libs.iter().any(|v| v.file_name() == lib.file_name()) {
+                println!(
+                    "{connector} {} (system)",
+                    console::style(lib.display()).black().bright()
+                );
+                continue;
+
+            // Check if the package itself has the shared library.
+            } else if package_files.iter().any(|package| {
+                lib.file_name()
+                    .and_then(|shared_library| {
+                        package.file.file_name().map(|v| {
+                            v.to_string_lossy()
+                                .contains(&*shared_library.to_string_lossy())
+                        })
+                    })
+                    .unwrap_or_default()
+            }) {
+                println!(
+                    "{connector} {} (package)",
+                    console::style(lib.display()).blue()
+                );
                 continue;
             } else if dynamic_linking
                 .missing_dso_allowlist()
-                .map(|v| v.is_match(shared_library))
+                .map(|v| v.is_match(lib))
                 .unwrap_or(false)
             {
-                tracing::warn!(
-                    "{shared_library:?} is missing in run dependencies for {:?}, \
+                warnings.push(format!(
+                    "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",
                     package.file
-                );
+                ));
             } else if dynamic_linking.error_on_overlinking() {
+                println!(" └─ {}\n", console::style(lib.display()).red());
                 return Err(LinkingCheckError::Overlinking {
-                    package: shared_library.clone(),
+                    package: lib.clone(),
                     file: package.file.clone(),
                 });
             } else {
-                tracing::warn!(
-                    "Overlinking against {shared_library:?} for {:?}",
+                warnings.push(format!(
+                    "Overlinking against {lib:?} for {:?}",
                     package.file
-                );
+                ));
             }
+            println!("{connector} {}", console::style(lib.display()).red());
         }
+        println!();
+    }
+
+    for warning in warnings {
+        tracing::warn!("{warning}");
     }
 
     // If there are any unused run dependencies then it is "overdepending".
