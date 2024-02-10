@@ -81,6 +81,13 @@ pub fn perform_linking_checks(
     let dynamic_linking = output.recipe.build().dynamic_linking();
 
     let system_libs = find_system_libs(output)?;
+    // let system_libs = if output.build_configuration.target_platform.is_linux() {
+    //     find_system_libs(output)?
+    // } else if output.build_configuration.target_platform.is_osx() {
+    //     macos::system_libraries();
+    // } else {
+    //     return Ok(());
+    // };
     let resolved_run_dependencies: Vec<String> = output
         .finalized_dependencies
         .clone()

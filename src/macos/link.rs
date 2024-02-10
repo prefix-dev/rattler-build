@@ -1,5 +1,5 @@
 //! Relink a dylib to use relative paths for rpaths
-use globset::GlobSet;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use goblin::mach::Mach;
 use memmap2::MmapMut;
 use scroll::Pread;
@@ -12,6 +12,55 @@ use std::path::{Path, PathBuf};
 use crate::post_process::relink::{RelinkError, Relinker};
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
+
+pub fn system_libraries() -> GlobSet {
+    let sysroots = vec!["/usr/lib", "/opt/X11", "/System/Library/Frameworks"];
+    let globs = vec![
+        "/System/Library/Frameworks/Accelerate.framework/*",
+        "/System/Library/Frameworks/AGL.framework/*",
+        "/System/Library/Frameworks/AppKit.framework/*",
+        "/System/Library/Frameworks/ApplicationServices.framework/*",
+        "/System/Library/Frameworks/AudioToolbox.framework/*",
+        "/System/Library/Frameworks/AudioUnit.framework/*",
+        "/System/Library/Frameworks/AVFoundation.framework/*",
+        "/System/Library/Frameworks/CFNetwork.framework/*",
+        "/System/Library/Frameworks/Carbon.framework/*",
+        "/System/Library/Frameworks/Cocoa.framework/*",
+        "/System/Library/Frameworks/CoreAudio.framework/*",
+        "/System/Library/Frameworks/CoreFoundation.framework/*",
+        "/System/Library/Frameworks/CoreGraphics.framework/*",
+        "/System/Library/Frameworks/CoreMedia.framework/*",
+        "/System/Library/Frameworks/CoreBluetooth.framework/*",
+        "/System/Library/Frameworks/CoreMIDI.framework/*",
+        "/System/Library/Frameworks/CoreMedia.framework/*",
+        "/System/Library/Frameworks/CoreServices.framework/*",
+        "/System/Library/Frameworks/CoreText.framework/*",
+        "/System/Library/Frameworks/CoreVideo.framework/*",
+        "/System/Library/Frameworks/CoreWLAN.framework/*",
+        "/System/Library/Frameworks/DiskArbitration.framework/*",
+        "/System/Library/Frameworks/Foundation.framework/*",
+        "/System/Library/Frameworks/GameController.framework/*",
+        "/System/Library/Frameworks/GLKit.framework/*",
+        "/System/Library/Frameworks/ImageIO.framework/*",
+        "/System/Library/Frameworks/IOBluetooth.framework/*",
+        "/System/Library/Frameworks/IOKit.framework/*",
+        "/System/Library/Frameworks/IOSurface.framework/*",
+        "/System/Library/Frameworks/OpenAL.framework/*",
+        "/System/Library/Frameworks/OpenGL.framework/*",
+        "/System/Library/Frameworks/Quartz.framework/*",
+        "/System/Library/Frameworks/QuartzCore.framework/*",
+        "/System/Library/Frameworks/Security.framework/*",
+        "/System/Library/Frameworks/StoreKit.framework/*",
+        "/System/Library/Frameworks/SystemConfiguration.framework/*",
+        "/System/Library/Frameworks/WebKit.framework/*"
+    ];
+    let mut set = GlobSetBuilder::new();
+    for g in globs {
+        let glob = Glob::new(g).unwrap();
+        set.add(glob);
+    }
+    set.build().unwrap()
+}
 
 /// A macOS dylib (Mach-O)
 #[derive(Debug)]
