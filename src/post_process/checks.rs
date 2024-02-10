@@ -104,10 +104,6 @@ pub fn perform_linking_checks(
         .host_prefix
         .join("conda-meta");
 
-    if !conda_meta.exists() {
-        return Ok(());
-    }
-
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
     for entry in conda_meta.read_dir()? {
