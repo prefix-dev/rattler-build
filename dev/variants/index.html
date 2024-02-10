@@ -313,6 +313,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../available_jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../experimental_features/" class="md-nav__link">
         
   
@@ -433,6 +452,33 @@
           <li class="md-nav__item">
   <a href="#pin-run-as-build" class="md-nav__link">
     Pin run as build
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prioritizing-variants" class="md-nav__link">
+    Prioritizing variants
+  </a>
+  
+    <nav class="md-nav" aria-label="Prioritizing variants">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-down_prioritize_variant-option" class="md-nav__link">
+    The "down_prioritize_variant" option
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mutex-packages" class="md-nav__link">
+    Mutex packages
   </a>
   
 </li>
@@ -570,6 +616,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../special_files/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Activation scripts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../internals/" class="md-nav__link">
         
   
@@ -627,6 +692,33 @@
           <li class="md-nav__item">
   <a href="#pin-run-as-build" class="md-nav__link">
     Pin run as build
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#prioritizing-variants" class="md-nav__link">
+    Prioritizing variants
+  </a>
+  
+    <nav class="md-nav" aria-label="Prioritizing variants">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-down_prioritize_variant-option" class="md-nav__link">
+    The "down_prioritize_variant" option
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mutex-packages" class="md-nav__link">
+    Mutex packages
   </a>
   
 </li>
@@ -768,6 +860,75 @@ looks like:</p>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libcurl 8.0.1 h13284</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
 </span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libcurl &gt;=8,&lt;9</span>
+</span></code></pre></div>
+<h2 id="prioritizing-variants">Prioritizing variants<a class="headerlink" href="#prioritizing-variants" title="Permanent link">#</a></h2>
+<p>You might produce multiple variants for a package, but want to define a <em>priority</em> for a given variant.
+The variant with the highest priority would be the default package that is selected by the resolver.</p>
+<p>There are two mechanisms to make this possible: <code>mutex</code> packages and the <code>down_prioritize_variant</code> option in the recipe.</p>
+<h3 id="the-down_prioritize_variant-option">The "down_prioritize_variant" option<a class="headerlink" href="#the-down_prioritize_variant-option" title="Permanent link">#</a></h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is not always necessary to use the <code>down_prioritize_variant</code> option - only if the solver has no other way to
+prefer a given variant. For example, if you have a package that has multiple variants for different Python versions,
+the solver will automatically prefer the variant with the highest Python version.</p>
+</div>
+<p>The <code>down_prioritize_variant</code> option allows you to specify a variant that should be <em>down-prioritized</em>. For example:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">variant_config</span><span class="p">:</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="nt">use_keys</span><span class="p">:</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">      </span><span class="c1"># use cuda from the variant config, e.g. to build multiple CUDA variants</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cuda</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a><span class="w">    </span><span class="c1"># this will down-prioritize the cuda variant versus other variants of the package</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="hll"><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 1 if cuda else 0 }}</span>
+</span></span></code></pre></div>
+<h3 id="mutex-packages">Mutex packages<a class="headerlink" href="#mutex-packages" title="Permanent link">#</a></h3>
+<p>Another way to make sure the right variants are selected are "mutex" packages. A mutex package is a package that is
+mutually exclusive. We use the fact that only one package of a given name can be installed at a time (the solver has to choose).</p>
+<p>A mutex package might be useful to make sure that all packages that depend on BLAS are compiled against the same BLAS implementation.
+The mutex package will serve the purpose that "openblas" and "mkl" can never be installed at the same time.</p>
+<p>We could define a BLAS mutex package like this:</p>
+<div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">blas_variant</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;openblas&quot;</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;mkl&quot;</span>
+</span></code></pre></div>
+<p>And then the <code>recipe.yaml</code> for the <code>mutex</code> package could look like this:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blas_mutex</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="hll"><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ blas_variant }}${{ hash }}_${{ build_number }}</span>
+</span></span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="w">  </span><span class="nt">variant_config</span><span class="p">:</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="w">    </span><span class="c1"># make sure that `openblas` is preferred over `mkl`</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="hll"><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 1 if blas_variant == &quot;mkl&quot; else 0 }}</span>
+</span></span></code></pre></div>
+<p>This will create two package: <code>blas_mutex-1.0-openblas</code> and <code>blas_mutex-1.0-mkl</code>.
+Only one of these packages can be installed at a time because they share the same name.
+The solver will then only select one of these two packages.</p>
+<p>The <code>blas</code> package in turn should have a <code>run_export</code> for the <code>blas_mutex</code> package, so that any package
+that links against <code>blas</code> also has a dependency on the correct <code>blas_mutex</code> package.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="hll"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openblas</span>
+</span></span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="c1"># any package depending on openblas should also depend on the correct blas_mutex package</span>
+</span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">  </span><span class="nt">run_export</span><span class="p">:</span>
+</span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="hll"><span class="w">    </span><span class="c1"># Add a run export on _any_ version of the blas_mutex package whose build string starts with &quot;openblas&quot;</span>
+</span></span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blas_mutex * openblas*</span>
+</span></code></pre></div>
+<p>And then the recipe of a package that wants to build two variants, one for <code>openblas</code> and one for <code>mkl</code> could look like this:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fastnumerics</span>
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+</span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-16-7"><a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">    </span><span class="c1"># build against both openblas and mkl</span>
+</span><span id="__span-16-8"><a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="hll"><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ blas_variant }}</span>
+</span></span><span id="__span-16-9"><a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-16-10"><a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">    </span><span class="c1"># implicitly adds the correct blas_mutex package through run exports</span>
+</span><span id="__span-16-11"><a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">    </span><span class="c1"># - blas_mutex * ${{ blas_variant }}*</span>
 </span></code></pre></div>
 
 

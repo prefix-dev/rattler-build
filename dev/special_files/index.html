@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/rebuild/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/special_files/">
       
       
-        <link rel="prev" href="../testing/">
+        <link rel="prev" href="../package_spec/">
       
       
-        <link rel="next" href="../package_spec/">
+        <link rel="next" href="../internals/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Reproducible builds - rattler-build</title>
+        <title>Activation scripts - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Reproducible builds - rattler-build" >
+        <meta  property="og:title"  content="Activation scripts - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/rebuild.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/special_files.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/rebuild/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/special_files/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Reproducible builds - rattler-build" >
+        <meta  name="twitter:title"  content="Activation scripts - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/rebuild.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/special_files.png" >
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#rebuilding-a-package" class="md-skip">
+        <a href="#activation-scripts-and-other-special-files" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Reproducible builds
+              Activation scripts
             
           </span>
         </div>
@@ -482,29 +482,9 @@
       
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Reproducible builds
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../rebuild/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -513,53 +493,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    Usage
-  </a>
-  
-    <nav class="md-nav" aria-label="Usage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    How it works
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#how-to-check-the-reproducibility-of-a-package" class="md-nav__link">
-    How to check the reproducibility of a package
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -587,9 +520,29 @@
       
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../special_files/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Activation scripts
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -598,6 +551,40 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#activation-scripts" class="md-nav__link">
+    Activation scripts
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-link-and-pre-unlink-scripts" class="md-nav__link">
+    Post-link and pre-unlink scripts
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -648,28 +635,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    Usage
+  <a href="#activation-scripts" class="md-nav__link">
+    Activation scripts
   </a>
-  
-    <nav class="md-nav" aria-label="Usage">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#how-it-works" class="md-nav__link">
-    How it works
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-check-the-reproducibility-of-a-package" class="md-nav__link">
-    How to check the reproducibility of a package
+  <a href="#post-link-and-pre-unlink-scripts" class="md-nav__link">
+    Post-link and pre-unlink scripts
   </a>
   
 </li>
@@ -689,7 +663,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/rebuild.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/special_files.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -697,34 +671,30 @@
   
 
 
-<h1 id="rebuilding-a-package">Rebuilding a package<a class="headerlink" href="#rebuilding-a-package" title="Permanent link">#</a></h1>
-<p>The <code>rebuild</code> command allows you to rebuild a package from an <em>existing
-package</em>. The main use case is to examine if a package can be rebuilt in a
-reproducible manner. You can read more about <a href="https://reproducible-builds.org/">reproducible builds
-here</a>.</p>
-<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>rebuild<span class="w"> </span>./mypkg-0.1.0-h60d57d3_0.tar.bz2
+<h1 id="activation-scripts-and-other-special-files">Activation scripts and other special files<a class="headerlink" href="#activation-scripts-and-other-special-files" title="Permanent link">#</a></h1>
+<p>A conda package can contain "special" files in the prefix. These files are scripts that are executed during activation, installation or uninstallation process.</p>
+<p>If possible, they should be avoided since they execute arbitrary code at installation time and slow down the installation and activation process.</p>
+<h2 id="activation-scripts">Activation scripts<a class="headerlink" href="#activation-scripts" title="Permanent link">#</a></h2>
+<p>The activation scripts are executed when the environment containing the package is activated (e.g. when doing <code>micromamba activate myenv</code> or <code>pixi run ...</code>).</p>
+<p>The scripts are located in special folders:</p>
+<ul>
+<li><code>etc/conda/activate.d/{script.sh/bat}</code> - scripts in this folder are executed before the environment is activated.</li>
+<li><code>etc/conda/deactivate.d/{script.sh/bat}</code> - scripts in this folder are executed when the environment is deactivated.</li>
+</ul>
+<p>The scripts are executed in lexicographical order, so you can prefix them with numbers to control the order of execution.</p>
+<p>To add a script to the package, just make sure that you install the file in this folder, e.g. on Linux:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/activate.d
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cp<span class="w"> </span>activate-mypkg.sh<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/activate.d/10-activate-mypkg.sh
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/deactivate.d
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>cp<span class="w"> </span>deactivate-mypkg.sh<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/deactivate.d/10-deactivate-mypkg.sh
 </span></code></pre></div>
-<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h3>
-<p>The recipe is "rendered" and stored into the package. The way the recipe is
-rendered is subject to change. For the moment, the rendered recipe is stored as
-<code>info/recipe/rendered_recipe.yaml</code> file. It includes the exact package versions that
-were used at build time. When rebuilding, we use the package resolutions from
-the rendered recipe, and execute the same build script as the original package.</p>
-<p>We also take great care to sort files in a deterministic manner as well as
-erasing any time stamps. The <code>SOURCE_DATE_EPOCH</code> environment variable is set to
-the same timestamp as the original build for additional determinism (some build
-tools use this variable to set timestamps).</p>
-<h2 id="how-to-check-the-reproducibility-of-a-package">How to check the reproducibility of a package<a class="headerlink" href="#how-to-check-the-reproducibility-of-a-package" title="Permanent link">#</a></h2>
-<p>There is an excellent tool called <a href="https://diffoscope.org/">diffoscope</a> that
-allows you to compare two packages and see the differences. You can install it
-with <code>pixi</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pixi<span class="w"> </span>global<span class="w"> </span>install<span class="w"> </span>diffoscope
-</span></code></pre></div>
-<p>To compare two packages, you can use the following command:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>rebuild<span class="w"> </span>./build0.tar.bz2
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>diffoscope<span class="w"> </span>./build0.tar.bz2<span class="w"> </span>./mypkg-0.1.0-h60d57d3_0.tar.bz2
-</span></code></pre></div>
+<h2 id="post-link-and-pre-unlink-scripts">Post-link and pre-unlink scripts<a class="headerlink" href="#post-link-and-pre-unlink-scripts" title="Permanent link">#</a></h2>
+<p>The post-link and pre-unlink scripts are executed when the package is installed or uninstalled.
+They are both heavily discouraged and currently not implemented in <code>rattler</code>, <code>rattler-build</code> and <code>pixi</code>.</p>
+<p>To create a <code>post-link</code> script for your package, you need to add <code>&lt;package_name&gt;-post-link.{sh/bat}</code> to the <code>bin/</code> folder of your package.
+The same for <code>pre-unlink</code> scripts, just with the name <code>&lt;package_name&gt;-pre-unlink.{sh/bat}</code>.</p>
+<p>For example, for <code>mypkg</code>, you would add <code>mypkg-post-link.sh</code> to the <code>bin/</code> folder of your package.</p>
 
 
 
@@ -785,9 +755,9 @@ with <code>pixi</code>:</p>
           
             
             <a
-              href="../testing/"
+              href="../package_spec/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Testing packages"
+              aria-label="Previous: Package specification"
             >
               <div class="md-footer__button md-icon">
                 
@@ -798,7 +768,7 @@ with <code>pixi</code>:</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Testing packages
+                  Package specification
                 </div>
               </div>
             </a>
@@ -808,16 +778,16 @@ with <code>pixi</code>:</p>
           
             
             <a
-              href="../package_spec/"
+              href="../internals/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Package specification"
+              aria-label="Next: Internals"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Package specification
+                  Internals
                 </div>
               </div>
               <div class="md-footer__button md-icon">

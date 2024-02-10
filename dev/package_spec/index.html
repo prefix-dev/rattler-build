@@ -14,7 +14,7 @@
         <link rel="prev" href="../rebuild/">
       
       
-        <link rel="next" href="../internals/">
+        <link rel="next" href="../special_files/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -313,6 +313,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../available_jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../experimental_features/" class="md-nav__link">
         
   
@@ -537,6 +556,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#special-files-in-packages" class="md-nav__link">
+    Special files in packages
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-metadata" class="md-nav__link">
     Package metadata
   </a>
@@ -598,6 +624,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../special_files/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Activation scripts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../internals/" class="md-nav__link">
         
   
@@ -640,6 +685,13 @@
         <li class="md-nav__item">
   <a href="#package-filename" class="md-nav__link">
     Package filename
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#special-files-in-packages" class="md-nav__link">
+    Special files in packages
   </a>
   
 </li>
@@ -744,6 +796,13 @@ which is often smaller in size.</p>
 <p>A conda package conforms to the following filename:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;name&gt;-&lt;version&gt;-&lt;hash&gt;.tar.bz2 OR &lt;name&gt;-&lt;version&gt;-&lt;hash&gt;.conda
 </span></code></pre></div>
+<h2 id="special-files-in-packages">Special files in packages<a class="headerlink" href="#special-files-in-packages" title="Permanent link">#</a></h2>
+<p>There are some special files in a package:</p>
+<ul>
+<li>activation and deactivation scripts that are executed when the environment is activated or deactivated</li>
+<li>post-link and pre-unlink scripts that are executed when the package is installed or uninstalled</li>
+</ul>
+<p>You can read more about these files in the <a href="../special_files/">activation scripts and other special files</a> section.</p>
 <h2 id="package-metadata">Package metadata<a class="headerlink" href="#package-metadata" title="Permanent link">#</a></h2>
 <p>The <code>info/</code> directory contains all metadata about a package. Files in this
 location are not installed under the install prefix. Although you are free to
@@ -919,16 +978,16 @@ However, note that currently this format is still in flux and can change at any 
           
             
             <a
-              href="../internals/"
+              href="../special_files/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Internals"
+              aria-label="Next: Activation scripts"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Internals
+                  Activation scripts
                 </div>
               </div>
               <div class="md-footer__button md-icon">

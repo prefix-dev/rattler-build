@@ -14,7 +14,7 @@
         <link rel="prev" href="../highlevel/">
       
       
-        <link rel="next" href="../experimental_features/">
+        <link rel="next" href="../available_jinja/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -619,6 +619,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../available_jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../experimental_features/" class="md-nav__link">
         
   
@@ -795,6 +814,25 @@
   
   <span class="md-ellipsis">
     Package specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../special_files/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Activation scripts
   </span>
   
 
@@ -1358,7 +1396,7 @@ by rattler-build. You can disable this behavior by setting <code>use_gitignore</
 <!-- boa (conda-build) automatically determines the patch strip level. -->
 
 <h4 id="destination-path">Destination path<a class="headerlink" href="#destination-path" title="Permanent link">#</a></h4>
-<p>Within boa's work directory, you may specify a particular folder to place source
+<p>Within rattler-build's work directory, you may specify a particular folder to place source
 into. <code>rattler-build</code> will always drop you into the same folder (build
 folder/work), but it's up to you whether you want your source extracted into
 that folder, or nested deeper. This feature is particularly useful when dealing
@@ -1442,7 +1480,7 @@ scripts for different platforms.</p>
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">    </span><span class="l l-Scalar l-Scalar-Plain">python setup.py install --single-version-externally-managed --record=record.txt</span>
 </span></code></pre></div>
 <h3 id="skipping-builds">Skipping builds<a class="headerlink" href="#skipping-builds" title="Permanent link">#</a></h3>
-<p>List conditions under which boa should skip the build of this recipe.
+<p>List conditions under which rattler-build should skip the build of this recipe.
 Particularly useful for defining recipes that are platform specific. By default,
 a build is never skipped.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="nt">build</span><span class="p">:</span>
@@ -2192,16 +2230,16 @@ Features work by requiring a special build string. When compiling with features,
           
             
             <a
-              href="../experimental_features/"
+              href="../available_jinja/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Experimental features"
+              aria-label="Next: Jinja functions"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Experimental features
+                  Jinja functions
                 </div>
               </div>
               <div class="md-footer__button md-icon">

@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/available_jinja/">
       
       
+        <link rel="prev" href="../recipe_file/">
+      
+      
+        <link rel="next" href="../experimental_features/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>Jinja functions that can be used in the recipe - rattler-build</title>
+        <title>Jinja functions - rattler-build</title>
       
     
     
@@ -55,7 +59,7 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Jinja functions that can be used in the recipe - rattler-build" >
+        <meta  property="og:title"  content="Jinja functions - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
@@ -71,7 +75,7 @@
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Jinja functions that can be used in the recipe - rattler-build" >
+        <meta  name="twitter:title"  content="Jinja functions - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
@@ -137,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Jinja functions that can be used in the recipe
+              Jinja functions
             
           </span>
         </div>
@@ -299,6 +303,134 @@
   
 
       </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#functions" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compiler-function" class="md-nav__link">
+    The compiler function
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pin_subpackage-function" class="md-nav__link">
+    The pin_subpackage function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pin_compatible-function" class="md-nav__link">
+    The pin_compatible function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-cdt-function" class="md-nav__link">
+    The cdt function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-hash-variable" class="md-nav__link">
+    The hash variable
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-version_to_buildstring-function" class="md-nav__link">
+    The version_to_buildstring function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-env-object" class="md-nav__link">
+    The env object
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-jinja-filters" class="md-nav__link">
+    Default Jinja filters
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -499,6 +631,25 @@
   
   
     <li class="md-nav__item">
+      <a href="../special_files/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Activation scripts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../internals/" class="md-nav__link">
         
   
@@ -532,6 +683,83 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#functions" class="md-nav__link">
+    Functions
+  </a>
+  
+    <nav class="md-nav" aria-label="Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-compiler-function" class="md-nav__link">
+    The compiler function
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pin_subpackage-function" class="md-nav__link">
+    The pin_subpackage function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-pin_compatible-function" class="md-nav__link">
+    The pin_compatible function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-cdt-function" class="md-nav__link">
+    The cdt function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-hash-variable" class="md-nav__link">
+    The hash variable
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-version_to_buildstring-function" class="md-nav__link">
+    The version_to_buildstring function
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-env-object" class="md-nav__link">
+    The env object
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-jinja-filters" class="md-nav__link">
+    Default Jinja filters
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -555,15 +783,58 @@
 
 <h1 id="jinja-functions-that-can-be-used-in-the-recipe">Jinja functions that can be used in the recipe<a class="headerlink" href="#jinja-functions-that-can-be-used-in-the-recipe" title="Permanent link">#</a></h1>
 <p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the recipe.</p>
+<h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
+<h3 id="the-compiler-function">The compiler function<a class="headerlink" href="#the-compiler-function" title="Permanent link">#</a></h3>
+<p>The compiler function can be used to put together a compiler that works for the current platform and the compilation "target_platform".
+The syntax looks like: <code>${{ compiler('c') }}</code> where <code>'c'</code> signifies the programming language that is used.</p>
+<p>This function evaluates to <code>&lt;compiler&gt;_&lt;target_platform&gt; &lt;compiler_version&gt;</code>.
+For example, when compiling <em>on</em> linux and to linux-64, this function evaluates to <code>gcc_linux-64</code>.</p>
+<p>The values can be influenced by the <code>variant_configuration</code>.
+The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with influence, for example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">c_compiler</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">c_compiler_version</span><span class="p">:</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
+</span></code></pre></div>
+<p>Would select the <code>clang</code> compiler in version <code>9.0</code>. Note that the final output will still contain the <code>target_platform</code>, so that the full compiler will read <code>clang_linux-64 9.0</code> when compiling with <code>--target-platform linux-64</code>.</p>
+<h2 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h2>
 <ul>
-<li><code>${{ compiler('c') }}</code></li>
 <li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x.x") }}</code> creates a pin to another output in the recipe.</li>
 </ul>
-<!-- `pin_compatible` (not implemented yet). -->
-
+<h2 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h2>
+<ul>
+<li><code>pin_compatible</code> pins a package in the run requirements based on the resolved package of the <code>host</code> or <code>build</code> section.</li>
+</ul>
+<h2 id="the-cdt-function">The <code>cdt</code> function<a class="headerlink" href="#the-cdt-function" title="Permanent link">#</a></h2>
+<ul>
+<li><code>${{ cdt("mypkg") }}</code> creates a cross dependency to another output in the recipe.</li>
+</ul>
+<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># on x86_64 system</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-x86_64</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># on aarch64 system</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
+</span></code></pre></div>
+<h2 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h2>
 <ul>
 <li><code>${{ hash }}</code> this is the variant hash and is useful in the build string computation</li>
+</ul>
+<h2 id="the-version_to_buildstring-function">The <code>version_to_buildstring</code> function<a class="headerlink" href="#the-version_to_buildstring-function" title="Permanent link">#</a></h2>
+<ul>
 <li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant to a build string (removes <code>.</code> and takes only the first two elements of the version).</li>
+</ul>
+<h2 id="the-env-object">The <code>env</code> object<a class="headerlink" href="#the-env-object" title="Permanent link">#</a></h2>
+<p>You can use the <code>env</code> object to retrieve environment variables and forward them to your build script. There are two ways to do this:</p>
+<ul>
+<li><code>${{ env.get("MY_ENV_VAR") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or throw an error if it is not set.</li>
+<li><code>${{ env.get_default("MY_ENV_VAR", "default_value") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or <code>"default_value"</code> if it is not set.</li>
+</ul>
+<p>You can also check for existence of an environment variable:</p>
+<ul>
+<li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
+</ul>
+<h2 id="default-jinja-filters">Default Jinja filters<a class="headerlink" href="#default-jinja-filters" title="Permanent link">#</a></h2>
+<ul>
 <li>default jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into characters: <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version }}.tar.gz</code>.
   A list of all the builtin filters can be found under: <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions">Link</a></li>
 </ul>
@@ -615,6 +886,60 @@
 <footer class="md-footer">
     <!-- Link to previous and/or next page -->
     
+      
+        
+        <nav
+          class="md-footer__inner md-grid"
+          aria-label="Footer"
+          
+        >
+
+          <!-- Link to previous page -->
+          
+            
+            <a
+              href="../recipe_file/"
+              class="md-footer__link md-footer__link--prev"
+              aria-label="Previous: Recipe file"
+            >
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+              </div>
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Previous
+                </span>
+                <div class="md-ellipsis">
+                  Recipe file
+                </div>
+              </div>
+            </a>
+          
+
+          <!-- Link to next page -->
+          
+            
+            <a
+              href="../experimental_features/"
+              class="md-footer__link md-footer__link--next"
+              aria-label="Next: Experimental features"
+            >
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Next
+                </span>
+                <div class="md-ellipsis">
+                  Experimental features
+                </div>
+              </div>
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+              </div>
+            </a>
+          
+        </nav>
       
     
 
