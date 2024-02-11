@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use thiserror::Error;
 
-use crate::recipe::parser::{Dependency, PinSubpackage};
+use crate::recipe::parser::Dependency;
 use crate::{
     _partialerror,
     hash::HashInfo,
@@ -403,12 +403,15 @@ impl VariantConfig {
             let noarch_type = parsed_recipe.build().noarch();
 
             // add in any host and build dependencies
-            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
+            used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
                 match dep {
                     Dependency::Spec(spec) => spec
                         .name
                         .as_ref()
                         .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::PinSubpackage(pin) => {
+                        Some(pin.pin_value().name.as_normalized().to_string())
+                    }
                     _ => None,
                 }
             }));
@@ -450,7 +453,7 @@ impl VariantConfig {
         }
 
         // Add an edge for each pair of outputs where one uses a variable defined by the other
-        for (output, (node, used_vars, _)) in &outputs_map {
+        for (output, (_, used_vars, _)) in &outputs_map {
             let output_node_index = *node_indices
                 .get(output)
                 .expect("unreachable, we insert keys in the loop above");
@@ -458,36 +461,6 @@ impl VariantConfig {
                 if outputs_map.contains_key(used_var) {
                     let defining_output_node_index = *node_indices
                         .get(used_var)
-                        .expect("unreachable, we insert keys in the loop above");
-                    // self referencing is possible, but not a cycle
-                    if defining_output_node_index == output_node_index {
-                        continue;
-                    }
-                    graph.add_edge(defining_output_node_index, output_node_index, ());
-                }
-            }
-            // We also add some more edges for run dependencies
-            let parsed_recipe = Recipe::from_node(node, selector_config.clone()).unwrap();
-            let run_dependencies = parsed_recipe
-                .requirements()
-                .run
-                .iter()
-                .filter_map(|dep| match dep {
-                    Dependency::Spec(spec) => spec
-                        .name
-                        .as_ref()
-                        .and_then(|name| name.as_normalized().to_string().into()),
-                    Dependency::PinSubpackage(pin_sub) => {
-                        Some(pin_sub.pin_value().name.as_normalized().to_string())
-                    }
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            println!("{:?}", run_dependencies);
-            for used_var in run_dependencies {
-                if outputs_map.contains_key(&used_var) {
-                    let defining_output_node_index = *node_indices
-                        .get(&used_var)
                         .expect("unreachable, we insert keys in the loop above");
                     // self referencing is possible, but not a cycle
                     if defining_output_node_index == output_node_index {
@@ -562,7 +535,6 @@ impl VariantConfig {
             })
             .collect::<HashSet<_>>();
 
-        println!("{:?}", all_variables);
         // also add all used variables from the outputs
         for (_, (_, _, used_vars, _)) in outputs_map.iter() {
             all_variables.extend(used_vars.clone());
@@ -1019,5 +991,35 @@ mod tests {
         config.zip_keys = None;
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
+    }
+
+    #[test]
+    fn test_order() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        for _ in 1..3 {
+            // First find all outputs from the recipe
+            let recipe_text =
+                std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
+                    .unwrap();
+            let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+            let variant_config = VariantConfig::from_files(&vec![], &selector_config).unwrap();
+            let outputs_and_variants = variant_config
+                .find_variants(&outputs, &recipe_text, &selector_config)
+                .unwrap();
+
+            // assert output order
+            let order = vec!["some-pkg-a", "some-pkg", "some_pkg"];
+            let outputs: Vec<_> = outputs_and_variants
+                .iter()
+                .map(|o| o.name.clone())
+                .collect();
+            assert_eq!(outputs, order);
+        }
     }
 }
