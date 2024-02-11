@@ -5,11 +5,15 @@
 We support shell completions through clap-complete.
 You can generate them for your shell using the `completion` command.
 
-E.g.,
+You can add the completions to your shell by adding the following to your shell's configuration file.
 
 ```sh
-rattler-build completion --shell=zsh > ${ZSH_COMPLETIONS_PATH:~/.zsh/completions}/_rattler-build
-compinit
+# For bash (add this to ~/.bashrc)
+eval "$(rattler-build completion --shell=bash)"
+# For zsh (add this to ~/.zshrc)
+eval "$(rattler-build completion --shell=zsh)"
+# For fish (add this to ~/.config/fish/config.fish)
+rattler-build completion --shell=fish | source
 ```
 
 Ensure that whereever you install the is pointed to by your FPATH (for zsh or equivalent in other shells).
@@ -21,12 +25,6 @@ build    -- Build a package
 help     -- Print this message or the help of the given subcommand(s)
 rebuild  -- Rebuild a package
 test     -- Test a package
-```
-
-Example for Fish Shell just generate the `completions.fish` and add to `~/.config/fish/completions`.
-```sh
-rattler-build completion --shell=fish > ${ZSH_COMPLETIONS_PATH:~/.config/fish/completions}/rattler-build.fish
-```
 
 ## Package format
 
@@ -38,6 +36,6 @@ For `.conda`, you can also set the `--compression-threads` flag to specify the n
 ```sh
 # default
 rattler-build build --package-format tarbz2 -r recipe/recipe.yaml
-# maximum compression
+# maximum compression with 10 threads
 rattler-build build --package-format conda:max --compression-threads 10 -r recipe/recipe.yaml
 ```
