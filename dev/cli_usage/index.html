@@ -479,13 +479,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#package-format" class="md-nav__link">
-    Package format
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -641,13 +634,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#package-format" class="md-nav__link">
-    Package format
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -675,9 +661,13 @@
 <h2 id="shell-completions">Shell Completions<a class="headerlink" href="#shell-completions" title="Permanent link">#</a></h2>
 <p>We support shell completions through clap-complete.
 You can generate them for your shell using the <code>completion</code> command.</p>
-<p>E.g.,</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>zsh<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">ZSH_COMPLETIONS_PATH</span><span class="p">:~/.zsh/completions</span><span class="si">}</span>/_rattler-build
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>compinit
+<p>You can add the completions to your shell by adding the following to your shell's configuration file.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># For bash (add this to ~/.bashrc)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>bash<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># For zsh (add this to ~/.zshrc)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>zsh<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># For fish (add this to ~/.config/fish/config.fish)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>fish<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="nb">source</span>
 </span></code></pre></div>
 <p>Ensure that whereever you install the is pointed to by your FPATH (for zsh or equivalent in other shells).
 Now you can use TAB or your configured completion key. :3</p>
@@ -686,19 +676,19 @@ Now you can use TAB or your configured completion key. :3</p>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nb">help</span><span class="w">     </span>--<span class="w"> </span>Print<span class="w"> </span>this<span class="w"> </span>message<span class="w"> </span>or<span class="w"> </span>the<span class="w"> </span><span class="nb">help</span><span class="w"> </span>of<span class="w"> </span>the<span class="w"> </span>given<span class="w"> </span>subcommand<span class="o">(</span>s<span class="o">)</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>rebuild<span class="w">  </span>--<span class="w"> </span>Rebuild<span class="w"> </span>a<span class="w"> </span>package
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="nb">test</span><span class="w">     </span>--<span class="w"> </span>Test<span class="w"> </span>a<span class="w"> </span>package
-</span></code></pre></div>
-<p>Example for Fish Shell just generate the <code>completions.fish</code> and add to <code>~/.config/fish/completions</code>.
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>completion<span class="w"> </span>--shell<span class="o">=</span>fish<span class="w"> </span>&gt;<span class="w"> </span><span class="si">${</span><span class="nv">ZSH_COMPLETIONS_PATH</span><span class="p">:~/.config/fish/completions</span><span class="si">}</span>/rattler-build.fish
-</span></code></pre></div></p>
-<h2 id="package-format">Package format<a class="headerlink" href="#package-format" title="Permanent link">#</a></h2>
-<p>You can specify the package format (either <code>.tar.bz2</code> or <code>.conda</code>) by using the <code>--package-format</code> flag.
-You can also set the compression level with <code>:&lt;level&gt;</code> after the package format. The <code>&lt;level&gt;</code> can be <code>max</code>, <code>min</code>, <code>default</code> or a number corresponding to the compression level.
-<code>.tar.bz2</code> supports compression levels between <code>1</code> and <code>9</code> while <code>.conda</code> supports compression levels between <code>-7</code> and <code>22</code>.
-For <code>.conda</code>, you can also set the <code>--compression-threads</code> flag to specify the number of threads to use for compression.</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># default</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>tarbz2<span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># maximum compression</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>conda:max<span class="w"> </span>--compression-threads<span class="w"> </span><span class="m">10</span><span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1">## Package format</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>You<span class="w"> </span>can<span class="w"> </span>specify<span class="w"> </span>the<span class="w"> </span>package<span class="w"> </span>format<span class="w"> </span><span class="o">(</span>either<span class="w"> </span><span class="sb">`</span>.tar.bz2<span class="sb">`</span><span class="w"> </span>or<span class="w"> </span><span class="sb">`</span>.conda<span class="sb">`</span><span class="o">)</span><span class="w"> </span>by<span class="w"> </span>using<span class="w"> </span>the<span class="w"> </span><span class="sb">`</span>--package-format<span class="sb">`</span><span class="w"> </span>flag.
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>You<span class="w"> </span>can<span class="w"> </span>also<span class="w"> </span><span class="nb">set</span><span class="w"> </span>the<span class="w"> </span>compression<span class="w"> </span>level<span class="w"> </span>with<span class="w"> </span><span class="sb">`</span>:&lt;level&gt;<span class="sb">`</span><span class="w"> </span>after<span class="w"> </span>the<span class="w"> </span>package<span class="w"> </span>format.<span class="w"> </span>The<span class="w"> </span><span class="sb">`</span>&lt;level&gt;<span class="sb">`</span><span class="w"> </span>can<span class="w"> </span>be<span class="w"> </span><span class="sb">`</span>max<span class="sb">`</span>,<span class="w"> </span><span class="sb">`</span>min<span class="sb">`</span>,<span class="w"> </span><span class="sb">`</span>default<span class="sb">`</span><span class="w"> </span>or<span class="w"> </span>a<span class="w"> </span>number<span class="w"> </span>corresponding<span class="w"> </span>to<span class="w"> </span>the<span class="w"> </span>compression<span class="w"> </span>level.
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="sb">`</span>.tar.bz2<span class="sb">`</span><span class="w"> </span>supports<span class="w"> </span>compression<span class="w"> </span>levels<span class="w"> </span>between<span class="w"> </span><span class="sb">`</span><span class="m">1</span><span class="sb">`</span><span class="w"> </span>and<span class="w"> </span><span class="sb">`</span><span class="m">9</span><span class="sb">`</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="sb">`</span>.conda<span class="sb">`</span><span class="w"> </span>supports<span class="w"> </span>compression<span class="w"> </span>levels<span class="w"> </span>between<span class="w"> </span><span class="sb">`</span>-7<span class="sb">`</span><span class="w"> </span>and<span class="w"> </span><span class="sb">`</span><span class="m">22</span><span class="sb">`</span>.
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>For<span class="w"> </span><span class="sb">`</span>.conda<span class="sb">`</span>,<span class="w"> </span>you<span class="w"> </span>can<span class="w"> </span>also<span class="w"> </span><span class="nb">set</span><span class="w"> </span>the<span class="w"> </span><span class="sb">`</span>--compression-threads<span class="sb">`</span><span class="w"> </span>flag<span class="w"> </span>to<span class="w"> </span>specify<span class="w"> </span>the<span class="w"> </span>number<span class="w"> </span>of<span class="w"> </span>threads<span class="w"> </span>to<span class="w"> </span>use<span class="w"> </span><span class="k">for</span><span class="w"> </span>compression.
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="sb">```</span>sh
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="c1"># default</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>tarbz2<span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="c1"># maximum compression with 10 threads</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>conda:max<span class="w"> </span>--compression-threads<span class="w"> </span><span class="m">10</span><span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
 </span></code></pre></div>
 
 
