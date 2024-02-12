@@ -942,6 +942,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "event-listener"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b72557800024fabbaa2449dd4bf24e37b93702d457a4d4f2b0dd1f0f039f20c1"
+dependencies = [
+ "concurrent-queue",
+ "parking",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "event-listener-strategy"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1564,15 +1575,6 @@ checksum = "7655c9839580ee829dfacba1d1278c2b7883e50a277ff7541299489d6bdfdc45"
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
@@ -2172,7 +2174,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b645dcde5f119c2c454a92d0dfa271a2a3b205da92e4292a68ead4bdbfde1f33"
 dependencies = [
  "heck",
- "itertools 0.12.1",
+ "itertools",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -2499,7 +2501,7 @@ dependencies = [
  "fxhash",
  "hex",
  "indexmap 2.2.2",
- "itertools 0.12.1",
+ "itertools",
  "memchr",
  "memmap2",
  "nom",
@@ -2553,7 +2555,7 @@ dependencies = [
  "indexmap 2.2.2",
  "indicatif",
  "insta",
- "itertools 0.12.1",
+ "itertools",
  "marked-yaml",
  "memmap2",
  "miette",
@@ -2612,7 +2614,7 @@ dependencies = [
  "glob",
  "hex",
  "indexmap 2.2.2",
- "itertools 0.12.1",
+ "itertools",
  "lazy-regex",
  "nom",
  "purl",
@@ -2676,7 +2678,7 @@ dependencies = [
  "dirs",
  "fslock",
  "getrandom",
- "itertools 0.12.1",
+ "itertools",
  "keyring",
  "lazy_static",
  "libc",
@@ -2700,7 +2702,7 @@ dependencies = [
  "bzip2",
  "chrono",
  "futures-util",
- "itertools 0.12.1",
+ "itertools",
  "num_cpus",
  "rattler_conda_types",
  "rattler_digest",
@@ -2731,7 +2733,7 @@ dependencies = [
  "hex",
  "humansize",
  "humantime",
- "itertools 0.12.1",
+ "itertools",
  "json-patch",
  "libc",
  "md-5",
@@ -2762,7 +2764,7 @@ version = "0.17.0"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.2.2",
- "itertools 0.12.1",
+ "itertools",
  "rattler_conda_types",
  "serde_json",
  "shlex",
@@ -2778,8 +2780,9 @@ version = "0.17.0"
 dependencies = [
  "anyhow",
  "chrono",
+ "futures",
  "hex",
- "itertools 0.12.1",
+ "itertools",
  "rattler_conda_types",
  "rattler_digest",
  "resolvo",
@@ -2973,13 +2976,15 @@ dependencies = [
 
 [[package]]
 name = "resolvo"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acd163bc7df01195423c83a7a391fecf319ff41d3de899694a9ccb698e790b29"
+checksum = "2016584c3fd9df0fd859a7dcbc7fafdc7fdd2d87b53a576e8e63e62fad140e33"
 dependencies = [
  "bitvec",
  "elsa",
- "itertools 0.11.0",
+ "event-listener 5.0.0",
+ "futures",
+ "itertools",
  "petgraph",
  "tracing",
 ]
@@ -3044,7 +3049,7 @@ version = "0.1.0"
 dependencies = [
  "duct",
  "glob",
- "itertools 0.12.1",
+ "itertools",
  "rattler_package_streaming",
  "serde_json",
  "sha1",

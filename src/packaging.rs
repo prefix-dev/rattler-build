@@ -251,7 +251,7 @@ pub fn package_conda(
     let progress_bar = tool_configuration.multi_progress_indicator.add(
         indicatif::ProgressBar::new(0)
             .with_prefix("Compressing ")
-            .with_style(default_bytes_style().unwrap())
+            .with_style(default_bytes_style().unwrap()),
     );
 
     match packaging_settings.archive_type {
@@ -262,7 +262,7 @@ pub fn package_conda(
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
-                Some(Box::new(ProgressBar {progress_bar})),
+                Some(Box::new(ProgressBar { progress_bar })),
             )?;
         }
         ArchiveType::Conda => {
@@ -274,7 +274,7 @@ pub fn package_conda(
                 packaging_settings.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
-                Some(Box::new(ProgressBar {progress_bar})),
+                Some(Box::new(ProgressBar { progress_bar })),
             )?;
         }
     }

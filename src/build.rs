@@ -307,7 +307,8 @@ pub async fn run_build(
     )
     .into_diagnostic()?;
 
-    let (result, paths_json) = package_conda(&output, &tool_configuration, &files_after).into_diagnostic()?;
+    let (result, paths_json) =
+        package_conda(&output, &tool_configuration, &files_after).into_diagnostic()?;
 
     // We run all the package content tests
     for test in output.recipe.tests() {
