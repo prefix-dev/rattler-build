@@ -13,7 +13,7 @@ These are all found under the `build` key in the `recipe.yaml`.
 There are some options that control the inclusion of files in the final package.
 
 The `always_include_files` option can be used to include files even if they are
-already in the environment as part of some other host dependency. This is normally 
+already in the environment as part of some other host dependency. This is normally
 "clobbering" and should be used with caution (since packages should not have any overlapping files).
 
 The `always_copy_files` option can be used to copy files instead of linking them.

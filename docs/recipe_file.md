@@ -426,11 +426,11 @@ build:
 ### Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
-the package\_metadata by default. You can disable this by passing 
+the package\_metadata by default. You can disable this by passing
 `--no-include-recipe` on the command line.
 
 !!! note
-    There are many more options in the build section. These additional options control 
+    There are many more options in the build section. These additional options control
     how variants are computed, prefix replacement and more.
     See the [full build options](./build_options.md) for more information.
 
