@@ -403,12 +403,15 @@ impl VariantConfig {
             let noarch_type = parsed_recipe.build().noarch();
 
             // add in any host and build dependencies
-            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
+            used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
                 match dep {
                     Dependency::Spec(spec) => spec
                         .name
                         .as_ref()
                         .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::PinSubpackage(pin) => {
+                        Some(pin.pin_value().name.as_normalized().to_string())
+                    }
                     _ => None,
                 }
             }));
@@ -524,6 +527,9 @@ impl VariantConfig {
                     } else {
                         None
                     }
+                }
+                Dependency::PinSubpackage(pin_sub) => {
+                    Some(pin_sub.pin_value().name.as_normalized().to_string())
                 }
                 _ => None,
             })
@@ -985,5 +991,35 @@ mod tests {
         config.zip_keys = None;
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
+    }
+
+    #[test]
+    fn test_order() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        for _ in 1..3 {
+            // First find all outputs from the recipe
+            let recipe_text =
+                std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
+                    .unwrap();
+            let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+            let variant_config = VariantConfig::from_files(&vec![], &selector_config).unwrap();
+            let outputs_and_variants = variant_config
+                .find_variants(&outputs, &recipe_text, &selector_config)
+                .unwrap();
+
+            // assert output order
+            let order = vec!["some-pkg-a", "some-pkg", "some_pkg"];
+            let outputs: Vec<_> = outputs_and_variants
+                .iter()
+                .map(|o| o.name.clone())
+                .collect();
+            assert_eq!(outputs, order);
+        }
     }
 }

@@ -83,7 +83,32 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
         return Ok(vec![recipe]);
     };
 
-    // TODO: Schema
+    let mut recipe_version: Option<marked_yaml::Node> = None;
+    // If `recipe` exists in root we will use the version as default for all outputs
+    // We otherwise ignore the `recipe.name` value.
+    if let Some(recipe_mapping) = root_map
+        .get("recipe")
+        .and_then(|recipe| recipe.as_mapping())
+    {
+        // make sure that mapping only contains name and version
+        for (k, v) in recipe_mapping.iter() {
+            match k.as_str() {
+                "name" => {}
+                "version" => recipe_version = Some(v.clone()),
+                _ => {
+                    return Err(ParsingError::from_partial(
+                        src,
+                        _partialerror!(
+                            *k.span(),
+                            ErrorKind::InvalidField(k.as_str().to_string().into()),
+                            help = "recipe can only contain `name` and `version` fields"
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
     let outputs = outputs.as_sequence().ok_or_else(|| {
         ParsingError::from_partial(
             src,
@@ -107,17 +132,8 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
         // 4. merge skip values (make sure to preserve the spans)
         // Note: Make sure to preserve the spans of the original root span so the error
         // messages remain accurate and point the correct part of the original recipe src
-
         let mut root = root_map.clone();
         root.remove("outputs");
-
-        // recipe.version, if exists in root, and package.version doesn't exist in output, we will
-        // use that instead
-        // ignore recipe.name
-        let version = root
-            .get("recipe")
-            .and_then(|recipe| recipe.as_mapping())
-            .and_then(|recipe| recipe.get("version"));
 
         let mut output_node = output.clone();
 
@@ -173,7 +189,7 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
             }
         }
 
-        if let Some(version) = version {
+        if let Some(version) = recipe_version.as_ref() {
             let Some(package_map) = output_map
                 .get_mut("package")
                 .and_then(|node| node.as_mapping_mut())

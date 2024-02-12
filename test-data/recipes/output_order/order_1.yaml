@@ -1,0 +1,47 @@
+context:
+  name: some-pkg
+  name_a: ${{ name }}-a
+  version: 1.0.0
+  build_number: 0
+
+recipe:
+  name: ${{ name }}
+  version: ${{ version }}
+
+source:
+  path: ../
+
+outputs:
+  - package:
+      name: ${{ name }}
+      version: ${{ version }}
+    build:
+      noarch: python
+      number: ${{ build_number }}
+    requirements:
+      host:
+        - python >=3.10
+        - pip
+      run:
+        - ${{ pin_subpackage(name_a, min_pin="x.x.x") }}
+        - python >=3.10
+  - package:
+      name: ${{ name_a }}
+      version: ${{ version }}
+    build:
+      noarch: python
+      number: ${{ build_number }}
+    requirements:
+      host:
+        - python >=3.10
+        - pip
+      run:
+        - python >=3.10
+  - package:
+      name: ${{ name | replace('-', '_') }}
+      version: ${{ version }}
+    build:
+      noarch: generic
+    requirements:
+      run:
+        - ${{ pin_subpackage(name, exact=true) }}
