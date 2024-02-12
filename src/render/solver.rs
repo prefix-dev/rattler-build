@@ -289,7 +289,7 @@ async fn execute_transaction(
     link_pb.enable_steady_tick(Duration::from_millis(100));
 
     // Perform all transactions operations in parallel.
-    stream::iter(transaction.operations)
+    stream::iter(transaction.operations.clone())
         .map(Ok)
         .try_for_each_concurrent(50, |op| {
             let download_client = download_client.clone();
@@ -314,10 +314,7 @@ async fn execute_transaction(
         })
         .await?;
 
-    install_driver.post_process(
-        &PrefixRecord::collect_from_prefix(target_prefix)?,
-        target_prefix,
-    )?;
+    install_driver.post_process(&transaction, target_prefix)?;
 
     Ok(())
 }

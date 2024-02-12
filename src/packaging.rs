@@ -20,7 +20,8 @@ pub use metadata::create_prefix_placeholder;
 
 use crate::metadata::Output;
 use crate::package_test::write_test_files;
-use crate::post_process;
+use crate::render::solver::default_bytes_style;
+use crate::{post_process, tool_configuration};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -150,6 +151,21 @@ fn write_recipe_folder(
     Ok(files)
 }
 
+struct ProgressBar {
+    progress_bar: indicatif::ProgressBar,
+}
+
+impl rattler_package_streaming::write::ProgressBar for ProgressBar {
+    fn set_progress(&mut self, progress: u64, message: &str) {
+        self.progress_bar.set_position(progress);
+        self.progress_bar.set_message(message.to_string());
+    }
+
+    fn set_total(&mut self, total: u64) {
+        self.progress_bar.set_length(total);
+    }
+}
+
 /// Given an output and a set of new files, create a conda package.
 /// This function will copy all the files to a temporary directory and then
 /// create a conda package from that. Note that the output needs to have its
@@ -158,6 +174,7 @@ fn write_recipe_folder(
 /// The `local_channel_dir` is the path to the local channel / output directory.
 pub fn package_conda(
     output: &Output,
+    tool_configuration: &tool_configuration::Configuration,
     files: &Files,
 ) -> Result<(PathBuf, PathsJson), PackagingError> {
     let local_channel_dir = &output.build_configuration.directories.output_dir;
@@ -231,6 +248,12 @@ pub fn package_conda(
 
     tracing::info!("Compressing archive...");
 
+    let progress_bar = tool_configuration.multi_progress_indicator.add(
+        indicatif::ProgressBar::new(0)
+            .with_prefix("Compressing ")
+            .with_style(default_bytes_style().unwrap()),
+    );
+
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
@@ -239,6 +262,7 @@ pub fn package_conda(
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
                 Some(&output.build_configuration.timestamp),
+                Some(Box::new(ProgressBar { progress_bar })),
             )?;
         }
         ArchiveType::Conda => {
@@ -250,6 +274,7 @@ pub fn package_conda(
                 packaging_settings.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
+                Some(Box::new(ProgressBar { progress_bar })),
             )?;
         }
     }
