@@ -22,6 +22,12 @@ Normally, files are linked from a central cache into the environment to save spa
 that files modified in one environment will be modified in all environments. This is not always
 desirable, and in that case you can use the `always_copy_files` option.
 
+??? note "How `always_copy_files` works"
+    The `always_copy_files` option works by setting the `no_link` option in the
+    `info/paths.json` to `true` for the files in question. This means that the
+    files are copied instead of linked when the package is installed.
+
+
 ```yaml title="recipe.yaml"
 build:
   # include files even if they are already in the environment
@@ -31,6 +37,19 @@ build:
   # do not soft- or hard-link these files, but always copy them was `no_link`
   always_copy_files: [glob]
 ```
+
+!!! note "Glob patterns"
+    Glob patterns are used througout the build options to specify files. The
+    patterns are matched against the relative path of the file in the build
+    directory.
+    Patterns can contain `*` to match any number of characters, `?` to match a
+    single character, and `**` to match any number of directories.
+
+    For example:
+
+    - `*.txt` matches all files ending in `.txt`
+    - `**/*.txt` matches all files ending in `.txt` in any directory
+    - `**/test_*.txt` matches all files starting with `test_` and ending in `.txt` in any directory
 
 ## Merge build and host environments
 
@@ -140,6 +159,9 @@ software).
 If you want to stop `rattler-build` from relocating the binaries, you can set
 `binary_relocation` to `false`. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.
+
+To read more about rpaths and how rattler-build creates relocatable binary packages,
+see the [internals](internals.md) docs.
 
 If you link against some libraries (possibly even outside of the prefix, in a
 system location), then you can use the `missing_dso_allowlist` to allow linking
