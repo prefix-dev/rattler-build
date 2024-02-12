@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/available_jinja/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/build_options/">
       
       
-        <link rel="prev" href="../build_options/">
+        <link rel="prev" href="../recipe_file/">
       
       
-        <link rel="next" href="../experimental_features/">
+        <link rel="next" href="../available_jinja/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Jinja functions - rattler-build</title>
+        <title>Advanced options - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Jinja functions - rattler-build" >
+        <meta  property="og:title"  content="Advanced options - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/available_jinja.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_options.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/available_jinja/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/build_options/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Jinja functions - rattler-build" >
+        <meta  name="twitter:title"  content="Advanced options - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/available_jinja.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_options.png" >
       
     
     
@@ -101,7 +101,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#jinja-functions-that-can-be-used-in-the-recipe" class="md-skip">
+        <a href="#advanced-build-options" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Jinja functions
+              Advanced options
             
           </span>
         </div>
@@ -311,25 +311,6 @@
       
   
   
-  
-    <li class="md-nav__item">
-      <a href="../build_options/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Advanced options
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -345,7 +326,7 @@
           
   
   <span class="md-ellipsis">
-    Jinja functions
+    Advanced options
   </span>
   
 
@@ -356,7 +337,7 @@
         
   
   <span class="md-ellipsis">
-    Jinja functions
+    Advanced options
   </span>
   
 
@@ -378,70 +359,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
-    Functions
-  </a>
-  
-    <nav class="md-nav" aria-label="Functions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-compiler-function" class="md-nav__link">
-    The compiler function
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-pin_subpackage-function" class="md-nav__link">
-    The pin_subpackage function
+  <a href="#always-include-and-always-copy-files" class="md-nav__link">
+    Always include and always copy files
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-pin_compatible-function" class="md-nav__link">
-    The pin_compatible function
+  <a href="#merge-build-and-host-environments" class="md-nav__link">
+    Merge build and host environments
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-cdt-function" class="md-nav__link">
-    The cdt function
+  <a href="#prefix-detection-replacement-options" class="md-nav__link">
+    Prefix detection / replacement options
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-hash-variable" class="md-nav__link">
-    The hash variable
+  <a href="#variant-configuration" class="md-nav__link">
+    Variant configuration
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-version_to_buildstring-function" class="md-nav__link">
-    The version_to_buildstring function
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-env-object" class="md-nav__link">
-    The env object
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#default-jinja-filters" class="md-nav__link">
-    Default Jinja filters
+  <a href="#dynamic-linking-configuration" class="md-nav__link">
+    Dynamic linking configuration
   </a>
   
 </li>
@@ -450,6 +397,25 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../available_jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -709,70 +675,36 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#functions" class="md-nav__link">
-    Functions
-  </a>
-  
-    <nav class="md-nav" aria-label="Functions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#the-compiler-function" class="md-nav__link">
-    The compiler function
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-pin_subpackage-function" class="md-nav__link">
-    The pin_subpackage function
+  <a href="#always-include-and-always-copy-files" class="md-nav__link">
+    Always include and always copy files
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-pin_compatible-function" class="md-nav__link">
-    The pin_compatible function
+  <a href="#merge-build-and-host-environments" class="md-nav__link">
+    Merge build and host environments
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-cdt-function" class="md-nav__link">
-    The cdt function
+  <a href="#prefix-detection-replacement-options" class="md-nav__link">
+    Prefix detection / replacement options
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-hash-variable" class="md-nav__link">
-    The hash variable
+  <a href="#variant-configuration" class="md-nav__link">
+    Variant configuration
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-version_to_buildstring-function" class="md-nav__link">
-    The version_to_buildstring function
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-env-object" class="md-nav__link">
-    The env object
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#default-jinja-filters" class="md-nav__link">
-    Default Jinja filters
+  <a href="#dynamic-linking-configuration" class="md-nav__link">
+    Dynamic linking configuration
   </a>
   
 </li>
@@ -792,7 +724,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/available_jinja.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/build_options.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -800,63 +732,170 @@
   
 
 
-<h1 id="jinja-functions-that-can-be-used-in-the-recipe">Jinja functions that can be used in the recipe<a class="headerlink" href="#jinja-functions-that-can-be-used-in-the-recipe" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the recipe.</p>
-<h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
-<h3 id="the-compiler-function">The compiler function<a class="headerlink" href="#the-compiler-function" title="Permanent link">#</a></h3>
-<p>The compiler function can be used to put together a compiler that works for the current platform and the compilation "target_platform".
-The syntax looks like: <code>${{ compiler('c') }}</code> where <code>'c'</code> signifies the programming language that is used.</p>
-<p>This function evaluates to <code>&lt;compiler&gt;_&lt;target_platform&gt; &lt;compiler_version&gt;</code>.
-For example, when compiling <em>on</em> linux and to linux-64, this function evaluates to <code>gcc_linux-64</code>.</p>
-<p>The values can be influenced by the <code>variant_configuration</code>.
-The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with influence, for example:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">c_compiler</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">c_compiler_version</span><span class="p">:</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
+<h1 id="advanced-build-options">Advanced Build Options<a class="headerlink" href="#advanced-build-options" title="Permanent link">#</a></h1>
+<p>There are some specialized build options to control various features:</p>
+<ul>
+<li>prefix replacement</li>
+<li>variant configuration</li>
+<li>encoded file type</li>
+</ul>
+<p>These are all found under the <code>build</code> key in the <code>recipe.yaml</code>.</p>
+<h2 id="always-include-and-always-copy-files">Always include and always copy files<a class="headerlink" href="#always-include-and-always-copy-files" title="Permanent link">#</a></h2>
+<p>There are some options that control the inclusion of files in the final package.</p>
+<p>The <code>always_include_files</code> option can be used to include files even if they are
+already in the environment as part of some other host dependency. This is normally
+"clobbering" and should be used with caution (since packages should not have any overlapping files).</p>
+<p>The <code>always_copy_files</code> option can be used to copy files instead of linking them.
+This is useful for files that might be modified inside the environment (for example configuration files).
+Normally, files are linked from a central cache into the environment to save space – that means
+that files modified in one environment will be modified in all environments. This is not always
+desirable, and in that case you can use the <code>always_copy_files</code> option.</p>
+<details class="note">
+<summary>How <code>always_copy_files</code> works</summary>
+<p>The <code>always_copy_files</code> option works by setting the <code>no_link</code> option in the
+<code>info/paths.json</code> to <code>true</code> for the files in question. This means that the
+files are copied instead of linked when the package is installed.</p>
+</details>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="c1"># include files even if they are already in the environment</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="c1"># as part of some other host dependency</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">always_include_files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="c1"># do not soft- or hard-link these files, but always copy them was `no_link`</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">always_copy_files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>Would select the <code>clang</code> compiler in version <code>9.0</code>. Note that the final output will still contain the <code>target_platform</code>, so that the full compiler will read <code>clang_linux-64 9.0</code> when compiling with <code>--target-platform linux-64</code>.</p>
-<h2 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h2>
+<div class="admonition note">
+<p class="admonition-title">Glob patterns</p>
+<p>Glob patterns are used througout the build options to specify files. The
+patterns are matched against the relative path of the file in the build
+directory.
+Patterns can contain <code>*</code> to match any number of characters, <code>?</code> to match a
+single character, and <code>**</code> to match any number of directories.</p>
+<p>For example:</p>
 <ul>
-<li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x.x") }}</code> creates a pin to another output in the recipe.</li>
+<li><code>*.txt</code> matches all files ending in <code>.txt</code></li>
+<li><code>**/*.txt</code> matches all files ending in <code>.txt</code> in any directory</li>
+<li><code>**/test_*.txt</code> matches all files starting with <code>test_</code> and ending in <code>.txt</code> in any directory</li>
 </ul>
-<h2 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h2>
-<ul>
-<li><code>pin_compatible</code> pins a package in the run requirements based on the resolved package of the <code>host</code> or <code>build</code> section.</li>
-</ul>
-<h2 id="the-cdt-function">The <code>cdt</code> function<a class="headerlink" href="#the-cdt-function" title="Permanent link">#</a></h2>
-<ul>
-<li><code>${{ cdt("mypkg") }}</code> creates a cross dependency to another output in the recipe.</li>
-</ul>
-<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># on x86_64 system</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-x86_64</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># on aarch64 system</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
+</div>
+<h2 id="merge-build-and-host-environments">Merge build and host environments<a class="headerlink" href="#merge-build-and-host-environments" title="Permanent link">#</a></h2>
+<p>In very rare cases you might want to merge the build and host environments to
+obtain the "legacy" behavior of conda-build.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="c1"># merge the build and host environments (used in many R packages on Windows)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">merge_build_and_host_envs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to false)</span>
 </span></code></pre></div>
-<h2 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h2>
-<ul>
-<li><code>${{ hash }}</code> this is the variant hash and is useful in the build string computation</li>
-</ul>
-<h2 id="the-version_to_buildstring-function">The <code>version_to_buildstring</code> function<a class="headerlink" href="#the-version_to_buildstring-function" title="Permanent link">#</a></h2>
-<ul>
-<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant to a build string (removes <code>.</code> and takes only the first two elements of the version).</li>
-</ul>
-<h2 id="the-env-object">The <code>env</code> object<a class="headerlink" href="#the-env-object" title="Permanent link">#</a></h2>
-<p>You can use the <code>env</code> object to retrieve environment variables and forward them to your build script. There are two ways to do this:</p>
-<ul>
-<li><code>${{ env.get("MY_ENV_VAR") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or throw an error if it is not set.</li>
-<li><code>${{ env.get_default("MY_ENV_VAR", "default_value") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or <code>"default_value"</code> if it is not set.</li>
-</ul>
-<p>You can also check for existence of an environment variable:</p>
-<ul>
-<li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
-</ul>
-<h2 id="default-jinja-filters">Default Jinja filters<a class="headerlink" href="#default-jinja-filters" title="Permanent link">#</a></h2>
-<ul>
-<li>default jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into characters: <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version }}.tar.gz</code>.
-  A list of all the builtin filters can be found under: <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions">Link</a></li>
-</ul>
+<h2 id="prefix-detection-replacement-options">Prefix detection / replacement options<a class="headerlink" href="#prefix-detection-replacement-options" title="Permanent link">#</a></h2>
+<p>During installation time the "install"-prefix is injected into text and binary
+files. Sometimes this is not desired, and sometimes the user might want closer
+control over the automatic text/binary detection.</p>
+<p>The main difference between prefix replacement for text and binary files is that
+for binary files, the prefix string is padded with null bytes to match the
+length of the original prefix. The original prefix is the very long placeholder
+string that you might have seen in the build process.</p>
+<p>On Windows, binary prefix replacement is never performed.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="c1"># settings concerning the prefix detection in files</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">prefix_detection</span><span class="p">:</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c1"># force the file type of the given files to be TEXT or BINARY</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="c1"># for prefix replacement</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">force_file_type</span><span class="p">:</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="c1"># force TEXT file type (list of globs)</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">globs</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># force binary file type (list of globs)</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">globs</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1"># ignore all or specific files for prefix replacement`</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool | [path] (defaults to false)</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="c1"># wether to detect binary files with prefix or not</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="c1"># defaults to true on Unix and (always) false on Windows</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">    </span><span class="nt">ignore_binary_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+</span></code></pre></div>
+<h2 id="variant-configuration">Variant configuration<a class="headerlink" href="#variant-configuration" title="Permanent link">#</a></h2>
+<p>To control the variant precisely you can use the "variant configuration"
+options.</p>
+<p>A variant package has the same version number, but different "hash" and
+potentially different dependencies or build options. Variant keys are extracted
+from the <code>variant_config.yaml</code> file and usually any used Jinja variables or
+dependencies without version specifier are used as variant keys.</p>
+<p>Variant keys can also be forcibly set or ignored with the <code>use_keys</code> and
+<code>ignore_keys</code> options.</p>
+<p>In order to decide which of the variant packages to prefer and install by
+default, the <code>down_prioritize_variant</code> option can be used. The higher the value,
+the less preferred the variant is.</p>
+<p>More about variants can be found in the <a href="../variants/">variant documentation</a>.</p>
+<p>The following options are available in the <code>build</code> section to control the
+variant configuration:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="c1"># settings for the variant</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">variant</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="c1"># Keys to forcibly use for the variant computation</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="c1"># even if they are not in the dependencies</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">use_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">string</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="c1"># Keys to forcibly ignore for the variant computation</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="c1"># even if they are in the dependencies</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">ignore_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">string</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="c1"># used to prefer this variant less</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer (defaults to 0, higher is less preferred)</span>
+</span></code></pre></div>
+<h2 id="dynamic-linking-configuration">Dynamic linking configuration<a class="headerlink" href="#dynamic-linking-configuration" title="Permanent link">#</a></h2>
+<p>After the package is build, rattler-build performs some "post-processing" on the
+binaries and libraries.</p>
+<p>This entails making the shared libraries relocatable and checking that all
+linked libraries are present in the run requirements. The following settings
+control this behavior.</p>
+<p>With the <code>rpath</code> option you can forcibly set the <code>rpath</code> of the shared
+libraries. The path is relative to the install prefix. Any rpath setting is
+ignored on Windows.</p>
+<p>The <code>rpath_allowlist</code> option can be used to allow the <code>rpath</code> to point to
+locations outside of the environment. This is useful if you want to link against
+libraries that are not part of the conda environment (e.g. proprietary
+software).</p>
+<p>If you want to stop <code>rattler-build</code> from relocating the binaries, you can set
+<code>binary_relocation</code> to <code>false</code>. If you want to only relocate some binaries, you
+can select the relevant ones with a glob pattern.</p>
+<p>To read more about rpaths and how rattler-build creates relocatable binary packages,
+see the <a href="../internals/">internals</a> docs.</p>
+<p>If you link against some libraries (possibly even outside of the prefix, in a
+system location), then you can use the <code>missing_dso_allowlist</code> to allow linking
+against these and suppress any warnings. This list is pre-populated with a list
+of known system libraries on the different operating systems.</p>
+<p>As part of the post-processing, <code>rattler-build</code> checks for overlinking and
+overdepending. Overlinking is when a binary links against a library that is not
+specified in the run requirements. This is usually a mistake because the library
+would not be present in the environment when the package is installed.</p>
+<p>Conversely, overdepending is when a library is part of the run requirements, but
+is not actually used by any of the binaries/libraries in the package.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="c1"># settings for shared libraries and executables</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">dynamic_linking</span><span class="p">:</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="c1"># linux only, list of rpaths relative to the installation prefix</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">rpaths</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">path</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(defaults to [&#39;lib/&#39;])</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="c1"># Allow runpath / rpath to point to these locations</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="c1"># outside of the environment</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="c1"># wether to relocate binaries or not. If this is a list of paths, then</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="c1"># only the listed paths are relocated</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">binary_relocation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to true) | [glob]</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="c1"># Allow linking against libraries that are not in the run requirements</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nt">missing_dso_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="c1"># what to do when detecting overdepending</span>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">overdepending_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">    </span><span class="c1"># what to do when detecting overlinking</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nt">overlinking_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
+</span></code></pre></div>
 
 
 
@@ -917,9 +956,9 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
           
             
             <a
-              href="../build_options/"
+              href="../recipe_file/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Advanced options"
+              aria-label="Previous: Recipe file"
             >
               <div class="md-footer__button md-icon">
                 
@@ -930,7 +969,7 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Advanced options
+                  Recipe file
                 </div>
               </div>
             </a>
@@ -940,16 +979,16 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
           
             
             <a
-              href="../experimental_features/"
+              href="../available_jinja/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Experimental features"
+              aria-label="Next: Jinja functions"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Experimental features
+                  Jinja functions
                 </div>
               </div>
               <div class="md-footer__button md-icon">
