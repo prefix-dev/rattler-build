@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     path::{Path, PathBuf},
 };
 
@@ -35,6 +36,77 @@ struct PackageFile {
     pub file: PathBuf,
     pub linked_dsos: HashMap<PathBuf, PackageName>,
     pub shared_libraries: HashSet<PathBuf>,
+}
+
+#[derive(Debug)]
+struct PackageLinkInfo {
+    file: PathBuf,
+    linked_packages: Vec<LinkedPackage>,
+}
+
+impl fmt::Display for PackageLinkInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(
+            f,
+            "[{}] links against:",
+            console::style(self.file.display()).white().bold()
+        )?;
+        for (i, package) in self.linked_packages.iter().enumerate() {
+            let connector = if i != self.linked_packages.len() - 1 {
+                " ├─"
+            } else {
+                " └─"
+            };
+            writeln!(f, "{connector} {package}")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct LinkedPackage {
+    name: PathBuf,
+    link_origin: LinkOrigin,
+}
+
+#[derive(Debug)]
+enum LinkOrigin {
+    System,
+    PackageItself,
+    ForeignPackage(String),
+    NotFound,
+}
+
+impl fmt::Display for LinkedPackage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.link_origin {
+            LinkOrigin::System => {
+                write!(
+                    f,
+                    "{} (system)",
+                    console::style(self.name.display()).black().bright()
+                )
+            }
+            LinkOrigin::PackageItself => {
+                write!(
+                    f,
+                    "{} (package)",
+                    console::style(self.name.display()).blue()
+                )
+            }
+            LinkOrigin::ForeignPackage(package) => {
+                write!(
+                    f,
+                    "{} ({})",
+                    console::style(self.name.display()).green(),
+                    console::style(package).italic()
+                )
+            }
+            LinkOrigin::NotFound => {
+                write!(f, "{}", console::style(self.name.display()).red())
+            }
+        }
+    }
 }
 
 /// Returns the list of resolved run dependencies.
@@ -191,34 +263,28 @@ pub fn perform_linking_checks(
     }
     tracing::trace!("Package files: {package_files:#?}");
 
-    let mut warnings = Vec::new();
+    let mut linked_packages = Vec::new();
     for package in package_files.iter() {
-        println!(
-            "\n[{}] links against:",
-            console::style(package.file.display()).white().bold()
-        );
+        let mut link_info = PackageLinkInfo {
+            file: package.file.clone(),
+            linked_packages: Vec::new(),
+        };
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
-        for (i, lib) in package.shared_libraries.iter().enumerate() {
-            let connector = if i != package.shared_libraries.len() - 1 {
-                " ├─"
-            } else {
-                " └─"
-            };
+        for lib in &package.shared_libraries {
             //  Check if the package has the library linked.
             if let Some(package) = package.linked_dsos.get(lib) {
-                println!(
-                    "{connector} {} ({})",
-                    console::style(lib.display()).green(),
-                    console::style(package.as_normalized()).italic()
-                );
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.clone(),
+                    link_origin: LinkOrigin::ForeignPackage(package.as_normalized().to_string()),
+                });
                 continue;
             // Check if the library is one of the system libraries (i.e. comes from sysroot).
             } else if system_libs.iter().any(|v| v.file_name() == lib.file_name()) {
-                println!(
-                    "{connector} {} (system)",
-                    console::style(lib.display()).black().bright()
-                );
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.clone(),
+                    link_origin: LinkOrigin::System,
+                });
                 continue;
             // Check if the package itself has the shared library.
             } else if package_files.iter().any(|package| {
@@ -231,41 +297,51 @@ pub fn perform_linking_checks(
                     })
                     .unwrap_or_default()
             }) {
-                println!(
-                    "{connector} {} (package)",
-                    console::style(lib.display()).blue()
-                );
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.clone(),
+                    link_origin: LinkOrigin::PackageItself,
+                });
                 continue;
+            // Check if we allow overlinking.
             } else if dynamic_linking
                 .missing_dso_allowlist()
                 .map(|v| v.is_match(lib))
                 .unwrap_or(false)
             {
-                warnings.push(format!(
+                tracing::warn!(
                     "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",
                     package.file
-                ));
+                );
+            // Error on overlinking.
             } else if dynamic_linking.error_on_overlinking() {
-                println!(" └─ {}\n", console::style(lib.display()).red());
+                link_info.linked_packages.push(LinkedPackage {
+                    name: lib.clone(),
+                    link_origin: LinkOrigin::NotFound,
+                });
+                linked_packages.push(link_info);
+                linked_packages.iter().for_each(|linked_package| {
+                    println!("\n{linked_package}");
+                });
                 return Err(LinkingCheckError::Overlinking {
                     package: lib.clone(),
                     file: package.file.clone(),
                 });
             } else {
-                warnings.push(format!(
-                    "Overlinking against {lib:?} for {:?}",
-                    package.file
-                ));
+                tracing::warn!("Overlinking against {lib:?} for {:?}", package.file);
             }
-            println!("{connector} {}", console::style(lib.display()).red());
+            link_info.linked_packages.push(LinkedPackage {
+                name: lib.clone(),
+                link_origin: LinkOrigin::NotFound,
+            });
         }
-        println!();
+        linked_packages.push(link_info);
     }
 
-    for warning in warnings {
-        tracing::warn!("{warning}");
-    }
+    println!();
+    linked_packages.iter().for_each(|linked_package| {
+        println!("{linked_package}");
+    });
 
     // If there are any unused run dependencies then it is "overdepending".
     for run_dependency in resolved_run_dependencies.iter() {
