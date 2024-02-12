@@ -37,6 +37,40 @@ struct PackageFile {
     pub shared_libraries: HashSet<PathBuf>,
 }
 
+/// Returns the list of resolved run dependencies.
+fn resolved_run_dependencies(
+    output: &Output,
+    package_to_nature_map: &HashMap<PackageName, PackageNature>,
+) -> Vec<String> {
+    output
+        .finalized_dependencies
+        .clone()
+        .expect("failed to get the finalized dependencies")
+        .run
+        .depends
+        .iter()
+        .filter(|dep| {
+            if let DependencyInfo::RunExport { from, .. } = dep {
+                from != &String::from("build")
+            } else {
+                true
+            }
+        })
+        .flat_map(|dep| {
+            if let Some(package_name) = &dep.spec().name {
+                if let Some(nature) = package_to_nature_map.get(package_name) {
+                    if nature != &PackageNature::DSOLibrary {
+                        return None;
+                    }
+                }
+                dep.spec().name.to_owned().map(|v| v.as_source().to_owned())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 /// Returns the system libraries found in sysroot.
 fn find_system_libs(output: &Output) -> Result<HashSet<PathBuf>, LinkingCheckError> {
     let mut system_libs = HashSet::new();
@@ -79,25 +113,7 @@ pub fn perform_linking_checks(
     tmp_prefix: &Path,
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
-
     let system_libs = find_system_libs(output)?;
-    let resolved_run_dependencies: Vec<String> = output
-        .finalized_dependencies
-        .clone()
-        .expect("failed to get the finalized dependencies")
-        .run
-        .depends
-        .iter()
-        .filter(|v| {
-            if let DependencyInfo::RunExport { from, .. } = v {
-                from != &String::from("build")
-            } else {
-                true
-            }
-        })
-        .flat_map(|v| v.spec().name.to_owned().map(|v| v.as_source().to_owned()))
-        .collect();
-
     let conda_meta = output
         .build_configuration
         .directories
@@ -126,11 +142,13 @@ pub fn perform_linking_checks(
             }
         }
     }
+    tracing::trace!("Package-nature map: {package_to_nature_map:#?}");
 
-    let host_prefix = &output.build_configuration.directories.host_prefix;
-    tracing::trace!("Package-nature map: {:#?}", package_to_nature_map);
+    let resolved_run_dependencies = resolved_run_dependencies(output, &package_to_nature_map);
+    tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
 
     // check all DSOs and what they are linking
+    let host_prefix = &output.build_configuration.directories.host_prefix;
     let mut package_files = Vec::new();
     for file in new_files.iter() {
         // Parse the DSO to get the list of libraries it links to
@@ -171,12 +189,7 @@ pub fn perform_linking_checks(
             Err(e) => return Err(LinkingCheckError::SharedObject(e.to_string())),
         }
     }
-
-    tracing::trace!("Package files: {:#?}", package_files);
-    tracing::trace!(
-        "Resolved run dependencies: {:#?}",
-        resolved_run_dependencies
-    );
+    tracing::trace!("Package files: {package_files:#?}");
 
     let mut warnings = Vec::new();
     for package in package_files.iter() {
