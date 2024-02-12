@@ -314,10 +314,7 @@ async fn execute_transaction(
         })
         .await?;
 
-    install_driver.post_process(
-        &transaction,
-        target_prefix,
-    )?;
+    install_driver.post_process(&transaction, target_prefix)?;
 
     Ok(())
 }
