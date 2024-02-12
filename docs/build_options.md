@@ -97,7 +97,7 @@ In order to decide which of the variant packages to prefer and install by
 default, the `down_prioritize_variant` option can be used. The higher the value,
 the less preferred the variant is.
 
-More about variants can be found in the [variant documentation](../variants.md).
+More about variants can be found in the [variant documentation](variants.md).
 
 The following options are available in the `build` section to control the
 variant configuration:
