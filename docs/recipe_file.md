@@ -336,26 +336,6 @@ build:
   string: abc
 ```
 
-A hash will appear when the package is affected by one or more variables from
-the conda_build_config.yaml file. The hash is made up from the "used" variables
-- if anything is used, you have a hash. If you don't use these variables then
-you won't have a hash. There are a few special cases that do not affect the
-hash, such as Python and R or anything that already had a place in the build
-string.
-
-The build hash will be added to the build string if these are true for any
-dependency:
-
-  * package is an explicit dependency in build, host, or run deps
-  * package has a matching entry in conda_build_config.yaml which is a pin to a
-    specific version, not a lower bound
-  * that package is not ignored by ignore_version
-
-OR
-
-  * package uses `{{ compiler() }}` jinja2 function
-
-
 #### Dynamic linking
 
 This section contains settings for the shared libraries and executables.
@@ -379,7 +359,6 @@ build:
       - bspatch4 = bsdiff4.cli:main_bspatch4
 ```
 
-
 ### Script
 
 By default, rattler-build uses a `build.sh` file on Unix (macOS and Linux) and a
@@ -390,8 +369,16 @@ scripts for different platforms.
 
 ```yaml
 build:
+  # A very simple build script
+  script: pip install .
+
+  # The build script can also be a list
   script:
-    python setup.py install --single-version-externally-managed --record=record.txt
+    - pip install .
+    - echo "hello world"
+    - if: unix
+      then:
+        - echo "unix"
 ```
 
 ### Skipping builds
@@ -436,17 +423,17 @@ build:
     evaluate to `true` in the platform it is built on, which probably will result
     in incorrect/incomplete installation in other platforms.
 
-<!--
 ### Include build recipe
 
-The full boa recipe and rendered `recipe.yaml` file is included in
-the package\_metadata by default. You can disable this with:
+The recipe and rendered `recipe.yaml` file are included in
+the package\_metadata by default. You can disable this by passing 
+`--no-include-recipe` on the command line.
 
-```yaml
-build:
-  include_recipe: false
-```
--->
+!!! note
+    There are many more options in the build section. These additional options control 
+    how variants are computed, prefix replacement and more.
+    See the [full build options](./build_options.md) for more information.
+
 
 Requirements section
 --------------------
@@ -1173,93 +1160,3 @@ Experimental features
 
 - [`load_from_file`](./experimental_features.md#load-from-files)
 - [`git.*` functions](./experimental_features.md#git-functions)
-
-<!--
-
-Experimental features
----------------------
-
-### Build time features
-
-```{warning}
-This is an experimental feature of boa and may change or go away completely
-```
-
-With boa, you can add "build-time" features. That makes building packages from
-source much more flexible and powerful and is a first step to enable a true "source"-distribution on top of conda packages.
-
-```yaml
-name: libarchive
-
-...
-
-features:
-  - name: zlib
-    default: true
-    requirements:
-      host:
-        - zlib
-      run:
-        - zlib
-
-  - name: bzip2
-    default: true
-    requirements:
-      host:
-        - bzip2
-      run:
-        - bzip2
-```
-
-This adds two "features" to the boa recipe. These features can be enabled / disabled when invoking boa:
-
-`boa build . --features [zlib, ~bzip2]`
-
-This would compile libarchive with the zlib compression mechanism enabled, and bzip2 disabled. If a feature is not specified, the default value is used.
-A feature can add additional requirements to the build/host/run section, and adds some environment variables to the build script invocation. In our example, the FEATURE_ZLIB environment variable will be set to `1`. This information can be used in the build script to enable or disable configuration and compilation flags.
-
-For this libarchive recipe, the `./configure` call might look like this:
-
-```
-${SRC_DIR}/configure --prefix=${PREFIX}                                           \
-                     $(feature $FEATURE_ZLIB --with-zlib --without-zlib)          \
-                     $(feature $FEATURE_BZIP2 --with-bz2lib --without-bz2lib) ...
-
-```
-
-In this case we're using a special shell function `feature` to select between the enabled and disabled flag (similar to a ternary operator). The `feature` shell function is automatically added by boa into the shell environment.
-
-One could similarly use bash `if / else` to set flags based on the `$FEATURE_...` variable.
-
-If you want to depend on packages and require a specific set of features, you can use the following syntax:
-
-```yaml
-requirements:
-  host:
-    - libarchive [static, zlib, bzip2]
-```
-
-Sometimes you might want to depend on the `static` build _only_ if the package we are compiling is also compiled as a static package. In that case, you can use the `&` modifier:
-
-```yaml
-package:
-  name:
-  - libarchive
-
-requirements:
-  host:
-    - bzip2 [&static]
-    # - bzip2 1.2.3 [&static] is also valid
-
-features:
-  - name: static
-    default: false
-```
-
-Now, by default building `libarchive` will use the dynamic build of `bzip2`. When building `libarchive --features="[static]"` boa will instead use the `bzip2-static` package as requirement.
-
-### How we think features will work
-
-Features work by requiring a special build string. When compiling with features, the build string will be composed of all features and the build hash. For example, the following active features [zlib, bzip2] will be first alphabetically sorted and then concatenated to a build string of the form `+bzip2+zlib_h123123_0`. A deactivated feature will be prefixed with a `-`. To match packages against required build time features boa will compose a regex-based match string. E.g. when asking for at least `[bzip2]`, boa will use a build string of the form `+bzip2*`.
-
--->
