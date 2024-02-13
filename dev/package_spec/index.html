@@ -274,6 +274,112 @@
   
   
   
+    
+    
+    
+    
+    
+      
+      
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Examples
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/python/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cpp/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    C++
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/rust/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Rust
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
     <li class="md-nav__item">
       <a href="../highlevel/" class="md-nav__link">
         
@@ -797,8 +903,8 @@ macOS.</p>
 </ul>
 <p>The format is identical across platforms and operating systems. During the
 install process, all files are extracted into the install prefix, except the
-ones in <code>info/</code>. Installing a conda package into an environment
-is similar to executing the following commands:</p>
+ones in <code>info/</code>. Installing a conda package into an environment is similar to
+executing the following commands:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;environment<span class="w"> </span>prefix&gt;
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tar<span class="w"> </span>xjf<span class="w"> </span>mypkg-1.0.0-h2134.tar.bz2
 </span></code></pre></div>
@@ -818,10 +924,13 @@ which is often smaller in size.</p>
 <h2 id="special-files-in-packages">Special files in packages<a class="headerlink" href="#special-files-in-packages" title="Permanent link">#</a></h2>
 <p>There are some special files in a package:</p>
 <ul>
-<li>activation and deactivation scripts that are executed when the environment is activated or deactivated</li>
-<li>post-link and pre-unlink scripts that are executed when the package is installed or uninstalled</li>
+<li>activation and deactivation scripts that are executed when the environment is
+  activated or deactivated</li>
+<li>post-link and pre-unlink scripts that are executed when the package is
+  installed or uninstalled</li>
 </ul>
-<p>You can read more about these files in the <a href="../special_files/">activation scripts and other special files</a> section.</p>
+<p>You can read more about these files in the <a href="../special_files/">activation scripts and other special
+files</a> section.</p>
 <h2 id="package-metadata">Package metadata<a class="headerlink" href="#package-metadata" title="Permanent link">#</a></h2>
 <p>The <code>info/</code> directory contains all metadata about a package. Files in this
 location are not installed under the install prefix. Although you are free to
@@ -832,38 +941,66 @@ discussed below.</p>
 build string, and dependencies. The content of this file is stored in
 <code>repodata.json</code>, which is the repository index file, hence the name
 <code>index.json</code>. The JSON object is a dictionary containing the keys shown below.</p>
+<dl>
+<dt><code>name: string</code></dt>
+<dd>
+<p>The lowercase name of the package. May contain lowercase characters,
+underscore and dashes.</p>
+</dd>
+<dt><code>version: string</code></dt>
+<dd>
+<p>The package version. May not contain "-". Acknowledges <a href="https://www.python.org/dev/peps/pep-0440/">PEP
+440</a>.</p>
+</dd>
+<dt><code>build: string</code></dt>
+<dd>
+<p>The build string. May not contain "-". Differentiates builds of packages with
+  otherwise identical names and versions, such as:</p>
+</dd>
+</dl>
 <ul>
-<li><code>name</code> - string - The lowercase name of the package. May contain lowercase
-characters, underscore and dashes.</li>
-<li><code>version</code> - string - The package version. May not contain "-". Acknowledges
-  <a href="https://www.python.org/dev/peps/pep-0440/">PEP 440</a>.</li>
-<li><code>build</code> - string - The build string. May not contain "-". Differentiates
-  builds of packages with otherwise identical names and versions, such as:</li>
 <li>A build with other dependencies, such as Python 3.4 instead of Python 2.7.</li>
 <li>A bug fix in the build process.</li>
 <li>Some different optional dependencies, such as MKL versus ATLAS linkage.
     Nothing in conda actually inspects the build string. Strings such as
     <code>np18py34_1</code> are designed only for human readability and conda never parses
     them.</li>
-<li><code>build_number</code> - integer - A non-negative integer representing the build
-  number of the package. Unlike the build string, the <code>build_number</code> is
-  inspected by conda. Conda uses it to sort packages that have otherwise
-  identical names and versions to determine the latest one. This is important
-  because new builds that contain bug fixes for the way a package is built may
-  be added to a repository.</li>
-<li><code>depends</code> - list of strings - A list of dependency specifications, where each
-  element is a string, as outlined in :ref:<code>build-version-spec</code>.</li>
-<li><code>constrains</code> - list of matchspecs - A list of optional dependency constraints.
-  The packages listed under <code>constrains</code> are not installed by default, but if
-  they are installed they have to respect the constraints.</li>
-<li><code>subdir</code> - string - Optional. The subdir (like <code>linux-64</code>) of this package.</li>
-<li><code>arch</code> - string - Optional. The architecture the package is built for.
-  EXAMPLE: <code>x86_64</code>. This key is generally not used.</li>
-<li><code>platform</code> - string - Optional. The OS that the package is built for. EXAMPLE:
-  <code>osx</code>. This key is generally not used. Packages for a specific architecture
-  and platform are usually distinguished by the repository subdirectory that
-  contains them---see :ref:<code>repo-si</code>.</li>
 </ul>
+<dl>
+<dt><code>build_number: integer</code></dt>
+<dd>
+<p>A non-negative integer representing the build number of the package. Unlike
+  the build string, the <code>build_number</code> is inspected by conda. Conda uses it to
+  sort packages that have otherwise identical names and versions to determine
+  the latest one. This is important because new builds that contain bug fixes
+  for the way a package is built may be added to a repository.</p>
+</dd>
+<dt><code>depends: list of match specs</code></dt>
+<dd>
+<p>A list of dependency specifications, where each element is a string. These
+come from the <code>run</code> section of the recipe or any run exports of dependencies.</p>
+</dd>
+<dt><code>constrains: list of match specs</code></dt>
+<dd>
+<p>A list of optional dependency constraints. The packages listed under
+<code>constrains</code> are not installed by default, but if they are installed they have
+  to respect the constraints.</p>
+</dd>
+<dt><code>subdir: string</code></dt>
+<dd>
+<p>The subdir (like <code>linux-64</code>) of this package.</p>
+</dd>
+<dt><code>arch: string</code></dt>
+<dd>
+<p>Optional. The architecture the package is built for. EXAMPLE: <code>x86_64</code>. This
+key is generally not used (duplicate information from <code>sudir</code>).</p>
+</dd>
+<dt><code>platform: string</code></dt>
+<dd>
+<p>Optional. The OS that the package is built for. EXAMPLE: <code>osx</code>. This key is
+generally not used (duplicate information from <code>sudir</code>).</p>
+</dd>
+</dl>
 <h3 id="infopathsjson"><code>info/paths.json</code><a class="headerlink" href="#infopathsjson" title="Permanent link">#</a></h3>
 <p>The
 <a href="https://docs.rs/rattler_conda_types/latest/rattler_conda_types/package/struct.PathsJson.html"><code>paths.json</code></a>
@@ -871,23 +1008,43 @@ file lists all files that are installed into the environment.</p>
 <p>It consists of a list of <a href="https://docs.rs/rattler_conda_types/latest/rattler_conda_types/package/struct.PathsEntry.html">path
 entries</a>,
 each with the following keys:</p>
-<ul>
-<li><code>_path</code> - string - the relative path of the file</li>
-<li><code>path_type</code> - optional, string - the type of linking, can be <code>hardlink</code>,
-  <code>softlink</code>, or <code>directory</code>. Default is <code>hardlink</code>.</li>
-<li><code>file_mode</code> - optional, string - the file mode can be <code>binary</code> or <code>text</code>. This
-  is only relevant for prefix replacement</li>
-<li><code>prefix_placeholder</code> - optional, string - the prefix placeholder string that
-  is encoded in the text or binary file, and that is replaced at installation
-  time. Note that this prefix placeholder uses <code>/</code> even on Windows.</li>
-<li><code>no_link</code> - bool, optional - whether this file should be linked or not
-  when installing the package, defaults false (linking the file from the cache
-  into the environment)</li>
-<li><code>sha256</code> - string - the SHA256 hash of the file. For symbolic links it
-  contains the SHA256 hash of the file pointed to.</li>
-<li><code>size_in_bytes</code> - number - the size in bytes of the file. For symbolic links,
-  it contains the file size of the file pointed to.</li>
-</ul>
+<dl>
+<dt><code>_path: string</code></dt>
+<dd>
+<p>the relative path of the file</p>
+</dd>
+<dt><code>path_type: optional, string</code></dt>
+<dd>
+<p>the type of linking, can be <code>hardlink</code>, <code>softlink</code>, or <code>directory</code>. Default is
+  <code>hardlink</code>.</p>
+</dd>
+</dl>
+<p><code>file_mode: - optional, string</code></p>
+<p>:the file mode can be <code>binary</code> or <code>text</code>. This is only relevant for prefix
+  replacement</p>
+<dl>
+<dt><code>prefix_placeholder: optional, string</code></dt>
+<dd>
+<p>the prefix placeholder string that is encoded in the text or binary file, and
+  that is replaced at installation time. Note that this prefix placeholder uses
+  <code>/</code> even on Windows.</p>
+</dd>
+<dt><code>no_link: bool, optional</code></dt>
+<dd>
+<p>whether this file should be linked or not when installing the package,
+  defaults false (linking the file from the cache into the environment)</p>
+</dd>
+<dt><code>sha256: string</code></dt>
+<dd>
+<p>the SHA256 hash of the file. For symbolic links it contains the SHA256 hash of
+  the file pointed to.</p>
+</dd>
+<dt><code>size_in_bytes: number</code></dt>
+<dd>
+<p>the size in bytes of the file. For symbolic links, it contains the file size
+  of the file pointed to.</p>
+</dd>
+</dl>
 <blockquote>
 <p>Due to the way the binary replacement works, the placeholder prefix must be
 longer than the install prefix.</p>
@@ -898,22 +1055,54 @@ longer than the install prefix.</p>
 <p>Optional file. Contains the entries of the about section of the recipe of the
 <code>recipe.yaml</code> file. The following keys are added to <code>info/about.json</code> if present
 in the build recipe:</p>
-<ul>
-<li><code>home</code> (from about.homepage)</li>
-<li><code>dev_url</code> (from about.repository)</li>
-<li><code>doc_url</code> (from about.documentation)</li>
-<li><code>license_url</code></li>
-<li><code>license</code></li>
-<li><code>summary</code></li>
-<li><code>description</code></li>
-<li><code>license_family</code> (this field is not used anymore as we rely on SPDX license identifiers)</li>
-</ul>
+<div class="admonition note">
+<p class="admonition-title">Renamed fields</p>
+<p>The new recipe spec renamed a few fields (from conda-build's original
+implementation). This means that some fields in the <code>about.json</code> file still
+have the old names (for backwards compatibility), while you would generally
+use different names in the recipe.</p>
+</div>
+<dl>
+<dt><code>home: url (from about.homepage)</code></dt>
+<dd>
+<p>The URL of the homepage of the package.</p>
+</dd>
+<dt><code>dev_url: url (from about.repository)</code></dt>
+<dd>
+<p>The URL of the development repository of the package.</p>
+</dd>
+<dt><code>doc_url: url (from about.documentation)</code></dt>
+<dd>
+<p>The URL of the documentation of the package.</p>
+</dd>
+<dt><code>license_url: url</code></dt>
+<dd>
+<p>The URL of the license of the package.</p>
+</dd>
+<dt><code>license: string (from about.license)</code></dt>
+<dd>
+<p>The SPDX license identifier of the package.</p>
+</dd>
+<dt><code>summary: string</code></dt>
+<dd>
+<p>A short summary of the package.</p>
+</dd>
+<dt><code>description: string</code></dt>
+<dd>
+<p>A longer description of the package.</p>
+</dd>
+<dt><code>license_family: string</code></dt>
+<dd>
+<p>(this field is not used anymore as we rely on SPDX license identifiers)</p>
+</dd>
+</dl>
 <h3 id="inforecipe"><code>info/recipe/&lt;...&gt;</code><a class="headerlink" href="#inforecipe" title="Permanent link">#</a></h3>
-<p>A directory containing the full contents of the build recipe.
-This folder also contains a rendered version of the recipe (<code>rendered_recipe.yaml</code>).
-This rendered version is used for the <code>rebuild</code> command.
-However, note that currently this format is still in flux and can change at any time.</p>
-<p>You can also use <code>--no-include-recipe</code> to disable the inclusion of the recipe in the package.</p>
+<p>A directory containing the full contents of the build recipe. This folder also
+contains a rendered version of the recipe (<code>rendered_recipe.yaml</code>). This
+rendered version is used for the <code>rebuild</code> command. However, note that currently
+this format is still in flux and can change at any time.</p>
+<p>You can also use <code>--no-include-recipe</code> to disable the inclusion of the recipe in
+the package.</p>
 
 
 
@@ -1090,7 +1279,7 @@ However, note that currently this format is still in flux and can change at any 
       <div class="md-progress" data-md-component="progress" role="progressbar"></div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
       <script src="../assets/javascripts/bundle.94c44541.min.js"></script>
