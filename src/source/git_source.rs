@@ -222,6 +222,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 }
 
 #[cfg(test)]
+#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
 mod tests {
     use crate::{
         recipe::parser::{GitRev, GitSource, GitUrl},
@@ -230,7 +231,6 @@ mod tests {
 
     #[tracing_test::traced_test]
     #[test]
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     fn test_host_git_source() {
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
