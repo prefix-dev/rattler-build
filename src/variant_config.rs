@@ -51,7 +51,13 @@ pub struct Pin {
 impl TryConvertNode<Pin> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Pin, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| _partialerror!(*self.span(), ErrorKind::ExpectedMapping,))
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expects mapping for {name}")
+                )
+            })
             .map_err(|e| vec![e])
             .and_then(|map| map.try_convert(name))
     }
@@ -731,7 +737,13 @@ impl VariantConfig {
 impl TryConvertNode<VariantConfig> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expects mapping for `{name}`")
+                )]
+            })
             .and_then(|map| map.try_convert(name))
     }
 }

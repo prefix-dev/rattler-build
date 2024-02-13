@@ -150,6 +150,7 @@ impl Recipe {
             vec![_partialerror!(
                 *root_node.span(),
                 ErrorKind::ExpectedMapping,
+                label = "expects a map as the yaml root"
             )]
         })?;
 
@@ -170,7 +171,7 @@ impl Recipe {
                         vec![_partialerror!(
                             *v.span(),
                             ErrorKind::ExpectedScalar,
-                            help = "`context` values must always be scalars"
+                            help = "`context` field values must always be scalars"
                         )]
                     })?;
                     let rendered: Option<ScalarNode> =
@@ -221,6 +222,7 @@ impl Recipe {
                         return Err(vec![_partialerror!(
                             *key.span(),
                             ErrorKind::InvalidField(invalid_key.to_string().into()),
+                            label = "only valid keys are `package`, `recipe`, `source`, `build`, `requirements`, `tests`, `about`, `context` and `extra`"
                         )])
                     }
                 }

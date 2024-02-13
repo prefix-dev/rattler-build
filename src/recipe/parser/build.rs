@@ -35,7 +35,13 @@ pub struct VariantKeyUsage {
 impl TryConvertNode<VariantKeyUsage> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<VariantKeyUsage, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expects mapping for {name}")
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -174,7 +180,13 @@ impl Build {
 impl TryConvertNode<Build> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Build, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expects mapping for {name}")
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -288,7 +300,13 @@ impl TryConvertNode<LinkingCheckBehavior> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<LinkingCheckBehavior, Vec<PartialParsingError>> {
         self.as_scalar()
             .cloned()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expects string scalar for {name}")
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -301,7 +319,7 @@ impl TryConvertNode<LinkingCheckBehavior> for RenderedScalarNode {
             _ => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedScalar,
-                help = format!("valid options for {name} are `ignore` or `error`")
+                help = format!("valid options for {name} are \"ignore\" or \"error\"")
             )]),
         }
     }
@@ -364,7 +382,13 @@ impl Python {
 impl TryConvertNode<Python> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Python, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expects mapping for {name}")
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -459,7 +483,13 @@ impl TryConvertNode<NoArchType> for RenderedScalarNode {
 impl TryConvertNode<EntryPoint> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<EntryPoint, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected string scalar for {name}")
+                )]
+            })
             .and_then(|s| s.try_convert(name))
     }
 }
@@ -470,6 +500,7 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::EntryPointParsing(err),
+                label = "failed to parse entrypoint, provide either `python` or `generic`"
             )]
         })
     }

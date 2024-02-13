@@ -66,7 +66,13 @@ impl About {
 impl TryConvertNode<About> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<About, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = "about section requires package information fields"
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -127,7 +133,13 @@ impl FromStr for License {
 impl TryConvertNode<License> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<License, Vec<PartialParsingError>> {
         self.as_scalar()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar,)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = "license requires a valid SPDX string"
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }
@@ -135,8 +147,13 @@ impl TryConvertNode<License> for RenderedNode {
 impl TryConvertNode<License> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<License, Vec<PartialParsingError>> {
         let original: String = self.try_convert(name)?;
-        let expr = Expression::parse(original.as_str())
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])?;
+        let expr = Expression::parse(original.as_str()).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = "invalid SPDX license expression"
+            )]
+        })?;
 
         Ok(License { original, expr })
     }

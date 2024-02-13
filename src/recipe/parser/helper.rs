@@ -11,6 +11,7 @@ macro_rules! validate_keys {
                 return Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::DuplicateKey(key_str.to_string()),
+                    label = format!("{key_str} is a duplicate")
                 )]);
             }
 
