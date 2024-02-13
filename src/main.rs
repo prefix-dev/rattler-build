@@ -32,6 +32,7 @@ use rattler_build::{
         parser::{find_outputs_from_src, Recipe},
         ParsingError,
     },
+    recipe_generator::{generate_recipe, GenerateRecipeOpts},
     selectors::SelectorConfig,
     system_tools::SystemTools,
     tool_configuration,
@@ -60,6 +61,9 @@ enum SubCommands {
 
     /// Generate shell completion script
     Completion(ShellCompletion),
+
+    /// Generate a recipe from PyPI or CRAN
+    GenerateRecipe(GenerateRecipeOpts),
 }
 
 #[derive(Parser)]
@@ -448,6 +452,7 @@ async fn main() -> miette::Result<()> {
         Some(SubCommands::Test(args)) => run_test_from_args(args).await,
         Some(SubCommands::Rebuild(args)) => rebuild_from_args(args).await,
         Some(SubCommands::Upload(args)) => upload_from_args(args).await,
+        Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
         None => {
             _ = App::command().print_long_help();
             Ok(())

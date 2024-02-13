@@ -10,7 +10,7 @@ use crate::{
     render::solver::default_bytes_style,
     tool_configuration,
 };
-use rattler_digest::compute_file_digest;
+use rattler_digest::{compute_file_digest, Md5};
 use tokio::io::AsyncWriteExt;
 
 use super::SourceError;
@@ -34,8 +34,21 @@ fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
                 true
             }
         }
-        Checksum::Md5(_value) => {
-            todo!("MD5 not implemented yet!");
+        Checksum::Md5(value) => {
+            let digest = compute_file_digest::<Md5>(path).expect("Could not compute SHA256");
+            let computed_md5 = hex::encode(digest);
+            let checksum_md5 = hex::encode(value);
+            if !computed_md5.eq(&checksum_md5) {
+                tracing::error!(
+                    "MD5 values of downloaded file not matching!\nDownloaded = {}, should be {}",
+                    computed_md5,
+                    checksum_md5
+                );
+                false
+            } else {
+                tracing::info!("Validated MD5 values of the downloaded file!");
+                true
+            }
         }
     }
 }
