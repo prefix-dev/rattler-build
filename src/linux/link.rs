@@ -100,7 +100,7 @@ impl Relinker for SharedObject {
                 for rpath in resolved_rpaths.iter().chain(resolved_runpaths.iter()) {
                     let candidate = rpath.join(library_path);
                     if candidate.exists() {
-                        resolved_library_path = Some(candidate);
+                        resolved_library_path = Some(candidate.canonicalize().unwrap_or(candidate));
                         break;
                     }
                 }

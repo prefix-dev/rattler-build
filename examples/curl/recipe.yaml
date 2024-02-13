@@ -31,6 +31,7 @@ requirements:
     - if: linux
       then:
         - openssl
+    - zlib
 
 tests:
   - script:
@@ -46,4 +47,3 @@ about:
     with URL syntax. It is used in command lines or scripts to transfer data.
   documentation: https://curl.haxx.se/docs/
   repository: https://github.com/curl/curl
-  # doc_source_url: https://github.com/curl/curl/tree/master/docs
