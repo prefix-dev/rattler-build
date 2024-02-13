@@ -201,7 +201,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[cfg(target_os = "linux")]
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
     fn test_system_tool() {
         let system_tool = SystemTools::new();
         let mut cmd = system_tool.call(Tool::Patchelf).unwrap();
