@@ -585,6 +585,8 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     use std::path::Path;
 
     use rattler_conda_types::Platform;
