@@ -94,7 +94,9 @@ impl Relinker for Dylib {
                 for rpath in &resolved_rpaths {
                     let resolved = rpath.join(lib_without_rpath);
                     if resolved.exists() {
-                        resolved_libraries.insert(lib.clone(), Some(resolved));
+                        let resolved_library_path =
+                            Some(resolved.canonicalize().unwrap_or(resolved));
+                        resolved_libraries.insert(lib.clone(), resolved_library_path);
                         break;
                     }
                 }

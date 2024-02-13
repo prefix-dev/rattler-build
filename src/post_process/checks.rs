@@ -168,7 +168,7 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
             }
         }
 
-        return Ok(system_libs.build()?);
+        return system_libs.build();
     }
 
     if let Some(sysroot_package) = output
@@ -202,12 +202,12 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         for file in record.files {
             if let Some(file_name) = file.file_name() {
                 if so_glob.is_match(file_name) {
-                    system_libs.add(Glob::new(&file.to_string_lossy())?);
+                    system_libs.add(Glob::new(&file_name.to_string_lossy())?);
                 }
             }
         }
     }
-    Ok(system_libs.build()?)
+    system_libs.build()
 }
 
 pub fn perform_linking_checks(
@@ -258,8 +258,7 @@ pub fn perform_linking_checks(
             Ok(relinker) => {
                 let mut file_dsos = Vec::new();
 
-                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, &host_prefix);
-
+                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, host_prefix);
                 for (lib, resolved) in &resolved_libraries {
                     // filter out @self on macOS
                     if target_platform.is_osx() && lib.to_str() == Some("self") {
@@ -335,7 +334,7 @@ pub fn perform_linking_checks(
             }
 
             // Check if the package itself has the shared library.
-            if package_files.iter().any(|file| file.file.ends_with(lib)) {
+            if new_files.iter().any(|file| file.ends_with(lib)) {
                 link_info.linked_packages.push(LinkedPackage {
                     name: lib.to_path_buf(),
                     link_origin: LinkOrigin::PackageItself,
