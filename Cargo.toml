@@ -15,8 +15,8 @@ documentation = "https://prefix-dev.github.io/rattler-build"
 
 [features]
 default = ['native-tls']
-native-tls = ['reqwest/native-tls', 'rattler/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls']
+native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_installs_packages/native-tls']
+rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls', 'rattler_installs_packages/rustls-tls']
 
 [dependencies]
 serde = { version = "1.0.196", features = ["derive"] }
@@ -105,7 +105,7 @@ toml = "0.8.10"
 memmap2 = "0.9.4"
 os_pipe = "1.1.5"
 reqwest-middleware = "0.2.4"
-rattler_installs_packages = "0.7.0"
+rattler_installs_packages = { version = "0.7.0", default-features = false }
 async-once-cell = "0.5.3"
 
 [dev-dependencies]
