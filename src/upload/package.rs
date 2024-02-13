@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine};
 use miette::IntoDiagnostic;
 use rattler_conda_types::{
     package::{AboutJson, IndexJson, PackageFile},
-    PackageName, Version as PackageVersion,
+    PackageName, VersionWithSource as PackageVersion,
 };
 use rattler_digest::{compute_file_digest, Md5};
 use sha2::Sha256;
