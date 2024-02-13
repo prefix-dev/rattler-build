@@ -75,6 +75,12 @@ On Windows, to obtain these dependencies from conda-forge, one can install
 We have extensive documentation for `rattler-build`. You can find the [book
 here](https://prefix-dev.github.io/rattler-build).
 
+### GitHub Action
+
+There is a GitHub Action for rattler-build.
+It can be used to install `rattler-build` in CI/CD workflows and run a build command.
+Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+
 ### Usage
 
 `rattler-build` comes with two commands: `build` and `test`.
