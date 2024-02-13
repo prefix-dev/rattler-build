@@ -25,6 +25,7 @@ theme:
     - content.tabs.link
     - content.code.copy
     - content.action.edit
+    - content.code.annotate
     # - content.code.select Sponsor only
     - navigation.instant
     - navigation.instant.progress
@@ -73,6 +74,12 @@ extra:
 
 nav:
   - Home: index.md
+  # - Tutorials:
+  #     - Writing a recipe: tutorials/writing_recipe.md
+  - Examples:
+    - "Python": tutorials/python.md
+    - "C++": tutorials/cpp.md
+    - "Rust": tutorials/rust.md
   - Highlevel overview: highlevel.md
   - Recipe file: recipe_file.md
   - Advanced options: build_options.md
