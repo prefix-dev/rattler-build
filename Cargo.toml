@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -21,22 +21,22 @@ rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/
 [dependencies]
 serde = { version = "1.0.196", features = ["derive"] }
 serde_yaml = "0.9.31"
-rattler = { version = "0.17.0", default-features = false }
-rattler_conda_types = { version = "0.17.0", default-features = false }
-rattler_digest = { version = "0.17.0", default-features = false }
-rattler_index = { version = "0.17.0", default-features = false }
-rattler_networking = { version = "0.17.0", default-features = false }
-rattler_repodata_gateway = { version = "0.17.0", default-features = false, features = [
+rattler = { version = "0.18.0", default-features = false }
+rattler_conda_types = { version = "0.18.0", default-features = false }
+rattler_digest = { version = "0.18.0", default-features = false }
+rattler_index = { version = "0.18.0", default-features = false }
+rattler_networking = { version = "0.18.0", default-features = false }
+rattler_repodata_gateway = { version = "0.18.0", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.17.0", default-features = false, features = [
+rattler_shell = { version = "0.18.0", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.17.0", default-features = false, features = [
+rattler_solve = { version = "0.18.0", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.17.0", default-features = false }
-rattler_package_streaming = { version = "0.17.0", default-features = false }
+rattler_virtual_packages = { version = "0.18.0", default-features = false }
+rattler_package_streaming = { version = "0.18.0", default-features = false }
 anyhow = "1.0.79"
 walkdir = "2.4.0"
 sha2 = "0.10.8"
@@ -105,7 +105,7 @@ toml = "0.8.10"
 memmap2 = "0.9.4"
 os_pipe = "1.1.5"
 reqwest-middleware = "0.2.4"
-rattler_installs_packages = { version = "0.7.0", default-features = false }
+rattler_installs_packages = { version = "0.8.0", default-features = false }
 async-once-cell = "0.5.3"
 
 [dev-dependencies]
@@ -123,16 +123,16 @@ pre-build = [
 ]
 
 [patch.crates-io]
-rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
