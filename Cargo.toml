@@ -123,7 +123,7 @@ pre-build = [
 
 [package.metadata.cross.target.aarch64-unknown-linux-musl]
 pre-build = [
-    "apt-get update && apt-get update -y git",
+    "apt-get update && apt-get upgrade -y git",
 ]
 
 # [patch.crates-io]
