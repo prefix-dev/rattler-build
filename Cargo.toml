@@ -121,6 +121,11 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
+[package.metadata.cross.target.aarch64-unknown-linux-musl]
+pre-build = [
+    "apt-get update && apt-get update -y git",
+]
+
 [patch.crates-io]
 rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
