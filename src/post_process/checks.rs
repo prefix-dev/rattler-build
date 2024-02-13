@@ -10,7 +10,7 @@ use crate::{
     render::resolved_dependencies::DependencyInfo,
 };
 
-use globset::Glob;
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
 
 #[derive(thiserror::Error, Debug)]
@@ -144,8 +144,33 @@ fn resolved_run_dependencies(
 }
 
 /// Returns the system libraries found in sysroot.
-fn find_system_libs(output: &Output) -> Result<HashSet<PathBuf>, LinkingCheckError> {
-    let mut system_libs = HashSet::new();
+fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
+    let mut system_libs = GlobSetBuilder::new();
+    if output.build_configuration.target_platform.is_osx() {
+        let default_sysroot = vec![
+            "/opt/X11/**/*.dylib",
+            "/usr/lib/libSystem.B.dylib",
+            "/usr/lib/libcrypto.0.9.8.dylib",
+            "/usr/lib/libobjc.A.dylib",
+            // e.g. /System/Library/Frameworks/AGL.framework/*
+            "/System/Library/Frameworks/*.framework/*",
+        ];
+
+        if let Some(sysroot) = output
+            .build_configuration
+            .variant
+            .get("CONDA_BUILD_SYSROOT")
+        {
+            system_libs.add(Glob::new(&format!("{}/**/*", sysroot))?);
+        } else {
+            for v in default_sysroot {
+                system_libs.add(Glob::new(v)?);
+            }
+        }
+
+        return Ok(system_libs.build()?);
+    }
+
     if let Some(sysroot_package) = output
         .finalized_dependencies
         .clone()
@@ -160,23 +185,29 @@ fn find_system_libs(output: &Output) -> Result<HashSet<PathBuf>, LinkingCheckErr
             })
         })
     {
+        let prefix_record_name = format!(
+            "conda-meta/{}-{}-{}.json",
+            sysroot_package.package_record.name.as_normalized(),
+            sysroot_package.package_record.version,
+            sysroot_package.package_record.build
+        );
+
         let sysroot_path = output
             .build_configuration
             .directories
             .build_prefix
-            .join("conda-meta")
-            .join(sysroot_package.file_name.replace("conda", "json"));
-        let record = PrefixRecord::from_path(sysroot_path)?;
+            .join(prefix_record_name);
+        let record = PrefixRecord::from_path(sysroot_path).unwrap();
         let so_glob = Glob::new("*.so*")?.compile_matcher();
         for file in record.files {
             if let Some(file_name) = file.file_name() {
                 if so_glob.is_match(file_name) {
-                    system_libs.insert(file);
+                    system_libs.add(Glob::new(&file.to_string_lossy())?);
                 }
             }
         }
     }
-    Ok(system_libs)
+    Ok(system_libs.build()?)
 }
 
 pub fn perform_linking_checks(
@@ -192,25 +223,23 @@ pub fn perform_linking_checks(
         .host_prefix
         .join("conda-meta");
 
-    if !conda_meta.exists() {
-        return Ok(());
-    }
-
     let mut package_to_nature_map = HashMap::new();
     let mut path_to_package_map = HashMap::new();
-    for entry in conda_meta.read_dir()? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|v| v.to_str()) == Some("json") {
-            let record = PrefixRecord::from_path(path)?;
-            let package_nature = PackageNature::from_prefix_record(&record);
-            package_to_nature_map.insert(
-                record.repodata_record.package_record.name.clone(),
-                package_nature,
-            );
-            for file in record.files {
-                path_to_package_map
-                    .insert(file, record.repodata_record.package_record.name.clone());
+    if conda_meta.exists() {
+        for entry in conda_meta.read_dir()? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|v| v.to_str()) == Some("json") {
+                let record = PrefixRecord::from_path(path)?;
+                let package_nature = PackageNature::from_prefix_record(&record);
+                package_to_nature_map.insert(
+                    record.repodata_record.package_record.name.clone(),
+                    package_nature,
+                );
+                for file in record.files {
+                    path_to_package_map
+                        .insert(file, record.repodata_record.package_record.name.clone());
+                }
             }
         }
     }
@@ -220,6 +249,7 @@ pub fn perform_linking_checks(
     tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
 
     // check all DSOs and what they are linking
+    let target_platform = output.build_configuration.target_platform;
     let host_prefix = &output.build_configuration.directories.host_prefix;
     let mut package_files = Vec::new();
     for file in new_files.iter() {
@@ -227,24 +257,28 @@ pub fn perform_linking_checks(
         match relink::get_relinker(output.build_configuration.target_platform, file) {
             Ok(relinker) => {
                 let mut file_dsos = Vec::new();
-                for lib in relinker.libraries().iter().map(PathBuf::from) {
-                    let libpath = if output.build_configuration.target_platform.is_osx() {
-                        match lib.strip_prefix("@rpath/").ok() {
-                            Some(suffix) => host_prefix.join("lib").join(suffix),
-                            None => lib.to_path_buf(),
-                        }
-                    } else {
-                        PathBuf::from("lib").join(&lib)
-                    };
-                    if let Some(package) = path_to_package_map.get(&libpath) {
-                        if let Some(nature) = package_to_nature_map.get(package) {
-                            // Only take shared libraries into account.
-                            if nature == &PackageNature::DSOLibrary {
-                                file_dsos.push((lib, package.clone()));
+
+                let resolved_libraries = relinker.resolve_libraries(tmp_prefix, &host_prefix);
+
+                for (lib, resolved) in &resolved_libraries {
+                    // filter out @self on macOS
+                    if target_platform.is_osx() && lib.to_str() == Some("self") {
+                        continue;
+                    }
+
+                    let lib = resolved.as_ref().unwrap_or(lib);
+                    if let Ok(libpath) = lib.strip_prefix(host_prefix) {
+                        if let Some(package) = path_to_package_map.get(libpath) {
+                            if let Some(nature) = package_to_nature_map.get(package) {
+                                // Only take shared libraries into account.
+                                if nature == &PackageNature::DSOLibrary {
+                                    file_dsos.push((libpath.to_path_buf(), package.clone()));
+                                }
                             }
                         }
                     }
                 }
+
                 package_files.push(PackageFile {
                     file: file
                         .clone()
@@ -252,7 +286,10 @@ pub fn perform_linking_checks(
                         .unwrap_or(file)
                         .to_path_buf(),
                     linked_dsos: file_dsos.into_iter().collect(),
-                    shared_libraries: relinker.libraries(),
+                    shared_libraries: resolved_libraries
+                        .into_iter()
+                        .map(|(v, res)| res.unwrap_or(v.to_path_buf()))
+                        .collect(),
                 });
             }
             Err(RelinkError::UnknownFileFormat) => {
@@ -272,38 +309,42 @@ pub fn perform_linking_checks(
         // If the package that we are linking against does not exist in run
         // dependencies then it is "overlinking".
         for lib in &package.shared_libraries {
+            let lib = lib.strip_prefix(host_prefix).unwrap_or(lib);
+
+            // skip @self on macOS
+            if target_platform.is_osx() && lib.to_str() == Some("self") {
+                continue;
+            }
+
             //  Check if the package has the library linked.
             if let Some(package) = package.linked_dsos.get(lib) {
                 link_info.linked_packages.push(LinkedPackage {
-                    name: lib.clone(),
+                    name: lib.to_path_buf(),
                     link_origin: LinkOrigin::ForeignPackage(package.as_normalized().to_string()),
                 });
                 continue;
+            }
+
             // Check if the library is one of the system libraries (i.e. comes from sysroot).
-            } else if system_libs.iter().any(|v| v.file_name() == lib.file_name()) {
+            if system_libs.is_match(lib) {
                 link_info.linked_packages.push(LinkedPackage {
-                    name: lib.clone(),
+                    name: lib.to_path_buf(),
                     link_origin: LinkOrigin::System,
                 });
                 continue;
+            }
+
             // Check if the package itself has the shared library.
-            } else if package_files.iter().any(|package| {
-                lib.file_name()
-                    .and_then(|shared_library| {
-                        package.file.file_name().map(|v| {
-                            v.to_string_lossy()
-                                .contains(&*shared_library.to_string_lossy())
-                        })
-                    })
-                    .unwrap_or_default()
-            }) {
+            if package_files.iter().any(|file| file.file.ends_with(lib)) {
                 link_info.linked_packages.push(LinkedPackage {
-                    name: lib.clone(),
+                    name: lib.to_path_buf(),
                     link_origin: LinkOrigin::PackageItself,
                 });
                 continue;
+            }
+
             // Check if we allow overlinking.
-            } else if dynamic_linking
+            if dynamic_linking
                 .missing_dso_allowlist()
                 .map(|v| v.is_match(lib))
                 .unwrap_or(false)
@@ -316,22 +357,24 @@ pub fn perform_linking_checks(
             // Error on overlinking.
             } else if dynamic_linking.error_on_overlinking() {
                 link_info.linked_packages.push(LinkedPackage {
-                    name: lib.clone(),
+                    name: lib.to_path_buf(),
                     link_origin: LinkOrigin::NotFound,
                 });
                 linked_packages.push(link_info);
                 linked_packages.iter().for_each(|linked_package| {
                     println!("\n{linked_package}");
                 });
+
                 return Err(LinkingCheckError::Overlinking {
-                    package: lib.clone(),
+                    package: lib.to_path_buf(),
                     file: package.file.clone(),
                 });
             } else {
                 tracing::warn!("Overlinking against {lib:?} for {:?}", package.file);
             }
+
             link_info.linked_packages.push(LinkedPackage {
-                name: lib.clone(),
+                name: lib.to_path_buf(),
                 link_origin: LinkOrigin::NotFound,
             });
         }

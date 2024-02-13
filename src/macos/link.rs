@@ -80,13 +80,18 @@ impl Relinker for Dylib {
         let resolved_rpaths = self
             .rpaths
             .iter()
-            .map(|rpath| self.resolve_rpath(rpath, prefix, encoded_prefix));
+            .map(|rpath| self.resolve_rpath(rpath, prefix, encoded_prefix))
+            .collect::<Vec<_>>();
 
         let mut resolved_libraries = HashMap::new();
         for lib in self.libraries.iter() {
+            if lib == &PathBuf::from("@self") {
+                continue;
+            }
             resolved_libraries.insert(lib.clone(), None);
+
             if let Ok(lib_without_rpath) = lib.strip_prefix("@rpath/") {
-                for rpath in resolved_rpaths.clone() {
+                for rpath in &resolved_rpaths {
                     let resolved = rpath.join(lib_without_rpath);
                     if resolved.exists() {
                         resolved_libraries.insert(lib.clone(), Some(resolved));
@@ -97,7 +102,6 @@ impl Relinker for Dylib {
                 resolved_libraries.insert(lib.clone(), Some(lib.clone()));
             }
         }
-
         resolved_libraries
     }
 
