@@ -17,7 +17,7 @@
         <link rel="next" href="../available_jinja/">
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.4">
     
     
@@ -88,12 +88,16 @@
   
     
     
+      
     
     
     
-    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="yellow" data-md-color-accent="yellow">
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="prefix" data-md-color-accent="prefix">
   
     
+    
+      <script>var palette=__md_get("__palette");if(palette&&"object"==typeof palette.color)for(var key of Object.keys(palette.color))document.body.setAttribute("data-md-color-"+key,palette.color[key])</script>
     
     <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
     <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
@@ -123,8 +127,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <img src="../assets/powerdrill.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -148,6 +151,30 @@
       </div>
     </div>
     
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="prefix" data-md-color-accent="prefix"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="prefix-light" data-md-color-accent="prefix-light"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12c0-2.42-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12 20 8.69Z"/></svg>
+      </label>
+    
+  
+</form>
       
     
     
@@ -229,8 +256,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54Z"/></svg>
+  <img src="../assets/powerdrill.png" alt="logo">
 
     </a>
     rattler-build
@@ -865,10 +891,10 @@ files are copied instead of linked when the package is installed.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="c1"># include files even if they are already in the environment</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="c1"># as part of some other host dependency</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">always_include_files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">always_include_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="c1"># do not soft- or hard-link these files, but always copy them was `no_link`</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">always_copy_files</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">always_copy_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span></code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Glob patterns</p>
@@ -911,9 +937,9 @@ string that you might have seen in the build process.</p>
 </span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="c1"># for prefix replacement</span>
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">force_file_type</span><span class="p">:</span>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="c1"># force TEXT file type (list of globs)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">globs</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># force binary file type (list of globs)</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">globs</span><span class="p p-Indicator">]</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
 </span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1"># ignore all or specific files for prefix replacement`</span>
 </span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool | [path] (defaults to false)</span>
@@ -942,11 +968,11 @@ variant configuration:</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">variant</span><span class="p">:</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="c1"># Keys to forcibly use for the variant computation</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="c1"># even if they are not in the dependencies</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">use_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">string</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">use_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of strings</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="c1"># Keys to forcibly ignore for the variant computation</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="c1"># even if they are in the dependencies</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">ignore_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">string</span><span class="p p-Indicator">]</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">ignore_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of strings</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
 </span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="c1"># used to prefer this variant less</span>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer (defaults to 0, higher is less preferred)</span>
@@ -983,18 +1009,18 @@ is not actually used by any of the binaries/libraries in the package.</p>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="c1"># settings for shared libraries and executables</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">dynamic_linking</span><span class="p">:</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="c1"># linux only, list of rpaths relative to the installation prefix</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">rpaths</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">path</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(defaults to [&#39;lib/&#39;])</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">rpaths</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of paths (defaults to [&#39;lib/&#39;])</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="c1"># Allow runpath / rpath to point to these locations</span>
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="c1"># outside of the environment</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
 </span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="c1"># wether to relocate binaries or not. If this is a list of paths, then</span>
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="c1"># only the listed paths are relocated</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">binary_relocation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to true) | [glob]</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">binary_relocation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to true) | list of globs</span>
 </span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
 </span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="c1"># Allow linking against libraries that are not in the run requirements</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nt">missing_dso_allowlist</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">glob</span><span class="p p-Indicator">]</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nt">missing_dso_allowlist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
 </span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="c1"># what to do when detecting overdepending</span>
 </span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">overdepending_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
