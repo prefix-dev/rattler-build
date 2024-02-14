@@ -58,6 +58,12 @@ self-contained.
 On Windows, to obtain these dependencies from conda-forge, one can install
 `m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
 
+#### GitHub Action
+
+There is a GitHub Action for rattler-build.
+It can be used to install `rattler-build` in CI/CD workflows and run a build command.
+Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+
 ### Usage
 
 `rattler-build` comes with three commands: `build`, `test` and `rebuild`.
