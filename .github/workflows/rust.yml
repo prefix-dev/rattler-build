@@ -218,3 +218,21 @@ jobs:
           body: |
             Creating a release failed. Please check the logs for more information.
             [Failed Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+  build-post:
+    name: Post-process
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version
+        shell: bash
+        id: metadata
+        run: |
+          yq '.package.version' Cargo.toml
+          echo "project-version=$(yq '.package.version' Cargo.toml)" >> $GITHUB_OUTPUT
+      - name: Set as latest release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release edit "v${{ steps.metadata.outputs.project-version }}" --draft=false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
