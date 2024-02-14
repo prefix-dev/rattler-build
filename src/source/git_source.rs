@@ -222,6 +222,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 }
 
 #[cfg(test)]
+#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
 mod tests {
     use crate::{
         recipe::parser::{GitRev, GitSource, GitUrl},

@@ -585,6 +585,8 @@ impl Object for Env {
 
 #[cfg(test)]
 mod tests {
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     use std::path::Path;
 
     use rattler_conda_types::Platform;
@@ -593,6 +595,8 @@ mod tests {
 
     use super::*;
 
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
         let tempdir = tempfile::tempdir().unwrap();
         let dir = tempdir.path().join(key);
@@ -601,6 +605,8 @@ mod tests {
         _ = std::fs::remove_dir_all(dir).unwrap();
     }
 
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     fn git_setup(path: &Path) -> anyhow::Result<()> {
         let git_config = r#"
 [user]
@@ -611,6 +617,8 @@ mod tests {
         Ok(())
     }
 
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     fn create_repo_with_tag(path: impl AsRef<Path>, tag: impl AsRef<str>) -> anyhow::Result<()> {
         let git_with_args = |arg: &str, args: &[&str]| -> anyhow::Result<bool> {
             Ok(Command::new("git")
@@ -640,6 +648,8 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
+    // git version is too old in cross container for aarch64
+    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
     fn eval_git() {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
