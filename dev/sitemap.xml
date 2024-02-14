@@ -2,102 +2,102 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/automatic_linting/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/available_jinja/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/build_options/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/build_script/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/cli_usage/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/compilers/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/experimental_features/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/highlevel/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/internals/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/package_spec/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/rebuild/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/recipe_file/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/selectors/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/special_files/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/testing/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/variants/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/tutorials/cpp/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/tutorials/python/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/tutorials/rust/</loc>
-         <lastmod>2024-02-13</lastmod>
+         <lastmod>2024-02-14</lastmod>
          <changefreq>daily</changefreq>
     </url>
 </urlset>
