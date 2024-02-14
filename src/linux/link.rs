@@ -205,7 +205,7 @@ impl Relinker for SharedObject {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpaths.push(rpath.clone());
             } else {
-                tracing::warn!(
+                tracing::info!(
                     "rpath ({:?}) is outside of prefix ({:?}) for {:?} - removing it",
                     rpath,
                     encoded_prefix,
@@ -218,12 +218,7 @@ impl Relinker for SharedObject {
         final_rpaths = final_rpaths.into_iter().unique().collect();
 
         // run builtin relink. if it fails, try patchelf
-        if let Err(e) = builtin_relink(&self.path, &final_rpaths) {
-            tracing::warn!(
-                "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
-                &self.path.display(),
-                e
-            );
+        if builtin_relink(&self.path, &final_rpaths).is_err() {
             call_patchelf(&self.path, &final_rpaths, system_tools)?;
         }
 
