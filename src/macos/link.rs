@@ -155,18 +155,24 @@ impl Relinker for Dylib {
         let mut changes = DylibChanges::default();
         let mut modified = false;
 
-        let mut rpaths = self.rpaths.clone();
+        let resolved_rpaths = self
+            .rpaths
+            .iter()
+            .map(|rpath| self.resolve_rpath(rpath, prefix, encoded_prefix))
+            .collect::<Vec<_>>();
+        let mut new_rpaths = self.rpaths.clone();
 
         for rpath in custom_rpaths.iter().rev() {
             let rpath = encoded_prefix.join(rpath);
-            if !rpaths.contains(&rpath) {
-                rpaths.insert(0, rpath);
+            if !resolved_rpaths.contains(&rpath) {
+                tracing::debug!("Adding rpath: {:?}", rpath);
+                new_rpaths.insert(0, rpath);
             }
         }
 
         let mut final_rpaths = Vec::new();
 
-        for rpath in &self.rpaths {
+        for rpath in &new_rpaths {
             if rpath.starts_with("@loader_path") {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
@@ -253,12 +259,7 @@ impl Relinker for Dylib {
 
         if modified {
             // run builtin relink. if it fails, try install_name_tool
-            if let Err(e) = relink(&self.path, &changes) {
-                tracing::warn!(
-                    "\n\nbuiltin relink failed for {}: {}. Please file an issue on Github!\n\n",
-                    &self.path.display(),
-                    e
-                );
+            if relink(&self.path, &changes).is_err() {
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
             codesign(&self.path, system_tools)?;
