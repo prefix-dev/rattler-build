@@ -6,16 +6,31 @@ site_url: https://prefix-dev.github.io/rattler-build/
 theme:
   name: material
   custom_dir: docs/overrides
-  # favicon: assets/pixi.png
-  # logo: assets/pixi.png
+  favicon: assets/favicon.png
+  logo: assets/powerdrill.png
   font:
     text: Red Hat Text
     code: JetBrains Mono
 
   palette:
-    primary: yellow
-    accent: yellow
-    scheme: slate
+    # Palette toggle for light mode
+    - scheme: slate
+      primary: prefix
+      accent: prefix
+
+      toggle:
+        icon: material/brightness-7 
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - scheme: default
+      primary: prefix-light
+      accent: prefix-light
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+
 
   icon:
     edit: material/pencil
