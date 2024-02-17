@@ -94,6 +94,7 @@ impl Tests {
             "PREFIX".to_string(),
             environment.to_string_lossy().to_string(),
         );
+        let tmp_dir = tempfile::tempdir()?;
 
         match self {
             Tests::Commands(path) => {
@@ -101,8 +102,18 @@ impl Tests {
                     content: ScriptContent::Path(path.clone()),
                     ..Script::default()
                 };
+
+                // copy all test files to a temporary directory and set it as the working directory
+                let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+                fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+                    TestError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to copy test files: {}", e),
+                    ))
+                })?;
+
                 script
-                    .run_script(env_vars, cwd, cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -112,8 +123,9 @@ impl Tests {
                     interpreter: Some("python".into()),
                     ..Script::default()
                 };
+
                 script
-                    .run_script(env_vars, cwd, cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -142,10 +154,10 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
             continue;
         };
         if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
-            println!("test {}", file_name.to_string_lossy());
+            tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Commands(path));
         } else if file_name.eq("run_test.py") {
-            println!("test {}", file_name.to_string_lossy());
+            tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Python(path));
         }
     }
@@ -313,7 +325,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         // for each enumerated test, we load and run it
         while let Some(entry) = read_dir.next_entry().await? {
-            println!("test {:?}", entry.path());
+            tracing::info!("test {:?}", entry.path());
             run_individual_test(&pkg, &entry.path(), &prefix, &config).await?;
         }
 
@@ -365,10 +377,17 @@ async fn run_python_test(
         interpreter: Some("python".into()),
         ..Script::default()
     };
+
+    let tmp_dir = tempfile::tempdir()?;
     script
-        .run_script(Default::default(), path, path, prefix, None)
+        .run_script(Default::default(), tmp_dir.path(), path, prefix, None)
         .await
         .map_err(|_| TestError::TestFailed)?;
+
+    tracing::info!(
+        "{} python imports test passed!",
+        console::style(console::Emoji("✔", "")).green()
+    );
 
     if test.pip_check {
         let script = Script {
@@ -379,6 +398,11 @@ async fn run_python_test(
             .run_script(Default::default(), path, path, prefix, None)
             .await
             .map_err(|_| TestError::TestFailed)?;
+
+        tracing::info!(
+            "{} pip check passed!",
+            console::style(console::Emoji("✔", "")).green()
+        );
     }
 
     Ok(())
@@ -454,9 +478,19 @@ async fn run_shell_test(
         ..Default::default()
     };
 
+    // copy all test files to a temporary directory and set it as the working directory
+    let tmp_dir = tempfile::tempdir()?;
+    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+    fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+        TestError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to copy test files: {}", e),
+        ))
+    })?;
+
     tracing::info!("Testing commands:");
     script
-        .run_script(env_vars, path, path, &run_env, build_env.as_ref())
+        .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
         .await
         .map_err(|_| TestError::TestFailed)?;
 
@@ -478,7 +512,7 @@ async fn run_individual_test(
         // no test found
     }
 
-    println!(
+    tracing::info!(
         "{} test passed!",
         console::style(console::Emoji("✔", "")).green()
     );
