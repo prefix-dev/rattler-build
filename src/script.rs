@@ -166,7 +166,14 @@ impl Interpreter for CmdExeInterpreter {
         let build_script_path = args.work_dir.join("conda_build.bat");
 
         tokio::fs::write(&build_env_path, &script).await?;
-        tokio::fs::write(&build_script_path, &args.script).await?;
+
+        let build_script = format!(
+            "IF \"%CONDA_BUILD%\" == \"\" (\n     call \"{}\"\n)\n{}",
+            build_env_path.to_string_lossy(),
+            args.script
+        );
+
+        tokio::fs::write(&build_script_path, &build_script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let cmd_args = ["cmd.exe", "/d", "/c", &build_script_path_str];
