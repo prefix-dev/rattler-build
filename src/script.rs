@@ -1,5 +1,4 @@
 #![allow(missing_docs)]
-use fs_err::File;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
@@ -11,7 +10,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt::Write as WriteFmt,
-    io::{ErrorKind, Write},
+    io::ErrorKind,
     path::{Path, PathBuf},
     process::Stdio,
 };
@@ -40,7 +39,7 @@ pub struct ExecutionArgs {
 
     pub execution_platform: Platform,
 
-    pub build_prefix: PathBuf,
+    pub build_prefix: Option<PathBuf>,
     pub run_prefix: PathBuf,
 
     pub work_dir: PathBuf,
@@ -52,10 +51,12 @@ impl ExecutionArgs {
     /// will be replaced with the actual variable name.
     pub fn replacements(&self, template: &str) -> HashMap<String, String> {
         let mut replacements = HashMap::new();
-        replacements.insert(
-            self.build_prefix.to_string_lossy().to_string(),
-            template.replace("((var))", "BUILD_PREFIX"),
-        );
+        if let Some(build_prefix) = &self.build_prefix {
+            replacements.insert(
+                build_prefix.to_string_lossy().to_string(),
+                template.replace("((var))", "BUILD_PREFIX"),
+            );
+        };
         replacements.insert(
             self.run_prefix.to_string_lossy().to_string(),
             template.replace("((var))", "PREFIX"),
@@ -95,21 +96,23 @@ trait Interpreter {
 
         let host_activation = host_prefix_activator.activation(activation_vars)?;
 
-        let build_prefix_activator =
-            Activator::from_path(&args.build_prefix, shell_type, args.execution_platform)?;
+        if let Some(build_prefix) = &args.build_prefix {
+            let build_prefix_activator =
+                Activator::from_path(build_prefix, shell_type, args.execution_platform)?;
 
-        // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
-        // prefix on top of the host prefix
-        let activation_vars = ActivationVariables {
-            conda_prefix: None,
-            path: Some(host_activation.path.clone()),
-            path_modification_behavior: Default::default(),
-        };
+            let activation_vars = ActivationVariables {
+                conda_prefix: None,
+                path: Some(host_activation.path.clone()),
+                path_modification_behavior: Default::default(),
+            };
 
-        let build_activation = build_prefix_activator.activation(activation_vars)?;
+            let build_activation = build_prefix_activator.activation(activation_vars)?;
 
-        writeln!(shell_script.contents, "{}", host_activation.script)?;
-        writeln!(shell_script.contents, "{}", build_activation.script)?;
+            writeln!(shell_script.contents, "{}", host_activation.script)?;
+            writeln!(shell_script.contents, "{}", build_activation.script)?;
+        } else {
+            writeln!(shell_script.contents, "{}", host_activation.script)?;
+        }
 
         Ok(shell_script.contents)
     }
@@ -126,25 +129,28 @@ impl Interpreter for BashInterpreter {
         let build_env_path = args.work_dir.join("build_env.sh");
         let build_script_path = args.work_dir.join("conda_build.sh");
 
-        // write the files and make sure they are closed/flushed
-        {
-            let mut file = File::create(&build_env_path)?;
-            file.write_all(script.as_bytes())?;
+        tokio::fs::write(&build_env_path, script).await?;
 
-            let mut exec_file = File::create(&build_script_path)?;
-            exec_file.write_all(
-                BASH_PREAMBLE
-                    .replace("((script_path))", &build_env_path.to_string_lossy())
-                    .as_bytes(),
-            )?;
-            exec_file.write_all(args.script.as_bytes())?;
-        }
+        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
+        let script = format!("{}\n{}", preamble, args.script);
+        tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let cmd_args = ["bash", "-e", &build_script_path_str];
 
-        run_process_with_replacements(&cmd_args, &args.work_dir, &args.replacements("$((var))"))
-            .await?;
+        let output = run_process_with_replacements(
+            &cmd_args,
+            &args.work_dir,
+            &args.replacements("$((var))"),
+        )
+        .await?;
+
+        if !output.status.success() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Script failed with status {:?}", output.status),
+            ));
+        }
 
         Ok(())
     }
@@ -159,22 +165,48 @@ impl Interpreter for CmdExeInterpreter {
         let build_env_path = args.work_dir.join("build_env.bat");
         let build_script_path = args.work_dir.join("conda_build.bat");
 
-        // write the files and make sure they are closed/flushed
-        {
-            let mut file = File::create(&build_env_path)?;
-            file.write_all(script.as_bytes())?;
-
-            let mut exec_file = File::create(&build_script_path)?;
-            exec_file.write_all(args.script.as_bytes())?;
-        }
+        tokio::fs::write(&build_env_path, &script).await?;
+        tokio::fs::write(&build_script_path, &args.script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let cmd_args = ["cmd.exe", "/d", "/c", &build_script_path_str];
 
-        run_process_with_replacements(&cmd_args, &args.work_dir, &args.replacements("%((var))%"))
-            .await?;
+        let output = run_process_with_replacements(
+            &cmd_args,
+            &args.work_dir,
+            &args.replacements("%((var))%"),
+        )
+        .await?;
+
+        if !output.status.success() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Script failed with status {:?}", output.status),
+            ));
+        }
 
         Ok(())
+    }
+}
+
+struct PythonInterpreter;
+
+// python interpreter calls either bash or cmd.exe interpreter for activation and then runs python script
+impl Interpreter for PythonInterpreter {
+    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
+        let py_script = args.work_dir.join("conda_build_script.py");
+        tokio::fs::write(&py_script, args.script).await?;
+
+        let args = ExecutionArgs {
+            script: format!("python {:?}", py_script),
+            ..args
+        };
+
+        if cfg!(windows) {
+            CmdExeInterpreter.run(args).await
+        } else {
+            BashInterpreter.run(args).await
+        }
     }
 }
 
@@ -253,7 +285,7 @@ impl Script {
         work_dir: &Path,
         recipe_dir: &Path,
         run_prefix: &Path,
-        build_prefix: &Path,
+        build_prefix: Option<&PathBuf>,
     ) -> Result<(), std::io::Error> {
         let interpreter = self
             .interpreter()
@@ -285,7 +317,7 @@ impl Script {
             script: contents,
             env_vars,
             secrets,
-            build_prefix: build_prefix.to_owned(),
+            build_prefix: build_prefix.map(|p| p.to_owned()),
             run_prefix: run_prefix.to_owned(),
             execution_platform: Platform::current(),
             work_dir: work_dir.to_owned(),
@@ -294,7 +326,13 @@ impl Script {
         match interpreter {
             "bash" => BashInterpreter.run(exec_args).await?,
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
-            _ => unimplemented!(),
+            "python" => PythonInterpreter.run(exec_args).await?,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("Unsupported interpreter: {}", interpreter),
+                ))
+            }
         };
 
         Ok(())
@@ -316,7 +354,7 @@ impl Output {
                 &self.build_configuration.directories.work_dir,
                 &self.build_configuration.directories.recipe_dir,
                 &self.build_configuration.directories.host_prefix,
-                &self.build_configuration.directories.build_prefix,
+                Some(&self.build_configuration.directories.build_prefix),
             )
             .await?;
 
@@ -330,7 +368,7 @@ async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
-) -> Result<(), tokio::io::Error> {
+) -> Result<std::process::Output, std::io::Error> {
     let mut command = tokio::process::Command::new(args[0]);
     command
         .current_dir(cwd)
@@ -347,10 +385,13 @@ async fn run_process_with_replacements(
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
     let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
 
+    let mut stdout_log = String::new();
+    let mut stderr_log = String::new();
+
     loop {
-        let line = tokio::select! {
-            line = stdout_lines.next_line() => line,
-            line = stderr_lines.next_line() => line,
+        let (line, is_stderr) = tokio::select! {
+            line = stdout_lines.next_line() => (line, false),
+            line = stderr_lines.next_line() => (line, true),
             else => break,
         };
 
@@ -359,6 +400,15 @@ async fn run_process_with_replacements(
                 let filtered_line = replacements
                     .iter()
                     .fold(line, |acc, (from, to)| acc.replace(from, to));
+
+                if is_stderr {
+                    stderr_log.push_str(&filtered_line);
+                    stderr_log.push('\n');
+                } else {
+                    stdout_log.push_str(&filtered_line);
+                    stdout_log.push('\n');
+                }
+
                 tracing::info!("{}", filtered_line);
             }
             Ok(None) => break,
@@ -368,14 +418,11 @@ async fn run_process_with_replacements(
         };
     }
 
-    let status = child.wait().await.expect("Failed to wait on child");
+    let status = child.wait().await?;
 
-    if !status.success() {
-        return Err(tokio::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Command failed with status: {:?}", status),
-        ));
-    }
-
-    Ok(())
+    Ok(std::process::Output {
+        status,
+        stdout: stdout_log.into_bytes(),
+        stderr: stderr_log.into_bytes(),
+    })
 }

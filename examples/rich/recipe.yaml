@@ -15,7 +15,11 @@ build:
   # Thanks to `noarch: python` this package works on all platforms
   noarch: python
   script:
-    - python -m pip install . -vv --no-deps --no-build-isolation
+    secrets: 
+      - IAMSECRET
+    content:
+      - echo $IAMSECRET
+      - python -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
   host:
