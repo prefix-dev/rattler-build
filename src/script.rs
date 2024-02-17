@@ -156,6 +156,13 @@ impl Interpreter for BashInterpreter {
     }
 }
 
+const CMDEXE_PREAMBLE: &str = r#"
+chcp 65001 > nul
+IF "%CONDA_BUILD%" == "" (
+    call ((script_path))
+)
+"#;
+
 struct CmdExeInterpreter;
 
 impl Interpreter for CmdExeInterpreter {
@@ -168,11 +175,10 @@ impl Interpreter for CmdExeInterpreter {
         tokio::fs::write(&build_env_path, &script).await?;
 
         let build_script = format!(
-            "IF \"%CONDA_BUILD%\" == \"\" (\n     call \"{}\"\n)\n{}",
-            build_env_path.to_string_lossy(),
+            "{}\n{}",
+            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
             args.script
         );
-
         tokio::fs::write(&build_script_path, &build_script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
