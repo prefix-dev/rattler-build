@@ -21,6 +21,7 @@ use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
 use rattler_shell::activation::ActivationError;
 
+use crate::env_vars;
 use crate::recipe::parser::{Script, ScriptContent};
 use crate::{
     recipe::parser::{CommandsTestRequirements, PythonTest},
@@ -86,6 +87,14 @@ enum Tests {
 impl Tests {
     async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
+
+        let mut env_vars = env_vars::os_vars(environment, &Platform::current());
+        env_vars.retain(|key, _| key != "PATH");
+        env_vars.insert(
+            "PREFIX".to_string(),
+            environment.to_string_lossy().to_string(),
+        );
+
         match self {
             Tests::Commands(path) => {
                 let script = Script {
@@ -93,7 +102,7 @@ impl Tests {
                     ..Script::default()
                 };
                 script
-                    .run_script(Default::default(), cwd, cwd, environment, None)
+                    .run_script(env_vars, cwd, cwd, environment, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -104,7 +113,7 @@ impl Tests {
                     ..Script::default()
                 };
                 script
-                    .run_script(Default::default(), cwd, cwd, environment, None)
+                    .run_script(env_vars, cwd, cwd, environment, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -436,24 +445,18 @@ async fn run_shell_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let test_file_path = if platform.is_windows() {
-        path.join("run_test.bat")
-    } else {
-        path.join("run_test.sh")
-    };
-
-    let contents = fs::read_to_string(test_file_path)?;
+    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
+    env_vars.retain(|key, _| key != "PATH");
+    env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
     let script = Script {
-        interpreter: None,
-        env: Default::default(),
-        secrets: Default::default(),
-        content: crate::recipe::parser::ScriptContent::Command(contents),
+        content: ScriptContent::Path(PathBuf::from("run_test")),
+        ..Default::default()
     };
 
     tracing::info!("Testing commands:");
     script
-        .run_script(Default::default(), path, path, &run_env, build_env.as_ref())
+        .run_script(env_vars, path, path, &run_env, build_env.as_ref())
         .await
         .map_err(|_| TestError::TestFailed)?;
 
