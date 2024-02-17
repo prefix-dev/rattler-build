@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
 use rattler_conda_types::Platform;
-use rattler_shell::activation::{ActivationError, ActivationVariables, Activator};
-use rattler_shell::shell::Shell;
 
 use crate::linux;
 use crate::macos;
@@ -339,96 +337,4 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // ];
 
     vars
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ScriptError {
-    #[error("Failed to write build env script")]
-    WriteBuildEnv(#[from] std::io::Error),
-
-    #[error("Failed to write activate script")]
-    WriteActivation(#[from] std::fmt::Error),
-
-    #[error("Failed to create activation script")]
-    CreateActivation(#[from] ActivationError),
-}
-
-/// Write a script that can be sourced to set the environment variables for the build process.
-/// The script will also activate the host and build prefixes.
-pub fn write_env_script<T: Shell + Clone>(
-    output: &Output,
-    state: &str,
-    out: &mut impl std::io::Write,
-    shell_type: T,
-) -> Result<(), ScriptError> {
-    let directories = &output.build_configuration.directories;
-
-    let vars = vars(output, state);
-    let mut s = String::new();
-    for v in vars {
-        shell_type.set_env_var(&mut s, &v.0, &v.1)?;
-    }
-
-    let platform = output.build_configuration.target_platform;
-
-    let additional_os_vars = os_vars(&directories.host_prefix, &platform);
-
-    for (k, v) in additional_os_vars {
-        shell_type.set_env_var(&mut s, &k, &v)?;
-    }
-
-    for (k, v) in output.recipe.build().script().env() {
-        shell_type.set_env_var(&mut s, k, v)?;
-    }
-
-    if !output.recipe.build().script().secrets().is_empty() {
-        tracing::error!("Secrets are not supported yet");
-    }
-
-    writeln!(out, "{}", s)?;
-
-    let host_prefix_activator = Activator::from_path(
-        &directories.host_prefix,
-        shell_type.clone(),
-        output.build_configuration.build_platform,
-    )?;
-    let current_path = std::env::var("PATH")
-        .ok()
-        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
-
-    // if we are in a conda environment, we need to deactivate it before activating the host / build prefix
-    let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-
-    let activation_vars = ActivationVariables {
-        conda_prefix,
-        path: current_path,
-        path_modification_behavior: Default::default(),
-    };
-
-    let host_activation = host_prefix_activator
-        .activation(activation_vars)
-        .expect("Could not activate host prefix");
-
-    let build_prefix_activator = Activator::from_path(
-        &directories.build_prefix,
-        shell_type,
-        output.build_configuration.build_platform,
-    )?;
-
-    // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
-    // prefix on top of the host prefix
-    let activation_vars = ActivationVariables {
-        conda_prefix: None,
-        path: Some(host_activation.path.clone()),
-        path_modification_behavior: Default::default(),
-    };
-
-    let build_activation = build_prefix_activator
-        .activation(activation_vars)
-        .expect("Could not activate host prefix");
-
-    writeln!(out, "{}", host_activation.script)?;
-    writeln!(out, "{}", build_activation.script)?;
-
-    Ok(())
 }
