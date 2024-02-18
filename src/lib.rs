@@ -8,6 +8,7 @@ pub mod package_test;
 pub mod packaging;
 pub mod recipe;
 pub mod render;
+pub mod script;
 pub mod selectors;
 pub mod source;
 pub mod system_tools;

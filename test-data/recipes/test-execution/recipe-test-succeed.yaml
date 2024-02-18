@@ -15,5 +15,13 @@ tests:
     - if: unix
       then:
         - test -f $PREFIX/test-execution.txt
+        - test -f ./testfile.txt
+        - test -f ./testfolder/data.txt
       else:
         - if not exist %PREFIX%\test-execution.txt (exit 1)
+        - if not exist .\testfile.txt (exit 1)
+        - if not exist .\testfolder\data.txt (exit 1)
+    files:
+      recipe:
+        - testfile.txt
+        - testfolder/

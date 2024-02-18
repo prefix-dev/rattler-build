@@ -13,15 +13,15 @@ use std::{borrow::Cow, collections::BTreeMap, path::PathBuf};
 #[derive(Debug, Default, Clone)]
 pub struct Script {
     /// The interpreter to use for the script.
-    pub(super) interpreter: Option<String>,
+    pub interpreter: Option<String>,
     /// Environment variables to set in the build environment.
-    pub(super) env: BTreeMap<String, String>,
+    pub env: BTreeMap<String, String>,
     /// Environment variables to leak into the build environment from the host system that
     /// contain sensitve information. Use with care because this might make recipes no
     /// longer reproducible on other machines.
-    pub(super) secrets: Vec<String>,
+    pub secrets: Vec<String>,
     /// The contents of the script, either a path or a list of commands.
-    pub(super) content: ScriptContent,
+    pub content: ScriptContent,
 }
 
 impl Serialize for Script {

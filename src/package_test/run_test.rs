@@ -11,7 +11,6 @@ use fs_err as fs;
 use rattler_conda_types::package::IndexJson;
 use std::fmt::Write as fmt_write;
 use std::{
-    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -20,13 +19,11 @@ use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
-use rattler_shell::{
-    activation::{ActivationError, ActivationVariables, Activator},
-    shell::{Shell, ShellEnum, ShellScript},
-};
+use rattler_shell::activation::ActivationError;
 
+use crate::env_vars;
+use crate::recipe::parser::{Script, ScriptContent};
 use crate::{
-    env_vars,
     recipe::parser::{CommandsTestRequirements, PythonTest},
     render::solver::create_environment,
     tool_configuration,
@@ -50,8 +47,8 @@ pub enum TestError {
     #[error("failed to run test")]
     TestFailed,
 
-    #[error("failed to read package: {0}")]
-    PackageRead(#[from] std::io::Error),
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 
     #[error("failed to write testing script: {0}")]
     FailedToWriteScript(#[from] std::fmt::Error),
@@ -87,143 +84,57 @@ enum Tests {
     Python(PathBuf),
 }
 
-fn run_in_environment(
-    shell: ShellEnum,
-    cmd: String,
-    cwd: &Path,
-    environment: &Path,
-    build_environment: Option<PathBuf>,
-) -> Result<(), TestError> {
-    let current_path = std::env::var("PATH")
-        .ok()
-        .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
-
-    // if we are in a conda environment, we need to deactivate it before activating the host / build prefix
-    let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-
-    let activation_vars = ActivationVariables {
-        conda_prefix,
-        path: current_path,
-        path_modification_behavior: Default::default(),
-    };
-
-    let host_prefix_activator =
-        Activator::from_path(environment, shell.clone(), Platform::current())?;
-
-    let host_activation = host_prefix_activator
-        .activation(activation_vars)
-        .expect("Could not activate host prefix");
-
-    let build_activation_script = if let Some(build_environment) = build_environment {
-        // We use the previous PATH and _no_ CONDA_PREFIX to stack the build
-        // prefix on top of the host prefix
-        let activation_vars = ActivationVariables {
-            conda_prefix: None,
-            path: Some(host_activation.path.clone()),
-            path_modification_behavior: Default::default(),
-        };
-
-        let activator =
-            Activator::from_path(&build_environment, shell.clone(), Platform::current())?;
-        activator.activation(activation_vars)?.script
-    } else {
-        String::new()
-    };
-
-    let mut script_content = String::new();
-    let mut additional_script = ShellScript::new(shell.clone(), Platform::current());
-
-    let os_vars = env_vars::os_vars(environment, &Platform::current());
-    for (key, val) in os_vars {
-        if key == "PATH" {
-            continue;
-        }
-        additional_script.set_env_var(&key, &val);
-    }
-
-    additional_script.set_env_var("PREFIX", environment.to_string_lossy().as_ref());
-    writeln!(script_content, "{}", additional_script.contents)?;
-    writeln!(script_content, "{}", host_activation.script)?;
-    writeln!(script_content, "{}", build_activation_script)?;
-    if matches!(shell, ShellEnum::Bash(_)) {
-        writeln!(script_content, "set -x")?;
-    }
-    writeln!(script_content, "{}", cmd)?;
-
-    let mut tmpfile = tempfile::Builder::new()
-        .prefix("rattler-test-")
-        .suffix(&format!(".{}", shell.extension()))
-        .tempfile()?;
-
-    if matches!(shell, ShellEnum::CmdExe(_)) {
-        script_content = format!("chcp 65001 > nul\n{script_content}").replace('\n', "\r\n");
-        tmpfile.write_all(script_content.as_bytes())?;
-    } else {
-        tmpfile.write_all(script_content.as_bytes())?;
-    }
-
-    let tmpfile_path = tmpfile.into_temp_path();
-
-    tracing::info!("Running test script:\n{}", script_content);
-
-    let executable = shell.executable();
-    let status = match shell {
-        ShellEnum::Bash(_) => std::process::Command::new(executable)
-            .arg("-e")
-            .arg(&tmpfile_path)
-            .current_dir(cwd)
-            .status()?,
-        ShellEnum::CmdExe(_) => std::process::Command::new(executable)
-            .arg("/d")
-            .arg("/c")
-            .arg(&tmpfile_path)
-            .current_dir(cwd)
-            .status()?,
-        _ => todo!("No shells implemented beyond cmd.exe and bash"),
-    };
-
-    if !status.success() {
-        return Err(TestError::TestFailed);
-    }
-
-    Ok(())
-}
-
 impl Tests {
-    fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
-        let default_shell = ShellEnum::default();
+    async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
+        tracing::info!("Testing commands:");
+
+        let mut env_vars = env_vars::os_vars(environment, &Platform::current());
+        env_vars.retain(|key, _| key != "PATH");
+        env_vars.insert(
+            "PREFIX".to_string(),
+            environment.to_string_lossy().to_string(),
+        );
+        let tmp_dir = tempfile::tempdir()?;
 
         match self {
             Tests::Commands(path) => {
-                let contents = fs::read_to_string(path)?;
-                let is_path_ext =
-                    |ext: &str| path.extension().map(|s| s.eq(ext)).unwrap_or_default();
-                if Platform::current().is_windows() && is_path_ext("bat") {
-                    tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment, None)
-                } else if Platform::current().is_unix() && is_path_ext("sh") {
-                    tracing::info!("Testing commands:");
-                    run_in_environment(default_shell, contents, cwd, environment, None)
-                } else {
-                    Ok(())
-                }
+                let script = Script {
+                    content: ScriptContent::Path(path.clone()),
+                    ..Script::default()
+                };
+
+                // copy all test files to a temporary directory and set it as the working directory
+                let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+                fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+                    TestError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Failed to copy test files: {}", e),
+                    ))
+                })?;
+
+                script
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .await
+                    .map_err(|_| TestError::TestFailed)?;
             }
             Tests::Python(path) => {
-                let imports = fs::read_to_string(path)?;
-                tracing::info!("Testing Python imports:\n{imports}");
-                run_in_environment(
-                    default_shell,
-                    format!("python {}", path.to_string_lossy()),
-                    cwd,
-                    environment,
-                    None,
-                )
+                let script = Script {
+                    content: ScriptContent::Path(path.clone()),
+                    interpreter: Some("python".into()),
+                    ..Script::default()
+                };
+
+                script
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .await
+                    .map_err(|_| TestError::TestFailed)?;
             }
         }
+        Ok(())
     }
 }
 
-async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), TestError> {
+async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), std::io::Error> {
     let mut tests = Vec::new();
 
     let test_folder = pkg.join("info/test");
@@ -243,10 +154,10 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), T
             continue;
         };
         if file_name.eq("run_test.sh") || file_name.eq("run_test.bat") {
-            println!("test {}", file_name.to_string_lossy());
+            tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Commands(path));
         } else if file_name.eq("run_test.py") {
-            println!("test {}", file_name.to_string_lossy());
+            tracing::info!("test {}", file_name.to_string_lossy());
             tests.push(Tests::Python(path));
         }
     }
@@ -398,7 +309,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder)?;
+            test.run(&prefix, &test_folder).await?;
         }
 
         tracing::info!(
@@ -414,7 +325,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         // for each enumerated test, we load and run it
         while let Some(entry) = read_dir.next_entry().await? {
-            println!("test {:?}", entry.path());
+            tracing::info!("test {:?}", entry.path());
             run_individual_test(&pkg, &entry.path(), &prefix, &config).await?;
         }
 
@@ -436,7 +347,7 @@ async fn run_python_test(
     config: &TestConfiguration,
 ) -> Result<(), TestError> {
     let test_file = path.join("python_test.json");
-    let test: PythonTest = serde_json::from_str(&fs::read_to_string(test_file)?)?;
+    let test: PythonTest = serde_json::from_reader(fs::File::open(test_file)?)?;
 
     let match_spec =
         MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
@@ -446,11 +357,9 @@ async fn run_python_test(
         dependencies.push(MatchSpec::from_str("pip").unwrap());
     }
 
-    let platform = Platform::current();
-
     create_environment(
         &dependencies,
-        &platform,
+        &Platform::current(),
         prefix,
         &config.channels,
         &config.tool_configuration,
@@ -458,30 +367,45 @@ async fn run_python_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let default_shell = ShellEnum::default();
-
-    let mut test_file = tempfile::Builder::new()
-        .prefix("rattler-test-")
-        .suffix(".py")
-        .tempfile()?;
-
+    let mut imports = String::new();
     for import in test.imports {
-        writeln!(test_file, "import {}", import)?;
+        writeln!(imports, "import {}", import)?;
     }
 
-    run_in_environment(
-        default_shell.clone(),
-        format!("python {}", test_file.path().to_string_lossy()),
-        path,
-        prefix,
-        None,
-    )?;
+    let script = Script {
+        content: ScriptContent::Command(imports),
+        interpreter: Some("python".into()),
+        ..Script::default()
+    };
+
+    let tmp_dir = tempfile::tempdir()?;
+    script
+        .run_script(Default::default(), tmp_dir.path(), path, prefix, None)
+        .await
+        .map_err(|_| TestError::TestFailed)?;
+
+    tracing::info!(
+        "{} python imports test passed!",
+        console::style(console::Emoji("✔", "")).green()
+    );
 
     if test.pip_check {
-        run_in_environment(default_shell, "pip check".into(), path, prefix, None)
-    } else {
-        Ok(())
+        let script = Script {
+            content: ScriptContent::Command("pip check".into()),
+            ..Script::default()
+        };
+        script
+            .run_script(Default::default(), path, path, prefix, None)
+            .await
+            .map_err(|_| TestError::TestFailed)?;
+
+        tracing::info!(
+            "{} pip check passed!",
+            console::style(console::Emoji("✔", "")).green()
+        );
     }
+
+    Ok(())
 }
 
 async fn run_shell_test(
@@ -545,18 +469,30 @@ async fn run_shell_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let default_shell = ShellEnum::default();
+    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
+    env_vars.retain(|key, _| key != "PATH");
+    env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
-    let test_file_path = if platform.is_windows() {
-        path.join("run_test.bat")
-    } else {
-        path.join("run_test.sh")
+    let script = Script {
+        content: ScriptContent::Path(PathBuf::from("run_test")),
+        ..Default::default()
     };
 
-    let contents = fs::read_to_string(test_file_path)?;
+    // copy all test files to a temporary directory and set it as the working directory
+    let tmp_dir = tempfile::tempdir()?;
+    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
+    fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+        TestError::IoError(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to copy test files: {}", e),
+        ))
+    })?;
 
     tracing::info!("Testing commands:");
-    run_in_environment(default_shell, contents, path, &run_env, build_env)?;
+    script
+        .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
+        .await
+        .map_err(|_| TestError::TestFailed)?;
 
     Ok(())
 }
@@ -576,7 +512,7 @@ async fn run_individual_test(
         // no test found
     }
 
-    println!(
+    tracing::info!(
         "{} test passed!",
         console::style(console::Emoji("✔", "")).green()
     );
