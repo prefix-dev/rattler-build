@@ -1,5 +1,3 @@
-# Rattler-Build
-
 <h1>
   <a href="https://github.com/prefix-dev/rattler-build/">
     <img alt="banner" src="https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg">
@@ -16,23 +14,23 @@ run is a package that can be installed using `mamba`, `rattler` or `conda`.
 `rattler-build` does not have any dependencies on `conda-build` or `Python` and
 works as a standalone binary.
 
+![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
+
 ### Installation
 
 You can grab a prerelease version of `rattler-build` from the [Github
 Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
-It is (of course) also available from conda-forge:
-
-```bash
-pixi global install rattler-build
-# or with micromamba
-micromamba install rattler-build -c conda-forge
-```
-
 Alternatively, you can install `rattler-build` via Homebrew:
 
-```bash
+```
 brew install rattler-build
+```
+
+`rattler-build` is also available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
+
+```
+pacman -S rattler-build
 ```
 
 #### Dependencies
@@ -58,7 +56,12 @@ self-contained.
 On Windows, to obtain these dependencies from conda-forge, one can install
 `m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
 
-#### GitHub Action
+### Documentation
+
+We have extensive documentation for `rattler-build`. You can find the [book
+here](https://prefix-dev.github.io/rattler-build).
+
+### GitHub Action
 
 There is a GitHub Action for rattler-build.
 It can be used to install `rattler-build` in CI/CD workflows and run a build command.
@@ -66,26 +69,25 @@ Please check out the [GitHub Action documentation](https://github.com/prefix-dev
 
 ### Usage
 
-`rattler-build` comes with three commands: `build`, `test` and `rebuild`.
+`rattler-build` comes with two commands: `build` and `test`.
 
 The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
 (tests are shipped with the package).
 
-The `rebuild` command can be used to attempt a reproducible rebuild of an existing package.
-
 ### The recipe format
 
-> **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
+> **Note** You can find all examples below in the [`examples`](./examples/)
 > folder and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   name: xtensor
   version: 0.24.6
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 package:
   name: ${{ name|lower }}
@@ -93,14 +95,10 @@ package:
 
 source:
   url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: ${{ sha256 }}
+  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 build:
   number: 0
-  # note: in the new recipe format, `skip` is a list of conditional expressions
-  #       but for the "YAML format" discussion we pretend that we still use the
-  #       `skip: bool` syntax
-  skip: ${{ true if (win and vc14) }}
   script:
     - if: win
       then: |
@@ -121,7 +119,7 @@ requirements:
     - xtl >=0.7,<0.8
   run:
     - xtl >=0.7,<0.8
-  run_constrained:
+  run_constraints:
     - xsimd >=8.0.3,<10
 
 tests:
