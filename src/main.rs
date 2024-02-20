@@ -207,7 +207,7 @@ struct BuildOpts {
 
     /// The package format to use for the build. Can be one of `tar-bz2` or `conda`.
     /// You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
-    #[arg(long, default_value = "tar-bz2")]
+    #[arg(long, default_value = "conda")]
     package_format: PackageFormatAndCompression,
 
     #[arg(long)]
