@@ -630,6 +630,26 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    Logs
+  </a>
+  
+    <nav class="md-nav" aria-label="Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-integration" class="md-nav__link">
+    Github integration
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -785,6 +805,26 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#logs" class="md-nav__link">
+    Logs
+  </a>
+  
+    <nav class="md-nav" aria-label="Logs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#github-integration" class="md-nav__link">
+    Github integration
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -841,6 +881,16 @@ Now you can use TAB or your configured completion key. :3</p>
 </span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="c1"># maximum compression with 10 threads</span>
 </span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--package-format<span class="w"> </span>conda:max<span class="w"> </span>--compression-threads<span class="w"> </span><span class="m">10</span><span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
 </span></code></pre></div>
+<h2 id="logs">Logs<a class="headerlink" href="#logs" title="Permanent link">#</a></h2>
+<p>Rattler-build knows 3 different log-styles: <code>fancy</code>, <code>plain</code> and <code>json</code>.
+You can configure them with the <code>--log-style=&lt;style&gt;</code> flag.</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># default</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--log-style<span class="w"> </span>fancy<span class="w"> </span>-r<span class="w"> </span>recipe/recipe.yaml
+</span></code></pre></div>
+<h3 id="github-integration">Github integration<a class="headerlink" href="#github-integration" title="Permanent link">#</a></h3>
+<p>Rattler-build also has a github integration. With this integration, warnings are automatically
+emitted in the github actions log and a summary is generated that is posted to the Github Actions summary page.</p>
+<p>To make use of the integration we recommend to use our Github action: <a href="https://github.com/prefix-dev/rattler-build-action"><code>rattler-build-action</code></a>. To manually enable it, you can set the environment variable <code>RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION=true</code>.</p>
 
 
 
