@@ -37,6 +37,7 @@ class RattlerBuild:
         if variant_config is not None:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
+        args += ["--package-format", str("tar.bz2")]
 
         if custom_channels:
             for c in custom_channels:
