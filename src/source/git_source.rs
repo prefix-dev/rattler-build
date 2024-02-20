@@ -16,7 +16,7 @@ use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
 pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceError> {
-    println!("Fetching repository from {} at {}", url, rev);
+    tracing::info!("Fetching repository from {} at {}", url, rev);
     let mut command = git_command("fetch");
     let output = command
         .args([url.to_string().as_str(), rev])

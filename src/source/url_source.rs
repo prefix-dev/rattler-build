@@ -7,7 +7,6 @@ use std::{
 
 use crate::{
     recipe::parser::{Checksum, UrlSource},
-    render::solver::default_bytes_style,
     tool_configuration,
 };
 use rattler_digest::{compute_file_digest, Md5};
@@ -139,12 +138,10 @@ pub(crate) async fn url_src(
         }
     };
 
-    let progress_bar = tool_configuration.multi_progress_indicator.add(
+    let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
         indicatif::ProgressBar::new(download_size)
             .with_prefix("Downloading")
-            .with_style(default_bytes_style().map_err(|_| {
-                SourceError::UnknownError("Failed to get progress bar style".to_string())
-            })?),
+            .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
     );
     progress_bar.set_message(
         source

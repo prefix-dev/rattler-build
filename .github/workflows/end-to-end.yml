@@ -22,6 +22,7 @@ env:
   RUST_BACKTRACE: 1
   RUSTFLAGS: "-D warnings"
   CARGO_TERM_COLOR: always
+  RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
 
 jobs:
   run_tests:

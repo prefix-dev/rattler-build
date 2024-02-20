@@ -8,7 +8,7 @@ platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 [tasks]
 build = "cargo build --release"
 install = "cargo install --path . --locked"
-end_to_end_test = "pytest test/end-to-end -v"
+end_to_end_test = "pytest test/end-to-end -v -s"
 test = "cargo test"
 lint = "pre-commit run --all"
 build-docs = "mkdocs build --strict"
