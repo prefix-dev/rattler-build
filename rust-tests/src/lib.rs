@@ -40,6 +40,7 @@ mod tests {
                 "build",
                 "--recipe",
                 rs.as_str(),
+                "--package-format=tarbz2",
                 "--output-dir",
                 od.as_str(),
             ];
