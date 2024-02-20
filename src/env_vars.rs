@@ -1,5 +1,4 @@
 //! Functions to collect environment variables that are used during the build process.
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
@@ -34,26 +33,33 @@ fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> Pat
 /// - SP_DIR: Python site-packages directory
 /// - NPY_VER: Numpy version (major.minor), e.g. 1.19
 /// - NPY_DISTUTILS_APPEND_FLAGS: 1 (https://github.com/conda/conda-build/pull/3015)
-pub fn python_vars(
-    prefix: &Path,
-    platform: &Platform,
-    variant: &BTreeMap<String, String>,
-) -> HashMap<String, String> {
+pub fn python_vars(output: &Output) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
-    if platform.is_windows() {
-        let python = prefix.join("python.exe");
+    if output.host_platform().is_windows() {
+        let python = output.prefix().join("python.exe");
         result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
     } else {
-        let python = prefix.join("bin/python");
+        let python = output.prefix().join("bin/python");
         result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
     }
 
-    if let Some(py_ver) = variant.get("python") {
+    // find python in the host dependencies
+    let mut python_version = output.variant().get("python").map(|s| s.to_string());
+    if python_version.is_none() {
+        if let Some((record, requested)) = output.find_resolved_package("python") {
+            if requested {
+                python_version = Some(record.package_record.version.to_string());
+            }
+        }
+    }
+
+    if let Some(py_ver) = python_version {
         let py_ver = py_ver.split('.').collect::<Vec<_>>();
         let py_ver_str = format!("{}.{}", py_ver[0], py_ver[1]);
-        let stdlib_dir = get_stdlib_dir(prefix, platform, &py_ver_str);
-        let site_packages_dir = get_sitepackages_dir(prefix, platform, &py_ver_str);
+        let stdlib_dir = get_stdlib_dir(output.prefix(), output.host_platform(), &py_ver_str);
+        let site_packages_dir =
+            get_sitepackages_dir(output.prefix(), output.host_platform(), &py_ver_str);
         result.insert(
             "PY3K".to_string(),
             if py_ver[0] == "3" {
@@ -73,7 +79,7 @@ pub fn python_vars(
         );
     }
 
-    if let Some(npy_version) = variant.get("numpy") {
+    if let Some(npy_version) = output.variant().get("numpy") {
         let np_ver = npy_version.split('.').collect::<Vec<_>>();
         let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
 
@@ -91,23 +97,19 @@ pub fn python_vars(
 /// - R: Path to R executable
 /// - R_USER: Path to R user directory
 ///
-pub fn r_vars(
-    prefix: &Path,
-    platform: &Platform,
-    variant: &BTreeMap<String, String>,
-) -> HashMap<String, String> {
+pub fn r_vars(output: &Output) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
-    if let Some(r_ver) = variant.get("r-base") {
+    if let Some(r_ver) = output.variant().get("r-base") {
         result.insert("R_VER".to_string(), r_ver.clone());
 
-        let r_bin = if platform.is_windows() {
-            prefix.join("Scripts/R.exe")
+        let r_bin = if output.host_platform().is_windows() {
+            output.prefix().join("Scripts/R.exe")
         } else {
-            prefix.join("bin/R")
+            output.prefix().join("bin/R")
         };
 
-        let r_user = prefix.join("Libs/R");
+        let r_user = output.prefix().join("Libs/R");
 
         result.insert("R".to_string(), r_bin.to_string_lossy().to_string());
         result.insert("R_USER".to_string(), r_user.to_string_lossy().to_string());
@@ -116,15 +118,11 @@ pub fn r_vars(
     result
 }
 
-pub fn language_vars(
-    prefix: &Path,
-    platform: &Platform,
-    variant: &BTreeMap<String, String>,
-) -> HashMap<String, String> {
+pub fn language_vars(output: &Output) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
-    result.extend(python_vars(prefix, platform, variant));
-    result.extend(r_vars(prefix, platform, variant));
+    result.extend(python_vars(output));
+    result.extend(r_vars(output));
 
     result
 }
@@ -214,13 +212,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
-    if let Some((_, host_arch)) = output
-        .build_configuration
-        .host_platform
-        .to_string()
-        .rsplit_once('-')
-    {
-        // TODO clear if we want/need this variable this seems to be pretty bad (in terms of cross compilation, etc.)
+    if let Some((_, host_arch)) = output.host_platform().to_string().rsplit_once('-') {
         insert!(vars, "ARCH", host_arch);
     }
 
@@ -282,7 +274,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         output.recipe.build().number().to_string()
     );
 
-    // TODO this is inaccurate
+    let hash = output.build_configuration.hash.clone();
     insert!(
         vars,
         "PKG_BUILD_STRING",
@@ -290,10 +282,11 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
             .recipe
             .build()
             .string()
-            .unwrap_or_default()
-            .to_owned()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| hash.to_string())
     );
-    insert!(vars, "PKG_HASH", output.build_configuration.hash.clone());
+    insert!(vars, "PKG_HASH", hash);
+
     if output.build_configuration.cross_compilation() {
         insert!(vars, "CONDA_BUILD_CROSS_COMPILATION", "1");
     } else {
@@ -316,12 +309,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     );
     insert!(vars, "CONDA_BUILD_STATE", build_state);
 
-    vars.extend(language_vars(
-        &directories.host_prefix,
-        // Note: host_platform cannot be noarch
-        &output.build_configuration.host_platform,
-        &output.build_configuration.variant,
-    ));
+    vars.extend(language_vars(output));
 
     // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
     // this value will be taken from the previous package for rebuild purposes
@@ -330,11 +318,6 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         "SOURCE_DATE_EPOCH".to_string(),
         timestamp_epoch_secs.to_string(),
     );
-
-    // let vars: Vec<(String, String)> = vec![
-    //     // build configuration
-    //     // (s!("CONDA_BUILD_SYSROOT"), s!("")),
-    // ];
 
     vars
 }
