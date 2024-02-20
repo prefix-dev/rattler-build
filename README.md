@@ -35,6 +35,14 @@ works as a standalone binary.
 You can grab a prerelease version of `rattler-build` from the [Github
 Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
+It is (of course) also available from conda-forge:
+
+```bash
+pixi global install rattler-build
+# or with micromamba
+micromamba install rattler-build -c conda-forge
+```
+
 Alternatively, you can install `rattler-build` via Homebrew:
 
 ```
