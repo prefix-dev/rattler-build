@@ -366,6 +366,26 @@ impl Output {
         summary.build_end = Some(chrono::Utc::now());
     }
 
+    /// Shorthand to retrieve the variant configuration for this output
+    pub fn variant(&self) -> &BTreeMap<String, String> {
+        &self.build_configuration.variant
+    }
+
+    /// Shorthand to retrieve the host prefix for this output
+    pub fn prefix(&self) -> &Path {
+        &self.build_configuration.directories.host_prefix
+    }
+
+    /// Shorthand to retrieve the build prefix for this output
+    pub fn build_prefix(&self) -> &Path {
+        &self.build_configuration.directories.build_prefix
+    }
+
+    /// Shorthand to retrieve the target platform for this output
+    pub fn target_platform(&self) -> &Platform {
+        &self.build_configuration.target_platform
+    }
+
     /// Print a nice summary of the build
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();
