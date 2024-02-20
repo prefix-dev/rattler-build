@@ -756,7 +756,11 @@ async fn resolve_dependencies(
     }
 
     // log a table of the rendered run dependencies
-    tracing::info!("\nFinalized run dependencies:\n{}", run_specs);
+    if run_specs.depends.is_empty() && run_specs.constrains.is_empty() {
+        tracing::info!("\nFinalized run dependencies: this output has no run dependencies");
+    } else {
+        tracing::info!("\nFinalized run dependencies:\n{}", run_specs);
+    }
 
     Ok(FinalizedDependencies {
         // build_env is empty now!
