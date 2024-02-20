@@ -303,7 +303,6 @@ pub(crate) fn create_entry_points(
         return Ok(Vec::new());
     }
 
-    let target_platform = &output.build_configuration.target_platform;
     let mut new_files = Vec::new();
 
     let (python_record, _) = output.find_resolved_package("python").ok_or_else(|| {
@@ -316,22 +315,18 @@ pub(crate) fn create_entry_points(
 
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
-            &output
-                .build_configuration
-                .directories
-                .host_prefix
-                .to_string_lossy(),
+            &output.prefix().to_string_lossy(),
             ep,
-            &PythonInfo::from_version(&python_version, output.build_configuration.target_platform)
-                .map_err(|e| {
-                    PackagingError::CannotCreateEntryPoint(format!(
-                        "Could not create python info: {}",
-                        e
-                    ))
-                })?,
+            // using target_platform is OK because this should never be noarch
+            &PythonInfo::from_version(&python_version, *output.target_platform()).map_err(|e| {
+                PackagingError::CannotCreateEntryPoint(format!(
+                    "Could not create python info: {}",
+                    e
+                ))
+            })?,
         );
 
-        if target_platform.is_windows() {
+        if output.target_platform().is_windows() {
             fs::create_dir_all(tmp_dir_path.join("Scripts"))?;
 
             let script_path = tmp_dir_path.join(format!("Scripts/{}-script.py", ep.command));
@@ -341,7 +336,7 @@ pub(crate) fn create_entry_points(
             // write exe launcher as well
             let exe_path = tmp_dir_path.join(format!("Scripts/{}.exe", ep.command));
             let mut exe = fs::File::create(&exe_path)?;
-            exe.write_all(get_windows_launcher(target_platform))?;
+            exe.write_all(get_windows_launcher(output.target_platform()))?;
 
             new_files.extend(vec![script_path, exe_path]);
         } else {
@@ -357,12 +352,12 @@ pub(crate) fn create_entry_points(
                 std::os::unix::fs::PermissionsExt::from_mode(0o775),
             )?;
 
-            if output.build_configuration.target_platform.is_osx()
+            if output.target_platform().is_osx()
                 && output.recipe.build().python().use_python_app_entrypoint
             {
                 fix_shebang(
                     &script_path,
-                    &output.build_configuration.directories.host_prefix,
+                    output.prefix(),
                     output.recipe.build().python().use_python_app_entrypoint,
                 )?;
             }
