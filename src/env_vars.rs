@@ -47,15 +47,9 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
     // find python in the host dependencies
     let mut python_version = output.variant().get("python").map(|s| s.to_string());
     if python_version.is_none() {
-        if let Some(finalized_deps) = &output.finalized_dependencies {
-            if let Some(host) = &finalized_deps.host {
-                let python_record = host
-                    .resolved
-                    .iter()
-                    .find(|record| record.package_record.name.as_normalized() == "python");
-                if let Some(python_record) = python_record {
-                    python_version = Some(python_record.package_record.version.to_string());
-                }
+        if let Some((record, requested)) = output.find_resolved_package("python") {
+            if requested {
+                python_version = Some(record.package_record.version.to_string());
             }
         }
     }

@@ -306,27 +306,13 @@ pub(crate) fn create_entry_points(
     let target_platform = &output.build_configuration.target_platform;
     let mut new_files = Vec::new();
 
-    let host_deps = output
-        .finalized_dependencies
-        .as_ref()
-        .ok_or_else(|| PackagingError::DependenciesNotFinalized)?
-        .host
-        .clone()
-        .ok_or_else(|| {
-            PackagingError::CannotCreateEntryPoint("Could not find host dependencies".to_string())
-        })?;
-
-    let python_record = host_deps
-        .resolved
-        .iter()
-        .find(|dep| dep.package_record.name.as_normalized() == "python");
-    let python_version = if let Some(python_record) = python_record {
-        python_record.package_record.version.version().clone()
-    } else {
-        return Err(PackagingError::CannotCreateEntryPoint(
+    let (python_record, _) = output.find_resolved_package("python").ok_or_else(|| {
+        PackagingError::CannotCreateEntryPoint(
             "Could not find python in host dependencies".to_string(),
-        ));
-    };
+        )
+    })?;
+
+    let python_version = python_record.package_record.version.clone();
 
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(

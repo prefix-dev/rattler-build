@@ -14,7 +14,7 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    PackageName, Platform,
+    PackageName, Platform, RepoDataRecord,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
@@ -389,6 +389,26 @@ impl Output {
     /// Shorthand to retrieve the target platform for this output
     pub fn host_platform(&self) -> &Platform {
         &self.build_configuration.host_platform
+    }
+
+    /// Search for the resolved package with the given name in the host prefix
+    /// Returns a tuple of the package and a boolean indicating whether the package is directly requested
+    pub fn find_resolved_package(&self, name: &str) -> Option<(&RepoDataRecord, bool)> {
+        let host = self.finalized_dependencies.as_ref()?.host.as_ref()?;
+        let record = host
+            .resolved
+            .iter()
+            .find(|p| p.package_record.name.as_normalized() == name);
+
+        let is_requested = host.specs.iter().any(|s| {
+            s.spec()
+                .name
+                .as_ref()
+                .map(|n| n.as_normalized() == name)
+                .unwrap_or(false)
+        });
+
+        record.map(|r| (r, is_requested))
     }
 
     /// Print a nice summary of the build
