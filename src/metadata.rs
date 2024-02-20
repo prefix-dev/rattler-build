@@ -386,6 +386,11 @@ impl Output {
         &self.build_configuration.target_platform
     }
 
+    /// Shorthand to retrieve the target platform for this output
+    pub fn host_platform(&self) -> &Platform {
+        &self.build_configuration.host_platform
+    }
+
     /// Print a nice summary of the build
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();

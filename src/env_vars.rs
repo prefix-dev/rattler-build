@@ -36,7 +36,7 @@ fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> Pat
 pub fn python_vars(output: &Output) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
-    if output.target_platform().is_windows() {
+    if output.host_platform().is_windows() {
         let python = output.prefix().join("python.exe");
         result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
     } else {
@@ -63,9 +63,9 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
     if let Some(py_ver) = python_version {
         let py_ver = py_ver.split('.').collect::<Vec<_>>();
         let py_ver_str = format!("{}.{}", py_ver[0], py_ver[1]);
-        let stdlib_dir = get_stdlib_dir(output.prefix(), output.target_platform(), &py_ver_str);
+        let stdlib_dir = get_stdlib_dir(output.prefix(), output.host_platform(), &py_ver_str);
         let site_packages_dir =
-            get_sitepackages_dir(output.prefix(), output.target_platform(), &py_ver_str);
+            get_sitepackages_dir(output.prefix(), output.host_platform(), &py_ver_str);
         result.insert(
             "PY3K".to_string(),
             if py_ver[0] == "3" {
@@ -109,7 +109,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, String> {
     if let Some(r_ver) = output.variant().get("r-base") {
         result.insert("R_VER".to_string(), r_ver.clone());
 
-        let r_bin = if output.target_platform().is_windows() {
+        let r_bin = if output.host_platform().is_windows() {
             output.prefix().join("Scripts/R.exe")
         } else {
             output.prefix().join("bin/R")
@@ -218,12 +218,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
-    if let Some((_, host_arch)) = output
-        .build_configuration
-        .host_platform
-        .to_string()
-        .rsplit_once('-')
-    {
+    if let Some((_, host_arch)) = output.host_platform().to_string().rsplit_once('-') {
         insert!(vars, "ARCH", host_arch);
     }
 
