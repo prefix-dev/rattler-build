@@ -15,7 +15,15 @@ source:
 
 build:
   number: 0
-  script: python -m pip install . -vv --no-deps --no-build-isolation
+  script:
+    - python -m pip install . -vv --no-deps --no-build-isolation
+    # make sure that PY_VER is set even for noarch packages
+    - if: unix
+      then:
+      - test ! -z "$PY_VER"
+      else:
+      - if not defined PY_VER exit 1
+
   python:
     entry_points:
       - flask = flask.cli:main
