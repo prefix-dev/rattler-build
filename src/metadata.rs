@@ -466,7 +466,7 @@ impl Output {
 
             writeln!(
                 summary_file,
-                "<details><summary>Resolved dependencies</summary>\n\n{}\n</details>",
+                "<details><summary>Resolved dependencies</summary>\n\n{}\n</details>\n",
                 self.format_as_markdown()
             )?;
         }
