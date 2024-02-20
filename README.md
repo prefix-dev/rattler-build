@@ -102,7 +102,6 @@ A simple example recipe for the `xtensor` header-only C++ library:
 context:
   name: xtensor
   version: 0.24.6
-  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 package:
   name: ${{ name|lower }}
@@ -110,14 +109,10 @@ package:
 
 source:
   url: https://github.com/xtensor-stack/xtensor/archive/${{ version }}.tar.gz
-  sha256: ${{ sha256 }}
+  sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 
 build:
   number: 0
-  # note: in the new recipe format, `skip` is a list of conditional expressions
-  #       but for the "YAML format" discussion we pretend that we still use the
-  #       `skip: bool` syntax
-  skip: ${{ true if (win and vc14) }}
   script:
     - if: win
       then: |
@@ -138,7 +133,7 @@ requirements:
     - xtl >=0.7,<0.8
   run:
     - xtl >=0.7,<0.8
-  run_constrained:
+  run_constraints:
     - xsimd >=8.0.3,<10
 
 tests:
