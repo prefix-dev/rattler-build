@@ -25,6 +25,8 @@ This will tell `rattler-build` what to insert for the `${{ compiler('rust') }}` 
 Then we can write the recipe for the package like so:
 
 ```yaml title="recipe.yaml"
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 context:
   version: "0.11.9"
 
@@ -38,7 +40,7 @@ source:
 
 build:
   script:
-    # Since Rust binaries are statically linked we should record all the licenses
+    # we bundle all the licenses of the dependencies into a THIRDPARTY.yml file and include it in the package
     - cargo-bundle-licenses --format yaml --output ${SRC_DIR}/THIRDPARTY.yml
     - $BUILD_PREFIX/bin/cargo install --locked --bins --root ${PREFIX} --path .
 
@@ -54,8 +56,11 @@ tests:
 about:
   homepage: https://github.com/killercup/cargo-edit
   license: MIT
-  description: A utility for managing cargo dependencies from the command line.
-  summary: A utility for managing cargo dependencies from the command line.
+  license_file:
+    - LICENSE
+    - THIRDPARTY.yml
+  description: "A utility for managing cargo dependencies from the command line."
+  summary: "A utility for managing cargo dependencies from the command line."
 ```
 
 To build this recipe, just run:

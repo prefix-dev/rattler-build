@@ -28,5 +28,8 @@ tests:
 about:
   homepage: https://github.com/killercup/cargo-edit
   license: MIT
+  license_file:
+    - LICENSE
+    - THIRDPARTY.yml
   description: "A utility for managing cargo dependencies from the command line."
   summary: "A utility for managing cargo dependencies from the command line."

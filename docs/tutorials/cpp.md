@@ -38,10 +38,10 @@ build:
             %SRC_DIR%
         ninja install
       else: |
-        cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF \
+        cmake ${CMAKE_ARGS} -GNinja -DBUILD_TESTS=OFF \
               -DCMAKE_INSTALL_PREFIX=$PREFIX \
               $SRC_DIR
-        make install
+        ninja install
 
 requirements:
   build:
