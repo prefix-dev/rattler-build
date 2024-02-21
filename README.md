@@ -124,19 +124,17 @@ build:
   script:
     - if: win
       then: |
-        cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
-        nmake
-        nmake install
+        cmake -G "Ninja" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
+        ninja install
       else: |
-        cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
-        make install
+        cmake ${CMAKE_ARGS} -G "Ninja" -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
+        ninja install
 
 requirements:
   build:
     - ${{ compiler('cxx') }}
     - cmake
-    - if: unix
-      then: make
+    - ninja
   host:
     - xtl >=0.7,<0.8
   run:
