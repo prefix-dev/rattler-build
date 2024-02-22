@@ -6,32 +6,41 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 
 [tasks]
-build = "cargo build --release"
+build = "cargo build"
 install = "cargo install --path . --locked"
-end_to_end_test = "pytest test/end-to-end -v -s"
-test = "cargo test"
-lint = "pre-commit run --all"
-build-docs = "mkdocs build --strict"
-docs = "mkdocs serve"
-deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
-deploy-dev = "mike deploy --push dev devel"
 
 [dependencies]
-openssl = "3.*"
-rust = "1.73.0.*"
-pre-commit = "3.3.3.*"
-compilers = "1.6.0.*"
-libssh2 = "1.11.0.*"
-pkg-config = "0.29.2.*"
-cmake = "3.27.6.*"
-make = "4.3.*"
-perl = "5.32.1.*"
+rust = "1.75.0.*"
+
+[feature.test.dependencies]
 pytest = "7.4.2.*"
 conda-package-handling = "2.2.0.*"
 
+[feature.test.tasks]
+end_to_end_test = "pytest test/end-to-end -v -s"
+test = "cargo test"
+
+[feature.lint.dependencies]
+pre-commit = "3.3.3.*"
+
+[feature.lint.tasks]
+lint = "pre-commit run --all"
+
+[feature.docs.dependencies]
 # Documentation building
 mkdocs = "1.5.3.*"
 mkdocs-material = "9.4.4.*"
 pillow = ">=9.4.0.*"
 cairosvg = "2.7.1.*"
 mike = "2.0.0.*"
+
+[feature.docs.tasks]
+build-docs = "mkdocs build --strict"
+docs = "mkdocs serve"
+deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
+deploy-dev = "mike deploy --push dev devel"
+
+[environments]
+docs = ["docs"]
+test = ["test"]
+lint = ["lint"]
