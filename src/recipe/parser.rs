@@ -26,6 +26,7 @@ mod output;
 mod package;
 mod requirements;
 mod script;
+mod skip;
 mod source;
 mod test;
 
@@ -234,6 +235,9 @@ impl Recipe {
                 build.string = Some(format!("{}_{}", hash, build.number));
             }
         }
+
+        // evaluate the skip conditions
+        build.skip = build.skip.with_eval(&jinja)?;
 
         let recipe = Recipe {
             package: package.ok_or_else(|| {

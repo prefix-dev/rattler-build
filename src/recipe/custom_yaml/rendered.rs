@@ -579,27 +579,6 @@ impl Render<RenderedNode> for Node {
 
 impl Render<RenderedNode> for ScalarNode {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
-        // Special case for the `skip` key when rendering
-        //
-        // The `skip` key is special. It expects one or more strings that are supposed to be
-        // evaluated by jinja without having the `${{}}` syntax (in a similar way that the condition
-        // on if-selector are as well).
-        // so when we encounter a scalar node that comes from a `skip` key, we evaluate it as a
-        // jinja expression and return a rendered scalar node with the boolean evaluation of that
-        // node.
-        if name == "ROOT.build.skip" || name == "ROOT.outputs.build.skip" {
-            let rendered = jinja.eval(self.as_str()).map_err(|err| {
-                vec![_partialerror!(
-                    *self.span(),
-                    ErrorKind::JinjaRendering(err),
-                    label = jinja_error_to_label(&err),
-                )]
-            })?;
-
-            let rendered = RenderedScalarNode::new(*self.span(), rendered.is_true().to_string());
-            return Ok(RenderedNode::Scalar(rendered));
-        }
-
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),

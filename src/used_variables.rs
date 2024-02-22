@@ -11,13 +11,14 @@
 //!    - extract all dependencies and add them to used variables to build full variant
 use std::collections::{HashSet, VecDeque};
 
+use marked_yaml::Span;
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
     parse,
 };
 
 use crate::recipe::{
-    custom_yaml::{HasSpan, Node, ScalarNode},
+    custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
     parser::CollectErrors,
     ParsingError,
 };
@@ -88,8 +89,6 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
 
 /// This recursively finds all `if/then/else` expressions in a YAML node
 fn find_all_selectors<'a>(node: &'a Node, selectors: &mut HashSet<&'a ScalarNode>) {
-    use crate::recipe::custom_yaml::SequenceNodeInternal;
-
     match node {
         Node::Mapping(map) => {
             for (_, value) in map.iter() {
@@ -120,8 +119,6 @@ fn find_jinja(
     src: &str,
     variables: &mut HashSet<String>,
 ) -> Result<(), Vec<ParsingError>> {
-    use crate::recipe::custom_yaml::SequenceNodeInternal;
-
     let mut errs = Vec::<ParsingError>::new();
     let mut queue = VecDeque::from([(node, src)]);
     while let Some((node, src)) = queue.pop_front() {
@@ -193,6 +190,67 @@ fn find_jinja(
     Ok(())
 }
 
+fn variables_from_raw_expr(
+    expr: &str,
+    src: &str,
+    span: &Span,
+) -> Result<HashSet<String>, ParsingError> {
+    let selector_tmpl = format!("${{{{ {} }}}}", expr);
+    let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| -> ParsingError {
+        ParsingError::from_partial(
+            src,
+            crate::_partialerror!(
+                *span,
+                crate::recipe::error::ErrorKind::from(e),
+                label = "failed to parse as jinja expression"
+            ),
+        )
+    })?;
+    let mut variables = HashSet::new();
+    extract_variables(&ast, &mut variables);
+    Ok(variables)
+}
+
+fn variables_from_skip(
+    root: &custom_yaml::Node,
+    src: &str,
+    variables: &mut HashSet<String>,
+) -> Result<(), Vec<ParsingError>> {
+    // find all variables from skip conditions in the recipe
+    let skip = root
+        .as_mapping()
+        .and_then(|m| m.get("build"))
+        .and_then(|m| m.as_mapping())
+        .and_then(|m| m.get("skip"));
+
+    let mut errors = Vec::new();
+    match skip {
+        Some(custom_yaml::Node::Sequence(node)) => {
+            for item in node.iter() {
+                if let SequenceNodeInternal::Simple(custom_yaml::Node::Scalar(scalar)) = item {
+                    let vars = variables_from_raw_expr(scalar.as_str(), src, scalar.span());
+                    match vars {
+                        Ok(vars) => variables.extend(vars),
+                        Err(err) => errors.push(err),
+                    }
+                }
+            }
+        }
+        Some(custom_yaml::Node::Scalar(scalar)) => {
+            let vars = variables_from_raw_expr(scalar.as_str(), src, scalar.span());
+            match vars {
+                Ok(vars) => variables.extend(vars),
+                Err(err) => errors.push(err),
+            }
+        }
+        _ => {}
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+    Ok(())
+}
+
 /// This finds all variables used in jinja or `if/then/else` expressions
 pub(crate) fn used_vars_from_expressions(
     yaml_node: &Node,
@@ -207,21 +265,14 @@ pub(crate) fn used_vars_from_expressions(
     selectors
         .iter()
         .map(|selector| -> Result<(), ParsingError> {
-            let selector_tmpl = format!("{{{{ {} }}}}", selector.as_str());
-            let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| -> ParsingError {
-                crate::recipe::ParsingError::from_partial(
-                    src,
-                    crate::_partialerror!(
-                        *selector.span(),
-                        crate::recipe::error::ErrorKind::from(e),
-                        label = "failed to parse as jinja expression"
-                    ),
-                )
-            })?;
-            extract_variables(&ast, &mut variables);
+            let vars = variables_from_raw_expr(selector.as_str(), src, selector.span())?;
+            variables.extend(vars);
             Ok(())
         })
         .collect_errors()?;
+
+    // find all variables from skip conditions in the recipe
+    variables_from_skip(yaml_node, src, &mut variables)?;
 
     // parse recipe into AST
     find_jinja(yaml_node, src, &mut variables)?;
@@ -254,5 +305,22 @@ mod test {
         assert!(used_vars.contains("c_compiler"));
         assert!(used_vars.contains("c_compiler_version"));
         assert!(used_vars.contains("abcdef"));
+    }
+
+    #[test]
+    fn test_used_vars_from_expressions_with_skip() {
+        let recipe = r#"build:
+            skip:
+              - llvm_variant > 10
+              - linux
+              - cuda
+        "#;
+
+        let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe_node, recipe).unwrap();
+        assert!(used_vars.contains("llvm_variant"));
+        assert!(used_vars.contains("cuda"));
+        assert!(used_vars.contains("linux"));
+        assert!(!used_vars.contains("osx"));
     }
 }
