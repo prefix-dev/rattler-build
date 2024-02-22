@@ -300,7 +300,7 @@ mod tests {
 
     #[test]
     fn parsing_unix() {
-        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+        let recipe = include_str!("../../test-data/recipes/test-parsing/xtensor.yaml");
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -314,7 +314,7 @@ mod tests {
 
     #[test]
     fn parsing_win() {
-        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+        let recipe = include_str!("../../test-data/recipes/test-parsing/xtensor.yaml");
 
         let selector_config_win = SelectorConfig {
             target_platform: Platform::Win64,

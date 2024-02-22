@@ -578,7 +578,7 @@ impl Render<RenderedNode> for Node {
 }
 
 impl Render<RenderedNode> for ScalarNode {
-    fn render(&self, jinja: &Jinja, name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
+    fn render(&self, jinja: &Jinja, _name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
         let rendered = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
