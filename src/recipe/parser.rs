@@ -327,6 +327,35 @@ mod tests {
     }
 
     #[test]
+    fn bad_skip_single_output() {
+        let raw_recipe = include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip.yaml");
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        let err: ParseErrors = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn bad_skip_multi_output() {
+        let raw_recipe =
+            include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip_multi.yaml");
+        let recipes = find_outputs_from_src(raw_recipe).unwrap();
+        for recipe in recipes {
+            let recipe = Recipe::from_node(&recipe, SelectorConfig::default());
+            if recipe.is_ok() {
+                assert_eq!(recipe.unwrap().package().name().as_normalized(), "zlib-dev");
+                continue;
+            }
+            let err = recipe.unwrap_err();
+            let err: ParseErrors = err
+                .into_iter()
+                .map(|err| ParsingError::from_partial(&raw_recipe, err))
+                .collect::<Vec<_>>()
+                .into();
+            assert_miette_snapshot!(err);
+        }
+    }
+
+    #[test]
     fn context_not_mapping() {
         let raw_recipe = r#"
         context: "not-mapping"
