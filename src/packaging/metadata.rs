@@ -86,7 +86,6 @@ fn contains_prefix_text(
         return Ok(contains_prefix);
     }
 
-    #[cfg(not(target_os = "windows"))]
     Ok(contains_prefix)
 }
 
