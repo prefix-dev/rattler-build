@@ -469,12 +469,59 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
     }
 }
 
+/// Whether to use colors in the output.
+#[derive(clap::ValueEnum, Clone, Eq, PartialEq, Debug, Copy)]
+pub enum Color {
+    /// Always use colors.
+    Always,
+    /// Never use colors.
+    Never,
+    /// Use colors when the output is a terminal.
+    Auto,
+}
+
+impl FromStr for Color {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Honor FORCE_COLOR and NO_COLOR environment variables.
+        // Those take precedence over the CLI flag and RATTLER_BUILD_COLOR.
+        match std::env::var("FORCE_COLOR") {
+            Ok(_) => return Ok(Color::Always),
+            Err(_) => match std::env::var("NO_COLOR") {
+                Ok(_) => return Ok(Color::Never),
+                Err(_) => {}
+            },
+        };
+
+        match s {
+            "always" => Ok(Color::Always),
+            "never" => Ok(Color::Never),
+            "auto" => Ok(Color::Auto),
+            _ => Err("invalid color value".to_string()),
+        }
+    }
+}
+
 /// Initializes logging with the given style and verbosity.
 pub fn init_logging(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
+    color: &Color,
 ) -> Result<LoggingOutputHandler, ParseError> {
     let log_handler = LoggingOutputHandler::default();
+
+    let use_colors = match color {
+        Color::Always => Some(true),
+        Color::Never => Some(false),
+        Color::Auto => None,
+    };
+
+    // Enable disable colors for the colors crate
+    if let Some(use_colors) = use_colors {
+        console::set_colors_enabled(use_colors);
+        console::set_colors_enabled_stderr(use_colors);
+    }
 
     // Setup tracing subscriber
     let registry =

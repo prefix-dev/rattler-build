@@ -20,7 +20,7 @@ use url::Url;
 
 use rattler_build::{
     build::run_build,
-    console_utils::{init_logging, LogStyle, LoggingOutputHandler},
+    console_utils::{init_logging, Color, LogStyle, LoggingOutputHandler},
     hash::HashInfo,
     metadata::{
         BuildConfiguration, BuildSummary, Directories, PackageIdentifier, PackagingSettings,
@@ -84,6 +84,16 @@ struct App {
         global = true
     )]
     log_style: LogStyle,
+
+    /// Enable or disable colored output from rattler-build.
+    /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
+    #[clap(
+        long,
+        env = "RATTLER_BUILD_COLOR",
+        default_value = "auto",
+        global = true
+    )]
+    color: Color,
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
@@ -223,8 +233,8 @@ struct BuildOpts {
     no_test: bool,
 
     /// Do not force colors in the output of the build script
-    #[arg(long, default_value = "false")]
-    no_force_colors: bool,
+    #[arg(long, default_value = "true")]
+    color_build_log: bool,
 
     #[clap(flatten)]
     common: CommonOpts,
@@ -423,7 +433,8 @@ pub struct CondaForgeOpts {
 async fn main() -> miette::Result<()> {
     let args = App::parse();
 
-    let fancy_log_handler = init_logging(&args.log_style, &args.verbose).into_diagnostic()?;
+    let fancy_log_handler =
+        init_logging(&args.log_style, &args.verbose, &args.color).into_diagnostic()?;
 
     match args.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
@@ -691,7 +702,7 @@ async fn run_build_from_args(
                     args.compression_threads,
                 ),
                 store_recipe: !args.no_include_recipe,
-                force_colors: !args.no_force_colors,
+                force_colors: args.color_build_log && console::colors_enabled(),
             },
             finalized_dependencies: None,
             finalized_sources: None,
