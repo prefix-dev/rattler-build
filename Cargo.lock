@@ -2964,6 +2964,7 @@ dependencies = [
  "insta",
  "itertools",
  "marked-yaml",
+ "memchr",
  "memmap2 0.9.4",
  "miette 7.0.0",
  "minijinja",

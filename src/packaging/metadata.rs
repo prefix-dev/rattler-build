@@ -41,16 +41,14 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
 
         // Open the file
         let file = File::open(file_path)?;
-        let mut buf_reader = BufReader::new(file);
 
         // Read the file's content
-        let mut content = Vec::new();
-        buf_reader.read_to_end(&mut content)?;
+        let data = unsafe { memmap2::Mmap::map(&file) }?;
 
-        // Check if the content contains the prefix bytes
-        let contains_prefix = content
-            .windows(prefix_bytes.len())
-            .any(|window| window == prefix_bytes.as_slice());
+        // Check if the content contains the prefix bytes with memchr
+        let contains_prefix = memchr::memmem::find_iter(data.as_ref(), &prefix_bytes)
+            .next()
+            .is_some();
 
         Ok(contains_prefix)
     }
