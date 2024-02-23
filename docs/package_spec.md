@@ -4,10 +4,10 @@
 and `conda` package managers, and they work cross-platform on Windows, Linux and
 macOS.
 
-By default, a conda package is a `tar.bz2` archive which contains
+By default, a conda package is a `tar.bz2` archive which contains:
 
-* Metadata under the `info/` directory.
-* A collection of files that are installed directly into an install prefix.
+* Metadata under the `info/` directory
+* A collection of files that are installed directly into an install prefix
 
 The format is identical across platforms and operating systems. During the
 install process, all files are extracted into the install prefix, except the
@@ -56,7 +56,7 @@ files](./special_files.md) section.
 The `info/` directory contains all metadata about a package. Files in this
 location are not installed under the install prefix. Although you are free to
 add any file to this directory, conda only inspects the content of the files
-discussed below.
+discussed below:
 
 ### `info/index.json`
 
@@ -69,17 +69,17 @@ build string, and dependencies. The content of this file is stored in
 `name: string`
 
 : The lowercase name of the package. May contain lowercase characters,
-underscore and dashes.
+underscores, and dashes.
 
 `version: string`
 
-: The package version. May not contain "-". Acknowledges [PEP
+: The package version. May not contain "`-`". Acknowledges [PEP
 440](https://www.python.org/dev/peps/pep-0440/).
 
 
 `build: string`
 
-: The build string. May not contain "-". Differentiates builds of packages with
+: The build string. May not contain "`-`". Differentiates builds of packages with
   otherwise identical names and versions, such as:
 
   * A build with other dependencies, such as Python 3.4 instead of Python 2.7.
@@ -119,7 +119,7 @@ key is generally not used (duplicate information from `sudir`).
 
 `platform: string`
 
-: Optional. The OS that the package is built for. EXAMPLE: `osx`. This key is
+: Optional. The OS that the package is built for, e.g. `osx`. This key is
 generally not used (duplicate information from `sudir`).
 
 ### `info/paths.json`
@@ -134,37 +134,37 @@ each with the following keys:
 
 `_path: string`
 
-: the relative path of the file
+: The relative path of the file
 
 `path_type: optional, string`
 
-: the type of linking, can be `hardlink`, `softlink`, or `directory`. Default is
+: The type of linking, can be `hardlink`, `softlink`, or `directory`. Default is
   `hardlink`.
 
 `file_mode: - optional, string`
 
-:the file mode can be `binary` or `text`. This is only relevant for prefix
-  replacement
+: The file mode can be `binary` or `text`. This is only relevant for prefix
+  replacement.
 
 `prefix_placeholder: optional, string`
 
-: the prefix placeholder string that is encoded in the text or binary file, and
-  that is replaced at installation time. Note that this prefix placeholder uses
+: The prefix placeholder string that is encoded in the text or binary file, which
+  is replaced at installation time. Note that this prefix placeholder uses
   `/` even on Windows.
 
 `no_link: bool, optional`
 
-: whether this file should be linked or not when installing the package,
-  defaults false (linking the file from the cache into the environment)
+: Determines whether this file should be linked or not when installing the package
+  (linking the file from the cache into the environment). Defaults to `false`.
 
 `sha256: string`
 
-: the SHA256 hash of the file. For symbolic links it contains the SHA256 hash of
+: The `SHA256` hash of the file. For symbolic links it contains the `SHA256` hash of
   the file pointed to.
 
 `size_in_bytes: number`
 
-: the size in bytes of the file. For symbolic links, it contains the file size
+: The size, in bytes, of the file. For symbolic links, it contains the file size
   of the file pointed to.
 
 > Due to the way the binary replacement works, the placeholder prefix must be
@@ -176,7 +176,7 @@ All licenses mentioned in the recipe are copied to this folder.
 
 ### `info/about.json`
 
-Optional file. Contains the entries of the about section of the recipe of the
+Optional file. Contains the entries of the "about" section of the recipe of the
 `recipe.yaml` file. The following keys are added to `info/about.json` if present
 in the build recipe:
 

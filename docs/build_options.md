@@ -1,4 +1,4 @@
-# Advanced Build Options
+# Advanced build options
 
 There are some specialized build options to control various features:
 

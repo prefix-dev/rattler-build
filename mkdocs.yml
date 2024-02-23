@@ -95,7 +95,7 @@ nav:
     - "Python": tutorials/python.md
     - "C++": tutorials/cpp.md
     - "Rust": tutorials/rust.md
-  - Highlevel overview: highlevel.md
+  - High-level overview: highlevel.md
   - Recipe file: recipe_file.md
   - Advanced options: build_options.md
   - Jinja functions: available_jinja.md

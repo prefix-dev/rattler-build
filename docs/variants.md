@@ -31,8 +31,8 @@ numpy:
 - "1.20"
 ```
 
-We can pass a variant configuration file to `rattler-build` using a command line
-like this:
+We can pass a variant configuration file to `rattler-build` using a command like
+the following:
 
 ```sh
 rattler-build build --variant-config ./variants.yaml --recipe myrecipe.yaml
@@ -51,7 +51,7 @@ requirements:
   - python
 ```
 
-will be rendered as (for the first variant)
+... will be rendered as (for the first variant):
 
 ```yaml
 # ...
@@ -61,7 +61,7 @@ requirements:
 ```
 
 Note that variants are _only_ applied if the requirement doesn't specify any
-constraints. If the requirement would be `python >3.8,<3.10` the variant entry
+constraints. If the requirement would be `python >3.8,<3.10` then the variant entry
 would be ignored.
 
 ## Package hash from variant
@@ -69,7 +69,9 @@ would be ignored.
 You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
 It serves as a mechanism to discern different build configurations that produce a package with the same name and version.
 
-The hash is computed by dumping all the variant configuration values that are used by a given recipe into a JSON file, and then hashing that JSON file.
+The hash is computed by dumping all of the variant configuration values that are used by a
+given recipe into a JSON file, and then hashing that JSON file.
+
 For example, in our `python` example, we would get a variant configuration file that looks something like:
 
 ```json
@@ -82,17 +84,17 @@ This JSON string is then hashed with the MD5 hash algorithm, and produces the ha
 For certain packages (such as Python packages) special rules exists, and the `py<Major.Minor>` version is prepended to the hash, so that the final hash
 would look something like `py38h123123`.
 
-### Zip Keys
+### Zip keys
 
 Zip keys modify how variants are combined. Usually, each variant key that has multiple
-entries is expanded to a build matrix, for example if we have:
+entries is expanded to a build matrix. For example, if we have:
 
 ```yaml
 python: ["3.8", "3.9"]
 numpy: ["1.12", "1.14"]
 ```
 
-We obtain 4 variants for a recipe that uses both `numpy` and `python`:
+...then we obtain 4 variants for a recipe that uses both `numpy` and `python`:
 
 ```
 - python 3.8, numpy 1.12
@@ -101,7 +103,7 @@ We obtain 4 variants for a recipe that uses both `numpy` and `python`:
 - python 3.9, numpy 1.14
 ```
 
-However, if we use the `zip_keys` and specify
+However, if we use the `zip_keys` and specify:
 
 ```yaml
 zip_keys: ["python", "numpy"]
@@ -109,8 +111,10 @@ python: ["3.8", "3.9"]
 numpy: ["1.12", "1.14"]
 ```
 
-Then the versions are "zipped up" and we only get two variants. Note that both, `python` and `numpy` need to specify the exact same number of
-versions to make this work.
+...then the versions are "zipped up" and we only get 2 variants. Note that
+both `python` and `numpy` need to specify the exact same number of versions
+to make this work.
+
 The resulting variants with the zip applied are:
 
 ```
@@ -162,7 +166,7 @@ The variant with the highest priority would be the default package that is selec
 
 There are two mechanisms to make this possible: `mutex` packages and the `down_prioritize_variant` option in the recipe.
 
-### The "down_prioritize_variant" option
+### The `down_prioritize_variant` option
 
 !!! note
     It is not always necessary to use the `down_prioritize_variant` option - only if the solver has no other way to
@@ -187,7 +191,7 @@ Another way to make sure the right variants are selected are "mutex" packages. A
 mutually exclusive. We use the fact that only one package of a given name can be installed at a time (the solver has to choose).
 
 A mutex package might be useful to make sure that all packages that depend on BLAS are compiled against the same BLAS implementation.
-The mutex package will serve the purpose that "openblas" and "mkl" can never be installed at the same time.
+The mutex package will serve the purpose that "`openblas`" and "`mkl`" can never be installed at the same time.
 
 We could define a BLAS mutex package like this:
 
@@ -216,7 +220,7 @@ Only one of these packages can be installed at a time because they share the sam
 The solver will then only select one of these two packages.
 
 The `blas` package in turn should have a `run_export` for the `blas_mutex` package, so that any package
-that links against `blas` also has a dependency on the correct `blas_mutex` package.
+that links against `blas` also has a dependency on the correct `blas_mutex` package:
 
 ```yaml title="recipe.yaml" hl_lines="2 8"
 package:
@@ -230,7 +234,8 @@ requirements:
     - blas_mutex * openblas*
 ```
 
-And then the recipe of a package that wants to build two variants, one for `openblas` and one for `mkl` could look like this:
+Then the recipe of a package that wants to build two variants, one for `openblas` and
+one for `mkl` could look like this:
 
 ```yaml title="recipe.yaml" hl_lines="8"
 package:
