@@ -403,7 +403,7 @@ async fn run_process_with_replacements(
 
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
-
+    let mut closed = (false, false);
     loop {
         let (line, is_stderr) = tokio::select! {
             line = stdout_lines.next_line() => (line, false),
@@ -427,11 +427,18 @@ async fn run_process_with_replacements(
 
                 tracing::info!("{}", filtered_line);
             }
-            Ok(None) => break,
+            Ok(None) if !is_stderr => closed.0 = true,
+            Ok(None) if is_stderr => closed.1 = true,
+            Ok(None) => unreachable!(),
             Err(e) => {
                 tracing::warn!("Error reading output: {:?}", e);
+                break;
             }
         };
+        // make sure we close the loop when both stdout and stderr are closed
+        if closed == (true, true) {
+            break;
+        }
     }
 
     let status = child.wait().await?;

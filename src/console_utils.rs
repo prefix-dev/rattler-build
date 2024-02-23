@@ -469,12 +469,37 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
     }
 }
 
+/// Whether to use colors in the output.
+#[derive(clap::ValueEnum, Clone, Eq, PartialEq, Debug, Copy, Default)]
+pub enum Color {
+    /// Always use colors.
+    Always,
+    /// Never use colors.
+    Never,
+    /// Use colors when the output is a terminal.
+    #[default]
+    Auto,
+}
+
 /// Initializes logging with the given style and verbosity.
 pub fn init_logging(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
+    color: &Color,
 ) -> Result<LoggingOutputHandler, ParseError> {
     let log_handler = LoggingOutputHandler::default();
+
+    let use_colors = match color {
+        Color::Always => Some(true),
+        Color::Never => Some(false),
+        Color::Auto => None,
+    };
+
+    // Enable disable colors for the colors crate
+    if let Some(use_colors) = use_colors {
+        console::set_colors_enabled(use_colors);
+        console::set_colors_enabled_stderr(use_colors);
+    }
 
     // Setup tracing subscriber
     let registry =

@@ -3,7 +3,7 @@ import json
 import os
 import platform
 from pathlib import Path
-from subprocess import CalledProcessError, check_output
+from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
 
 import pytest
@@ -23,7 +23,7 @@ class RattlerBuild:
             print(e.stderr)
             raise e
 
-    def build(
+    def build_args(
         self,
         recipe_folder: Path,
         output_folder: Path,
@@ -43,7 +43,23 @@ class RattlerBuild:
             for c in custom_channels:
                 args += ["--channel", c]
 
-        print(args)
+        return args
+
+    def build(
+        self,
+        recipe_folder: Path,
+        output_folder: Path,
+        variant_config: Optional[Path] = None,
+        custom_channels: list[str] | None = None,
+        extra_args: list[str] = None,
+    ):
+        args = self.build_args(
+            recipe_folder,
+            output_folder,
+            variant_config=variant_config,
+            custom_channels=custom_channels,
+            extra_args=extra_args,
+        )
         return self(*args)
 
 
@@ -537,3 +553,20 @@ def test_empty_folder(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     # read paths json
     paths = json.loads((pkg / "info/paths.json").read_text())
     assert len(paths["paths"]) == 0
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "console_logging"
+    os.environ["SECRET"] = "hahaha"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    assert "hahaha" not in output
+    assert "I am hahaha" not in output
+    assert "I am ********" in output
