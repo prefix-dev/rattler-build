@@ -1,0 +1,17 @@
+package:
+  name: console_logging
+  version: 0.1.0
+
+build:
+  script:
+    secrets:
+      - SECRET
+    content:
+      - if: unix
+        then:
+        - printf "Building console_logging\n"
+        - printf "\e[1;31mThis is a red text\e[0m\n"
+        - printf "I am ${SECRET}\n"
+        else:
+        - echo "Building console_logging"
+        - echo "I am %SECRET%"
