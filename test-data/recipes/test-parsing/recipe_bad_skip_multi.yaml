@@ -1,0 +1,12 @@
+recipe:
+  name: zlib
+  version: 0.1.0
+
+outputs:
+  - package:
+      name: zlib-dev
+  - package:
+      name: zlib-lib
+    build:
+      skip:
+        - asd;asd;123

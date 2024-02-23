@@ -7,6 +7,8 @@ use serde::{Deserialize, Serialize};
 use super::glob_vec::{AllOrGlobVec, GlobVec};
 use super::{Dependency, FlattenErrors};
 use crate::recipe::parser::script::Script;
+use crate::recipe::parser::skip::Skip;
+
 use crate::validate_keys;
 use crate::{
     _partialerror,
@@ -73,8 +75,8 @@ pub struct Build {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(super) string: Option<String>,
     /// List of conditions under which to skip the build of the package.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub(super) skip: bool,
+    #[serde(default, skip)]
+    pub(super) skip: Skip,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     #[serde(default, skip_serializing_if = "Script::is_default")]
@@ -127,7 +129,7 @@ impl Build {
 
     /// Get the skip conditions.
     pub fn skip(&self) -> bool {
-        self.skip
+        self.skip.eval()
     }
 
     /// Get the build script.
@@ -148,11 +150,6 @@ impl Build {
     /// Settings for shared libraries and executables
     pub const fn dynamic_linking(&self) -> &DynamicLinking {
         &self.dynamic_linking
-    }
-
-    /// Check if the build should be skipped.
-    pub fn is_skip_build(&self) -> bool {
-        self.skip()
     }
 
     /// Get the always copy files settings.

@@ -74,7 +74,26 @@ Recipe {
     build: Build {
         number: 0,
         string: None,
-        skip: false,
+        skip: Skip(
+            [
+                (
+                    "win and vc14",
+                    Span {
+                        start: Some(
+                            Marker {
+                                source: 0,
+                                line: 16,
+                                column: 9,
+                            },
+                        ),
+                        end: None,
+                    },
+                ),
+            ],
+            Some(
+                false,
+            ),
+        ),
         script: Script {
             interpreter: None,
             env: {},

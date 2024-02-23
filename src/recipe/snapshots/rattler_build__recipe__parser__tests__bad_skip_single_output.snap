@@ -1,0 +1,14 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error:   × Parsing: failed to render Jinja expression: syntax error
+   ╭─[7:7]
+ 6 │   skip:
+ 7 │     - asd;asd;123
+   ·       ─────┬─────
+   ·            ╰── here
+   ╰────
+

@@ -26,6 +26,7 @@ mod output;
 mod package;
 mod requirements;
 mod script;
+mod skip;
 mod source;
 mod test;
 
@@ -235,6 +236,9 @@ impl Recipe {
             }
         }
 
+        // evaluate the skip conditions
+        build.skip = build.skip.with_eval(&jinja)?;
+
         let recipe = Recipe {
             package: package.ok_or_else(|| {
                 vec![_partialerror!(
@@ -296,7 +300,7 @@ mod tests {
 
     #[test]
     fn parsing_unix() {
-        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+        let recipe = include_str!("../../test-data/recipes/test-parsing/xtensor.yaml");
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -310,7 +314,7 @@ mod tests {
 
     #[test]
     fn parsing_win() {
-        let recipe = include_str!("../../examples/xtensor/recipe.yaml");
+        let recipe = include_str!("../../test-data/recipes/test-parsing/xtensor.yaml");
 
         let selector_config_win = SelectorConfig {
             target_platform: Platform::Win64,
@@ -320,6 +324,35 @@ mod tests {
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
         assert!(win_recipe.is_ok());
         insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
+    }
+
+    #[test]
+    fn bad_skip_single_output() {
+        let raw_recipe = include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip.yaml");
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        let err: ParseErrors = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn bad_skip_multi_output() {
+        let raw_recipe =
+            include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip_multi.yaml");
+        let recipes = find_outputs_from_src(raw_recipe).unwrap();
+        for recipe in recipes {
+            let recipe = Recipe::from_node(&recipe, SelectorConfig::default());
+            if recipe.is_ok() {
+                assert_eq!(recipe.unwrap().package().name().as_normalized(), "zlib-dev");
+                continue;
+            }
+            let err = recipe.unwrap_err();
+            let err: ParseErrors = err
+                .into_iter()
+                .map(|err| ParsingError::from_partial(&raw_recipe, err))
+                .collect::<Vec<_>>()
+                .into();
+            assert_miette_snapshot!(err);
+        }
     }
 
     #[test]

@@ -13,20 +13,26 @@ source:
   sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 build:
   number: 0
+  skip: win and vc14
   script:
     - if: win
       then: |
-        cmake -GNinja %SRC_DIR% %CMAKE_ARGS% -DBUILD_TESTS=OFF
-        ninja install
+        cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
+        nmake
+        nmake install
       else: |
-        cmake -GNinja $SRC_DIR ${CMAKE_ARGS} -DBUILD_TESTS=OFF
-        ninja install
+        cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib
+        make install
+  dynamic_linking:
+    rpath_allowlist: ["/usr/lib/**"]
+    binary_relocation: true
 
 requirements:
   build:
     - ${{ compiler('cxx') }}
     - cmake
-    - ninja
+    - if: unix
+      then: make
   host:
     - xtl >=0.7,<0.8
   run:
@@ -41,6 +47,19 @@ tests:
       files:
         - share/cmake/xtensor/xtensorConfig.cmake
         - share/cmake/xtensor/xtensorConfigVersion.cmake
+
+  - script:
+      - if: unix or emscripten
+        then:
+          - test -d ${PREFIX}/include/xtensor
+          - test -f ${PREFIX}/include/xtensor/xarray.hpp
+          - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake
+          - test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake
+      - if: win
+        then:
+          - if not exist %LIBRARY_PREFIX%\include\xtensor\xarray.hpp (exit 1)
+          - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfig.cmake (exit 1)
+          - if not exist %LIBRARY_PREFIX%\share\cmake\xtensor\xtensorConfigVersion.cmake (exit 1)
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor
