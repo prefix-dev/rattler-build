@@ -10,7 +10,6 @@ use scroll::ctx::SizeWith;
 use scroll::Pwrite;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
@@ -35,24 +34,16 @@ pub struct SharedObject {
 impl Relinker for SharedObject {
     /// Check if the file is an ELF file by reading the first 4 bytes
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
-        let mut file = File::open(path)?;
-        let mut signature: [u8; 4] = [0; 4];
-        match file.read_exact(&mut signature) {
-            Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
-            Err(e) => return Err(e.into()),
-        }
-        Ok(ELFMAG.iter().eq(signature.iter()))
+        let file = File::open(path)?;
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        Ok(&mmap[0..4] == ELFMAG)
     }
 
     /// Create a new shared object from a path
     fn new(path: &Path) -> Result<Self, RelinkError> {
-        let mut buffer = Vec::new();
-        let mut file = File::open(path).expect("Failed to open the DLL file");
-        file.read_to_end(&mut buffer)
-            .expect("Failed to read the DLL file");
-        let elf = Elf::parse(&buffer).expect("Failed to parse the ELF file");
-
+        let file = File::open(path).expect("Failed to open the ELF file");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let elf = Elf::parse(&mmap).expect("Failed to parse the ELF file");
         Ok(Self {
             path: path.to_path_buf(),
             libraries: elf.libraries.iter().map(PathBuf::from).collect(),
@@ -446,6 +437,7 @@ mod test {
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert_eq!(
             vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
             object
@@ -482,6 +474,7 @@ mod test {
 
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         object.relink(
             &prefix,
             encoded_prefix,
@@ -515,6 +508,7 @@ mod test {
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
 
         super::builtin_relink(
@@ -547,6 +541,7 @@ mod test {
         fs::copy(prefix.join("zlink-runpath"), &binary_path)?;
 
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
 
         super::builtin_relink(

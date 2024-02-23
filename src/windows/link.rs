@@ -2,7 +2,6 @@
 use std::{
     collections::HashSet,
     fs::File,
-    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -54,10 +53,9 @@ pub enum DllParseError {
 impl Dll {
     /// Check if the file is a DLL (PE) file.
     fn test_file(path: &Path) -> Result<bool, std::io::Error> {
-        let mut file = File::open(path)?;
-        let mut buf: [u8; 2] = [0; 2];
-        file.read_exact(&mut buf)?;
-        let signature = buf
+        let file = File::open(path).expect("Failed to open the ELF file");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let signature = mmap[0..2]
             .pread_with::<u16>(0, scroll::LE)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(DOS_MAGIC == signature)
@@ -66,10 +64,9 @@ impl Dll {
     /// Parse a DLL file and return an object that contains the path to the DLL and the list of
     /// libraries it depends on.
     fn new(path: &Path) -> Result<Self, DllParseError> {
-        let mut buffer = Vec::new();
-        let mut file = File::open(path)?;
-        file.read_to_end(&mut buffer)?;
-        let pe = PE::parse(&buffer)?;
+        let file = File::open(path).expect("Failed to open the Mach-O binary");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let pe = PE::parse(&mmap)?;
         Ok(Self {
             path: path.to_path_buf(),
             libraries: pe.libraries.iter().map(|s| s.to_string()).collect(),
