@@ -470,37 +470,15 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
 }
 
 /// Whether to use colors in the output.
-#[derive(clap::ValueEnum, Clone, Eq, PartialEq, Debug, Copy)]
+#[derive(clap::ValueEnum, Clone, Eq, PartialEq, Debug, Copy, Default)]
 pub enum Color {
     /// Always use colors.
     Always,
     /// Never use colors.
     Never,
     /// Use colors when the output is a terminal.
+    #[default]
     Auto,
-}
-
-impl FromStr for Color {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Honor FORCE_COLOR and NO_COLOR environment variables.
-        // Those take precedence over the CLI flag and RATTLER_BUILD_COLOR.
-        match std::env::var("FORCE_COLOR") {
-            Ok(_) => return Ok(Color::Always),
-            Err(_) => match std::env::var("NO_COLOR") {
-                Ok(_) => return Ok(Color::Never),
-                Err(_) => {}
-            },
-        };
-
-        match s {
-            "always" => Ok(Color::Always),
-            "never" => Ok(Color::Never),
-            "auto" => Ok(Color::Auto),
-            _ => Err("invalid color value".to_string()),
-        }
-    }
 }
 
 /// Initializes logging with the given style and verbosity.
