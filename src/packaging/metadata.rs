@@ -14,7 +14,7 @@ use rattler_conda_types::{
 use rattler_digest::compute_file_digest;
 use std::{
     collections::HashSet,
-    io::{BufReader, Read, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
@@ -41,16 +41,14 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
 
         // Open the file
         let file = File::open(file_path)?;
-        let mut buf_reader = BufReader::new(file);
 
         // Read the file's content
-        let mut content = Vec::new();
-        buf_reader.read_to_end(&mut content)?;
+        let data = unsafe { memmap2::Mmap::map(&file) }?;
 
-        // Check if the content contains the prefix bytes
-        let contains_prefix = content
-            .windows(prefix_bytes.len())
-            .any(|window| window == prefix_bytes.as_slice());
+        // Check if the content contains the prefix bytes with memchr
+        let contains_prefix = memchr::memmem::find_iter(data.as_ref(), &prefix_bytes)
+            .next()
+            .is_some();
 
         Ok(contains_prefix)
     }
@@ -58,30 +56,36 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
 
 /// This function requires we know the file content we are matching against is UTF-8
 /// In case the source is non utf-8 it will fail with a read error
-fn contains_prefix_text(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
+fn contains_prefix_text(
+    file_path: &Path,
+    prefix: &Path,
+    target_platform: &Platform,
+) -> Result<bool, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
-    let mut buf_reader = BufReader::new(file);
 
-    // Read the file's content
-    let mut content = String::new();
-    buf_reader.read_to_string(&mut content)?;
+    // mmap the file
+    let mmap = unsafe { memmap2::Mmap::map(&file)? };
 
-    // Check if the content contains the prefix
-    let src = prefix.to_string_lossy();
-    let contains_prefix = content.contains(&src.to_string());
+    // Check if the content contains the prefix with memchr
+    let prefix_string = prefix.to_string_lossy().to_string();
+    let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
+        .next()
+        .is_some();
 
-    #[cfg(target_os = "windows")]
-    {
+    if !contains_prefix && target_platform.is_windows() {
         use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
-        let s = to_forward_slash_lossy(prefix);
-        return Ok(contains_prefix || content.contains(s.to_string().as_str()));
+        let forward_slash = to_forward_slash_lossy(prefix);
+        let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.as_ref())
+            .next()
+            .is_some();
+
+        return Ok(contains_prefix);
     }
 
-    #[cfg(not(target_os = "windows"))]
     Ok(contains_prefix)
 }
 
@@ -135,7 +139,7 @@ pub fn create_prefix_placeholder(
     // Even if we force the replacement mode to be text we still cannot handle it like a text file
     // since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
-        match contains_prefix_text(file_path, encoded_prefix) {
+        match contains_prefix_text(file_path, encoded_prefix, target_platform) {
             Ok(true) => {
                 has_prefix = Some(encoded_prefix.to_path_buf());
                 FileMode::Text
