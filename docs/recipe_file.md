@@ -551,7 +551,7 @@ glibc version is too old.
 
 ### Run exports
 
-Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Packages may have runtime requirements such as shared libraries (e.g. `zlib`), which are required for linking at build time, and for resolving the link at run time.
 Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
 
 Example from zlib:
@@ -1024,7 +1024,7 @@ requirements:
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
 
-E.g. if the variant specifies a pin for `numpy: 1.11`, one can use
+For example, if the variant specifies a pin for `numpy: 1.11`, one can use
 `pin_compatible` to relax it:
 
 ```yaml
@@ -1051,7 +1051,7 @@ There are three functions:
 - `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
   to any value
 
-This can be used for some light templating, e.g.
+This can be used for some light templating, for example:
 
 ```yaml
 build:

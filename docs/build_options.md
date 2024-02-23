@@ -17,7 +17,7 @@ already in the environment as part of some other host dependency. This is normal
 "clobbering" and should be used with caution (since packages should not have any overlapping files).
 
 The `always_copy_files` option can be used to copy files instead of linking them.
-This is useful for files that might be modified inside the environment (for example configuration files).
+This is useful for files that might be modified inside the environment (e.g. configuration files).
 Normally, files are linked from a central cache into the environment to save space – that means
 that files modified in one environment will be modified in all environments. This is not always
 desirable, and in that case you can use the `always_copy_files` option.
@@ -140,7 +140,7 @@ build:
 
 ## Dynamic linking configuration
 
-After the package is build, rattler-build performs some "post-processing" on the
+After the package is built, rattler-build performs some "post-processing" on the
 binaries and libraries.
 
 This entails making the shared libraries relocatable and checking that all
@@ -148,7 +148,7 @@ linked libraries are present in the run requirements. The following settings
 control this behavior.
 
 With the `rpath` option you can forcibly set the `rpath` of the shared
-libraries. The path is relative to the install prefix. Any rpath setting is
+libraries. The path is relative to the install prefix. Any `rpath` setting is
 ignored on Windows.
 
 The `rpath_allowlist` option can be used to allow the `rpath` to point to
@@ -160,7 +160,7 @@ If you want to stop `rattler-build` from relocating the binaries, you can set
 `binary_relocation` to `false`. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.
 
-To read more about rpaths and how rattler-build creates relocatable binary packages,
+To read more about `rpath`s and how rattler-build creates relocatable binary packages,
 see the [internals](internals.md) docs.
 
 If you link against some libraries (possibly even outside of the prefix, in a
@@ -169,11 +169,11 @@ against these and suppress any warnings. This list is pre-populated with a list
 of known system libraries on the different operating systems.
 
 As part of the post-processing, `rattler-build` checks for overlinking and
-overdepending. Overlinking is when a binary links against a library that is not
+overdepending. "Overlinking" is when a binary links against a library that is not
 specified in the run requirements. This is usually a mistake because the library
 would not be present in the environment when the package is installed.
 
-Conversely, overdepending is when a library is part of the run requirements, but
+Conversely, "overdepending" is when a library is part of the run requirements, but
 is not actually used by any of the binaries/libraries in the package.
 
 ```yaml title="recipe.yaml"

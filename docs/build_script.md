@@ -47,7 +47,7 @@ noted, no variables are inherited from the shell environment in which you invoke
 : Represents the number of CPUs on the system.
 
 `SHLIB_EXT`
-: Denotes the shared library extension specific to the operating system (e.g., .so for Linux, .dylib for macOS, and .dll for Windows).
+: Denotes the shared library extension specific to the operating system (e.g. `.so` for Linux, `.dylib` for macOS, and `.dll` for Windows).
 
 `HTTP_PROXY`
 : Inherited from the user's shell environment, specifying the HTTP proxy settings.
@@ -80,10 +80,10 @@ noted, no variables are inherited from the shell environment in which you invoke
 : The version of the package currently under construction.
 
 `PKG_BUILD_STRING`
-: The complete build string of the package being built, including the hash (e.g., py311h21422ab_0).
+: The complete build string of the package being built, including the hash (e.g. py311h21422ab_0).
 
 `PKG_HASH`
-: Represents the hash of the package being built, excluding the leading 'h' (e.g., 21422ab). This is applicable from Conda-build 3.0 onwards.
+: Represents the hash of the package being built, excluding the leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.
 
 `PYTHON`
 : The path to the Python executable in the host prefix. Python is installed in the host prefix only when it is listed as a host requirement.
