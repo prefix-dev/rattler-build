@@ -140,7 +140,7 @@ pub async fn create_environment(
                 .await
             }
         })
-        .buffer_unordered(channel_and_platform_len)
+        .buffered(channel_and_platform_len)
         .collect::<Vec<_>>()
         .await
         // Collect into another iterator where we extract the first erroneous result
