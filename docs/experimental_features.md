@@ -1,7 +1,7 @@
 # Experimental features
 
 !!! warning
-    These are experimental features of rattler-build and may change or go away completely.
+    These are experimental features of `rattler-build` and may change or go away completely.
 
 
 Currently only the `build` and `rebuild` commands support the following experimental features.

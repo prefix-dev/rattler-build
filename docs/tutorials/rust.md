@@ -2,16 +2,16 @@
 
 Building a Rust package is very straightforward with `rattler-build`. In this
 example, we build the a package for the `cargo-edit` utility, which is a utility
-for managing cargo dependencies from the command line.
+for managing Cargo dependencies from the command line.
 
-One tiny challenge is that the rust-compiler is not "pre-configured" and we need to
+One tiny challenge is that the Rust compiler is not "pre-configured" and we need to
 add a `variant_config.yaml` file to the package:
 
 ```yaml title="variant_config.yaml"
 rust_compiler: rust
 ```
 
-This will tell `rattler-build` what to insert for the `${{ compiler('rust') }}` jinja function.
+This will tell `rattler-build` what to insert for the `${{ compiler('rust') }}` Jinja function.
 
 !!! note
     The `${{ compiler(...) }}` functions are very useful in the context of
@@ -63,7 +63,7 @@ about:
   summary: "A utility for managing cargo dependencies from the command line."
 ```
 
-To build this recipe, just run:
+To build this recipe, simply run:
 
 ```bash
 rattler-build build \
