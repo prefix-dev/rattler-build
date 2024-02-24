@@ -1,47 +1,47 @@
 # The recipe spec
 
 `rattler-build` implements a new recipe spec, different from the traditional
-"meta.yaml" used in `conda-build`. A recipe has to be stored as `recipe.yaml`
-file.
+"`meta.yaml`" file used in `conda-build`. A recipe has to be stored as a
+`recipe.yaml` file.
 
-##  History
+## History
 
 A discussion was started on what a new recipe spec could or should look like.
-The fragments of this discussion can be found here:
-https://github.com/mamba-org/conda-specs/blob/master/proposed_specs/recipe.md
+The fragments of this discussion can be found [here](https://github.com/mamba-org/conda-specs/blob/master/proposed_specs/recipe.md).
+
 The reason for a new spec are:
 
-- Make it easier to parse ("pure yaml"). conda-build uses a mix of comments and
-  jinja to achieve a great deal of flexibility, but it's hard to parse the
+- make it easier to parse (i.e. "pure YAML"); `conda-build` uses a mix of comments
+  and Jinja to achieve a great deal of flexibility, but it's hard to parse the
   recipe with a computer
-- iron out some inconsistencies around multiple outputs (build vs. build/script
+- iron out some inconsistencies around multiple outputs (`build` vs. `build/script`
   and more)
 - remove any need for recursive parsing & solving
-- finally, the initial implementation in `boa` relied on conda-build.
-  `rattler-build` removes any dependency on Python or conda-build and
-  reimplements everything in Rust.
+- finally, the initial implementation in `boa` relied on `conda-build`;
+  `rattler-build` removes any dependency on Python or `conda-build` and
+  reimplements everything in Rust
 
-## Major differences with conda-build
+## Major differences from `conda-build`
 
 - recipe filename is `recipe.yaml`, not `meta.yaml`
 - outputs have less complicated behavior, keys are same as top-level recipe
-  (e.g. build/script, not just script), same for package/name, not just name)
+  (e.g. `build/script`, not just `script` and `package/name`, not just `name`)
 - no implicit meta-packages in outputs
 - no full Jinja2 support: no conditional or `{% set ...` support, only string
-  interpolation. Variables can be set in the toplevel "context" which is valid
+  interpolation; variables can be set in the toplevel "context" which is valid
   YAML
 - Jinja string interpolation needs to be preceded by a dollar sign at the
   beginning of a string, e.g. `- ${{ version }}` in order for it to be valid
   YAML
-- Selectors use a YAML dictionary style (vs. comments in conda-build). Instead
-  of `- somepkg  #[osx]` we use
+- selectors use a YAML dictionary style (vs. comments in conda-build). Instead
+  of `- somepkg  #[osx]` we use:
    ```yaml
    if: osx
    then:
      - somepkg
    ```
-- Skip instruction uses a list of skip conditions and not the selector syntax
-  from conda-build (e.g. `skip: ["osx", "win and py37"]`)
+- `skip` instruction uses a list of skip conditions and not the selector syntax
+  from `conda-build` (e.g. `skip: ["osx", "win and py37"]`)
 
 ## Spec
 
@@ -58,16 +58,15 @@ The recipe spec has the following parts:
 - [x] `outputs`: a recipe can have multiple outputs. Each output can and should
   have a `package`, `requirements` and `test` section
 
-Spec reference
---------------
+## Spec reference
 
 The spec is also made available through a JSON Schema (which is used for
 validation).<br/>
-The schema (and pydantic source file) can be found in this repository:
-[`recipe-format`](https://github.com/prefix-dev/recipe-format).
+The schema (and `pydantic` source file) can be found in this repository:
+[`recipe-format`](https://github.com/prefix-dev/recipe-format)
 
 ???+ info "To use with VSCode(yaml-plugin) and other IDEs:"
-    Either, start the document with the following line:
+    Either start the document with the following line:
     ```html
     # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
     ```
@@ -77,7 +76,7 @@ The schema (and pydantic source file) can be found in this repository:
       "https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json": "**/recipe.yaml",
     }
     ```
-    [Read more.](https://github.com/redhat-developer/yaml-language-server)
+    Read more about this [here](https://github.com/redhat-developer/yaml-language-server).
 
 
 See more in the [automatic linting](./automatic_linting.md) chapter.
@@ -158,10 +157,10 @@ package:
   version: "2.1.4"
 ```
 
-- **name**: The lower case name of the package. It may contain "-", but no
+- **name**: The lower case name of the package. It may contain "`-`", but no
   spaces.
 - **version**: The version number of the package. Use the PEP-386 verlib
-  conventions. Cannot contain "-". YAML interprets version numbers such as 1.0
+  conventions. Cannot contain "`-`". YAML interprets version numbers such as 1.0
   as floats, meaning that 0.10 will be the same as 0.1. To avoid this, put the
   version number in quotes so that it is interpreted as a string.
 
@@ -169,11 +168,11 @@ package:
 ### Source section
 
 Specifies where the source code of the package is coming from. The source may
-come from a tarball file, git, hg, or svn. It may be a local path and it may
+come from a tarball file, `git`, `hg`, or `svn`. It may be a local path and it may
 contain patches.
 
 
-#### Source from tarball or zip archive
+#### Source from tarball or `zip` archive
 
 ```yaml
 source:
@@ -187,7 +186,7 @@ If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
 
-#### Source from git
+#### Source from `git`
 
 ```yaml
 source:
@@ -195,7 +194,7 @@ source:
   # branch: master # note: defaults to fetching the repo's default branch
 ```
 
-You can use `rev` to pin the commit version directly.
+You can use `rev` to pin the commit version directly:
 
 ```yaml
 source:
@@ -203,7 +202,7 @@ source:
   rev: "50a1f7ed6c168eb0815d424cba2df62790f168f0"
 ```
 
-Or you can use the `tag`.
+Or you can use the `tag`:
 
 ```yaml
 source:
@@ -211,7 +210,7 @@ source:
   tag: "1.1.4"
 ```
 
-The `git` can also be a relative path to the recipe directory.
+`git` can also be a relative path to the recipe directory:
 
 ```yaml
 source:
@@ -219,8 +218,8 @@ source:
   tag: "1.1.4"
 ```
 
-Futhermore if you want to fetch just the current "HEAD"(this may result in non-deterministic builds)
-then you can use `depth`,
+Futhermore, if you want to fetch just the current "`HEAD`" (this may result in
+non-deterministic builds), then you can use `depth`.
 
 ```yaml
 source:
@@ -229,7 +228,7 @@ source:
 ```
 
 Note: `tag` or `rev` may not be available within commit depth range, hence we don't
-allow using `rev` or `tag` and `depth` of them together if not set to `-1`.
+allow using `rev` or the `tag` and `depth` of them together if not set to `-1`.
 
 ```yaml
 source:
@@ -238,8 +237,8 @@ source:
   depth: 1 # error: use of `depth` with `rev` is invalid, they are mutually exclusive
 ```
 
-When you want to use git-lfs, you need to set `lfs: true`. This will also pull
-the lfs files from the repository.
+When you want to use `git-lfs`, you need to set `lfs: true`. This will also pull
+the `lfs` files from the repository.
 
 ```yaml
 source:
@@ -259,8 +258,8 @@ source is copied to the work directory before building.
     use_gitignore: false # note: defaults to true
 ```
 
-By default, all files in the local path that are ignored by git are also ignored
-by rattler-build. You can disable this behavior by setting `use_gitignore` to
+By default, all files in the local path that are ignored by `git` are also ignored
+by `rattler-build`. You can disable this behavior by setting `use_gitignore` to
 `false`.
 
 #### Patches
@@ -278,10 +277,10 @@ Patches may optionally be applied to the source.
 
 #### Destination path
 
-Within rattler-build's work directory, you may specify a particular folder to place source
-into. `rattler-build` will always drop you into the same folder (build
-folder/work), but it's up to you whether you want your source extracted into
-that folder, or nested deeper. This feature is particularly useful when dealing
+Within `rattler-build`'s work directory, you may specify a particular folder to
+place the source into. `rattler-build` will always drop you into the same folder
+(`[build folder]/work`), but it's up to you whether you want your source extracted
+into that folder, or nested deeper. This feature is particularly useful when dealing
 with multiple sources, but can apply to recipes with single sources as well.
 
 ```yaml
@@ -309,8 +308,8 @@ source:
     target_directory: boa
 ```
 
-Here, the two URL tarballs will go into one folder, and the git repo is checked
-out into its own space. Git will not clone into a non-empty folder.
+Here, the two URL tarballs will go into one folder, and the `git` repo is checked
+out into its own space. `git` will not clone into a non-empty folder.
 
 ## Build section
 
@@ -319,7 +318,7 @@ Specifies build information.
 Each field that expects a path can also handle a glob pattern. The matching is
 performed from the top of the build environment, so to match files inside your
 project you can use a pattern similar to the following one:
-`"**/myproject/**/*.txt"`. This pattern will match any .txt file found in your
+`"**/myproject/**/*.txt"`. This pattern will match any `.txt` file found in your
 project. Quotation marks (`""`) are required for patterns that start with a `*`.
 
 Recursive globbing using `**` is also supported.
@@ -327,8 +326,8 @@ Recursive globbing using `**` is also supported.
 #### Build number and string
 
 The build number should be incremented for new builds of the same version. The
-number defaults to `0`. The build string cannot contain "-". The string defaults
-to the default rattler-build build string plus the build number.
+number defaults to `0`. The build string cannot contain "`-`". The string defaults
+to the default `rattler-build` build string plus the build number.
 
 ```yaml
 build:
@@ -348,7 +347,7 @@ build:
 
 #### Python entry points
 
-The following example creates a Python entry point named "bsdiff4" that calls
+The following example creates a Python entry point named "`bsdiff4`" that calls
 ``bsdiff4.cli.main_bsdiff4()``.
 
 ```yaml
@@ -361,8 +360,8 @@ build:
 
 ### Script
 
-By default, rattler-build uses a `build.sh` file on Unix (macOS and Linux) and a
-`build.bat` file on Linux, if they exist in the same folder as the `recipe.yaml`
+By default, `rattler-build` uses a `build.sh` file on Unix (macOS and Linux) and a
+`build.bat` file on Windows, if they exist in the same folder as the `recipe.yaml`
 file. With the script parameter you can either supply a different filename or
 write out short build scripts. You may need to use selectors to use different
 scripts for different platforms.
@@ -383,8 +382,8 @@ build:
 
 ### Skipping builds
 
-List conditions under which rattler-build should skip the build of this recipe.
-Particularly useful for defining recipes that are platform specific. By default,
+Lists conditions under which `rattler-build` should skip the build of this recipe.
+Particularly useful for defining recipes that are platform-specific. By default,
 a build is never skipped.
 
 ```yaml
@@ -394,13 +393,13 @@ build:
     ...
 ```
 
-### Architecture independent packages
+### Architecture-independent packages
 
 Allows you to specify "no architecture" when building a package, thus making it
-compatible with all platforms and architectures. Noarch packages can be
-installed on any platform.
+compatible with all platforms and architectures. Architecture-independent packages
+can be installed on any platform.
 
-Assigning the noarch key as `generic` tells conda to not try any manipulation of
+Assigning the `noarch` key as `generic` tells `conda` to not try any manipulation of
 the contents.
 
 ```yaml
@@ -408,7 +407,7 @@ build:
   noarch: generic
 ```
 
-`noarch: generic` is most useful for packages such as static javascript assets
+`noarch: generic` is most useful for packages such as static JavaScript assets
 and source archives. For pure Python packages that can run on any Python
 version, you can use the `noarch: python` value instead:
 
@@ -426,33 +425,34 @@ build:
 ### Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
-the package\_metadata by default. You can disable this by passing
+the `package\_metadata` by default. You can disable this by passing
 `--no-include-recipe` on the command line.
 
 !!! note
     There are many more options in the build section. These additional options control
-    how variants are computed, prefix replacement and more.
+    how variants are computed, prefix replacements, and more.
     See the [full build options](./build_options.md) for more information.
 
 
-Requirements section
---------------------
+## Requirements section
 
 Specifies the build and runtime requirements. Dependencies of these requirements
 are included automatically.
 
-Versions for requirements must follow the conda/mamba match specification. See
-build-version-spec.
+Versions for requirements must follow the `conda`/`mamba` match specification. See
+`build-version-spec`.
 
 ### Build
 
-Tools required to build the package. These packages are run on the build system
-and include things such as revision control systems (Git, SVN) make tools (GNU
-make, Autotool, CMake) and compilers (real cross, pseudo-cross, or native when
-not cross-compiling), and any source pre-processors.
+Tools required to build the package.
 
-Packages which provide "sysroot" files, like the `CDT` packages (see below) also
-belong in the build section.
+These packages are run on the build system and include things such as version
+control systems (`git`, `svn`) make tools (GNU make, Autotool, CMake) and compilers
+(real cross, pseudo-cross, or native when not cross-compiling), and any source
+pre-processors.
+
+Packages which provide "`sysroot`" files, like the `CDT` packages (see below), also
+belong in the `build` section.
 
 ```yaml
 requirements:
@@ -463,10 +463,10 @@ requirements:
 
 ### Host
 
-It represents packages that need to be specific to the target platform when the
+Represents packages that need to be specific to the target platform when the
 target platform is not necessarily the same as the native build platform. For
 example, in order for a recipe to be "cross-capable", shared libraries
-requirements must be listed in the host section, rather than the build section,
+requirements must be listed in the `host` section, rather than the `build` section,
 so that the shared libraries that get linked are ones for the target platform,
 rather than the native build platform. You should also include the base
 interpreter for packages that need one. In other words, a Python package would
@@ -484,27 +484,28 @@ requirements:
 ```
 
 !!! note
-    When both build and host sections are defined, the build section can
-    be thought of as "build tools" - things that run on the native platform, but output results for the target platform.
-    For example, a cross-compiler that runs on linux-64, but targets linux-armv7.
+    When both "`build`" and "`host`" sections are defined, the `build` section can
+    be thought of as "build tools" - things that run on the native platform, but
+    output results for the target platform (e.g. a cross-compiler that runs on
+    `linux-64`, but targets `linux-armv7`).
 
 
-The PREFIX environment variable points to the host prefix. With respect to
+The `PREFIX` environment variable points to the host prefix. With respect to
 activation during builds, both the host and build environments are activated.
 The build prefix is activated before the host prefix so that the host prefix has
 priority over the build prefix. Executables that don't exist in the host prefix
 should be found in the build prefix.
 
-The build and host prefixes are always separate when both are defined, or when
-`${{ compiler() }}` Jinja2 functions are used. The only time that build and host
-are merged is when the host section is absent, and no `${{ compiler() }}` Jinja2
-functions are used in meta.yaml.
+The `build` and `host` prefixes are always separate when both are defined, or when
+`${{ compiler() }}` Jinja2 functions are used. The only time that `build` and `host`
+are merged is when the `host` section is absent, and no `${{ compiler() }}` Jinja2
+functions are used in `meta.yaml`.
 
 ### Run
 
-Packages required to run the package. These are the dependencies that are
-installed automatically whenever the package is installed. Package names should
-follow the [package match
+Packages required to run the package.
+
+These are the dependencies that are installed automatically whenever the package is installed. Package names should follow the [package match
 specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html#package-match-specifications).
 
 ```yaml
@@ -534,27 +535,27 @@ requirements:
 ```
 
 For example, let's say we have an environment that has package "a" installed at
-version 1.0. If we install package "b" that has a run\_constrained entry of
-"a\>1.0", then mamba would need to upgrade "a" in the environment in order to
+version 1.0. If we install package "b" that has a `run\_constrained` entry of
+"`a\>1.0`", then `mamba` would need to upgrade "a" in the environment in order to
 install "b".
 
 This is especially useful in the context of virtual packages, where the
-run\_constrained dependency is not a package that mamba manages, but rather a
+`run\_constrained` dependency is not a package that `mamba` manages, but rather a
 [virtual
 package](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html)
-that represents a system property that mamba can't change. For example, a
-package on linux may impose a run\_constrained dependency on \_\_glibc\>=2.12.
+that represents a system property that `mamba` can't change. For example, a
+package on Linux may impose a `run\_constrained` dependency on `\_\_glibc\>=2.12`.
 This is the version bound consistent with CentOS 6. Software built against glibc
-2.12 will be compatible with CentOS 6. This run\_constrained dependency helps
-mamba tell the user that a given package can't be installed if their system
+2.12 will be compatible with CentOS 6. This `run\_constrained` dependency helps
+`mamba` tell the user that a given package can't be installed if their system
 glibc version is too old.
 
 ### Run exports
 
-Packages may have runtime requirements such as shared libraries (e.g. zlib), which are required for linking at build time, and for resolving the link at run time.
+Packages may have runtime requirements such as shared libraries (e.g. `zlib`), which are required for linking at build time, and for resolving the link at run time.
 Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
 
-Example from zlib:
+Example from `zlib`:
 
 ```yaml
   requirements:
@@ -562,7 +563,7 @@ Example from zlib:
       - {{ pin_subpackage('libzlib', exact=True) }}
 ```
 
-Run exports are weak by default. But you can also define strong run_exports.
+Run exports are weak by default. But you can also define strong `run_exports`.
 
 ```yaml
   requirements:
@@ -573,7 +574,9 @@ Run exports are weak by default. But you can also define strong run_exports.
 
 ### Ignore run exports
 
-There maybe cases where an upstream package has a problematic `run_exports` constraint, you can ignore it in your recipe by listing the upstream package name in the `ignore_run_exports` section in `requirements`.
+There maybe cases where an upstream package has a problematic `run_exports` constraint.
+You can ignore it in your recipe by listing the upstream package name in the
+`ignore_run_exports` section in `requirements`.
 
 You can ignore them by package name, or by naming the runtime dependency directly.
 
@@ -584,7 +587,7 @@ You can ignore them by package name, or by naming the runtime dependency directl
         - zlib
 ```
 
-Using, runtime depenedency name.
+Using a runtime depenedency name:
 
 ```yaml
   requirements:
@@ -596,18 +599,16 @@ Using, runtime depenedency name.
 !!! note
     `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
-Tests section
--------------
 
-Rattler-build supports 4 different types of tests. The "script" test installs
-the package and runs a list of commands. The python test attempts to import a
-list of python modules and runs `pip check`. The downstream test runs the tests
-of a downstream package that reverse depends on the package being built.
+## Tests section
 
-And lastly, the package content test checks if the built package contains the
-mentioned items.
+`rattler-build` supports four different types of tests. The "script test" installs
+the package and runs a list of commands. The "Python test" attempts to import a
+list of Python modules and runs `pip check`. The "downstream test" runs the tests
+of a downstream package that reverse depends on the package being built. And lastly,
+the "package content test" checks if the built package contains the mentioned items.
 
-The tests section is a list of these items:
+The `tests` section is a list of these items:
 
 ```yaml
 tests:
@@ -644,7 +645,7 @@ tests:
       - bspatch4 -h
 ```
 
-#### Extra Test Files
+#### Extra test files
 
 Test files that are copied from the source work directory into the temporary
 test directory and are needed during testing (note that the source work
@@ -671,9 +672,9 @@ tests:
 #### Test requirements
 
 In addition to the runtime requirements, you can specify requirements needed
-during testing. The runtime requirements that you specified in the "run" section
+during testing. The runtime requirements that you specified in the "`run`" section
 described above are automatically included during testing (because the built
-package is installed like regular).
+package is installed as it regularly would be).
 
 In the `build` section you can specify additional requirements that are only
 needed on the build system for cross-compilation (e.g. emulators or compilers).
@@ -769,8 +770,8 @@ tests:
   - downstream: numpy
 ```
 
-Outputs section
----------------
+
+## Outputs section
 
 Explicitly specifies packaging steps. This section supports multiple outputs, as
 well as different package output types. The format is a list of mappings.
@@ -779,7 +780,7 @@ When using multiple outputs, certain top-level keys are "forbidden": `package`
 and `requirements`. Instead of `package`, a top-level `recipe` key can be
 defined. The `recipe.name` is ignored but the `recipe.version` key is used as
 default version for each output. Other "top-level" keys are merged into each
-output (for example, the `about` section) to avoid repetition. Each output is a
+output (e.g. the `about` section) to avoid repetition. Each output is a
 complete recipe, and can have its own `build`, `requirements`, and `test`
 sections.
 
@@ -871,8 +872,8 @@ Due to the variant config file, this will build two versions of `libtest`. We
 will also build two versions of `test`, one that depends on `libtest (openssl
 1)` and one that depends on `libtest (openssl 3)`.
 
-About section
--------------
+
+## About section
 
 Specifies identifying information about the package. The information displays in
 the package server.
@@ -891,9 +892,9 @@ about:
 
 ### License file
 
-Add a file containing the software license to the package metadata. Many
-licenses require the license statement to be distributed with the package. The
-filename is relative to the source or recipe directory. The value can be a
+Adds a file containing the software license to the package metadata.
+Many licenses require the license statement to be distributed with the package.
+The filename is relative to the source or recipe directory. The value can be a
 single filename or a YAML list for multiple license files. Values can also point
 to directories with license information. Directory entries must end with a `/`
 suffix (this is to lessen unintentional inclusion of non-license files; all the
@@ -906,10 +907,10 @@ about:
     - vendor-licenses/
 ```
 
-Extra section
--------------
 
-A schema-free area for storing non-conda-specific metadata in standard YAML
+## Extra section
+
+A schema-free area for storing non-`conda`-specific metadata in standard YAML
 form.
 
 ???+ Example "Example: To store recipe maintainers information"
@@ -919,12 +920,12 @@ form.
        - name of maintainer
     ```
 
-Templating with Jinja
----------------------
 
-rattler-build supports limited Jinja templating in the `recipe.yaml` file.
+## Templating with Jinja
 
-You can set up Jinja variables in the context yaml section:
+`rattler-build` supports limited Jinja templating in the `recipe.yaml` file.
+
+You can set up Jinja variables in the `context` section:
 
 ```yaml
 context:
@@ -936,7 +937,7 @@ context:
 ```
 
 Later in your `recipe.yaml` you can use these values in string interpolation
-with Jinja. For example:
+with Jinja:
 
 ```yaml
 source:
@@ -947,7 +948,7 @@ Jinja has built-in support for some common string manipulations.
 
 In rattler-build, complex Jinja is completely disallowed as we try to produce
 YAML that is valid at all times. So you should not use any `{% if ... %}` or
-similar Jinja constructs that produce invalid yaml. Furthermore, instead of
+similar Jinja constructs that produce invalid YAML. Furthermore, instead of
 plain double curly brackets Jinja statements need to be prefixed by `$`, e.g.
 `${{ ... }}`:
 
@@ -969,7 +970,7 @@ To retrieve a fully rendered `recipe.yaml`, use the `` command.
 #### Additional Jinja2 functionality in rattler-build
 
 Besides the default Jinja2 functionality, additional Jinja functions are
-available during the rattler-build process: `pin_compatible`, `pin_subpackage`,
+available during the `rattler-build` process: `pin_compatible`, `pin_subpackage`,
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
@@ -1024,7 +1025,7 @@ requirements:
 Pin compatible lets you pin a package based on the version retrieved from the
 variant file (if the pinning from the variant file needs customization).
 
-E.g. if the variant specifies a pin for `numpy: 1.11`, one can use
+For example, if the variant specifies a pin for `numpy: 1.11`, one can use
 `pin_compatible` to relax it:
 
 ```yaml
@@ -1051,7 +1052,7 @@ There are three functions:
 - `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
   to any value
 
-This can be used for some light templating, e.g.
+This can be used for some light templating, for example:
 
 ```yaml
 build:
@@ -1060,13 +1061,14 @@ build:
 
 #### `cmp` function
 
-This function matches the first argument(package's MatchSpec) against the second argument(the version spec) and returns the resulting boolean.
+This function matches the first argument (the package's MatchSpec) against the second
+argument (the version spec) and returns the resulting boolean.
 
 ```yaml
 cmp(python, '>=3.4')
 ```
 
-Example: [cmp usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+Example: [`cmp` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
 
 #### `cdt` function
 
@@ -1079,10 +1081,10 @@ cdt('package-name') # outputs: package-name-cos6-x86_64
 cdt('package-name') # outputs: package-name-cos6-aarch64
 ```
 
-Example: [cdt usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
 
-Preprocessing selectors
------------------------
+
+## Preprocessing selectors
 
 You can add selectors to any item, and the selector is evaluated in a
 preprocessing stage. If a selector evaluates to `true`, the item is flattened
@@ -1111,12 +1113,12 @@ source:
       - url: http://path/to/windows/source
 ```
 
-A selector is a valid Python statement that is executed. The following variables
-are defined. Unless otherwise stated, the variables are booleans.
+A selector is a valid Python statement that is executed. You can read more about
+them in the ["Selectors in recipes" chapter](./selectors.md).
 
-The use of the Python version selectors, py27, py34, etc. is discouraged in
+The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
 favor of the more general comparison operators. Additional selectors in this
-series will not be added to conda-build.
+series will not be added to `conda-build`.
 
 Because the selector is any valid Python expression, complicated logic is
 possible:
@@ -1150,8 +1152,8 @@ tests:
     - test -f ${PREFIX}/lib/cmake/xtensor/xtensorConfigVersion.cmake
 ```
 
-Experimental features
----------------------
+
+## Experimental features
 
 !!! warning
     These are experimental features of `rattler-build` and may change or go away completely.

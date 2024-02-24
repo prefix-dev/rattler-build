@@ -1,11 +1,10 @@
-# CLI Usage
+# CLI usage
 
 ## Shell Completions
 
-We support shell completions through clap-complete.
-You can generate them for your shell using the `completion` command.
+We support shell completions through [`clap_complete`](https://crates.io/crates/clap_complete). You can generate them for your shell using the `completion` command.
 
-You can add the completions to your shell by adding the following to your shell's configuration file.
+You can add the completions to your shell by adding the following to your shell's configuration file:
 
 ```sh
 # For bash (add this to ~/.bashrc)
@@ -16,8 +15,7 @@ eval "$(rattler-build completion --shell=zsh)"
 rattler-build completion --shell=fish | source
 ```
 
-Ensure that whereever you install the is pointed to by your FPATH (for zsh or equivalent in other shells).
-Now you can use TAB or your configured completion key. :3
+Ensure that wherever you install `rattler-build` is pointed to by your `FPATH` (for `zsh` or equivalent in other shells), after which point you can use TAB or any configured completion key of choice. 😄
 
 ```sh
 $ rattler-build <TAB>
@@ -42,17 +40,16 @@ rattler-build build --package-format conda:max --compression-threads 10 -r recip
 
 ## Logs
 
-Rattler-build knows 3 different log-styles: `fancy`, `plain` and `json`.
-You can configure them with the `--log-style=<style>` flag.
+`rattler-build` knows three different log styles: `fancy`, `plain`, and `json`.
+You can configure them with the `--log-style=<style>` flag:
 
 ```sh
 # default
 rattler-build build --log-style fancy -r recipe/recipe.yaml
 ```
 
-### Github integration
+### GitHub integration
 
-Rattler-build also has a github integration. With this integration, warnings are automatically
-emitted in the github actions log and a summary is generated that is posted to the Github Actions summary page.
+`rattler-build` also has a GitHub integration. With this integration, warnings are automatically emitted in the GitHub Actions log and a summary is generated and posted to the GitHub Actions summary page.
 
-To make use of the integration we recommend to use our Github action: [`rattler-build-action`](https://github.com/prefix-dev/rattler-build-action). To manually enable it, you can set the environment variable `RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION=true`.
+To make use of this integration, we recommend using our custom GitHub action: [`rattler-build-action`](https://github.com/prefix-dev/rattler-build-action). To manually enable it, you can set the environment variable `RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION=true`.

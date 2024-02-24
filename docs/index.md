@@ -4,14 +4,14 @@
   </a>
 </h1>
 
-# rattler-build: a fast conda-package builder
+# `rattler-build`: A Fast Conda Package Builder
 
 The `rattler-build` tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
 run is a package that can be installed using `mamba`, `rattler` or `conda`.
 
-`rattler-build` does not have any dependencies on `conda-build` or `Python` and
+`rattler-build` does not have any dependencies on `conda-build` or Python and
 works as a standalone binary.
 
 ![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
@@ -56,7 +56,7 @@ self-contained.
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require git
+* `git` to checkout Git repositories (not implemented yet, but will require `git`
   in the future)
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
@@ -71,9 +71,7 @@ here](https://prefix-dev.github.io/rattler-build).
 
 ### GitHub Action
 
-There is a GitHub Action for rattler-build.
-It can be used to install `rattler-build` in CI/CD workflows and run a build command.
-Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
 
 ### Usage
 
@@ -85,8 +83,8 @@ package as output. The `test` subcommand can be used to test existing packages
 
 ### The recipe format
 
-> **Note** You can find all examples below in the [`examples`](./examples/)
-> folder and run them with `rattler-build`.
+> **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
+> folder in the codebase and run them with `rattler-build`.
 
 A simple example recipe for the `xtensor` header-only C++ library:
 
@@ -158,10 +156,7 @@ extra:
     - some-maintainer
 ```
 
-<details>
-  <summary>
-    A recipe for the `rich` Python package (using `noarch`)
-  </summary>
+A recipe for the `rich` Python package (using `noarch`):
 
 ```yaml
 context:
@@ -213,10 +208,8 @@ about:
   documentation: https://rich.readthedocs.io
   repository: https://github.com/Textualize/rich
 ```
-</details>
 
-<details>
-<summary>A recipe for the `curl` library</summary>
+A recipe for the `curl` library:
 
 ```yaml
 context:
@@ -263,10 +256,9 @@ about:
   repository: https://github.com/curl/curl
 ```
 
-For this recipe, two additional script files (`build.sh` and `build.bat`) are
-needed.
+For the `curl` library recipe, two additional script files (`build.sh` and `build.bat`) are needed.
 
-**build.sh**
+**`build.sh`**
 
 ```bash
 #!/bin/bash
@@ -294,7 +286,7 @@ make install
 rm -rf "${PREFIX}/share"
 ```
 
-**build.bat**
+**`build.bat`**
 
 ```cmd
 mkdir build
@@ -314,4 +306,3 @@ IF %ERRORLEVEL% NEQ 0 exit 1
 
 ninja install --verbose
 ```
-</details>

@@ -25,7 +25,7 @@ binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by `conda-build` and `boa`, and the output of a regular `rattler-build`
 run is a package that can be installed using `mamba`, `rattler` or `conda`.
 
-`rattler-build` does not have any dependencies on `conda-build` or `Python` and
+`rattler-build` does not have any dependencies on `conda-build` or Python and
 works as a standalone binary.
 
 ![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
@@ -70,7 +70,7 @@ self-contained.
   libraries and executables to make it relative
 * `patchelf` is required on Linux to rewrite the `rpath` and `runpath` of shared
   libraries and executables
-* `git` to checkout Git repositories (not implemented yet, but will require git
+* `git` to checkout Git repositories (not implemented yet, but will require `git`
   in the future)
 * `msvc` on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)
@@ -85,9 +85,7 @@ here](https://prefix-dev.github.io/rattler-build).
 
 ### GitHub Action
 
-There is a GitHub Action for rattler-build.
-It can be used to install `rattler-build` in CI/CD workflows and run a build command.
-Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
+There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
 
 ### Usage
 
@@ -278,7 +276,7 @@ about:
 For this recipe, two additional script files (`build.sh` and `build.bat`) are
 needed.
 
-**build.sh**
+**`build.sh`**
 
 ```bash
 #!/bin/bash
@@ -306,7 +304,7 @@ make install
 rm -rf "${PREFIX}/share"
 ```
 
-**build.bat**
+**`build.bat`**
 
 ```cmd
 mkdir build

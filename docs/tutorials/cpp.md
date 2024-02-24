@@ -1,17 +1,17 @@
 # Packaging a C++ package
 
-This tutorial will guide you though making a C++ package with rattler-build.
+This tutorial will guide you though making a C++ package with `rattler-build`.
 
-## Header only library
+## Header-only library
 
 Here we will build a package for the header-only library `xtensor`. The package
 depends on `cmake` and `ninja` for building.
 
 The main "trick" is to instruct `CMake` to install the headers in the right
-prefix, by using the `CMAKE_INSTALL_PREFIX` setting. On Unix, conda packages
-follow the regular "unix" prefix standard ($PREFIX/include and $PREFIX/lib
-etc.). On Windows, it also looks like a "unix" prefix but it's nested in a
-`Library` folder ($PREFIX/Library/include and $PREFIX/Library/lib etc.). For
+prefix, by using the `CMAKE_INSTALL_PREFIX` setting. On Unix, `conda` packages
+follow the regular "Unix" prefix standard (`$PREFIX/include` and `$PREFIX/lib`
+etc.). On Windows, it also looks like a "Unix" prefix but it's nested in a
+`Library` folder (`$PREFIX/Library/include` and `$PREFIX/Library/lib` etc.). For
 this reason, there are some handy variables (`%LIBRARY_PREFIX%` and
 `%LIBRARY_BIN%`) that can be used in the `CMake` command to install the headers
 and libraries in the right place.
@@ -165,15 +165,15 @@ ninja install
 ```
 
 When you look at the output of the `rattler-build` command you might see some
-interesting information:
+interesting information.
 
 Our package will have some `run` dependencies (even though we did not specify
-any). These run-dependencies come from the "run-exports" of the packages we
+any). These run-dependencies come from the "`run-exports`" of the packages we
 depend on in the `host` section of the recipe.  This is shown in the output of
-`rattler-build` with a little `"RE of [host: package]"`.
+`rattler-build` along with `"RE of [host: package]"`.
 
-Basically, `libcurl` defines: if you depend on me in the host section, then you
-should also depend on me during runtime with the following version ranges. This
+Basically, `libcurl` declares "if you depend on me in the host section, then you
+should also depend on me during runtime with the following version ranges". This
 is important to make linking to shared libraries work correctly.
 
 ```
@@ -215,10 +215,10 @@ macOS:
  └─ @rpath/libcairo.2.dylib
 ```
 
-rattler-build performs these checks to make sure that:
+`rattler-build` performs these checks to make sure that:
 
 1. All shared libraries that are linked against are present in the run
    dependencies. If you link against a library that is not explicitly mentioned
    in your recipe, you will get an "overlinking" warning.
-2. You don't require any packages in host that you are _not_ linking against. If this is the case, you
-   will get an "overdepending" warning.
+2. You don't require any packages in host that you are _not_ linking against.
+   this is the case, you will get an "overdepending" warning.

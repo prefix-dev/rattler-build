@@ -1,6 +1,6 @@
-# Internals of rattler-build
+# Internals of `rattler-build`
 
-## Making Packages Relocatable with Rattler-Build
+## Making Packages Relocatable with `rattler-build`
 
 Often, the most challenging aspect of building a package using `rattler-build`
 is making it relocatable. A relocatable package can be installed into any
@@ -14,8 +14,8 @@ relocatable:
 1. **Binary object file conversion**: Binary object files are converted to use
    relative paths using `install_name_tool` on macOS and `patchelf` on Linux.
    This uses `$ORIGIN` for elf files on Linux and `@loader_path` for Mach-O files
-   on macOS to make the rpath relative to the executable / shared library.
-2. **Text file prefix registration**: Any text file without NULL bytes
+   on macOS to make the `rpath` relative to the executable / shared library.
+2. **Text file prefix registration**: Any text file without `NULL` bytes
    containing the placeholder prefix have the registered prefix replaced with the
    install prefix.
 3. **Binary file prefix detection and registration**: Binary files containing

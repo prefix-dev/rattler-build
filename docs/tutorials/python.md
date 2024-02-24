@@ -1,6 +1,6 @@
 # Writing a Python package
 
-Writing a Python package is fairly straightforward, especially for "python-only"
+Writing a Python package is fairly straightforward, especially for "Python-only"
 packages. But it becomes really interesting when compiled extensions are
 involved (we will look at this in the second example).
 
@@ -57,8 +57,8 @@ about:
   documentation: https://ipywidgets.readthedocs.io/en/latest/
 ```
 
-1. The `noarch: python` line tells rattler-build that this package is pure
-   Python and can be one-size-fits-all. Noarch packages can be installed on any
+1. The `noarch: python` line tells `rattler-build` that this package is pure
+   Python and can be one-size-fits-all. `noarch` packages can be installed on any
    platform without modification which is very handy.
 2. The `imports` section in the tests is used to check that the package is
    installed correctly and can be imported.
@@ -67,7 +67,7 @@ about:
 ## A Python package with compiled extensions
 
 We will build a package for `numpy` – which most definitely contains compiled code.
-Since compiled code is `python` version specific, we will need to specify the
+Since compiled code is `python` version-specific, we will need to specify the
 `python` version explictly. This is most easily done with a "variant config" file:
 
 ```yaml title="variant_config.yaml"
@@ -137,7 +137,7 @@ about:
   repository: https://github.com/numpy/numpy
 ```
 
-The build script for unix:
+The build script for Unix:
 
 ```bash title="build.sh"
 mkdir builddir
@@ -150,7 +150,7 @@ $PYTHON -m build -w -n -x \
 $PYTHON -m pip install dist/numpy*.whl
 ```
 
-The build script for windows:
+The build script for Windows:
 
 ```bat title="build.bat"
 mkdir builddir
@@ -170,14 +170,14 @@ for /f %%f in ('dir /b /S .\dist') do (
 ```
 
 ### Running the recipe
-Running this recipe with the variant config file will build a a total of 2 numpy packages:
+Running this recipe with the variant config file will build a a total of 2 `numpy` packages:
 
 ```bash
 rattler-build build --recipe ./numpy \
   --variant-config ./numpy/variant_config.yaml
 ```
 
-At the beginning of the build process, rattler-build will print the following message to show you the variants it found:
+At the beginning of the build process, `rattler-build` will print the following message to show you the variants it found:
 
 ```txt
 Found variants:

@@ -1,30 +1,27 @@
-# Experimental Features
+# Experimental features
 
 !!! warning
-    These are experimental features of rattler-build and may change or go away completely.
+    These are experimental features of `rattler-build` and may change or go away completely.
 
 
-Currently only `build` & `rebuild` command supports the following experimental features.
+Currently only the `build` and `rebuild` commands support the following experimental features.
 
-To enable them use the `--experimental` flag with the command.
+To enable them, use the `--experimental` flag with the command.
 Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=1`.
 
-Jinja functions
----------------
+## Jinja functions
 
 ### `load_from_file(<file_path>)`
 
-The jinja function `load_from_file` allows loading from files, specifically, it allows loading from `toml`, `json`
-and `yaml` to an object to allow to fetch things directly from it.
-While it loads all other files as strings.
+The Jinja function `load_from_file` allows loading from files; specifically, it allows loading from `toml`, `json`,
+and `yaml` file types to an object to allow it to fetch things directly from the file.
+It loads all other files as strings.
 
 #### Usage
 
-This is useful when you have the project description in a well defined project file, such as, `Cargo.toml`, `package.json`, `pyproject.toml`, `package.yaml`, or `stack.yaml`. And would like to keep the recipe as simple as possible, while not worrying about keeping changes in sync, perhaps using it with CI/CD.
+`load_from_file` is useful when there is a project description in a well-defined project file such as `Cargo.toml`, `package.json`, `pyproject.toml`, `package.yaml`, or `stack.yaml`. It enables the recipe to be preserved in as simple a state as possible, especially when there is no need to keep the changes in sync; some example use cases for this are with CI/CD infrastructure or when there is a well-defined output format.
 
-Or, from some other source that provides a well-defined output format.
-
-Example against `Cargo.toml` inside `rattler-build` github repository:
+Below is an example loading a `Cargo.toml` inside of the `rattler-build` GitHub repository:
 
 ``` yaml title="recipe.yaml"
 context:
@@ -60,11 +57,11 @@ about:
   license: ${{ load_from_file("Cargo.toml").package.license }}
 ```
 
-### Git functions
+### `git` functions
 
-Git functions are useful for getting the latest tag and commit hash.
+`git` functions are useful for getting the latest tag and commit hash.
 These can be used in the `context` section of the recipe, to fetch version information
-from the git repository.
+from a repository.
 
 ???+ example "Examples"
     ```python
@@ -80,8 +77,7 @@ from the git repository.
 
 #### Usage
 
-These can be useful for automating minor things inside the recipe itself.
-Such as if the current version is the latest version, if the current hash is the latest hash, etc.
+These can be useful for automating minor things inside of the recipe itself, such as if the current version is the latest version or if the current hash is the latest hash, etc.
 
 ``` yaml title="recipe.yaml"
 context:
@@ -97,5 +93,4 @@ source:
   tag: ${{ latest_tag }}
 ```
 
-Though it's important to understand currently we don't guarantee caching for repo fetch for git functions
-this may lead to some performance issues.
+There is currently no guarantee of caching for repo fetches when using `git` functions. This may lead to some performance issues.
