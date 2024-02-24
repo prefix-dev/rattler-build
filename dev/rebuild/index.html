@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -902,7 +902,7 @@ here</a>.</p>
 <h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">#</a></h3>
 <p>The recipe is "rendered" and stored into the package. The way the recipe is
 rendered is subject to change. For the moment, the rendered recipe is stored as
-<code>info/recipe/rendered_recipe.yaml</code> file. It includes the exact package versions that
+<code>info/recipe/rendered_recipe.yaml</code>. It includes the exact package versions that
 were used at build time. When rebuilding, we use the package resolutions from
 the rendered recipe, and execute the same build script as the original package.</p>
 <p>We also take great care to sort files in a deterministic manner as well as
@@ -910,7 +910,7 @@ erasing any time stamps. The <code>SOURCE_DATE_EPOCH</code> environment variable
 the same timestamp as the original build for additional determinism (some build
 tools use this variable to set timestamps).</p>
 <h2 id="how-to-check-the-reproducibility-of-a-package">How to check the reproducibility of a package<a class="headerlink" href="#how-to-check-the-reproducibility-of-a-package" title="Permanent link">#</a></h2>
-<p>There is an excellent tool called <a href="https://diffoscope.org/">diffoscope</a> that
+<p>There is an excellent tool called <a href="https://diffoscope.org/"><code>diffoscope</code></a> that
 allows you to compare two packages and see the differences. You can install it
 with <code>pixi</code>:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pixi<span class="w"> </span>global<span class="w"> </span>install<span class="w"> </span>diffoscope

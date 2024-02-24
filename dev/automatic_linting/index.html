@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -790,11 +790,11 @@
 <h1 id="automatic-linting-in-vscode">Automatic linting in VSCode<a class="headerlink" href="#automatic-linting-in-vscode" title="Permanent link">#</a></h1>
 <p>The new recipe format comes with a strict JSON scheme. You can find the scheme
 <a href="https://github.com/prefix-dev/recipe-format">in this repository</a>.</p>
-<p>It's implemented with <code>pydantic</code> and renders to a JSON schema file. The <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML
+<p>It is implemented with <code>pydantic</code> and renders to a JSON schema file. The <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML
 language server extension in
 VSCode</a>
 can recognize the scheme and give helpful hints during editing.</p>
-<p>With the YAML language server installed the automatic linting can be enabled by
+<p>With the YAML language server installed, the automatic linting can be enabled by
 adding the following line to the top of the recipe file:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json</span>
 </span></code></pre></div>

@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -631,7 +631,7 @@
         <li class="md-nav__item">
   <a href="#cross-compilation" class="md-nav__link">
     <span class="md-ellipsis">
-      Cross compilation
+      Cross-compilation
     </span>
   </a>
   
@@ -814,7 +814,7 @@
         <li class="md-nav__item">
   <a href="#cross-compilation" class="md-nav__link">
     <span class="md-ellipsis">
-      Cross compilation
+      Cross-compilation
     </span>
   </a>
   
@@ -864,22 +864,22 @@ like the following:</p>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.3.0</span>
 </span></code></pre></div>
 <p>When the template function is evaluated, it will look something like:
-<code>gcc_linux-64 9.3.0</code>. You can define your own compilers. For example, for <code>rust</code>
+<code>gcc_linux-64 9.3.0</code>. You can define your own compilers. For example, for Rust
 you can use <code>${{ compiler('rust') }}</code> and <code>rust_compiler_{version}</code> in your
 variant config.</p>
-<h2 id="cross-compilation">Cross compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">#</a></h2>
-<p>Cross compilation is supported by rattler-build and the compiler template
+<h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">#</a></h2>
+<p>Cross-compilation is supported by <code>rattler-build</code> and the compiler template
 function is part of what makes it possible. When you want to cross-compile from
-<code>linux-64</code> to <code>linux-aarch64</code> (intel to ARM), you can pass <code>--target-platform
+<code>linux-64</code> to <code>linux-aarch64</code> (i.e. intel to ARM), you can pass <code>--target-platform
 linux-aarch64</code> to the <code>rattler-build</code> command. This will cause the compiler
 template function to select a compiler that is configured for <code>linux-aarch64</code>.
 The above example would resolve to <code>gcc_linux-aarch64 9.3.0</code>. Provided that the
 package is available for <code>linux-64</code> (your build platform), the compilation
 should succeed.</p>
-<p>The distinction between <code>build</code> and <code>host</code> section begins to make sense when
-thinking about cross compilation. The <code>build</code> enviromemnt is resolved to
+<p>The distinction between the <code>build</code> and <code>host</code> sections begins to make sense when
+thinking about cross-compilation. The <code>build</code> enviromemnt is resolved to
 packages that need to <em>run</em> at compilation time. For example, <code>cmake</code>, <code>gcc</code>,
-<code>autotools</code> are all tools that need to be executed. Therefore, the <code>build</code>
+and <code>autotools</code> are all tools that need to be executed. Therefore, the <code>build</code>
 environment resolves to packages for the <code>linux-64</code> architecture (in our
 example). On the other hand, the <code>host</code> packages resolve to <code>linux-aarch64</code> -
 those are packages that we want to link against.</p>

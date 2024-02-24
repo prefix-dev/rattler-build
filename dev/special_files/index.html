@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -862,17 +862,18 @@
 
 
 <h1 id="activation-scripts-and-other-special-files">Activation scripts and other special files<a class="headerlink" href="#activation-scripts-and-other-special-files" title="Permanent link">#</a></h1>
-<p>A conda package can contain "special" files in the prefix. These files are scripts that are executed during activation, installation or uninstallation process.</p>
+<p>A <code>conda</code> package can contain "special" files in the prefix. These files are scripts that are executed during activation, installation, or uninstallation process.</p>
 <p>If possible, they should be avoided since they execute arbitrary code at installation time and slow down the installation and activation process.</p>
 <h2 id="activation-scripts">Activation scripts<a class="headerlink" href="#activation-scripts" title="Permanent link">#</a></h2>
 <p>The activation scripts are executed when the environment containing the package is activated (e.g. when doing <code>micromamba activate myenv</code> or <code>pixi run ...</code>).</p>
 <p>The scripts are located in special folders:</p>
 <ul>
-<li><code>etc/conda/activate.d/{script.sh/bat}</code> - scripts in this folder are executed before the environment is activated.</li>
-<li><code>etc/conda/deactivate.d/{script.sh/bat}</code> - scripts in this folder are executed when the environment is deactivated.</li>
+<li><code>etc/conda/activate.d/{script.sh/bat}</code> - scripts in this folder are executed before the environment is activated</li>
+<li><code>etc/conda/deactivate.d/{script.sh/bat}</code> - scripts in this folder are executed when the environment is deactivated</li>
 </ul>
 <p>The scripts are executed in lexicographical order, so you can prefix them with numbers to control the order of execution.</p>
-<p>To add a script to the package, just make sure that you install the file in this folder, e.g. on Linux:</p>
+<p>To add a script to the package, just make sure that you install the file in this folder. For
+example, on Linux:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/activate.d
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cp<span class="w"> </span>activate-mypkg.sh<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/activate.d/10-activate-mypkg.sh
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -880,10 +881,11 @@
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>cp<span class="w"> </span>deactivate-mypkg.sh<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/deactivate.d/10-deactivate-mypkg.sh
 </span></code></pre></div>
 <h2 id="post-link-and-pre-unlink-scripts">Post-link and pre-unlink scripts<a class="headerlink" href="#post-link-and-pre-unlink-scripts" title="Permanent link">#</a></h2>
-<p>The post-link and pre-unlink scripts are executed when the package is installed or uninstalled.
-They are both heavily discouraged and currently not implemented in <code>rattler</code>, <code>rattler-build</code> and <code>pixi</code>.</p>
+<p>The <code>post-link</code> and <code>pre-unlink</code> scripts are executed when the package is installed or
+uninstalled. They are both heavily discouraged and currently not implemented in <code>rattler</code>,
+<code>rattler-build</code>, and <code>pixi</code>.</p>
 <p>To create a <code>post-link</code> script for your package, you need to add <code>&lt;package_name&gt;-post-link.{sh/bat}</code> to the <code>bin/</code> folder of your package.
-The same for <code>pre-unlink</code> scripts, just with the name <code>&lt;package_name&gt;-pre-unlink.{sh/bat}</code>.</p>
+The same is applicable for <code>pre-unlink</code> scripts, just with the name <code>&lt;package_name&gt;-pre-unlink.{sh/bat}</code>.</p>
 <p>For example, for <code>mypkg</code>, you would add <code>mypkg-post-link.sh</code> to the <code>bin/</code> folder of your package.</p>
 
 

@@ -424,7 +424,7 @@
         <li class="md-nav__item">
   <a href="#header-only-library" class="md-nav__link">
     <span class="md-ellipsis">
-      Header only library
+      Header-only library
     </span>
   </a>
   
@@ -487,7 +487,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -825,7 +825,7 @@
         <li class="md-nav__item">
   <a href="#header-only-library" class="md-nav__link">
     <span class="md-ellipsis">
-      Header only library
+      Header-only library
     </span>
   </a>
   
@@ -864,15 +864,15 @@
 
 
 <h1 id="packaging-a-c-package">Packaging a C++ package<a class="headerlink" href="#packaging-a-c-package" title="Permanent link">#</a></h1>
-<p>This tutorial will guide you though making a C++ package with rattler-build.</p>
-<h2 id="header-only-library">Header only library<a class="headerlink" href="#header-only-library" title="Permanent link">#</a></h2>
+<p>This tutorial will guide you though making a C++ package with <code>rattler-build</code>.</p>
+<h2 id="header-only-library">Header-only library<a class="headerlink" href="#header-only-library" title="Permanent link">#</a></h2>
 <p>Here we will build a package for the header-only library <code>xtensor</code>. The package
 depends on <code>cmake</code> and <code>ninja</code> for building.</p>
 <p>The main "trick" is to instruct <code>CMake</code> to install the headers in the right
-prefix, by using the <code>CMAKE_INSTALL_PREFIX</code> setting. On Unix, conda packages
-follow the regular "unix" prefix standard ($PREFIX/include and $PREFIX/lib
-etc.). On Windows, it also looks like a "unix" prefix but it's nested in a
-<code>Library</code> folder ($PREFIX/Library/include and $PREFIX/Library/lib etc.). For
+prefix, by using the <code>CMAKE_INSTALL_PREFIX</code> setting. On Unix, <code>conda</code> packages
+follow the regular "Unix" prefix standard (<code>$PREFIX/include</code> and <code>$PREFIX/lib</code>
+etc.). On Windows, it also looks like a "Unix" prefix but it's nested in a
+<code>Library</code> folder (<code>$PREFIX/Library/include</code> and <code>$PREFIX/Library/lib</code> etc.). For
 this reason, there are some handy variables (<code>%LIBRARY_PREFIX%</code> and
 <code>%LIBRARY_BIN%</code>) that can be used in the <code>CMake</code> command to install the headers
 and libraries in the right place.</p>
@@ -1017,13 +1017,13 @@ to the recipe by the file name given (or by the default name <code>build.sh</cod
 </span><span id="__span-2-26"><a id="__codelineno-2-26" name="__codelineno-2-26" href="#__codelineno-2-26"></a>ninja<span class="w"> </span>install
 </span></code></pre></div>
 <p>When you look at the output of the <code>rattler-build</code> command you might see some
-interesting information:</p>
+interesting information.</p>
 <p>Our package will have some <code>run</code> dependencies (even though we did not specify
-any). These run-dependencies come from the "run-exports" of the packages we
+any). These run-dependencies come from the "<code>run-exports</code>" of the packages we
 depend on in the <code>host</code> section of the recipe.  This is shown in the output of
-<code>rattler-build</code> with a little <code>"RE of [host: package]"</code>.</p>
-<p>Basically, <code>libcurl</code> defines: if you depend on me in the host section, then you
-should also depend on me during runtime with the following version ranges. This
+<code>rattler-build</code> along with <code>"RE of [host: package]"</code>.</p>
+<p>Basically, <code>libcurl</code> declares "if you depend on me in the host section, then you
+should also depend on me during runtime with the following version ranges". This
 is important to make linking to shared libraries work correctly.</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>Run dependencies:
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>╭───────────────────────┬──────────────────────────────────────────────╮
@@ -1059,13 +1059,13 @@ macOS:</p>
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a> ├─ @rpath/libpoppler-glib.8.dylib
 </span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a> └─ @rpath/libcairo.2.dylib
 </span></code></pre></div>
-<p>rattler-build performs these checks to make sure that:</p>
+<p><code>rattler-build</code> performs these checks to make sure that:</p>
 <ol>
 <li>All shared libraries that are linked against are present in the run
    dependencies. If you link against a library that is not explicitly mentioned
    in your recipe, you will get an "overlinking" warning.</li>
-<li>You don't require any packages in host that you are <em>not</em> linking against. If this is the case, you
-   will get an "overdepending" warning.</li>
+<li>You don't require any packages in host that you are <em>not</em> linking against.
+   this is the case, you will get an "overdepending" warning.</li>
 </ol>
 
 

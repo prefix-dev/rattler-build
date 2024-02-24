@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -869,8 +869,8 @@ execution based on specific conditions.</p>
 valid YAML dictionary. The condition is evaluated using <code>minijinja</code> and follows
 the same syntax as a Python expression.</p>
 <p>During rendering, several variables are set based on the platform and variant
-being built. For example, the unix variable is true for macOS and Linux, while
-win is true for Windows. Consider the following recipe executed on Linux:</p>
+being built. For example, the <code>unix</code> variable is true for macOS and Linux, while
+<code>win</code> is true for Windows. Consider the following recipe executed on Linux:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
@@ -916,7 +916,7 @@ afterward:</p>
 <tbody>
 <tr>
 <td><code>target_platform</code></td>
-<td>the configured target_platform for the build</td>
+<td>the configured <code>target_platform</code> for the build</td>
 </tr>
 <tr>
 <td><code>build_platform</code></td>
@@ -924,29 +924,29 @@ afterward:</p>
 </tr>
 <tr>
 <td><code>linux</code></td>
-<td>true if target_platform is Linux</td>
+<td>"true" if <code>target_platform</code> is Linux</td>
 </tr>
 <tr>
 <td><code>osx</code></td>
-<td>true if target_platform is OSX / macOS</td>
+<td>"true" if <code>target_platform</code> is OSX / macOS</td>
 </tr>
 <tr>
 <td><code>win</code></td>
-<td>true if target_platform is Windows</td>
+<td>"true" if <code>target_platform</code> is Windows</td>
 </tr>
 <tr>
 <td><code>unix</code></td>
-<td>true if target_platform is a Unix (macOS or Linux)</td>
+<td>"true" if <code>target_platform</code> is a Unix (macOS or Linux)</td>
 </tr>
 <tr>
 <td><code>x86_64</code>, <code>x86</code>, <code>arm64</code>, ...</td>
-<td>The architecture ("x86_64" for 64 bit, "x86" for 32 bit, otherwise arm64, aarch64, ppc64le, ...)</td>
+<td>The architecture ("x86_64" for 64 bit, "x86" for 32 bit, otherwise <code>arm64</code>, <code>aarch64</code>, <code>ppc64le</code>, etc.)</td>
 </tr>
 </tbody>
 </table>
 <p>After the initial phase, when the variant configuration is selected, the variant
 values are also available in selectors. For example, if the build uses <code>python:
-3.8</code> as variant, we can use <code>if: python == "3.8"</code> to enable a dependency only
+3.8</code> as a variant, we can use <code>if: python == "3.8"</code> to enable a dependency for only
 when the Python version is 3.8.</p>
 <h3 id="the-cmp-function">The <code>cmp</code> function<a class="headerlink" href="#the-cmp-function" title="Permanent link">#</a></h3>
 <p>Inside selectors, one can use a special <code>cmp</code> function to test if the selected
@@ -959,10 +959,10 @@ variant version has a matching version. For example, if we have again a <code>py
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmp(python, &quot;&lt;3.8&quot;)</span><span class="w">   </span><span class="c1"># false</span>
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
 </span></code></pre></div>
-<p>This function eliminates the need to implement any python-special conda-build
+<p>This function eliminates the need to implement any Python-specific <code>conda-build</code>
 selectors (such as <code>py3k</code>, <code>py38</code>, etc.) or the <code>py</code> and <code>npy</code> integers.</p>
 <p>Please note that during the <em>initial</em> phase of rendering we do not know the
-variant, and thus the <code>cmp</code> condition always evaluates to true.</p>
+variant, and thus the <code>cmp</code> condition always evaluates to <code>true</code>.</p>
 
 
 

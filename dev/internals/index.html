@@ -425,7 +425,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -769,7 +769,7 @@
         <li class="md-nav__item">
   <a href="#making-packages-relocatable-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
-      Making Packages Relocatable with Rattler-Build
+      Making Packages Relocatable with rattler-build
     </span>
   </a>
   
@@ -812,7 +812,7 @@
         <li class="md-nav__item">
   <a href="#making-packages-relocatable-with-rattler-build" class="md-nav__link">
     <span class="md-ellipsis">
-      Making Packages Relocatable with Rattler-Build
+      Making Packages Relocatable with rattler-build
     </span>
   </a>
   
@@ -841,8 +841,8 @@
   
 
 
-<h1 id="internals-of-rattler-build">Internals of rattler-build<a class="headerlink" href="#internals-of-rattler-build" title="Permanent link">#</a></h1>
-<h2 id="making-packages-relocatable-with-rattler-build">Making Packages Relocatable with Rattler-Build<a class="headerlink" href="#making-packages-relocatable-with-rattler-build" title="Permanent link">#</a></h2>
+<h1 id="internals-of-rattler-build">Internals of <code>rattler-build</code><a class="headerlink" href="#internals-of-rattler-build" title="Permanent link">#</a></h1>
+<h2 id="making-packages-relocatable-with-rattler-build">Making Packages Relocatable with <code>rattler-build</code><a class="headerlink" href="#making-packages-relocatable-with-rattler-build" title="Permanent link">#</a></h2>
 <p>Often, the most challenging aspect of building a package using <code>rattler-build</code>
 is making it relocatable. A relocatable package can be installed into any
 prefix, allowing it to be used outside the environment in which it was built.
@@ -854,8 +854,8 @@ relocatable:</p>
 <li><strong>Binary object file conversion</strong>: Binary object files are converted to use
    relative paths using <code>install_name_tool</code> on macOS and <code>patchelf</code> on Linux.
    This uses <code>$ORIGIN</code> for elf files on Linux and <code>@loader_path</code> for Mach-O files
-   on macOS to make the rpath relative to the executable / shared library.</li>
-<li><strong>Text file prefix registration</strong>: Any text file without NULL bytes
+   on macOS to make the <code>rpath</code> relative to the executable / shared library.</li>
+<li><strong>Text file prefix registration</strong>: Any text file without <code>NULL</code> bytes
    containing the placeholder prefix have the registered prefix replaced with the
    install prefix.</li>
 <li><strong>Binary file prefix detection and registration</strong>: Binary files containing

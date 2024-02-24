@@ -510,7 +510,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -919,12 +919,12 @@
   </a>
 </h1>
 
-<h1 id="rattler-build-a-fast-conda-package-builder">rattler-build: a fast conda-package builder<a class="headerlink" href="#rattler-build-a-fast-conda-package-builder" title="Permanent link">#</a></h1>
+<h1 id="rattler-build-a-fast-conda-package-builder"><code>rattler-build</code>: A Fast Conda Package Builder<a class="headerlink" href="#rattler-build-a-fast-conda-package-builder" title="Permanent link">#</a></h1>
 <p>The <code>rattler-build</code> tooling and library creates cross-platform relocatable
 binaries / packages from a simple recipe format. The recipe format is heavily
 inspired by <code>conda-build</code> and <code>boa</code>, and the output of a regular <code>rattler-build</code>
 run is a package that can be installed using <code>mamba</code>, <code>rattler</code> or <code>conda</code>.</p>
-<p><code>rattler-build</code> does not have any dependencies on <code>conda-build</code> or <code>Python</code> and
+<p><code>rattler-build</code> does not have any dependencies on <code>conda-build</code> or Python and
 works as a standalone binary.</p>
 <p><img alt="" src="https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg" /></p>
 <h3 id="installation">Installation<a class="headerlink" href="#installation" title="Permanent link">#</a></h3>
@@ -955,7 +955,7 @@ self-contained.</p>
   libraries and executables to make it relative</li>
 <li><code>patchelf</code> is required on Linux to rewrite the <code>rpath</code> and <code>runpath</code> of shared
   libraries and executables</li>
-<li><code>git</code> to checkout Git repositories (not implemented yet, but will require git
+<li><code>git</code> to checkout Git repositories (not implemented yet, but will require <code>git</code>
   in the future)</li>
 <li><code>msvc</code> on Windows because we cannot ship the MSVC compiler on conda-forge
   (needs to be installed on the host machine)</li>
@@ -966,9 +966,7 @@ self-contained.</p>
 <p>We have extensive documentation for <code>rattler-build</code>. You can find the <a href="https://prefix-dev.github.io/rattler-build">book
 here</a>.</p>
 <h3 id="github-action">GitHub Action<a class="headerlink" href="#github-action" title="Permanent link">#</a></h3>
-<p>There is a GitHub Action for rattler-build.
-It can be used to install <code>rattler-build</code> in CI/CD workflows and run a build command.
-Please check out the <a href="https://github.com/prefix-dev/rattler-build-action">GitHub Action documentation</a> for more information.</p>
+<p>There is a GitHub Action for <code>rattler-build</code>. It can be used to install <code>rattler-build</code> in CI/CD workflows and run a build command. Please check out the <a href="https://github.com/prefix-dev/rattler-build-action">GitHub Action documentation</a> for more information.</p>
 <h3 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h3>
 <p><code>rattler-build</code> comes with two commands: <code>build</code> and <code>test</code>.</p>
 <p>The <code>build</code> command takes a <code>--recipe recipe.yaml</code> as input and produces a
@@ -976,8 +974,8 @@ package as output. The <code>test</code> subcommand can be used to test existing
 (tests are shipped with the package).</p>
 <h3 id="the-recipe-format">The recipe format<a class="headerlink" href="#the-recipe-format" title="Permanent link">#</a></h3>
 <blockquote>
-<p><strong>Note</strong> You can find all examples below in the <a href="./examples/"><code>examples</code></a>
-folder and run them with <code>rattler-build</code>.</p>
+<p><strong>Note</strong> You can find all examples below in the <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples"><code>examples</code></a>
+folder in the codebase and run them with <code>rattler-build</code>.</p>
 </blockquote>
 <p>A simple example recipe for the <code>xtensor</code> header-only C++ library:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json</span>
@@ -1046,11 +1044,7 @@ folder and run them with <code>rattler-build</code>.</p>
 </span><span id="__span-3-64"><a id="__codelineno-3-64" name="__codelineno-3-64" href="#__codelineno-3-64"></a><span class="w">  </span><span class="nt">recipe-maintainers</span><span class="p">:</span>
 </span><span id="__span-3-65"><a id="__codelineno-3-65" name="__codelineno-3-65" href="#__codelineno-3-65"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">some-maintainer</span>
 </span></code></pre></div>
-<details>
-  <summary>
-    A recipe for the `rich` Python package (using `noarch`)
-  </summary>
-
+<p>A recipe for the <code>rich</code> Python package (using <code>noarch</code>):</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;13.4.2&quot;</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
@@ -1100,11 +1094,7 @@ folder and run them with <code>rattler-build</code>.</p>
 </span><span id="__span-4-47"><a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://rich.readthedocs.io</span>
 </span><span id="__span-4-48"><a id="__codelineno-4-48" name="__codelineno-4-48" href="#__codelineno-4-48"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/Textualize/rich</span>
 </span></code></pre></div>
-</details>
-
-<details>
-<summary>A recipe for the `curl` library</summary>
-
+<p>A recipe for the <code>curl</code> library:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;8.0.1&quot;</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
@@ -1148,12 +1138,8 @@ folder and run them with <code>rattler-build</code>.</p>
 </span><span id="__span-5-41"><a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://curl.haxx.se/docs/</span>
 </span><span id="__span-5-42"><a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/curl/curl</span>
 </span></code></pre></div>
-
-For this recipe, two additional script files (`build.sh` and `build.bat`) are
-needed.
-
-**build.sh**
-
+<p>For the <code>curl</code> library recipe, two additional script files (<code>build.sh</code> and <code>build.bat</code>) are needed.</p>
+<p><strong><code>build.sh</code></strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="ch">#!/bin/bash</span>
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Get an updated config.sub and config.guess</span>
@@ -1178,9 +1164,7 @@ needed.
 </span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a><span class="c1"># Includes man pages and other miscellaneous.</span>
 </span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>rm<span class="w"> </span>-rf<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">PREFIX</span><span class="si">}</span><span class="s2">/share&quot;</span>
 </span></code></pre></div>
-
-**build.bat**
-
+<p><strong><code>build.bat</code></strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>mkdir build
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>cmake -GNinja ^
@@ -1198,7 +1182,6 @@ needed.
 </span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>
 </span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>ninja install --verbose
 </span></code></pre></div>
-</details>
 
 
 

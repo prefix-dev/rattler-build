@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -621,7 +621,7 @@
           <li class="md-nav__item">
   <a href="#zip-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Zip Keys
+      Zip keys
     </span>
   </a>
   
@@ -654,7 +654,7 @@
           <li class="md-nav__item">
   <a href="#the-down_prioritize_variant-option" class="md-nav__link">
     <span class="md-ellipsis">
-      The "down_prioritize_variant" option
+      The down_prioritize_variant option
     </span>
   </a>
   
@@ -881,7 +881,7 @@
           <li class="md-nav__item">
   <a href="#zip-keys" class="md-nav__link">
     <span class="md-ellipsis">
-      Zip Keys
+      Zip keys
     </span>
   </a>
   
@@ -914,7 +914,7 @@
           <li class="md-nav__item">
   <a href="#the-down_prioritize_variant-option" class="md-nav__link">
     <span class="md-ellipsis">
-      The "down_prioritize_variant" option
+      The down_prioritize_variant option
     </span>
   </a>
   
@@ -985,8 +985,8 @@ For example:</p>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;1.12&quot;</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;1.20&quot;</span>
 </span></code></pre></div>
-<p>We can pass a variant configuration file to <code>rattler-build</code> using a command line
-like this:</p>
+<p>We can pass a variant configuration file to <code>rattler-build</code> using a command like
+the following:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--variant-config<span class="w"> </span>./variants.yaml<span class="w"> </span>--recipe<span class="w"> </span>myrecipe.yaml
 </span></code></pre></div>
 <p>If we have a recipe, that has a <code>build</code>, <code>host</code> or <code>run</code> dependency on <code>python</code>
@@ -998,20 +998,21 @@ we will build multiple variants of this package, one for each configured
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
 </span></code></pre></div>
-<p>will be rendered as (for the first variant)</p>
+<p>... will be rendered as (for the first variant):</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># ...</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python 3.8*</span>
 </span></code></pre></div>
 <p>Note that variants are <em>only</em> applied if the requirement doesn't specify any
-constraints. If the requirement would be <code>python &gt;3.8,&lt;3.10</code> the variant entry
+constraints. If the requirement would be <code>python &gt;3.8,&lt;3.10</code> then the variant entry
 would be ignored.</p>
 <h2 id="package-hash-from-variant">Package hash from variant<a class="headerlink" href="#package-hash-from-variant" title="Permanent link">#</a></h2>
 <p>You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
 It serves as a mechanism to discern different build configurations that produce a package with the same name and version.</p>
-<p>The hash is computed by dumping all the variant configuration values that are used by a given recipe into a JSON file, and then hashing that JSON file.
-For example, in our <code>python</code> example, we would get a variant configuration file that looks something like:</p>
+<p>The hash is computed by dumping all of the variant configuration values that are used by a
+given recipe into a JSON file, and then hashing that JSON file.</p>
+<p>For example, in our <code>python</code> example, we would get a variant configuration file that looks something like:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="nt">&quot;python&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;3.8&quot;</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="p">}</span>
@@ -1019,26 +1020,27 @@ For example, in our <code>python</code> example, we would get a variant configur
 <p>This JSON string is then hashed with the MD5 hash algorithm, and produces the hash.
 For certain packages (such as Python packages) special rules exists, and the <code>py&lt;Major.Minor&gt;</code> version is prepended to the hash, so that the final hash
 would look something like <code>py38h123123</code>.</p>
-<h3 id="zip-keys">Zip Keys<a class="headerlink" href="#zip-keys" title="Permanent link">#</a></h3>
+<h3 id="zip-keys">Zip keys<a class="headerlink" href="#zip-keys" title="Permanent link">#</a></h3>
 <p>Zip keys modify how variants are combined. Usually, each variant key that has multiple
-entries is expanded to a build matrix, for example if we have:</p>
+entries is expanded to a build matrix. For example, if we have:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;3.8&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.9&quot;</span><span class="p p-Indicator">]</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">numpy</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;1.12&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;1.14&quot;</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>We obtain 4 variants for a recipe that uses both <code>numpy</code> and <code>python</code>:</p>
+<p>...then we obtain 4 variants for a recipe that uses both <code>numpy</code> and <code>python</code>:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>- python 3.8, numpy 1.12
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>- python 3.8, numpy 1.14
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>- python 3.9, numpy 1.12
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>- python 3.9, numpy 1.14
 </span></code></pre></div>
-<p>However, if we use the <code>zip_keys</code> and specify</p>
+<p>However, if we use the <code>zip_keys</code> and specify:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">zip_keys</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;python&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;numpy&quot;</span><span class="p p-Indicator">]</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;3.8&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.9&quot;</span><span class="p p-Indicator">]</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="nt">numpy</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;1.12&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;1.14&quot;</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>Then the versions are "zipped up" and we only get two variants. Note that both, <code>python</code> and <code>numpy</code> need to specify the exact same number of
-versions to make this work.
-The resulting variants with the zip applied are:</p>
+<p>...then the versions are "zipped up" and we only get 2 variants. Note that
+both <code>python</code> and <code>numpy</code> need to specify the exact same number of versions
+to make this work.</p>
+<p>The resulting variants with the zip applied are:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>- python 3.8, numpy 1.12
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>- python 3.9, numpy 1.14
 </span></code></pre></div>
@@ -1071,7 +1073,7 @@ looks like:</p>
 <p>You might produce multiple variants for a package, but want to define a <em>priority</em> for a given variant.
 The variant with the highest priority would be the default package that is selected by the resolver.</p>
 <p>There are two mechanisms to make this possible: <code>mutex</code> packages and the <code>down_prioritize_variant</code> option in the recipe.</p>
-<h3 id="the-down_prioritize_variant-option">The "down_prioritize_variant" option<a class="headerlink" href="#the-down_prioritize_variant-option" title="Permanent link">#</a></h3>
+<h3 id="the-down_prioritize_variant-option">The <code>down_prioritize_variant</code> option<a class="headerlink" href="#the-down_prioritize_variant-option" title="Permanent link">#</a></h3>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>It is not always necessary to use the <code>down_prioritize_variant</code> option - only if the solver has no other way to
@@ -1091,7 +1093,7 @@ the solver will automatically prefer the variant with the highest Python version
 <p>Another way to make sure the right variants are selected are "mutex" packages. A mutex package is a package that is
 mutually exclusive. We use the fact that only one package of a given name can be installed at a time (the solver has to choose).</p>
 <p>A mutex package might be useful to make sure that all packages that depend on BLAS are compiled against the same BLAS implementation.
-The mutex package will serve the purpose that "openblas" and "mkl" can never be installed at the same time.</p>
+The mutex package will serve the purpose that "<code>openblas</code>" and "<code>mkl</code>" can never be installed at the same time.</p>
 <p>We could define a BLAS mutex package like this:</p>
 <div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">blas_variant</span><span class="p">:</span>
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;openblas&quot;</span>
@@ -1112,7 +1114,7 @@ The mutex package will serve the purpose that "openblas" and "mkl" can never be 
 Only one of these packages can be installed at a time because they share the same name.
 The solver will then only select one of these two packages.</p>
 <p>The <code>blas</code> package in turn should have a <code>run_export</code> for the <code>blas_mutex</code> package, so that any package
-that links against <code>blas</code> also has a dependency on the correct <code>blas_mutex</code> package.</p>
+that links against <code>blas</code> also has a dependency on the correct <code>blas_mutex</code> package:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">package</span><span class="p">:</span>
 </span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="hll"><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">openblas</span>
 </span></span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
@@ -1123,7 +1125,8 @@ that links against <code>blas</code> also has a dependency on the correct <code>
 </span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="hll"><span class="w">    </span><span class="c1"># Add a run export on _any_ version of the blas_mutex package whose build string starts with &quot;openblas&quot;</span>
 </span></span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blas_mutex * openblas*</span>
 </span></code></pre></div>
-<p>And then the recipe of a package that wants to build two variants, one for <code>openblas</code> and one for <code>mkl</code> could look like this:</p>
+<p>Then the recipe of a package that wants to build two variants, one for <code>openblas</code> and
+one for <code>mkl</code> could look like this:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="nt">package</span><span class="p">:</span>
 </span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fastnumerics</span>
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>

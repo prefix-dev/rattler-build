@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -547,12 +547,7 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#the-pin_subpackage-function" class="md-nav__link">
     <span class="md-ellipsis">
       The pin_subpackage function
@@ -560,8 +555,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-pin_compatible-function" class="md-nav__link">
     <span class="md-ellipsis">
       The pin_compatible function
@@ -569,8 +564,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-cdt-function" class="md-nav__link">
     <span class="md-ellipsis">
       The cdt function
@@ -578,8 +573,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-hash-variable" class="md-nav__link">
     <span class="md-ellipsis">
       The hash variable
@@ -587,8 +582,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-version_to_buildstring-function" class="md-nav__link">
     <span class="md-ellipsis">
       The version_to_buildstring function
@@ -596,13 +591,18 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-env-object" class="md-nav__link">
     <span class="md-ellipsis">
       The env object
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -908,12 +908,7 @@
   
 </li>
         
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
+          <li class="md-nav__item">
   <a href="#the-pin_subpackage-function" class="md-nav__link">
     <span class="md-ellipsis">
       The pin_subpackage function
@@ -921,8 +916,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-pin_compatible-function" class="md-nav__link">
     <span class="md-ellipsis">
       The pin_compatible function
@@ -930,8 +925,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-cdt-function" class="md-nav__link">
     <span class="md-ellipsis">
       The cdt function
@@ -939,8 +934,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-hash-variable" class="md-nav__link">
     <span class="md-ellipsis">
       The hash variable
@@ -948,8 +943,8 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-version_to_buildstring-function" class="md-nav__link">
     <span class="md-ellipsis">
       The version_to_buildstring function
@@ -957,13 +952,18 @@
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#the-env-object" class="md-nav__link">
     <span class="md-ellipsis">
       The env object
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1003,59 +1003,57 @@
 <p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the recipe.</p>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
 <h3 id="the-compiler-function">The compiler function<a class="headerlink" href="#the-compiler-function" title="Permanent link">#</a></h3>
-<p>The compiler function can be used to put together a compiler that works for the current platform and the compilation "target_platform".
+<p>The compiler function can be used to put together a compiler that works for the current platform and the compilation "<code>target_platform</code>".
 The syntax looks like: <code>${{ compiler('c') }}</code> where <code>'c'</code> signifies the programming language that is used.</p>
 <p>This function evaluates to <code>&lt;compiler&gt;_&lt;target_platform&gt; &lt;compiler_version&gt;</code>.
-For example, when compiling <em>on</em> linux and to linux-64, this function evaluates to <code>gcc_linux-64</code>.</p>
+For example, when compiling <em>on</em> <code>linux</code> and <em>to</em> <code>linux-64</code>, this function evaluates to <code>gcc_linux-64</code>.</p>
 <p>The values can be influenced by the <code>variant_configuration</code>.
-The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with influence, for example:</p>
+The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with influence. See below for an example:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">c_compiler</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">clang</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">c_compiler_version</span><span class="p">:</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
 </span></code></pre></div>
-<p>Would select the <code>clang</code> compiler in version <code>9.0</code>. Note that the final output will still contain the <code>target_platform</code>, so that the full compiler will read <code>clang_linux-64 9.0</code> when compiling with <code>--target-platform linux-64</code>.</p>
-<h2 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h2>
+<p>The variables shown above would select the <code>clang</code> compiler in version <code>9.0</code>. Note that the final output will still contain the <code>target_platform</code>, so that the full compiler will read <code>clang_linux-64 9.0</code> when compiling with <code>--target-platform linux-64</code>.</p>
+<h3 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h3>
 <ul>
 <li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x.x") }}</code> creates a pin to another output in the recipe.</li>
 </ul>
-<h2 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h2>
+<h3 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h3>
 <ul>
 <li><code>pin_compatible</code> pins a package in the run requirements based on the resolved package of the <code>host</code> or <code>build</code> section.</li>
 </ul>
-<h2 id="the-cdt-function">The <code>cdt</code> function<a class="headerlink" href="#the-cdt-function" title="Permanent link">#</a></h2>
+<h3 id="the-cdt-function">The <code>cdt</code> function<a class="headerlink" href="#the-cdt-function" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ cdt("mypkg") }}</code> creates a cross dependency to another output in the recipe.</li>
+<li><code>${{ cdt("mypkg") }}</code> creates a cross-dependency to another output in the recipe.</li>
 </ul>
-<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.</p>
+<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic. See below for an example of how this function can be used:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># on x86_64 system</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-x86_64</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># on aarch64 system</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
 </span></code></pre></div>
-<h2 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h2>
+<h3 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ hash }}</code> this is the variant hash and is useful in the build string computation</li>
+<li><code>${{ hash }}</code> is the variant hash and is useful in the build string computation.</li>
 </ul>
-<h2 id="the-version_to_buildstring-function">The <code>version_to_buildstring</code> function<a class="headerlink" href="#the-version_to_buildstring-function" title="Permanent link">#</a></h2>
+<h3 id="the-version_to_buildstring-function">The <code>version_to_buildstring</code> function<a class="headerlink" href="#the-version_to_buildstring-function" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant to a build string (removes <code>.</code> and takes only the first two elements of the version).</li>
+<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant to a build string (it removes the <code>.</code> character and takes only the first two elements of the version).</li>
 </ul>
-<h2 id="the-env-object">The <code>env</code> object<a class="headerlink" href="#the-env-object" title="Permanent link">#</a></h2>
+<h3 id="the-env-object">The <code>env</code> object<a class="headerlink" href="#the-env-object" title="Permanent link">#</a></h3>
 <p>You can use the <code>env</code> object to retrieve environment variables and forward them to your build script. There are two ways to do this:</p>
 <ul>
 <li><code>${{ env.get("MY_ENV_VAR") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or throw an error if it is not set.</li>
 <li><code>${{ env.get_default("MY_ENV_VAR", "default_value") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or <code>"default_value"</code> if it is not set.</li>
 </ul>
-<p>You can also check for existence of an environment variable:</p>
+<p>You can also check for the existence of an environment variable:</p>
 <ul>
 <li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
 </ul>
 <h2 id="default-jinja-filters">Default Jinja filters<a class="headerlink" href="#default-jinja-filters" title="Permanent link">#</a></h2>
-<ul>
-<li>default jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into characters: <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version }}.tar.gz</code>.
-  A list of all the builtin filters can be found under: <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#functions">Link</a></li>
-</ul>
+<p>The following Jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into characters (e.g. <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version }}.tar.gz</code>).</p>
+<p>Navigate to the <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#built-in-filters">Minijinja documentation</a> for a list of all available built-in filters.</p>
 
 
 

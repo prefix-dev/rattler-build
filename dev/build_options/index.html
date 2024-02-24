@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -915,7 +915,7 @@
   
 
 
-<h1 id="advanced-build-options">Advanced Build Options<a class="headerlink" href="#advanced-build-options" title="Permanent link">#</a></h1>
+<h1 id="advanced-build-options">Advanced build options<a class="headerlink" href="#advanced-build-options" title="Permanent link">#</a></h1>
 <p>There are some specialized build options to control various features:</p>
 <ul>
 <li>prefix replacement</li>
@@ -929,7 +929,7 @@
 already in the environment as part of some other host dependency. This is normally
 "clobbering" and should be used with caution (since packages should not have any overlapping files).</p>
 <p>The <code>always_copy_files</code> option can be used to copy files instead of linking them.
-This is useful for files that might be modified inside the environment (for example configuration files).
+This is useful for files that might be modified inside the environment (e.g. configuration files).
 Normally, files are linked from a central cache into the environment to save space – that means
 that files modified in one environment will be modified in all environments. This is not always
 desirable, and in that case you can use the <code>always_copy_files</code> option.</p>
@@ -1029,13 +1029,13 @@ variant configuration:</p>
 </span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer (defaults to 0, higher is less preferred)</span>
 </span></code></pre></div>
 <h2 id="dynamic-linking-configuration">Dynamic linking configuration<a class="headerlink" href="#dynamic-linking-configuration" title="Permanent link">#</a></h2>
-<p>After the package is build, rattler-build performs some "post-processing" on the
+<p>After the package is built, rattler-build performs some "post-processing" on the
 binaries and libraries.</p>
 <p>This entails making the shared libraries relocatable and checking that all
 linked libraries are present in the run requirements. The following settings
 control this behavior.</p>
 <p>With the <code>rpath</code> option you can forcibly set the <code>rpath</code> of the shared
-libraries. The path is relative to the install prefix. Any rpath setting is
+libraries. The path is relative to the install prefix. Any <code>rpath</code> setting is
 ignored on Windows.</p>
 <p>The <code>rpath_allowlist</code> option can be used to allow the <code>rpath</code> to point to
 locations outside of the environment. This is useful if you want to link against
@@ -1044,17 +1044,17 @@ software).</p>
 <p>If you want to stop <code>rattler-build</code> from relocating the binaries, you can set
 <code>binary_relocation</code> to <code>false</code>. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.</p>
-<p>To read more about rpaths and how rattler-build creates relocatable binary packages,
+<p>To read more about <code>rpath</code>s and how rattler-build creates relocatable binary packages,
 see the <a href="../internals/">internals</a> docs.</p>
 <p>If you link against some libraries (possibly even outside of the prefix, in a
 system location), then you can use the <code>missing_dso_allowlist</code> to allow linking
 against these and suppress any warnings. This list is pre-populated with a list
 of known system libraries on the different operating systems.</p>
 <p>As part of the post-processing, <code>rattler-build</code> checks for overlinking and
-overdepending. Overlinking is when a binary links against a library that is not
+overdepending. "Overlinking" is when a binary links against a library that is not
 specified in the run requirements. This is usually a mistake because the library
 would not be present in the environment when the package is installed.</p>
-<p>Conversely, overdepending is when a library is part of the run requirements, but
+<p>Conversely, "overdepending" is when a library is part of the run requirements, but
 is not actually used by any of the binaries/libraries in the package.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="c1"># settings for shared libraries and executables</span>

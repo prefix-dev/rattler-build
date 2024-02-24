@@ -493,7 +493,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -876,7 +876,7 @@
 
 
 <h1 id="writing-a-python-package">Writing a Python package<a class="headerlink" href="#writing-a-python-package" title="Permanent link">#</a></h1>
-<p>Writing a Python package is fairly straightforward, especially for "python-only"
+<p>Writing a Python package is fairly straightforward, especially for "Python-only"
 packages. But it becomes really interesting when compiled extensions are
 involved (we will look at this in the second example).</p>
 <p>The following recipe uses the <code>noarch: python</code> setting to build a <code>noarch</code>
@@ -930,15 +930,15 @@ specific Python version).</p>
 </span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://ipywidgets.readthedocs.io/en/latest/</span>
 </span></code></pre></div>
 <ol>
-<li>The <code>noarch: python</code> line tells rattler-build that this package is pure
-   Python and can be one-size-fits-all. Noarch packages can be installed on any
+<li>The <code>noarch: python</code> line tells <code>rattler-build</code> that this package is pure
+   Python and can be one-size-fits-all. <code>noarch</code> packages can be installed on any
    platform without modification which is very handy.</li>
 <li>The <code>imports</code> section in the tests is used to check that the package is
    installed correctly and can be imported.</li>
 </ol>
 <h2 id="a-python-package-with-compiled-extensions">A Python package with compiled extensions<a class="headerlink" href="#a-python-package-with-compiled-extensions" title="Permanent link">#</a></h2>
 <p>We will build a package for <code>numpy</code> – which most definitely contains compiled code.
-Since compiled code is <code>python</code> version specific, we will need to specify the
+Since compiled code is <code>python</code> version-specific, we will need to specify the
 <code>python</code> version explictly. This is most easily done with a "variant config" file:</p>
 <div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.11</span>
@@ -1002,7 +1002,7 @@ Since compiled code is <code>python</code> version specific, we will need to spe
 </span><span id="__span-2-54"><a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://numpy.org/doc/stable/</span>
 </span><span id="__span-2-55"><a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/numpy/numpy</span>
 </span></code></pre></div>
-<p>The build script for unix:</p>
+<p>The build script for Unix:</p>
 <div class="language-bash highlight"><span class="filename">build.sh</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>mkdir<span class="w"> </span>builddir
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nv">$PYTHON</span><span class="w"> </span>-m<span class="w"> </span>build<span class="w"> </span>-w<span class="w"> </span>-n<span class="w"> </span>-x<span class="w"> </span><span class="se">\</span>
@@ -1012,7 +1012,7 @@ Since compiled code is <code>python</code> version specific, we will need to spe
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nv">$PYTHON</span><span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>dist/numpy*.whl
 </span></code></pre></div>
-<p>The build script for windows:</p>
+<p>The build script for Windows:</p>
 <div class="language-bat highlight"><span class="filename">build.bat</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">mkdir</span> builddir
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nv">%PYTHON%</span> -m build -w -n -x <span class="se">^</span>
@@ -1029,11 +1029,11 @@ Since compiled code is <code>python</code> version specific, we will need to spe
 </span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="running-the-recipe">Running the recipe<a class="headerlink" href="#running-the-recipe" title="Permanent link">#</a></h3>
-<p>Running this recipe with the variant config file will build a a total of 2 numpy packages:</p>
+<p>Running this recipe with the variant config file will build a a total of 2 <code>numpy</code> packages:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>./numpy<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--variant-config<span class="w"> </span>./numpy/variant_config.yaml
 </span></code></pre></div>
-<p>At the beginning of the build process, rattler-build will print the following message to show you the variants it found:</p>
+<p>At the beginning of the build process, <code>rattler-build</code> will print the following message to show you the variants it found:</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>Found variants:
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>numpy-1.26.4-py311h5f8ada8_0

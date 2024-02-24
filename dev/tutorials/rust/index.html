@@ -439,7 +439,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -792,12 +792,12 @@
 <h1 id="building-a-rust-package">Building a Rust package<a class="headerlink" href="#building-a-rust-package" title="Permanent link">#</a></h1>
 <p>Building a Rust package is very straightforward with <code>rattler-build</code>. In this
 example, we build the a package for the <code>cargo-edit</code> utility, which is a utility
-for managing cargo dependencies from the command line.</p>
-<p>One tiny challenge is that the rust-compiler is not "pre-configured" and we need to
+for managing Cargo dependencies from the command line.</p>
+<p>One tiny challenge is that the Rust compiler is not "pre-configured" and we need to
 add a <code>variant_config.yaml</code> file to the package:</p>
 <div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">rust_compiler</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust</span>
 </span></code></pre></div>
-<p>This will tell <code>rattler-build</code> what to insert for the <code>${{ compiler('rust') }}</code> jinja function.</p>
+<p>This will tell <code>rattler-build</code> what to insert for the <code>${{ compiler('rust') }}</code> Jinja function.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The <code>${{ compiler(...) }}</code> functions are very useful in the context of
@@ -845,7 +845,7 @@ when you are targeting the <code>linux-64</code> platform.</p>
 </span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">utility</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">managing</span><span class="nv"> </span><span class="s">cargo</span><span class="nv"> </span><span class="s">dependencies</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">command</span><span class="nv"> </span><span class="s">line.&quot;</span>
 </span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">utility</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">managing</span><span class="nv"> </span><span class="s">cargo</span><span class="nv"> </span><span class="s">dependencies</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">command</span><span class="nv"> </span><span class="s">line.&quot;</span>
 </span></code></pre></div>
-<p>To build this recipe, just run:</p>
+<p>To build this recipe, simply run:</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--recipe<span class="w"> </span>./cargo-edit/recipe.yaml<span class="w"> </span><span class="se">\</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--variant-config<span class="w"> </span>./cargo-edit/variant_config.yaml
@@ -946,14 +946,14 @@ when you are targeting the <code>linux-64</code> platform.</p>
             <a
               href="../../highlevel/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Highlevel overview"
+              aria-label="Next: High-level overview"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Highlevel overview
+                  High-level overview
                 </div>
               </div>
               <div class="md-footer__button md-icon">

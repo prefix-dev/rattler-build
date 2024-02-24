@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -985,10 +985,10 @@
 <p><code>rattler-build</code> produces "conda" packages. These packages work with the <code>mamba</code>
 and <code>conda</code> package managers, and they work cross-platform on Windows, Linux and
 macOS.</p>
-<p>By default, a conda package is a <code>tar.bz2</code> archive which contains</p>
+<p>By default, a conda package is a <code>tar.bz2</code> archive which contains:</p>
 <ul>
-<li>Metadata under the <code>info/</code> directory.</li>
-<li>A collection of files that are installed directly into an install prefix.</li>
+<li>Metadata under the <code>info/</code> directory</li>
+<li>A collection of files that are installed directly into an install prefix</li>
 </ul>
 <p>The format is identical across platforms and operating systems. During the
 install process, all files are extracted into the install prefix, except the
@@ -1024,7 +1024,7 @@ files</a> section.</p>
 <p>The <code>info/</code> directory contains all metadata about a package. Files in this
 location are not installed under the install prefix. Although you are free to
 add any file to this directory, conda only inspects the content of the files
-discussed below.</p>
+discussed below:</p>
 <h3 id="infoindexjson"><code>info/index.json</code><a class="headerlink" href="#infoindexjson" title="Permanent link">#</a></h3>
 <p>This file contains basic information about the package, such as name, version,
 build string, and dependencies. The content of this file is stored in
@@ -1034,16 +1034,16 @@ build string, and dependencies. The content of this file is stored in
 <dt><code>name: string</code></dt>
 <dd>
 <p>The lowercase name of the package. May contain lowercase characters,
-underscore and dashes.</p>
+underscores, and dashes.</p>
 </dd>
 <dt><code>version: string</code></dt>
 <dd>
-<p>The package version. May not contain "-". Acknowledges <a href="https://www.python.org/dev/peps/pep-0440/">PEP
+<p>The package version. May not contain "<code>-</code>". Acknowledges <a href="https://www.python.org/dev/peps/pep-0440/">PEP
 440</a>.</p>
 </dd>
 <dt><code>build: string</code></dt>
 <dd>
-<p>The build string. May not contain "-". Differentiates builds of packages with
+<p>The build string. May not contain "<code>-</code>". Differentiates builds of packages with
   otherwise identical names and versions, such as:</p>
 </dd>
 </dl>
@@ -1086,7 +1086,7 @@ key is generally not used (duplicate information from <code>sudir</code>).</p>
 </dd>
 <dt><code>platform: string</code></dt>
 <dd>
-<p>Optional. The OS that the package is built for. EXAMPLE: <code>osx</code>. This key is
+<p>Optional. The OS that the package is built for, e.g. <code>osx</code>. This key is
 generally not used (duplicate information from <code>sudir</code>).</p>
 </dd>
 </dl>
@@ -1100,37 +1100,37 @@ each with the following keys:</p>
 <dl>
 <dt><code>_path: string</code></dt>
 <dd>
-<p>the relative path of the file</p>
+<p>The relative path of the file</p>
 </dd>
 <dt><code>path_type: optional, string</code></dt>
 <dd>
-<p>the type of linking, can be <code>hardlink</code>, <code>softlink</code>, or <code>directory</code>. Default is
+<p>The type of linking, can be <code>hardlink</code>, <code>softlink</code>, or <code>directory</code>. Default is
   <code>hardlink</code>.</p>
 </dd>
-</dl>
-<p><code>file_mode: - optional, string</code></p>
-<p>:the file mode can be <code>binary</code> or <code>text</code>. This is only relevant for prefix
-  replacement</p>
-<dl>
+<dt><code>file_mode: - optional, string</code></dt>
+<dd>
+<p>The file mode can be <code>binary</code> or <code>text</code>. This is only relevant for prefix
+  replacement.</p>
+</dd>
 <dt><code>prefix_placeholder: optional, string</code></dt>
 <dd>
-<p>the prefix placeholder string that is encoded in the text or binary file, and
-  that is replaced at installation time. Note that this prefix placeholder uses
+<p>The prefix placeholder string that is encoded in the text or binary file, which
+  is replaced at installation time. Note that this prefix placeholder uses
   <code>/</code> even on Windows.</p>
 </dd>
 <dt><code>no_link: bool, optional</code></dt>
 <dd>
-<p>whether this file should be linked or not when installing the package,
-  defaults false (linking the file from the cache into the environment)</p>
+<p>Determines whether this file should be linked or not when installing the package
+  (linking the file from the cache into the environment). Defaults to <code>false</code>.</p>
 </dd>
 <dt><code>sha256: string</code></dt>
 <dd>
-<p>the SHA256 hash of the file. For symbolic links it contains the SHA256 hash of
+<p>The <code>SHA256</code> hash of the file. For symbolic links it contains the <code>SHA256</code> hash of
   the file pointed to.</p>
 </dd>
 <dt><code>size_in_bytes: number</code></dt>
 <dd>
-<p>the size in bytes of the file. For symbolic links, it contains the file size
+<p>The size, in bytes, of the file. For symbolic links, it contains the file size
   of the file pointed to.</p>
 </dd>
 </dl>
@@ -1141,7 +1141,7 @@ longer than the install prefix.</p>
 <h3 id="infolicense"><code>info/license/&lt;...&gt;</code><a class="headerlink" href="#infolicense" title="Permanent link">#</a></h3>
 <p>All licenses mentioned in the recipe are copied to this folder.</p>
 <h3 id="infoaboutjson"><code>info/about.json</code><a class="headerlink" href="#infoaboutjson" title="Permanent link">#</a></h3>
-<p>Optional file. Contains the entries of the about section of the recipe of the
+<p>Optional file. Contains the entries of the "about" section of the recipe of the
 <code>recipe.yaml</code> file. The following keys are added to <code>info/about.json</code> if present
 in the build recipe:</p>
 <div class="admonition note">

@@ -427,7 +427,7 @@
         
   
   <span class="md-ellipsis">
-    Highlevel overview
+    High-level overview
   </span>
   
 
@@ -570,7 +570,7 @@
           <li class="md-nav__item">
   <a href="#git-functions" class="md-nav__link">
     <span class="md-ellipsis">
-      Git functions
+      git functions
     </span>
   </a>
   
@@ -857,7 +857,7 @@
           <li class="md-nav__item">
   <a href="#git-functions" class="md-nav__link">
     <span class="md-ellipsis">
-      Git functions
+      git functions
     </span>
   </a>
   
@@ -891,23 +891,22 @@
   
 
 
-<h1 id="experimental-features">Experimental Features<a class="headerlink" href="#experimental-features" title="Permanent link">#</a></h1>
+<h1 id="experimental-features">Experimental features<a class="headerlink" href="#experimental-features" title="Permanent link">#</a></h1>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>These are experimental features of rattler-build and may change or go away completely.</p>
+<p>These are experimental features of <code>rattler-build</code> and may change or go away completely.</p>
 </div>
-<p>Currently only <code>build</code> &amp; <code>rebuild</code> command supports the following experimental features.</p>
-<p>To enable them use the <code>--experimental</code> flag with the command.
+<p>Currently only the <code>build</code> and <code>rebuild</code> commands support the following experimental features.</p>
+<p>To enable them, use the <code>--experimental</code> flag with the command.
 Or, use the environment variable, <code>RATTLER_BUILD_EXPERIMENTAL=1</code>.</p>
 <h2 id="jinja-functions">Jinja functions<a class="headerlink" href="#jinja-functions" title="Permanent link">#</a></h2>
 <h3 id="load_from_filefile_path"><code>load_from_file(&lt;file_path&gt;)</code><a class="headerlink" href="#load_from_filefile_path" title="Permanent link">#</a></h3>
-<p>The jinja function <code>load_from_file</code> allows loading from files, specifically, it allows loading from <code>toml</code>, <code>json</code>
-and <code>yaml</code> to an object to allow to fetch things directly from it.
-While it loads all other files as strings.</p>
+<p>The Jinja function <code>load_from_file</code> allows loading from files; specifically, it allows loading from <code>toml</code>, <code>json</code>,
+and <code>yaml</code> file types to an object to allow it to fetch things directly from the file.
+It loads all other files as strings.</p>
 <h4 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">#</a></h4>
-<p>This is useful when you have the project description in a well defined project file, such as, <code>Cargo.toml</code>, <code>package.json</code>, <code>pyproject.toml</code>, <code>package.yaml</code>, or <code>stack.yaml</code>. And would like to keep the recipe as simple as possible, while not worrying about keeping changes in sync, perhaps using it with CI/CD.</p>
-<p>Or, from some other source that provides a well-defined output format.</p>
-<p>Example against <code>Cargo.toml</code> inside <code>rattler-build</code> github repository:</p>
+<p><code>load_from_file</code> is useful when there is a project description in a well-defined project file such as <code>Cargo.toml</code>, <code>package.json</code>, <code>pyproject.toml</code>, <code>package.yaml</code>, or <code>stack.yaml</code>. It enables the recipe to be preserved in as simple a state as possible, especially when there is no need to keep the changes in sync; some example use cases for this are with CI/CD infrastructure or when there is a well-defined output format.</p>
+<p>Below is an example loading a <code>Cargo.toml</code> inside of the <code>rattler-build</code> GitHub repository:</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ load_from_file(&quot;Cargo.toml&quot;).package.name }}</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ load_from_file(&quot;Cargo.toml&quot;).package.version }}</span>
@@ -940,10 +939,10 @@ While it loads all other files as strings.</p>
 </span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ load_from_file(&quot;Cargo.toml&quot;).package.description }}</span>
 </span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ load_from_file(&quot;Cargo.toml&quot;).package.license }}</span>
 </span></code></pre></div>
-<h3 id="git-functions">Git functions<a class="headerlink" href="#git-functions" title="Permanent link">#</a></h3>
-<p>Git functions are useful for getting the latest tag and commit hash.
+<h3 id="git-functions"><code>git</code> functions<a class="headerlink" href="#git-functions" title="Permanent link">#</a></h3>
+<p><code>git</code> functions are useful for getting the latest tag and commit hash.
 These can be used in the <code>context</code> section of the recipe, to fetch version information
-from the git repository.</p>
+from a repository.</p>
 <details class="example" open="open">
 <summary>Examples</summary>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># latest tag in the repo</span>
@@ -957,8 +956,7 @@ from the git repository.</p>
 </span></code></pre></div>
 </details>
 <h4 id="usage_1">Usage<a class="headerlink" href="#usage_1" title="Permanent link">#</a></h4>
-<p>These can be useful for automating minor things inside the recipe itself.
-Such as if the current version is the latest version, if the current hash is the latest hash, etc.</p>
+<p>These can be useful for automating minor things inside of the recipe itself, such as if the current version is the latest version or if the current hash is the latest hash, etc.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">git_repo_url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://github.com/prefix-dev/rattler-build&quot;</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">latest_tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ git.latest_tag( git_repo_url ) }}</span>
@@ -971,8 +969,7 @@ Such as if the current version is the latest version, if the current hash is the
 </span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ git_repo_url }}</span>
 </span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ latest_tag }}</span>
 </span></code></pre></div>
-<p>Though it's important to understand currently we don't guarantee caching for repo fetch for git functions
-this may lead to some performance issues.</p>
+<p>There is currently no guarantee of caching for repo fetches when using <code>git</code> functions. This may lead to some performance issues.</p>
 
 
 
