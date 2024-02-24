@@ -2,6 +2,7 @@
 use std::{
     collections::HashSet,
     fs::File,
+    io::Read,
     path::{Path, PathBuf},
 };
 
@@ -53,9 +54,10 @@ pub enum DllParseError {
 impl Dll {
     /// Check if the file is a DLL (PE) file.
     fn test_file(path: &Path) -> Result<bool, std::io::Error> {
-        let file = File::open(path).expect("Failed to open the ELF file");
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-        let signature = mmap[0..2]
+        let mut file = File::open(path)?;
+        let mut buf: [u8; 2] = [0; 2];
+        file.read_exact(&mut buf)?;
+        let signature = buf
             .pread_with::<u16>(0, scroll::LE)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
         Ok(DOS_MAGIC == signature)

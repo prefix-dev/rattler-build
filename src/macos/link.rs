@@ -6,6 +6,7 @@ use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
@@ -29,9 +30,15 @@ impl Relinker for Dylib {
     /// only parse the magic number of a file and check if it
     /// is a Mach-O file
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
-        let file = File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-        let ctx_res = goblin::mach::parse_magic_and_ctx(&mmap[0..4], 0);
+        let mut file = File::open(path)?;
+        let mut buf: [u8; 4] = [0; 4];
+        match file.read_exact(&mut buf) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(e) => return Err(e.into()),
+        }
+
+        let ctx_res = goblin::mach::parse_magic_and_ctx(&buf, 0);
         match ctx_res {
             Ok((_, Some(_))) => Ok(true),
             Ok((_, None)) => Ok(false),

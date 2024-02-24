@@ -10,6 +10,7 @@ use scroll::ctx::SizeWith;
 use scroll::Pwrite;
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
@@ -34,9 +35,14 @@ pub struct SharedObject {
 impl Relinker for SharedObject {
     /// Check if the file is an ELF file by reading the first 4 bytes
     fn test_file(path: &Path) -> Result<bool, RelinkError> {
-        let file = File::open(path)?;
-        let mmap = unsafe { memmap2::Mmap::map(&file)? };
-        Ok(&mmap[0..4] == ELFMAG)
+        let mut file = File::open(path)?;
+        let mut signature: [u8; 4] = [0; 4];
+        match file.read_exact(&mut signature) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(false),
+            Err(e) => return Err(e.into()),
+        }
+        Ok(ELFMAG.iter().eq(signature.iter()))
     }
 
     /// Create a new shared object from a path
