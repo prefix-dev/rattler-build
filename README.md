@@ -55,6 +55,10 @@ brew install rattler-build
 pacman -S rattler-build
 ```
 
+#### Distro Packages
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/rattler-build.svg)](https://repology.org/project/rattler-build/versions)
+
 #### Dependencies
 
 Currently `rattler-build` needs some dependencies on the host system which are
