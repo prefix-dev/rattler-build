@@ -12,10 +12,12 @@ source:
     sha256: 78884f64b564a3b06dc6ee731ed33b60c6d8cd864cea07f21d94ba0f90c7b310
 
   - path: ./test-folder/test-file-2.txt
+    md5: d41d8cd98f00b204e9800998ecf8427e
   - path: ./test-folder
     target_directory: just-a-test
   - path: test-file.txt
     file_name: am-i-renamed.txt
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 build:
   script:

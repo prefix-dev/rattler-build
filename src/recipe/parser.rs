@@ -40,7 +40,7 @@ pub use self::{
         Compiler, Dependency, IgnoreRunExports, PinSubpackage, Requirements, RunExports,
     },
     script::{Script, ScriptContent},
-    source::{Checksum, GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
+    source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
         PackageContentsTest, PythonTest, TestType,

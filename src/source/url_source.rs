@@ -5,52 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{
-    recipe::parser::{Checksum, UrlSource},
-    tool_configuration,
-};
-use rattler_digest::{compute_file_digest, Md5};
+use crate::{recipe::parser::UrlSource, tool_configuration};
 use tokio::io::AsyncWriteExt;
 
-use super::SourceError;
-
-fn validate_checksum(path: &Path, checksum: &Checksum) -> bool {
-    match checksum {
-        Checksum::Sha256(value) => {
-            let digest =
-                compute_file_digest::<sha2::Sha256>(path).expect("Could not compute SHA256");
-            let computed_sha = hex::encode(digest);
-            let checksum_sha = hex::encode(value);
-            if !computed_sha.eq(&checksum_sha) {
-                tracing::error!(
-                    "SHA256 values of downloaded file not matching!\nDownloaded = {}, should be {}",
-                    computed_sha,
-                    checksum_sha
-                );
-                false
-            } else {
-                tracing::info!("Validated SHA256 values of the downloaded file!");
-                true
-            }
-        }
-        Checksum::Md5(value) => {
-            let digest = compute_file_digest::<Md5>(path).expect("Could not compute SHA256");
-            let computed_md5 = hex::encode(digest);
-            let checksum_md5 = hex::encode(value);
-            if !computed_md5.eq(&checksum_md5) {
-                tracing::error!(
-                    "MD5 values of downloaded file not matching!\nDownloaded = {}, should be {}",
-                    computed_md5,
-                    checksum_md5
-                );
-                false
-            } else {
-                tracing::info!("Validated MD5 values of the downloaded file!");
-                true
-            }
-        }
-    }
-}
+use super::{checksum::Checksum, SourceError};
 
 fn split_filename(filename: &str) -> (String, String) {
     let stem = Path::new(filename)
@@ -91,7 +49,9 @@ pub(crate) async fn url_src(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
-    let checksum = Checksum::try_from(source)?;
+    let checksum = Checksum::from_url_source(source).ok_or_else(|| {
+        SourceError::NoChecksum(format!("No checksum found for url: {}", source.url()))
+    })?;
 
     if source.url().scheme() == "file" {
         let local_path = source.url().to_file_path().map_err(|_| {
@@ -105,7 +65,7 @@ pub(crate) async fn url_src(
             return Err(SourceError::FileNotFound(local_path));
         }
 
-        if !validate_checksum(&local_path, &checksum) {
+        if !checksum.validate(&local_path) {
             return Err(SourceError::ValidationFailed);
         }
 
@@ -119,7 +79,7 @@ pub(crate) async fn url_src(
     let cache_name = cache_dir.join(cache_name);
 
     let metadata = fs::metadata(&cache_name);
-    if metadata.is_ok() && metadata?.is_file() && validate_checksum(&cache_name, &checksum) {
+    if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
         tracing::info!("Found valid source cache file.");
         return Ok(cache_name.clone());
     }
@@ -165,7 +125,7 @@ pub(crate) async fn url_src(
 
     file.flush().await?;
 
-    if !validate_checksum(&cache_name, &checksum) {
+    if !checksum.validate(&cache_name) {
         tracing::error!("Checksum validation failed!");
         fs::remove_file(&cache_name)?;
         return Err(SourceError::ValidationFailed);
@@ -177,7 +137,7 @@ pub(crate) async fn url_src(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recipe::parser::Checksum;
+    use crate::source::Checksum;
     use sha2::Sha256;
     use url::Url;
 

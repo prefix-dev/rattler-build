@@ -2,21 +2,25 @@
 
 use std::{
     ffi::OsStr,
-    path::{Path, PathBuf, StripPrefixError},
+    path::{PathBuf, StripPrefixError},
 };
 
 use crate::{
-    console_utils::LoggingOutputHandler,
     metadata::{Directories, Output},
     recipe::parser::{GitRev, GitSource, Source},
+    source::{
+        checksum::Checksum,
+        extract::{extract_tar, extract_zip},
+    },
     tool_configuration,
 };
 
 use fs_err as fs;
-use fs_err::File;
 
 use crate::system_tools::SystemTools;
+pub mod checksum;
 pub mod copy_dir;
+pub mod extract;
 pub mod git_source;
 pub mod patch;
 pub mod url_source;
@@ -82,7 +86,7 @@ pub enum SourceError {
     Glob(#[from] globset::Error),
 
     #[error("No checksum found for url: {0}")]
-    NoChecksum(url::Url),
+    NoChecksum(String),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -157,12 +161,7 @@ pub async fn fetch_sources(
                 {
                     extract_tar(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
-                } else if res
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .ends_with(".zip")
-                {
+                } else if res.extension() == Some(OsStr::new("zip")) {
                     extract_zip(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else {
@@ -215,6 +214,11 @@ pub async fn fetch_sources(
                         src_path,
                         dest_dir.join(&file_name)
                     );
+                    if let Some(checksum) = Checksum::from_path_source(src) {
+                        if !checksum.validate(&src_path) {
+                            return Err(SourceError::ValidationFailed);
+                        }
+                    }
                     fs::copy(&src_path, &dest_dir.join(file_name))?;
                 } else {
                     return Err(SourceError::FileNotFound(src_path));
@@ -229,144 +233,6 @@ pub async fn fetch_sources(
         }
     }
     Ok(rendered_sources)
-}
-
-/// Handle Compression formats internally
-enum TarCompression<'a> {
-    PlainTar(File),
-    Gzip(flate2::read::GzDecoder<File>),
-    Bzip2(bzip2::read::BzDecoder<File>),
-    Xz2(xz2::read::XzDecoder<File>),
-    Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<File>>),
-    Compress,
-    Lzip,
-    Lzop,
-}
-
-fn ext_to_compression(ext: Option<&OsStr>, file: File) -> TarCompression {
-    match ext
-        .and_then(OsStr::to_str)
-        .and_then(|s| s.rsplit_once('.'))
-        .map(|(_, s)| s)
-    {
-        Some("gz" | "tgz" | "taz") => TarCompression::Gzip(flate2::read::GzDecoder::new(file)),
-        Some("bz2" | "tbz" | "tbz2" | "tz2") => {
-            TarCompression::Bzip2(bzip2::read::BzDecoder::new(file))
-        }
-        Some("lzma" | "tlz" | "xz" | "txz") => TarCompression::Xz2(xz2::read::XzDecoder::new(file)),
-        Some("zst" | "tzst") => {
-            TarCompression::Zstd(zstd::stream::read::Decoder::new(file).unwrap())
-        }
-        Some("Z" | "taZ") => TarCompression::Compress,
-        Some("lz") => TarCompression::Lzip,
-        Some("lzo") => TarCompression::Lzop,
-        Some(_) | None => TarCompression::PlainTar(file),
-    }
-}
-
-impl std::io::Read for TarCompression<'_> {
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        match self {
-            TarCompression::PlainTar(reader) => reader.read(buf),
-            TarCompression::Gzip(reader) => reader.read(buf),
-            TarCompression::Bzip2(reader) => reader.read(buf),
-            TarCompression::Xz2(reader) => reader.read(buf),
-            TarCompression::Zstd(reader) => reader.read(buf),
-            TarCompression::Compress | TarCompression::Lzip | TarCompression::Lzop => {
-                todo!("unsupported for now")
-            }
-        }
-    }
-}
-
-/// Moves the directory content from src to dest after stripping root dir, if present.
-fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
-    let mut entries = fs::read_dir(src)?;
-    let src_dir = match entries.next().transpose()? {
-        // ensure if only single directory in entries(root dir)
-        Some(dir) if entries.next().is_none() && dir.file_type()?.is_dir() => {
-            src.join(dir.file_name())
-        }
-        _ => src.to_path_buf(),
-    };
-
-    for entry in fs::read_dir(src_dir)? {
-        let entry = entry?;
-        let destination = dest.join(entry.file_name());
-        fs::rename(entry.path(), destination)?;
-    }
-
-    Ok(())
-}
-
-/// Extracts a tar archive to the specified target directory
-fn extract_tar(
-    archive: impl AsRef<Path>,
-    target_directory: impl AsRef<Path>,
-    log_handler: &LoggingOutputHandler,
-) -> Result<(), SourceError> {
-    let archive = archive.as_ref();
-    let target_directory = target_directory.as_ref();
-
-    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
-    let progress_bar = log_handler.add_progress_bar(
-        indicatif::ProgressBar::new(len)
-            .with_prefix("Extracting tar")
-            .with_style(log_handler.default_bytes_style()),
-    );
-
-    let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
-        archive.file_name(),
-        File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    )));
-
-    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
-    archive
-        .unpack(&tmp_extraction_dir)
-        .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
-
-    move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
-    progress_bar.finish_with_message("Extracted...");
-
-    Ok(())
-}
-
-/// Extracts a zip archive to the specified target directory
-/// currently this doesn't support bzip2 and zstd.
-///
-/// `.zip` files archived with compression other than deflate would fail.
-///
-/// <!-- TODO: we can trivially add support for bzip2 and zstd by enabling the feature flags -->
-fn extract_zip(
-    archive: impl AsRef<Path>,
-    target_directory: impl AsRef<Path>,
-    log_handler: &LoggingOutputHandler,
-) -> Result<(), SourceError> {
-    let archive = archive.as_ref();
-    let target_directory = target_directory.as_ref();
-
-    let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
-    let progress_bar = log_handler.add_progress_bar(
-        indicatif::ProgressBar::new(len)
-            .with_finish(indicatif::ProgressFinish::AndLeave)
-            .with_prefix("Extracting zip")
-            .with_style(log_handler.default_bytes_style()),
-    );
-
-    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
-        File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    ))
-    .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
-
-    let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
-    archive
-        .extract(&tmp_extraction_dir)
-        .map_err(|e| SourceError::ZipExtractionError(e.to_string()))?;
-
-    move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
-    progress_bar.finish_with_message("Extracted...");
-
-    Ok(())
 }
 
 impl Output {
@@ -402,67 +268,5 @@ impl Output {
                 ..self
             })
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::{fs::File, io::Write};
-
-    use crate::{console_utils::LoggingOutputHandler, source::SourceError};
-
-    use super::extract_zip;
-
-    #[test]
-    fn test_extract_zip() {
-        // zip contains text.txt with "Hello, World" text
-        const HELLOW_ZIP_FILE: &[u8] = &[
-            80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13,
-            0, 0, 0, 8, 0, 28, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85, 84, 9, 0, 3, 4, 130,
-            150, 101, 6, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 72,
-            101, 108, 108, 111, 44, 32, 87, 111, 114, 108, 100, 10, 80, 75, 1, 2, 30, 3, 10, 0, 0,
-            0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13, 0, 0, 0, 8, 0, 24, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 164, 129, 0, 0, 0, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85,
-            84, 5, 0, 3, 4, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 80,
-            75, 5, 6, 0, 0, 0, 0, 1, 0, 1, 0, 78, 0, 0, 0, 79, 0, 0, 0, 0, 0,
-        ];
-        let term = indicatif::InMemoryTerm::new(100, 100);
-        let multi_progress = indicatif::MultiProgress::new();
-        multi_progress.set_draw_target(indicatif::ProgressDrawTarget::term_like(Box::new(
-            term.clone(),
-        )));
-        let tempdir = tempfile::tempdir().unwrap();
-        let file_path = tempdir.path().join("test.zip");
-        let mut file = File::create(&file_path).unwrap();
-        _ = file.write_all(HELLOW_ZIP_FILE);
-
-        let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
-        let res = extract_zip(file_path, tempdir.path(), &fancy_log);
-        assert!(term.contents().trim().starts_with(
-            "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
-        ));
-        assert!(matches!(res.err(), None));
-        assert!(tempdir.path().join("text.txt").exists());
-        assert!(std::fs::read_to_string(tempdir.path().join("text.txt"))
-            .unwrap()
-            .contains("Hello, World"));
-    }
-
-    #[test]
-    fn test_extract_fail() {
-        let fancy_log = LoggingOutputHandler::default();
-        let tempdir = tempfile::tempdir().unwrap();
-        let res = extract_zip("", tempdir.path(), &fancy_log);
-        assert!(matches!(res.err(), Some(SourceError::FileNotFound(_))));
-    }
-
-    #[test]
-    fn test_extract_fail_2() {
-        let fancy_log = LoggingOutputHandler::default();
-        let tempdir = tempfile::tempdir().unwrap();
-        let file = tempdir.path().join("test.zip");
-        _ = File::create(&file);
-        let res = extract_zip(file, tempdir.path(), &fancy_log);
-        assert!(matches!(res.err(), Some(SourceError::InvalidZip(_))));
     }
 }
