@@ -881,7 +881,7 @@ the package server.
 ```yaml
 about:
   homepage: https://example.com/bsdiff4
-  license: BSD
+  license: BSD-3-Clause # (1)!
   license_file: LICENSE
   summary: binary diff and patch using the BSDIFF4-format
   description: |
@@ -889,6 +889,8 @@ about:
   repository: https://github.com/ilanschnell/bsdiff4
   documentation: https://docs.com
 ```
+
+1.  These follow the SPDX specifiers more info here: [SPDX](https://spdx.org/licenses/)
 
 ### License file
 
