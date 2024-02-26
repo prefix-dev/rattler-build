@@ -15,7 +15,6 @@ use crate::{
         },
         error::{ErrorKind, PartialParsingError},
     },
-    source::SourceError,
 };
 
 use super::FlattenErrors;
@@ -442,22 +441,21 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
         let mut file_name = None;
 
         self.iter().map(|(key, value)| {
-            let key_str = key.as_str();
-            match key_str {
-                "url" => url = value.try_convert(key_str)?,
+            match key.as_str() {
+                "url" => url = value.try_convert(key)?,
                 "sha256" => {
-                    let sha256_str: RenderedScalarNode = value.try_convert(key_str)?;
+                    let sha256_str: RenderedScalarNode = value.try_convert(key)?;
                     let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| vec![_partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256)])?;
                     sha256 = Some(sha256_out);
                 }
                 "md5" => {
-                    let md5_str: RenderedScalarNode = value.try_convert(key_str)?;
+                    let md5_str: RenderedScalarNode = value.try_convert(key)?;
                     let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| vec![_partialerror!(*md5_str.span(), ErrorKind::InvalidMd5)])?;
                     md5 = Some(md5_out);
                 }
-                "file_name" => file_name = value.try_convert(key_str)?,
-                "patches" => patches = value.try_convert(key_str)?,
-                "target_directory" => target_directory = value.try_convert(key_str)?,
+                "file_name" => file_name = value.try_convert(key)?,
+                "patches" => patches = value.try_convert(key)?,
+                "target_directory" => target_directory = value.try_convert(key)?,
                 invalid_key => {
                     return Err(vec![_partialerror!(
                         *key.span(),
@@ -496,58 +494,33 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
     }
 }
 
-/// Checksum information.
-#[serde_as]
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-pub enum Checksum {
-    /// A SHA256 checksum
-    Sha256(#[serde_as(as = "SerializableHash::<rattler_digest::Sha256>")] Sha256Hash),
-    /// A MD5 checksum
-    Md5(#[serde_as(as = "SerializableHash::<rattler_digest::Md5>")] Md5Hash),
-}
-
-impl TryFrom<&UrlSource> for Checksum {
-    type Error = SourceError;
-
-    fn try_from(source: &UrlSource) -> Result<Self, Self::Error> {
-        if let Some(sha256) = source.sha256() {
-            Ok(Checksum::Sha256(*sha256))
-        } else if let Some(md5) = source.md5() {
-            Ok(Checksum::Md5(*md5))
-        } else {
-            return Err(SourceError::NoChecksum(source.url().clone()));
-        }
-    }
-}
-
-impl Checksum {
-    /// Get the checksum as a hex string.
-    pub fn to_hex(&self) -> String {
-        match self {
-            Checksum::Sha256(sha256) => hex::encode(sha256),
-            Checksum::Md5(md5) => hex::encode(md5),
-        }
-    }
-}
-
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PathSource {
     /// Path to the local source code
-    path: PathBuf,
+    pub path: PathBuf,
+    /// Optionally a sha256 checksum to verify the source code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<rattler_digest::Sha256>>")]
+    pub sha256: Option<Sha256Hash>,
+    /// Optionally a md5 checksum to verify the source code
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde_as(as = "Option<SerializableHash::<rattler_digest::Md5>>")]
+    pub md5: Option<Md5Hash>,
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    patches: Vec<PathBuf>,
+    pub patches: Vec<PathBuf>,
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
-    target_directory: Option<PathBuf>,
+    pub target_directory: Option<PathBuf>,
     /// Optionally a file name to rename the file to
     #[serde(skip_serializing_if = "Option::is_none")]
-    file_name: Option<PathBuf>,
+    pub file_name: Option<PathBuf>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
     #[serde(skip_serializing_if = "should_not_serialize_use_gitignore")]
-    use_gitignore: bool,
+    pub use_gitignore: bool,
 }
 
 /// Helper method to skip serializing the use_gitignore flag if it is true.
@@ -589,10 +562,22 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut target_directory = None;
         let mut use_gitignore = true;
         let mut file_name = None;
+        let mut sha256 = None;
+        let mut md5 = None;
 
         self.iter().map(|(key, value)| {
             match key.as_str() {
                 "path" => path = value.try_convert("path")?,
+                "sha256" => {
+                    let sha256_str: RenderedScalarNode = value.try_convert(key)?;
+                    let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| vec![_partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256)])?;
+                    sha256 = Some(sha256_out);
+                }
+                "md5" => {
+                    let md5_str: RenderedScalarNode = value.try_convert(key)?;
+                    let md5_out = rattler_digest::parse_digest_from_hex::<Md5>(md5_str.as_str()).ok_or_else(|| vec![_partialerror!(*md5_str.span(), ErrorKind::InvalidMd5)])?;
+                    md5 = Some(md5_out);
+                }
                 "patches" => patches = value.try_convert("patches")?,
                 "target_directory" => target_directory = value.try_convert("target_directory")?,
                 "file_name" => file_name = value.try_convert("file_name")?,
@@ -608,7 +593,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             Ok(())
         }).flatten_errors()?;
 
-        let path = path.ok_or_else(|| {
+        let path: PathBuf = path.ok_or_else(|| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("path".into()),
@@ -616,8 +601,18 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             )]
         })?;
 
+        if path.is_dir() && (sha256.is_some() || md5.is_some()) {
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                help = "path `source` with a directory cannot have a `sha256` or `md5` checksum"
+            )]);
+        }
+
         Ok(PathSource {
             path,
+            sha256,
+            md5,
             patches,
             target_directory,
             file_name,
