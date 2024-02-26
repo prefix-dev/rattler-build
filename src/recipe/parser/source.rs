@@ -61,6 +61,9 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
                 if map.contains_key("git") {
                     let git_src = map.try_convert("source")?;
                     sources.push(Source::Git(git_src));
+                } else if map.contains_key("ssh") {
+                    let git_src = map.try_convert("source")?;
+                    sources.push(Source::Git(git_src));
                 } else if map.contains_key("url") {
                     let url_src = map.try_convert("source")?;
                     sources.push(Source::Url(url_src));
@@ -273,6 +276,10 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                         }
                     }
                 }
+                "ssh" => {
+                    let ssh_url_str: String = v.try_convert("git")?;
+                    url = Some(GitUrl::Ssh(ssh_url_str));
+                }
                 "rev" | "tag" | "branch" => {
                     if rev.is_some() {
                         return Err(vec![_partialerror!(
@@ -314,7 +321,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
+                        help = "valid fields for git `source` are `git`, `ssh`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
                     )])
                 }
             }
@@ -357,6 +364,8 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
 pub enum GitUrl {
     /// A remote Git repository URL
     Url(Url),
+    /// A remote Git repository URL in scp style
+    Ssh(String),
     /// A local path to a Git repository
     Path(PathBuf),
 }
@@ -365,6 +374,7 @@ impl fmt::Display for GitUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GitUrl::Url(url) => write!(f, "{url}"),
+            GitUrl::Ssh(url) => write!(f, "{url}"),
             GitUrl::Path(path) => write!(f, "{path:?}"),
         }
     }
