@@ -890,7 +890,7 @@ about:
   documentation: https://docs.com
 ```
 
-1.  These follow the SPDX specifiers more info here: [SPDX](https://spdx.org/licenses/)
+1.  Only the SPDX specifiers are allowed, more info here: [SPDX](https://spdx.org/licenses/)
 
 ### License file
 
