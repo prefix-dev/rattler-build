@@ -891,6 +891,7 @@ about:
 ```
 
 1.  Only the SPDX specifiers are allowed, more info here: [SPDX](https://spdx.org/licenses/)
+    If you want another license type `LicenseRef-<YOUR-LICENSE>` can be used, e.g. `license: LicenseRef-Proprietary`
 
 ### License file
 
