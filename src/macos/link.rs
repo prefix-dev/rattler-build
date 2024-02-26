@@ -5,7 +5,7 @@ use memmap2::MmapMut;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -48,9 +48,9 @@ impl Relinker for Dylib {
 
     /// parse the Mach-O file and extract all relevant information
     fn new(path: &Path) -> Result<Self, RelinkError> {
-        let data = fs::read(path)?;
-
-        match goblin::mach::Mach::parse(&data)? {
+        let file = File::open(path).expect("Failed to open the Mach-O binary");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        match goblin::mach::Mach::parse(&mmap)? {
             Mach::Binary(mach) => {
                 return Ok(Dylib {
                     path: path.to_path_buf(),
@@ -547,6 +547,7 @@ mod tests {
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
 
         let object = Dylib::new(&binary_path).unwrap();
+        assert!(Dylib::test_file(&binary_path)?);
         let expected_rpath = PathBuf::from("/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib");
 
         assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
@@ -582,6 +583,7 @@ mod tests {
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
 
         let object = Dylib::new(&binary_path).unwrap();
+        assert!(Dylib::test_file(&binary_path)?);
 
         let delete_paths = object
             .rpaths
@@ -630,6 +632,7 @@ mod tests {
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
 
         let object = Dylib::new(&binary_path).unwrap();
+        assert!(Dylib::test_file(&binary_path)?);
 
         let delete_paths = object
             .rpaths

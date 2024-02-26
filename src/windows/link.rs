@@ -66,10 +66,9 @@ impl Dll {
     /// Parse a DLL file and return an object that contains the path to the DLL and the list of
     /// libraries it depends on.
     fn new(path: &Path) -> Result<Self, DllParseError> {
-        let mut buffer = Vec::new();
-        let mut file = File::open(path)?;
-        file.read_to_end(&mut buffer)?;
-        let pe = PE::parse(&buffer)?;
+        let file = File::open(path).expect("Failed to open the Mach-O binary");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let pe = PE::parse(&mmap)?;
         Ok(Self {
             path: path.to_path_buf(),
             libraries: pe.libraries.iter().map(|s| s.to_string()).collect(),

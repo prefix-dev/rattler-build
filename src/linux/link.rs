@@ -47,12 +47,9 @@ impl Relinker for SharedObject {
 
     /// Create a new shared object from a path
     fn new(path: &Path) -> Result<Self, RelinkError> {
-        let mut buffer = Vec::new();
-        let mut file = File::open(path).expect("Failed to open the DLL file");
-        file.read_to_end(&mut buffer)
-            .expect("Failed to read the DLL file");
-        let elf = Elf::parse(&buffer).expect("Failed to parse the ELF file");
-
+        let file = File::open(path).expect("Failed to open the ELF file");
+        let mmap = unsafe { memmap2::Mmap::map(&file)? };
+        let elf = Elf::parse(&mmap).expect("Failed to parse the ELF file");
         Ok(Self {
             path: path.to_path_buf(),
             libraries: elf.libraries.iter().map(PathBuf::from).collect(),
@@ -446,6 +443,7 @@ mod test {
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert_eq!(
             vec!["$ORIGIN/../lib", "/usr/lib/custom_lib"],
             object
@@ -482,6 +480,7 @@ mod test {
 
         let encoded_prefix = Path::new("/rattler-build_zlink/host_env_placehold");
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         object.relink(
             &prefix,
             encoded_prefix,
@@ -515,6 +514,7 @@ mod test {
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert!(object.runpaths.is_empty() && !object.rpaths.is_empty());
 
         super::builtin_relink(
@@ -547,6 +547,7 @@ mod test {
         fs::copy(prefix.join("zlink-runpath"), &binary_path)?;
 
         let object = SharedObject::new(&binary_path)?;
+        assert!(SharedObject::test_file(&binary_path)?);
         assert!(!object.runpaths.is_empty() && object.rpaths.is_empty());
 
         super::builtin_relink(
