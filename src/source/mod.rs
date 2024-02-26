@@ -2,6 +2,7 @@
 
 use std::{
     ffi::OsStr,
+    io::BufRead,
     path::{Path, PathBuf, StripPrefixError},
 };
 
@@ -233,17 +234,17 @@ pub async fn fetch_sources(
 
 /// Handle Compression formats internally
 enum TarCompression<'a> {
-    PlainTar(File),
-    Gzip(flate2::read::GzDecoder<File>),
-    Bzip2(bzip2::read::BzDecoder<File>),
-    Xz2(xz2::read::XzDecoder<File>),
-    Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<File>>),
+    PlainTar(Box<dyn BufRead + 'a>),
+    Gzip(flate2::read::GzDecoder<Box<dyn BufRead + 'a>>),
+    Bzip2(bzip2::read::BzDecoder<Box<dyn BufRead + 'a>>),
+    Xz2(xz2::read::XzDecoder<Box<dyn BufRead + 'a>>),
+    Zstd(zstd::stream::read::Decoder<'a, std::io::BufReader<Box<dyn BufRead + 'a>>>),
     Compress,
     Lzip,
     Lzop,
 }
 
-fn ext_to_compression(ext: Option<&OsStr>, file: File) -> TarCompression {
+fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
     match ext
         .and_then(OsStr::to_str)
         .and_then(|s| s.rsplit_once('.'))
@@ -264,7 +265,7 @@ fn ext_to_compression(ext: Option<&OsStr>, file: File) -> TarCompression {
     }
 }
 
-impl std::io::Read for TarCompression<'_> {
+impl<'a> std::io::Read for TarCompression<'a> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             TarCompression::PlainTar(reader) => reader.read(buf),
@@ -278,7 +279,6 @@ impl std::io::Read for TarCompression<'_> {
         }
     }
 }
-
 /// Moves the directory content from src to dest after stripping root dir, if present.
 fn move_extracted_dir(src: &Path, dest: &Path) -> Result<(), SourceError> {
     let mut entries = fs::read_dir(src)?;
@@ -315,10 +315,14 @@ fn extract_tar(
             .with_style(log_handler.default_bytes_style()),
     );
 
-    let mut archive = tar::Archive::new(progress_bar.wrap_read(ext_to_compression(
+    let file = File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?;
+    let wrapped = progress_bar.wrap_read(file);
+    let buf_reader = std::io::BufReader::new(wrapped);
+
+    let mut archive = tar::Archive::new(ext_to_compression(
         archive.file_name(),
-        File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    )));
+        Box::new(buf_reader),
+    ));
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
@@ -335,8 +339,6 @@ fn extract_tar(
 /// currently this doesn't support bzip2 and zstd.
 ///
 /// `.zip` files archived with compression other than deflate would fail.
-///
-/// <!-- TODO: we can trivially add support for bzip2 and zstd by enabling the feature flags -->
 fn extract_zip(
     archive: impl AsRef<Path>,
     target_directory: impl AsRef<Path>,
