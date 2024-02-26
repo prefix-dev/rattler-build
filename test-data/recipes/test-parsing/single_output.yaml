@@ -17,8 +17,8 @@ source:
   # path source
   - path: ./some-file.tar.gz
     # currently not valid
-    # sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
-    # md5: 1234567890abcdef1234567890abcdef
+    sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+    md5: 1234567890abcdef1234567890abcdef
     patches:
       - file.patch
     file_name: test-package.tar.gz
@@ -33,7 +33,8 @@ source:
 build:
   number: 0
   string: "blabla"
-  skip: false
+  skip:
+    - false
   noarch: generic
   merge_build_and_host_envs: true
   script:
