@@ -137,7 +137,7 @@ pub(crate) async fn url_src(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recipe::parser::Checksum;
+    use crate::source::Checksum;
     use sha2::Sha256;
     use url::Url;
 
