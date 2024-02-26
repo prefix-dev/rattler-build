@@ -7,7 +7,7 @@ use std::{
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
-use rattler_networking::{redact_known_secrets_from_error, Authentication, AuthenticationStorage};
+use rattler_networking::{Authentication, AuthenticationStorage, Redact};
 use reqwest::Method;
 use tracing::info;
 use url::Url;
@@ -320,12 +320,12 @@ async fn send_request(
         .body(body)
         .send()
         .await
-        .map_err(redact_known_secrets_from_error)
+        .map_err(|e| e.redact())
         .into_diagnostic()?;
 
     response
         .error_for_status_ref()
-        .map_err(redact_known_secrets_from_error)
+        .map_err(|e| e.redact())
         .into_diagnostic()
         .wrap_err("Server responded with error")?;
 
