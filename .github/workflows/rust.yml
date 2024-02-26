@@ -228,6 +228,6 @@ jobs:
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          gh release edit "${{ github.ref_name }}" --draft=false
+          gh release edit "${{ github.ref_name }}" --draft=false --latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
