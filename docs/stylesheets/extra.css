@@ -26,6 +26,11 @@
   --md-primary-bg-color--light: #F9C405;
 }
 
+[data-md-color-primary=prefix-light] .md-content a {
+  color: blue;
+  text-decoration: underline;
+}
+
 [data-md-color-accent=prefix-light] {
   --md-accent-fg-color: #2e2400;
   --md-accent-fg-color--transparent: #ffaa001a;
