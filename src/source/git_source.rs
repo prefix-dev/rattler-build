@@ -134,7 +134,10 @@ pub fn git_src(
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
                 if !output.status.success() {
-                    return Err(SourceError::GitErrorStr("Git clone failed for source"));
+                    return Err(SourceError::GitError(format!(
+                        "Git clone failed for source: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    )));
                 }
             }
         }
