@@ -61,9 +61,6 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
                 if map.contains_key("git") {
                     let git_src = map.try_convert("source")?;
                     sources.push(Source::Git(git_src));
-                } else if map.contains_key("ssh") {
-                    let git_src = map.try_convert("source")?;
-                    sources.push(Source::Git(git_src));
                 } else if map.contains_key("url") {
                     let url_src = map.try_convert("source")?;
                     sources.push(Source::Url(url_src));
@@ -269,16 +266,18 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     match url_ {
                         Ok(url_) => url = Some(GitUrl::Url(url_)),
                         Err(err) => {
+
                             tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
-                            tracing::warn!("attempting to parse as path");
-                            let path = PathBuf::from(url_str);
-                            url = Some(GitUrl::Path(path));
+                            if url_str.contains("@") {
+                                tracing::warn!("attempting to use as SSH url");
+                                url = Some(GitUrl::Ssh(url_str));
+                            } else {
+                                tracing::warn!("attempting to parse as path");
+                                let path = PathBuf::from(url_str);
+                                url = Some(GitUrl::Path(path));
+                            }
                         }
                     }
-                }
-                "ssh" => {
-                    let ssh_url_str: String = v.try_convert("git")?;
-                    url = Some(GitUrl::Ssh(ssh_url_str));
                 }
                 "rev" | "tag" | "branch" => {
                     if rev.is_some() {
@@ -321,7 +320,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                     return Err(vec![_partialerror!(
                         *k.span(),
                         ErrorKind::InvalidField(k.as_str().to_owned().into()),
-                        help = "valid fields for git `source` are `git`, `ssh`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
+                        help = "valid fields for git `source` are `git`, `rev`, `tag`, `branch`, `depth`, `patches`, `lfs` and `target_directory`"
                     )])
                 }
             }
