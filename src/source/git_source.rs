@@ -7,7 +7,6 @@ use std::{
 };
 
 use fs_extra::dir::remove;
-use url::Url;
 
 use crate::recipe::parser::{GitSource, GitUrl};
 use crate::system_tools::{SystemTools, Tool};
@@ -15,11 +14,11 @@ use crate::system_tools::{SystemTools, Tool};
 use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
-pub fn fetch_repo(repo_path: &Path, url: &Url, rev: &str) -> Result<(), SourceError> {
+pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceError> {
     tracing::info!("Fetching repository from {} at {}", url, rev);
     let mut command = git_command("fetch");
     let output = command
-        .args([url.to_string().as_str(), rev])
+        .args([url, rev])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -84,6 +83,15 @@ pub fn git_src(
     let filename = match &source.url() {
         GitUrl::Url(url) => (|| Some(url.path_segments()?.last()?.to_string()))()
             .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
+        GitUrl::Ssh(url) => (|| {
+            Some(
+                url.trim_end_matches(".git")
+                    .split(std::path::MAIN_SEPARATOR)
+                    .last()?
+                    .to_string(),
+            )
+        })()
+        .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from SSH url"))?,
         GitUrl::Path(path) => recipe_dir
             .join(path)
             .canonicalize()?
@@ -100,10 +108,15 @@ pub fn git_src(
 
     // Initialize or clone the repository depending on the source's git_url.
     match &source.url() {
-        GitUrl::Url(url) => {
+        GitUrl::Url(_) | GitUrl::Ssh(_) => {
+            let url = match &source.url() {
+                GitUrl::Url(url) => url.to_string(),
+                GitUrl::Ssh(url) => url.to_string(),
+                _ => unreachable!(),
+            };
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if cache_path.exists() {
-                fetch_repo(&cache_path, url, &rev)?;
+                fetch_repo(&cache_path, &url.to_string(), &rev)?;
             } else {
                 let mut command = system_tools
                     .call(Tool::Git)
@@ -121,7 +134,10 @@ pub fn git_src(
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
                 if !output.status.success() {
-                    return Err(SourceError::GitErrorStr("Git clone failed for source"));
+                    return Err(SourceError::GitError(format!(
+                        "Git clone failed for source: {}",
+                        String::from_utf8_lossy(&output.stderr)
+                    )));
                 }
             }
         }

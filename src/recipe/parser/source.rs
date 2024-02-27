@@ -267,9 +267,14 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                         Ok(url_) => url = Some(GitUrl::Url(url_)),
                         Err(err) => {
                             tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
-                            tracing::warn!("attempting to parse as path");
-                            let path = PathBuf::from(url_str);
-                            url = Some(GitUrl::Path(path));
+                            if url_str.contains('@') {
+                                tracing::warn!("attempting to use as SSH url");
+                                url = Some(GitUrl::Ssh(url_str));
+                            } else {
+                                tracing::warn!("attempting to parse as path");
+                                let path = PathBuf::from(url_str);
+                                url = Some(GitUrl::Path(path));
+                            }
                         }
                     }
                 }
@@ -357,6 +362,8 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
 pub enum GitUrl {
     /// A remote Git repository URL
     Url(Url),
+    /// A remote Git repository URL in scp style
+    Ssh(String),
     /// A local path to a Git repository
     Path(PathBuf),
 }
@@ -365,6 +372,7 @@ impl fmt::Display for GitUrl {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GitUrl::Url(url) => write!(f, "{url}"),
+            GitUrl::Ssh(url) => write!(f, "{url}"),
             GitUrl::Path(path) => write!(f, "{path:?}"),
         }
     }
@@ -637,6 +645,27 @@ mod tests {
         };
 
         let yaml = serde_yaml::to_string(&git).unwrap();
+
+        insta::assert_snapshot!(yaml);
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.url, git.url);
+    }
+
+    #[test]
+    fn test_ssh_serialization() {
+        let git = GitSource {
+            url: GitUrl::Ssh(String::from("git@github.com:prefix-dev/rattler-build.git")),
+            rev: GitRev::Head,
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+        println!("{}", yaml);
 
         insta::assert_snapshot!(yaml);
 

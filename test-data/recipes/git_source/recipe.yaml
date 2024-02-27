@@ -15,6 +15,7 @@ source:
   - git: https://github.com/prefix-dev/rattler-build
     rev: df83c1edf287a756b8fc995e03e9632af0344777
     target_directory: initial_version
+  - git: git@github.com:prefix-dev/rattler-build.git
   # - git: https://github.com/tensorflow/tensorflow
   #   target_directory: tensorflow
 
