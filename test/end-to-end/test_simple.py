@@ -207,7 +207,7 @@ def variant_hash(variant):
 
 
 def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(recipes / "pkg_hash", tmp_path)
+    rattler_build.build(recipes / "pkg_hash", tmp_path, extra_args=["--no-test"])
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")

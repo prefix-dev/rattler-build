@@ -87,7 +87,7 @@ pub async fn run_build(
 
     drop(enter);
 
-    if !tool_configuration.no_clean {
+    if !tool_configuration.no_clean && directories.build_dir.exists() {
         fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
     }
 
