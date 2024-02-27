@@ -267,7 +267,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
                         Ok(url_) => url = Some(GitUrl::Url(url_)),
                         Err(err) => {
                             tracing::warn!("invalid url for `GitSource` `{url_str}`: {err}");
-                            if url_str.contains("@") {
+                            if url_str.contains('@') {
                                 tracing::warn!("attempting to use as SSH url");
                                 url = Some(GitUrl::Ssh(url_str));
                             } else {
