@@ -9,7 +9,7 @@ package:
   version: "${{ version }}"
 
 source:
-  git: git@github.com:ggerganov/llama.cpp.git
+  git: https://github.com/ggerganov/llama.cpp.git
   rev: "${{ version }}"
 
 build:

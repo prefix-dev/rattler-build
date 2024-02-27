@@ -652,4 +652,25 @@ mod tests {
 
         assert_eq!(parsed_git.url, git.url);
     }
+
+    #[test]
+    fn test_ssh_serialization() {
+        let git = GitSource {
+            url: GitUrl::Ssh(String::from("git@github.com:prefix-dev/rattler-build.git")),
+            rev: GitRev::Head,
+            depth: None,
+            patches: Vec::new(),
+            target_directory: None,
+            lfs: false,
+        };
+
+        let yaml = serde_yaml::to_string(&git).unwrap();
+        println!("{}", yaml);
+
+        insta::assert_snapshot!(yaml);
+
+        let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(parsed_git.url, git.url);
+    }
 }
