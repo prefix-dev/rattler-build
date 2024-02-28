@@ -113,6 +113,7 @@ nav:
   - Compilers and cross compilation: compilers.md
 
   - CLI Usage: cli_usage.md
+  - Authentication & upload: authentication_and_upload.md
   - Automatic recipe linting: automatic_linting.md
 
   - Testing packages: testing.md
