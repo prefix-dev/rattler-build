@@ -43,21 +43,33 @@ pixi global install rattler-build
 micromamba install rattler-build -c conda-forge
 ```
 
-Alternatively, you can install `rattler-build` via Homebrew:
+### Distro Packages
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/rattler-build.svg)](https://repology.org/project/rattler-build/versions)
+
+#### Homebrew
+
+You can install `rattler-build` via Homebrew:
 
 ```
 brew install rattler-build
 ```
 
-`rattler-build` is also available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
+#### Arch Linux
+
+`rattler-build` is available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
 
 ```
 pacman -S rattler-build
 ```
 
-#### Distro Packages
+#### Alpine Linux
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/rattler-build.svg)](https://repology.org/project/rattler-build/versions)
+`rattler-build` is available for [Alpine Edge](https://pkgs.alpinelinux.org/packages?name=rattler-build&branch=edge). It can be installed via [apk](https://wiki.alpinelinux.org/wiki/Alpine_Package_Keeper) after enabling the [testing repository](https://wiki.alpinelinux.org/wiki/Repositories).
+
+```shell
+apk add rattler-build
+```
 
 #### Dependencies
 
