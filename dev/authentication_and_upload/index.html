@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/build_options/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/authentication_and_upload/">
       
       
-        <link rel="prev" href="../recipe_file/">
+        <link rel="prev" href="../cli_usage/">
       
       
-        <link rel="next" href="../available_jinja/">
+        <link rel="next" href="../automatic_linting/">
       
       
       <link rel="icon" href="../assets/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Advanced options - rattler-build</title>
+        <title>Authentication & upload - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Advanced options - rattler-build" >
+        <meta  property="og:title"  content="Authentication & upload - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_options.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/authentication_and_upload.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/build_options/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/authentication_and_upload/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Advanced options - rattler-build" >
+        <meta  name="twitter:title"  content="Authentication & upload - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/build_options.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/authentication_and_upload.png" >
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#advanced-build-options" class="md-skip">
+        <a href="#server-authentication" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Advanced options
+              Authentication & upload
             
           </span>
         </div>
@@ -460,30 +460,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Advanced options
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../build_options/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -492,71 +472,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#always-include-and-always-copy-files" class="md-nav__link">
-    <span class="md-ellipsis">
-      Always include and always copy files
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#merge-build-and-host-environments" class="md-nav__link">
-    <span class="md-ellipsis">
-      Merge build and host environments
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#prefix-detection-replacement-options" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prefix detection / replacement options
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#variant-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Variant configuration
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#dynamic-linking-configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      Dynamic linking configuration
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -705,10 +620,30 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../authentication_and_upload/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Authentication & upload
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -717,6 +652,86 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#authenticating-with-a-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      Authenticating with a server
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#uploading-packages" class="md-nav__link">
+    <span class="md-ellipsis">
+      Uploading packages
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uploading packages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prefixdev" class="md-nav__link">
+    <span class="md-ellipsis">
+      prefix.dev
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#quetz" class="md-nav__link">
+    <span class="md-ellipsis">
+      Quetz
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#artifactory" class="md-nav__link">
+    <span class="md-ellipsis">
+      Artifactory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#anacondaorg" class="md-nav__link">
+    <span class="md-ellipsis">
+      anaconda.org
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -868,47 +883,62 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#always-include-and-always-copy-files" class="md-nav__link">
+  <a href="#authenticating-with-a-server" class="md-nav__link">
     <span class="md-ellipsis">
-      Always include and always copy files
+      Authenticating with a server
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#merge-build-and-host-environments" class="md-nav__link">
+  <a href="#uploading-packages" class="md-nav__link">
     <span class="md-ellipsis">
-      Merge build and host environments
+      Uploading packages
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Uploading packages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prefixdev" class="md-nav__link">
+    <span class="md-ellipsis">
+      prefix.dev
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#prefix-detection-replacement-options" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#quetz" class="md-nav__link">
     <span class="md-ellipsis">
-      Prefix detection / replacement options
+      Quetz
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#variant-configuration" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#artifactory" class="md-nav__link">
     <span class="md-ellipsis">
-      Variant configuration
+      Artifactory
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#dynamic-linking-configuration" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#anacondaorg" class="md-nav__link">
     <span class="md-ellipsis">
-      Dynamic linking configuration
+      anaconda.org
     </span>
   </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -927,7 +957,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/build_options.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/authentication_and_upload.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -935,169 +965,87 @@
   
 
 
-<h1 id="advanced-build-options">Advanced build options<a class="headerlink" href="#advanced-build-options" title="Permanent link">#</a></h1>
-<p>There are some specialized build options to control various features:</p>
+<h1 id="server-authentication">Server authentication<a class="headerlink" href="#server-authentication" title="Permanent link">#</a></h1>
+<h2 id="authenticating-with-a-server">Authenticating with a server<a class="headerlink" href="#authenticating-with-a-server" title="Permanent link">#</a></h2>
+<p>You may want to use private channels for which you need to be authenticated. To
+do this ephemerally you can use the <code>RATTLER_AUTH_FILE</code> environment variable to
+point to a JSON file with the following structure:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">&quot;*.prefix.dev&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="nt">&quot;BearerToken&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your_token&quot;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">&quot;otherhost.com&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="nt">&quot;BasicHttp&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">            </span><span class="nt">&quot;username&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your_username&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">            </span><span class="nt">&quot;password&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your_password&quot;</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="p">}</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">&quot;anaconda.org&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="nt">&quot;CondaToken&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your_token&quot;</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>The keys are the host names. You can use wildcard specifiers here (e.g.
+<code>*.prefix.dev</code> to match all subdomains of <code>prefix.dev</code>, such as
+<code>repo.prefix.dev</code>). This will allow you to also obtain packages from any private
+channels that you have access to.</p>
+<p>The following known authentication methods are supported:</p>
 <ul>
-<li>prefix replacement</li>
-<li>variant configuration</li>
-<li>encoded file type</li>
+<li><code>BearerToken</code>: prefix.dev</li>
+<li><code>CondaToken</code>: anaconda.org, quetz</li>
+<li><code>BasicHttp</code>: artifactory</li>
 </ul>
-<p>These are all found under the <code>build</code> key in the <code>recipe.yaml</code>.</p>
-<h2 id="always-include-and-always-copy-files">Always include and always copy files<a class="headerlink" href="#always-include-and-always-copy-files" title="Permanent link">#</a></h2>
-<p>There are some options that control the inclusion of files in the final package.</p>
-<p>The <code>always_include_files</code> option can be used to include files even if they are
-already in the environment as part of some other host dependency. This is normally
-"clobbering" and should be used with caution (since packages should not have any overlapping files).</p>
-<p>The <code>always_copy_files</code> option can be used to copy files instead of linking them.
-This is useful for files that might be modified inside the environment (e.g. configuration files).
-Normally, files are linked from a central cache into the environment to save space – that means
-that files modified in one environment will be modified in all environments. This is not always
-desirable, and in that case you can use the <code>always_copy_files</code> option.</p>
-<details class="note">
-<summary>How <code>always_copy_files</code> works</summary>
-<p>The <code>always_copy_files</code> option works by setting the <code>no_link</code> option in the
-<code>info/paths.json</code> to <code>true</code> for the files in question. This means that the
-files are copied instead of linked when the package is installed.</p>
-</details>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="c1"># include files even if they are already in the environment</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="c1"># as part of some other host dependency</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">always_include_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="c1"># do not soft- or hard-link these files, but always copy them was `no_link`</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">always_copy_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span></code></pre></div>
-<div class="admonition note">
-<p class="admonition-title">Glob patterns</p>
-<p>Glob patterns are used througout the build options to specify files. The
-patterns are matched against the relative path of the file in the build
-directory.
-Patterns can contain <code>*</code> to match any number of characters, <code>?</code> to match a
-single character, and <code>**</code> to match any number of directories.</p>
-<p>For example:</p>
+<h2 id="uploading-packages">Uploading packages<a class="headerlink" href="#uploading-packages" title="Permanent link">#</a></h2>
+<p>If you want to upload packages, then rattler-build comes with a built-in
+<code>upload</code> command. There are 4 options:</p>
 <ul>
-<li><code>*.txt</code> matches all files ending in <code>.txt</code></li>
-<li><code>**/*.txt</code> matches all files ending in <code>.txt</code> in any directory</li>
-<li><code>**/test_*.txt</code> matches all files starting with <code>test_</code> and ending in <code>.txt</code> in any directory</li>
+<li><code>prefix.dev</code>: you can create public or private channels on the prefix.dev
+  hosted server</li>
+<li><code>anaconda.org</code>: you can upload packages to the free anaconda.org server</li>
+<li><code>quetz</code>: you can host your own quetz server and upload packages to it</li>
+<li><code>artifactory</code>: you can upload packages to a JFrog Artifactory server</li>
 </ul>
-</div>
-<h2 id="merge-build-and-host-environments">Merge build and host environments<a class="headerlink" href="#merge-build-and-host-environments" title="Permanent link">#</a></h2>
-<p>In very rare cases you might want to merge the build and host environments to
-obtain the "legacy" behavior of conda-build.</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="c1"># merge the build and host environments (used in many R packages on Windows)</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">merge_build_and_host_envs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to false)</span>
+<p>The command is:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>&lt;server&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
-<h2 id="prefix-detection-replacement-options">Prefix detection / replacement options<a class="headerlink" href="#prefix-detection-replacement-options" title="Permanent link">#</a></h2>
-<p>During installation time the "install"-prefix is injected into text and binary
-files. Sometimes this is not desired, and sometimes the user might want closer
-control over the automatic text/binary detection.</p>
-<p>The main difference between prefix replacement for text and binary files is that
-for binary files, the prefix string is padded with null bytes to match the
-length of the original prefix. The original prefix is the very long placeholder
-string that you might have seen in the build process.</p>
-<p>On Windows, binary prefix replacement is never performed.</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="c1"># settings concerning the prefix detection in files</span>
-</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span><span class="nt">prefix_detection</span><span class="p">:</span>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="c1"># force the file type of the given files to be TEXT or BINARY</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="c1"># for prefix replacement</span>
-</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">force_file_type</span><span class="p">:</span>
-</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="c1"># force TEXT file type (list of globs)</span>
-</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># force binary file type (list of globs)</span>
-</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a>
-</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">    </span><span class="c1"># ignore all or specific files for prefix replacement`</span>
-</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">    </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool | [path] (defaults to false)</span>
-</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a>
-</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">    </span><span class="c1"># wether to detect binary files with prefix or not</span>
-</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">    </span><span class="c1"># defaults to true on Unix and (always) false on Windows</span>
-</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">    </span><span class="nt">ignore_binary_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
+<p>Note: you can also use the <code>RATTLER_AUTH_FILE</code> environment variable to
+authenticate with the server.</p>
+<h3 id="prefixdev">prefix.dev<a class="headerlink" href="#prefixdev" title="Permanent link">#</a></h3>
+<p>To upload to <a href="https://prefix.dev">prefix.dev</a>, you need to have an account and a
+token. You can create a token in the settings of your account. The token is used
+to authenticate the upload.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFIX_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>prefix<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
-<h2 id="variant-configuration">Variant configuration<a class="headerlink" href="#variant-configuration" title="Permanent link">#</a></h2>
-<p>To control the variant precisely you can use the "variant configuration"
-options.</p>
-<p>A variant package has the same version number, but different "hash" and
-potentially different dependencies or build options. Variant keys are extracted
-from the <code>variant_config.yaml</code> file and usually any used Jinja variables or
-dependencies without version specifier are used as variant keys.</p>
-<p>Variant keys can also be forcibly set or ignored with the <code>use_keys</code> and
-<code>ignore_keys</code> options.</p>
-<p>In order to decide which of the variant packages to prefer and install by
-default, the <code>down_prioritize_variant</code> option can be used. The higher the value,
-the less preferred the variant is.</p>
-<p>More about variants can be found in the <a href="../variants/">variant documentation</a>.</p>
-<p>The following options are available in the <code>build</code> section to control the
-variant configuration:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="c1"># settings for the variant</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">variant</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="c1"># Keys to forcibly use for the variant computation</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="c1"># even if they are not in the dependencies</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="nt">use_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of strings</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="c1"># Keys to forcibly ignore for the variant computation</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="c1"># even if they are in the dependencies</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">ignore_keys</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of strings</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="c1"># used to prefer this variant less</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">down_prioritize_variant</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer (defaults to 0, higher is less preferred)</span>
+<p>You can also use the <code>--api-key=$PREFIX_API_KEY</code> option to pass the token
+directly to the command. Note that you need to have created the channel on the
+prefix.dev website before you can upload to it.</p>
+<h3 id="quetz">Quetz<a class="headerlink" href="#quetz" title="Permanent link">#</a></h3>
+<p>You need to pass a token and API key to upload to a channel on your own Quetz
+server. The token is used to authenticate the upload.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">QUETZ_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>quetz<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
-<h2 id="dynamic-linking-configuration">Dynamic linking configuration<a class="headerlink" href="#dynamic-linking-configuration" title="Permanent link">#</a></h2>
-<p>After the package is built, rattler-build performs some "post-processing" on the
-binaries and libraries.</p>
-<p>This entails making the shared libraries relocatable and checking that all
-linked libraries are present in the run requirements. The following settings
-control this behavior.</p>
-<p>With the <code>rpath</code> option you can forcibly set the <code>rpath</code> of the shared
-libraries. The path is relative to the install prefix. Any <code>rpath</code> setting is
-ignored on Windows.</p>
-<p>The <code>rpath_allowlist</code> option can be used to allow the <code>rpath</code> to point to
-locations outside of the environment. This is useful if you want to link against
-libraries that are not part of the conda environment (e.g. proprietary
-software).</p>
-<p>If you want to stop <code>rattler-build</code> from relocating the binaries, you can set
-<code>binary_relocation</code> to <code>false</code>. If you want to only relocate some binaries, you
-can select the relevant ones with a glob pattern.</p>
-<p>To read more about <code>rpath</code>s and how rattler-build creates relocatable binary packages,
-see the <a href="../internals/">internals</a> docs.</p>
-<p>If you link against some libraries (possibly even outside of the prefix, in a
-system location), then you can use the <code>missing_dso_allowlist</code> to allow linking
-against these and suppress any warnings. This list is pre-populated with a list
-of known system libraries on the different operating systems.</p>
-<p>As part of the post-processing, <code>rattler-build</code> checks for overlinking and
-overdepending. "Overlinking" is when a binary links against a library that is not
-specified in the run requirements. This is usually a mistake because the library
-would not be present in the environment when the package is installed.</p>
-<p>Conversely, "overdepending" is when a library is part of the run requirements, but
-is not actually used by any of the binaries/libraries in the package.</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="c1"># settings for shared libraries and executables</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="nt">dynamic_linking</span><span class="p">:</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="c1"># linux only, list of rpaths relative to the installation prefix</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">rpaths</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of paths (defaults to [&#39;lib/&#39;])</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">    </span><span class="c1"># Allow runpath / rpath to point to these locations</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="c1"># outside of the environment</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">    </span><span class="c1"># wether to relocate binaries or not. If this is a list of paths, then</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">    </span><span class="c1"># only the listed paths are relocated</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="w">    </span><span class="nt">binary_relocation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to true) | list of globs</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="w">    </span><span class="c1"># Allow linking against libraries that are not in the run requirements</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="w">    </span><span class="nt">missing_dso_allowlist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="w">    </span><span class="c1"># what to do when detecting overdepending</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="w">    </span><span class="nt">overdepending_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a><span class="w">    </span><span class="c1"># what to do when detecting overlinking</span>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="w">    </span><span class="nt">overlinking_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
+<h3 id="artifactory">Artifactory<a class="headerlink" href="#artifactory" title="Permanent link">#</a></h3>
+<p>To upload to an Artifactory server, you need to pass a username and password.
+The username and password are used to authenticate the upload.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">ARTIFACTORY_USERNAME</span><span class="o">=</span>&lt;your_username&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">ARTIFACTORY_PASSWORD</span><span class="o">=</span>&lt;your_password&gt;
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>artifactory<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
+</span></code></pre></div>
+<h3 id="anacondaorg">anaconda.org<a class="headerlink" href="#anacondaorg" title="Permanent link">#</a></h3>
+<p>To upload to <a href="https://anaconda.org">anaconda.org</a>, you need to pass a owner,
+channel (with optional label) and API key. The API key is used to authenticate
+the upload.</p>
+<p>The owner is the is owner of the distribution, for example, your user name or
+"conda-forge". The channel is <code>main</code> by default (which means something like
+<code>owner/main</code>), but optionally you can also specify labels, such as <code>main/rc</code> for
+release candidates.</p>
+<p>You can also add the <code>--force</code> argument to forcibly upload a new package (and
+overwrite any existing ones).</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">ANACONDA_OWNER</span><span class="o">=</span>&lt;your_username&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 
 
@@ -1170,9 +1118,9 @@ is not actually used by any of the binaries/libraries in the package.</p>
           
             
             <a
-              href="../recipe_file/"
+              href="../cli_usage/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Recipe file"
+              aria-label="Previous: CLI Usage"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1183,7 +1131,7 @@ is not actually used by any of the binaries/libraries in the package.</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Recipe file
+                  CLI Usage
                 </div>
               </div>
             </a>
@@ -1193,16 +1141,16 @@ is not actually used by any of the binaries/libraries in the package.</p>
           
             
             <a
-              href="../available_jinja/"
+              href="../automatic_linting/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Jinja functions"
+              aria-label="Next: Automatic recipe linting"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Jinja functions
+                  Automatic recipe linting
                 </div>
               </div>
               <div class="md-footer__button md-icon">
