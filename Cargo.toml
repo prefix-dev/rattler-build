@@ -20,7 +20,7 @@ rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.32"
-rattler = { version = "0.19.0", default-features = false }
+rattler = { version = "0.19.0", default-features = false, features = ["cli-tools"] }
 rattler_conda_types = { version = "0.19.0", default-features = false }
 rattler_digest = { version = "0.19.0", default-features = false }
 rattler_index = { version = "0.19.0", default-features = false }
@@ -124,17 +124,17 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-# [patch.crates-io]
-# rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+[patch.crates-io]
+rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
