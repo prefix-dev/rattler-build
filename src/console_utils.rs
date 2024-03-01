@@ -486,9 +486,9 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
         event.record(&mut CustomVisitor::new(&mut message));
         let message = String::from_utf8_lossy(&message);
 
-        match metadata.level() {
-            &Level::ERROR => println!("::error ::{}", message),
-            &Level::WARN => println!("::warning ::{}", message),
+        match *metadata.level() {
+            Level::ERROR => println!("::error ::{}", message),
+            Level::WARN => println!("::warning ::{}", message),
             _ => {}
         }
     }
