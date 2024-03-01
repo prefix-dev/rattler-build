@@ -17,7 +17,7 @@ use tokio::sync::mpsc;
 /// Spinner frames.
 ///
 /// See <https://github.com/sindresorhus/cli-spinners/blob/main/spinners.json> for alternatives.
-const SPINNER_FRAMES: &'static [&'static str] = &["◢", "◣", "◤", "◥"];
+const SPINNER_FRAMES: &[&str] = &["◢", "◣", "◤", "◥"];
 
 /// Spinner interval.
 const SPINNER_INTERVAL: u128 = 50;
@@ -48,7 +48,7 @@ pub(crate) fn handle_key_events(
             }
         }
         KeyCode::PageDown => {
-            state.vertical_scroll = state.vertical_scroll + 5;
+            state.vertical_scroll += 5;
         }
         KeyCode::Up => {
             if !state.is_building_package() {
@@ -62,7 +62,7 @@ pub(crate) fn handle_key_events(
         }
         KeyCode::PageUp => {
             if state.vertical_scroll > 1 {
-                state.vertical_scroll = state.vertical_scroll - 5;
+                state.vertical_scroll -= 5;
             }
         }
         KeyCode::Enter => sender
@@ -107,7 +107,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                         BuildProgress::Building => Span::from("◉ ").yellow(),
                         BuildProgress::Done => Span::from("◉ ").green(),
                     },
-                    format!("{}", package.name).into(),
+                    package.name.to_string().into(),
                     if package.build_progress == BuildProgress::Building {
                         if state.spinner_last_tick.elapsed().as_millis() > SPINNER_INTERVAL {
                             state.spinner_last_tick = Instant::now();
