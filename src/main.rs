@@ -238,6 +238,10 @@ struct BuildOpts {
 
     #[clap(flatten)]
     common: CommonOpts,
+
+    /// Launch the terminal user interface.
+    #[arg(long, default_value = "false")]
+    tui: bool,
 }
 
 #[derive(Parser)]
@@ -578,6 +582,11 @@ async fn run_build_from_args(
         variant: BTreeMap::new(),
         experimental: args.common.experimental,
     };
+
+    if args.tui {
+        rattler_build::tui::run_tui().await?;
+        return Ok(());
+    }
 
     let span = tracing::info_span!("Finding outputs from recipe");
     tracing::info!("Target platform: {}", host_platform);

@@ -14,6 +14,7 @@ pub mod selectors;
 pub mod source;
 pub mod system_tools;
 pub mod tool_configuration;
+pub mod tui;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
