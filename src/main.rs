@@ -40,10 +40,7 @@ async fn main() -> miette::Result<()> {
                     Some(tui.event_handler.sender.clone()),
                 )
                 .into_diagnostic()?;
-                tokio::spawn(
-                    async move { run_build_from_args(build_args, log_handler).await.unwrap() },
-                );
-                rattler_build::tui::run(tui).await
+                rattler_build::tui::run(tui, build_args, log_handler).await
             } else {
                 let log_handler = init_logging(&args.log_style, &args.verbose, &args.color, None)
                     .into_diagnostic()?;

@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+use crate::{console_utils::LoggingOutputHandler, opt::BuildOpts};
+
 /// Representation of a package.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Package {
@@ -24,8 +26,11 @@ impl BuildProgress {
 }
 
 /// Application state.
-#[derive(Debug)]
 pub(crate) struct TuiState {
+    /// Build options.
+    pub build_opts: BuildOpts,
+    /// Log handler.
+    pub log_handler: LoggingOutputHandler,
     /// Is the application running?
     pub running: bool,
     /// Packages to build.
@@ -40,40 +45,23 @@ pub(crate) struct TuiState {
     pub spinner_frame: usize,
 }
 
-impl Default for TuiState {
-    fn default() -> Self {
-        let packages = vec![
-            Package {
-                name: String::from("package 1"),
-                build_progress: BuildProgress::None,
-                build_log: Vec::new(),
-            },
-            Package {
-                name: String::from("package 2"),
-                build_progress: BuildProgress::None,
-                build_log: Vec::new(),
-            },
-            Package {
-                name: String::from("package 3"),
-                build_progress: BuildProgress::None,
-                build_log: Vec::new(),
-            },
-        ];
+impl TuiState {
+    /// Constructs a new instance.
+    pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
+            build_opts: build_opts.clone(),
+            log_handler,
             running: true,
-            packages,
+            packages: vec![Package {
+                name: build_opts.recipe.to_string_lossy().to_string(),
+                build_progress: BuildProgress::None,
+                build_log: Vec::new(),
+            }],
             selected_package: 0,
             vertical_scroll: 0,
             spinner_last_tick: Instant::now(),
             spinner_frame: 0,
         }
-    }
-}
-
-impl TuiState {
-    /// Constructs a new instance.
-    pub fn new() -> Self {
-        Self::default()
     }
 
     /// Handles the tick event of the terminal.

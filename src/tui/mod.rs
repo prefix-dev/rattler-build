@@ -5,6 +5,10 @@ pub mod event;
 mod render;
 mod state;
 
+use event::*;
+use render::*;
+use state::*;
+
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use miette::IntoDiagnostic;
@@ -14,9 +18,9 @@ use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
 
-use event::*;
-use render::*;
-use state::*;
+use crate::console_utils::LoggingOutputHandler;
+use crate::opt::BuildOpts;
+use crate::run_build_from_args;
 
 /// Representation of a terminal user interface.
 ///
@@ -100,9 +104,13 @@ pub async fn init() -> miette::Result<Tui<CrosstermBackend<Stderr>>> {
 }
 
 /// Launches the terminal user interface.
-pub async fn run<B: Backend>(mut tui: Tui<B>) -> miette::Result<()> {
+pub async fn run<B: Backend>(
+    mut tui: Tui<B>,
+    opts: BuildOpts,
+    log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
     // Create an application.
-    let mut state = TuiState::new();
+    let mut state = TuiState::new(opts, log_handler);
 
     // Start the main loop.
     while state.running {
@@ -118,6 +126,13 @@ pub async fn run<B: Backend>(mut tui: Tui<B>) -> miette::Result<()> {
             Event::Resize(_, _) => {}
             Event::StartBuild(index) => {
                 state.packages[index].build_progress = BuildProgress::Building;
+                let build_opts = state.build_opts.clone();
+                let log_handler = state.log_handler.clone();
+                let log_sender = tui.event_handler.sender.clone();
+                tokio::spawn(async move {
+                    run_build_from_args(build_opts, log_handler).await.unwrap();
+                    log_sender.send(Event::FinishBuild).unwrap();
+                });
             }
             Event::BuildLog(log) => {
                 let building_package = &mut state.packages[state.selected_package];

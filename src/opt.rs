@@ -78,7 +78,7 @@ pub struct App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct CommonOpts {
     /// Output directory for build artifacts. Defaults to `./output`.
     #[clap(long, env = "CONDA_BLD_PATH")]
@@ -166,7 +166,7 @@ impl FromStr for PackageFormatAndCompression {
 }
 
 /// Build options.
-#[derive(Parser)]
+#[derive(Parser, Clone)]
 pub struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
     #[arg(short, long, default_value = ".")]
