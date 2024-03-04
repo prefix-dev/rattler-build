@@ -45,7 +45,7 @@ pub struct ShellCompletion {
     pub shell: Option<clap_complete::Shell>,
 }
 
-/// Application.
+#[allow(missing_docs)]
 #[derive(Parser)]
 #[clap(version = crate_version!())]
 pub struct App {
