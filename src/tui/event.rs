@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 /// Terminal events.
 #[derive(Clone, Debug)]
-pub(crate) enum Event {
+pub enum Event {
     /// Terminal tick.
     Tick,
     /// Key press.
@@ -18,7 +18,7 @@ pub(crate) enum Event {
     /// Start building.
     StartBuild(usize),
     /// Build log.
-    BuildLog(Vec<String>),
+    BuildLog(Vec<u8>),
     /// Finish building.
     FinishBuild,
 }
@@ -26,7 +26,7 @@ pub(crate) enum Event {
 /// Terminal event handler.
 #[derive(Debug)]
 #[allow(dead_code)]
-pub(crate) struct EventHandler {
+pub struct EventHandler {
     /// Event sender channel.
     pub sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.

@@ -1,3 +1,5 @@
+//! Conda-forge package uploader.
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -6,7 +8,7 @@ use std::{
 use miette::{miette, IntoDiagnostic};
 use tracing::{debug, info};
 
-use crate::{upload::get_default_client, CondaForgeOpts};
+use crate::{opt::CondaForgeOpts, upload::get_default_client};
 
 use super::{
     anaconda,
@@ -41,6 +43,7 @@ async fn get_channel_target_from_variant_config(
     Ok(label.to_string())
 }
 
+/// Uploads the package conda forge.
 pub async fn upload_packages_to_conda_forge(
     opts: CondaForgeOpts,
     package_files: &Vec<PathBuf>,

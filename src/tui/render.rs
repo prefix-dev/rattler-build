@@ -80,7 +80,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             .title_top("rattler-build-tui")
             .title_bottom(env!("CARGO_PKG_VERSION"))
             .title_alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Yellow).bg(Color::Black)),
+            .style(Style::default().fg(Color::Yellow)),
         frame.size(),
     );
     let rects = Layout::horizontal([Constraint::Percentage(20), Constraint::Percentage(80)])
@@ -146,7 +146,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         Paragraph::new(
             selected_package
                 .build_log
-                .join("\n")
+                .join("")
                 .into_text()
                 .unwrap()
                 .on_black(),

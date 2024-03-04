@@ -1,10 +1,10 @@
 //! System tools are installed on the system (git, patchelf, install_name_tool, etc.)
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
-    cell::RefCell,
     collections::{BTreeMap, HashMap},
     path::PathBuf,
     process::Command,
+    sync::{Arc, Mutex},
 };
 
 /// Any third party tool that is used by rattler build should be added here
@@ -44,16 +44,16 @@ impl ToString for Tool {
 #[derive(Debug, Clone)]
 pub struct SystemTools {
     rattler_build_version: String,
-    used_tools: RefCell<HashMap<Tool, String>>,
-    found_tools: RefCell<HashMap<Tool, PathBuf>>,
+    used_tools: Arc<Mutex<HashMap<Tool, String>>>,
+    found_tools: Arc<Mutex<HashMap<Tool, PathBuf>>>,
 }
 
 impl Default for SystemTools {
     fn default() -> Self {
         Self {
             rattler_build_version: env!("CARGO_PKG_VERSION").to_string(),
-            used_tools: RefCell::new(HashMap::new()),
-            found_tools: RefCell::new(HashMap::new()),
+            used_tools: Arc::new(Mutex::new(HashMap::new())),
+            found_tools: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -80,8 +80,8 @@ impl SystemTools {
 
         Self {
             rattler_build_version,
-            used_tools: RefCell::new(used_tools),
-            found_tools: RefCell::new(HashMap::new()),
+            used_tools: Arc::new(Mutex::new(used_tools)),
+            found_tools: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -135,9 +135,10 @@ impl SystemTools {
         let found_version = found_version.trim().to_string();
 
         self.found_tools
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .insert(tool, tool_path.clone());
-        let prev_version = self.used_tools.borrow().get(&tool).cloned();
+        let prev_version = self.used_tools.lock().unwrap().get(&tool).cloned();
 
         if let Some(prev_version) = prev_version {
             if prev_version != found_version {
@@ -148,7 +149,7 @@ impl SystemTools {
                 );
             }
         } else {
-            self.used_tools.borrow_mut().insert(tool, found_version);
+            self.used_tools.lock().unwrap().insert(tool, found_version);
         }
 
         Ok(tool_path)
@@ -157,7 +158,7 @@ impl SystemTools {
     /// Create a new `std::process::Command` for the given tool. The command is created with the
     /// path to the tool and can be further configured with arguments and environment variables.
     pub fn call(&self, tool: Tool) -> Result<Command, which::Error> {
-        let found_tool = self.found_tools.borrow().get(&tool).cloned();
+        let found_tool = self.found_tools.lock().unwrap().get(&tool).cloned();
         let tool_path = if let Some(tool) = found_tool {
             tool
         } else {
@@ -171,7 +172,7 @@ impl SystemTools {
 impl Serialize for SystemTools {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut ordered_map = BTreeMap::new();
-        let used_tools = self.used_tools.borrow();
+        let used_tools = self.used_tools.lock().unwrap();
         for (tool, version) in used_tools.iter() {
             ordered_map.insert(tool.to_string(), version);
         }
@@ -208,10 +209,10 @@ mod tests {
         let stdout = cmd.arg("--version").output().unwrap().stdout;
         let version = String::from_utf8_lossy(&stdout).trim().to_string();
 
-        let found_tools = system_tool.found_tools.borrow();
+        let found_tools = system_tool.found_tools.lock().unwrap();
         assert!(found_tools.contains_key(&Tool::Patchelf));
 
-        let used_tools = system_tool.used_tools.borrow();
+        let used_tools = system_tool.used_tools.lock().unwrap();
         assert!(used_tools.contains_key(&Tool::Patchelf));
 
         assert!(used_tools.get(&Tool::Patchelf).unwrap() == &version);
@@ -227,8 +228,8 @@ mod tests {
 
         let system_tool = SystemTools {
             rattler_build_version: "0.0.0".to_string(),
-            used_tools: RefCell::new(used_tools),
-            found_tools: RefCell::new(HashMap::new()),
+            used_tools: Arc::new(Mutex::new(used_tools)),
+            found_tools: Arc::new(Mutex::new(HashMap::new())),
         };
 
         let json = serde_json::to_string_pretty(&system_tool).unwrap();
@@ -237,7 +238,8 @@ mod tests {
         let deserialized: SystemTools = serde_json::from_str(&json).unwrap();
         assert!(deserialized
             .used_tools
-            .borrow()
+            .lock()
+            .unwrap()
             .contains_key(&Tool::Patchelf));
     }
 }
