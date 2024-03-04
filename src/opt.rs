@@ -77,6 +77,16 @@ pub struct App {
     pub color: Color,
 }
 
+impl App {
+    /// Returns true if the application will launch a TUI.
+    pub fn is_tui(&self) -> bool {
+        match &self.subcommand {
+            Some(SubCommands::Build(args)) => args.tui,
+            _ => false,
+        }
+    }
+}
+
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
 #[derive(Parser, Clone)]
 pub struct CommonOpts {

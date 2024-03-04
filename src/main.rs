@@ -12,8 +12,13 @@ use rattler_build::{
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
-    let args = App::parse();
-    match args.subcommand {
+    let app = App::parse();
+    let log_handler = if !app.is_tui() {
+        Some(init_logging(&app.log_style, &app.verbose, &app.color, None).into_diagnostic()?)
+    } else {
+        None
+    };
+    match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
             fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
@@ -34,30 +39,29 @@ async fn main() -> miette::Result<()> {
             if build_args.tui {
                 let tui = rattler_build::tui::init().await?;
                 let log_handler = init_logging(
-                    &args.log_style,
-                    &args.verbose,
-                    &args.color,
+                    &app.log_style,
+                    &app.verbose,
+                    &app.color,
                     Some(tui.event_handler.sender.clone()),
                 )
                 .into_diagnostic()?;
                 rattler_build::tui::run(tui, build_args, log_handler).await
             } else {
-                let log_handler = init_logging(&args.log_style, &args.verbose, &args.color, None)
-                    .into_diagnostic()?;
-                run_build_from_args(build_args, log_handler).await
+                run_build_from_args(build_args, log_handler.expect("logger is not initialized"))
+                    .await
             }
         }
         Some(SubCommands::Test(test_args)) => {
-            let log_handler = init_logging(&args.log_style, &args.verbose, &args.color, None)
-                .into_diagnostic()?;
-            run_test_from_args(test_args, log_handler).await
+            run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
-            let log_handler = init_logging(&args.log_style, &args.verbose, &args.color, None)
-                .into_diagnostic()?;
-            rebuild_from_args(rebuild_args, log_handler).await
+            rebuild_from_args(
+                rebuild_args,
+                log_handler.expect("logger is not initialized"),
+            )
+            .await
         }
-        Some(SubCommands::Upload(args)) => upload_from_args(args).await,
+        Some(SubCommands::Upload(upload_args)) => upload_from_args(upload_args).await,
         Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         None => {
