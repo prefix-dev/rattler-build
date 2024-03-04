@@ -59,6 +59,9 @@ enum SubCommands {
 
     /// Generate a recipe from PyPI or CRAN
     GenerateRecipe(GenerateRecipeOpts),
+
+    /// Handle authentication to external repositories
+    Auth(rattler::cli::auth::Args),
 }
 
 #[derive(Parser)]
@@ -462,6 +465,7 @@ async fn main() -> miette::Result<()> {
         Some(SubCommands::Rebuild(args)) => rebuild_from_args(args, fancy_log_handler).await,
         Some(SubCommands::Upload(args)) => upload_from_args(args).await,
         Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
+        Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         None => {
             _ = App::command().print_long_help();
             Ok(())
