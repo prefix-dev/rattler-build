@@ -3084,7 +3084,6 @@ dependencies = [
  "os_pipe",
  "pathdiff",
  "petgraph",
- "rand",
  "ratatui",
  "rattler",
  "rattler_conda_types",
