@@ -40,9 +40,11 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
 }
 
 fn get_default_client() -> Result<reqwest::Client, reqwest::Error> {
+    static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
     reqwest::Client::builder()
         .no_gzip()
-        .user_agent(format!("rattler-build/{}", VERSION))
+        .user_agent(APP_USER_AGENT)
         .build()
 }
 

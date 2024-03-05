@@ -45,9 +45,15 @@ pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
 /// Create a reqwest client with the authentication middleware
 pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWithMiddleware {
     let auth_storage = get_auth_store(auth_file);
+
+    static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+    let timeout = 5 * 60;
     reqwest_middleware::ClientBuilder::new(
         reqwest::Client::builder()
             .no_gzip()
+            .pool_max_idle_per_host(20)
+            .user_agent(APP_USER_AGENT)
+            .timeout(std::time::Duration::from_secs(timeout))
             .build()
             .expect("failed to create client"),
     )
@@ -59,16 +65,7 @@ impl Default for Configuration {
     fn default() -> Self {
         Self {
             fancy_log_handler: LoggingOutputHandler::default(),
-            client: reqwest_middleware::ClientBuilder::new(
-                reqwest::Client::builder()
-                    .no_gzip()
-                    .build()
-                    .expect("failed to create client"),
-            )
-            .with_arc(Arc::new(AuthenticationMiddleware::new(
-                AuthenticationStorage::default(),
-            )))
-            .build(),
+            client: reqwest_client_from_auth_storage(None),
             no_clean: false,
             no_test: false,
             use_zstd: true,
