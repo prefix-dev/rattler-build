@@ -3,6 +3,7 @@ source: src/recipe/parser.rs
 expression: unix_recipe.unwrap()
 ---
 Recipe {
+    schema_version: 1,
     package: Package {
         name: PackageName {
             normalized: None,

@@ -52,6 +52,8 @@ use super::custom_yaml::Node;
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
+    /// The schema version of this recipe YAML file
+    pub schema_version: u64,
     /// The package information
     pub package: Package,
     /// The information about where to obtain the sources
@@ -190,6 +192,7 @@ impl Recipe {
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
 
+        let mut schema_version = 1;
         let mut package = None;
         let mut build = Build::default();
         let mut source = Vec::new();
@@ -202,6 +205,7 @@ impl Recipe {
             .map(|(key, value)| {
                 let key_str = key.as_str();
                 match key_str {
+                    "schema_version" => schema_version = value.try_convert(key_str)?,
                     "package" => package = Some(value.try_convert(key_str)?),
                     "recipe" => {
                         return Err(vec![_partialerror!(
@@ -239,7 +243,13 @@ impl Recipe {
         // evaluate the skip conditions
         build.skip = build.skip.with_eval(&jinja)?;
 
+        if schema_version != 1 {
+            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.", 
+                schema_version, env!("CARGO_PKG_VERSION"));
+        }
+
         let recipe = Recipe {
+            schema_version,
             package: package.ok_or_else(|| {
                 vec![_partialerror!(
                     *root_node.span(),

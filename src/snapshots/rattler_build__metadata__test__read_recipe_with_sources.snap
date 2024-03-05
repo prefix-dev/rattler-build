@@ -3,6 +3,7 @@ source: src/metadata.rs
 expression: git_source_output
 ---
 recipe:
+  schema_version: 1
   package:
     name: git_source
     version: "1"
@@ -70,5 +71,4 @@ finalized_sources:
     rev: df83c1edf287a756b8fc995e03e9632af0344777
     target_directory: initial_version
 system_tools:
-  rattler_build: 0.6.0
-
+  rattler_build: 0.12.1
