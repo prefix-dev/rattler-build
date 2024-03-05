@@ -38,7 +38,7 @@ pub(crate) fn handle_key_events(
                 }
             }
         }
-        KeyCode::PageDown => {
+        KeyCode::PageUp => {
             state.vertical_scroll += 5;
         }
         KeyCode::Up => {
@@ -51,7 +51,7 @@ pub(crate) fn handle_key_events(
                 }
             }
         }
-        KeyCode::PageUp => {
+        KeyCode::PageDown => {
             if state.vertical_scroll > 1 {
                 state.vertical_scroll -= 5;
             }
@@ -126,21 +126,25 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     }
 
     let selected_package = state.packages[state.selected_package].clone();
+    let logs = Text::from(
+        selected_package
+            .build_log
+            .join("")
+            .into_text()
+            .unwrap()
+            .on_black(),
+    );
+    let vertical_scroll = (logs.height() as u16)
+        .saturating_sub(rects[1].height)
+        .saturating_sub(state.vertical_scroll);
     frame.render_widget(
-        Paragraph::new(
-            selected_package
-                .build_log
-                .join("")
-                .into_text()
-                .unwrap()
-                .on_black(),
-        )
-        .block(
-            Block::bordered()
-                .title_top(format!("Build Logs for {}", selected_package.name))
-                .border_type(BorderType::Rounded),
-        )
-        .scroll((state.vertical_scroll as u16, 0)),
+        Paragraph::new(logs.clone())
+            .block(
+                Block::bordered()
+                    .title_top(format!("Build Logs for {}", selected_package.name))
+                    .border_type(BorderType::Rounded),
+            )
+            .scroll((vertical_scroll, 0)),
         rects[1],
     );
 
@@ -149,7 +153,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .end_symbol(Some("↓"));
 
     let mut scrollbar_state =
-        ScrollbarState::new(selected_package.build_log.len()).position(state.vertical_scroll);
+        ScrollbarState::new(selected_package.build_log.len()).position(vertical_scroll as usize);
 
     frame.render_stateful_widget(
         scrollbar,

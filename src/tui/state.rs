@@ -50,7 +50,7 @@ pub(crate) struct TuiState {
     /// Index of the selected package.
     pub selected_package: usize,
     /// Vertical scroll value.
-    pub vertical_scroll: usize,
+    pub vertical_scroll: u16,
 }
 
 impl TuiState {
