@@ -126,14 +126,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     }
 
     let selected_package = state.packages[state.selected_package].clone();
-    let logs = Text::from(
-        selected_package
-            .build_log
-            .join("")
-            .into_text()
-            .unwrap()
-            .on_black(),
-    );
+    let logs = selected_package
+        .build_log
+        .join("")
+        .into_text()
+        .unwrap()
+        .on_black();
     let vertical_scroll = (logs.height() as u16)
         .saturating_sub(rects[1].height)
         .saturating_sub(state.vertical_scroll);
