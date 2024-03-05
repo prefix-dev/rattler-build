@@ -1,5 +1,5 @@
 use super::event::Event;
-use super::state::{BuildProgress, TuiState};
+use super::state::TuiState;
 use ansi_to_tui::IntoText;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use miette::IntoDiagnostic;
@@ -11,16 +11,7 @@ use ratatui::{
     widgets::{Block, BorderType, Paragraph},
     Frame,
 };
-use std::time::Instant;
 use tokio::sync::mpsc;
-
-/// Spinner frames.
-///
-/// See <https://github.com/sindresorhus/cli-spinners/blob/main/spinners.json> for alternatives.
-const SPINNER_FRAMES: &[&str] = &["◢", "◣", "◤", "◥"];
-
-/// Spinner interval.
-const SPINNER_INTERVAL: u128 = 50;
 
 /// Handles the key events and updates the state.
 pub(crate) fn handle_key_events(
@@ -99,45 +90,38 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                 .margin(1)
                 .split(rects[0]);
 
-        for (i, package) in state.packages.iter().enumerate() {
+        for (i, package) in state.packages.iter_mut().enumerate() {
             frame.render_widget(
-                Paragraph::new(Line::from(vec![
-                    match package.build_progress {
-                        BuildProgress::None => Span::from("◉ ").red(),
-                        BuildProgress::Building => Span::from("◉ ").yellow(),
-                        BuildProgress::Done => Span::from("◉ ").green(),
-                    },
-                    package.name.to_string().into(),
-                    if package.build_progress == BuildProgress::Building {
-                        if state.spinner_last_tick.elapsed().as_millis() > SPINNER_INTERVAL {
-                            state.spinner_last_tick = Instant::now();
-                            state.spinner_frame = if state.spinner_frame < SPINNER_FRAMES.len() - 1
-                            {
-                                state.spinner_frame + 1
-                            } else {
-                                0
-                            };
-                        }
-                        format!(" {}", SPINNER_FRAMES[state.spinner_frame]).cyan()
-                    } else {
-                        String::new().into()
-                    },
-                ]))
-                .block(
-                    Block::bordered()
-                        .border_type(BorderType::Rounded)
-                        .border_style(if state.selected_package == i {
-                            if state.is_building_package() {
-                                Style::new().green()
-                            } else {
-                                Style::new()
-                            }
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(if state.selected_package == i {
+                        if package.build_progress.is_building() {
+                            Style::new().green()
                         } else {
-                            Style::new().black()
-                        }),
-                ),
-                rects[i],
+                            Style::new()
+                        }
+                    } else {
+                        Style::new().black()
+                    }),
+                rects[0],
             );
+            let item = Layout::horizontal([Constraint::Min(3), Constraint::Percentage(100)])
+                .margin(1)
+                .split(rects[i]);
+            frame.render_stateful_widget(
+                throbber_widgets_tui::Throbber::default()
+                    .style(Style::default().fg(Color::Cyan))
+                    .throbber_style(
+                        Style::default()
+                            .fg(package.build_progress.as_color())
+                            .add_modifier(Modifier::BOLD),
+                    )
+                    .throbber_set(throbber_widgets_tui::BLACK_CIRCLE)
+                    .use_type(throbber_widgets_tui::WhichUse::Spin),
+                item[0],
+                &mut package.spinner_state,
+            );
+            frame.render_widget(Paragraph::new(package.name.to_string()), item[1]);
         }
     }
 
