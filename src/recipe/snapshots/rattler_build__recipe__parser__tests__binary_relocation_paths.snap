@@ -2,6 +2,7 @@
 source: src/recipe/parser.rs
 expression: recipe
 ---
+schema_version: 1
 package:
   name: zlib
   version: 0.1.0
@@ -12,4 +13,3 @@ build:
       - /usr/lib/**
       - /etc
 requirements: {}
-
