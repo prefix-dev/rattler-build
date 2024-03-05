@@ -3,6 +3,7 @@ source: src/metadata.rs
 expression: output_curl
 ---
 recipe:
+  schema_version: 1
   package:
     name: curl
     version: 8.0.1
@@ -644,5 +645,4 @@ finalized_dependencies:
     run_exports: ~
 finalized_sources: ~
 system_tools:
-  rattler_build: 0.6.0
-
+  rattler_build: 0.12.1

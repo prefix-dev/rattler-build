@@ -2,6 +2,7 @@
 source: src/recipe/parser.rs
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
+schema_version: 1
 package:
   name: single_output
   version: 0.1.0
@@ -111,4 +112,3 @@ about:
   - LICENSE
   summary: A summary
   description: More description
-

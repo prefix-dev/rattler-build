@@ -3,6 +3,7 @@ source: src/metadata.rs
 expression: output_rich
 ---
 recipe:
+  schema_version: 1
   package:
     name: rich
     version: 13.4.2
@@ -390,5 +391,4 @@ finalized_dependencies:
     run_exports: ~
 finalized_sources: ~
 system_tools:
-  rattler_build: 0.6.0
-
+  rattler_build: 0.12.1
