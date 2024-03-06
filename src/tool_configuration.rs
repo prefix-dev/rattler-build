@@ -6,6 +6,10 @@ use std::{path::PathBuf, sync::Arc};
 use crate::console_utils::LoggingOutputHandler;
 use rattler_networking::{authentication_storage, AuthenticationMiddleware, AuthenticationStorage};
 use reqwest_middleware::ClientWithMiddleware;
+
+/// The user agent to use for the reqwest client
+pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
 /// Global configuration for the build
 #[derive(Clone, Debug)]
 pub struct Configuration {
@@ -46,7 +50,6 @@ pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
 pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWithMiddleware {
     let auth_storage = get_auth_store(auth_file);
 
-    static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
     let timeout = 5 * 60;
     reqwest_middleware::ClientBuilder::new(
         reqwest::Client::builder()
