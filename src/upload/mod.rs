@@ -1,5 +1,6 @@
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
+use rattler_build::tool_configuration::APP_USER_AGENT;
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
@@ -42,7 +43,7 @@ fn default_bytes_style() -> Result<indicatif::ProgressStyle, TemplateError> {
 fn get_default_client() -> Result<reqwest::Client, reqwest::Error> {
     reqwest::Client::builder()
         .no_gzip()
-        .user_agent(format!("rattler-build/{}", VERSION))
+        .user_agent(APP_USER_AGENT)
         .build()
 }
 
