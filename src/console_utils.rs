@@ -1,5 +1,4 @@
 //! This module contains utilities for logging and progress bar handling.
-use crate::tui::event::Event as TuiEvent;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use console::style;
 use indicatif::{HumanBytes, HumanDuration, MultiProgress, ProgressState, ProgressStyle};
@@ -10,9 +9,9 @@ use std::{
     sync::{Arc, Mutex},
     time::Instant,
 };
-use tokio::sync::mpsc;
 use tracing::{field, Level};
 use tracing_core::{span::Id, Event, Field, Subscriber};
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{
     filter::{Directive, ParseError},
     fmt::{
@@ -22,7 +21,6 @@ use tracing_subscriber::{
     },
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
-    util::SubscriberInitExt,
     EnvFilter, Layer,
 };
 
@@ -483,52 +481,14 @@ pub enum Color {
     Auto,
 }
 
-/// Writer for TUI logs.
-#[derive(Debug)]
-pub struct TuiOutputHandler {
-    log_sender: mpsc::UnboundedSender<TuiEvent>,
-}
-
-impl Clone for TuiOutputHandler {
-    fn clone(&self) -> Self {
-        Self {
-            log_sender: self.log_sender.clone(),
-        }
-    }
-}
-
-impl io::Write for TuiOutputHandler {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.log_sender
-            .send(TuiEvent::BuildLog(buf.to_vec()))
-            .map_err(|e| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("could not send TUI event: {e}"),
-                )
-            })?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-impl<'a> MakeWriter<'a> for TuiOutputHandler {
-    type Writer = TuiOutputHandler;
-
-    fn make_writer(&'a self) -> Self::Writer {
-        self.clone()
-    }
-}
-
 /// Initializes logging with the given style and verbosity.
 pub fn init_logging(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
     color: &Color,
-    tui_log_sender: Option<mpsc::UnboundedSender<TuiEvent>>,
+    #[cfg(feature = "tui")] tui_log_sender: Option<
+        tokio::sync::mpsc::UnboundedSender<crate::tui::event::Event>,
+    >,
 ) -> Result<LoggingOutputHandler, ParseError> {
     let log_handler = LoggingOutputHandler::default();
 
@@ -556,32 +516,36 @@ pub fn init_logging(
 
     let registry = registry.with(GitHubActionsLayer(github_integration_enabled()));
 
-    if let Some(tui_log_sender) = tui_log_sender {
-        log_handler.set_progress_bars_hidden(true);
-        let writer = TuiOutputHandler {
-            log_sender: tui_log_sender,
-        };
-        registry.with(fmt::layer().with_writer(writer)).init();
-    } else {
-        match log_style {
-            LogStyle::Fancy => {
-                registry.with(log_handler.clone()).init();
-            }
-            LogStyle::Plain => {
-                registry
-                    .with(
-                        fmt::layer()
-                            .with_writer(log_handler.clone())
-                            .event_format(TracingFormatter),
-                    )
-                    .init();
-            }
-            LogStyle::Json => {
-                log_handler.set_progress_bars_hidden(true);
-                registry
-                    .with(fmt::layer().json().with_writer(io::stderr))
-                    .init();
-            }
+    #[cfg(feature = "tui")]
+    {
+        if let Some(tui_log_sender) = tui_log_sender {
+            log_handler.set_progress_bars_hidden(true);
+            let writer = crate::tui::logger::TuiOutputHandler {
+                log_sender: tui_log_sender,
+            };
+            registry.with(fmt::layer().with_writer(writer)).init();
+            return Ok(log_handler);
+        }
+    }
+
+    match log_style {
+        LogStyle::Fancy => {
+            registry.with(log_handler.clone()).init();
+        }
+        LogStyle::Plain => {
+            registry
+                .with(
+                    fmt::layer()
+                        .with_writer(log_handler.clone())
+                        .event_format(TracingFormatter),
+                )
+                .init();
+        }
+        LogStyle::Json => {
+            log_handler.set_progress_bars_hidden(true);
+            registry
+                .with(fmt::layer().json().with_writer(io::stderr))
+                .init();
         }
     }
 

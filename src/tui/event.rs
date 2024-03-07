@@ -1,3 +1,5 @@
+//! TUI event handling.
+
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use miette::IntoDiagnostic;

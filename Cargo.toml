@@ -16,6 +16,7 @@ documentation = "https://prefix-dev.github.io/rattler-build"
 default = ['native-tls']
 native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_installs_packages/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls', 'rattler_installs_packages/rustls-tls']
+tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui']
 
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
@@ -109,10 +110,10 @@ rattler_installs_packages = { version = "0.8.1", default-features = false }
 async-once-cell = "0.5.3"
 terminal_size = "0.3.0"
 memchr = "2.7.1"
-ratatui = "0.26.1"
-crossterm = { version = "0.27.0", features = ["event-stream"] }
-ansi-to-tui = "4.0.1"
-throbber-widgets-tui = "0.4.1"
+ratatui = { version = "0.26.1", optional = true }
+crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
+ansi-to-tui = { version = "4.0.1", optional = true }
+throbber-widgets-tui = { version = "0.4.1", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.35.1", features = ["yaml"] }

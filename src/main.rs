@@ -14,7 +14,16 @@ use rattler_build::{
 async fn main() -> miette::Result<()> {
     let app = App::parse();
     let log_handler = if !app.is_tui() {
-        Some(init_logging(&app.log_style, &app.verbose, &app.color, None).into_diagnostic()?)
+        Some(
+            init_logging(
+                &app.log_style,
+                &app.verbose,
+                &app.color,
+                #[cfg(feature = "tui")]
+                None,
+            )
+            .into_diagnostic()?,
+        )
     } else {
         None
     };
@@ -35,6 +44,7 @@ async fn main() -> miette::Result<()> {
             print_completions(shell, &mut cmd);
             Ok(())
         }
+        #[cfg(feature = "tui")]
         Some(SubCommands::Build(build_args)) => {
             if build_args.tui {
                 let tui = rattler_build::tui::init().await?;
@@ -50,6 +60,10 @@ async fn main() -> miette::Result<()> {
                 run_build_from_args(build_args, log_handler.expect("logger is not initialized"))
                     .await
             }
+        }
+        #[cfg(not(feature = "tui"))]
+        Some(SubCommands::Build(build_args)) => {
+            run_build_from_args(build_args, log_handler.expect("logger is not initialized")).await
         }
         Some(SubCommands::Test(test_args)) => {
             run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await

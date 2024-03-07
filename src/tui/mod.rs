@@ -1,7 +1,7 @@
 //! Terminal user interface for rattler-build.
 
-/// Event handling.
 pub mod event;
+pub mod logger;
 mod render;
 mod state;
 

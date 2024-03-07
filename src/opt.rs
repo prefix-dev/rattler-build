@@ -79,11 +79,18 @@ pub struct App {
 
 impl App {
     /// Returns true if the application will launch a TUI.
+    #[cfg(feature = "tui")]
     pub fn is_tui(&self) -> bool {
         match &self.subcommand {
             Some(SubCommands::Build(args)) => args.tui,
             _ => false,
         }
+    }
+
+    /// Returns true if the application will launch a TUI.
+    #[cfg(not(feature = "tui"))]
+    pub fn is_tui(&self) -> bool {
+        false
     }
 }
 
@@ -233,6 +240,7 @@ pub struct BuildOpts {
     pub common: CommonOpts,
 
     /// Launch the terminal user interface.
+    #[cfg(feature = "tui")]
     #[arg(long, default_value = "false")]
     pub tui: bool,
 }
