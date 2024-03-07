@@ -1,7 +1,7 @@
 use super::event::Event;
 use super::state::TuiState;
 use ansi_to_tui::IntoText;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use miette::IntoDiagnostic;
 use ratatui::prelude::*;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
@@ -28,7 +28,7 @@ pub(crate) fn handle_key_events(
                 state.quit();
             }
         }
-        KeyCode::Down => {
+        KeyCode::Char('j') => {
             if !state.is_building_package() {
                 state.vertical_scroll = 0;
                 state.selected_package = if state.selected_package >= state.packages.len() - 1 {
@@ -38,10 +38,10 @@ pub(crate) fn handle_key_events(
                 }
             }
         }
-        KeyCode::PageUp => {
+        KeyCode::Up => {
             state.vertical_scroll += 5;
         }
-        KeyCode::Up => {
+        KeyCode::Char('k') => {
             if !state.is_building_package() {
                 state.vertical_scroll = 0;
                 state.selected_package = if state.selected_package == 0 {
@@ -51,7 +51,7 @@ pub(crate) fn handle_key_events(
                 }
             }
         }
-        KeyCode::PageDown => {
+        KeyCode::Down => {
             if state.vertical_scroll > 1 {
                 state.vertical_scroll -= 5;
             }
@@ -59,6 +59,26 @@ pub(crate) fn handle_key_events(
         KeyCode::Enter => sender
             .send(Event::StartBuild(state.selected_package))
             .into_diagnostic()?,
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Handles the mouse events and updates the state.
+pub(crate) fn handle_mouse_events(
+    mouse_event: MouseEvent,
+    _: mpsc::UnboundedSender<Event>,
+    state: &mut TuiState,
+) -> miette::Result<()> {
+    match mouse_event.kind {
+        MouseEventKind::ScrollDown => {
+            if state.vertical_scroll > 1 {
+                state.vertical_scroll -= 5;
+            }
+        }
+        MouseEventKind::ScrollUp => {
+            state.vertical_scroll += 5;
+        }
         _ => {}
     }
     Ok(())

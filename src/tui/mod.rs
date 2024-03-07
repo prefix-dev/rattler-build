@@ -122,7 +122,9 @@ pub async fn run<B: Backend>(
             Event::Key(key_event) => {
                 handle_key_events(key_event, tui.event_handler.sender.clone(), &mut state)?
             }
-            Event::Mouse(_) => {}
+            Event::Mouse(mouse_event) => {
+                handle_mouse_events(mouse_event, tui.event_handler.sender.clone(), &mut state)?
+            }
             Event::Resize(_, _) => {}
             Event::StartBuild(index) => {
                 state.packages[index].build_progress = BuildProgress::Building;
