@@ -1,4 +1,4 @@
-use ratatui::style::Color;
+use ratatui::{layout::Rect, style::Color};
 use throbber_widgets_tui::ThrobberState;
 
 use crate::{console_utils::LoggingOutputHandler, opt::BuildOpts};
@@ -10,6 +10,8 @@ pub(crate) struct Package {
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
     pub spinner_state: ThrobberState,
+    pub area: Rect,
+    pub is_hovered: bool,
 }
 
 /// Build progress.
@@ -65,6 +67,8 @@ impl TuiState {
                 build_progress: BuildProgress::None,
                 build_log: Vec::new(),
                 spinner_state: ThrobberState::default(),
+                area: Rect::default(),
+                is_hovered: false,
             }],
             selected_package: 0,
             vertical_scroll: 0,

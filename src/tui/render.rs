@@ -1,8 +1,9 @@
 use super::event::Event;
 use super::state::TuiState;
 use ansi_to_tui::IntoText;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use miette::IntoDiagnostic;
+use ratatui::layout::Position;
 use ratatui::prelude::*;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
@@ -67,7 +68,7 @@ pub(crate) fn handle_key_events(
 /// Handles the mouse events and updates the state.
 pub(crate) fn handle_mouse_events(
     mouse_event: MouseEvent,
-    _: mpsc::UnboundedSender<Event>,
+    sender: mpsc::UnboundedSender<Event>,
     state: &mut TuiState,
 ) -> miette::Result<()> {
     match mouse_event.kind {
@@ -78,6 +79,19 @@ pub(crate) fn handle_mouse_events(
         }
         MouseEventKind::ScrollUp => {
             state.vertical_scroll += 5;
+        }
+        MouseEventKind::Moved => {
+            let p = Position::new(mouse_event.column, mouse_event.row);
+            state.packages.iter_mut().for_each(|package| {
+                package.is_hovered = package.area.contains(p);
+            })
+        }
+        MouseEventKind::Down(MouseButton::Left) => {
+            if let Some(selected_pos) = state.packages.iter().position(|p| p.is_hovered) {
+                sender
+                    .send(Event::StartBuild(selected_pos))
+                    .into_diagnostic()?
+            }
         }
         _ => {}
     }
@@ -109,19 +123,23 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             Layout::vertical([Constraint::Min(2)].repeat(((rects[0].height - 2) / 3) as usize))
                 .margin(1)
                 .split(rects[0]);
-
         for (i, package) in state.packages.iter_mut().enumerate() {
+            package.area = rects[i];
             frame.render_widget(
                 Block::bordered()
                     .border_type(BorderType::Rounded)
-                    .border_style(if state.selected_package == i {
-                        if package.build_progress.is_building() {
-                            Style::new().green()
+                    .border_style({
+                        let mut style = Style::new();
+                        if state.selected_package == i {
+                            if package.build_progress.is_building() {
+                                style = style.green()
+                            } else if package.is_hovered {
+                                style = style.white()
+                            }
                         } else {
-                            Style::new()
+                            style = style.black()
                         }
-                    } else {
-                        Style::new().black()
+                        style
                     }),
                 rects[0],
             );
