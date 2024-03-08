@@ -1,8 +1,8 @@
 //! The upload module provides the package upload functionality.
 
+use crate::tool_configuration::APP_USER_AGENT;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
-use rattler_build::tool_configuration::APP_USER_AGENT;
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
