@@ -112,6 +112,12 @@ pub async fn run<B: Backend>(
     // Create an application.
     let mut state = TuiState::new(opts, log_handler);
 
+    // Resolve the packages to build.
+    tui.event_handler
+        .sender
+        .send(Event::ResolvePackages)
+        .into_diagnostic()?;
+
     // Start the main loop.
     while state.running {
         // Render the user interface.
@@ -126,22 +132,26 @@ pub async fn run<B: Backend>(
                 handle_mouse_events(mouse_event, tui.event_handler.sender.clone(), &mut state)?
             }
             Event::Resize(_, _) => {}
+            Event::ResolvePackages => {
+                state.resolve_packages().await?;
+            }
             Event::StartBuild(index) => {
                 state.packages[index].build_progress = BuildProgress::Building;
-                let build_opts = state.build_opts.clone();
-                let log_handler = state.log_handler.clone();
+                let build_output = state.build_output.clone().unwrap();
                 let log_sender = tui.event_handler.sender.clone();
                 tokio::spawn(async move {
-                    run_build_from_args(build_opts, log_handler).await.unwrap();
+                    run_build_from_args(build_output).await.unwrap();
                     log_sender.send(Event::FinishBuild).unwrap();
                 });
             }
             Event::BuildLog(log) => {
-                let building_package = &mut state.packages[state.selected_package];
-                building_package.build_progress = BuildProgress::Building;
-                building_package
-                    .build_log
-                    .push(String::from_utf8_lossy(&log).to_string());
+                if let Some(building_package) = state.packages.get_mut(state.selected_package) {
+                    building_package
+                        .build_log
+                        .push(String::from_utf8_lossy(&log).to_string());
+                } else {
+                    state.log.push(String::from_utf8_lossy(&log).to_string());
+                }
             }
             Event::FinishBuild => {
                 state.packages[state.selected_package].build_progress = BuildProgress::Done;

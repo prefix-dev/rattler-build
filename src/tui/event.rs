@@ -17,6 +17,8 @@ pub enum Event {
     Mouse(MouseEvent),
     /// Terminal resize.
     Resize(u16, u16),
+    /// Resolves packages to build.
+    ResolvePackages,
     /// Start building.
     StartBuild(usize),
     /// Build log.

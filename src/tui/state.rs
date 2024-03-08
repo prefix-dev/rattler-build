@@ -1,7 +1,7 @@
 use ratatui::{layout::Rect, style::Color};
 use throbber_widgets_tui::ThrobberState;
 
-use crate::{console_utils::LoggingOutputHandler, opt::BuildOpts};
+use crate::{console_utils::LoggingOutputHandler, get_build_output, opt::BuildOpts, BuildOutput};
 
 /// Representation of a package.
 #[derive(Clone, Debug, Default)]
@@ -41,6 +41,8 @@ impl BuildProgress {
 
 /// Application state.
 pub(crate) struct TuiState {
+    /// Build output.
+    pub build_output: Option<BuildOutput>,
     /// Build options.
     pub build_opts: BuildOpts,
     /// Log handler.
@@ -53,26 +55,45 @@ pub(crate) struct TuiState {
     pub selected_package: usize,
     /// Vertical scroll value.
     pub vertical_scroll: u16,
+    /// Application log.
+    pub log: Vec<String>,
 }
 
 impl TuiState {
     /// Constructs a new instance.
     pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
+            build_output: None,
             build_opts: build_opts.clone(),
             log_handler,
             running: true,
-            packages: vec![Package {
-                name: build_opts.recipe.to_string_lossy().to_string(),
+            packages: Vec::new(),
+            selected_package: 0,
+            vertical_scroll: 0,
+            log: Vec::new(),
+        }
+    }
+
+    /// Resolves the packages to build.
+    pub async fn resolve_packages(&mut self) -> miette::Result<()> {
+        self.build_output =
+            Some(get_build_output(self.build_opts.clone(), self.log_handler.clone()).await?);
+        self.packages = self
+            .build_output
+            .as_ref()
+            .unwrap()
+            .outputs
+            .iter()
+            .map(|output| Package {
+                name: output.name().as_normalized().to_string(),
                 build_progress: BuildProgress::None,
                 build_log: Vec::new(),
                 spinner_state: ThrobberState::default(),
                 area: Rect::default(),
                 is_hovered: false,
-            }],
-            selected_package: 0,
-            vertical_scroll: 0,
-        }
+            })
+            .collect();
+        Ok(())
     }
 
     /// Handles the tick event of the terminal.

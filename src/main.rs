@@ -4,6 +4,7 @@ use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
+    get_build_output,
     opt::{App, ShellCompletion, SubCommands},
     rebuild_from_args,
     recipe_generator::generate_recipe,
@@ -57,13 +58,18 @@ async fn main() -> miette::Result<()> {
                 .into_diagnostic()?;
                 rattler_build::tui::run(tui, build_args, log_handler).await
             } else {
-                run_build_from_args(build_args, log_handler.expect("logger is not initialized"))
-                    .await
+                let build_output =
+                    get_build_output(build_args, log_handler.expect("logger is not initialized"))
+                        .await?;
+                run_build_from_args(build_output).await
             }
         }
         #[cfg(not(feature = "tui"))]
         Some(SubCommands::Build(build_args)) => {
-            run_build_from_args(build_args, log_handler.expect("logger is not initialized")).await
+            let build_output =
+                get_build_output(build_args, log_handler.expect("logger is not initialized"))
+                    .await?;
+            run_build_from_args(build_output).await
         }
         Some(SubCommands::Test(test_args)) => {
             run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await

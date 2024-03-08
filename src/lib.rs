@@ -61,52 +61,20 @@ use {
     variant_config::{ParseErrors, VariantConfig},
 };
 
-/// Runs test.
-pub async fn run_test_from_args(
-    args: TestOpts,
-    fancy_log_handler: LoggingOutputHandler,
-) -> miette::Result<()> {
-    let package_file = canonicalize(args.package_file).into_diagnostic()?;
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
-
-    let tempdir = tempfile::tempdir().into_diagnostic()?;
-
-    let test_options = TestConfiguration {
-        test_prefix: tempdir.path().to_path_buf(),
-        target_platform: None,
-        keep_test_prefix: false,
-        channels: args
-            .channel
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
-        tool_configuration: tool_configuration::Configuration {
-            client,
-            fancy_log_handler,
-            // duplicate from `keep_test_prefix`?
-            no_clean: false,
-            ..Default::default()
-        },
-    };
-
-    let package_name = package_file
-        .file_name()
-        .ok_or_else(|| miette::miette!("Could not get file name from package file"))?
-        .to_string_lossy()
-        .to_string();
-
-    let span = tracing::info_span!("Running tests for ", recipe = %package_name);
-    let _enter = span.enter();
-    package_test::run_test(&package_file, &test_options)
-        .await
-        .into_diagnostic()?;
-
-    Ok(())
+#[derive(Clone)]
+/// Wrapper for multiple outputs.
+pub struct BuildOutput {
+    /// Build outputs.
+    pub outputs: Vec<metadata::Output>,
+    /// Tool configuration.
+    pub tool_config: tool_configuration::Configuration,
 }
 
-/// Runs build.
-pub async fn run_build_from_args(
+/// Returns the output for the build.
+pub async fn get_build_output(
     args: BuildOpts,
     fancy_log_handler: LoggingOutputHandler,
-) -> miette::Result<()> {
+) -> miette::Result<BuildOutput> {
     let recipe_path = canonicalize(&args.recipe);
     if let Err(e) = &recipe_path {
         match e.kind() {
@@ -316,8 +284,20 @@ pub async fn run_build_from_args(
             println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
             continue;
         }
+        outputs.push(output);
+    }
 
-        let output = match run_build(output, tool_config.clone()).await {
+    Ok(BuildOutput {
+        outputs,
+        tool_config,
+    })
+}
+
+/// Runs build.
+pub async fn run_build_from_args(build_output: BuildOutput) -> miette::Result<()> {
+    let mut outputs: Vec<metadata::Output> = Vec::new();
+    for output in build_output.outputs {
+        let output = match run_build(output, build_output.tool_config.clone()).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output
@@ -339,6 +319,47 @@ pub async fn run_build_from_args(
             e
         });
     }
+
+    Ok(())
+}
+
+/// Runs test.
+pub async fn run_test_from_args(
+    args: TestOpts,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<()> {
+    let package_file = canonicalize(args.package_file).into_diagnostic()?;
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+
+    let tempdir = tempfile::tempdir().into_diagnostic()?;
+
+    let test_options = TestConfiguration {
+        test_prefix: tempdir.path().to_path_buf(),
+        target_platform: None,
+        keep_test_prefix: false,
+        channels: args
+            .channel
+            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
+        tool_configuration: tool_configuration::Configuration {
+            client,
+            fancy_log_handler,
+            // duplicate from `keep_test_prefix`?
+            no_clean: false,
+            ..Default::default()
+        },
+    };
+
+    let package_name = package_file
+        .file_name()
+        .ok_or_else(|| miette::miette!("Could not get file name from package file"))?
+        .to_string_lossy()
+        .to_string();
+
+    let span = tracing::info_span!("Running tests for ", recipe = %package_name);
+    let _enter = span.enter();
+    package_test::run_test(&package_file, &test_options)
+        .await
+        .into_diagnostic()?;
 
     Ok(())
 }

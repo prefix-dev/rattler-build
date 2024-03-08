@@ -163,13 +163,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         }
     }
 
-    let selected_package = state.packages[state.selected_package].clone();
-    let logs = selected_package
-        .build_log
-        .join("")
-        .into_text()
-        .unwrap()
-        .on_black();
+    let mut log_lines = state.log.clone();
+    if let Some(selected_package) = state.packages.get(state.selected_package) {
+        log_lines.extend(selected_package.build_log.clone());
+    }
+    let logs = log_lines.join("").into_text().unwrap().on_black();
+
     let vertical_scroll = (logs.height() as u16)
         .saturating_sub(rects[1].height)
         .saturating_sub(state.vertical_scroll);
@@ -177,7 +176,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         Paragraph::new(logs.clone())
             .block(
                 Block::bordered()
-                    .title_top(format!("Build Logs for {}", selected_package.name))
+                    .title_top(match state.packages.get(state.selected_package) {
+                        Some(package) => {
+                            format!("Build Logs for {}", package.name)
+                        }
+                        None => String::from("Build Logs"),
+                    })
                     .border_type(BorderType::Rounded),
             )
             .scroll((vertical_scroll, 0)),
@@ -189,7 +193,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .end_symbol(Some("↓"));
 
     let mut scrollbar_state =
-        ScrollbarState::new(selected_package.build_log.len()).position(vertical_scroll as usize);
+        ScrollbarState::new(log_lines.len()).position(vertical_scroll as usize);
 
     frame.render_stateful_widget(
         scrollbar,
