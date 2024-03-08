@@ -133,7 +133,7 @@ pub async fn run<B: Backend>(
             }
             Event::Resize(_, _) => {}
             Event::ResolvePackages => {
-                state.resolve_packages().await?;
+                state.resolve_packages().await.unwrap();
             }
             Event::StartBuild(index) => {
                 state.packages[index].build_progress = BuildProgress::Building;
