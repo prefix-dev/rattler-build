@@ -174,7 +174,7 @@ pub async fn get_build_output(
         for (key, value) in discovered_output.used_vars.iter() {
             table.add_row(vec![key, value]);
         }
-        tracing::info!("{}\n", table);
+        tracing::info!("\n{}\n", table);
     }
     drop(enter);
 
