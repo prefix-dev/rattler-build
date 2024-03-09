@@ -52,7 +52,7 @@ impl Display for GitRev {
 }
 
 /// Directories used during the build process
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Directories {
     /// The directory where the recipe is located
     #[serde(skip)]

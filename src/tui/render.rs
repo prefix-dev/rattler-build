@@ -120,53 +120,51 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             rects[0],
         );
 
-        if state.packages.is_empty() {
-            return;
-        }
-
-        let rects = Layout::vertical(
-            [Constraint::Min(2)]
-                .repeat(((rects[0].height - 2) / state.packages.len() as u16) as usize),
-        )
-        .margin(1)
-        .split(rects[0]);
-        for (i, package) in state.packages.iter_mut().enumerate() {
-            package.area = rects[i];
-            frame.render_widget(
-                Block::bordered()
-                    .border_type(BorderType::Rounded)
-                    .border_style({
-                        let mut style = Style::new();
-                        if package.is_hovered {
-                            style = style.white()
-                        } else if state.selected_package == i {
-                            if package.build_progress.is_building() {
-                                style = style.green()
+        if !state.packages.is_empty() {
+            let rects = Layout::vertical(
+                [Constraint::Min(2)]
+                    .repeat(((rects[0].height - 2) / state.packages.len() as u16) as usize),
+            )
+            .margin(1)
+            .split(rects[0]);
+            for (i, package) in state.packages.iter_mut().enumerate() {
+                package.area = rects[i];
+                frame.render_widget(
+                    Block::bordered()
+                        .border_type(BorderType::Rounded)
+                        .border_style({
+                            let mut style = Style::new();
+                            if package.is_hovered {
+                                style = style.white()
+                            } else if state.selected_package == i {
+                                if package.build_progress.is_building() {
+                                    style = style.green()
+                                }
+                            } else {
+                                style = style.black()
                             }
-                        } else {
-                            style = style.black()
-                        }
-                        style
-                    }),
-                rects[i],
-            );
-            let item = Layout::horizontal([Constraint::Min(3), Constraint::Percentage(100)])
-                .margin(1)
-                .split(rects[i]);
-            frame.render_stateful_widget(
-                throbber_widgets_tui::Throbber::default()
-                    .style(Style::default().fg(Color::Cyan))
-                    .throbber_style(
-                        Style::default()
-                            .fg(package.build_progress.as_color())
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .throbber_set(throbber_widgets_tui::BLACK_CIRCLE)
-                    .use_type(throbber_widgets_tui::WhichUse::Spin),
-                item[0],
-                &mut package.spinner_state,
-            );
-            frame.render_widget(Paragraph::new(package.name.to_string()), item[1]);
+                            style
+                        }),
+                    rects[i],
+                );
+                let item = Layout::horizontal([Constraint::Min(3), Constraint::Percentage(100)])
+                    .margin(1)
+                    .split(rects[i]);
+                frame.render_stateful_widget(
+                    throbber_widgets_tui::Throbber::default()
+                        .style(Style::default().fg(Color::Cyan))
+                        .throbber_style(
+                            Style::default()
+                                .fg(package.build_progress.as_color())
+                                .add_modifier(Modifier::BOLD),
+                        )
+                        .throbber_set(throbber_widgets_tui::BLACK_CIRCLE)
+                        .use_type(throbber_widgets_tui::WhichUse::Spin),
+                    item[0],
+                    &mut package.spinner_state,
+                );
+                frame.render_widget(Paragraph::new(package.name.to_string()), item[1]);
+            }
         }
     }
 
