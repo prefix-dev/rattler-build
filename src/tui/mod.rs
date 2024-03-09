@@ -133,7 +133,18 @@ pub async fn run<B: Backend>(
             }
             Event::Resize(_, _) => {}
             Event::ResolvePackages => {
-                state.resolve_packages().await.unwrap();
+                let log_sender = tui.event_handler.sender.clone();
+                let state = state.clone();
+                tokio::spawn(async move {
+                    let resolved = state.resolve_packages().await.unwrap();
+                    log_sender
+                        .send(Event::ProcessResolvedPackages(resolved.0, resolved.1))
+                        .unwrap();
+                });
+            }
+            Event::ProcessResolvedPackages(build_output, packages) => {
+                state.build_output = Some(build_output);
+                state.packages = packages.clone();
             }
             Event::StartBuild(index) => {
                 state.selected_package = index;

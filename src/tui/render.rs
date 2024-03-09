@@ -121,12 +121,10 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         );
 
         if !state.packages.is_empty() {
-            let rects = Layout::vertical(
-                [Constraint::Min(2)]
-                    .repeat(((rects[0].height - 2) / state.packages.len() as u16) as usize),
-            )
-            .margin(1)
-            .split(rects[0]);
+            let rects =
+                Layout::vertical([Constraint::Min(2)].repeat(((rects[0].height - 2) / 3) as usize))
+                    .margin(1)
+                    .split(rects[0]);
             for (i, package) in state.packages.iter_mut().enumerate() {
                 package.area = rects[i];
                 frame.render_widget(

@@ -6,8 +6,12 @@ use miette::IntoDiagnostic;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
+use crate::BuildOutput;
+
+use super::state::Package;
+
 /// Terminal events.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum Event {
     /// Terminal tick.
     Tick,
@@ -19,6 +23,8 @@ pub enum Event {
     Resize(u16, u16),
     /// Resolves packages to build.
     ResolvePackages,
+    /// Handles the result of resolving packages.
+    ProcessResolvedPackages(BuildOutput, Vec<Package>),
     /// Start building.
     StartBuild(usize),
     /// Build log.

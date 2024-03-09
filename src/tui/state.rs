@@ -5,7 +5,7 @@ use crate::{console_utils::LoggingOutputHandler, get_build_output, opt::BuildOpt
 
 /// Representation of a package.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct Package {
+pub struct Package {
     pub name: String,
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
@@ -16,7 +16,7 @@ pub(crate) struct Package {
 
 /// Build progress.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub(crate) enum BuildProgress {
+pub enum BuildProgress {
     #[default]
     None,
     Building,
@@ -40,6 +40,7 @@ impl BuildProgress {
 }
 
 /// Application state.
+#[derive(Clone)]
 pub(crate) struct TuiState {
     /// Build output.
     pub build_output: Option<BuildOutput>,
@@ -74,14 +75,11 @@ impl TuiState {
         }
     }
 
-    /// Resolves the packages to build.
-    pub async fn resolve_packages(&mut self) -> miette::Result<()> {
-        self.build_output =
-            Some(get_build_output(self.build_opts.clone(), self.log_handler.clone()).await?);
-        self.packages = self
-            .build_output
-            .as_ref()
-            .unwrap()
+    /// Resolves and returns the packages to build.
+    pub async fn resolve_packages(&self) -> miette::Result<(BuildOutput, Vec<Package>)> {
+        let build_output =
+            get_build_output(self.build_opts.clone(), self.log_handler.clone()).await?;
+        let packages = build_output
             .outputs
             .iter()
             .map(|output| Package {
@@ -93,7 +91,7 @@ impl TuiState {
                 is_hovered: false,
             })
             .collect();
-        Ok(())
+        Ok((build_output, packages))
     }
 
     /// Handles the tick event of the terminal.
