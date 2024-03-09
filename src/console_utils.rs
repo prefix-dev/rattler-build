@@ -523,7 +523,9 @@ pub fn init_logging(
             let writer = crate::tui::logger::TuiOutputHandler {
                 log_sender: tui_log_sender,
             };
-            registry.with(fmt::layer().with_writer(writer)).init();
+            registry
+                .with(fmt::layer().with_writer(writer).without_time())
+                .init();
             return Ok(log_handler);
         }
     }
