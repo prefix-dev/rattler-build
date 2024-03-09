@@ -83,7 +83,7 @@ impl TuiState {
             .outputs
             .iter()
             .map(|output| Package {
-                name: output.0.name().as_normalized().to_string(),
+                name: output.name().as_normalized().to_string(),
                 build_progress: BuildProgress::None,
                 build_log: Vec::new(),
                 spinner_state: ThrobberState::default(),

@@ -72,7 +72,7 @@ pub struct Directories {
     pub output_dir: PathBuf,
 }
 
-fn setup_build_dir(
+fn get_build_dir(
     output_dir: &Path,
     name: &str,
     no_build_id: bool,
@@ -85,14 +85,12 @@ fn setup_build_dir(
     } else {
         format!("rattler-build_{}_{:?}", name, since_the_epoch)
     };
-    let path = output_dir.join("bld").join(dirname);
-    fs::create_dir_all(path.join("work"))?;
-    Ok(path)
+    Ok(output_dir.join("bld").join(dirname))
 }
 
 impl Directories {
     /// Create all directories needed for the building of a package
-    pub fn create(
+    pub fn setup(
         name: &str,
         recipe_path: &Path,
         output_dir: &Path,
@@ -104,7 +102,7 @@ impl Directories {
         }
         let output_dir = canonicalize(output_dir)?;
 
-        let build_dir = setup_build_dir(&output_dir, name, no_build_id, timestamp)
+        let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
         let recipe_dir = recipe_path
             .parent()
@@ -141,6 +139,12 @@ impl Directories {
         };
 
         Ok(directories)
+    }
+
+    /// Creates the build directory.
+    pub fn create_build_dir(&self) -> Result<(), std::io::Error> {
+        fs::create_dir_all(self.build_dir.join("work"))?;
+        Ok(())
     }
 
     /// create all directories
@@ -599,18 +603,16 @@ mod tests {
     fn setup_build_dir_test() {
         // without build_id (aka timestamp)
         let dir = tempfile::tempdir().unwrap();
-        let p1 = setup_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
+        let p1 = get_build_dir(dir.path(), "name", true, &Utc::now()).unwrap();
         let f1 = p1.file_name().unwrap();
         assert!(f1.eq("rattler-build_name"));
-        _ = std::fs::remove_dir_all(p1);
 
         // with build_id (aka timestamp)
         let timestamp = &Utc::now();
-        let p2 = setup_build_dir(dir.path(), "name", false, timestamp).unwrap();
+        let p2 = get_build_dir(dir.path(), "name", false, timestamp).unwrap();
         let f2 = p2.file_name().unwrap();
         let epoch = timestamp.timestamp();
         assert!(f2.eq(format!("rattler-build_name_{epoch}").as_str()));
-        _ = std::fs::remove_dir_all(p2);
     }
 }
 
@@ -634,7 +636,7 @@ mod test {
     fn test_directories_yaml_rendering() {
         let tempdir = tempfile::tempdir().unwrap();
 
-        let directories = Directories::create(
+        let directories = Directories::setup(
             "name",
             &tempdir.path().join("recipe"),
             &tempdir.path().join("output"),
@@ -642,6 +644,7 @@ mod test {
             &chrono::Utc::now(),
         )
         .unwrap();
+        directories.create_build_dir().unwrap();
 
         // test yaml roundtrip
         let yaml = serde_yaml::to_string(&directories).unwrap();

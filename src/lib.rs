@@ -82,7 +82,7 @@ pub struct DirectoryInfo {
 #[derive(Clone)]
 pub struct BuildOutput {
     /// Build outputs.
-    pub outputs: Vec<(metadata::Output, DirectoryInfo)>,
+    pub outputs: Vec<metadata::Output>,
     /// Tool configuration.
     pub tool_config: tool_configuration::Configuration,
 }
@@ -268,7 +268,14 @@ pub async fn get_build_output(
                 build_platform: Platform::current(),
                 hash,
                 variant: discovered_output.used_vars.clone(),
-                directories: Directories::default(),
+                directories: Directories::setup(
+                    name.as_normalized(),
+                    &recipe_path,
+                    &output_dir,
+                    args.no_build_id,
+                    &timestamp,
+                )
+                .into_diagnostic()?,
                 channels,
                 timestamp,
                 subpackages: subpackages.clone(),
@@ -285,13 +292,6 @@ pub async fn get_build_output(
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
         };
-        let directory_info = DirectoryInfo {
-            name: name.as_normalized().to_string(),
-            recipe_path: recipe_path.clone(),
-            output_dir: output_dir.clone(),
-            no_build_id: args.no_build_id,
-            timestamp,
-        };
 
         if args.render_only {
             let resolved = output
@@ -301,7 +301,7 @@ pub async fn get_build_output(
             println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
             continue;
         }
-        outputs.push((output, directory_info));
+        outputs.push(output);
     }
 
     Ok(BuildOutput {
@@ -313,15 +313,12 @@ pub async fn get_build_output(
 /// Runs build.
 pub async fn run_build_from_args(build_output: BuildOutput) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
-    for (mut output, dir_info) in build_output.outputs {
-        output.build_configuration.directories = Directories::create(
-            &dir_info.name,
-            &dir_info.recipe_path,
-            &dir_info.output_dir,
-            dir_info.no_build_id,
-            &dir_info.timestamp,
-        )
-        .into_diagnostic()?;
+    for output in build_output.outputs {
+        output
+            .build_configuration
+            .directories
+            .create_build_dir()
+            .into_diagnostic()?;
         let output = match run_build(output, build_output.tool_config.clone()).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
