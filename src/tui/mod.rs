@@ -136,6 +136,7 @@ pub async fn run<B: Backend>(
                 state.resolve_packages().await.unwrap();
             }
             Event::StartBuild(index) => {
+                state.selected_package = index;
                 state.packages[index].build_progress = BuildProgress::Building;
                 let build_output = state.build_output.clone().unwrap();
                 let log_sender = tui.event_handler.sender.clone();
@@ -145,7 +146,11 @@ pub async fn run<B: Backend>(
                 });
             }
             Event::BuildLog(log) => {
-                if let Some(building_package) = state.packages.get_mut(state.selected_package) {
+                if let Some(building_package) = state
+                    .packages
+                    .iter_mut()
+                    .find(|p| p.build_progress.is_building())
+                {
                     building_package
                         .build_log
                         .push(String::from_utf8_lossy(&log).to_string());

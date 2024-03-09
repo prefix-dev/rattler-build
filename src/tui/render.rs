@@ -119,10 +119,17 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                 .border_type(BorderType::Rounded),
             rects[0],
         );
-        let rects =
-            Layout::vertical([Constraint::Min(2)].repeat(((rects[0].height - 2) / 3) as usize))
-                .margin(1)
-                .split(rects[0]);
+
+        if state.packages.is_empty() {
+            return;
+        }
+
+        let rects = Layout::vertical(
+            [Constraint::Min(2)]
+                .repeat(((rects[0].height - 2) / state.packages.len() as u16) as usize),
+        )
+        .margin(1)
+        .split(rects[0]);
         for (i, package) in state.packages.iter_mut().enumerate() {
             package.area = rects[i];
             frame.render_widget(
@@ -130,18 +137,18 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     .border_type(BorderType::Rounded)
                     .border_style({
                         let mut style = Style::new();
-                        if state.selected_package == i {
+                        if package.is_hovered {
+                            style = style.white()
+                        } else if state.selected_package == i {
                             if package.build_progress.is_building() {
                                 style = style.green()
-                            } else if package.is_hovered {
-                                style = style.white()
                             }
                         } else {
                             style = style.black()
                         }
                         style
                     }),
-                rects[0],
+                rects[i],
             );
             let item = Layout::horizontal([Constraint::Min(3), Constraint::Percentage(100)])
                 .margin(1)
