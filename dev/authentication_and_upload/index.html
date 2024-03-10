@@ -1023,14 +1023,14 @@ prefix.dev website before you can upload to it.</p>
 <h3 id="quetz">Quetz<a class="headerlink" href="#quetz" title="Permanent link">#</a></h3>
 <p>You need to pass a token and API key to upload to a channel on your own Quetz
 server. The token is used to authenticate the upload.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nv">QUETZ_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">QUETZ_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>quetz<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <h3 id="artifactory">Artifactory<a class="headerlink" href="#artifactory" title="Permanent link">#</a></h3>
 <p>To upload to an Artifactory server, you need to pass a username and password.
 The username and password are used to authenticate the upload.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nv">ARTIFACTORY_USERNAME</span><span class="o">=</span>&lt;your_username&gt;
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nv">ARTIFACTORY_PASSWORD</span><span class="o">=</span>&lt;your_password&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_USERNAME</span><span class="o">=</span>&lt;your_username&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_PASSWORD</span><span class="o">=</span>&lt;your_password&gt;
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>artifactory<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <h3 id="anacondaorg">anaconda.org<a class="headerlink" href="#anacondaorg" title="Permanent link">#</a></h3>
@@ -1043,8 +1043,8 @@ the upload.</p>
 release candidates.</p>
 <p>You can also add the <code>--force</code> argument to forcibly upload a new package (and
 overwrite any existing ones).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nv">ANACONDA_OWNER</span><span class="o">=</span>&lt;your_username&gt;
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_OWNER</span><span class="o">=</span>&lt;your_username&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 
