@@ -75,7 +75,7 @@ You need to pass a token and API key to upload to a channel on your own Quetz
 server. The token is used to authenticate the upload.
 
 ```bash
-QUETZ_API_KEY=<your_token>
+export QUETZ_API_KEY=<your_token>
 rattler-build upload quetz -u <url> -c <channel> <package_files>
 ```
 
@@ -85,8 +85,8 @@ To upload to an Artifactory server, you need to pass a username and password.
 The username and password are used to authenticate the upload.
 
 ```bash
-ARTIFACTORY_USERNAME=<your_username>
-ARTIFACTORY_PASSWORD=<your_password>
+export ARTIFACTORY_USERNAME=<your_username>
+export ARTIFACTORY_PASSWORD=<your_password>
 rattler-build upload artifactory -u <url> -c <channel> <package_files>
 ```
 
@@ -105,7 +105,7 @@ You can also add the `--force` argument to forcibly upload a new package (and
 overwrite any existing ones).
 
 ```bash
-ANACONDA_OWNER=<your_username>
-ANACONDA_API_KEY=<your_token>
+export ANACONDA_OWNER=<your_username>
+export ANACONDA_API_KEY=<your_token>
 rattler-build upload anaconda -c <channel> <package_files>
 ```
