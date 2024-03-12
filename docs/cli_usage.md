@@ -15,7 +15,7 @@ eval "$(rattler-build completion --shell=zsh)"
 rattler-build completion --shell=fish | source
 ```
 
-Ensure that wherever you install `rattler-build` is pointed to by your `FPATH` (for `zsh` or equivalent in other shells), after which point you can use TAB or any configured completion key of choice. 😄
+Ensure that wherever you install `rattler-build` is pointed to by your `PATH` (for `zsh` or equivalent in other shells), after which point you can use TAB or any configured completion key of choice.
 
 ```sh
 $ rattler-build <TAB>
