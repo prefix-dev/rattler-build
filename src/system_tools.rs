@@ -1,4 +1,5 @@
 //! System tools are installed on the system (git, patchelf, install_name_tool, etc.)
+
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::{BTreeMap, HashMap},
@@ -6,6 +7,14 @@ use std::{
     process::Command,
     sync::{Arc, Mutex},
 };
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+#[allow(missing_docs)]
+pub enum ToolError {
+    #[error("failed to find `{0}` ({1})")]
+    ToolNotFound(Tool, which::Error),
+}
 
 /// Any third party tool that is used by rattler build should be added here
 /// and the tool should be invoked through the system tools object.
@@ -26,16 +35,20 @@ pub enum Tool {
     Git,
 }
 
-impl ToString for Tool {
-    fn to_string(&self) -> String {
-        match self {
-            Tool::RattlerBuild => "rattler_build".to_string(),
-            Tool::Codesign => "codesign".to_string(),
-            Tool::Patch => "patch".to_string(),
-            Tool::Patchelf => "patchelf".to_string(),
-            Tool::InstallNameTool => "install_name_tool".to_string(),
-            Tool::Git => "git".to_string(),
-        }
+impl std::fmt::Display for Tool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Tool::RattlerBuild => "rattler_build".to_string(),
+                Tool::Codesign => "codesign".to_string(),
+                Tool::Patch => "patch".to_string(),
+                Tool::Patchelf => "patchelf".to_string(),
+                Tool::InstallNameTool => "install_name_tool".to_string(),
+                Tool::Git => "git".to_string(),
+            }
+        )
     }
 }
 
@@ -86,7 +99,7 @@ impl SystemTools {
     }
 
     /// Find the tool in the system and return the path to the tool
-    pub fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
+    fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let (tool_path, found_version) = match tool {
             Tool::Patchelf => {
                 let path = which::which("patchelf")?;
@@ -157,12 +170,13 @@ impl SystemTools {
 
     /// Create a new `std::process::Command` for the given tool. The command is created with the
     /// path to the tool and can be further configured with arguments and environment variables.
-    pub fn call(&self, tool: Tool) -> Result<Command, which::Error> {
+    pub fn call(&self, tool: Tool) -> Result<Command, ToolError> {
         let found_tool = self.found_tools.lock().unwrap().get(&tool).cloned();
         let tool_path = if let Some(tool) = found_tool {
             tool
         } else {
-            self.find_tool(tool)?
+            self.find_tool(tool)
+                .map_err(|e| ToolError::ToolNotFound(tool, e))?
         };
 
         Ok(std::process::Command::new(tool_path))

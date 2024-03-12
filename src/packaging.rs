@@ -52,7 +52,7 @@ pub enum PackagingError {
     #[error("Failed to parse version {0}")]
     VersionParseError(#[from] rattler_conda_types::ParseVersionError),
 
-    #[error("Relink error: {0}")]
+    #[error(transparent)]
     RelinkError(#[from] crate::post_process::relink::RelinkError),
 
     #[error(transparent)]

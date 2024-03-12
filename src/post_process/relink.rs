@@ -5,7 +5,7 @@ use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
-use crate::system_tools::SystemTools;
+use crate::system_tools::{SystemTools, ToolError};
 use globset::GlobSet;
 use rattler_conda_types::Platform;
 use std::collections::{HashMap, HashSet};
@@ -23,8 +23,8 @@ pub enum RelinkError {
     #[error("failed to run install_name_tool")]
     InstallNameToolFailed,
 
-    #[error("failed to find relinking tool: {0}")]
-    ToolNotFound(#[from] which::Error),
+    #[error(transparent)]
+    SystemToolError(#[from] ToolError),
 
     #[error("failed to read or write file: {0}")]
     IoError(#[from] std::io::Error),
