@@ -11,7 +11,6 @@ use crate::BuildOutput;
 use super::state::Package;
 
 /// Terminal events.
-#[derive(Clone)]
 pub enum Event {
     /// Terminal tick.
     Tick,
@@ -31,6 +30,8 @@ pub enum Event {
     BuildLog(Vec<u8>),
     /// Finish building.
     FinishBuild,
+    /// Handle build error.
+    HandleBuildError(miette::Error),
 }
 
 /// Terminal event handler.

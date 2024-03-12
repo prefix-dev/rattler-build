@@ -131,15 +131,15 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     Block::bordered()
                         .border_type(BorderType::Rounded)
                         .border_style({
-                            let mut style = Style::default().fg(Color::Rgb(100, 100, 100));
+                            let mut style = Style::new().fg(package.build_progress.as_color());
                             if package.is_hovered && !package.build_progress.is_building() {
                                 style = style.yellow()
                             } else if state.selected_package == i {
                                 if package.build_progress.is_building() {
                                     style = style.green()
+                                } else {
+                                    style = style.white();
                                 }
-                            } else {
-                                style = style.black()
                             }
                             style
                         }),

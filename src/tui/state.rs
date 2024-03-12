@@ -20,6 +20,7 @@ pub enum BuildProgress {
     #[default]
     None,
     Building,
+    Failed,
     Done,
 }
 
@@ -32,8 +33,9 @@ impl BuildProgress {
     /// Returns the corresponding color for the progress.
     pub fn as_color(&self) -> Color {
         match self {
-            BuildProgress::None => Color::Red,
+            BuildProgress::None => Color::Rgb(100, 100, 100),
             BuildProgress::Building => Color::Yellow,
+            BuildProgress::Failed => Color::Red,
             BuildProgress::Done => Color::Green,
         }
     }

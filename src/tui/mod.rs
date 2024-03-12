@@ -153,11 +153,12 @@ pub async fn run<B: Backend>(
                     let build_output = state.build_output.clone().unwrap();
                     let log_sender = tui.event_handler.sender.clone();
                     tokio::spawn(async move {
-                        run_build_from_args(build_output).await.unwrap();
-                        log_sender.send(Event::FinishBuild).unwrap();
+                        if let Err(e) = run_build_from_args(build_output).await {
+                            log_sender.send(Event::HandleBuildError(e)).unwrap();
+                        } else {
+                            log_sender.send(Event::FinishBuild).unwrap();
+                        }
                     });
-                } else {
-                    // TODO: show a popup message
                 }
             }
             Event::BuildLog(log) => {
@@ -175,6 +176,9 @@ pub async fn run<B: Backend>(
             }
             Event::FinishBuild => {
                 state.packages[state.selected_package].build_progress = BuildProgress::Done;
+            }
+            Event::HandleBuildError(_) => {
+                state.packages[state.selected_package].build_progress = BuildProgress::Failed;
             }
         }
     }
