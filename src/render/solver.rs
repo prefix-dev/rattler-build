@@ -517,9 +517,10 @@ fn wrap_in_progress<T, F: FnOnce() -> T>(
     fancy_log_handler: &LoggingOutputHandler,
     func: F,
 ) -> Result<T, TemplateError> {
-    let pb = ProgressBar::new_spinner();
+    let pb = fancy_log_handler.add_progress_bar(
+        ProgressBar::new_spinner().with_style(fancy_log_handler.long_running_progress_style()),
+    );
     pb.enable_steady_tick(Duration::from_millis(100));
-    pb.set_style(fancy_log_handler.long_running_progress_style());
     pb.set_message(msg);
     let result = func();
     pb.finish_and_clear();
