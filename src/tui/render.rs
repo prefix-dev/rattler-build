@@ -170,10 +170,13 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     if let Some(selected_package) = state.packages.get(state.selected_package) {
         log_lines.extend(selected_package.build_log.clone());
     }
-    let logs = log_lines.join("").into_text().unwrap().on_black();
-
+    let log_lines = log_lines
+        .iter()
+        .map(|l| l.trim_end())
+        .collect::<Vec<&str>>();
+    let logs = log_lines.join("\n").into_text().unwrap().on_black();
     let vertical_scroll = (logs.height() as u16)
-        .saturating_sub(rects[1].height)
+        .saturating_sub(rects[1].height.saturating_sub(2))
         .saturating_sub(state.vertical_scroll);
     frame.render_widget(
         Paragraph::new(logs.clone())
@@ -195,8 +198,8 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"));
 
-    let mut scrollbar_state =
-        ScrollbarState::new(log_lines.len()).position(vertical_scroll as usize);
+    let mut scrollbar_state = ScrollbarState::new(logs.height())
+        .position((logs.height()).saturating_sub(state.vertical_scroll as usize));
 
     frame.render_stateful_widget(
         scrollbar,
