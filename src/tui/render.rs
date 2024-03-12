@@ -54,7 +54,7 @@ pub(crate) fn handle_key_events(
         }
         KeyCode::Down => {
             if state.vertical_scroll > 1 {
-                state.vertical_scroll -= 5;
+                state.vertical_scroll = state.vertical_scroll.saturating_sub(5);
             }
         }
         KeyCode::Enter => sender
@@ -74,7 +74,7 @@ pub(crate) fn handle_mouse_events(
     match mouse_event.kind {
         MouseEventKind::ScrollDown => {
             if state.vertical_scroll > 1 {
-                state.vertical_scroll -= 5;
+                state.vertical_scroll = state.vertical_scroll.saturating_sub(5);
             }
         }
         MouseEventKind::ScrollUp => {
@@ -178,6 +178,11 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     let vertical_scroll = (logs.height() as u16)
         .saturating_sub(rects[1].height.saturating_sub(2))
         .saturating_sub(state.vertical_scroll);
+    if vertical_scroll == 0 {
+        state.vertical_scroll =
+            (logs.height() as u16).saturating_sub(rects[1].height.saturating_sub(2));
+    }
+
     frame.render_widget(
         Paragraph::new(logs.clone())
             .block(
@@ -198,8 +203,9 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .begin_symbol(Some("↑"))
         .end_symbol(Some("↓"));
 
-    let mut scrollbar_state = ScrollbarState::new(logs.height())
-        .position((logs.height()).saturating_sub(state.vertical_scroll as usize));
+    let mut scrollbar_state =
+        ScrollbarState::new(logs.height().saturating_sub(rects[1].height.into()))
+            .position(vertical_scroll.into());
 
     frame.render_stateful_widget(
         scrollbar,
