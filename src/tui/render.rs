@@ -102,10 +102,9 @@ pub(crate) fn handle_mouse_events(
 pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     frame.render_widget(
         Block::new()
-            .title_top("rattler-build-tui")
-            .title_bottom(env!("CARGO_PKG_VERSION"))
-            .title_alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Yellow)),
+            .title_top(Line::from("rattler-build-tui").style(Style::default().bold()))
+            .title_bottom(Line::from(env!("CARGO_PKG_VERSION")).style(Style::default().italic()))
+            .title_alignment(Alignment::Center),
         frame.size(),
     );
     let rects = Layout::horizontal([Constraint::Percentage(20), Constraint::Percentage(80)])
@@ -114,9 +113,10 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     {
         frame.render_widget(
             Block::bordered()
-                .title_top("Packages")
+                .title_top("|Packages|".yellow())
                 .title_alignment(Alignment::Center)
-                .border_type(BorderType::Rounded),
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
             rects[0],
         );
 
@@ -131,9 +131,9 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     Block::bordered()
                         .border_type(BorderType::Rounded)
                         .border_style({
-                            let mut style = Style::new();
-                            if package.is_hovered {
-                                style = style.white()
+                            let mut style = Style::default().fg(Color::Rgb(100, 100, 100));
+                            if package.is_hovered && !package.build_progress.is_building() {
+                                style = style.yellow()
                             } else if state.selected_package == i {
                                 if package.build_progress.is_building() {
                                     style = style.green()
@@ -187,13 +187,18 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         Paragraph::new(logs.clone())
             .block(
                 Block::bordered()
-                    .title_top(match state.packages.get(state.selected_package) {
-                        Some(package) => {
-                            format!("Build Logs for {}", package.name)
+                    .title_top(
+                        match state.packages.get(state.selected_package) {
+                            Some(package) => {
+                                format!("|Build Logs for {}|", package.name)
+                            }
+                            None => String::from("|Build Logs|"),
                         }
-                        None => String::from("Build Logs"),
-                    })
-                    .border_type(BorderType::Rounded),
+                        .yellow(),
+                    )
+                    .title_alignment(Alignment::Left)
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
             )
             .scroll((vertical_scroll, 0)),
         rects[1],
