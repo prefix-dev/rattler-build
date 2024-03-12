@@ -147,14 +147,18 @@ pub async fn run<B: Backend>(
                 state.packages = packages.clone();
             }
             Event::StartBuild(index) => {
-                state.selected_package = index;
-                state.packages[index].build_progress = BuildProgress::Building;
-                let build_output = state.build_output.clone().unwrap();
-                let log_sender = tui.event_handler.sender.clone();
-                tokio::spawn(async move {
-                    run_build_from_args(build_output).await.unwrap();
-                    log_sender.send(Event::FinishBuild).unwrap();
-                });
+                if !state.is_building_package() {
+                    state.selected_package = index;
+                    state.packages[index].build_progress = BuildProgress::Building;
+                    let build_output = state.build_output.clone().unwrap();
+                    let log_sender = tui.event_handler.sender.clone();
+                    tokio::spawn(async move {
+                        run_build_from_args(build_output).await.unwrap();
+                        log_sender.send(Event::FinishBuild).unwrap();
+                    });
+                } else {
+                    // TODO: show a popup message
+                }
             }
             Event::BuildLog(log) => {
                 if let Some(building_package) = state
