@@ -79,18 +79,19 @@ impl TuiState {
     pub async fn resolve_packages(&self) -> miette::Result<(BuildOutput, Vec<Package>)> {
         let build_output =
             get_build_output(self.build_opts.clone(), self.log_handler.clone()).await?;
-        let packages = build_output
-            .outputs
-            .iter()
-            .map(|output| Package {
-                name: output.name().as_normalized().to_string(),
-                build_progress: BuildProgress::None,
-                build_log: Vec::new(),
-                spinner_state: ThrobberState::default(),
-                area: Rect::default(),
-                is_hovered: false,
-            })
-            .collect();
+        let packages = vec![Package {
+            name: build_output
+                .outputs
+                .iter()
+                .map(|output| output.name().as_normalized().to_string())
+                .collect::<Vec<String>>()
+                .join(", "),
+            build_progress: BuildProgress::None,
+            build_log: Vec::new(),
+            spinner_state: ThrobberState::default(),
+            area: Rect::default(),
+            is_hovered: false,
+        }];
         Ok((build_output, packages))
     }
 
