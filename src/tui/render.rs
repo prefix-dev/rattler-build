@@ -232,11 +232,11 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .collect::<Vec<&str>>();
     let logs = log_lines.join("\n").into_text().unwrap().on_black();
     let vertical_scroll = (logs.height() as u16)
-        .saturating_sub(rects[1].height.saturating_sub(2))
+        .saturating_sub(rects[1].height.saturating_sub(3))
         .saturating_sub(state.vertical_scroll);
     if vertical_scroll == 0 {
         state.vertical_scroll =
-            (logs.height() as u16).saturating_sub(rects[1].height.saturating_sub(2));
+            (logs.height() as u16).saturating_sub(rects[1].height.saturating_sub(3));
     }
 
     frame.render_widget(
