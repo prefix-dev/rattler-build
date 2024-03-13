@@ -20,7 +20,7 @@ const KEY_BINDINGS: &[(&str, &str)] = &[
     ("q", "Quit"),
     ("j", "Next"),
     ("k", "Prev"),
-    ("↕", "Scroll"),
+    ("↕ ↔ ", "Scroll"),
 ];
 
 /// Handles the key events and updates the state.
@@ -66,6 +66,12 @@ pub(crate) fn handle_key_events(
                 state.vertical_scroll = state.vertical_scroll.saturating_sub(5);
             }
         }
+        KeyCode::Right => {
+            state.horizontal_scroll += 5;
+        }
+        KeyCode::Left => {
+            state.horizontal_scroll = state.horizontal_scroll.saturating_sub(5);
+        }
         KeyCode::Enter => sender
             .send(Event::StartBuild(state.selected_package))
             .into_diagnostic()?,
@@ -88,6 +94,12 @@ pub(crate) fn handle_mouse_events(
         }
         MouseEventKind::ScrollUp => {
             state.vertical_scroll += 5;
+        }
+        MouseEventKind::ScrollRight => {
+            state.horizontal_scroll += 5;
+        }
+        MouseEventKind::ScrollLeft => {
+            state.horizontal_scroll = state.horizontal_scroll.saturating_sub(5);
         }
         MouseEventKind::Moved => {
             let p = Position::new(mouse_event.column, mouse_event.row);
@@ -244,7 +256,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     .border_type(BorderType::Rounded)
                     .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
             )
-            .scroll((vertical_scroll, 0)),
+            .scroll((vertical_scroll, state.horizontal_scroll)),
         rects[1],
     );
 
@@ -261,6 +273,33 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         rects[1].inner(&Margin {
             vertical: 1,
             horizontal: 0,
+        }),
+        &mut scrollbar_state,
+    );
+
+    let scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+        .thumb_symbol("🬋")
+        .begin_symbol(Some("←"))
+        .end_symbol(Some("→"));
+
+    let max_width = logs
+        .lines
+        .iter()
+        .map(|l| l.width())
+        .max()
+        .unwrap_or_default();
+    let content_length = max_width.saturating_sub(rects[1].width.saturating_sub(2).into());
+    if content_length == 0 {
+        state.horizontal_scroll = 0;
+    }
+    let mut scrollbar_state =
+        ScrollbarState::new(content_length).position(state.horizontal_scroll.into());
+
+    frame.render_stateful_widget(
+        scrollbar,
+        rects[1].inner(&Margin {
+            vertical: 0,
+            horizontal: 1,
         }),
         &mut scrollbar_state,
     );

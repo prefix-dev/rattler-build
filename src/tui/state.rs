@@ -58,6 +58,8 @@ pub(crate) struct TuiState {
     pub selected_package: usize,
     /// Vertical scroll value.
     pub vertical_scroll: u16,
+    /// Horizontal scroll value.
+    pub horizontal_scroll: u16,
     /// Application log.
     pub log: Vec<String>,
 }
@@ -73,6 +75,7 @@ impl TuiState {
             packages: Vec::new(),
             selected_package: 0,
             vertical_scroll: 0,
+            horizontal_scroll: 0,
             log: Vec::new(),
         }
     }
