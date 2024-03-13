@@ -14,6 +14,15 @@ use ratatui::{
 };
 use tokio::sync::mpsc;
 
+/// Key bindings.
+const KEY_BINDINGS: &[(&str, &str)] = &[
+    ("Enter", "Build"),
+    ("q", "Quit"),
+    ("j", "Next"),
+    ("k", "Prev"),
+    ("↕", "Scroll"),
+];
+
 /// Handles the key events and updates the state.
 pub(crate) fn handle_key_events(
     key_event: KeyEvent,
@@ -103,13 +112,48 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
     frame.render_widget(
         Block::new()
             .title_top(Line::from("rattler-build-tui").style(Style::default().bold()))
-            .title_bottom(Line::from(env!("CARGO_PKG_VERSION")).style(Style::default().italic()))
             .title_alignment(Alignment::Center),
         frame.size(),
     );
-    let rects = Layout::horizontal([Constraint::Percentage(20), Constraint::Percentage(80)])
+    let rects = Layout::vertical([Constraint::Percentage(100), Constraint::Min(3)])
         .margin(1)
         .split(frame.size());
+    frame.render_widget(
+        Paragraph::new(
+            Line::default()
+                .spans(
+                    KEY_BINDINGS
+                        .iter()
+                        .flat_map(|(key, desc)| {
+                            vec![
+                                "<".fg(Color::Rgb(100, 100, 100)),
+                                key.yellow(),
+                                ": ".fg(Color::Rgb(100, 100, 100)),
+                                Span::from(*desc),
+                                "> ".fg(Color::Rgb(100, 100, 100)),
+                            ]
+                        })
+                        .collect::<Vec<Span>>(),
+                )
+                .alignment(Alignment::Center),
+        )
+        .block(
+            Block::bordered()
+                .title_bottom(Line::from(format!("|{}|", env!("CARGO_PKG_VERSION"))))
+                .title_alignment(Alignment::Right)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
+        ),
+        rects[1],
+    );
+    frame.render_widget(
+        Block::new()
+            .title_top(Line::from("rattler-build-tui").style(Style::default().bold()))
+            .title_alignment(Alignment::Center),
+        rects[0],
+    );
+    let rects = Layout::horizontal([Constraint::Percentage(20), Constraint::Percentage(80)])
+        .split(rects[0]);
     {
         frame.render_widget(
             Block::bordered()
