@@ -4,7 +4,7 @@ pub mod event;
 pub mod logger;
 mod render;
 mod state;
-mod util;
+mod utils;
 
 use event::*;
 use render::*;
@@ -24,7 +24,7 @@ use crate::console_utils::LoggingOutputHandler;
 use crate::opt::BuildOpts;
 use crate::{get_recipe_path, run_build_from_args};
 
-use self::util::run_editor;
+use self::utils::run_editor;
 
 /// Representation of a terminal user interface.
 ///
