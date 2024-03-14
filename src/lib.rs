@@ -40,7 +40,7 @@ use rattler_conda_types::{package::ArchiveType, Platform};
 use std::{
     collections::BTreeMap,
     env::current_dir,
-    path::PathBuf,
+    path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
 };
@@ -85,32 +85,31 @@ pub struct BuildOutput {
     pub outputs: Vec<metadata::Output>,
     /// Tool configuration.
     pub tool_config: tool_configuration::Configuration,
+    /// Recipe path.
+    pub recipe_path: PathBuf,
 }
 
-/// Returns the output for the build.
-pub async fn get_build_output(
-    args: BuildOpts,
-    fancy_log_handler: LoggingOutputHandler,
-) -> miette::Result<BuildOutput> {
-    let recipe_path = canonicalize(&args.recipe);
+/// Returns the recipe path.
+pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
+    let recipe_path = canonicalize(&path);
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
                 return Err(miette::miette!(
                     "The file {} could not be found.",
-                    args.recipe.to_string_lossy()
+                    path.to_string_lossy()
                 ));
             }
             std::io::ErrorKind::PermissionDenied => {
                 return Err(miette::miette!(
                     "Permission denied when trying to access the file {}.",
-                    args.recipe.to_string_lossy()
+                    path.to_string_lossy()
                 ));
             }
             _ => {
                 return Err(miette::miette!(
                     "An unknown error occurred while trying to access the file {}: {:?}",
-                    args.recipe.to_string_lossy(),
+                    path.to_string_lossy(),
                     e
                 ));
             }
@@ -126,11 +125,20 @@ pub async fn get_build_output(
         } else {
             return Err(miette::miette!(
                 "'recipe.yaml' not found in the directory {}",
-                args.recipe.to_string_lossy()
+                path.to_string_lossy()
             ));
         }
     }
 
+    Ok(recipe_path)
+}
+
+/// Returns the output for the build.
+pub async fn get_build_output(
+    args: BuildOpts,
+    recipe_path: PathBuf,
+    fancy_log_handler: LoggingOutputHandler,
+) -> miette::Result<BuildOutput> {
     let output_dir = args
         .common
         .output_dir
@@ -307,6 +315,7 @@ pub async fn get_build_output(
     Ok(BuildOutput {
         outputs,
         tool_config,
+        recipe_path,
     })
 }
 

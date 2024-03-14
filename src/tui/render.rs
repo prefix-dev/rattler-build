@@ -1,7 +1,10 @@
 use super::event::Event;
 use super::state::TuiState;
 use ansi_to_tui::IntoText;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{
+    Event as CrosstermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
+    MouseEventKind,
+};
 use miette::IntoDiagnostic;
 use ratatui::layout::Position;
 use ratatui::prelude::*;
@@ -13,6 +16,7 @@ use ratatui::{
     Frame,
 };
 use tokio::sync::mpsc;
+use tui_input::backend::crossterm::EventHandler;
 
 /// Key bindings.
 const KEY_BINDINGS: &[(&str, &str)] = &[
@@ -21,6 +25,8 @@ const KEY_BINDINGS: &[(&str, &str)] = &[
     ("j", "Next"),
     ("k", "Prev"),
     ("↕ ↔ ", "Scroll"),
+    ("e", "Edit Recipe"),
+    ("c", "Console"),
 ];
 
 /// Handles the key events and updates the state.
@@ -29,13 +35,40 @@ pub(crate) fn handle_key_events(
     sender: mpsc::UnboundedSender<Event>,
     state: &mut TuiState,
 ) -> miette::Result<()> {
+    if state.input_mode {
+        match key_event.code {
+            KeyCode::Enter => sender.send(Event::HandleInput).into_diagnostic()?,
+            KeyCode::Esc => {
+                state.input_mode = false;
+            }
+            KeyCode::Char('c') | KeyCode::Char('C') => {
+                if key_event.modifiers == KeyModifiers::CONTROL {
+                    state.input_mode = false;
+                } else {
+                    state.input.handle_event(&CrosstermEvent::Key(key_event));
+                }
+            }
+            _ => {
+                state.input.handle_event(&CrosstermEvent::Key(key_event));
+
+                std::thread::sleep(std::time::Duration::from_millis(400));
+            }
+        }
+        return Ok(());
+    }
     match key_event.code {
         KeyCode::Esc | KeyCode::Char('q') => {
-            state.quit();
+            if state.input_mode {
+                state.input_mode = false;
+            } else {
+                state.quit();
+            }
         }
         KeyCode::Char('c') | KeyCode::Char('C') => {
             if key_event.modifiers == KeyModifiers::CONTROL {
                 state.quit();
+            } else {
+                state.input_mode = false;
             }
         }
         KeyCode::Char('j') => {
@@ -75,6 +108,7 @@ pub(crate) fn handle_key_events(
         KeyCode::Enter => sender
             .send(Event::StartBuild(state.selected_package))
             .into_diagnostic()?,
+        KeyCode::Char('e') => sender.send(Event::EditRecipe).into_diagnostic()?,
         _ => {}
     }
     Ok(())
@@ -239,6 +273,26 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             (logs.height() as u16).saturating_sub(rects[1].height.saturating_sub(3));
     }
 
+    let logs_rect = if state.input_mode {
+        let rects =
+            Layout::vertical([Constraint::Percentage(100), Constraint::Min(3)]).split(rects[1]);
+        frame.render_widget(
+            Paragraph::new(Line::from(vec!["> ".yellow(), state.input.value().into()])).block(
+                Block::bordered()
+                    .border_type(BorderType::Rounded)
+                    .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
+            ),
+            rects[1],
+        );
+        frame.set_cursor(
+            rects[1].x + state.input.visual_cursor() as u16 + 3,
+            rects[1].y + 1,
+        );
+        rects[0]
+    } else {
+        rects[1]
+    };
+
     frame.render_widget(
         Paragraph::new(logs.clone())
             .block(
@@ -257,7 +311,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     .border_style(Style::default().fg(Color::Rgb(100, 100, 100))),
             )
             .scroll((vertical_scroll, state.horizontal_scroll)),
-        rects[1],
+        logs_rect,
     );
 
     let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
@@ -265,12 +319,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .end_symbol(Some("↓"));
 
     let mut scrollbar_state =
-        ScrollbarState::new(logs.height().saturating_sub(rects[1].height.into()))
+        ScrollbarState::new(logs.height().saturating_sub(logs_rect.height.into()))
             .position(vertical_scroll.into());
 
     frame.render_stateful_widget(
         scrollbar,
-        rects[1].inner(&Margin {
+        logs_rect.inner(&Margin {
             vertical: 1,
             horizontal: 0,
         }),
@@ -288,7 +342,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         .map(|l| l.width())
         .max()
         .unwrap_or_default();
-    let content_length = max_width.saturating_sub(rects[1].width.saturating_sub(2).into());
+    let content_length = max_width.saturating_sub(logs_rect.width.saturating_sub(2).into());
     if content_length == 0 {
         state.horizontal_scroll = 0;
     }
@@ -297,7 +351,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
 
     frame.render_stateful_widget(
         scrollbar,
-        rects[1].inner(&Margin {
+        logs_rect.inner(&Margin {
             vertical: 0,
             horizontal: 1,
         }),

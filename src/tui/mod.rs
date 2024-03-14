@@ -4,6 +4,7 @@ pub mod event;
 pub mod logger;
 mod render;
 mod state;
+mod util;
 
 use event::*;
 use render::*;
@@ -17,10 +18,13 @@ use ratatui::prelude::*;
 use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
+use std::sync::atomic::Ordering;
 
 use crate::console_utils::LoggingOutputHandler;
 use crate::opt::BuildOpts;
-use crate::run_build_from_args;
+use crate::{get_recipe_path, run_build_from_args};
+
+use self::util::run_editor;
 
 /// Representation of a terminal user interface.
 ///
@@ -32,6 +36,8 @@ pub struct Tui<B: Backend> {
     terminal: Terminal<B>,
     /// Terminal event handler.
     pub event_handler: EventHandler,
+    /// Is the interface paused?
+    pub paused: bool,
 }
 
 impl<B: Backend> Tui<B> {
@@ -40,6 +46,7 @@ impl<B: Backend> Tui<B> {
         Self {
             terminal,
             event_handler,
+            paused: false,
         }
     }
 
@@ -72,6 +79,23 @@ impl<B: Backend> Tui<B> {
         Ok(())
     }
 
+    /// Toggles the paused state of interface.
+    ///
+    /// It disables the key input and exits the
+    /// terminal interface on pause (and vice-versa).
+    pub fn toggle_pause(&mut self) -> miette::Result<()> {
+        self.paused = !self.paused;
+        if self.paused {
+            Self::reset()?;
+        } else {
+            self.init()?;
+        }
+        self.event_handler
+            .key_input_disabled
+            .store(self.paused, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// Resets the terminal interface.
     ///
     /// This function is also used for the panic hook to revert
@@ -79,6 +103,10 @@ impl<B: Backend> Tui<B> {
     fn reset() -> miette::Result<()> {
         terminal::disable_raw_mode().into_diagnostic()?;
         crossterm::execute!(io::stderr(), LeaveAlternateScreen, DisableMouseCapture)
+            .into_diagnostic()?;
+        Terminal::new(CrosstermBackend::new(io::stderr()))
+            .into_diagnostic()?
+            .show_cursor()
             .into_diagnostic()?;
         Ok(())
     }
@@ -109,13 +137,16 @@ pub async fn run<B: Backend>(
     opts: BuildOpts,
     log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
+    // Get the recipe.
+    let recipe_path = get_recipe_path(&opts.recipe)?;
+
     // Create an application.
     let mut state = TuiState::new(opts, log_handler);
 
     // Resolve the packages to build.
     tui.event_handler
         .sender
-        .send(Event::ResolvePackages)
+        .send(Event::ResolvePackages(recipe_path))
         .into_diagnostic()?;
 
     // Start the main loop.
@@ -132,11 +163,11 @@ pub async fn run<B: Backend>(
                 handle_mouse_events(mouse_event, tui.event_handler.sender.clone(), &mut state)?
             }
             Event::Resize(_, _) => {}
-            Event::ResolvePackages => {
+            Event::ResolvePackages(recipe_path) => {
                 let log_sender = tui.event_handler.sender.clone();
                 let state = state.clone();
                 tokio::spawn(async move {
-                    let resolved = state.resolve_packages().await.unwrap();
+                    let resolved = state.resolve_packages(recipe_path).await.unwrap();
                     log_sender
                         .send(Event::ProcessResolvedPackages(resolved.0, resolved.1))
                         .unwrap();
@@ -179,6 +210,28 @@ pub async fn run<B: Backend>(
             }
             Event::HandleBuildError(_) => {
                 state.packages[state.selected_package].build_progress = BuildProgress::Failed;
+            }
+            Event::HandleInput => {
+                state.input_mode = false;
+                if state.input.value() == "edit" {
+                    tui.event_handler
+                        .sender
+                        .send(Event::EditRecipe)
+                        .into_diagnostic()?;
+                }
+                state.input.reset();
+            }
+            Event::EditRecipe => {
+                state.input_mode = false;
+                state.input.reset();
+                let build_output = state.build_output.clone().unwrap();
+                tui.toggle_pause()?;
+                run_editor(&build_output.recipe_path)?;
+                tui.event_handler
+                    .sender
+                    .send(Event::ResolvePackages(build_output.recipe_path))
+                    .into_diagnostic()?;
+                tui.toggle_pause()?;
             }
         }
     }

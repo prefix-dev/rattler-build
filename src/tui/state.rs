@@ -1,5 +1,8 @@
+use std::path::PathBuf;
+
 use ratatui::{layout::Rect, style::Color};
 use throbber_widgets_tui::ThrobberState;
+use tui_input::Input;
 
 use crate::{console_utils::LoggingOutputHandler, get_build_output, opt::BuildOpts, BuildOutput};
 
@@ -62,6 +65,10 @@ pub(crate) struct TuiState {
     pub horizontal_scroll: u16,
     /// Application log.
     pub log: Vec<String>,
+    /// Is the input mode enabled?
+    pub input_mode: bool,
+    /// Current value of the prompt input.
+    pub input: Input,
 }
 
 impl TuiState {
@@ -77,13 +84,22 @@ impl TuiState {
             vertical_scroll: 0,
             horizontal_scroll: 0,
             log: Vec::new(),
+            input_mode: false,
+            input: Input::default(),
         }
     }
 
     /// Resolves and returns the packages to build.
-    pub async fn resolve_packages(&self) -> miette::Result<(BuildOutput, Vec<Package>)> {
-        let build_output =
-            get_build_output(self.build_opts.clone(), self.log_handler.clone()).await?;
+    pub async fn resolve_packages(
+        &self,
+        recipe_path: PathBuf,
+    ) -> miette::Result<(BuildOutput, Vec<Package>)> {
+        let build_output = get_build_output(
+            self.build_opts.clone(),
+            recipe_path,
+            self.log_handler.clone(),
+        )
+        .await?;
         let packages = vec![Package {
             name: build_output
                 .outputs

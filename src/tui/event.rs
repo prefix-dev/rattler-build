@@ -3,12 +3,18 @@
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use miette::IntoDiagnostic;
-use std::time::Duration;
+use std::{
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::mpsc;
 
-use crate::BuildOutput;
-
 use super::state::Package;
+use crate::BuildOutput;
 
 /// Terminal events.
 pub enum Event {
@@ -21,7 +27,7 @@ pub enum Event {
     /// Terminal resize.
     Resize(u16, u16),
     /// Resolves packages to build.
-    ResolvePackages,
+    ResolvePackages(PathBuf),
     /// Handles the result of resolving packages.
     ProcessResolvedPackages(BuildOutput, Vec<Package>),
     /// Start building.
@@ -32,6 +38,10 @@ pub enum Event {
     FinishBuild,
     /// Handle build error.
     HandleBuildError(miette::Error),
+    /// Handle console input.
+    HandleInput,
+    /// Edit recipe.
+    EditRecipe,
 }
 
 /// Terminal event handler.
@@ -44,6 +54,8 @@ pub struct EventHandler {
     receiver: mpsc::UnboundedReceiver<Event>,
     /// Event handler thread.
     handler: tokio::task::JoinHandle<()>,
+    /// Is the key input disabled?
+    pub key_input_disabled: Arc<AtomicBool>,
 }
 
 impl EventHandler {
@@ -52,10 +64,15 @@ impl EventHandler {
         let tick_rate = Duration::from_millis(tick_rate);
         let (sender, receiver) = mpsc::unbounded_channel();
         let _sender = sender.clone();
+        let key_input_disabled = Arc::new(AtomicBool::new(false));
+        let key_input_disabled_cloned = Arc::clone(&key_input_disabled);
         let handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
             let mut tick = tokio::time::interval(tick_rate);
             loop {
+                if key_input_disabled_cloned.load(Ordering::Relaxed) {
+                    continue;
+                }
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
@@ -90,6 +107,7 @@ impl EventHandler {
             sender,
             receiver,
             handler,
+            key_input_disabled,
         }
     }
 
