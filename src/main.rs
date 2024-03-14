@@ -70,9 +70,13 @@ async fn main() -> miette::Result<()> {
         }
         #[cfg(not(feature = "tui"))]
         Some(SubCommands::Build(build_args)) => {
-            let build_output =
-                get_build_output(build_args, log_handler.expect("logger is not initialized"))
-                    .await?;
+            let recipe_path = get_recipe_path(&build_args.recipe)?;
+            let build_output = get_build_output(
+                build_args,
+                recipe_path,
+                log_handler.expect("logger is not initialized"),
+            )
+            .await?;
             run_build_from_args(build_output).await
         }
         Some(SubCommands::Test(test_args)) => {
