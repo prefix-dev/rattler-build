@@ -91,7 +91,7 @@ pub struct BuildOutput {
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
-    let recipe_path = canonicalize(&path);
+    let recipe_path = canonicalize(path);
     if let Err(e) = &recipe_path {
         match e.kind() {
             std::io::ErrorKind::NotFound => {
