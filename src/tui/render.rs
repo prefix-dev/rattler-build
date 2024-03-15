@@ -50,8 +50,6 @@ pub(crate) fn handle_key_events(
             }
             _ => {
                 state.input.handle_event(&CrosstermEvent::Key(key_event));
-
-                std::thread::sleep(std::time::Duration::from_millis(400));
             }
         }
         return Ok(());
@@ -68,7 +66,7 @@ pub(crate) fn handle_key_events(
             if key_event.modifiers == KeyModifiers::CONTROL {
                 state.quit();
             } else {
-                state.input_mode = false;
+                state.input_mode = true;
             }
         }
         KeyCode::Char('j') => {
@@ -108,6 +106,10 @@ pub(crate) fn handle_key_events(
         KeyCode::Enter => sender
             .send(Event::StartBuild(state.selected_package))
             .into_diagnostic()?,
+        KeyCode::Char(':') => {
+            state.input.reset();
+            state.input_mode = true;
+        }
         KeyCode::Char('e') => sender.send(Event::EditRecipe).into_diagnostic()?,
         _ => {}
     }
