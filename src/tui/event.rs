@@ -3,15 +3,9 @@
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use miette::IntoDiagnostic;
-use std::{
-    path::PathBuf,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 use super::state::Package;
 use crate::BuildOutput;
@@ -48,34 +42,48 @@ pub enum Event {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct EventHandler {
+    /// Tick rate.
+    tick_rate: Duration,
     /// Event sender channel.
     pub sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
     /// Event handler thread.
     handler: tokio::task::JoinHandle<()>,
-    /// Is the key input disabled?
-    pub key_input_disabled: Arc<AtomicBool>,
+    /// Token for cancelling the event loop.
+    cancellation_token: CancellationToken,
 }
 
 impl EventHandler {
     /// Constructs a new instance.
     pub fn new(tick_rate: u64) -> Self {
-        let tick_rate = Duration::from_millis(tick_rate);
         let (sender, receiver) = mpsc::unbounded_channel();
-        let _sender = sender.clone();
-        let key_input_disabled = Arc::new(AtomicBool::new(false));
-        let key_input_disabled_cloned = Arc::clone(&key_input_disabled);
-        let handler = tokio::spawn(async move {
+        Self {
+            tick_rate: Duration::from_millis(tick_rate),
+            sender,
+            receiver,
+            handler: tokio::spawn(async {}),
+            cancellation_token: CancellationToken::new(),
+        }
+    }
+
+    /// Starts the event loop.
+    pub fn start(&mut self) {
+        self.cancel();
+        self.cancellation_token = CancellationToken::new();
+        let _cancellation_token = self.cancellation_token.clone();
+        let _sender = self.sender.clone();
+        let _tick_rate = self.tick_rate;
+        self.handler = tokio::spawn(async move {
             let mut reader = crossterm::event::EventStream::new();
-            let mut tick = tokio::time::interval(tick_rate);
+            let mut tick = tokio::time::interval(_tick_rate);
             loop {
-                if key_input_disabled_cloned.load(Ordering::Relaxed) {
-                    continue;
-                }
                 let tick_delay = tick.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
+                  _ = _cancellation_token.cancelled() => {
+                    break;
+                  }
                   _ = tick_delay => {
                     _sender.send(Event::Tick).unwrap();
                   }
@@ -103,12 +111,11 @@ impl EventHandler {
                 };
             }
         });
-        Self {
-            sender,
-            receiver,
-            handler,
-            key_input_disabled,
-        }
+    }
+
+    /// Cancels the event loop.
+    pub fn cancel(&self) {
+        self.cancellation_token.cancel();
     }
 
     /// Receive the next event from the handler thread.

@@ -18,7 +18,6 @@ use ratatui::prelude::*;
 use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
-use std::sync::atomic::Ordering;
 
 use crate::console_utils::LoggingOutputHandler;
 use crate::opt::BuildOpts;
@@ -68,6 +67,7 @@ impl<B: Backend> Tui<B> {
 
         self.terminal.hide_cursor().into_diagnostic()?;
         self.terminal.clear().into_diagnostic()?;
+        self.event_handler.start();
         Ok(())
     }
 
@@ -87,12 +87,11 @@ impl<B: Backend> Tui<B> {
         self.paused = !self.paused;
         if self.paused {
             Self::reset()?;
+            self.event_handler.cancel();
         } else {
             self.init()?;
+            self.event_handler.start();
         }
-        self.event_handler
-            .key_input_disabled
-            .store(self.paused, Ordering::Relaxed);
         Ok(())
     }
 
