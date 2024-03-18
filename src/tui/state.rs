@@ -100,19 +100,18 @@ impl TuiState {
             self.log_handler.clone(),
         )
         .await?;
-        let packages = vec![Package {
-            name: build_output
-                .outputs
-                .iter()
-                .map(|output| output.name().as_normalized().to_string())
-                .collect::<Vec<String>>()
-                .join(", "),
-            build_progress: BuildProgress::None,
-            build_log: Vec::new(),
-            spinner_state: ThrobberState::default(),
-            area: Rect::default(),
-            is_hovered: false,
-        }];
+        let packages = build_output
+            .outputs
+            .iter()
+            .map(|output| Package {
+                name: output.name().as_normalized().to_string(),
+                build_progress: BuildProgress::None,
+                build_log: Vec::new(),
+                spinner_state: ThrobberState::default(),
+                area: Rect::default(),
+                is_hovered: false,
+            })
+            .collect();
         Ok((build_output, packages))
     }
 

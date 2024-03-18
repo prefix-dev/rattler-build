@@ -16,6 +16,11 @@ pub async fn run_build(
     output: Output,
     tool_configuration: tool_configuration::Configuration,
 ) -> miette::Result<(Output, PathBuf)> {
+    output
+        .build_configuration
+        .directories
+        .create_build_dir()
+        .into_diagnostic()?;
     if output.build_string().is_none() {
         miette::bail!("Build string is not set for {:?}", output.name());
     }

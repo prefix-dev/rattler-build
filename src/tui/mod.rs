@@ -19,9 +19,10 @@ use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
 
+use crate::build::run_build;
 use crate::console_utils::LoggingOutputHandler;
+use crate::get_recipe_path;
 use crate::opt::BuildOpts;
-use crate::{get_recipe_path, run_build_from_args};
 
 use self::utils::run_editor;
 
@@ -183,11 +184,23 @@ pub async fn run<B: Backend>(
                     let build_output = state.build_output.clone().unwrap();
                     let log_sender = tui.event_handler.sender.clone();
                     tokio::spawn(async move {
-                        if let Err(e) = run_build_from_args(build_output).await {
-                            log_sender.send(Event::HandleBuildError(e)).unwrap();
-                        } else {
-                            log_sender.send(Event::FinishBuild).unwrap();
-                        }
+                        let output = build_output.outputs[index].clone();
+                        match run_build(output, build_output.tool_config.clone()).await {
+                            Ok((output, _archive)) => {
+                                output.record_build_end();
+                                let span = tracing::info_span!("Build summary");
+                                let _enter = span.enter();
+                                let _ = output.log_build_summary().map_err(|e| {
+                                    tracing::error!("Error writing build summary: {}", e);
+                                    e
+                                });
+                                log_sender.send(Event::FinishBuild).unwrap();
+                            }
+                            Err(e) => {
+                                tracing::error!("Error building package: {}", e);
+                                log_sender.send(Event::HandleBuildError(e)).unwrap();
+                            }
+                        };
                     });
                 }
             }
