@@ -286,7 +286,7 @@ pub struct BuildSummary {
 
 /// A output. This is the central element that is passed to the `run_build` function
 /// and fully specifies all the options and settings to run the build.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
     pub recipe: Recipe,

@@ -79,7 +79,7 @@ pub struct DirectoryInfo {
 }
 
 /// Wrapper for multiple outputs.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BuildOutput {
     /// Build outputs.
     pub outputs: Vec<metadata::Output>,
