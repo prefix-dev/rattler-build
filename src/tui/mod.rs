@@ -192,7 +192,6 @@ pub async fn run<B: Backend>(
                         }
                     }
                     packages.push((index, package.clone()));
-                    state.selected_package = packages[0].0;
                     tokio::spawn(async move {
                         for (i, package) in packages {
                             log_sender
@@ -214,6 +213,7 @@ pub async fn run<B: Backend>(
                                 Err(e) => {
                                     tracing::error!("Error building package: {}", e);
                                     log_sender.send(Event::HandleBuildError(e, i)).unwrap();
+                                    break;
                                 }
                             };
                         }
@@ -221,6 +221,7 @@ pub async fn run<B: Backend>(
                 }
             }
             Event::SetBuildState(index, progress) => {
+                state.selected_package = index;
                 state.packages[index].build_progress = progress;
             }
             Event::BuildLog(log) => {
