@@ -246,6 +246,9 @@ pub async fn run<B: Backend>(
                         .sender
                         .send(Event::EditRecipe)
                         .into_diagnostic()?;
+                } else {
+                    tracing::error!("Unknown command: {}", state.input.value());
+                    tracing::info!("Available commands are: [edit]");
                 }
                 state.input.reset();
             }
