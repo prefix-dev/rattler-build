@@ -249,7 +249,10 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     item[0],
                     &mut package.spinner_state,
                 );
-                frame.render_widget(Paragraph::new(package.name.to_string()), item[1]);
+                frame.render_widget(
+                    Paragraph::new(package.identifier.clone().unwrap_or(package.name.clone())),
+                    item[1],
+                );
             }
         }
     }
