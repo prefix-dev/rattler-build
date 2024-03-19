@@ -179,30 +179,49 @@ pub async fn run<B: Backend>(
             }
             Event::StartBuild(index) => {
                 if !state.is_building_package() {
-                    state.selected_package = index;
-                    state.packages[index].build_progress = BuildProgress::Building;
+                    let package = state.packages[index].clone();
                     let build_output = state.build_output.clone().unwrap();
+                    let tool_config = build_output.tool_config.clone();
                     let log_sender = tui.event_handler.sender.clone();
+                    let mut packages = Vec::new();
+                    for subpackage in package.subpackages.iter() {
+                        if let Some(i) = state.packages.iter().position(|v| v.name == *subpackage) {
+                            packages.push((i, state.packages[i].clone()));
+                        } else {
+                            tracing::error!("Cannot find subpackage to build: {subpackage}")
+                        }
+                    }
+                    packages.push((index, package.clone()));
+                    state.selected_package = packages[0].0;
                     tokio::spawn(async move {
-                        let output = build_output.outputs[index].clone();
-                        match run_build(output, build_output.tool_config.clone()).await {
-                            Ok((output, _archive)) => {
-                                output.record_build_end();
-                                let span = tracing::info_span!("Build summary");
-                                let _enter = span.enter();
-                                let _ = output.log_build_summary().map_err(|e| {
-                                    tracing::error!("Error writing build summary: {}", e);
-                                    e
-                                });
-                                log_sender.send(Event::FinishBuild).unwrap();
-                            }
-                            Err(e) => {
-                                tracing::error!("Error building package: {}", e);
-                                log_sender.send(Event::HandleBuildError(e)).unwrap();
-                            }
-                        };
+                        for (i, package) in packages {
+                            log_sender
+                                .send(Event::SetBuildState(i, BuildProgress::Building))
+                                .unwrap();
+                            match run_build(package.output, &tool_config).await {
+                                Ok((output, _archive)) => {
+                                    output.record_build_end();
+                                    let span = tracing::info_span!("Build summary");
+                                    let _enter = span.enter();
+                                    let _ = output.log_build_summary().map_err(|e| {
+                                        tracing::error!("Error writing build summary: {}", e);
+                                        e
+                                    });
+                                    log_sender
+                                        .send(Event::SetBuildState(i, BuildProgress::Done))
+                                        .unwrap();
+                                }
+                                Err(e) => {
+                                    tracing::error!("Error building package: {}", e);
+                                    log_sender.send(Event::HandleBuildError(e, i)).unwrap();
+                                }
+                            };
+                        }
                     });
                 }
+            }
+            Event::SetBuildState(index, progress) => {
+                state.packages[index].build_progress = progress;
             }
             Event::BuildLog(log) => {
                 if let Some(building_package) = state
@@ -217,11 +236,8 @@ pub async fn run<B: Backend>(
                     state.log.push(String::from_utf8_lossy(&log).to_string());
                 }
             }
-            Event::FinishBuild => {
-                state.packages[state.selected_package].build_progress = BuildProgress::Done;
-            }
-            Event::HandleBuildError(_) => {
-                state.packages[state.selected_package].build_progress = BuildProgress::Failed;
+            Event::HandleBuildError(_, i) => {
+                state.packages[i].build_progress = BuildProgress::Failed;
             }
             Event::HandleInput => {
                 state.input_mode = false;

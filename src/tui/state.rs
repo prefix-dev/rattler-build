@@ -4,17 +4,22 @@ use ratatui::{layout::Rect, style::Color};
 use throbber_widgets_tui::ThrobberState;
 use tui_input::Input;
 
-use crate::{console_utils::LoggingOutputHandler, get_build_output, opt::BuildOpts, BuildOutput};
+use crate::{
+    console_utils::LoggingOutputHandler, get_build_output, metadata::Output, opt::BuildOpts,
+    BuildOutput,
+};
 
 /// Representation of a package.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct Package {
     pub name: String,
+    pub subpackages: Vec<String>,
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
     pub spinner_state: ThrobberState,
     pub area: Rect,
     pub is_hovered: bool,
+    pub output: Output,
 }
 
 /// Build progress.
@@ -103,13 +108,24 @@ impl TuiState {
         let packages = build_output
             .outputs
             .iter()
-            .map(|output| Package {
-                name: output.name().as_normalized().to_string(),
-                build_progress: BuildProgress::None,
-                build_log: Vec::new(),
-                spinner_state: ThrobberState::default(),
-                area: Rect::default(),
-                is_hovered: false,
+            .map(|output| {
+                let name = output.name().as_normalized().to_string();
+                Package {
+                    name: name.clone(),
+                    subpackages: output
+                        .build_configuration
+                        .subpackages
+                        .keys()
+                        .map(|v| v.as_normalized().to_string())
+                        .filter(|v| v != &name)
+                        .collect(),
+                    build_progress: BuildProgress::None,
+                    build_log: Vec::new(),
+                    spinner_state: ThrobberState::default(),
+                    area: Rect::default(),
+                    is_hovered: false,
+                    output: output.clone(),
+                }
             })
             .collect();
         Ok((build_output, packages))

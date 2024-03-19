@@ -323,7 +323,7 @@ pub async fn get_build_output(
 pub async fn run_build_from_args(build_output: BuildOutput) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
     for output in build_output.outputs {
-        let output = match run_build(output, build_output.tool_config.clone()).await {
+        let output = match run_build(output, &build_output.tool_config).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output
@@ -441,7 +441,7 @@ pub async fn rebuild_from_args(
         .recreate_directories()
         .into_diagnostic()?;
 
-    run_build(output, tool_config.clone()).await?;
+    run_build(output, &tool_config).await?;
 
     Ok(())
 }

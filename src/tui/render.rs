@@ -70,26 +70,22 @@ pub(crate) fn handle_key_events(
             }
         }
         KeyCode::Char('j') => {
-            if !state.is_building_package() {
-                state.vertical_scroll = 0;
-                state.selected_package = if state.selected_package >= state.packages.len() - 1 {
-                    0
-                } else {
-                    state.selected_package + 1
-                }
+            state.vertical_scroll = 0;
+            state.selected_package = if state.selected_package >= state.packages.len() - 1 {
+                0
+            } else {
+                state.selected_package + 1
             }
         }
         KeyCode::Up => {
             state.vertical_scroll += 5;
         }
         KeyCode::Char('k') => {
-            if !state.is_building_package() {
-                state.vertical_scroll = 0;
-                state.selected_package = if state.selected_package == 0 {
-                    state.packages.len() - 1
-                } else {
-                    state.selected_package - 1
-                }
+            state.vertical_scroll = 0;
+            state.selected_package = if state.selected_package == 0 {
+                state.packages.len() - 1
+            } else {
+                state.selected_package - 1
             }
         }
         KeyCode::Down => {

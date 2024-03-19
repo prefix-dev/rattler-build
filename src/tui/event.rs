@@ -7,7 +7,7 @@ use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::state::Package;
+use super::state::{BuildProgress, Package};
 use crate::BuildOutput;
 
 /// Terminal events.
@@ -26,12 +26,12 @@ pub enum Event {
     ProcessResolvedPackages(BuildOutput, Vec<Package>),
     /// Start building.
     StartBuild(usize),
+    /// Set build state.
+    SetBuildState(usize, BuildProgress),
     /// Build log.
     BuildLog(Vec<u8>),
-    /// Finish building.
-    FinishBuild,
     /// Handle build error.
-    HandleBuildError(miette::Error),
+    HandleBuildError(miette::Error, usize),
     /// Handle console input.
     HandleInput,
     /// Edit recipe.
