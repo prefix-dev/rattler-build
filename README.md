@@ -357,7 +357,8 @@ To launch the TUI, run the `build` command with the `--tui` flag as shown below:
 $ rattler-build build -r recipe.yml --tui
 ```
 
-> [!NOTE] > `rattler-build-tui` is gated behind the `tui` feature flag to avoid extra dependencies. Build the project with `--features tui` arguments to enable the TUI functionality.
+> [!NOTE]
+> `rattler-build-tui` is gated behind the `tui` feature flag to avoid extra dependencies. Build the project with `--features tui` arguments to enable the TUI functionality.
 
 #### Key Bindings
 
