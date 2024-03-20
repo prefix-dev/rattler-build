@@ -623,7 +623,8 @@ mod test {
     use chrono::TimeZone;
     use insta::assert_yaml_snapshot;
     use rattler_conda_types::{
-        MatchSpec, NoArchType, PackageName, PackageRecord, RepoDataRecord, VersionWithSource,
+        MatchSpec, NoArchType, PackageName, PackageRecord, ParseStrictness, RepoDataRecord,
+        VersionWithSource,
     };
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
     use url::Url;
@@ -658,7 +659,7 @@ mod test {
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
             specs: vec![DependencyInfo::Raw {
-                spec: MatchSpec::from_str("python 3.12.* h12332").unwrap(),
+                spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
             }],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {

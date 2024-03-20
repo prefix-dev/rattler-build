@@ -812,20 +812,20 @@ mod tests {
     fn test_dependency_info_render() {
         let dep_info = vec![
             DependencyInfo::Raw {
-                spec: MatchSpec::from_str("xyz").unwrap(),
+                spec: MatchSpec::from_str("xyz", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::Variant {
-                spec: MatchSpec::from_str("foo").unwrap(),
+                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
                 variant: "bar".to_string(),
             },
             DependencyInfo::Compiler {
-                spec: MatchSpec::from_str("foo").unwrap(),
+                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::PinSubpackage {
-                spec: MatchSpec::from_str("baz").unwrap(),
+                spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::PinCompatible {
-                spec: MatchSpec::from_str("bat").unwrap(),
+                spec: MatchSpec::from_str("bat", ParseStrictness::Strict).unwrap(),
             },
         ];
         let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
