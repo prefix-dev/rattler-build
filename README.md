@@ -114,6 +114,8 @@ The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
 (tests are shipped with the package).
 
+There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rattler-build/latest/tui/) that can help with building multiple packages and viewing logs easily.
+
 ### The recipe format
 
 > **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
@@ -343,30 +345,5 @@ IF %ERRORLEVEL% NEQ 0 exit 1
 
 ninja install --verbose
 ```
+
 </details>
-
-### Terminal User Interface (TUI)
-
-`rattler-build` offers a terminal user interface for building multiple packages and viewing the logs.
-
-![rattler-build-tui](https://github.com/prefix-dev/rattler-build/assets/24392180/52138fd0-3c53-4028-a2c8-3099222c368a)
-
-To launch the TUI, run the `build` command with the `--tui` flag as shown below:
-
-```shell
-$ rattler-build build -r recipe.yml --tui
-```
-
-> [!NOTE]
-> `rattler-build-tui` is gated behind the `tui` feature flag to avoid extra dependencies. Build the project with `--features tui` arguments to enable the TUI functionality.
-
-#### Key Bindings
-
-| Key                                                               | Action                                           |
-| ----------------------------------------------------------------- | ------------------------------------------------ |
-| <kbd>Enter</kbd>                                                  | Build package                                    |
-| <kbd>j</kbd>/<kbd>k</kbd>                                         | Next/previous package                            |
-| <kbd>up</kbd>/<kbd>down</kbd>/<kbd>left</kbd>/<kbd>right</kbd> | Scroll logs                                      |
-| <kbd>e</kbd>                                                      | Edit recipe (via `$EDITOR`)                      |
-| <kbd>c</kbd>, <kbd>:</kbd>                                        | Open command prompt (available commands: `edit`) |
-| <kbd>q</kbd>, <kbd>ctrl-c</kbd>, <kbd>esc</kbd>,                  | Quit                                             |
