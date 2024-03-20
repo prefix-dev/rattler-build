@@ -9,6 +9,7 @@
 
 use fs_err as fs;
 use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::ParseStrictness;
 use std::fmt::Write as fmt_write;
 use std::{
     path::{Path, PathBuf},
@@ -288,12 +289,13 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         let mut dependencies: Vec<MatchSpec> = test_dependencies
             .iter()
-            .map(|s| MatchSpec::from_str(s))
+            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
         tracing::info!("Creating test environment in {:?}", prefix);
         let match_spec = MatchSpec::from_str(
             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
         )
         .map_err(|e| TestError::MatchSpecParse(e.to_string()))?;
         dependencies.push(match_spec);
@@ -352,12 +354,13 @@ async fn run_python_test(
     let test_file = path.join("python_test.json");
     let test: PythonTest = serde_json::from_reader(fs::File::open(test_file)?)?;
 
-    let match_spec =
-        MatchSpec::from_str(format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str())
-            .unwrap();
+    let match_spec = MatchSpec::from_str(
+        format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+        ParseStrictness::Lenient,
+    )?;
     let mut dependencies = vec![match_spec];
     if test.pip_check {
-        dependencies.push(MatchSpec::from_str("pip").unwrap());
+        dependencies.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap());
     }
 
     create_environment(
@@ -431,7 +434,7 @@ async fn run_shell_test(
         let build_dependencies = deps
             .build
             .iter()
-            .map(|s| MatchSpec::from_str(s))
+            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
         create_environment(
@@ -451,12 +454,13 @@ async fn run_shell_test(
     let mut dependencies = deps
         .run
         .iter()
-        .map(|s| MatchSpec::from_str(s))
+        .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
         .collect::<Result<Vec<_>, _>>()?;
 
     // create environment with the test dependencies
     dependencies.push(MatchSpec::from_str(
         format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+        ParseStrictness::Lenient,
     )?);
 
     let platform = config.target_platform.unwrap_or_else(Platform::current);

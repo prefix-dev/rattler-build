@@ -2,10 +2,9 @@
 
 use crate::recipe::parser::FlattenErrors;
 use indexmap::IndexSet;
-use rattler_conda_types::{MatchSpec, PackageName};
+use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::{
@@ -352,7 +351,7 @@ impl TryConvertNode<MatchSpec> for RenderedNode {
 
 impl TryConvertNode<MatchSpec> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
-        MatchSpec::from_str(self.as_str()).map_err(|err| {
+        MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::from(err),
