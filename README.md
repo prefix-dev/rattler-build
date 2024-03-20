@@ -366,7 +366,7 @@ $ rattler-build build -r recipe.yml --tui
 | ----------------------------------------------------------------- | ------------------------------------------------ |
 | <kbd>Enter</kbd>                                                  | Build package                                    |
 | <kbd>j</kbd>/<kbd>k</kbd>                                         | Next/previous package                            |
-| <kbd>up</kbd>, <kbd>down</kbd>, <kbd>left</kbd>, <kbd>right</kbd> | Scroll logs                                      |
+| <kbd>up</kbd>/<kbd>down</kbd>/<kbd>left</kbd>/<kbd>right</kbd> | Scroll logs                                      |
 | <kbd>e</kbd>                                                      | Edit recipe (via `$EDITOR`)                      |
 | <kbd>c</kbd>, <kbd>:</kbd>                                        | Open command prompt (available commands: `edit`) |
 | <kbd>q</kbd>, <kbd>ctrl-c</kbd>, <kbd>esc</kbd>,                  | Quit                                             |
