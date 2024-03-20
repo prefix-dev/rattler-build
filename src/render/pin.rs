@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use rattler_conda_types::{MatchSpec, PackageName, Version};
+use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, Version};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,12 +74,10 @@ impl Pin {
     /// are given, the pin is applied to the version accordingly.
     pub fn apply(&self, version: &Version, hash: &str) -> Result<MatchSpec, PinError> {
         if self.exact {
-            return Ok(MatchSpec::from_str(&format!(
-                "{} {} {}",
-                self.name.as_normalized(),
-                version,
-                hash
-            ))
+            return Ok(MatchSpec::from_str(
+                &format!("{} {} {}", self.name.as_normalized(), version, hash),
+                ParseStrictness::Strict,
+            )
             // TODO use MatchSpecError when it becomes accessible
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?);
         }
@@ -140,7 +138,7 @@ impl Pin {
         spec.push(',');
         spec.push_str(&format!("<{}", pin));
 
-        Ok(MatchSpec::from_str(spec.as_str())
+        Ok(MatchSpec::from_str(spec.as_str(), ParseStrictness::Strict)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
     }
 

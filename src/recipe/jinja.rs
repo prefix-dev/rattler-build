@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
 use minijinja::{Environment, Value};
-use rattler_conda_types::{PackageName, Version};
+use rattler_conda_types::{PackageName, ParseStrictness, Version};
 
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
@@ -161,12 +161,13 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
                     format!("Failed to deserialize `version`: {}", e),
                 )
             })?;
-            let version_spec = VersionSpec::from_str(spec).map_err(|e| {
-                minijinja::Error::new(
-                    minijinja::ErrorKind::SyntaxError,
-                    format!("Bad syntax for `spec`: {}", e),
-                )
-            })?;
+            let version_spec =
+                VersionSpec::from_str(spec, ParseStrictness::Strict).map_err(|e| {
+                    minijinja::Error::new(
+                        minijinja::ErrorKind::SyntaxError,
+                        format!("Bad syntax for `spec`: {}", e),
+                    )
+                })?;
             Ok(version_spec.matches(&version))
         } else {
             // if a is undefined, we are currently searching for all variants and thus return true

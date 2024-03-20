@@ -14,7 +14,8 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, PackageName, Platform, RepoDataRecord, StringMatcher, Version, VersionSpec,
+    MatchSpec, PackageName, ParseStrictness, Platform, RepoDataRecord, StringMatcher, Version,
+    VersionSpec,
 };
 use rattler_conda_types::{version_spec::ParseVersionSpecError, PackageRecord};
 use serde::{Deserialize, Serialize};
@@ -329,7 +330,7 @@ pub fn apply_variant(
 
                                 // we split at whitespace to separate into version and build
                                 let mut splitter = spec.split_whitespace();
-                                let version_spec = splitter.next().map(VersionSpec::from_str).transpose()?;
+                                let version_spec = splitter.next().map(|v| VersionSpec::from_str(v, ParseStrictness::Strict)).transpose()?;
                                 let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
                                 let final_spec = MatchSpec {
                                     version: version_spec,
@@ -431,7 +432,7 @@ pub fn apply_variant(
                     };
 
                     Ok(DependencyInfo::Compiler {
-                        spec: MatchSpec::from_str(&final_compiler)?,
+                        spec: MatchSpec::from_str(&final_compiler, ParseStrictness::Strict)?,
                     })
                 }
             }
@@ -580,7 +581,7 @@ async fn resolve_dependencies(
      -> Result<Vec<DependencyInfo>, ResolveError> {
         let mut cloned = Vec::new();
         for spec in specs {
-            let spec = MatchSpec::from_str(spec)?;
+            let spec = MatchSpec::from_str(spec, ParseStrictness::Strict)?;
             let in_ignore_run_exports = |pkg| {
                 output
                     .recipe
@@ -811,20 +812,20 @@ mod tests {
     fn test_dependency_info_render() {
         let dep_info = vec![
             DependencyInfo::Raw {
-                spec: MatchSpec::from_str("xyz").unwrap(),
+                spec: MatchSpec::from_str("xyz", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::Variant {
-                spec: MatchSpec::from_str("foo").unwrap(),
+                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
                 variant: "bar".to_string(),
             },
             DependencyInfo::Compiler {
-                spec: MatchSpec::from_str("foo").unwrap(),
+                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::PinSubpackage {
-                spec: MatchSpec::from_str("baz").unwrap(),
+                spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
             },
             DependencyInfo::PinCompatible {
-                spec: MatchSpec::from_str("bat").unwrap(),
+                spec: MatchSpec::from_str("bat", ParseStrictness::Strict).unwrap(),
             },
         ];
         let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
