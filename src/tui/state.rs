@@ -13,7 +13,8 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct Package {
     pub name: String,
-    pub identifier: Option<String>,
+    pub version: String,
+    pub build_string: Option<String>,
     pub subpackages: Vec<String>,
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
@@ -113,7 +114,8 @@ impl TuiState {
                 let name = output.name().as_normalized().to_string();
                 Package {
                     name: name.clone(),
-                    identifier: output.identifier(),
+                    version: output.version().to_string(),
+                    build_string: output.build_string().map(String::from),
                     subpackages: output
                         .build_configuration
                         .subpackages

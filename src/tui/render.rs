@@ -249,10 +249,25 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     item[0],
                     &mut package.spinner_state,
                 );
-                frame.render_widget(
-                    Paragraph::new(package.identifier.clone().unwrap_or(package.name.clone())),
-                    item[1],
-                );
+                let mut line = Line::from(vec![
+                    package.name.clone().into(),
+                    "-".fg(Color::Rgb(100, 100, 100)),
+                    package.version.clone().into(),
+                    package
+                        .build_string
+                        .clone()
+                        .map(|v| format!("{}{v}", "-".fg(Color::Rgb(100, 100, 100))))
+                        .unwrap_or_default()
+                        .into(),
+                ]);
+                if item[1].width < line.width() as u16 {
+                    line = Line::from(vec![
+                        package.name.clone().into(),
+                        "-".fg(Color::Rgb(100, 100, 100)),
+                        package.version.clone().into(),
+                    ]);
+                }
+                frame.render_widget(Paragraph::new(line), item[1]);
             }
         }
     }
