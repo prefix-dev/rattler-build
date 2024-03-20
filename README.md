@@ -114,7 +114,7 @@ The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
 (tests are shipped with the package).
 
-There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rattler-build/latest/tui/) that can help with building multiple packages and viewing logs easily.
+There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rattler-build/latest/tui/) that can help with building multiple packages and easily viewing logs.
 
 ### The recipe format
 
