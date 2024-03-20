@@ -114,6 +114,8 @@ The `build` command takes a `--recipe recipe.yaml` as input and produces a
 package as output. The `test` subcommand can be used to test existing packages
 (tests are shipped with the package).
 
+There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rattler-build/latest/tui/) that can help with building multiple packages and easily viewing logs.
+
 ### The recipe format
 
 > **Note** You can find all examples below in the [`examples`](https://github.com/prefix-dev/rattler-build/tree/main/examples)
@@ -343,4 +345,5 @@ IF %ERRORLEVEL% NEQ 0 exit 1
 
 ninja install --verbose
 ```
+
 </details>

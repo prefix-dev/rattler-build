@@ -14,8 +14,13 @@ use crate::{package_test, tool_configuration};
 /// and execute the build script. Returns the path to the resulting package.
 pub async fn run_build(
     output: Output,
-    tool_configuration: tool_configuration::Configuration,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<(Output, PathBuf)> {
+    output
+        .build_configuration
+        .directories
+        .create_build_dir()
+        .into_diagnostic()?;
     if output.build_string().is_none() {
         miette::bail!("Build string is not set for {:?}", output.name());
     }
@@ -32,12 +37,12 @@ pub async fn run_build(
     .into_diagnostic()?;
 
     let output = output
-        .fetch_sources(&tool_configuration)
+        .fetch_sources(tool_configuration)
         .await
         .into_diagnostic()?;
 
     let output = output
-        .resolve_dependencies(&tool_configuration)
+        .resolve_dependencies(tool_configuration)
         .await
         .into_diagnostic()?;
 
@@ -45,7 +50,7 @@ pub async fn run_build(
 
     // Package all the new files
     let (result, paths_json) = output
-        .create_package(&tool_configuration)
+        .create_package(tool_configuration)
         .await
         .into_diagnostic()?;
 

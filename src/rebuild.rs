@@ -1,7 +1,10 @@
+//! The rebuild module contains rebuild helper functions.
+
 use std::path::{Path, PathBuf};
 
 use rattler_conda_types::package::ArchiveType;
 
+/// Extracts a folder from a tar.bz2 archive.
 fn folder_from_tar_bz2(
     archive_path: &Path,
     find_path: &Path,
@@ -27,6 +30,7 @@ fn folder_from_tar_bz2(
     Ok(())
 }
 
+/// Extracts a folder from a conda archive.
 fn folder_from_conda(
     archive_path: &Path,
     find_path: &Path,
@@ -58,7 +62,8 @@ fn folder_from_conda(
     Ok(())
 }
 
-pub(crate) fn extract_recipe(package: &Path, dest_folder: &Path) -> Result<(), std::io::Error> {
+/// Extracts a recipe from a package archive to a destination folder.
+pub fn extract_recipe(package: &Path, dest_folder: &Path) -> Result<(), std::io::Error> {
     let archive_type = ArchiveType::try_from(package).ok_or_else(|| {
         std::io::Error::new(
             std::io::ErrorKind::NotFound,

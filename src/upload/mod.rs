@@ -1,6 +1,8 @@
+//! The upload module provides the package upload functionality.
+
+use crate::tool_configuration::APP_USER_AGENT;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
-use rattler_build::tool_configuration::APP_USER_AGENT;
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
@@ -47,6 +49,7 @@ fn get_default_client() -> Result<reqwest::Client, reqwest::Error> {
         .build()
 }
 
+/// Uploads package files to a Quetz server.
 pub async fn upload_package_to_quetz(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
@@ -101,6 +104,7 @@ pub async fn upload_package_to_quetz(
     Ok(())
 }
 
+/// Uploads package files to an Artifactory server.
 pub async fn upload_package_to_artifactory(
     storage: &AuthenticationStorage,
     username: Option<String>,
@@ -166,6 +170,7 @@ pub async fn upload_package_to_artifactory(
     Ok(())
 }
 
+/// Uploads package files to a prefix.dev server.
 pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
@@ -227,6 +232,7 @@ pub async fn upload_package_to_prefix(
     Ok(())
 }
 
+/// Uploads package files to an Anaconda server.
 pub async fn upload_package_to_anaconda(
     storage: &AuthenticationStorage,
     token: Option<String>,

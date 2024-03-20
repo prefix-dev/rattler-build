@@ -11,6 +11,7 @@ use std::{
 };
 use tracing::{field, Level};
 use tracing_core::{span::Id, Event, Field, Subscriber};
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{
     filter::{Directive, ParseError},
     fmt::{
@@ -20,7 +21,6 @@ use tracing_subscriber::{
     },
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
-    util::SubscriberInitExt,
     EnvFilter, Layer,
 };
 
@@ -486,6 +486,9 @@ pub fn init_logging(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
     color: &Color,
+    #[cfg(feature = "tui")] tui_log_sender: Option<
+        tokio::sync::mpsc::UnboundedSender<crate::tui::event::Event>,
+    >,
 ) -> Result<LoggingOutputHandler, ParseError> {
     let log_handler = LoggingOutputHandler::default();
 
@@ -513,6 +516,20 @@ pub fn init_logging(
 
     let registry = registry.with(GitHubActionsLayer(github_integration_enabled()));
 
+    #[cfg(feature = "tui")]
+    {
+        if let Some(tui_log_sender) = tui_log_sender {
+            log_handler.set_progress_bars_hidden(true);
+            let writer = crate::tui::logger::TuiOutputHandler {
+                log_sender: tui_log_sender,
+            };
+            registry
+                .with(fmt::layer().with_writer(writer).without_time())
+                .init();
+            return Ok(log_handler);
+        }
+    }
+
     match log_style {
         LogStyle::Fancy => {
             registry.with(log_handler.clone()).init();
@@ -529,11 +546,7 @@ pub fn init_logging(
         LogStyle::Json => {
             log_handler.set_progress_bars_hidden(true);
             registry
-                .with(
-                    tracing_subscriber::fmt::layer()
-                        .json()
-                        .with_writer(io::stderr),
-                )
+                .with(fmt::layer().json().with_writer(io::stderr))
                 .init();
         }
     }
