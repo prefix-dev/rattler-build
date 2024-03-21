@@ -135,13 +135,14 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
 
 /// Returns the output for the build.
 pub async fn get_build_output(
-    args: BuildOpts,
+    args: &BuildOpts,
     recipe_path: PathBuf,
-    fancy_log_handler: LoggingOutputHandler,
+    fancy_log_handler: &LoggingOutputHandler,
 ) -> miette::Result<BuildOutput> {
     let output_dir = args
         .common
         .output_dir
+        .clone()
         .unwrap_or(current_dir().into_diagnostic()?.join("output"));
     if output_dir.starts_with(
         recipe_path
@@ -155,8 +156,8 @@ pub async fn get_build_output(
 
     let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
-    let host_platform = if let Some(target_platform) = args.target_platform {
-        Platform::from_str(&target_platform).into_diagnostic()?
+    let host_platform = if let Some(target_platform) = &args.target_platform {
+        Platform::from_str(target_platform).into_diagnostic()?
     } else {
         Platform::current()
     };
@@ -203,7 +204,8 @@ pub async fn get_build_output(
     }
     drop(enter);
 
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+    let client =
+        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone());
 
     let tool_config = tool_configuration::Configuration {
         client,

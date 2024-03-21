@@ -18,10 +18,10 @@ use ratatui::prelude::*;
 use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
+use std::path::PathBuf;
 
 use crate::build::run_build;
 use crate::console_utils::LoggingOutputHandler;
-use crate::get_recipe_path;
 use crate::opt::BuildOpts;
 
 use self::utils::run_editor;
@@ -135,18 +135,16 @@ pub async fn init() -> miette::Result<Tui<CrosstermBackend<Stderr>>> {
 pub async fn run<B: Backend>(
     mut tui: Tui<B>,
     opts: BuildOpts,
+    recipe_paths: Vec<PathBuf>,
     log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    // Get the recipe.
-    let recipe_path = get_recipe_path(&opts.recipe)?;
-
     // Create an application.
     let mut state = TuiState::new(opts, log_handler);
 
     // Resolve the packages to build.
     tui.event_handler
         .sender
-        .send(Event::ResolvePackages(recipe_path))
+        .send(Event::ResolvePackages(recipe_paths))
         .into_diagnostic()?;
 
     // Start the main loop.
@@ -163,25 +161,40 @@ pub async fn run<B: Backend>(
                 handle_mouse_events(mouse_event, tui.event_handler.sender.clone(), &mut state)?
             }
             Event::Resize(_, _) => {}
-            Event::ResolvePackages(recipe_path) => {
-                let log_sender = tui.event_handler.sender.clone();
-                let state = state.clone();
-                tokio::spawn(async move {
-                    let resolved = state.resolve_packages(recipe_path).await.unwrap();
-                    log_sender
-                        .send(Event::ProcessResolvedPackages(resolved.0, resolved.1))
-                        .unwrap();
-                });
+            Event::ResolvePackages(recipe_paths) => {
+                for recipe_path in recipe_paths {
+                    let state = state.clone();
+                    let log_sender = tui.event_handler.sender.clone();
+                    tokio::spawn(async move {
+                        let resolved = state.resolve_packages(recipe_path).await.unwrap();
+                        log_sender
+                            .send(Event::ProcessResolvedPackages(resolved))
+                            .unwrap();
+                    });
+                }
             }
-            Event::ProcessResolvedPackages(build_output, packages) => {
-                state.build_output = Some(build_output);
-                state.packages = packages.clone();
+            Event::ProcessResolvedPackages(packages) => {
+                state.packages.retain(|package| {
+                    packages
+                        .iter()
+                        .any(|p| p.recipe_path != package.recipe_path)
+                });
+                for new_package in packages {
+                    match state
+                        .packages
+                        .iter_mut()
+                        .find(|p| new_package.name == p.name)
+                    {
+                        Some(package) => {
+                            *package = new_package;
+                        }
+                        None => state.packages.push(new_package),
+                    }
+                }
             }
             Event::StartBuild(index) => {
                 if !state.is_building_package() {
                     let package = state.packages[index].clone();
-                    let build_output = state.build_output.clone().unwrap();
-                    let tool_config = build_output.tool_config.clone();
                     let log_sender = tui.event_handler.sender.clone();
                     let mut packages = Vec::new();
                     for subpackage in package.subpackages.iter() {
@@ -197,7 +210,7 @@ pub async fn run<B: Backend>(
                             log_sender
                                 .send(Event::SetBuildState(i, BuildProgress::Building))
                                 .unwrap();
-                            match run_build(package.output, &tool_config).await {
+                            match run_build(package.output, &package.tool_config).await {
                                 Ok((output, _archive)) => {
                                     output.record_build_end();
                                     let span = tracing::info_span!("Build summary");
@@ -254,14 +267,14 @@ pub async fn run<B: Backend>(
                 state.input.reset();
             }
             Event::EditRecipe => {
+                let package = state.packages[state.selected_package].clone();
                 state.input_mode = false;
                 state.input.reset();
-                let build_output = state.build_output.clone().unwrap();
                 tui.toggle_pause()?;
-                run_editor(&build_output.recipe_path)?;
+                run_editor(&package.recipe_path)?;
                 tui.event_handler
                     .sender
-                    .send(Event::ResolvePackages(build_output.recipe_path))
+                    .send(Event::ResolvePackages(vec![package.recipe_path]))
                     .into_diagnostic()?;
                 tui.toggle_pause()?;
             }

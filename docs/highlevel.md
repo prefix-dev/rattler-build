@@ -50,6 +50,12 @@ A custom channel that is not conda-forge (the default) can be specified like so:
 rattler-build build -c robostack --recipe myrecipe/recipe.yaml
 ```
 
+You can also use the `--recipe-dir` argument if you want to build all the packages in a directory:
+
+```sh
+rattler-build build --recipe-dir myrecipes/
+```
+
 ### Overview of a `recipe.yaml`
 
 A `recipe.yaml` file is separated into multiple sections and can conditionally

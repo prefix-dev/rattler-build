@@ -6,6 +6,7 @@ use crate::{
     console_utils::{Color, LogStyle},
     recipe_generator::GenerateRecipeOpts,
 };
+use clap::builder::ArgPredicate;
 use clap::{arg, crate_version, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::package::ArchiveType;
@@ -79,18 +80,11 @@ pub struct App {
 
 impl App {
     /// Returns true if the application will launch a TUI.
-    #[cfg(feature = "tui")]
     pub fn is_tui(&self) -> bool {
         match &self.subcommand {
             Some(SubCommands::Build(args)) => args.tui,
             _ => false,
         }
-    }
-
-    /// Returns true if the application will launch a TUI.
-    #[cfg(not(feature = "tui"))]
-    pub fn is_tui(&self) -> bool {
-        false
     }
 }
 
@@ -186,8 +180,17 @@ impl FromStr for PackageFormatAndCompression {
 #[derive(Parser, Clone)]
 pub struct BuildOpts {
     /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
-    #[arg(short, long, default_value = ".")]
-    pub recipe: PathBuf,
+    #[arg(
+        short,
+        long,
+        default_value = ".",
+        default_value_if("recipe_dir", ArgPredicate::IsPresent, None)
+    )]
+    pub recipe: Vec<PathBuf>,
+
+    /// The directory that contains recipes.
+    #[arg(long)]
+    pub recipe_dir: Option<PathBuf>,
 
     /// The target platform for the build.
     #[arg(long)]
@@ -240,8 +243,7 @@ pub struct BuildOpts {
     pub common: CommonOpts,
 
     /// Launch the terminal user interface.
-    #[cfg(feature = "tui")]
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", hide = !cfg!(feature = "tui"))]
     pub tui: bool,
 }
 
