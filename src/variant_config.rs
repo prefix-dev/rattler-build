@@ -401,14 +401,20 @@ impl VariantConfig {
                     errs
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
-
             // add in any host and build dependencies
             used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
                 match dep {
-                    Dependency::Spec(spec) => spec
-                        .name
-                        .as_ref()
-                        .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::Spec(spec) => {
+                        // here we filter python as a variant and don't take it's passed variants
+                        // when noarch is python
+                        spec.name.as_ref().and_then(|name| {
+                            let normalized_name = name.as_normalized();
+                            if normalized_name == "python" && noarch_type.is_python() {
+                                return None;
+                            }
+                            normalized_name.to_string().into()
+                        })
+                    }
                     Dependency::PinSubpackage(pin) => {
                         Some(pin.pin_value().name.as_normalized().to_string())
                     }
@@ -509,8 +515,23 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
-
-            let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
+            let noarch_type = parsed_recipe.build().noarch();
+            let build_time_requirements = parsed_recipe
+                .requirements()
+                .build_time()
+                .cloned()
+                .filter_map(|dep| {
+                    // here we filter python as a variant and don't take it's passed variants
+                    // when noarch is python
+                    if let Dependency::Spec(spec) = &dep {
+                        if let Some(name) = &spec.name {
+                            if name.as_normalized() == "python" && noarch_type.is_python() {
+                                return None;
+                            }
+                        }
+                    }
+                    Some(dep)
+                });
             all_build_dependencies.extend(build_time_requirements);
         }
 
@@ -598,7 +619,6 @@ impl VariantConfig {
 
                 // find the variables that were actually used in the recipe and that count towards the hash
                 let requirements = parsed_recipe.requirements();
-
                 requirements.build_time().for_each(|dep| match dep {
                     Dependency::Spec(spec) => {
                         if let Some(name) = &spec.name {
@@ -1021,5 +1041,34 @@ mod tests {
                 .collect();
             assert_eq!(outputs, order);
         }
+    }
+
+    #[test]
+    fn test_python_is_not_used_as_variant_when_noarch() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = test_data_dir.join("recipes/variants/python_variant.yaml");
+        let selector_config = SelectorConfig {
+            target_platform: Platform::NoArch,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        // First find all outputs from the recipe
+        let recipe_text =
+            std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
+                .unwrap();
+        let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let outputs_and_variants = variant_config
+            .find_variants(&outputs, &recipe_text, &selector_config)
+            .unwrap();
+
+        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+            .as_slice()
+            .into_iter()
+            .map(|s| &s.used_vars)
+            .collect();
+
+        insta::assert_yaml_snapshot!(used_variables_all);
     }
 }
