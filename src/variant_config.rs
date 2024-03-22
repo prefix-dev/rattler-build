@@ -1042,4 +1042,33 @@ mod tests {
             assert_eq!(outputs, order);
         }
     }
+
+    #[test]
+    fn test_python_is_not_used_as_variant_when_noarch() {
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let yaml_file = test_data_dir.join("recipes/variants/python_variant.yaml");
+        let selector_config = SelectorConfig {
+            target_platform: Platform::NoArch,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        // First find all outputs from the recipe
+        let recipe_text =
+            std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
+                .unwrap();
+        let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let outputs_and_variants = variant_config
+            .find_variants(&outputs, &recipe_text, &selector_config)
+            .unwrap();
+
+        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+            .as_slice()
+            .into_iter()
+            .map(|s| &s.used_vars)
+            .collect();
+
+        insta::assert_yaml_snapshot!(used_variables_all);
+    }
 }
