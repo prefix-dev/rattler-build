@@ -8,7 +8,6 @@ use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use super::state::{BuildProgress, Package};
-use crate::BuildOutput;
 
 /// Terminal events.
 pub enum Event {
@@ -21,9 +20,9 @@ pub enum Event {
     /// Terminal resize.
     Resize(u16, u16),
     /// Resolves packages to build.
-    ResolvePackages(PathBuf),
+    ResolvePackages(Vec<PathBuf>),
     /// Handles the result of resolving packages.
-    ProcessResolvedPackages(BuildOutput, Vec<Package>),
+    ProcessResolvedPackages(Vec<Package>),
     /// Start building.
     StartBuild(usize),
     /// Set build state.

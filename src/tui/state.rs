@@ -6,7 +6,7 @@ use tui_input::Input;
 
 use crate::{
     console_utils::LoggingOutputHandler, get_build_output, metadata::Output, opt::BuildOpts,
-    BuildOutput,
+    tool_configuration::Configuration,
 };
 
 /// Representation of a package.
@@ -21,6 +21,8 @@ pub struct Package {
     pub spinner_state: ThrobberState,
     pub area: Rect,
     pub is_hovered: bool,
+    pub tool_config: Configuration,
+    pub recipe_path: PathBuf,
     pub output: Output,
 }
 
@@ -54,8 +56,6 @@ impl BuildProgress {
 /// Application state.
 #[derive(Clone)]
 pub(crate) struct TuiState {
-    /// Build output.
-    pub build_output: Option<BuildOutput>,
     /// Build options.
     pub build_opts: BuildOpts,
     /// Log handler.
@@ -82,7 +82,6 @@ impl TuiState {
     /// Constructs a new instance.
     pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
-            build_output: None,
             build_opts: build_opts.clone(),
             log_handler,
             running: true,
@@ -97,16 +96,9 @@ impl TuiState {
     }
 
     /// Resolves and returns the packages to build.
-    pub async fn resolve_packages(
-        &self,
-        recipe_path: PathBuf,
-    ) -> miette::Result<(BuildOutput, Vec<Package>)> {
-        let build_output = get_build_output(
-            self.build_opts.clone(),
-            recipe_path,
-            self.log_handler.clone(),
-        )
-        .await?;
+    pub async fn resolve_packages(&self, recipe_path: PathBuf) -> miette::Result<Vec<Package>> {
+        let build_output =
+            get_build_output(&self.build_opts, recipe_path, &self.log_handler).await?;
         let packages = build_output
             .outputs
             .iter()
@@ -129,10 +121,12 @@ impl TuiState {
                     area: Rect::default(),
                     is_hovered: false,
                     output: output.clone(),
+                    tool_config: build_output.tool_config.clone(),
+                    recipe_path: build_output.recipe_path.clone(),
                 }
             })
             .collect();
-        Ok((build_output, packages))
+        Ok(packages)
     }
 
     /// Handles the tick event of the terminal.

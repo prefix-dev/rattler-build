@@ -26,6 +26,9 @@ async fn main() -> miette::Result<()> {
             .into_diagnostic()?,
         )
     } else {
+        #[cfg(not(feature = "tui"))]
+        return Err(miette::miette!("tui feature is not enabled!"));
+        #[cfg(feature = "tui")]
         None
     };
     match app.subcommand {
@@ -45,39 +48,43 @@ async fn main() -> miette::Result<()> {
             print_completions(shell, &mut cmd);
             Ok(())
         }
-        #[cfg(feature = "tui")]
         Some(SubCommands::Build(build_args)) => {
-            if build_args.tui {
-                let tui = rattler_build::tui::init().await?;
-                let log_handler = init_logging(
-                    &app.log_style,
-                    &app.verbose,
-                    &app.color,
-                    Some(tui.event_handler.sender.clone()),
-                )
-                .into_diagnostic()?;
-                rattler_build::tui::run(tui, build_args, log_handler).await
-            } else {
-                let recipe_path = get_recipe_path(&build_args.recipe)?;
-                let build_output = get_build_output(
-                    build_args,
-                    recipe_path,
-                    log_handler.expect("logger is not initialized"),
-                )
-                .await?;
-                run_build_from_args(build_output).await
+            let mut recipe_paths = Vec::new();
+            for recipe_path in &build_args.recipe {
+                recipe_paths.push(get_recipe_path(recipe_path)?);
             }
-        }
-        #[cfg(not(feature = "tui"))]
-        Some(SubCommands::Build(build_args)) => {
-            let recipe_path = get_recipe_path(&build_args.recipe)?;
-            let build_output = get_build_output(
-                build_args,
-                recipe_path,
-                log_handler.expect("logger is not initialized"),
-            )
-            .await?;
-            run_build_from_args(build_output).await
+            if let Some(recipe_dir) = &build_args.recipe_dir {
+                for entry in ignore::Walk::new(recipe_dir) {
+                    let entry = entry.into_diagnostic()?;
+                    if entry.path().is_dir() {
+                        if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                            recipe_paths.push(recipe_path);
+                        }
+                    }
+                }
+            }
+            if build_args.tui {
+                #[cfg(feature = "tui")]
+                {
+                    let tui = rattler_build::tui::init().await?;
+                    let log_handler = init_logging(
+                        &app.log_style,
+                        &app.verbose,
+                        &app.color,
+                        Some(tui.event_handler.sender.clone()),
+                    )
+                    .into_diagnostic()?;
+                    rattler_build::tui::run(tui, build_args, recipe_paths, log_handler).await?;
+                }
+            } else {
+                let log_handler = log_handler.expect("logger is not initialized");
+                for recipe_path in &recipe_paths {
+                    let output =
+                        get_build_output(&build_args, recipe_path.clone(), &log_handler).await?;
+                    run_build_from_args(output).await?;
+                }
+            }
+            Ok(())
         }
         Some(SubCommands::Test(test_args)) => {
             run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await
