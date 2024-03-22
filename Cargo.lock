@@ -3104,8 +3104,6 @@ dependencies = [
  "miette 7.2.0",
  "minijinja",
  "num_cpus",
- "once_cell",
- "os_pipe",
  "pathdiff",
  "petgraph",
  "ratatui",
@@ -3696,7 +3694,6 @@ version = "0.1.0"
 dependencies = [
  "duct",
  "glob",
- "itertools",
  "rattler_package_streaming",
  "serde_json",
  "sha1",
