@@ -5,8 +5,8 @@ use throbber_widgets_tui::ThrobberState;
 use tui_input::Input;
 
 use crate::{
-    console_utils::LoggingOutputHandler, get_build_output, metadata::Output, opt::BuildOpts,
-    tool_configuration::Configuration,
+    console_utils::LoggingOutputHandler, metadata::Output, opt::BuildOpts,
+    tool_configuration::Configuration, BuildOutput,
 };
 
 /// Representation of a package.
@@ -24,6 +24,39 @@ pub struct Package {
     pub tool_config: Configuration,
     pub recipe_path: PathBuf,
     pub output: Output,
+}
+
+impl Package {
+    /// Constructs a package list from build output.
+    pub fn from_output(build_output: BuildOutput) -> Vec<Self> {
+        build_output
+            .outputs
+            .iter()
+            .map(|output| {
+                let name = output.name().as_normalized().to_string();
+                Package {
+                    name: name.clone(),
+                    version: output.version().to_string(),
+                    build_string: output.build_string().map(String::from),
+                    subpackages: output
+                        .build_configuration
+                        .subpackages
+                        .keys()
+                        .map(|v| v.as_normalized().to_string())
+                        .filter(|v| v != &name)
+                        .collect(),
+                    build_progress: BuildProgress::None,
+                    build_log: Vec::new(),
+                    spinner_state: ThrobberState::default(),
+                    area: Rect::default(),
+                    is_hovered: false,
+                    output: output.clone(),
+                    tool_config: build_output.tool_config.clone(),
+                    recipe_path: build_output.recipe_path.clone(),
+                }
+            })
+            .collect()
+    }
 }
 
 /// Build progress.
@@ -93,40 +126,6 @@ impl TuiState {
             input_mode: false,
             input: Input::default(),
         }
-    }
-
-    /// Resolves and returns the packages to build.
-    pub async fn resolve_packages(&self, recipe_path: PathBuf) -> miette::Result<Vec<Package>> {
-        let build_output =
-            get_build_output(&self.build_opts, recipe_path, &self.log_handler).await?;
-        let packages = build_output
-            .outputs
-            .iter()
-            .map(|output| {
-                let name = output.name().as_normalized().to_string();
-                Package {
-                    name: name.clone(),
-                    version: output.version().to_string(),
-                    build_string: output.build_string().map(String::from),
-                    subpackages: output
-                        .build_configuration
-                        .subpackages
-                        .keys()
-                        .map(|v| v.as_normalized().to_string())
-                        .filter(|v| v != &name)
-                        .collect(),
-                    build_progress: BuildProgress::None,
-                    build_log: Vec::new(),
-                    spinner_state: ThrobberState::default(),
-                    area: Rect::default(),
-                    is_hovered: false,
-                    output: output.clone(),
-                    tool_config: build_output.tool_config.clone(),
-                    recipe_path: build_output.recipe_path.clone(),
-                }
-            })
-            .collect();
-        Ok(packages)
     }
 
     /// Handles the tick event of the terminal.

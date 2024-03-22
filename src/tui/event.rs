@@ -1,13 +1,13 @@
 //! TUI event handling.
 
+use super::state::BuildProgress;
+use crate::BuildOutput;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use miette::IntoDiagnostic;
 use std::{path::PathBuf, time::Duration};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-
-use super::state::{BuildProgress, Package};
 
 /// Terminal events.
 pub enum Event {
@@ -19,10 +19,10 @@ pub enum Event {
     Mouse(MouseEvent),
     /// Terminal resize.
     Resize(u16, u16),
-    /// Resolves packages to build.
-    ResolvePackages(Vec<PathBuf>),
-    /// Handles the result of resolving packages.
-    ProcessResolvedPackages(Vec<Package>),
+    /// Get build outputs.
+    GetBuildOutputs(Vec<PathBuf>),
+    /// Processes the build outputs.
+    ProcessBuildOutputs(Vec<BuildOutput>),
     /// Start building.
     StartBuild(usize),
     /// Set build state.
