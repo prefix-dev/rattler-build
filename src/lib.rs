@@ -35,11 +35,11 @@ mod windows;
 use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
-use itertools::Itertools;
 use miette::IntoDiagnostic;
+use petgraph::{algo::toposort, graph::DiGraph};
 use rattler_conda_types::{package::ArchiveType, Platform};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap},
     env::current_dir,
     path::{Path, PathBuf},
     str::FromStr,
@@ -522,76 +522,45 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
     Ok(())
 }
 
-/// aslkjfksjd
-pub fn sort_build_outputs_topologically(
-    outputs: &Vec<BuildOutput>,
-) -> miette::Result<Vec<BuildOutput>> {
-    // first we have to collect the set of needs and produces for each recipe
-    let mut graph = petgraph::graph::DiGraph::new();
-    let mut graph_nodes = Vec::new();
+/// Sort the build outputs (recipes) topologically based on their dependencies.
+pub fn sort_build_outputs_topologically(outputs: &mut Vec<BuildOutput>) -> miette::Result<()> {
+    let mut graph = DiGraph::<usize, ()>::new();
+    let mut name_to_index = HashMap::new();
 
-    let mut idx_to_outputs = HashMap::new();
+    // Index outputs by their produced names for quick lookup
     for (idx, output) in outputs.iter().enumerate() {
-        // for all outputs we need to find the outputs that they produce
-        let inner_outputs = output
-            .outputs
-            .iter()
-            .map(|output| output.name().clone())
-            .collect::<HashSet<_>>();
-        idx_to_outputs.insert(idx, inner_outputs);
-
-        let node = graph.add_node(0);
-        graph_nodes.push(node);
-    }
-
-    // now find all requirements for each build output
-    let mut idx_to_needs = HashMap::new();
-    for (idx, output) in outputs.iter().enumerate() {
-        let mut needs = HashSet::new();
-        for o in output.outputs.iter() {
-            for dep in o.recipe.requirements().build_time() {
-                match dep {
-                    recipe::parser::Dependency::Spec(spec) => {
-                        needs.insert(spec.name.clone().unwrap())
-                    }
-                    recipe::parser::Dependency::PinSubpackage(pin) => {
-                        needs.insert(pin.pin_value().name.clone())
-                    }
-                    recipe::parser::Dependency::PinCompatible(pin) => {
-                        needs.insert(pin.pin_value().name.clone())
-                    }
-                    recipe::parser::Dependency::Compiler(_) => false,
-                };
-            }
+        let idx = graph.add_node(idx);
+        for produced in &output.outputs {
+            name_to_index.insert(produced.name().clone(), idx);
         }
-        idx_to_needs.insert(idx, needs);
     }
 
-    // create a petgraph graph from the needs and outputs
-    for (idx, needs) in idx_to_needs.iter() {
-        for need in needs {
-            for (idx2, outputs) in idx_to_outputs.iter() {
-                if outputs.contains(need) {
-                    graph.add_edge(graph_nodes[*idx2], graph_nodes[*idx], ());
+    // Add edges based on dependencies
+    for (idx, output) in outputs.iter().enumerate() {
+        for o in &output.outputs {
+            for dep in o.recipe.requirements().build_time() {
+                let dep_name = match dep {
+                    recipe::parser::Dependency::Spec(spec) => spec.name.clone().unwrap(),
+                    recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+                    recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                    recipe::parser::Dependency::Compiler(_) => continue,
+                };
+                if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+                    graph.add_edge(dep_idx, *name_to_index.get(o.name()).unwrap(), ());
+                    // Corrected to use indices directly
                 }
             }
         }
     }
 
-    // now we can sort the outputs topologically
-    let sorted_outputs = petgraph::algo::toposort(&graph, None).unwrap();
+    // Perform topological sort
+    let sorted_indices = toposort(&graph, None).unwrap();
 
-    let outputs = outputs
+    // Reorder outputs based on the sorted indices
+    *outputs = sorted_indices
         .iter()
-        .enumerate()
-        .sorted_by(|a, b| {
-            sorted_outputs
-                .iter()
-                .position(|x| x.index() == a.0)
-                .cmp(&sorted_outputs.iter().position(|x| x.index() == b.0))
-        })
-        .map(|(_, output)| output.clone())
-        .collect::<Vec<_>>();
+        .map(|node| outputs[node.index()].clone())
+        .collect();
 
-    Ok(outputs)
+    Ok(())
 }

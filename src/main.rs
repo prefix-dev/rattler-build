@@ -84,7 +84,7 @@ async fn main() -> miette::Result<()> {
                         get_build_output(&build_args, recipe_path.clone(), &log_handler).await?;
                     outputs.push(output);
                 }
-                let outputs = sort_build_outputs_topologically(&outputs)?;
+                sort_build_outputs_topologically(&mut outputs)?;
                 for output in outputs {
                     run_build_from_args(output).await?;
                 }
