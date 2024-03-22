@@ -552,6 +552,11 @@ pub fn sort_build_outputs_topologically(
                     recipe::parser::Dependency::Compiler(_) => continue,
                 };
                 if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+                    // do not point to self (circular dependency) - this can happen with
+                    // pin_subpackage in run_exports, for example.
+                    if output_idx == dep_idx {
+                        continue;
+                    }
                     graph.add_edge(output_idx, dep_idx, ());
                 }
             }
