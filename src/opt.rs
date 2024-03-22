@@ -192,6 +192,10 @@ pub struct BuildOpts {
     #[arg(long)]
     pub recipe_dir: Option<PathBuf>,
 
+    /// Build recipes up to the specified package.
+    #[arg(long)]
+    pub up_to: Option<String>,
+
     /// The target platform for the build.
     #[arg(long)]
     pub target_platform: Option<String>,

@@ -36,9 +36,10 @@ use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
 use miette::IntoDiagnostic;
+use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Platform};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     env::current_dir,
     path::{Path, PathBuf},
     str::FromStr,
@@ -517,6 +518,86 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             .await?;
         }
     }
+
+    Ok(())
+}
+
+/// Sort the build outputs (recipes) topologically based on their dependencies.
+pub fn sort_build_outputs_topologically(
+    outputs: &mut Vec<BuildOutput>,
+    up_to: Option<&str>,
+) -> miette::Result<()> {
+    let mut graph = DiGraph::<usize, ()>::new();
+    let mut name_to_index = HashMap::new();
+
+    // Index outputs by their produced names for quick lookup
+    for (idx, output) in outputs.iter().enumerate() {
+        let idx = graph.add_node(idx);
+        for produced in &output.outputs {
+            name_to_index.insert(produced.name().clone(), idx);
+        }
+    }
+
+    // Add edges based on dependencies
+    for output in outputs.iter() {
+        for o in &output.outputs {
+            let output_idx = *name_to_index.get(o.name()).expect("We just inserted it");
+            for dep in o.recipe.requirements().all() {
+                let dep_name = match dep {
+                    recipe::parser::Dependency::Spec(spec) => {
+                        spec.name.clone().expect("We should always have a name")
+                    }
+                    recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+                    recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                    recipe::parser::Dependency::Compiler(_) => continue,
+                };
+                if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+                    // do not point to self (circular dependency) - this can happen with
+                    // pin_subpackage in run_exports, for example.
+                    if output_idx == dep_idx {
+                        continue;
+                    }
+                    graph.add_edge(output_idx, dep_idx, ());
+                }
+            }
+        }
+    }
+
+    let sorted_indices = if let Some(up_to) = up_to {
+        // Find the node index for the "up-to" package
+        let up_to_index = name_to_index
+            .get(up_to)
+            .copied()
+            .expect("Up-to package not found");
+
+        // Perform a DFS post-order traversal from the "up-to" node to find all dependencies
+        let mut dfs = DfsPostOrder::new(&graph, up_to_index);
+        let mut sorted_indices = Vec::new();
+        while let Some(nx) = dfs.next(&graph) {
+            sorted_indices.push(nx);
+        }
+
+        sorted_indices
+    } else {
+        // Perform topological sort
+        toposort(&graph, None).unwrap()
+    };
+
+    sorted_indices
+        .iter()
+        .map(|idx| &outputs[idx.index()])
+        .for_each(|output| {
+            tracing::info!(
+                "Ordered output: {:?}",
+                output.outputs[0].name().as_normalized()
+            );
+        });
+
+    // Reorder outputs based on the sorted indices
+    *outputs = sorted_indices
+        .iter()
+        .map(|node| outputs[node.index()].clone())
+        .collect();
 
     Ok(())
 }
