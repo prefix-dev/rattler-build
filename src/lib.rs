@@ -539,7 +539,7 @@ pub fn sort_build_outputs_topologically(
     }
 
     // Add edges based on dependencies
-    for (_, output) in outputs.iter().enumerate() {
+    for output in outputs.iter() {
         for o in &output.outputs {
             let output_idx = *name_to_index.get(o.name()).expect("We just inserted it");
             for dep in o.recipe.requirements().all() {
