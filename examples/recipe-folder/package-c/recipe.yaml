@@ -1,0 +1,8 @@
+package:
+  name: package-c
+  version: 1.0.0
+
+requirements:
+  build:
+    - package-b
+    - package-a
