@@ -580,7 +580,9 @@ pub fn sort_build_outputs_topologically(
         sorted_indices
     } else {
         // Perform topological sort
-        toposort(&graph, None).unwrap()
+        let mut sorted_indices = toposort(&graph, None).unwrap();
+        sorted_indices.reverse();
+        sorted_indices
     };
 
     sorted_indices
