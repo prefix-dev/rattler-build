@@ -401,14 +401,20 @@ impl VariantConfig {
                     errs
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
-
             // add in any host and build dependencies
             used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
                 match dep {
-                    Dependency::Spec(spec) => spec
-                        .name
-                        .as_ref()
-                        .and_then(|name| name.as_normalized().to_string().into()),
+                    Dependency::Spec(spec) => {
+                        // here we filter python as a variant and don't take it's passed variants
+                        // when noarch is python
+                        spec.name.as_ref().and_then(|name| {
+                            let normalized_name = name.as_normalized();
+                            if normalized_name == "python" && noarch_type.is_python() {
+                                return None;
+                            }
+                            normalized_name.to_string().into()
+                        })
+                    }
                     Dependency::PinSubpackage(pin) => {
                         Some(pin.pin_value().name.as_normalized().to_string())
                     }
@@ -509,8 +515,23 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
-
-            let build_time_requirements = parsed_recipe.requirements().build_time().cloned();
+            let noarch_type = parsed_recipe.build().noarch();
+            let build_time_requirements = parsed_recipe
+                .requirements()
+                .build_time()
+                .cloned()
+                .filter_map(|dep| {
+                    // here we filter python as a variant and don't take it's passed variants
+                    // when noarch is python
+                    if let Dependency::Spec(spec) = &dep {
+                        if let Some(name) = &spec.name {
+                            if name.as_normalized() == "python" && noarch_type.is_python() {
+                                return None;
+                            }
+                        }
+                    }
+                    Some(dep)
+                });
             all_build_dependencies.extend(build_time_requirements);
         }
 
@@ -598,7 +619,6 @@ impl VariantConfig {
 
                 // find the variables that were actually used in the recipe and that count towards the hash
                 let requirements = parsed_recipe.requirements();
-
                 requirements.build_time().for_each(|dep| match dep {
                     Dependency::Spec(spec) => {
                         if let Some(name) = &spec.name {
