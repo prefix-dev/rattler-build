@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use crate::build::run_build;
 use crate::console_utils::LoggingOutputHandler;
 use crate::opt::BuildOpts;
+use crate::{get_build_output, sort_build_outputs_topologically};
 
 use self::utils::run_editor;
 
@@ -144,7 +145,7 @@ pub async fn run<B: Backend>(
     // Resolve the packages to build.
     tui.event_handler
         .sender
-        .send(Event::ResolvePackages(recipe_paths))
+        .send(Event::GetBuildOutputs(recipe_paths))
         .into_diagnostic()?;
 
     // Start the main loop.
@@ -161,34 +162,46 @@ pub async fn run<B: Backend>(
                 handle_mouse_events(mouse_event, tui.event_handler.sender.clone(), &mut state)?
             }
             Event::Resize(_, _) => {}
-            Event::ResolvePackages(recipe_paths) => {
-                for recipe_path in recipe_paths {
-                    let state = state.clone();
-                    let log_sender = tui.event_handler.sender.clone();
-                    tokio::spawn(async move {
-                        let resolved = state.resolve_packages(recipe_path).await.unwrap();
-                        log_sender
-                            .send(Event::ProcessResolvedPackages(resolved))
-                            .unwrap();
-                    });
-                }
-            }
-            Event::ProcessResolvedPackages(packages) => {
-                state.packages.retain(|package| {
-                    packages
-                        .iter()
-                        .any(|p| p.recipe_path != package.recipe_path)
+            Event::GetBuildOutputs(recipe_paths) => {
+                let state = state.clone();
+                let log_sender = tui.event_handler.sender.clone();
+                tokio::spawn(async move {
+                    let mut outputs = Vec::new();
+                    for recipe_path in &recipe_paths {
+                        let output = get_build_output(
+                            &state.build_opts,
+                            recipe_path.clone(),
+                            &state.log_handler,
+                        )
+                        .await
+                        .unwrap();
+                        outputs.push(output);
+                    }
+                    log_sender
+                        .send(Event::ProcessBuildOutputs(outputs))
+                        .unwrap();
                 });
-                for new_package in packages {
-                    match state
-                        .packages
-                        .iter_mut()
-                        .find(|p| new_package.name == p.name)
-                    {
-                        Some(package) => {
-                            *package = new_package;
+            }
+            Event::ProcessBuildOutputs(mut outputs) => {
+                sort_build_outputs_topologically(&mut outputs, state.build_opts.up_to.as_deref())?;
+                for output in outputs {
+                    let packages = Package::from_output(output);
+                    state.packages.retain(|package| {
+                        packages
+                            .iter()
+                            .any(|p| p.recipe_path != package.recipe_path)
+                    });
+                    for new_package in packages {
+                        match state
+                            .packages
+                            .iter_mut()
+                            .find(|p| new_package.name == p.name)
+                        {
+                            Some(package) => {
+                                *package = new_package;
+                            }
+                            None => state.packages.push(new_package),
                         }
-                        None => state.packages.push(new_package),
                     }
                 }
             }
@@ -274,7 +287,7 @@ pub async fn run<B: Backend>(
                 run_editor(&package.recipe_path)?;
                 tui.event_handler
                     .sender
-                    .send(Event::ResolvePackages(vec![package.recipe_path]))
+                    .send(Event::GetBuildOutputs(vec![package.recipe_path]))
                     .into_diagnostic()?;
                 tui.toggle_pause()?;
             }
