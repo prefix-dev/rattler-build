@@ -10,6 +10,7 @@ on:
     paths:
       - "src/**"
       - "Cargo.*"
+      - ".github/workflows/*"
 
   workflow_dispatch:
 
