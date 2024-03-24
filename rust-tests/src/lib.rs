@@ -616,4 +616,24 @@ mod tests {
         let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("it is included in the allow list. Skipping..."));
     }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn render_only_dont_install_pkgs() {
+        let tmp = tmp("test_render_only");
+
+        let rattler_build = rattler().with_args([
+            "build",
+            "--recipe",
+            recipes().join("flask").to_str().unwrap(),
+            "--render-only",
+            "--output-dir",
+            tmp.as_dir().to_str().unwrap(),
+            "--target-platform",
+            "win-64"
+
+        ]);
+
+        assert!(rattler_build.status.success());
+    }
 }
