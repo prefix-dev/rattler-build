@@ -195,14 +195,18 @@ pub async fn create_environment(
         move || Solver.solve(solver_task),
     )??;
 
-    install_packages(
-        &required_packages,
-        target_platform,
-        target_prefix,
-        &cache_dir,
-        tool_configuration,
-    )
-    .await?;
+    if !tool_configuration.render_only {
+        install_packages(
+            &required_packages,
+            target_platform,
+            target_prefix,
+            &cache_dir,
+            tool_configuration,
+        )
+        .await?;
+    } else {
+        tracing::info!("skipping installation when --render-only is used",);
+    }
 
     Ok(required_packages)
 }

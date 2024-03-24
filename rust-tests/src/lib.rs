@@ -620,6 +620,7 @@ mod tests {
     #[test]
     #[cfg(target_os = "macos")]
     fn render_only_dont_install_pkgs() {
+        // test covering this issue https://github.com/prefix-dev/rattler-build/issues/716
         let tmp = tmp("test_render_only");
 
         let rattler_build = rattler().with_args([
