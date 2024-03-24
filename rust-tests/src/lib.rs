@@ -619,7 +619,6 @@ mod tests {
 
     #[test]
     fn test_render_only_recipe() {
-        // let tmp = tmp("test_rich_render_only");
         let recipe_path = recipes().join("rich").join("recipe.yaml");
         let rattler_build_render_only = rattler().with_args([
             "build",
