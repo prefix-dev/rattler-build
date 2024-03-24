@@ -630,8 +630,7 @@ mod tests {
             "--output-dir",
             tmp.as_dir().to_str().unwrap(),
             "--target-platform",
-            "win-64"
-
+            "win-64",
         ]);
 
         assert!(rattler_build.status.success());
