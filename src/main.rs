@@ -84,6 +84,21 @@ async fn main() -> miette::Result<()> {
                         get_build_output(&build_args, recipe_path.clone(), &log_handler).await?;
                     outputs.push(output);
                 }
+
+                if build_args.render_only {
+                    let mut render_output = Vec::new();
+                    outputs.iter().for_each(|output| {
+                        let resolved_dep_as_str: Vec<String> = output
+                            .resolved_dependencies
+                            .iter()
+                            .map(|resolved_dep| serde_json::to_string_pretty(resolved_dep).unwrap())
+                            .collect();
+                        render_output.extend(resolved_dep_as_str);
+                    });
+
+                    println!("[{}]", render_output.join(","));
+                }
+
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
                 for output in outputs {
                     run_build_from_args(output).await?;

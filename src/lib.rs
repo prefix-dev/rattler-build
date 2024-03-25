@@ -35,6 +35,7 @@ mod windows;
 use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
+use metadata::Output;
 use miette::IntoDiagnostic;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Platform};
@@ -88,6 +89,8 @@ pub struct BuildOutput {
     pub tool_config: tool_configuration::Configuration,
     /// Recipe path.
     pub recipe_path: PathBuf,
+    /// Resolved dependencies which are printed when render_only is used
+    pub resolved_dependencies: Vec<metadata::Output>,
 }
 
 /// Returns the recipe path.
@@ -219,7 +222,7 @@ pub async fn get_build_output(
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
-    let mut render_only_output = Vec::new();
+    let mut resolved_dependencies = Vec::new();
     for discovered_output in outputs_and_variants {
         let hash =
             HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
@@ -310,20 +313,17 @@ pub async fn get_build_output(
                 .resolve_dependencies(&tool_config)
                 .await
                 .into_diagnostic()?;
-            render_only_output.push(serde_json::to_string_pretty(&resolved).unwrap());
+            resolved_dependencies.push(resolved);
             continue;
         }
         outputs.push(output);
-    }
-
-    if args.render_only {
-        println!("[{}]", render_only_output.join(","));
     }
 
     Ok(BuildOutput {
         outputs,
         tool_config,
         recipe_path,
+        resolved_dependencies,
     })
 }
 
