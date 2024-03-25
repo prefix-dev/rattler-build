@@ -616,4 +616,17 @@ mod tests {
         let output = String::from_utf8(rattler_build.stdout).unwrap();
         assert!(output.contains("it is included in the allow list. Skipping..."));
     }
+
+    #[test]
+    fn test_render_only_recipe() {
+        let recipe_path = recipes().join("rich").join("recipe.yaml");
+        let rattler_build_render_only = rattler().with_args([
+            "build",
+            "--recipe",
+            recipe_path.to_str().unwrap(),
+            "--render-only",
+        ]);
+
+        assert!(rattler_build_render_only.status.success());
+    }
 }
