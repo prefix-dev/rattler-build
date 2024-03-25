@@ -35,7 +35,6 @@ mod windows;
 use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
-use metadata::Output;
 use miette::IntoDiagnostic;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Platform};
