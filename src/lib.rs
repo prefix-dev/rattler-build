@@ -123,6 +123,7 @@ pub fn get_tool_config(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        render_only: args.render_only,
     }
 }
 
@@ -415,6 +416,7 @@ pub async fn rebuild_from_args(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        render_only: false,
     };
 
     output

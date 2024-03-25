@@ -30,6 +30,9 @@ pub struct Configuration {
 
     /// Whether to use bzip2
     pub use_bz2: bool,
+
+    /// Whether to only render the build output
+    pub render_only: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -73,6 +76,7 @@ impl Default for Configuration {
             no_test: false,
             use_zstd: true,
             use_bz2: true,
+            render_only: false,
         }
     }
 }
