@@ -590,15 +590,15 @@ pub fn sort_build_outputs_topologically(
         sorted_indices
     };
 
-    // sorted_indices
-    //     .iter()
-    //     .map(|idx| &outputs[idx.index()])
-    //     .for_each(|output| {
-    //         tracing::info!(
-    //             "Ordered output: {:?}",
-    //             output.outputs[0].name().as_normalized()
-    //         );
-    //     });
+    sorted_indices
+        .iter()
+        .map(|idx| &outputs[idx.index()])
+        .for_each(|output| {
+            tracing::info!(
+                "Ordered output: {:?}",
+                output.outputs[0].name().as_normalized()
+            );
+        });
 
     // Reorder outputs based on the sorted indices
     *outputs = sorted_indices
