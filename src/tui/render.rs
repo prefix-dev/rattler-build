@@ -20,13 +20,14 @@ use tui_input::backend::crossterm::EventHandler;
 
 /// Key bindings.
 const KEY_BINDINGS: &[(&str, &str)] = &[
-    ("Enter", "Build"),
-    ("q", "Quit"),
+    ("⏎ ", "Build"),
+    ("a", "Build All"),
+    ("e", "Edit Recipe"),
+    ("c", "Console"),
     ("j", "Next"),
     ("k", "Prev"),
     ("↕ ↔ ", "Scroll"),
-    ("e", "Edit Recipe"),
-    ("c", "Console"),
+    ("q", "Quit"),
 ];
 
 /// Handles the key events and updates the state.
@@ -99,6 +100,7 @@ pub(crate) fn handle_key_events(
         KeyCode::Left => {
             state.horizontal_scroll = state.horizontal_scroll.saturating_sub(5);
         }
+        KeyCode::Char('a') => sender.send(Event::StartBuildQueue).into_diagnostic()?,
         KeyCode::Enter => sender
             .send(Event::StartBuild(state.selected_package))
             .into_diagnostic()?,

@@ -25,12 +25,12 @@ pub enum Event {
     ProcessResolvedPackages(Vec<Package>),
     /// Start building.
     StartBuild(usize),
+    /// Build all packages.
+    StartBuildQueue,
     /// Set build state.
     SetBuildState(usize, BuildProgress),
     /// Build log.
     BuildLog(Vec<u8>),
-    /// Handle build error.
-    HandleBuildError(miette::Error, usize),
     /// Handle console input.
     HandleInput,
     /// Edit recipe.
