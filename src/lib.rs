@@ -219,6 +219,7 @@ pub async fn get_build_output(
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
+    let mut render_only_output = Vec::new();
     for discovered_output in outputs_and_variants {
         let hash =
             HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
@@ -309,10 +310,14 @@ pub async fn get_build_output(
                 .resolve_dependencies(&tool_config)
                 .await
                 .into_diagnostic()?;
-            println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
+            render_only_output.push(serde_json::to_string_pretty(&resolved).unwrap());
             continue;
         }
         outputs.push(output);
+    }
+
+    if args.render_only {
+        println!("[{}]", render_only_output.join(","));
     }
 
     Ok(BuildOutput {
@@ -585,15 +590,15 @@ pub fn sort_build_outputs_topologically(
         sorted_indices
     };
 
-    sorted_indices
-        .iter()
-        .map(|idx| &outputs[idx.index()])
-        .for_each(|output| {
-            tracing::info!(
-                "Ordered output: {:?}",
-                output.outputs[0].name().as_normalized()
-            );
-        });
+    // sorted_indices
+    //     .iter()
+    //     .map(|idx| &outputs[idx.index()])
+    //     .for_each(|output| {
+    //         tracing::info!(
+    //             "Ordered output: {:?}",
+    //             output.outputs[0].name().as_normalized()
+    //         );
+    //     });
 
     // Reorder outputs based on the sorted indices
     *outputs = sorted_indices
