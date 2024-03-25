@@ -205,7 +205,7 @@ pub async fn create_environment(
         )
         .await?;
     } else {
-        tracing::info!("skipping installation when --render-only is used",);
+        tracing::info!("skipping installation when --render-only is used");
     }
 
     Ok(required_packages)
