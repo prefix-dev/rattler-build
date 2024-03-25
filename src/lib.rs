@@ -32,9 +32,9 @@ mod unix;
 pub mod upload;
 mod windows;
 
-use chrono::{DateTime, Utc};
 use dunce::canonicalize;
 use fs_err as fs;
+use metadata::Output;
 use miette::IntoDiagnostic;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Platform};
@@ -45,6 +45,7 @@ use std::{
     str::FromStr,
     sync::{Arc, Mutex},
 };
+use tool_configuration::Configuration;
 
 use {
     build::run_build,
@@ -63,32 +64,6 @@ use {
     system_tools::SystemTools,
     variant_config::{ParseErrors, VariantConfig},
 };
-
-/// Directories that will be created for the build process.
-#[derive(Debug, Clone)]
-pub struct DirectoryInfo {
-    /// Name of the directory.
-    pub name: String,
-    /// Recipe path.
-    pub recipe_path: PathBuf,
-    /// Output directory.
-    pub output_dir: PathBuf,
-    /// No build ID flag.
-    pub no_build_id: bool,
-    /// Timestamp.
-    pub timestamp: DateTime<Utc>,
-}
-
-/// Wrapper for multiple outputs.
-#[derive(Clone, Debug)]
-pub struct BuildOutput {
-    /// Build outputs.
-    pub outputs: Vec<metadata::Output>,
-    /// Tool configuration.
-    pub tool_config: tool_configuration::Configuration,
-    /// Recipe path.
-    pub recipe_path: PathBuf,
-}
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -134,12 +109,29 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
     Ok(recipe_path)
 }
 
+/// Returns the tool configuration.
+pub fn get_tool_config(
+    args: &BuildOpts,
+    fancy_log_handler: &LoggingOutputHandler,
+) -> Configuration {
+    let client =
+        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone());
+    Configuration {
+        client,
+        fancy_log_handler: fancy_log_handler.clone(),
+        no_clean: args.keep_build,
+        no_test: args.no_test,
+        use_zstd: args.common.use_zstd,
+        use_bz2: args.common.use_bz2,
+    }
+}
+
 /// Returns the output for the build.
 pub async fn get_build_output(
     args: &BuildOpts,
     recipe_path: PathBuf,
-    fancy_log_handler: &LoggingOutputHandler,
-) -> miette::Result<BuildOutput> {
+    tool_config: &Configuration,
+) -> miette::Result<Vec<Output>> {
     let output_dir = args
         .common
         .output_dir
@@ -204,18 +196,6 @@ pub async fn get_build_output(
         tracing::info!("\n{}\n", table);
     }
     drop(enter);
-
-    let client =
-        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone());
-
-    let tool_config = tool_configuration::Configuration {
-        client,
-        fancy_log_handler: fancy_log_handler.clone(),
-        no_clean: args.keep_build,
-        no_test: args.no_test,
-        use_zstd: args.common.use_zstd,
-        use_bz2: args.common.use_bz2,
-    };
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
@@ -306,7 +286,7 @@ pub async fn get_build_output(
 
         if args.render_only {
             let resolved = output
-                .resolve_dependencies(&tool_config)
+                .resolve_dependencies(tool_config)
                 .await
                 .into_diagnostic()?;
             println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
@@ -315,18 +295,17 @@ pub async fn get_build_output(
         outputs.push(output);
     }
 
-    Ok(BuildOutput {
-        outputs,
-        tool_config,
-        recipe_path,
-    })
+    Ok(outputs)
 }
 
 /// Runs build.
-pub async fn run_build_from_args(build_output: BuildOutput) -> miette::Result<()> {
+pub async fn run_build_from_args(
+    build_output: Vec<Output>,
+    tool_config: Configuration,
+) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
-    for output in build_output.outputs {
-        let output = match run_build(output, &build_output.tool_config).await {
+    for output in build_output {
+        let output = match run_build(output, &tool_config).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output
@@ -369,7 +348,7 @@ pub async fn run_test_from_args(
         channels: args
             .channel
             .unwrap_or_else(|| vec!["conda-forge".to_string()]),
-        tool_configuration: tool_configuration::Configuration {
+        tool_configuration: Configuration {
             client,
             fancy_log_handler,
             // duplicate from `keep_test_prefix`?
@@ -524,7 +503,7 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
 
 /// Sort the build outputs (recipes) topologically based on their dependencies.
 pub fn sort_build_outputs_topologically(
-    outputs: &mut Vec<BuildOutput>,
+    outputs: &mut Vec<Output>,
     up_to: Option<&str>,
 ) -> miette::Result<()> {
     let mut graph = DiGraph::<usize, ()>::new();
@@ -533,32 +512,30 @@ pub fn sort_build_outputs_topologically(
     // Index outputs by their produced names for quick lookup
     for (idx, output) in outputs.iter().enumerate() {
         let idx = graph.add_node(idx);
-        for produced in &output.outputs {
-            name_to_index.insert(produced.name().clone(), idx);
-        }
+        name_to_index.insert(output.name().clone(), idx);
     }
 
     // Add edges based on dependencies
     for output in outputs.iter() {
-        for o in &output.outputs {
-            let output_idx = *name_to_index.get(o.name()).expect("We just inserted it");
-            for dep in o.recipe.requirements().all() {
-                let dep_name = match dep {
-                    recipe::parser::Dependency::Spec(spec) => {
-                        spec.name.clone().expect("We should always have a name")
-                    }
-                    recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                    recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
-                    recipe::parser::Dependency::Compiler(_) => continue,
-                };
-                if let Some(&dep_idx) = name_to_index.get(&dep_name) {
-                    // do not point to self (circular dependency) - this can happen with
-                    // pin_subpackage in run_exports, for example.
-                    if output_idx == dep_idx {
-                        continue;
-                    }
-                    graph.add_edge(output_idx, dep_idx, ());
+        let output_idx = *name_to_index
+            .get(output.name())
+            .expect("We just inserted it");
+        for dep in output.recipe.requirements().all() {
+            let dep_name = match dep {
+                recipe::parser::Dependency::Spec(spec) => {
+                    spec.name.clone().expect("We should always have a name")
                 }
+                recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+                recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
+                recipe::parser::Dependency::Compiler(_) => continue,
+            };
+            if let Some(&dep_idx) = name_to_index.get(&dep_name) {
+                // do not point to self (circular dependency) - this can happen with
+                // pin_subpackage in run_exports, for example.
+                if output_idx == dep_idx {
+                    continue;
+                }
+                graph.add_edge(output_idx, dep_idx, ());
             }
         }
     }
@@ -589,12 +566,7 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|idx| &outputs[idx.index()])
         .for_each(|output| {
-            if !output.outputs.is_empty() {
-                tracing::info!(
-                    "Ordered output: {:?}",
-                    output.outputs[0].name().as_normalized()
-                );
-            }
+            tracing::info!("Ordered output: {:?}", output.name().as_normalized());
         });
 
     // Reorder outputs based on the sorted indices

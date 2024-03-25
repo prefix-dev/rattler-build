@@ -171,11 +171,11 @@ pub async fn run<B: Backend>(
                         let output = get_build_output(
                             &state.build_opts,
                             recipe_path.clone(),
-                            &state.log_handler,
+                            &state.tool_config,
                         )
                         .await
                         .unwrap();
-                        outputs.push(output);
+                        outputs.extend(output);
                     }
                     log_sender
                         .send(Event::ProcessBuildOutputs(outputs))
@@ -184,24 +184,25 @@ pub async fn run<B: Backend>(
             }
             Event::ProcessBuildOutputs(mut outputs) => {
                 sort_build_outputs_topologically(&mut outputs, state.build_opts.up_to.as_deref())?;
-                for output in outputs {
-                    let packages = Package::from_output(output);
-                    state.packages.retain(|package| {
-                        packages
-                            .iter()
-                            .any(|p| p.recipe_path != package.recipe_path)
-                    });
-                    for new_package in packages {
-                        match state
-                            .packages
-                            .iter_mut()
-                            .find(|p| new_package.name == p.name)
-                        {
-                            Some(package) => {
-                                *package = new_package;
-                            }
-                            None => state.packages.push(new_package),
+                let packages: Vec<Package> = outputs
+                    .into_iter()
+                    .map(|output| Package::from_output(output, &state.tool_config))
+                    .collect();
+                state.packages.retain(|package| {
+                    packages
+                        .iter()
+                        .any(|p| p.recipe_path != package.recipe_path)
+                });
+                for new_package in packages {
+                    match state
+                        .packages
+                        .iter_mut()
+                        .find(|p| new_package.name == p.name)
+                    {
+                        Some(package) => {
+                            *package = new_package;
                         }
+                        None => state.packages.push(new_package),
                     }
                 }
             }
