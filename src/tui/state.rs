@@ -105,6 +105,8 @@ pub(crate) struct TuiState {
     pub horizontal_scroll: u16,
     /// Application log.
     pub log: Vec<String>,
+    /// Index of the currently building package.
+    pub build_queue: Option<usize>,
     /// Is the input mode enabled?
     pub input_mode: bool,
     /// Current value of the prompt input.
@@ -124,6 +126,7 @@ impl TuiState {
             horizontal_scroll: 0,
             log: Vec::new(),
             input_mode: false,
+            build_queue: None,
             input: Input::default(),
         }
     }

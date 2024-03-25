@@ -17,7 +17,8 @@ $ rattler-build build -r recipe.yml --tui
 
 | Key                                                            | Action                                           |
 | -------------------------------------------------------------- | ------------------------------------------------ |
-| <kbd>Enter</kbd>                                               | Build package                                    |
+| <kbd>⏎</kbd>                                                   | Build                                            |
+| <kbd>a</kbd>                                                   | Build all                                        |
 | <kbd>j</kbd>/<kbd>k</kbd>                                      | Next/previous package                            |
 | <kbd>up</kbd>/<kbd>down</kbd>/<kbd>left</kbd>/<kbd>right</kbd> | Scroll logs                                      |
 | <kbd>e</kbd>                                                   | Edit recipe (via `$EDITOR`)                      |
