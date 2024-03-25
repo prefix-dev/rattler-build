@@ -591,10 +591,12 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|idx| &outputs[idx.index()])
         .for_each(|output| {
-            tracing::info!(
-                "Ordered output: {:?}",
-                output.outputs[0].name().as_normalized()
-            );
+            if !output.outputs.is_empty() {
+                tracing::info!(
+                    "Ordered output: {:?}",
+                    output.outputs[0].name().as_normalized()
+                );
+            }
         });
 
     // Reorder outputs based on the sorted indices

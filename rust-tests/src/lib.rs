@@ -618,6 +618,19 @@ mod tests {
     }
 
     #[test]
+    fn test_render_only_recipe() {
+        let recipe_path = recipes().join("rich").join("recipe.yaml");
+        let rattler_build_render_only = rattler().with_args([
+            "build",
+            "--recipe",
+            recipe_path.to_str().unwrap(),
+            "--render-only",
+        ]);
+
+        assert!(rattler_build_render_only.status.success());
+    }
+
+    #[test]
     #[cfg(target_os = "macos")]
     fn render_only_dont_install_pkgs() {
         // test covering this issue https://github.com/prefix-dev/rattler-build/issues/716
