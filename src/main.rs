@@ -4,7 +4,7 @@ use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
-    get_build_output, get_recipe_path,
+    get_build_output, get_recipe_path, get_tool_config,
     opt::{App, ShellCompletion, SubCommands},
     rebuild_from_args,
     recipe_generator::generate_recipe,
@@ -78,16 +78,15 @@ async fn main() -> miette::Result<()> {
                 }
             } else {
                 let log_handler = log_handler.expect("logger is not initialized");
+                let tool_config = get_tool_config(&build_args, &log_handler);
                 let mut outputs = Vec::new();
                 for recipe_path in &recipe_paths {
                     let output =
-                        get_build_output(&build_args, recipe_path.clone(), &log_handler).await?;
-                    outputs.push(output);
+                        get_build_output(&build_args, recipe_path.clone(), &tool_config).await?;
+                    outputs.extend(output);
                 }
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
-                for output in outputs {
-                    run_build_from_args(output).await?;
-                }
+                run_build_from_args(outputs, tool_config).await?;
             }
             Ok(())
         }
