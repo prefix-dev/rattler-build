@@ -215,6 +215,7 @@ pub async fn get_build_output(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        render_only: args.render_only,
     };
 
     let mut subpackages = BTreeMap::new();
@@ -436,6 +437,7 @@ pub async fn rebuild_from_args(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        render_only: false,
     };
 
     output

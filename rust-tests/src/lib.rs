@@ -629,4 +629,24 @@ mod tests {
 
         assert!(rattler_build_render_only.status.success());
     }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn render_only_dont_install_pkgs() {
+        // test covering this issue https://github.com/prefix-dev/rattler-build/issues/716
+        let tmp = tmp("test_render_only");
+
+        let rattler_build = rattler().with_args([
+            "build",
+            "--recipe",
+            recipes().join("flask").to_str().unwrap(),
+            "--render-only",
+            "--output-dir",
+            tmp.as_dir().to_str().unwrap(),
+            "--target-platform",
+            "win-64",
+        ]);
+
+        assert!(rattler_build.status.success());
+    }
 }
