@@ -472,30 +472,26 @@ pub async fn install_environments(
         .as_ref()
         .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-    if !tool_configuration.render_only {
-        if let Some(build_deps) = dependencies.build.as_ref() {
-            install_packages(
-                &build_deps.resolved,
-                &output.build_configuration.build_platform,
-                &output.build_configuration.directories.build_prefix,
-                &cache_dir,
-                tool_configuration,
-            )
-            .await?;
-        }
+    if let Some(build_deps) = dependencies.build.as_ref() {
+        install_packages(
+            &build_deps.resolved,
+            &output.build_configuration.build_platform,
+            &output.build_configuration.directories.build_prefix,
+            &cache_dir,
+            tool_configuration,
+        )
+        .await?;
+    }
 
-        if let Some(host_deps) = dependencies.host.as_ref() {
-            install_packages(
-                &host_deps.resolved,
-                &output.build_configuration.host_platform,
-                &output.build_configuration.directories.host_prefix,
-                &cache_dir,
-                tool_configuration,
-            )
-            .await?;
-        }
-    } else {
-        tracing::info!("skipping installation when --render-only is used",);
+    if let Some(host_deps) = dependencies.host.as_ref() {
+        install_packages(
+            &host_deps.resolved,
+            &output.build_configuration.host_platform,
+            &output.build_configuration.directories.host_prefix,
+            &cache_dir,
+            tool_configuration,
+        )
+        .await?;
     }
 
     Ok(())
