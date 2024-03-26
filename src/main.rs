@@ -58,7 +58,10 @@ async fn main() -> miette::Result<()> {
         }
         Some(SubCommands::Build(build_args)) => {
             let mut recipe_paths = Vec::new();
-            if !std::io::stdin().is_terminal() {
+            if !std::io::stdin().is_terminal()
+                && build_args.recipe.len() == 1
+                && get_recipe_path(&build_args.recipe[0]).is_err()
+            {
                 let package_name =
                     format!("{}-{}", env!("CARGO_PKG_NAME"), get_current_timestamp()?);
                 let temp_dir = env::temp_dir().join(package_name);
