@@ -98,7 +98,7 @@ async fn main() -> miette::Result<()> {
                     });
 
                     println!("[{}]", render_output.join(","));
-                    return Ok(())
+                    return Ok(());
                 }
 
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
