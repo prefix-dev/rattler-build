@@ -1,7 +1,8 @@
 //! TUI event handling.
 
+use crate::metadata::Output;
+
 use super::state::BuildProgress;
-use crate::BuildOutput;
 use crossterm::event::{Event as CrosstermEvent, KeyEvent, MouseEvent};
 use futures::{FutureExt, StreamExt};
 use miette::IntoDiagnostic;
@@ -22,15 +23,15 @@ pub enum Event {
     /// Get build outputs.
     GetBuildOutputs(Vec<PathBuf>),
     /// Processes the build outputs.
-    ProcessBuildOutputs(Vec<BuildOutput>),
+    ProcessBuildOutputs(Vec<Output>),
     /// Start building.
     StartBuild(usize),
+    /// Build all packages.
+    StartBuildQueue,
     /// Set build state.
     SetBuildState(usize, BuildProgress),
     /// Build log.
     BuildLog(Vec<u8>),
-    /// Handle build error.
-    HandleBuildError(miette::Error, usize),
     /// Handle console input.
     HandleInput,
     /// Edit recipe.

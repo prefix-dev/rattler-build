@@ -5,8 +5,8 @@ use throbber_widgets_tui::ThrobberState;
 use tui_input::Input;
 
 use crate::{
-    console_utils::LoggingOutputHandler, metadata::Output, opt::BuildOpts,
-    tool_configuration::Configuration, BuildOutput,
+    console_utils::LoggingOutputHandler, get_tool_config, metadata::Output, opt::BuildOpts,
+    tool_configuration::Configuration,
 };
 
 /// Representation of a package.
@@ -28,34 +28,28 @@ pub struct Package {
 
 impl Package {
     /// Constructs a package list from build output.
-    pub fn from_output(build_output: BuildOutput) -> Vec<Self> {
-        build_output
-            .outputs
-            .iter()
-            .map(|output| {
-                let name = output.name().as_normalized().to_string();
-                Package {
-                    name: name.clone(),
-                    version: output.version().to_string(),
-                    build_string: output.build_string().map(String::from),
-                    subpackages: output
-                        .build_configuration
-                        .subpackages
-                        .keys()
-                        .map(|v| v.as_normalized().to_string())
-                        .filter(|v| v != &name)
-                        .collect(),
-                    build_progress: BuildProgress::None,
-                    build_log: Vec::new(),
-                    spinner_state: ThrobberState::default(),
-                    area: Rect::default(),
-                    is_hovered: false,
-                    output: output.clone(),
-                    tool_config: build_output.tool_config.clone(),
-                    recipe_path: build_output.recipe_path.clone(),
-                }
-            })
-            .collect()
+    pub fn from_output(output: Output, tool_config: &Configuration) -> Self {
+        let name = output.name().as_normalized().to_string();
+        Package {
+            name: name.clone(),
+            version: output.version().to_string(),
+            build_string: output.build_string().map(String::from),
+            subpackages: output
+                .build_configuration
+                .subpackages
+                .keys()
+                .map(|v| v.as_normalized().to_string())
+                .filter(|v| v != &name)
+                .collect(),
+            build_progress: BuildProgress::None,
+            build_log: Vec::new(),
+            spinner_state: ThrobberState::default(),
+            area: Rect::default(),
+            is_hovered: false,
+            output: output.clone(),
+            tool_config: tool_config.clone(),
+            recipe_path: output.build_configuration.directories.recipe_dir.clone(),
+        }
     }
 }
 
@@ -91,8 +85,8 @@ impl BuildProgress {
 pub(crate) struct TuiState {
     /// Build options.
     pub build_opts: BuildOpts,
-    /// Log handler.
-    pub log_handler: LoggingOutputHandler,
+    /// Tool configuration.
+    pub tool_config: Configuration,
     /// Is the application running?
     pub running: bool,
     /// Packages to build.
@@ -105,6 +99,8 @@ pub(crate) struct TuiState {
     pub horizontal_scroll: u16,
     /// Application log.
     pub log: Vec<String>,
+    /// Index of the currently building package.
+    pub build_queue: Option<usize>,
     /// Is the input mode enabled?
     pub input_mode: bool,
     /// Current value of the prompt input.
@@ -116,7 +112,7 @@ impl TuiState {
     pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
             build_opts: build_opts.clone(),
-            log_handler,
+            tool_config: get_tool_config(&build_opts, &log_handler),
             running: true,
             packages: Vec::new(),
             selected_package: 0,
@@ -124,6 +120,7 @@ impl TuiState {
             horizontal_scroll: 0,
             log: Vec::new(),
             input_mode: false,
+            build_queue: None,
             input: Input::default(),
         }
     }

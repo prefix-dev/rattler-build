@@ -171,11 +171,11 @@ pub async fn run<B: Backend>(
                         let output = get_build_output(
                             &state.build_opts,
                             recipe_path.clone(),
-                            &state.log_handler,
+                            &state.tool_config,
                         )
                         .await
                         .unwrap();
-                        outputs.push(output);
+                        outputs.extend(output);
                     }
                     log_sender
                         .send(Event::ProcessBuildOutputs(outputs))
@@ -184,27 +184,54 @@ pub async fn run<B: Backend>(
             }
             Event::ProcessBuildOutputs(mut outputs) => {
                 sort_build_outputs_topologically(&mut outputs, state.build_opts.up_to.as_deref())?;
-                for output in outputs {
-                    let packages = Package::from_output(output);
-                    state.packages.retain(|package| {
-                        packages
-                            .iter()
-                            .any(|p| p.recipe_path != package.recipe_path)
-                    });
-                    for new_package in packages {
-                        match state
-                            .packages
-                            .iter_mut()
-                            .find(|p| new_package.name == p.name)
-                        {
-                            Some(package) => {
-                                *package = new_package;
-                            }
-                            None => state.packages.push(new_package),
+                let packages: Vec<Package> = outputs
+                    .into_iter()
+                    .map(|output| Package::from_output(output, &state.tool_config))
+                    .collect();
+                state.packages.retain(|package| {
+                    packages
+                        .iter()
+                        .any(|p| p.recipe_path != package.recipe_path)
+                });
+                for new_package in packages {
+                    match state
+                        .packages
+                        .iter_mut()
+                        .find(|p| new_package.name == p.name)
+                    {
+                        Some(package) => {
+                            *package = new_package;
                         }
+                        None => state.packages.push(new_package),
                     }
                 }
             }
+            Event::StartBuildQueue => match state.build_queue {
+                Some(mut build_index) => {
+                    while build_index != state.packages.len() {
+                        if state.packages[build_index].build_progress == BuildProgress::Done {
+                            build_index += 1;
+                            continue;
+                        }
+                        state.build_queue = Some(build_index);
+                        tui.event_handler
+                            .sender
+                            .send(Event::StartBuild(build_index))
+                            .into_diagnostic()?;
+                        break;
+                    }
+                    if build_index == state.packages.len() {
+                        state.build_queue = None;
+                    }
+                }
+                None => {
+                    state.build_queue = Some(0);
+                    tui.event_handler
+                        .sender
+                        .send(Event::StartBuild(0))
+                        .into_diagnostic()?;
+                }
+            },
             Event::StartBuild(index) => {
                 if !state.is_building_package() {
                     let package = state.packages[index].clone();
@@ -212,13 +239,16 @@ pub async fn run<B: Backend>(
                     let mut packages = Vec::new();
                     for subpackage in package.subpackages.iter() {
                         if let Some(i) = state.packages.iter().position(|v| v.name == *subpackage) {
-                            packages.push((i, state.packages[i].clone()));
+                            if state.packages[i].build_progress != BuildProgress::Done {
+                                packages.push((i, state.packages[i].clone()));
+                            }
                         } else {
                             tracing::error!("Cannot find subpackage to build: {subpackage}")
                         }
                     }
                     packages.push((index, package.clone()));
                     tokio::spawn(async move {
+                        let mut build_error = None;
                         for (i, package) in packages {
                             log_sender
                                 .send(Event::SetBuildState(i, BuildProgress::Building))
@@ -237,11 +267,18 @@ pub async fn run<B: Backend>(
                                         .unwrap();
                                 }
                                 Err(e) => {
-                                    tracing::error!("Error building package: {}", e);
-                                    log_sender.send(Event::HandleBuildError(e, i)).unwrap();
+                                    build_error = Some(e);
+                                    log_sender
+                                        .send(Event::SetBuildState(i, BuildProgress::Failed))
+                                        .unwrap();
                                     break;
                                 }
                             };
+                        }
+                        if let Some(e) = build_error {
+                            tracing::error!("Error building package: {}", e);
+                        } else if state.build_queue.is_some() {
+                            log_sender.send(Event::StartBuildQueue).unwrap();
                         }
                     });
                 }
@@ -262,9 +299,6 @@ pub async fn run<B: Backend>(
                 } else {
                     state.log.push(String::from_utf8_lossy(&log).to_string());
                 }
-            }
-            Event::HandleBuildError(_, i) => {
-                state.packages[i].build_progress = BuildProgress::Failed;
             }
             Event::HandleInput => {
                 state.input_mode = false;
