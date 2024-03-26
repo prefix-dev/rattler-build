@@ -12,13 +12,12 @@
 // | "interpreted library (R)"
 // | "non-library"
 
+use rattler_conda_types::{PackageName, PrefixRecord};
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     ops::Sub,
     path::{Path, PathBuf},
 };
-
-use rattler_conda_types::PrefixRecord;
 
 /// The nature of a package
 #[derive(Debug, PartialEq, Eq)]
@@ -124,6 +123,42 @@ impl PackageNature {
         }
 
         nature
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct PrefixInfo {
+    pub package_to_nature: HashMap<PackageName, PackageNature>,
+    pub path_to_package: HashMap<PathBuf, PackageName>,
+}
+
+impl PrefixInfo {
+    pub fn from_prefix(prefix: &Path) -> Result<Self, std::io::Error> {
+        let mut prefix_info = Self::default();
+
+        let conda_meta = prefix.join("conda-meta");
+
+        if conda_meta.exists() {
+            for entry in conda_meta.read_dir()? {
+                let entry = entry?;
+                let path = entry.path();
+                if path.extension().and_then(|v| v.to_str()) == Some("json") {
+                    let record = PrefixRecord::from_path(path)?;
+                    let package_nature = PackageNature::from_prefix_record(&record);
+                    prefix_info.package_to_nature.insert(
+                        record.repodata_record.package_record.name.clone(),
+                        package_nature,
+                    );
+                    for file in record.files {
+                        prefix_info
+                            .path_to_package
+                            .insert(file, record.repodata_record.package_record.name.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(prefix_info)
     }
 }
 

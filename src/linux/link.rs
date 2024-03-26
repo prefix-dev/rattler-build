@@ -147,6 +147,7 @@ impl Relinker for SharedObject {
             .rpaths
             .iter()
             .flat_map(|r| r.split(':'))
+            .filter(|r| !r.is_empty())
             .map(PathBuf::from)
             .collect::<Vec<_>>();
         rpaths.extend(
@@ -160,6 +161,7 @@ impl Relinker for SharedObject {
             .runpaths
             .iter()
             .flat_map(|r| r.split(':'))
+            .filter(|r| !r.is_empty())
             .map(PathBuf::from)
             .collect::<Vec<_>>();
 
