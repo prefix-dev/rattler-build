@@ -8,6 +8,7 @@ use rattler_build::{
     opt::{App, ShellCompletion, SubCommands},
     rebuild_from_args,
     recipe_generator::generate_recipe,
+    render::resolved_dependencies::FinalizedDependencies,
     run_build_from_args, run_test_from_args, sort_build_outputs_topologically, upload_from_args,
 };
 
@@ -97,7 +98,6 @@ async fn main() -> miette::Result<()> {
                     );
                     return Ok(());
                 }
-
 
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
                 run_build_from_args(outputs, tool_config).await?;
