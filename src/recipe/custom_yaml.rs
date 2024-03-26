@@ -1103,7 +1103,13 @@ impl TryConvertNode<Url> for RenderedNode {
 impl TryConvertNode<Url> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<Url, Vec<PartialParsingError>> {
         Url::parse(self.as_str())
-            .map_err(|err| _partialerror!(*self.span(), ErrorKind::from(err)))
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::from(err),
+                    label = "failed to parse the URL"
+                )
+            })
             .map_err(|e| vec![e])
     }
 }

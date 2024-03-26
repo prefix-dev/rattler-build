@@ -119,7 +119,13 @@ impl GlobVec {
 impl TryConvertNode<GlobVec> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
         self.as_sequence()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedSequence)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedSequence,
+                    label = "expects a sequence of globs(as strings)"
+                )]
+            })
             .and_then(|s| s.try_convert(name))
     }
 }
@@ -128,12 +134,15 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
     fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
         let mut vec = Vec::with_capacity(self.len());
         for item in self.iter() {
-            let str: String = item.try_convert(_name)?;
-            vec.push(
-                Glob::new(&str).map_err(|err| {
-                    vec![_partialerror!(*item.span(), ErrorKind::GlobParsing(err),)]
-                })?,
-            );
+            let src: String = item.try_convert(_name)?;
+            vec.push(Glob::new(&src).map_err(|err| {
+                vec![_partialerror!(
+                    *item.span(),
+                    ErrorKind::GlobParsing(err),
+                    label = "expects valid globs",
+                    help = format!("invalid glob pattern `{src}`")
+                )]
+            })?);
         }
 
         if vec.is_empty() {
@@ -143,9 +152,13 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
             for glob in vec.iter() {
                 globset_builder.add(glob.clone());
             }
-            let globset = globset_builder
-                .build()
-                .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?;
+            let globset = globset_builder.build().map_err(|err| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::GlobParsing(err),
+                    label = "failed to parse globset from globs"
+                )]
+            })?;
 
             Ok(GlobVec(vec, Some(globset)))
         }
