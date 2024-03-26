@@ -87,19 +87,17 @@ async fn main() -> miette::Result<()> {
                 }
 
                 if build_args.render_only {
-                    let mut render_output = Vec::new();
-                    outputs.iter().for_each(|output| {
-                        let resolved_dep_as_str: Vec<String> = output
-                            .finalized_dependencies
-                            .iter()
-                            .map(|resolved_dep| serde_json::to_string_pretty(resolved_dep).unwrap())
-                            .collect();
-                        render_output.extend(resolved_dep_as_str);
-                    });
-
-                    println!("[{}]", render_output.join(","));
+                    let render_output: Vec<FinalizedDependencies> = outputs
+                        .into_iter()
+                        .flat_map(|output| output.finalized_dependencies)
+                        .collect();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&render_output).into_diagnostic()?
+                    );
                     return Ok(());
                 }
+
 
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
                 run_build_from_args(outputs, tool_config).await?;
