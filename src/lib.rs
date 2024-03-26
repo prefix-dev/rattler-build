@@ -286,11 +286,11 @@ pub async fn get_build_output(
         };
 
         if args.render_only {
-            let resolved = output
+            let output_with_resolved_dependencies = output
                 .resolve_dependencies(tool_config)
                 .await
                 .into_diagnostic()?;
-            println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
+            outputs.push(output_with_resolved_dependencies);
             continue;
         }
         outputs.push(output);

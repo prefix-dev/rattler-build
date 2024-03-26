@@ -8,6 +8,7 @@ use rattler_build::{
     opt::{App, ShellCompletion, SubCommands},
     rebuild_from_args,
     recipe_generator::generate_recipe,
+    render::resolved_dependencies::FinalizedDependencies,
     run_build_from_args, run_test_from_args, sort_build_outputs_topologically, upload_from_args,
 };
 
@@ -85,6 +86,19 @@ async fn main() -> miette::Result<()> {
                         get_build_output(&build_args, recipe_path.clone(), &tool_config).await?;
                     outputs.extend(output);
                 }
+
+                if build_args.render_only {
+                    let render_output: Vec<FinalizedDependencies> = outputs
+                        .into_iter()
+                        .flat_map(|output| output.finalized_dependencies)
+                        .collect();
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&render_output).into_diagnostic()?
+                    );
+                    return Ok(());
+                }
+
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
                 run_build_from_args(outputs, tool_config).await?;
             }
