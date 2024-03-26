@@ -7,7 +7,7 @@
 To launch the TUI, run the `build` command with the `--tui` flag as shown below:
 
 ```shell
-$ rattler-build build -r recipe.yml --tui
+$ rattler-build build -r recipe.yaml --tui
 ```
 
 !!! note
