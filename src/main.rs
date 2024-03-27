@@ -88,13 +88,9 @@ async fn main() -> miette::Result<()> {
                 }
 
                 if build_args.render_only {
-                    let render_output: Vec<FinalizedDependencies> = outputs
-                        .into_iter()
-                        .flat_map(|output| output.finalized_dependencies)
-                        .collect();
                     println!(
                         "{}",
-                        serde_json::to_string_pretty(&render_output).into_diagnostic()?
+                        serde_json::to_string_pretty(&outputs).into_diagnostic()?
                     );
                     return Ok(());
                 }
