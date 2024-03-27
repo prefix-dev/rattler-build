@@ -217,7 +217,7 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `command`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
