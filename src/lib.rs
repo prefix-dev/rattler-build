@@ -133,11 +133,13 @@ pub async fn get_build_output(
     recipe_path: PathBuf,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
-    let output_dir = args
-        .common
-        .output_dir
-        .clone()
-        .unwrap_or(current_dir().into_diagnostic()?.join("output"));
+    let output_dir = canonicalize(
+        args.common
+            .output_dir
+            .clone()
+            .unwrap_or(current_dir().into_diagnostic()?.join("output")),
+    )
+    .into_diagnostic()?;
     if output_dir.starts_with(
         recipe_path
             .parent()
