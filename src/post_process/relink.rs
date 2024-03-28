@@ -181,7 +181,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         }
         if is_valid_file(target_platform, p)? {
             if target_platform != Platform::EmscriptenWasm32 {
-                let relinker =  get_relinker(target_platform, p)?;
+                let relinker = get_relinker(target_platform, p)?;
                 relinker.relink(
                     tmp_prefix,
                     encoded_prefix,
