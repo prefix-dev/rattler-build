@@ -1,5 +1,11 @@
 //! This is the main entry point for the `rattler-build` binary.
 
+use std::{
+    env,
+    fs::{self, File},
+    io::{self, IsTerminal},
+};
+
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
@@ -9,6 +15,7 @@ use rattler_build::{
     rebuild_from_args,
     recipe_generator::generate_recipe,
     run_build_from_args, run_test_from_args, sort_build_outputs_topologically, upload_from_args,
+    utils::get_current_timestamp,
 };
 
 #[tokio::main]
@@ -50,19 +57,37 @@ async fn main() -> miette::Result<()> {
         }
         Some(SubCommands::Build(build_args)) => {
             let mut recipe_paths = Vec::new();
-            for recipe_path in &build_args.recipe {
-                recipe_paths.push(get_recipe_path(recipe_path)?);
-            }
-            if let Some(recipe_dir) = &build_args.recipe_dir {
-                for entry in ignore::Walk::new(recipe_dir) {
-                    let entry = entry.into_diagnostic()?;
-                    if entry.path().is_dir() {
-                        if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                            recipe_paths.push(recipe_path);
+            if !std::io::stdin().is_terminal()
+                && build_args.recipe.len() == 1
+                && get_recipe_path(&build_args.recipe[0]).is_err()
+            {
+                let package_name =
+                    format!("{}-{}", env!("CARGO_PKG_NAME"), get_current_timestamp()?);
+                let temp_dir = env::temp_dir().join(package_name);
+                fs::create_dir(&temp_dir).into_diagnostic()?;
+                let recipe_path = temp_dir.join("recipe.yaml");
+                io::copy(
+                    &mut io::stdin(),
+                    &mut File::create(&recipe_path).into_diagnostic()?,
+                )
+                .into_diagnostic()?;
+                recipe_paths.push(get_recipe_path(&recipe_path)?);
+            } else {
+                for recipe_path in &build_args.recipe {
+                    recipe_paths.push(get_recipe_path(recipe_path)?);
+                }
+                if let Some(recipe_dir) = &build_args.recipe_dir {
+                    for entry in ignore::Walk::new(recipe_dir) {
+                        let entry = entry.into_diagnostic()?;
+                        if entry.path().is_dir() {
+                            if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                                recipe_paths.push(recipe_path);
+                            }
                         }
                     }
                 }
             }
+
             if build_args.tui {
                 #[cfg(feature = "tui")]
                 {
@@ -81,8 +106,7 @@ async fn main() -> miette::Result<()> {
                 let tool_config = get_tool_config(&build_args, &log_handler);
                 let mut outputs = Vec::new();
                 for recipe_path in &recipe_paths {
-                    let output =
-                        get_build_output(&build_args, recipe_path.clone(), &tool_config).await?;
+                    let output = get_build_output(&build_args, recipe_path, &tool_config).await?;
                     outputs.extend(output);
                 }
 
