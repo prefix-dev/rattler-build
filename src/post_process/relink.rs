@@ -105,9 +105,6 @@ pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkErro
         SharedObject::test_file(path)
     } else if platform.is_osx() {
         Dylib::test_file(path)
-    } else if platform == Platform::EmscriptenWasm32 {
-        // return true for wasm files
-        Ok(true)
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -152,7 +149,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
     if target_platform == Platform::NoArch
         || target_platform.is_windows()
-        || target_platform.arch().eq(&Some(Arch::Wasm32))
+        // skip linking checks for wasm
+        || target_platform.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
     {
         return Ok(());
@@ -192,7 +190,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             binaries.insert(p.clone());
         }
     }
-    // skip linking checks for wasm
     perform_linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())
