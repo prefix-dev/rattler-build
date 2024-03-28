@@ -1,6 +1,8 @@
 //! The build module contains the code for running the build process for a given [`Output`]
 use fs_err as fs;
+use rattler_conda_types::{MatchSpec, ParseStrictness};
 use std::path::PathBuf;
+use std::vec;
 
 use miette::IntoDiagnostic;
 use rattler_index::index;
@@ -8,7 +10,37 @@ use rattler_index::index;
 use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
 use crate::recipe::parser::TestType;
+use crate::render::solver::load_repodatas;
 use crate::{package_test, tool_configuration};
+
+/// Check if the build should be skipped because it already exists in any of the channels
+pub async fn skip_existing(
+    output: &Output,
+    tool_configuration: &tool_configuration::Configuration,
+) -> miette::Result<bool> {
+    // If we should skip existing builds, check if the build already exists
+    if tool_configuration.skip_existing {
+        let channels = output.reindex_channels().into_diagnostic()?;
+        let match_spec =
+            MatchSpec::from_str(output.name().as_normalized(), ParseStrictness::Strict)
+                .into_diagnostic()?;
+        let match_spec_vec = vec![match_spec.clone()];
+        let (_, existing) = load_repodatas(
+            &channels,
+            output.target_platform(),
+            tool_configuration,
+            &match_spec_vec,
+        )
+        .await
+        .unwrap();
+
+        return Ok(existing.iter().flatten().any(|package| {
+            package.package_record.version.to_string() == output.version()
+                && output.build_string() == Some(&package.package_record.build)
+        }));
+    }
+    Ok(false)
+}
 
 /// Run the build for the given output. This will fetch the sources, resolve the dependencies,
 /// and execute the build script. Returns the path to the resulting package.
@@ -16,14 +48,16 @@ pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<(Output, PathBuf)> {
+    if output.build_string().is_none() {
+        miette::bail!("Build string is not set for {:?}", output.name());
+    }
+
     output
         .build_configuration
         .directories
         .create_build_dir()
         .into_diagnostic()?;
-    if output.build_string().is_none() {
-        miette::bail!("Build string is not set for {:?}", output.name());
-    }
+
     let span = tracing::info_span!("Running build for", recipe = output.identifier().unwrap());
     let _enter = span.enter();
     output.record_build_start();

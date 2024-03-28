@@ -253,6 +253,10 @@ pub struct BuildOpts {
     /// Launch the terminal user interface.
     #[arg(long, default_value = "false", hide = !cfg!(feature = "tui"))]
     pub tui: bool,
+
+    /// Wether to skip packages that already exist in any channel
+    #[arg(long, default_value = "false")]
+    pub skip_existing: bool,
 }
 
 /// Test options.
