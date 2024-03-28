@@ -180,7 +180,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             continue;
         }
         if is_valid_file(target_platform, p)? {
-            if target_platform != Platform::EmscriptenWasm32{
+            if target_platform != Platform::EmscriptenWasm32 {
                 let relinker =  get_relinker(target_platform, p)?;
                 relinker.relink(
                     tmp_prefix,
@@ -194,7 +194,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         }
     }
     // skip linking checks for wasm
-    if target_platform != Platform::EmscriptenWasm32{
+    if target_platform != Platform::EmscriptenWasm32 {
         perform_linking_checks(output, &binaries, tmp_prefix)?;
     }
 
