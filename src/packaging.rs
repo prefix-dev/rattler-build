@@ -113,11 +113,15 @@ fn copy_license_files(
             .collect::<Vec<PathBuf>>();
 
         if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            tracing::warn!("No include glob matched for copying license files");
+            let warn_str = "No include glob matched for copying license files";
+            tracing::warn!(warn_str);
+            output.record_warning(warn_str);
         }
 
         if copied_files.is_empty() {
-            tracing::warn!("No license files were copied");
+            let warn_str = "No license files were copied";
+            tracing::warn!(warn_str);
+            output.record_warning(warn_str);
         }
 
         Ok(Some(copied_files))
