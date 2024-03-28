@@ -7,7 +7,7 @@ use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
 use crate::system_tools::{SystemTools, ToolError};
 use globset::GlobSet;
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -152,6 +152,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
     if target_platform == Platform::NoArch
         || target_platform.is_windows()
+        || target_platform.arch().eq(&Some(Arch::Wasm32))
         || relocation_config.is_none()
     {
         return Ok(());
@@ -180,23 +181,19 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             continue;
         }
         if is_valid_file(target_platform, p)? {
-            if target_platform != Platform::EmscriptenWasm32 {
-                let relinker = get_relinker(target_platform, p)?;
-                relinker.relink(
-                    tmp_prefix,
-                    encoded_prefix,
-                    &rpaths,
-                    rpath_allowlist,
-                    &output.system_tools,
-                )?;
-            }
+            let relinker = get_relinker(target_platform, p)?;
+            relinker.relink(
+                tmp_prefix,
+                encoded_prefix,
+                &rpaths,
+                rpath_allowlist,
+                &output.system_tools,
+            )?;
             binaries.insert(p.clone());
         }
     }
     // skip linking checks for wasm
-    if target_platform != Platform::EmscriptenWasm32 {
-        perform_linking_checks(output, &binaries, tmp_prefix)?;
-    }
+    perform_linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())
 }
