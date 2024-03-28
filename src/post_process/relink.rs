@@ -7,7 +7,7 @@ use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
 use crate::system_tools::{SystemTools, ToolError};
 use globset::GlobSet;
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -149,6 +149,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
     if target_platform == Platform::NoArch
         || target_platform.is_windows()
+        // skip linking checks for wasm
+        || target_platform.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
     {
         return Ok(());
@@ -188,7 +190,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
             binaries.insert(p.clone());
         }
     }
-
     perform_linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())
