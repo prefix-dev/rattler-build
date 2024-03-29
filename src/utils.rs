@@ -1,5 +1,10 @@
 //! Utility functions for working with paths.
 
+use serde::{Deserialize, Serialize};
+use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use std::collections::btree_map::Entry;
+use std::collections::btree_map::IntoIter;
+use std::collections::BTreeMap;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -64,6 +69,88 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     #[cfg(not(target_os = "windows"))]
     {
         path.to_string_lossy()
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+
+/// Struct where keys upon insertion and retrieval are normalized
+pub struct NormalizedKeyBTreeMap {
+    #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
+    #[serde(flatten)]
+    /// the inner map
+    pub map: BTreeMap<String, Vec<String>>,
+}
+
+impl NormalizedKeyBTreeMap {
+    /// Makes a new, empty `BTreeMap`
+    pub fn new() -> Self {
+        NormalizedKeyBTreeMap {
+            map: BTreeMap::new(),
+        }
+    }
+
+    /// Replaces all matches of a `-` with `_`.
+    pub fn normalize_key(key: &str) -> String {
+        key.replace('-', "_")
+    }
+
+    /// Inserts a key-value pair into the map, where key is normalized
+    pub fn insert(&mut self, key: String, value: Vec<String>) {
+        let normalized_key = Self::normalize_key(&key);
+        self.map.insert(normalized_key, value);
+    }
+
+    /// Returns a reference to the value corresponding to the key.
+    /// Key is normalized
+    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
+        // Change value type as needed
+        let normalized_key = Self::normalize_key(key);
+        self.map.get(&normalized_key)
+    }
+}
+
+impl Extend<(String, Vec<String>)> for NormalizedKeyBTreeMap {
+    fn extend<T>(&mut self, iter: T)
+    where
+        T: IntoIterator<Item = (String, Vec<String>)>,
+    {
+        for (key, value) in iter {
+            match self.map.entry(Self::normalize_key(&key)) {
+                Entry::Occupied(mut entry) => {
+                    entry.get_mut().extend(value);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(value);
+                }
+            }
+        }
+    }
+}
+
+impl NormalizedKeyBTreeMap {
+    /// Gets an iterator over the entries of the map, sorted by key.
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+        self.map.iter()
+    }
+}
+
+impl IntoIterator for NormalizedKeyBTreeMap {
+    type Item = (String, Vec<String>);
+    type IntoIter = IntoIter<String, Vec<String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a NormalizedKeyBTreeMap {
+    type Item = (&'a String, &'a Vec<String>);
+    type IntoIter = std::collections::btree_map::Iter<'a, String, Vec<String>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.map.iter()
     }
 }
 
