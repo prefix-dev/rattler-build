@@ -256,7 +256,7 @@ pub async fn get_build_output(
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: args.target_platform,
-                build_platform: Platform::current(),
+                build_platform: args.build_platform,
                 hash,
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
