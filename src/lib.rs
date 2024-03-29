@@ -524,9 +524,10 @@ pub fn sort_build_outputs_topologically(
             .expect("We just inserted it");
         for dep in output.recipe.requirements().all() {
             let dep_name = match dep {
-                recipe::parser::Dependency::Spec(spec) => {
-                    spec.name.clone().expect("We should always have a name")
-                }
+                recipe::parser::Dependency::Spec(spec) => spec
+                    .name
+                    .clone()
+                    .expect("MatchSpec should always have a name"),
                 recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
                 recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
                 recipe::parser::Dependency::Compiler(_) => continue,
@@ -544,10 +545,9 @@ pub fn sort_build_outputs_topologically(
 
     let sorted_indices = if let Some(up_to) = up_to {
         // Find the node index for the "up-to" package
-        let up_to_index = name_to_index
-            .get(up_to)
-            .copied()
-            .expect("Up-to package not found");
+        let up_to_index = name_to_index.get(up_to).copied().ok_or_else(|| {
+            miette::miette!("The package '{}' was not found in the outputs", up_to)
+        })?;
 
         // Perform a DFS post-order traversal from the "up-to" node to find all dependencies
         let mut dfs = DfsPostOrder::new(&graph, up_to_index);
@@ -559,7 +559,11 @@ pub fn sort_build_outputs_topologically(
         sorted_indices
     } else {
         // Perform topological sort
-        let mut sorted_indices = toposort(&graph, None).unwrap();
+        let mut sorted_indices = toposort(&graph, None).map_err(|cycle| {
+            let node = cycle.node_id();
+            let name = outputs[node.index()].name();
+            miette::miette!("Cycle detected in dependencies: {}", name.as_source())
+        })?;
         sorted_indices.reverse();
         sorted_indices
     };
@@ -568,7 +572,7 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|idx| &outputs[idx.index()])
         .for_each(|output| {
-            tracing::info!("Ordered output: {:?}", output.name().as_normalized());
+            tracing::debug!("ordered output: {:?}", output.name().as_normalized());
         });
 
     // Reorder outputs based on the sorted indices
