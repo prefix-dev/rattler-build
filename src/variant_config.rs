@@ -778,7 +778,7 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                             .insert(key_str.to_string(), variants.clone());
                         config
                             .variants
-                            .insert(key_str.to_string().replace("_", "-"), variants);
+                            .insert(key_str.to_string().replace('_', "-"), variants);
                     }
                 }
             }
