@@ -7,10 +7,10 @@ use rattler_conda_types::Platform;
 use crate::unix;
 
 /// Get default env vars for Linux
-pub fn default_env_vars(prefix: &Path) -> HashMap<String, String> {
+pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<String, String> {
     let mut vars = unix::env::default_env_vars(prefix);
-    let build_platform = Platform::current();
-    let build_distro = match build_platform {
+
+    let build_distro = match target_platform {
         Platform::Linux32 | Platform::Linux64 => "cos6",
         _ => "cos7",
     };

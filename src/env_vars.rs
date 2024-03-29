@@ -175,7 +175,7 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     if platform.is_osx() {
         vars.extend(macos::env::default_env_vars(prefix, platform));
     } else if platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(prefix));
+        vars.extend(linux::env::default_env_vars(prefix, platform));
     }
 
     vars

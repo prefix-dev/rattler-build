@@ -9,7 +9,7 @@ use crate::{
 use clap::builder::ArgPredicate;
 use clap::{arg, crate_version, Parser};
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::package::ArchiveType;
+use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_package_streaming::write::CompressionLevel;
 use url::Url;
 
@@ -196,9 +196,13 @@ pub struct BuildOpts {
     #[arg(long)]
     pub up_to: Option<String>,
 
+    /// The build platform to use for the build (e.g. for building with emulation, or rendering).
+    #[arg(long, default_value_t = Platform::current())]
+    pub build_platform: Platform,
+
     /// The target platform for the build.
-    #[arg(long)]
-    pub target_platform: Option<String>,
+    #[arg(long, default_value_t = Platform::current())]
+    pub target_platform: Platform,
 
     /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
     /// The default channel is `conda-forge`.
