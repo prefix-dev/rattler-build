@@ -130,7 +130,7 @@ pub fn get_tool_config(
 /// Returns the output for the build.
 pub async fn get_build_output(
     args: &BuildOpts,
-    recipe_path: PathBuf,
+    recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
     let output_dir = args
@@ -148,7 +148,7 @@ pub async fn get_build_output(
         , output_dir.to_string_lossy()));
     }
 
-    let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
+    let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
 
     let host_platform = if let Some(target_platform) = &args.target_platform {
         Platform::from_str(target_platform).into_diagnostic()?
@@ -262,7 +262,7 @@ pub async fn get_build_output(
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
                     name.as_normalized(),
-                    &recipe_path,
+                    recipe_path,
                     &output_dir,
                     args.no_build_id,
                     &timestamp,

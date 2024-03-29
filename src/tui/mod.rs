@@ -168,13 +168,10 @@ pub async fn run<B: Backend>(
                 tokio::spawn(async move {
                     let mut outputs = Vec::new();
                     for recipe_path in &recipe_paths {
-                        let output = get_build_output(
-                            &state.build_opts,
-                            recipe_path.clone(),
-                            &state.tool_config,
-                        )
-                        .await
-                        .unwrap();
+                        let output =
+                            get_build_output(&state.build_opts, recipe_path, &state.tool_config)
+                                .await
+                                .unwrap();
                         outputs.extend(output);
                     }
                     log_sender

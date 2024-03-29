@@ -1,6 +1,11 @@
 //! Utility functions for working with paths.
 
-use std::path::{Component, Path, PathBuf};
+use std::{
+    path::{Component, Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
+
+use miette::IntoDiagnostic;
 
 /// Converts `p` to an absolute path, but doesn't resolve symlinks.
 /// The function does normalize the path by resolving any `.` and `..` components which are present.
@@ -60,6 +65,14 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     {
         path.to_string_lossy()
     }
+}
+
+/// Returns the UNIX epoch time in seconds.
+pub fn get_current_timestamp() -> miette::Result<u64> {
+    Ok(SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .into_diagnostic()?
+        .as_secs())
 }
 
 #[cfg(test)]
