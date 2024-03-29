@@ -3,3 +3,5 @@ libblas:
   - 3.9 *netlib
 libcblas:
   - 3.9 *netlib
+r_base:
+  - 4.2
