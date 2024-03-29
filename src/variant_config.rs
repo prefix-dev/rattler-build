@@ -775,7 +775,6 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                 _ => {
                     let variants: Option<Vec<_>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        // store both lower_case and upper_case
                         config
                             .variants
                             .insert(key_str.to_string(), variants.clone());
