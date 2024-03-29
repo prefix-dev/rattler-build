@@ -149,6 +149,7 @@ pub struct VariantConfig {
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
+    #[serde(flatten)]
     pub variants: NormalizedKeyBTreeMap,
 }
 

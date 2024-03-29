@@ -45,23 +45,14 @@ zip_keys:
     - python_impl
   - - arrow_cpp
     - libarrow
-abseil-cpp:
-  - "20220623.0"
 abseil_cpp:
   - "20220623.0"
-alsa-lib:
-  - 1.2.8
 alsa_lib:
   - 1.2.8
 arb:
   - "2.23"
 arpack:
   - "3.7"
-arrow-cpp:
-  - 11.0.0
-  - 10.0.1
-  - 9.0.0
-  - 8.0.1
 arrow_cpp:
   - 11.0.0
   - 10.0.1
@@ -69,12 +60,8 @@ arrow_cpp:
   - 8.0.1
 assimp:
   - 5.2.5
-aws-sdk-cpp:
+aws_sdk_cpp:
   - "4.5"
-blas-impl:
-  - openblas
-  - mkl
-  - blis
 blas_impl:
   - openblas
   - mkl

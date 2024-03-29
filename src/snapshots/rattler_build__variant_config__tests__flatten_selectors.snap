@@ -4,21 +4,15 @@ expression: res
 ---
 pin_run_as_build: ~
 zip_keys: ~
-c-compiler:
-  - super_g++
 c_compiler:
   - super_g++
 cplusplus:
   - "10"
   - "1000"
-cxx-compiler:
-  - super_gcc
 cxx_compiler:
   - super_gcc
 python:
   - "3.7"
   - "3.8"
-unix-level:
-  - "1"
 unix_level:
   - "1"
