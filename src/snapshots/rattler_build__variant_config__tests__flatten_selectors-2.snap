@@ -4,14 +4,10 @@ expression: res
 ---
 pin_run_as_build: ~
 zip_keys: ~
-c-compiler:
-  - vs2019
 c_compiler:
   - vs2019
 cplusplus:
   - "100"
-cxx-compiler:
-  - vs2019
 cxx_compiler:
   - vs2019
 python:
