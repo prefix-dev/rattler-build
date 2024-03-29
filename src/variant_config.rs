@@ -84,7 +84,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
     }
 }
 
-// #[serde_as]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// The variant configuration.
 /// This is usually loaded from a YAML file and contains a mapping of package names to a list of
