@@ -42,7 +42,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
     path::{Path, PathBuf},
-    str::FromStr,
     sync::{Arc, Mutex},
 };
 use tool_configuration::Configuration;
@@ -150,23 +149,23 @@ pub async fn get_build_output(
 
     let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
 
-    let host_platform = if let Some(target_platform) = &args.target_platform {
-        Platform::from_str(target_platform).into_diagnostic()?
-    } else {
-        Platform::current()
-    };
+    if args.target_platform == Platform::NoArch || args.build_platform == Platform::NoArch {
+        return Err(miette::miette!(
+            "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
+        ));
+    }
 
     let selector_config = SelectorConfig {
         // We ignore noarch here
-        target_platform: host_platform,
+        target_platform: args.target_platform,
         hash: None,
-        build_platform: Platform::current(),
+        build_platform: args.build_platform,
         variant: BTreeMap::new(),
         experimental: args.common.experimental,
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
-    tracing::info!("Target platform: {}", host_platform);
+
     let enter = span.enter();
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
@@ -256,7 +255,7 @@ pub async fn get_build_output(
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform,
+                host_platform: args.target_platform,
                 build_platform: Platform::current(),
                 hash,
                 variant: discovered_output.used_vars.clone(),
