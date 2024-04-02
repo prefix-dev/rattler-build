@@ -32,6 +32,6 @@ conda-package-handling = "2.2.0.*"
 # Documentation building
 mkdocs = "1.5.3.*"
 mkdocs-material = "9.5.*"
-pillow = ">=9.4.0.*"
+pillow = ">=9.4.0"
 cairosvg = "2.7.1.*"
 mike = "2.0.0.*"
