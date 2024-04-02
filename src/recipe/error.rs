@@ -245,7 +245,7 @@ impl fmt::Display for ErrorKind {
                     f,
                     "See <https://spdx.org/licenses> for the list of valid licenses."
                 )?;
-                writeln!(
+                write!(
                     f,
                     "Use 'LicenseRef-<MyLicense>' if you are using a custom license."
                 )
