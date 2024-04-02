@@ -112,6 +112,8 @@ crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "4.0.1", optional = true }
 throbber-widgets-tui = { version = "0.5.0", optional = true }
 tui-input = { version = "0.8.0", optional = true }
+reflink-copy = "0.1.15"
+rayon = "1.10.0"
 
 [dev-dependencies]
 insta = { version = "1.38.0", features = ["yaml"] }
