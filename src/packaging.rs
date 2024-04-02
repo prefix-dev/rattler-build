@@ -69,6 +69,9 @@ pub enum PackagingError {
 
     #[error("Failed to find content type for file: {0:?}")]
     ContentTypeNotFound(PathBuf),
+
+    #[error("No license files were copied")]
+    LicensesNotFound,
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -119,12 +122,10 @@ fn copy_license_files(
         }
 
         if copied_files.is_empty() {
-            let warn_str = "No license files were copied";
-            tracing::warn!(warn_str);
-            output.record_warning(warn_str);
+            Err(PackagingError::LicensesNotFound)
+        } else {
+            Ok(Some(copied_files))
         }
-
-        Ok(Some(copied_files))
     }
 }
 
