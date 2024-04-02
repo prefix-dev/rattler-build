@@ -4,7 +4,10 @@
 use std::{path::PathBuf, sync::Arc};
 
 use crate::console_utils::LoggingOutputHandler;
-use rattler_networking::{authentication_storage, AuthenticationMiddleware, AuthenticationStorage};
+use rattler_networking::{
+    authentication_storage::{self, backends::file::FileStorageError},
+    AuthenticationMiddleware, AuthenticationStorage,
+};
 use reqwest_middleware::ClientWithMiddleware;
 
 /// The user agent to use for the reqwest client
@@ -39,25 +42,29 @@ pub struct Configuration {
 }
 
 /// Get the authentication storage from the given file
-pub fn get_auth_store(auth_file: Option<PathBuf>) -> AuthenticationStorage {
+pub fn get_auth_store(
+    auth_file: Option<PathBuf>,
+) -> Result<AuthenticationStorage, FileStorageError> {
     match auth_file {
         Some(auth_file) => {
             let mut store = AuthenticationStorage::new();
             store.add_backend(Arc::from(
-                authentication_storage::backends::file::FileStorage::new(auth_file),
+                authentication_storage::backends::file::FileStorage::new(auth_file)?,
             ));
-            store
+            Ok(store)
         }
-        None => rattler_networking::AuthenticationStorage::default(),
+        None => Ok(rattler_networking::AuthenticationStorage::default()),
     }
 }
 
 /// Create a reqwest client with the authentication middleware
-pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWithMiddleware {
-    let auth_storage = get_auth_store(auth_file);
+pub fn reqwest_client_from_auth_storage(
+    auth_file: Option<PathBuf>,
+) -> Result<ClientWithMiddleware, FileStorageError> {
+    let auth_storage = get_auth_store(auth_file)?;
 
     let timeout = 5 * 60;
-    reqwest_middleware::ClientBuilder::new(
+    Ok(reqwest_middleware::ClientBuilder::new(
         reqwest::Client::builder()
             .no_gzip()
             .pool_max_idle_per_host(20)
@@ -67,14 +74,14 @@ pub fn reqwest_client_from_auth_storage(auth_file: Option<PathBuf>) -> ClientWit
             .expect("failed to create client"),
     )
     .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
-    .build()
+    .build())
 }
 
 impl Default for Configuration {
     fn default() -> Self {
         Self {
             fancy_log_handler: LoggingOutputHandler::default(),
-            client: reqwest_client_from_auth_storage(None),
+            client: reqwest_client_from_auth_storage(None).expect("failed to create client"),
             no_clean: false,
             no_test: false,
             use_zstd: true,

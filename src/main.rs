@@ -103,7 +103,7 @@ async fn main() -> miette::Result<()> {
                 }
             } else {
                 let log_handler = log_handler.expect("logger is not initialized");
-                let tool_config = get_tool_config(&build_args, &log_handler);
+                let tool_config = get_tool_config(&build_args, &log_handler)?;
                 let mut outputs = Vec::new();
                 for recipe_path in &recipe_paths {
                     let output = get_build_output(&build_args, recipe_path, &tool_config).await?;
