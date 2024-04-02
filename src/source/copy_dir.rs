@@ -1,6 +1,6 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -9,6 +9,7 @@ use fs_err::create_dir_all;
 
 use fs_extra::dir::CopyOptions;
 use ignore::WalkBuilder;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use super::SourceError;
 
@@ -216,52 +217,158 @@ impl<'a> CopyDir<'a> {
 
                 (include && !exclude).then_some(Ok(entry))
             })
-            .map(|entry| {
-                let entry = entry?;
-                let path = entry.path();
+            .par_bridge()
+            .map_with(
+                HashSet::from_iter([self.to_path.to_path_buf()]),
+                |paths_created: &mut HashSet<PathBuf>, entry| {
+                    let entry = entry?;
+                    let path = entry.path();
 
-                let stripped_path = path.strip_prefix(self.from_path)?;
-                let dest_path = self.to_path.join(stripped_path);
+                    let stripped_path = path.strip_prefix(self.from_path)?;
+                    let dest_path = self.to_path.join(stripped_path);
 
-                if path.is_dir() {
-                    // create the empty dir
-                    create_dir_all(&dest_path)?;
-                    Ok(Some(dest_path))
-                } else {
-                    // create dir if parent does not exist
-                    if let Some(parent) = dest_path.parent() {
-                        if !parent.exists() {
-                            create_dir_all(parent)?;
-                        }
-                    }
-
-                    let file_options = fs_extra::file::CopyOptions {
-                        overwrite: self.copy_options.overwrite,
-                        skip_exist: self.copy_options.skip_exist,
-                        buffer_size: self.copy_options.buffer_size,
-                    };
-
-                    // if file is a symlink, copy it as a symlink
-                    if path.is_symlink() {
-                        let link_target = std::fs::read_link(path)?;
-                        #[cfg(unix)]
-                        std::os::unix::fs::symlink(link_target, &dest_path)?;
-                        #[cfg(windows)]
-                        std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+                    if path.is_dir() {
+                        create_dir_all_cached(&dest_path, paths_created)?;
+                        Ok(Some(dest_path))
                     } else {
-                        fs_extra::file::copy(path, &dest_path, &file_options)
-                            .map_err(SourceError::FileSystemError)?;
-                    }
+                        // create dir if parent does not exist
+                        if let Some(parent) = dest_path.parent() {
+                            create_dir_all_cached(parent, paths_created)?;
+                        }
 
-                    Ok(Some(dest_path))
-                }
-            })
+                        let file_options = fs_extra::file::CopyOptions {
+                            overwrite: self.copy_options.overwrite,
+                            skip_exist: self.copy_options.skip_exist,
+                            buffer_size: self.copy_options.buffer_size,
+                        };
+
+                        // if file is a symlink, copy it as a symlink
+                        if path.is_symlink() {
+                            let link_target = std::fs::read_link(path)?;
+                            #[cfg(unix)]
+                            std::os::unix::fs::symlink(link_target, &dest_path)?;
+                            #[cfg(windows)]
+                            std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+                        } else {
+                            reflink_or_copy(path, &dest_path, &file_options)
+                                .map_err(SourceError::FileSystemError)?;
+                        }
+
+                        Ok(Some(dest_path))
+                    }
+                },
+            )
             .filter_map(|res| res.transpose())
             .collect::<Result<Vec<_>, SourceError>>()?;
 
         result.copied_paths = copied_pathes;
         Ok(result)
     }
+}
+
+/// Recursively creates directories and keeps an in-memory cache of the directories that have been
+/// created before. This speeds up creation of large amounts of directories significantly because
+/// there are fewer IO operations.
+fn create_dir_all_cached(path: &Path, paths_created: &mut HashSet<PathBuf>) -> std::io::Result<()> {
+    // Find the first directory that is not already created
+    let mut dirs_to_create = Vec::new();
+    let mut path = path;
+    loop {
+        if paths_created.contains(path) {
+            break;
+        }
+
+        if path.is_dir() {
+            paths_created.insert(path.to_path_buf());
+            break;
+        }
+
+        dirs_to_create.push(path.to_path_buf());
+        path = match path.parent() {
+            Some(path) => path,
+            None => break,
+        }
+    }
+
+    // Actually create the directories
+    for path in dirs_to_create.into_iter().rev() {
+        match std::fs::create_dir(&path) {
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+
+        paths_created.insert(path);
+    }
+
+    Ok(())
+}
+
+/// Reflinks or copies a file. If reflinking fails the file is copied instead.
+///
+/// The implementation of this function is partially taken from fs_extra.
+pub fn reflink_or_copy<P, Q>(
+    from: P,
+    to: Q,
+    options: &fs_extra::file::CopyOptions,
+) -> fs_extra::error::Result<()>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    let from = from.as_ref();
+    if !from.exists() {
+        if let Some(msg) = from.to_str() {
+            let msg = format!("Path \"{}\" does not exist or you don't have access!", msg);
+            return Err(fs_extra::error::Error::new(
+                fs_extra::error::ErrorKind::NotFound,
+                &msg,
+            ));
+        }
+
+        return Err(fs_extra::error::Error::new(
+            fs_extra::error::ErrorKind::NotFound,
+            "Path does not exist or you don't have access!",
+        ));
+    }
+
+    if !from.is_file() {
+        if let Some(msg) = from.to_str() {
+            let msg = format!("Path \"{}\" is not a file!", msg);
+            return Err(fs_extra::error::Error::new(
+                fs_extra::error::ErrorKind::InvalidFile,
+                &msg,
+            ));
+        }
+
+        return Err(fs_extra::error::Error::new(
+            fs_extra::error::ErrorKind::NotFound,
+            "Path is not a file!",
+        ));
+    }
+
+    if to.as_ref().exists() {
+        if !options.overwrite {
+            if options.skip_exist {
+                return Ok(());
+            }
+
+            if let Some(msg) = to.as_ref().to_str() {
+                return Err(fs_extra::error::Error::new(
+                    fs_extra::error::ErrorKind::AlreadyExists,
+                    msg,
+                ));
+            }
+        }
+
+        // Reflinking on windows cannot overwrite files. It will fail with a permission denied error.
+        fs_extra::file::remove(&to)?;
+    }
+
+    // Reflink or copy the file
+    reflink_copy::reflink_or_copy(from, to)?;
+
+    Ok(())
 }
 
 pub(crate) struct CopyDirResult<'a> {
