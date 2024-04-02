@@ -9,10 +9,9 @@ use indexmap::IndexSet;
 use miette::Diagnostic;
 use rattler_conda_types::{NoArchType, ParseVersionError, Platform};
 use serde::{Deserialize, Serialize};
-use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+
 use thiserror::Error;
 
-use crate::recipe::parser::Dependency;
 use crate::{
     _partialerror,
     hash::HashInfo,
@@ -25,6 +24,7 @@ use crate::{
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
 };
+use crate::{recipe::parser::Dependency, utils::NormalizedKeyBTreeMap};
 use petgraph::{algo::toposort, graph::DiGraph};
 
 #[allow(missing_docs)]
@@ -84,7 +84,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
     }
 }
 
-#[serde_as]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// The variant configuration.
 /// This is usually loaded from a YAML file and contains a mapping of package names to a list of
@@ -149,9 +148,8 @@ pub struct VariantConfig {
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
-    #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
     #[serde(flatten)]
-    pub variants: BTreeMap<String, Vec<String>>,
+    pub variants: NormalizedKeyBTreeMap,
 }
 
 #[allow(missing_docs)]
@@ -333,12 +331,16 @@ impl VariantConfig {
             })
             .collect::<Vec<_>>();
 
-        let variant_keys = self
-            .variants
+        let variant_keys = used_vars
             .iter()
-            .filter(|(key, _)| used_vars.contains(*key))
-            .filter(|(key, _)| !zip_keys.iter().any(|zip| zip.contains(*key)))
-            .map(|(key, values)| VariantKey::Key(key.clone(), values.clone()))
+            .filter_map(|key| {
+                if let Some(values) = self.variants.get(key) {
+                    if !zip_keys.iter().any(|zip| zip.contains(key)) {
+                        return Some(VariantKey::Key(key.clone(), values.clone()));
+                    }
+                }
+                None
+            })
             .collect::<Vec<_>>();
 
         let variant_keys = used_zip_keys
@@ -772,7 +774,9 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                 _ => {
                     let variants: Option<Vec<_>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config.variants.insert(key_str.to_string(), variants);
+                        config
+                            .variants
+                            .insert(key_str.to_string(), variants.clone());
                     }
                 }
             }
@@ -976,7 +980,7 @@ mod tests {
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = BTreeMap::new();
+        let mut variants = NormalizedKeyBTreeMap::new();
         variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
         variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
         let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];

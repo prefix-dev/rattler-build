@@ -60,7 +60,7 @@ arrow_cpp:
   - 8.0.1
 assimp:
   - 5.2.5
-aws-sdk-cpp:
+aws_sdk_cpp:
   - "4.5"
 blas_impl:
   - openblas
@@ -78,4 +78,3 @@ liblapacke:
   - 3.9 *netlib
 target_platform:
   - linux-64
-

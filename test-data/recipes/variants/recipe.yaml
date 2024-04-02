@@ -29,6 +29,7 @@ requirements:
     - ${{ compiler('c') }}
     - cmake
     - libcblas
+    - r-base
     - if: win
       then: ninja
 
