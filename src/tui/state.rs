@@ -112,7 +112,8 @@ impl TuiState {
     pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
             build_opts: build_opts.clone(),
-            tool_config: get_tool_config(&build_opts, &log_handler),
+            tool_config: get_tool_config(&build_opts, &log_handler)
+                .expect("Could not get tool config"),
             running: true,
             packages: Vec::new(),
             selected_package: 0,

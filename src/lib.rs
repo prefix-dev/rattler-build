@@ -113,10 +113,11 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
 pub fn get_tool_config(
     args: &BuildOpts,
     fancy_log_handler: &LoggingOutputHandler,
-) -> Configuration {
+) -> miette::Result<Configuration> {
     let client =
-        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone());
-    Configuration {
+        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone())
+            .into_diagnostic()?;
+    Ok(Configuration {
         client,
         fancy_log_handler: fancy_log_handler.clone(),
         no_clean: args.keep_build,
@@ -125,7 +126,7 @@ pub fn get_tool_config(
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
         skip_existing: args.skip_existing,
-    }
+    })
 }
 
 /// Returns the output for the build.
@@ -346,7 +347,8 @@ pub async fn run_test_from_args(
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+        .into_diagnostic()?;
 
     let tempdir = tempfile::tempdir().into_diagnostic()?;
 
@@ -415,7 +417,8 @@ pub async fn rebuild_from_args(
     output.build_configuration.directories.output_dir =
         canonicalize(output_dir).into_diagnostic()?;
 
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+        .into_diagnostic()?;
 
     let tool_config = tool_configuration::Configuration {
         client,
@@ -454,7 +457,7 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
         }
     }
 
-    let store = tool_configuration::get_auth_store(args.common.auth_file);
+    let store = tool_configuration::get_auth_store(args.common.auth_file).into_diagnostic()?;
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {
