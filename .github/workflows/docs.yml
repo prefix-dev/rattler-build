@@ -40,9 +40,6 @@ jobs:
           submodules: recursive
 
       - uses: prefix-dev/setup-pixi@v0.5.1
-        with:
-          pixi-version: v0.13.0
-          cache: true
 
       - name: Build docs for test
         run: |
@@ -50,7 +47,7 @@ jobs:
 
   docs-release:
     # Don't run on forks
-    if: startsWith(github.event.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.tag, 'v')
+    if: github.repository == 'prefix-dev/rattler-build' && (startsWith(github.event.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' && startsWith(github.event.inputs.tag, 'v'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -67,9 +64,6 @@ jobs:
           git checkout tags/${{ github.event.inputs.tag }}
 
       - uses: prefix-dev/setup-pixi@v0.5.1
-        with:
-          pixi-version: v0.13.0
-          cache: true
 
       - name: Configure Git user
         run: |
@@ -90,7 +84,7 @@ jobs:
 
   docs-dev:
     # Don't run on forks
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && !startsWith(github.event.inputs.tag, 'v')
+    if: github.repository == 'prefix-dev/rattler-build' && (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' && !startsWith(github.event.inputs.tag, 'v'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -101,9 +95,6 @@ jobs:
           submodules: recursive
 
       - uses: prefix-dev/setup-pixi@v0.5.1
-        with:
-          pixi-version: v0.13.0
-          cache: true
 
       - name: Configure Git user
         run: |
