@@ -71,12 +71,8 @@ pub async fn create_environment(
     channels: &[String],
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
-    let channel_config = ChannelConfig::default();
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
     // with this because we need to parse the `channel_config` when parsing matchspecs.
-
-    // Find the default cache directory. Create it if it doesn't exist yet.
-    let cache_dir = rattler::default_cache_dir()?;
 
     tracing::info!("\nResolving environment for:\n");
     tracing::info!("  Platform: {}", target_platform);
@@ -89,72 +85,12 @@ pub async fn create_environment(
         tracing::info!("   - {}", spec);
     }
 
-    std::fs::create_dir_all(&cache_dir)
-        .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;
-
-    // Determine the channels to use from the command line or select the default. Like matchspecs
-    // this also requires the use of the `channel_config` so we have to do this manually.
-    let channels = channels
-        .iter()
-        .map(|channel_str| Channel::from_str(channel_str, &channel_config))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    // Each channel contains multiple subdirectories. Users can specify the subdirectories they want
-    // to use when specifying their channels. If the user didn't specify the default subdirectories
-    // we use defaults based on the current platform.
-    let platforms = [Platform::NoArch, *target_platform];
-    let channel_urls = channels
-        .iter()
-        .flat_map(|channel| {
-            platforms
-                .iter()
-                .map(move |platform| (channel.clone(), *platform))
-        })
-        .collect::<Vec<_>>();
-
-    // Determine the packages that are currently installed in the environment.
     let installed_packages = find_installed_packages(target_prefix, 100)
         .await
         .context("failed to determine currently installed packages")?;
 
-    // For each channel/subdirectory combination, download and cache the `repodata.json` that should
-    // be available from the corresponding Url. The code below also displays a nice CLI progress-bar
-    // to give users some more information about what is going on.
-
-    let repodata_cache_path = cache_dir.join("repodata");
-    let channel_and_platform_len = channel_urls.len();
-    let repodata_download_client = tool_configuration.client.clone();
-    let sparse_repo_datas = futures::stream::iter(channel_urls)
-        .map(move |(channel, platform)| {
-            let repodata_cache = repodata_cache_path.clone();
-            let download_client = repodata_download_client.clone();
-            async move {
-                fetch_repo_data_records_with_progress(
-                    channel,
-                    platform,
-                    &repodata_cache,
-                    download_client.clone(),
-                    tool_configuration.fancy_log_handler.clone(),
-                    platform != Platform::NoArch,
-                )
-                .await
-            }
-        })
-        .buffered(channel_and_platform_len)
-        .collect::<Vec<_>>()
-        .await
-        // Collect into another iterator where we extract the first erroneous result
-        .into_iter()
-        .filter_map(Result::transpose)
-        .collect::<Result<Vec<_>, _>>()?;
-
-    // Get the package names from the matchspecs so we can only load the package records that we need.
-    let package_names = specs.iter().filter_map(|spec| spec.name.clone());
-    let repodatas = wrap_in_progress(
-        "parsing repodata",
-        &tool_configuration.fancy_log_handler,
-        move || SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None),
-    )??;
+    let (cache_dir, repodatas) =
+        load_repodatas(channels, target_platform, tool_configuration, specs).await?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
     // system. Some packages depend on these virtual packages to indicate compatibility with the
@@ -209,6 +145,71 @@ pub async fn create_environment(
     }
 
     Ok(required_packages)
+}
+
+/// Load repodata for given matchspecs and channels.
+pub async fn load_repodatas(
+    channels: &[String],
+    target_platform: &Platform,
+    tool_configuration: &tool_configuration::Configuration,
+    specs: &[MatchSpec],
+) -> Result<(PathBuf, Vec<Vec<RepoDataRecord>>), anyhow::Error> {
+    let channel_config = ChannelConfig::default();
+    let cache_dir = rattler::default_cache_dir()?;
+    std::fs::create_dir_all(&cache_dir)
+        .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;
+
+    let channels = channels
+        .iter()
+        .map(|channel_str| Channel::from_str(channel_str, &channel_config))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let platforms = [Platform::NoArch, *target_platform];
+    let channel_urls = channels
+        .iter()
+        .flat_map(|channel| {
+            platforms
+                .iter()
+                .map(move |platform| (channel.clone(), *platform))
+        })
+        .collect::<Vec<_>>();
+
+    let repodata_cache_path = cache_dir.join("repodata");
+
+    let channel_and_platform_len = channel_urls.len();
+    let repodata_download_client = tool_configuration.client.clone();
+    let sparse_repo_datas = futures::stream::iter(channel_urls)
+        .map(move |(channel, platform)| {
+            let repodata_cache = repodata_cache_path.clone();
+            let download_client = repodata_download_client.clone();
+            async move {
+                fetch_repo_data_records_with_progress(
+                    channel,
+                    platform,
+                    &repodata_cache,
+                    download_client.clone(),
+                    tool_configuration.fancy_log_handler.clone(),
+                    platform != Platform::NoArch,
+                )
+                .await
+            }
+        })
+        .buffered(channel_and_platform_len)
+        .collect::<Vec<_>>()
+        .await
+        // Collect into another iterator where we extract the first erroneous result
+        .into_iter()
+        .filter_map(Result::transpose)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let package_names = specs.iter().filter_map(|spec| spec.name.clone());
+    let repodatas = wrap_in_progress(
+        "parsing repodata",
+        &tool_configuration.fancy_log_handler,
+        move || SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None),
+    )??;
+
+    Ok((cache_dir, repodatas))
 }
 
 pub async fn install_packages(

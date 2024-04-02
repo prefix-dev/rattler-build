@@ -32,6 +32,7 @@ mod unix;
 pub mod upload;
 mod windows;
 
+use build::skip_existing;
 use dunce::canonicalize;
 use fs_err as fs;
 use metadata::Output;
@@ -123,6 +124,7 @@ pub fn get_tool_config(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
+        skip_existing: args.skip_existing,
     }
 }
 
@@ -305,6 +307,13 @@ pub async fn run_build_from_args(
 ) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
     for output in build_output {
+        if skip_existing(&output, &tool_config).await? {
+            tracing::info!(
+                "Skipping build for {:?}",
+                output.identifier().unwrap_or_else(|| "unknown".to_string())
+            );
+            continue;
+        }
         let output = match run_build(output, &tool_config).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
@@ -416,6 +425,7 @@ pub async fn rebuild_from_args(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: false,
+        skip_existing: false,
     };
 
     output
@@ -571,7 +581,7 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|idx| &outputs[idx.index()])
         .for_each(|output| {
-            tracing::debug!("ordered output: {:?}", output.name().as_normalized());
+            tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
         });
 
     // Reorder outputs based on the sorted indices
