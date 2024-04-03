@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import platform
+import yaml
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
@@ -570,3 +571,32 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "hahaha" not in output
     assert "I am hahaha" not in output
     assert "I am ********" in output
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "git_source_submodule"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "nanobind")
+
+    assert (pkg / "info/paths.json").exists()
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load recipe as YAML
+    
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+
+    # parse the rendered recipe
+    rendered_recipe = yaml.safe_load(text)
+    sources = rendered_recipe["finalized_sources"]
+
+    assert len(sources) == 1
+    source = sources[0]
+    assert source["git"] == "https://github.com/wjakob/nanobind"
+    assert source["rev"] == "8e1f8408b37d994fb987440859eb977af39be8c3"
