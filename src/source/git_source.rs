@@ -8,13 +8,21 @@ use std::{
 
 use fs_extra::dir::remove;
 
-use crate::recipe::parser::{GitSource, GitUrl};
 use crate::system_tools::{SystemTools, Tool};
+use crate::{
+    recipe::parser::{GitSource, GitUrl},
+    system_tools::ToolError,
+};
 
 use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
-pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceError> {
+pub fn fetch_repo(
+    system_tools: &SystemTools,
+    repo_path: &Path,
+    url: &str,
+    rev: &str,
+) -> Result<(), SourceError> {
     tracing::info!(
         "Fetching repository from {} at {} into {}",
         url,
@@ -26,7 +34,7 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
         return Err(SourceError::GitErrorStr("repository path does not exist"));
     }
 
-    let mut command = git_command("fetch");
+    let mut command = git_command(system_tools, "fetch")?;
     let output = command
         .args([url, rev])
         .current_dir(repo_path)
@@ -59,9 +67,8 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
         return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
     }
 
-    let mut command = Command::new("git");
-    let output = command
-        .args(["checkout", rev])
+    let output = git_command(system_tools, "checkout")?
+        .args([rev])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -72,8 +79,8 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
     }
 
     // Update submodules
-    let output = Command::new("git")
-        .args(["submodule", "update", "--init", "--recursive"])
+    let output = git_command(system_tools, "submodule")?
+        .args(["update", "--init", "--recursive"])
         .current_dir(repo_path)
         .output()?;
 
@@ -87,16 +94,19 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
 }
 
 /// Create a `git` command with the given subcommand.
-fn git_command(sub_cmd: &str) -> Command {
-    let mut command = Command::new("git");
+fn git_command(system_tools: &SystemTools, sub_cmd: &str) -> Result<Command, ToolError> {
+    let mut command = system_tools.call(Tool::Git)?;
     command.arg(sub_cmd);
 
     if std::io::stdin().is_terminal() {
         command.stdout(std::process::Stdio::inherit());
         command.stderr(std::process::Stdio::inherit());
-        command.arg("--progress");
+        if sub_cmd != "submodule" {
+            command.arg("--progress");
+        }
     }
-    command
+
+    Ok(command)
 }
 
 /// Fetch the git repository specified by the given source and place it in the cache directory.
@@ -161,17 +171,9 @@ pub fn git_src(
             };
             // If the cache_path exists, initialize the repo and fetch the specified revision.
             if !cache_path.exists() {
-                let mut command = system_tools
-                    .call(Tool::Git)
-                    .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
-
+                let mut command = git_command(system_tools, "clone")?;
                 command
-                    .args([
-                        "clone",
-                        "--progress",
-                        "-n",
-                        source.url().to_string().as_str(),
-                    ])
+                    .args(["--progress", "-n", source.url().to_string().as_str()])
                     .arg(cache_path.as_os_str());
 
                 let output = command
@@ -187,7 +189,7 @@ pub fn git_src(
             }
 
             assert!(cache_path.exists());
-            fetch_repo(&cache_path, &url.to_string(), &rev)?;
+            fetch_repo(system_tools, &cache_path, &url.to_string(), &rev)?;
         }
         GitUrl::Path(path) => {
             if cache_path.exists() {
@@ -204,7 +206,7 @@ pub fn git_src(
             })?;
 
             let path = path.to_string_lossy();
-            let mut command = git_command("clone");
+            let mut command = git_command(system_tools, "clone")?;
 
             command
                 .arg("--recursive")
