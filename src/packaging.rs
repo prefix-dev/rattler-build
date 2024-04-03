@@ -302,7 +302,7 @@ pub fn package_conda(
 /// until this behaviour is changed
 /// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
 fn create_empty_build_folder(
-    local_channel_dir: &PathBuf,
+    local_channel_dir: &Path,
     build_platform: &Platform,
 ) -> miette::Result<(), PackagingError> {
     let build_output_folder = local_channel_dir.join(build_platform.to_string());
