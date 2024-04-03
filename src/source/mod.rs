@@ -208,6 +208,17 @@ pub async fn fetch_sources(
                     copy_dir::CopyDir::new(&src_path, &dest_dir)
                         .use_gitignore(src.use_gitignore())
                         .run()?;
+                } else if src_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .contains(".tar")
+                {
+                    extract_tar(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
+                    tracing::info!("Extracted to {:?}", dest_dir);
+                } else if src_path.extension() == Some(OsStr::new("zip")) {
+                    extract_zip(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
+                    tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else if let Some(file_name) = src
                     .file_name()
                     .cloned()

@@ -1,0 +1,20 @@
+# copied from conda-build test suite
+
+package:
+  name: patch_with_strip
+  version: "1.0"
+
+source:
+  path: ./somefile.tar
+  patches:
+    # Use different kinds of patches to trigger different code paths.
+    - 0001-Patch-with-levels-to-strip.patch
+    - 0002-Patch-without-additional-levels.patch
+
+build:
+  script:
+    - if: unix
+      then:
+        - cp somefile $PREFIX/somefile
+      else:
+        - copy somefile %PREFIX%\somefile
