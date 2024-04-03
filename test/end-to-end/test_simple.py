@@ -598,5 +598,5 @@ def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     assert len(sources) == 1
     source = sources[0]
-    assert source["git"] == "https://github.com/wjakob/nanobind"
+    assert source["git"] == "https://github.com/wjakob/nanobind/"
     assert source["rev"] == "8e1f8408b37d994fb987440859eb977af39be8c3"
