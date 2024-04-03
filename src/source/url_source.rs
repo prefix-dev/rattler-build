@@ -37,7 +37,7 @@ fn split_filename(filename: &str) -> (String, String) {
 }
 
 fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
-    let filename = url.path_segments()?.last()?;
+    let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
     let (stem, extension) = split_filename(filename);
     let checksum = checksum.to_hex();
     Some(format!("{}_{}{}", stem, &checksum[0..8], extension))

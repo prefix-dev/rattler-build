@@ -3,7 +3,7 @@ package:
     version: "1.9.1"
 
 source:
-  git: https://github.com/wjakob/nanobind
+  git: https://github.com/wjakob/nanobind/
   tag: v1.9.1
 
 build:

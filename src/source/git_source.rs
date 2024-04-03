@@ -114,12 +114,20 @@ pub fn git_src(
     }
 
     let filename = match &source.url() {
-        GitUrl::Url(url) => (|| Some(url.path_segments()?.last()?.to_string()))()
-            .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
+        GitUrl::Url(url) => (|| {
+            Some(
+                url.path_segments()?
+                    .filter(|x| !x.is_empty())
+                    .last()?
+                    .to_string(),
+            )
+        })()
+        .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
         GitUrl::Ssh(url) => (|| {
             Some(
                 url.trim_end_matches(".git")
-                    .split(std::path::MAIN_SEPARATOR)
+                    .split('/')
+                    .filter(|x| !x.is_empty())
                     .last()?
                     .to_string(),
             )
