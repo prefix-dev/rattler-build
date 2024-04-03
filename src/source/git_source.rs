@@ -118,6 +118,10 @@ pub fn git_src(
             .to_string(),
     };
 
+    if filename.is_empty() {
+        return Err(SourceError::GitErrorStr("failed to get filename from url"));
+    }
+
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
 
