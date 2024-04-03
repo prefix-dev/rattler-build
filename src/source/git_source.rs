@@ -15,10 +15,15 @@ use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
 pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceError> {
-    tracing::info!("Fetching repository from {} at {}", url, rev);
+    tracing::info!("Fetching repository from {} at {} into {}", url, rev, repo_path.display());
+
+    if !repo_path.exists() {
+        return Err(SourceError::GitErrorStr("repository path does not exist"));
+    }
+
     let mut command = git_command("fetch");
     let output = command
-        .args([url, rev])
+        .args([url, rev, "--recurse-submodules"])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -46,6 +51,18 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
 
     if !output.status.success() {
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
+        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+    }
+
+    let mut command = Command::new("git");
+    let output = command
+        .args(["checkout", rev])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|_err| SourceError::ValidationFailed)?;
+
+    if !output.status.success() {
+        tracing::debug!("Repository checkout for revision {:?} failed!", rev);
         return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
     }
 
@@ -115,24 +132,19 @@ pub fn git_src(
                 _ => unreachable!(),
             };
             // If the cache_path exists, initialize the repo and fetch the specified revision.
-            if cache_path.exists() {
-                fetch_repo(&cache_path, &url.to_string(), &rev)?;
-            } else {
+            if !cache_path.exists() {
                 let mut command = system_tools
                     .call(Tool::Git)
                     .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
 
                 command
-                    .args(["clone", "--recursive", source.url().to_string().as_str()])
+                    .args(["clone", "-n", source.url().to_string().as_str()])
                     .arg(cache_path.as_os_str());
-
-                if let Some(depth) = source.depth() {
-                    command.args(["--depth", depth.to_string().as_str()]);
-                }
 
                 let output = command
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
+
                 if !output.status.success() {
                     return Err(SourceError::GitError(format!(
                         "Git clone failed for source: {}",
@@ -140,6 +152,9 @@ pub fn git_src(
                     )));
                 }
             }
+
+            assert!(cache_path.exists());
+            fetch_repo(&cache_path, &url.to_string(), &rev)?;
         }
         GitUrl::Path(path) => {
             if cache_path.exists() {
