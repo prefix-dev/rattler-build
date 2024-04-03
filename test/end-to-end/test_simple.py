@@ -583,7 +583,7 @@ def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
         tmp_path,
     )
 
-    output = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
     pkg = get_extracted_package(tmp_path, "nanobind")
 
     assert (pkg / "info/paths.json").exists()
@@ -612,7 +612,7 @@ def test_git_patch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
         tmp_path,
     )
 
-    output = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
     pkg = get_extracted_package(tmp_path, "ament_package")
 
     assert (pkg / "info/paths.json").exists()
