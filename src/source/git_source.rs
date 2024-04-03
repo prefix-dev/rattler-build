@@ -23,7 +23,7 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
 
     let mut command = git_command("fetch");
     let output = command
-        .args([url, rev, "--recurse-submodules"])
+        .args([url, rev])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -64,6 +64,17 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
     if !output.status.success() {
         tracing::debug!("Repository checkout for revision {:?} failed!", rev);
         return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+    }
+
+    // Update submodules
+    let output = Command::new("git")
+        .args(["submodule", "update", "--init", "--recursive"])
+        .current_dir(repo_path)
+        .output()?;
+
+    if !output.status.success() {
+        tracing::debug!("Submodule update failed!");
+        return Err(SourceError::GitErrorStr("failed to update submodules"));
     }
 
     tracing::debug!("Repository fetched successfully!");
@@ -142,7 +153,7 @@ pub fn git_src(
                     .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
 
                 command
-                    .args(["clone", "-n", source.url().to_string().as_str()])
+                    .args(["clone", "--progress", "-n", source.url().to_string().as_str()])
                     .arg(cache_path.as_os_str());
 
                 let output = command
@@ -202,7 +213,8 @@ pub fn git_src(
     // Resolve the reference and set the head to the specified revision.
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", rev.as_str()])
+        // make sure that we get the commit, not the annotated tag
+        .args(["rev-parse", &format!("{}^{{commit}}", rev)])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
 
