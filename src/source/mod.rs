@@ -12,6 +12,7 @@ use crate::{
         checksum::Checksum,
         extract::{extract_tar, extract_zip},
     },
+    system_tools::ToolError,
     tool_configuration,
 };
 
@@ -87,6 +88,9 @@ pub enum SourceError {
 
     #[error("No checksum found for url: {0}")]
     NoChecksum(String),
+
+    #[error("Failed to find git executable: {0}")]
+    GitNotFound(#[from] ToolError),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches

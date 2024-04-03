@@ -8,15 +8,33 @@ use std::{
 
 use fs_extra::dir::remove;
 
-use crate::recipe::parser::{GitSource, GitUrl};
 use crate::system_tools::{SystemTools, Tool};
+use crate::{
+    recipe::parser::{GitSource, GitUrl},
+    system_tools::ToolError,
+};
 
 use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
-pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceError> {
-    tracing::info!("Fetching repository from {} at {}", url, rev);
-    let mut command = git_command("fetch");
+pub fn fetch_repo(
+    system_tools: &SystemTools,
+    repo_path: &Path,
+    url: &str,
+    rev: &str,
+) -> Result<(), SourceError> {
+    tracing::info!(
+        "Fetching repository from {} at {} into {}",
+        url,
+        rev,
+        repo_path.display()
+    );
+
+    if !repo_path.exists() {
+        return Err(SourceError::GitErrorStr("repository path does not exist"));
+    }
+
+    let mut command = git_command(system_tools, "fetch")?;
     let output = command
         .args([url, rev])
         .current_dir(repo_path)
@@ -49,21 +67,46 @@ pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceEr
         return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
     }
 
+    let output = git_command(system_tools, "checkout")?
+        .args([rev])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|_err| SourceError::ValidationFailed)?;
+
+    if !output.status.success() {
+        tracing::debug!("Repository checkout for revision {:?} failed!", rev);
+        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+    }
+
+    // Update submodules
+    let output = git_command(system_tools, "submodule")?
+        .args(["update", "--init", "--recursive"])
+        .current_dir(repo_path)
+        .output()?;
+
+    if !output.status.success() {
+        tracing::debug!("Submodule update failed!");
+        return Err(SourceError::GitErrorStr("failed to update submodules"));
+    }
+
     tracing::debug!("Repository fetched successfully!");
     Ok(())
 }
 
 /// Create a `git` command with the given subcommand.
-fn git_command(sub_cmd: &str) -> Command {
-    let mut command = Command::new("git");
+fn git_command(system_tools: &SystemTools, sub_cmd: &str) -> Result<Command, ToolError> {
+    let mut command = system_tools.call(Tool::Git)?;
     command.arg(sub_cmd);
 
     if std::io::stdin().is_terminal() {
         command.stdout(std::process::Stdio::inherit());
         command.stderr(std::process::Stdio::inherit());
-        command.arg("--progress");
+        if sub_cmd != "submodule" {
+            command.arg("--progress");
+        }
     }
-    command
+
+    Ok(command)
 }
 
 /// Fetch the git repository specified by the given source and place it in the cache directory.
@@ -81,12 +124,20 @@ pub fn git_src(
     }
 
     let filename = match &source.url() {
-        GitUrl::Url(url) => (|| Some(url.path_segments()?.last()?.to_string()))()
-            .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
+        GitUrl::Url(url) => (|| {
+            Some(
+                url.path_segments()?
+                    .filter(|x| !x.is_empty())
+                    .last()?
+                    .to_string(),
+            )
+        })()
+        .ok_or_else(|| SourceError::GitErrorStr("failed to get filename from url"))?,
         GitUrl::Ssh(url) => (|| {
             Some(
                 url.trim_end_matches(".git")
-                    .split(std::path::MAIN_SEPARATOR)
+                    .split('/')
+                    .filter(|x| !x.is_empty())
                     .last()?
                     .to_string(),
             )
@@ -100,6 +151,10 @@ pub fn git_src(
             .to_string_lossy()
             .to_string(),
     };
+
+    if filename.is_empty() {
+        return Err(SourceError::GitErrorStr("failed to get filename from url"));
+    }
 
     let cache_name = PathBuf::from(filename);
     let cache_path = cache_dir.join(cache_name);
@@ -115,24 +170,16 @@ pub fn git_src(
                 _ => unreachable!(),
             };
             // If the cache_path exists, initialize the repo and fetch the specified revision.
-            if cache_path.exists() {
-                fetch_repo(&cache_path, &url.to_string(), &rev)?;
-            } else {
-                let mut command = system_tools
-                    .call(Tool::Git)
-                    .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
-
+            if !cache_path.exists() {
+                let mut command = git_command(system_tools, "clone")?;
                 command
-                    .args(["clone", "--recursive", source.url().to_string().as_str()])
+                    .args(["--progress", "-n", source.url().to_string().as_str()])
                     .arg(cache_path.as_os_str());
-
-                if let Some(depth) = source.depth() {
-                    command.args(["--depth", depth.to_string().as_str()]);
-                }
 
                 let output = command
                     .output()
                     .map_err(|_e| SourceError::GitErrorStr("Failed to execute clone command"))?;
+
                 if !output.status.success() {
                     return Err(SourceError::GitError(format!(
                         "Git clone failed for source: {}",
@@ -140,6 +187,9 @@ pub fn git_src(
                     )));
                 }
             }
+
+            assert!(cache_path.exists());
+            fetch_repo(system_tools, &cache_path, &url.to_string(), &rev)?;
         }
         GitUrl::Path(path) => {
             if cache_path.exists() {
@@ -156,7 +206,7 @@ pub fn git_src(
             })?;
 
             let path = path.to_string_lossy();
-            let mut command = git_command("clone");
+            let mut command = git_command(system_tools, "clone")?;
 
             command
                 .arg("--recursive")
@@ -183,7 +233,8 @@ pub fn git_src(
     // Resolve the reference and set the head to the specified revision.
     let output = Command::new("git")
         .current_dir(&cache_path)
-        .args(["rev-parse", rev.as_str()])
+        // make sure that we get the commit, not the annotated tag
+        .args(["rev-parse", &format!("{}^{{commit}}", rev)])
         .output()
         .map_err(|_| SourceError::GitErrorStr("git rev-parse failed"))?;
 

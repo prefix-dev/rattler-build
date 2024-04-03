@@ -1,0 +1,18 @@
+package:
+    name: nanobind
+    version: "1.9.1"
+
+source:
+  git: https://github.com/wjakob/nanobind/
+  tag: v1.9.1
+
+build:
+  number: 0
+  # make noarch so that we can run the test on any platform
+  noarch: generic
+  script: |
+    # test that the tag is checked out to hash 8e1f8408b37d994fb987440859eb977af39be8c3
+    test "$(git rev-parse HEAD)" = "8e1f8408b37d994fb987440859eb977af39be8c3"
+    # check that ext/robin_map is checked out to 68ff732
+    cd ext/robin_map
+    test "$(git rev-parse HEAD)" = "68ff7325b3898fca267a103bad5c509e8861144d"
