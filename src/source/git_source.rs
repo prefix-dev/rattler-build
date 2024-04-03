@@ -199,7 +199,7 @@ pub fn git_src(
 
     // only do lfs pull if a requirement!
     if source.lfs() {
-        git_lfs_pull()?;
+        git_lfs_pull(&ref_git)?;
     }
 
     tracing::info!(
@@ -211,10 +211,10 @@ pub fn git_src(
     Ok((cache_path, ref_git))
 }
 
-fn git_lfs_pull() -> Result<(), SourceError> {
-    // verify lfs install
+fn git_lfs_pull(git_ref: &str) -> Result<(), SourceError> {
+    // verify git-lfs is installed
     let mut command = Command::new("git");
-    command.args(["lfs", "install"]);
+    command.args(["lfs", "ls-files"]);
     let output = command
         .output()
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
@@ -224,14 +224,24 @@ fn git_lfs_pull() -> Result<(), SourceError> {
         ));
     }
 
-    // git lfs pull
+    // git lfs fetch
     let mut command = Command::new("git");
-    command.args(["lfs", "pull"]);
+    command.args(["lfs", "fetch", "origin", git_ref]);
     let output = command
         .output()
         .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
     if !output.status.success() {
-        return Err(SourceError::GitErrorStr("`git lfs pull` failed!"));
+        return Err(SourceError::GitErrorStr("`git lfs fetch` failed!"));
+    }
+
+    // git lfs checkout
+    let mut command = Command::new("git");
+    command.args(["lfs", "checkout"]);
+    let output = command
+        .output()
+        .map_err(|_| SourceError::GitErrorStr("failed to execute command"))?;
+    if !output.status.success() {
+        return Err(SourceError::GitErrorStr("`git lfs checkout` failed!"));
     }
 
     Ok(())
