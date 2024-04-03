@@ -1,6 +1,7 @@
 //! This module contains the functions to package a conda package from a given output.
 use fs_err as fs;
 use fs_err::File;
+use rattler_conda_types::Platform;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -240,6 +241,13 @@ pub fn package_conda(
 
     fs::create_dir_all(&output_folder)?;
 
+    if let Platform::NoArch = output.build_configuration.target_platform {
+        create_empty_build_folder(
+            local_channel_dir,
+            &output.build_configuration.build_platform,
+        )?;
+    }
+
     let identifier = output
         .identifier()
         .ok_or(PackagingError::BuildStringNotSet)?;
@@ -287,6 +295,24 @@ pub fn package_conda(
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))
+}
+
+/// When building package for noarch, we don't create another build-platform folder
+/// together with noarch but conda-build does
+/// because of this we have a failure in conda-smithy CI so we also *mimic* this behaviour
+/// until this behaviour is changed
+/// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
+fn create_empty_build_folder(
+    local_channel_dir: &Path,
+    build_platform: &Platform,
+) -> miette::Result<(), PackagingError> {
+    let build_output_folder = local_channel_dir.join(build_platform.to_string());
+
+    tracing::info!("Creating empty build folder {:?}", build_output_folder);
+
+    fs::create_dir_all(&build_output_folder)?;
+
+    Ok(())
 }
 
 impl Output {
