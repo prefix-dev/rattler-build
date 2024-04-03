@@ -15,7 +15,12 @@ use super::SourceError;
 
 /// Fetch the given repository using the host `git` executable.
 pub fn fetch_repo(repo_path: &Path, url: &str, rev: &str) -> Result<(), SourceError> {
-    tracing::info!("Fetching repository from {} at {} into {}", url, rev, repo_path.display());
+    tracing::info!(
+        "Fetching repository from {} at {} into {}",
+        url,
+        rev,
+        repo_path.display()
+    );
 
     if !repo_path.exists() {
         return Err(SourceError::GitErrorStr("repository path does not exist"));
@@ -153,7 +158,12 @@ pub fn git_src(
                     .map_err(|_| SourceError::GitErrorStr("Failed to execute command"))?;
 
                 command
-                    .args(["clone", "--progress", "-n", source.url().to_string().as_str()])
+                    .args([
+                        "clone",
+                        "--progress",
+                        "-n",
+                        source.url().to_string().as_str(),
+                    ])
                     .arg(cache_path.as_os_str());
 
                 let output = command
