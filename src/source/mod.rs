@@ -133,7 +133,7 @@ pub async fn fetch_sources(
                     .use_gitignore(false)
                     .run()?;
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
@@ -179,7 +179,7 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Url(src.clone()));
@@ -229,7 +229,7 @@ pub async fn fetch_sources(
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Path(src.clone()));
