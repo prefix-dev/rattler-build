@@ -2,13 +2,13 @@ import hashlib
 import json
 import os
 import platform
-import yaml
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
 
 import pytest
 import requests
+import yaml
 from conda_package_handling.api import extract
 
 
@@ -589,7 +589,7 @@ def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert (pkg / "info/paths.json").exists()
     assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
     # load recipe as YAML
-    
+
     text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
 
     # parse the rendered recipe

@@ -244,7 +244,7 @@ impl Recipe {
         build.skip = build.skip.with_eval(&jinja)?;
 
         if schema_version != 1 {
-            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.", 
+            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
                 schema_version, env!("CARGO_PKG_VERSION"));
         }
 
