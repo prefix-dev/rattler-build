@@ -217,6 +217,10 @@ pub struct BuildOpts {
     #[arg(long)]
     pub render_only: bool,
 
+    /// Render the recipe files with solving requirements.
+    #[arg(long, requires("render_only"))]
+    pub with_solve: bool,
+
     /// Keep intermediate build artifacts after the build.
     #[arg(long)]
     pub keep_build: bool,

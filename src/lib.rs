@@ -287,7 +287,7 @@ pub async fn get_build_output(
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
         };
 
-        if args.render_only {
+        if args.render_only && args.with_solve {
             let output_with_resolved_dependencies = output
                 .resolve_dependencies(tool_config)
                 .await
