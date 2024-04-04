@@ -17,6 +17,7 @@ tests:
         - test -f $PREFIX/test-execution.txt
         - test -f ./testfile.txt
         - test -f ./testfolder/data.txt
+        - test "$PKG_VERSION" = "0.1.0"
       else:
         - if not exist %PREFIX%\test-execution.txt (exit 1)
         - if not exist .\testfile.txt (exit 1)
