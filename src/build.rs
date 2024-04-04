@@ -15,31 +15,66 @@ use crate::{package_test, tool_configuration};
 
 /// Check if the build should be skipped because it already exists in any of the channels
 pub async fn skip_existing(
-    output: &Output,
+    mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
-) -> miette::Result<bool> {
-    // If we should skip existing builds, check if the build already exists
-    if tool_configuration.skip_existing {
-        let channels = output.reindex_channels().into_diagnostic()?;
-        let match_spec =
-            MatchSpec::from_str(output.name().as_normalized(), ParseStrictness::Strict)
-                .into_diagnostic()?;
-        let match_spec_vec = vec![match_spec.clone()];
-        let (_, existing) = load_repodatas(
-            &channels,
-            output.target_platform(),
-            tool_configuration,
-            &match_spec_vec,
-        )
-        .await
-        .unwrap();
+) -> miette::Result<Vec<Output>> {
+    let only_local = match tool_configuration.skip_existing {
+        tool_configuration::SkipExisting::Local => true,
+        tool_configuration::SkipExisting::All => false,
+        tool_configuration::SkipExisting::None => return Ok(outputs),
+    };
 
-        return Ok(existing.iter().flatten().any(|package| {
+    // If we should skip existing builds, check if the build already exists
+    let Some(first_output) = outputs.first() else {
+        return Ok(outputs);
+    };
+
+    let all_channels = first_output.reindex_channels().into_diagnostic()?;
+
+    let match_specs = outputs
+        .iter()
+        .map(|o| {
+            MatchSpec::from_str(o.name().as_normalized(), ParseStrictness::Strict).into_diagnostic()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let channels = if only_local {
+        vec![first_output
+            .build_configuration
+            .directories
+            .output_dir
+            .to_string_lossy()
+            .to_string()]
+    } else {
+        all_channels
+    };
+
+    let (_, existing) = load_repodatas(
+        &channels,
+        first_output.host_platform(),
+        tool_configuration,
+        &match_specs,
+    )
+    .await
+    .unwrap();
+
+    // Retain only the outputs that do not exist yet
+    outputs.retain(|output| {
+        let exists = existing.iter().flatten().any(|package| {
             package.package_record.version.to_string() == output.version()
                 && output.build_string() == Some(&package.package_record.build)
-        }));
-    }
-    Ok(false)
+        });
+        if exists {
+            // The identifier should always be set at this point
+            tracing::info!(
+                "Skipping build for {}",
+                output.identifier().as_deref().unwrap_or("unknown")
+            );
+        }
+        !exists
+    });
+
+    Ok(outputs)
 }
 
 /// Run the build for the given output. This will fetch the sources, resolve the dependencies,

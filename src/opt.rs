@@ -5,6 +5,7 @@ use std::{path::PathBuf, str::FromStr};
 use crate::{
     console_utils::{Color, LogStyle},
     recipe_generator::GenerateRecipeOpts,
+    tool_configuration::SkipExisting,
 };
 use clap::builder::ArgPredicate;
 use clap::{arg, crate_version, Parser};
@@ -259,8 +260,8 @@ pub struct BuildOpts {
     pub tui: bool,
 
     /// Wether to skip packages that already exist in any channel
-    #[arg(long, default_value = "false")]
-    pub skip_existing: bool,
+    #[arg(long)]
+    pub skip_existing: Option<SkipExisting>,
 }
 
 /// Test options.
