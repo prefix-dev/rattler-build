@@ -61,7 +61,8 @@ pub async fn skip_existing(
     // Retain only the outputs that do not exist yet
     outputs.retain(|output| {
         let exists = existing.iter().flatten().any(|package| {
-            package.package_record.version.to_string() == output.version()
+            package.package_record.name == *output.name()
+                && package.package_record.version.to_string() == output.version()
                 && output.build_string() == Some(&package.package_record.build)
         });
         if exists {
