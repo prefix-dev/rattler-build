@@ -2,3 +2,6 @@ python:
   - "3.11.* *cpython"
   # - "3.12.* *cpython"
   # - "3.9.* *cpython"
+
+cxx_compiler:
+  - vs2019
