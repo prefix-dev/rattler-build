@@ -629,3 +629,24 @@ def test_git_patch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     source = sources[0]
     assert source["git"] == "https://github.com/ros2-gbp/ament_package-release.git"
     assert source["rev"] == "00da147b17c19bc225408dc693ed8fdc14c314ab"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "patch_with_strip"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "patch_with_strip")
+
+    assert (pkg / "info/paths.json").exists()
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+
+    text = (pkg / "somefile").read_text()
+
+    assert text == "123\n"
