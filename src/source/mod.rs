@@ -129,9 +129,15 @@ pub async fn fetch_sources(
                     ..src.clone()
                 }));
 
-                crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
-                    .use_gitignore(false)
-                    .run()?;
+                tool_configuration.fancy_log_handler.wrap_in_progress(
+                    "copying source into isolated environment",
+                    || {
+                        crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
+                            .use_gitignore(false)
+                            .run()
+                    },
+                )?;
+
                 if !src.patches().is_empty() {
                     patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }

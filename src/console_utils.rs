@@ -1,7 +1,11 @@
 //! This module contains utilities for logging and progress bar handling.
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use console::style;
-use indicatif::{HumanBytes, HumanDuration, MultiProgress, ProgressState, ProgressStyle};
+use indicatif::{
+    HumanBytes, HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle,
+};
+use std::borrow::Cow;
+use std::time::Duration;
 use std::{
     collections::HashMap,
     io,
@@ -353,7 +357,7 @@ impl LoggingOutputHandler {
     /// Returns the style to use for a progressbar that is finished.
     pub fn finished_progress_style(&self) -> indicatif::ProgressStyle {
         let template_str = self.with_indent_levels(&format!(
-            "{} {{spinner:.green}} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.green}}",
+            "{} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.green}}",
             console::style(console::Emoji("✔", " ")).green()
         ));
 
@@ -394,6 +398,22 @@ impl LoggingOutputHandler {
         } else {
             indicatif::ProgressDrawTarget::stderr()
         });
+    }
+
+    /// Displays a spinner with the given message while running the specified function to completion.
+    pub fn wrap_in_progress<T, F: FnOnce() -> T>(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        func: F,
+    ) -> T {
+        let pb = self.add_progress_bar(
+            ProgressBar::new_spinner().with_style(self.long_running_progress_style()),
+        );
+        pb.enable_steady_tick(Duration::from_millis(100));
+        pb.set_message(msg);
+        let result = func();
+        pb.finish_and_clear();
+        result
     }
 }
 

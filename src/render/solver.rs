@@ -2,7 +2,7 @@ use anyhow::Context;
 use comfy_table::Table;
 use futures::{stream, stream::FuturesUnordered, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 
-use indicatif::{style::TemplateError, HumanBytes, ProgressBar};
+use indicatif::{HumanBytes, ProgressBar};
 use rattler::{
     install::{link_package, InstallDriver, InstallOptions, Transaction, TransactionOperation},
     package_cache::PackageCache,
@@ -19,7 +19,6 @@ use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
 use reqwest_middleware::ClientWithMiddleware;
 
 use std::{
-    borrow::Cow,
     future::ready,
     io::ErrorKind,
     path::{Path, PathBuf},
@@ -95,9 +94,8 @@ pub async fn create_environment(
     // Determine virtual packages of the system. These packages define the capabilities of the
     // system. Some packages depend on these virtual packages to indicate compatibility with the
     // hardware of the system.
-    let virtual_packages = wrap_in_progress(
+    let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
         "determining virtual packages",
-        &tool_configuration.fancy_log_handler,
         move || {
             rattler_virtual_packages::VirtualPackage::current().map(|vpkgs| {
                 vpkgs
@@ -106,7 +104,7 @@ pub async fn create_environment(
                     .collect::<Vec<_>>()
             })
         },
-    )??;
+    )?;
 
     // Now that we parsed and downloaded all information, construct the packaging problem that we
     // need to solve. We do this by constructing a `SolverProblem`. This encapsulates all the
@@ -125,11 +123,9 @@ pub async fn create_environment(
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
     // we need to apply to our environment to bring it up to date.
-    let required_packages = wrap_in_progress(
-        "solving",
-        &tool_configuration.fancy_log_handler,
-        move || Solver.solve(solver_task),
-    )??;
+    let required_packages = tool_configuration
+        .fancy_log_handler
+        .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
     if !tool_configuration.render_only {
         install_packages(
@@ -203,11 +199,11 @@ pub async fn load_repodatas(
         .collect::<Result<Vec<_>, _>>()?;
 
     let package_names = specs.iter().filter_map(|spec| spec.name.clone());
-    let repodatas = wrap_in_progress(
-        "parsing repodata",
-        &tool_configuration.fancy_log_handler,
-        move || SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None),
-    )??;
+    let repodatas = tool_configuration
+        .fancy_log_handler
+        .wrap_in_progress("parsing repodata", move || {
+            SparseRepoData::load_records_recursive(&sparse_repo_datas, package_names, None)
+        })?;
 
     Ok((cache_dir, repodatas))
 }
@@ -514,22 +510,6 @@ async fn remove_package_from_environment(
     tokio::fs::remove_file(conda_meta_path).await?;
 
     Ok(())
-}
-
-/// Displays a spinner with the given message while running the specified function to completion.
-fn wrap_in_progress<T, F: FnOnce() -> T>(
-    msg: impl Into<Cow<'static, str>>,
-    fancy_log_handler: &LoggingOutputHandler,
-    func: F,
-) -> Result<T, TemplateError> {
-    let pb = fancy_log_handler.add_progress_bar(
-        ProgressBar::new_spinner().with_style(fancy_log_handler.long_running_progress_style()),
-    );
-    pb.enable_steady_tick(Duration::from_millis(100));
-    pb.set_message(msg);
-    let result = func();
-    pb.finish_and_clear();
-    Ok(result)
 }
 
 /// Given a channel and platform, download and cache the `repodata.json` for it. This function
