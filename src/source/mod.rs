@@ -129,14 +129,18 @@ pub async fn fetch_sources(
                     ..src.clone()
                 }));
 
-                tool_configuration.fancy_log_handler.wrap_in_progress(
+                let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
                     "copying source into isolated environment",
                     || {
-                        crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
+                        copy_dir::CopyDir::new(&result.0, &dest_dir)
                             .use_gitignore(false)
                             .run()
                     },
                 )?;
+                tracing::info!(
+                    "Copied {} files into isolated environment",
+                    copy_result.copied_paths().len()
+                );
 
                 if !src.patches().is_empty() {
                     patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
@@ -211,9 +215,18 @@ pub async fn fetch_sources(
 
                 // check if the source path is a directory
                 if src_path.is_dir() {
-                    copy_dir::CopyDir::new(&src_path, &dest_dir)
-                        .use_gitignore(src.use_gitignore())
-                        .run()?;
+                    let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
+                        "copying source into isolated environment",
+                        || {
+                            copy_dir::CopyDir::new(&src_path, &dest_dir)
+                                .use_gitignore(src.use_gitignore())
+                                .run()
+                        },
+                    )?;
+                    tracing::info!(
+                        "Copied {} files into isolated environment",
+                        copy_result.copied_paths().len()
+                    );
                 } else if src_path
                     .file_name()
                     .unwrap_or_default()
