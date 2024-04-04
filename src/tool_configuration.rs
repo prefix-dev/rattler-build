@@ -4,6 +4,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use crate::console_utils::LoggingOutputHandler;
+use clap::ValueEnum;
 use rattler_networking::{
     authentication_storage::{self, backends::file::FileStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
@@ -12,6 +13,17 @@ use reqwest_middleware::ClientWithMiddleware;
 
 /// The user agent to use for the reqwest client
 pub const APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
+
+/// Whether to skip existing packages or not
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum SkipExisting {
+    /// Do not skip any packages
+    None,
+    /// Skip packages that already exist locally
+    Local,
+    /// Skip packages that already exist in any channel
+    All,
+}
 
 /// Global configuration for the build
 #[derive(Clone, Debug)]
@@ -38,7 +50,7 @@ pub struct Configuration {
     pub render_only: bool,
 
     /// Wether to skip existing packages
-    pub skip_existing: bool,
+    pub skip_existing: SkipExisting,
 }
 
 /// Get the authentication storage from the given file
@@ -87,7 +99,7 @@ impl Default for Configuration {
             use_zstd: true,
             use_bz2: true,
             render_only: false,
-            skip_existing: false,
+            skip_existing: SkipExisting::None,
         }
     }
 }

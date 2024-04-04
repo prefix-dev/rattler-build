@@ -47,6 +47,8 @@ use std::{
 };
 use tool_configuration::Configuration;
 
+use crate::tool_configuration::SkipExisting;
+
 use {
     build::run_build,
     console_utils::LoggingOutputHandler,
@@ -117,6 +119,7 @@ pub fn get_tool_config(
     let client =
         tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone())
             .into_diagnostic()?;
+
     Ok(Configuration {
         client,
         fancy_log_handler: fancy_log_handler.clone(),
@@ -307,14 +310,8 @@ pub async fn run_build_from_args(
     tool_config: Configuration,
 ) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
-    for output in build_output {
-        if skip_existing(&output, &tool_config).await? {
-            tracing::info!(
-                "Skipping build for {:?}",
-                output.identifier().unwrap_or_else(|| "unknown".to_string())
-            );
-            continue;
-        }
+
+    for output in skip_existing(build_output, &tool_config).await? {
         let output = match run_build(output, &tool_config).await {
             Ok((output, _archive)) => {
                 output.record_build_end();
@@ -428,7 +425,7 @@ pub async fn rebuild_from_args(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: false,
-        skip_existing: false,
+        skip_existing: SkipExisting::None,
     };
 
     output
