@@ -128,7 +128,7 @@ pub fn get_tool_config(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
-        skip_existing: args.skip_existing.unwrap_or(SkipExisting::None),
+        skip_existing: args.skip_existing,
     })
 }
 

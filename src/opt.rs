@@ -260,8 +260,8 @@ pub struct BuildOpts {
     pub tui: bool,
 
     /// Wether to skip packages that already exist in any channel
-    #[arg(long)]
-    pub skip_existing: Option<SkipExisting>,
+    #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1)]
+    pub skip_existing: SkipExisting,
 }
 
 /// Test options.
