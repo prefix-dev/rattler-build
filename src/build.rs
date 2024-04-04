@@ -11,7 +11,7 @@ use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
 use crate::recipe::parser::TestType;
 use crate::render::solver::load_repodatas;
-use crate::{package_test, tool_configuration};
+use crate::{env_vars, package_test, tool_configuration};
 
 /// Check if the build should be skipped because it already exists in any of the channels
 pub async fn skip_existing(
@@ -118,6 +118,7 @@ pub async fn run_build(
                 keep_test_prefix: tool_configuration.no_clean,
                 channels: output.reindex_channels().into_diagnostic()?,
                 tool_configuration: tool_configuration.clone(),
+                env_vars: env_vars::vars(&output, "TEST"),
             },
         )
         .await

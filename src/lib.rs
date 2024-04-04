@@ -366,6 +366,7 @@ pub async fn run_test_from_args(
             no_clean: false,
             ..Default::default()
         },
+        env_vars: HashMap::new(),
     };
 
     let package_name = package_file

@@ -10,6 +10,7 @@
 use fs_err as fs;
 use rattler_conda_types::package::IndexJson;
 use rattler_conda_types::ParseStrictness;
+use std::collections::HashMap;
 use std::fmt::Write as fmt_write;
 use std::{
     path::{Path, PathBuf},
@@ -180,6 +181,8 @@ pub struct TestConfiguration {
     pub channels: Vec<String>,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+    /// Environment variables to set.
+    pub env_vars: HashMap<String, String>,
 }
 
 /// Run a test for a single package
@@ -476,7 +479,8 @@ async fn run_shell_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
+    let mut env_vars = config.env_vars.clone();
+    env_vars.extend(env_vars::os_vars(prefix, &Platform::current()));
     env_vars.retain(|key, _| key != "PATH");
     env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
