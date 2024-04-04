@@ -2,10 +2,10 @@
 
 context:
   name: mamba
-  libmamba_version: "1.5.3"
-  libmambapy_version: "1.5.3"
-  mamba_version: "1.5.3"
-  release: "2023.10.30"
+  libmamba_version: "1.5.8"
+  libmambapy_version: "1.5.8"
+  mamba_version: "1.5.8"
+  release: "2024.03.25"
   build_number: 2
   # libmamba_version_split: ${{ libmamba_version.split('.') }}
 
@@ -14,7 +14,7 @@ recipe:
 
 source:
   url: https://github.com/mamba-org/mamba/archive/refs/tags/${{ release }}.tar.gz
-  sha256: 36d617de5971ad2b4460f5446bee7622f33cf3a8a079df8f97bc24e9a5873071
+  sha256: 6ddaf4b0758eb7ca1250f427bc40c2c3ede43257a60bac54e4320a4de66759a6
 
 build:
   number: ${{ build_number }}
