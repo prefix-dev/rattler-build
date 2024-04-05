@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.14.1"
+version = "0.14.2"
 authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -21,22 +21,22 @@ tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input
 [dependencies]
 serde = { version = "1.0.197", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.20.1", default-features = false, features = ["cli-tools"] }
-rattler_conda_types = { version = "0.20.4", default-features = false }
+rattler = { version = "0.21.0", default-features = false, features = ["cli-tools"] }
+rattler_conda_types = { version = "0.20.5", default-features = false }
 rattler_digest = { version = "0.19.2", default-features = false }
-rattler_index = { version = "0.19.5", default-features = false }
-rattler_networking = { version = "0.20.0", default-features = false }
-rattler_repodata_gateway = { version = "0.19.5", default-features = false, features = [
+rattler_index = { version = "0.19.6", default-features = false }
+rattler_networking = { version = "0.20.1", default-features = false }
+rattler_repodata_gateway = { version = "0.19.6", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.19.5", default-features = false, features = [
+rattler_shell = { version = "0.19.6", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.20.4", default-features = false, features = [
+rattler_solve = { version = "0.20.5", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.19.5", default-features = false }
-rattler_package_streaming = { version = "0.20.2", default-features = false }
+rattler_virtual_packages = { version = "0.19.6", default-features = false }
+rattler_package_streaming = { version = "0.20.3", default-features = false }
 anyhow = "1.0.81"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
@@ -62,7 +62,7 @@ tracing-subscriber = { version = "0.3.18", features = [
     "ansi",
     "json"
 ] }
-marked-yaml = { version = "0.4.0" }
+marked-yaml = { version = "0.5.0" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
 goblin = "0.8.0"
