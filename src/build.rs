@@ -18,6 +18,9 @@ pub async fn skip_existing(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<Vec<Output>> {
+    let span = tracing::info_span!("Checking existing builds");
+    let _enter = span.enter();
+
     let only_local = match tool_configuration.skip_existing {
         tool_configuration::SkipExisting::Local => true,
         tool_configuration::SkipExisting::All => false,
@@ -58,12 +61,27 @@ pub async fn skip_existing(
     .await
     .unwrap();
 
+    let existing_set = existing
+        .iter()
+        .flatten()
+        .map(|p| {
+            format!(
+                "{}-{}-{}",
+                p.package_record.name.as_normalized(),
+                p.package_record.version,
+                p.package_record.build
+            )
+        })
+        .collect::<std::collections::HashSet<_>>();
+
     // Retain only the outputs that do not exist yet
     outputs.retain(|output| {
-        let exists = existing.iter().flatten().any(|package| {
-            package.package_record.version.to_string() == output.version()
-                && output.build_string() == Some(&package.package_record.build)
-        });
+        let exists = existing_set.contains(&format!(
+            "{}-{}-{}",
+            output.name().as_normalized(),
+            output.version(),
+            output.build_string().unwrap_or_default()
+        ));
         if exists {
             // The identifier should always be set at this point
             tracing::info!(
