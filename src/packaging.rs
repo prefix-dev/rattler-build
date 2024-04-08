@@ -241,10 +241,7 @@ pub fn package_conda(
     });
     files.iter().for_each(|f| {
         if f.components().next() == Some(Component::Normal("info".as_ref())) {
-            tracing::info!(
-                "  - {}",
-                console::style(f.to_string_lossy()).dim()
-            )
+            tracing::info!("  - {}", console::style(f.to_string_lossy()).dim())
         } else {
             tracing::info!("  - {}", f.to_string_lossy())
         }
