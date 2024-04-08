@@ -243,7 +243,7 @@ pub fn package_conda(
         if f.components().next() == Some(Component::Normal("info".as_ref())) {
             tracing::info!(
                 "  - {}",
-                console::style(f.to_string_lossy()).black().bright()
+                console::style(f.to_string_lossy()).dim()
             )
         } else {
             tracing::info!("  - {}", f.to_string_lossy())
