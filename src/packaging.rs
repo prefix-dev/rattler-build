@@ -3,9 +3,7 @@ use fs_err as fs;
 use fs_err::File;
 use rattler_conda_types::Platform;
 use std::io::Write;
-use std::path::{Path, PathBuf};
-
-use itertools::Itertools;
+use std::path::{Component, Path, PathBuf};
 
 use rattler_conda_types::package::PathsJson;
 use rattler_conda_types::package::{ArchiveType, PackageFile};
@@ -227,13 +225,27 @@ pub fn package_conda(
 
     // print sorted files
     tracing::info!("\nFiles in package:\n");
-    tmp.files
+    let mut files = tmp
+        .files
         .iter()
         .map(|x| x.strip_prefix(tmp.temp_dir.path()))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .sorted()
-        .for_each(|f| tracing::info!("  - {}", f.to_string_lossy()));
+        .collect::<Result<Vec<_>, _>>()?;
+    files.sort_by(|a, b| {
+        let a_is_info = a.components().next() == Some(Component::Normal("info".as_ref()));
+        let b_is_info = b.components().next() == Some(Component::Normal("info".as_ref()));
+        match (a_is_info, b_is_info) {
+            (true, true) | (false, false) => a.cmp(b),
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+        }
+    });
+    files.iter().for_each(|f| {
+        if f.components().next() == Some(Component::Normal("info".as_ref())) {
+            tracing::info!("  - {}", console::style(f.to_string_lossy()).dim())
+        } else {
+            tracing::info!("  - {}", f.to_string_lossy())
+        }
+    });
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
