@@ -59,6 +59,9 @@ pub struct App {
     #[command(flatten)]
     pub verbose: Verbosity<InfoLevel>,
 
+    #[clap(flatten)]
+    pub build_opts: BuildOpts,
+
     /// Logging style
     #[clap(
         long,

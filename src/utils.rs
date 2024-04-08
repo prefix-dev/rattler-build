@@ -2,9 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use walkdir::WalkDir;
 use std::collections::btree_map::Entry;
 use std::collections::btree_map::IntoIter;
 use std::collections::BTreeMap;
+use std::fs;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -160,6 +162,32 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
         .duration_since(UNIX_EPOCH)
         .into_diagnostic()?
         .as_secs())
+}
+
+/// Removes a directory and all its contents, including read-only files.
+pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(path) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            // If the normal removal fails, try to forcefully remove it.
+            for entry in WalkDir::new(path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_file())
+            {
+                let file_path = entry.path();
+                let metadata = fs::metadata(file_path)?;
+                let mut permissions = metadata.permissions();
+
+                if permissions.readonly() {
+                    permissions.set_readonly(false);
+                    fs::set_permissions(file_path, permissions)?;
+                }
+            }
+            fs::remove_dir_all(path)
+        },
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]

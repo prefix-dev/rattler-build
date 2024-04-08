@@ -1,5 +1,4 @@
 //! The build module contains the code for running the build process for a given [`Output`]
-use fs_err as fs;
 use rattler_conda_types::{MatchSpec, ParseStrictness};
 use std::path::PathBuf;
 use std::vec;
@@ -11,6 +10,7 @@ use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
 use crate::recipe::parser::TestType;
 use crate::render::solver::load_repodatas;
+use crate::utils::remove_dir_all_force;
 use crate::{package_test, tool_configuration};
 
 /// Check if the build should be skipped because it already exists in any of the channels
@@ -157,7 +157,7 @@ pub async fn run_build(
     }
 
     if !tool_configuration.no_clean {
-        fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
+        remove_dir_all_force(&directories.build_dir).into_diagnostic()?;
     }
 
     if tool_configuration.no_test {
@@ -180,7 +180,7 @@ pub async fn run_build(
     drop(enter);
 
     if !tool_configuration.no_clean && directories.build_dir.exists() {
-        fs::remove_dir_all(&directories.build_dir).into_diagnostic()?;
+        remove_dir_all_force(&directories.build_dir).into_diagnostic()?;
     }
 
     Ok((output, result))
