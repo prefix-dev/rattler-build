@@ -650,3 +650,43 @@ def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     text = (pkg / "somefile").read_text()
 
     assert text == "123\n"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "symlink"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "symlink")
+
+    assert (pkg / "info/paths.json").exists()
+    # parse paths.json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    pp = paths["paths"]
+    assert len(pp) == 3
+
+    for p in paths["paths"]:
+        if p["_path"] == "bin/symlink-to-lib":
+            assert p["path_type"] == "softlink"
+            assert (
+                p["sha256"]
+                == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            )
+        if p["_path"] == "bin/symlink":
+            assert p["path_type"] == "softlink"
+            assert (
+                p["sha256"]
+                == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
+            )
+        if p["_path"] == "lib/symlink/symlink-target":
+            assert p["path_type"] == "hardlink"
+            assert (
+                p["sha256"]
+                == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
+            )
