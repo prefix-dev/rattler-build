@@ -54,7 +54,10 @@ pub enum SourceError {
     FileNotFound(PathBuf),
 
     #[error("Could not find `patch` executable")]
-    PatchNotFound,
+    PatchExeNotFound,
+
+    #[error("Patch file not found: {0}")]
+    PatchNotFound(PathBuf),
 
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),

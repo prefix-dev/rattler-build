@@ -7,7 +7,7 @@ use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
 
 fn guess_strip_level(patch: &Path, work_dir: &Path) -> Result<usize, std::io::Error> {
-    let text = std::fs::read_to_string(patch)?;
+    let text = fs_err::read_to_string(patch)?;
     let Ok(patches) = Patch::from_multiple(&text) else {
         return Ok(1);
     };
@@ -39,11 +39,15 @@ pub(crate) fn apply_patches(
     for patch in patches {
         let patch = recipe_dir.join(patch);
 
+        if !patch.exists() {
+            return Err(SourceError::PatchNotFound(patch));
+        }
+
         let strip_level = guess_strip_level(&patch, work_dir)?;
 
         let output = system_tools
             .call(Tool::Patch)
-            .map_err(|_| SourceError::PatchNotFound)?
+            .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
             .arg("-i")
             .arg(String::from(patch.to_string_lossy()))
