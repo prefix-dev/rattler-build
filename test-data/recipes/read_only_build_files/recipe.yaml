@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+package:
+  name: read-only-build-files
+  version: 0.1.0
+
+build:
+  script: |
+    # create some readonly files in the current directory incl. a read-only directory with files
+    mkdir -p ./read-only-cache/read-only-dir
+    touch read-only-cache/read-only-file
+    touch read-only-cache/read-only-dir/read-only-file
+
+    chmod 444 ./read-only-cache/read-only-file
+    chmod 444 ./read-only-cache/read-only-dir/read-only-file
+    chmod 555 ./read-only-cache/read-only-dir
+
+    ls -al 
+    ls -al ./read-only-cache
+    ls -al ./read-only-cache/read-only-dir

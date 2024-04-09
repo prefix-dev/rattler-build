@@ -137,7 +137,7 @@ async fn main() -> miette::Result<()> {
         Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         None => {
-            println!("build opts: {:?}", app.build_opts.recipe);            
+            println!("build opts: {:?}", app.build_opts.recipe);
             // _ = App::command().print_long_help();
             Ok(())
         }
