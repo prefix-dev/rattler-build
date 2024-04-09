@@ -27,12 +27,18 @@ impl SelectorConfig {
     pub fn into_context(self) -> BTreeMap<String, Value> {
         let mut context = BTreeMap::new();
 
+        let host_platform = if self.target_platform == Platform::NoArch {
+            Platform::current()
+        } else {
+            self.target_platform
+        };
+
         context.insert(
             "target_platform".to_string(),
             Value::from_safe_string(self.target_platform.to_string()),
         );
 
-        if let Some(platform) = self.target_platform.only_platform() {
+        if let Some(platform) = host_platform.only_platform() {
             context.insert(
                 platform.to_string(),
                 Value::from_safe_string(platform.to_string()),
@@ -45,7 +51,7 @@ impl SelectorConfig {
 
         context.insert(
             "unix".to_string(),
-            Value::from(self.target_platform.is_unix()),
+            Value::from(host_platform.is_unix()),
         );
 
         context.insert(
