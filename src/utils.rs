@@ -6,6 +6,8 @@ use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use std::collections::btree_map::Entry;
 use std::collections::btree_map::IntoIter;
 use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -179,6 +181,10 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
                 let mut permissions = metadata.permissions();
 
                 if permissions.readonly() {
+                    // Set only the user write bit
+                    #[cfg(unix)]
+                    permissions.set_mode(permissions.mode() | 0o200);
+                    #[cfg(windows)]
                     permissions.set_readonly(false);
                     fs::set_permissions(file_path, permissions)?;
                 }

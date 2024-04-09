@@ -703,6 +703,6 @@ def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     )
 
     rattler_build(*args)
-    pkg = get_extracted_package(tmp_path, "symlink")
+    pkg = get_extracted_package(tmp_path, "read-only-build-files")
 
     assert (pkg / "info/index.json").exists()
