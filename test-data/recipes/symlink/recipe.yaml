@@ -16,9 +16,9 @@ build:
     mkdir -p ${PREFIX}/bin
     echo "test" > ${PREFIX}/lib/symlink/symlink-target
 
-    ln -sfr ${PREFIX}/lib/symlink/symlink-target ${PREFIX}/bin/symlink
+    ln -s ${PREFIX}/lib/symlink/symlink-target ${PREFIX}/bin/symlink
 
-    ln -sfr ${PREFIX}/broken ${PREFIX}/bin/broken
+    ln -s ${PREFIX}/broken ${PREFIX}/bin/broken
 
     ln -s ${PREFIX}/lib/ $PREFIX/bin/symlink-to-lib
 

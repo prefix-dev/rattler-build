@@ -662,7 +662,7 @@ def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
         tmp_path,
     )
 
-    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    rattler_build(*args)
     pkg = get_extracted_package(tmp_path, "symlink")
 
     assert (pkg / "info/paths.json").exists()
