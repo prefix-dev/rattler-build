@@ -1,0 +1,26 @@
+context:
+  name: symlink
+  version: 0.1.0
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+build:
+  number: 0
+  always_include_files:
+  - lib/empty-folder
+
+  script: |
+    mkdir -p ${PREFIX}/lib/symlink
+    mkdir -p ${PREFIX}/bin
+    echo "test" > ${PREFIX}/lib/symlink/symlink-target
+
+    ln -s ${PREFIX}/lib/symlink/symlink-target ${PREFIX}/bin/symlink
+
+    ln -s ${PREFIX}/broken ${PREFIX}/bin/broken
+
+    ln -s ${PREFIX}/lib/ $PREFIX/bin/symlink-to-lib
+
+    # note: we currently don't expect empty folders in the output!
+    mkdir -p ${PREFIX}/lib/empty-folder

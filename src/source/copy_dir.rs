@@ -244,9 +244,9 @@ impl<'a> CopyDir<'a> {
 
                         // if file is a symlink, copy it as a symlink
                         if path.is_symlink() {
-                            let link_target = std::fs::read_link(path)?;
+                            let link_target = fs_err::read_link(path)?;
                             #[cfg(unix)]
-                            std::os::unix::fs::symlink(link_target, &dest_path)?;
+                            fs_err::os::unix::fs::symlink(link_target, &dest_path)?;
                             #[cfg(windows)]
                             std::os::windows::fs::symlink_file(link_target, &dest_path)?;
                         } else {
@@ -292,7 +292,7 @@ fn create_dir_all_cached(path: &Path, paths_created: &mut HashSet<PathBuf>) -> s
 
     // Actually create the directories
     for path in dirs_to_create.into_iter().rev() {
-        match std::fs::create_dir(&path) {
+        match fs_err::create_dir(&path) {
             Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
             Ok(()) => {}
             Err(e) => return Err(e),

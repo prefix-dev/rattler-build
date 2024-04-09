@@ -11,7 +11,7 @@ use rattler_conda_types::{
     },
     Platform,
 };
-use rattler_digest::compute_file_digest;
+use rattler_digest::{compute_bytes_digest, compute_file_digest};
 use std::{
     collections::HashSet,
     io::Write,
@@ -387,7 +387,11 @@ impl Output {
                     size_in_bytes: Some(meta.len()),
                 });
             } else if meta.is_symlink() {
-                let digest = compute_file_digest::<sha2::Sha256>(p)?;
+                let digest = if p.is_file() {
+                    compute_file_digest::<sha2::Sha256>(p)?
+                } else {
+                    compute_bytes_digest::<sha2::Sha256>(&[])
+                };
 
                 paths_json.paths.push(PathsEntry {
                     sha256: Some(digest),
@@ -439,7 +443,6 @@ impl Output {
         variant_config.write_all(
             serde_json::to_string_pretty(&self.build_configuration.variant)?.as_bytes(),
         )?;
-
         Ok(new_files)
     }
 }
