@@ -14,6 +14,6 @@ build:
     chmod 444 ./read-only-cache/read-only-dir/read-only-file
     chmod 555 ./read-only-cache/read-only-dir
 
-    ls -al 
+    ls -al
     ls -al ./read-only-cache
     ls -al ./read-only-cache/read-only-dir

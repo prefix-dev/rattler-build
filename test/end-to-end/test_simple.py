@@ -691,6 +691,7 @@ def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
                 == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
             )
 
+
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )

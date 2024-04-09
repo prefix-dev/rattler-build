@@ -1,11 +1,11 @@
 //! Utility functions for working with paths.
 
+use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use std::collections::btree_map::Entry;
 use std::collections::btree_map::IntoIter;
 use std::collections::BTreeMap;
-use fs_err as fs;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
