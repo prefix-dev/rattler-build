@@ -1,14 +1,18 @@
 //! Utility functions for working with paths.
 
+use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use std::collections::btree_map::Entry;
 use std::collections::btree_map::IntoIter;
 use std::collections::BTreeMap;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
+use walkdir::WalkDir;
 
 use miette::IntoDiagnostic;
 
@@ -160,6 +164,35 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
         .duration_since(UNIX_EPOCH)
         .into_diagnostic()?
         .as_secs())
+}
+
+/// Removes a directory and all its contents, including read-only files.
+pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
+    match fs::remove_dir_all(path) {
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
+            // If the normal removal fails, try to forcefully remove it.
+            tracing::debug!(
+                "Adjusting permissions to remove read-only files in the build directory."
+            );
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                let file_path = entry.path();
+                let metadata = fs::metadata(file_path)?;
+                let mut permissions = metadata.permissions();
+
+                if permissions.readonly() {
+                    // Set only the user write bit
+                    #[cfg(unix)]
+                    permissions.set_mode(permissions.mode() | 0o200);
+                    #[cfg(windows)]
+                    permissions.set_readonly(false);
+                    fs::set_permissions(file_path, permissions)?;
+                }
+            }
+            fs::remove_dir_all(path)
+        }
+        Err(e) => Err(e),
+    }
 }
 
 #[cfg(test)]

@@ -690,3 +690,19 @@ def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
                 p["sha256"]
                 == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
             )
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "read_only_build_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    rattler_build(*args)
+    pkg = get_extracted_package(tmp_path, "read-only-build-files")
+
+    assert (pkg / "info/index.json").exists()
