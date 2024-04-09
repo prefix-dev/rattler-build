@@ -228,7 +228,6 @@ impl<'a> CopyDir<'a> {
                     let dest_path = self.to_path.join(stripped_path);
 
                     if path.is_dir() {
-                        println!("Creating dir: {:?}", dest_path);
                         create_dir_all_cached(&dest_path, paths_created)?;
                         Ok(Some(dest_path))
                     } else {
