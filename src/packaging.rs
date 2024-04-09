@@ -204,18 +204,22 @@ pub fn package_conda(
     tmp.add_files(output.write_metadata(&tmp)?);
 
     // TODO move things below also to metadata.rs
+    tracing::info!("Copying license files");
     if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
         tmp.add_files(license_files);
     }
 
+    tracing::info!("Copying recipe files");
     if output.build_configuration.store_recipe {
         let recipe_files = write_recipe_folder(output, tmp.temp_dir.path())?;
         tmp.add_files(recipe_files);
     }
 
+    tracing::info!("Writing test files");
     let test_files = write_test_files(output, tmp.temp_dir.path())?;
     tmp.add_files(test_files);
 
+    tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
         let link_json = File::create(info_folder.join("link.json"))?;
