@@ -57,6 +57,9 @@ pub struct Directories {
     /// The directory where the recipe is located
     #[serde(skip)]
     pub recipe_dir: PathBuf,
+    /// The path where the recipe is located
+    #[serde(skip)]
+    pub recipe_path: PathBuf,
     /// The host prefix is the directory where host dependencies are installed
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
     pub host_prefix: PathBuf,
@@ -135,6 +138,7 @@ impl Directories {
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,
+            recipe_path: recipe_path.to_path_buf(),
             output_dir,
         };
 
