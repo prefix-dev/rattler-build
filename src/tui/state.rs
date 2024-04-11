@@ -48,7 +48,7 @@ impl Package {
             is_hovered: false,
             output: output.clone(),
             tool_config: tool_config.clone(),
-            recipe_path: output.build_configuration.directories.recipe_dir.clone(),
+            recipe_path: output.build_configuration.directories.recipe_path.clone(),
         }
     }
 }
