@@ -544,7 +544,13 @@ pub fn init_logging(
                 log_sender: tui_log_sender,
             };
             registry
-                .with(fmt::layer().with_writer(writer).without_time())
+                .with(
+                    fmt::layer()
+                        .with_writer(writer)
+                        .without_time()
+                        .with_level(false)
+                        .with_target(false),
+                )
                 .init();
             return Ok(log_handler);
         }
