@@ -206,7 +206,9 @@ pub fn package_conda(
 
     post_process::relink::relink(&tmp, output)?;
 
-    tmp.add_files(post_process::python::python(output, &tmp)?);
+    tmp.add_files(post_process::python::python(&tmp, output)?);
+
+    post_process::regex_replacements::regex_post_process(&tmp, output)?;
 
     tracing::info!("Post-processing done!");
 

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};
 use super::{Dependency, FlattenErrors};
+use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
 
@@ -104,6 +105,15 @@ pub struct Build {
     pub(super) variant: VariantKeyUsage,
     #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
     pub(super) prefix_detection: PrefixDetection,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(super) post_process: Vec<PostProcess>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostProcess {
+    pub files: GlobVec,
+    pub regex: String,
+    pub replacement: String,
 }
 
 impl Build {
@@ -166,6 +176,11 @@ impl Build {
     pub const fn prefix_detection(&self) -> &PrefixDetection {
         &self.prefix_detection
     }
+
+    /// Post-process operations for regex based replacements
+    pub const fn post_process(&self) -> &Vec<PostProcess> {
+        &self.post_process
+    }
 }
 
 impl TryConvertNode<Build> for RenderedNode {
@@ -194,7 +209,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             always_include_files,
             merge_build_and_host_envs,
             variant,
-            prefix_detection
+            prefix_detection,
+            post_process
         }
 
         Ok(build)
@@ -328,6 +344,49 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
         );
 
         Ok(dynamic_linking)
+    }
+}
+
+impl TryConvertNode<Vec<PostProcess>> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Vec<PostProcess>, Vec<PartialParsingError>> {
+        self.as_sequence()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedSequence)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Vec<PostProcess>> for RenderedSequenceNode {
+    fn try_convert(&self, _name: &str) -> Result<Vec<PostProcess>, Vec<PartialParsingError>> {
+        let mut post_process = Vec::new();
+
+        for (idx, node) in self.iter().enumerate() {
+            let pp = node.try_convert(&format!("post_process[{}]", idx))?;
+            post_process.push(pp);
+        }
+
+        Ok(post_process)
+    }
+}
+
+impl TryConvertNode<PostProcess> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PostProcess, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PostProcess> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PostProcess, Vec<PartialParsingError>> {
+        let mut post_process = PostProcess {
+            files: GlobVec::default(),
+            regex: String::new(),
+            replacement: String::new(),
+        };
+
+        validate_keys!(post_process, self.iter(), files, regex, replacement);
+
+        Ok(post_process)
     }
 }
 

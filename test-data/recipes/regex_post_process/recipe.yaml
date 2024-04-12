@@ -1,0 +1,27 @@
+package:
+  name: regex-post-process
+  version: 0.1.0
+
+build:
+  script:
+    - echo "Building the regex-post-process package" > $PREFIX/test.txt
+    - cp $RECIPE_DIR/test.pc $PREFIX/test.pc
+    - cp $RECIPE_DIR/test.cmake $PREFIX/test.cmake
+
+  post_process:
+    - files:
+        - "*.txt"
+      regex: "regex-post-process"
+      replacement: "regex-post-process-replaced"
+    - files: 
+        - '*.pc'
+      regex: (?:-L|-I)?"?([^;\s]+/sysroot/)
+      replacement: '$(CONDA_BUILD_SYSROOT_S)'
+    - files:
+        - '*.cmake'
+      regex: ([^;\s"]+/sysroot)
+      replacement: '$ENV{CONDA_BUILD_SYSROOT}'
+    - files:
+        - '*.cmake'
+      regex: ([^;\s"]+/MacOSX\d*\.?\d*\.sdk)
+      replacement: '$ENV{CONDA_BUILD_SYSROOT}'
