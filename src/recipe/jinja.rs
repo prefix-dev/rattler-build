@@ -721,6 +721,7 @@ mod tests {
     fn eval() {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -745,6 +746,7 @@ mod tests {
     fn eval2() {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -759,6 +761,7 @@ mod tests {
         let variant = BTreeMap::new();
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant,
             ..Default::default()
@@ -788,6 +791,7 @@ mod tests {
         let variant = BTreeMap::new();
         let options = SelectorConfig {
             target_platform: Platform::Linux32,
+            host_platform: Platform::Linux32,
             build_platform: Platform::Linux32,
             variant,
             ..Default::default()
@@ -817,6 +821,7 @@ mod tests {
         let variant = BTreeMap::new();
         let options = SelectorConfig {
             target_platform: Platform::LinuxAarch64,
+            host_platform: Platform::LinuxAarch64,
             build_platform: Platform::LinuxAarch64,
             variant,
             ..Default::default()
@@ -846,6 +851,7 @@ mod tests {
         let variant = BTreeMap::new();
         let options = SelectorConfig {
             target_platform: Platform::LinuxArmV6l,
+            host_platform: Platform::LinuxArmV6l,
             build_platform: Platform::LinuxArmV6l,
             variant,
             ..Default::default()

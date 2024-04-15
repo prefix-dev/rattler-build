@@ -328,6 +328,7 @@ mod tests {
 
         let selector_config_win = SelectorConfig {
             target_platform: Platform::Win64,
+            host_platform: Platform::Win64,
             ..SelectorConfig::default()
         };
 
