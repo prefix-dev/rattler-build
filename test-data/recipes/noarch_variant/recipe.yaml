@@ -1,0 +1,29 @@
+context:
+  name: rattler-build-demo
+  version: 1
+  build_variant: ${{ 'unix' if unix else 'win' }}
+  build_number: 0
+
+outputs:
+  - package:
+      name: ${{ name }}
+      version: ${{ version }}
+    build:
+      noarch: generic
+      number: ${{ build_number }}
+      string: ${{ build_variant }}_${{ hash }}_${{ build_number }}
+    requirements:
+      run:
+        - ${{ "__unix" if unix }}
+        - ${{ "__win" if win }}
+
+  - package:
+      name: ${{ name }}-subpackage
+      version: ${{ version }}
+    build:
+      noarch: generic
+      number: ${{ build_number }}
+      string: ${{ build_variant }}_${{ hash }}_${{ build_number }}
+    requirements:
+      run:
+        - ${{ pin_subpackage('rattler-build-demo', exact=True) }}
