@@ -32,6 +32,8 @@ set -x
 ## End of preamble
 "#;
 
+const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+
 pub struct ExecutionArgs {
     pub script: String,
     pub env_vars: IndexMap<String, String>,
@@ -148,7 +150,12 @@ impl Interpreter for BashInterpreter {
         if !output.status.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!("Script failed with status {:?}", output.status),
+                format!(
+                    "Script failed with status {:?}.\nWork directory: {:?}\n{}",
+                    output.status.code(),
+                    args.work_dir,
+                    DEBUG_HELP
+                ),
             ));
         }
 
@@ -194,7 +201,12 @@ impl Interpreter for CmdExeInterpreter {
         if !output.status.success() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!("Script failed with status {:?}", output.status),
+                format!(
+                    "Script failed with status {:?}.\nWork directory: {:?}\n{}",
+                    output.status.code(),
+                    args.work_dir,
+                    DEBUG_HELP
+                ),
             ));
         }
 
