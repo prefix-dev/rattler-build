@@ -14,4 +14,9 @@ build:
     max_pin: x.x.x
     min_pin: x.x
     exact: false
+- pin_compatible:
+    name: bar
+    max_pin: null
+    min_pin: x.x
+    exact: true
 - compiler: gcc

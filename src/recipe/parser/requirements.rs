@@ -578,15 +578,26 @@ mod test {
             },
         };
 
+        let pin_compatible_2 = PinCompatible {
+            pin_compatible: Pin {
+                name: PackageName::from_str("bar").unwrap(),
+                max_pin: None,
+                min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                exact: true,
+            },
+        };
+
         let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
         let compiler = Compiler {
             language: "gcc".to_string(),
         };
+
         let requirements = Requirements {
             build: vec![
                 Dependency::Spec(spec),
                 Dependency::PinSubpackage(pin_subpackage),
                 Dependency::PinCompatible(pin_compatible),
+                Dependency::PinCompatible(pin_compatible_2),
                 Dependency::Compiler(compiler),
             ],
             ..Default::default()
