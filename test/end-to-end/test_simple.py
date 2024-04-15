@@ -3,7 +3,7 @@ import json
 import os
 import platform
 from pathlib import Path
-from subprocess import STDOUT, CalledProcessError, check_output
+from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
 
 import pytest
@@ -712,3 +712,65 @@ def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     pkg = get_extracted_package(tmp_path, "read-only-build-files")
 
     assert (pkg / "info/index.json").exists()
+
+
+def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "noarch_variant"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = rattler_build(
+        *args, "--target-platform=linux-64", "--render-only", stderr=DEVNULL
+    )
+
+    # parse as json
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert rendered[0]["recipe"]["build"]["string"] == "unix_4616a5c_0"
+
+    pin = {
+        "pin_subpackage": {
+            "name": "rattler-build-demo",
+            "max_pin": None,
+            "min_pin": None,
+            "exact": True,
+        }
+    }
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_2233755_0"
+    assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
+    assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
+    assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler-build-demo": "1 unix_4616a5c_0",
+        "target_platform": "noarch",
+    }
+
+    output = rattler_build(
+        *args, "--target-platform=win-64", "--render-only", stderr=DEVNULL
+    )
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
+    assert rendered[0]["recipe"]["build"]["string"] == "win_4616a5c_0"
+
+    pin = {
+        "pin_subpackage": {
+            "name": "rattler-build-demo",
+            "max_pin": None,
+            "min_pin": None,
+            "exact": True,
+        }
+    }
+    assert rendered[1]["recipe"]["build"]["string"] == "win_b28fc4d_0"
+    assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
+    assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
+    assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler-build-demo": "1 win_4616a5c_0",
+        "target_platform": "noarch",
+    }
