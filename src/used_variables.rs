@@ -79,7 +79,7 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     }
                 }
             }
-        },
+        }
         Expr::IfExpr(ifexpr) => {
             extract_variable_from_expression(&ifexpr.test_expr, variables);
             extract_variable_from_expression(&ifexpr.true_expr, variables);
