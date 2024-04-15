@@ -64,7 +64,7 @@ impl<'a> Jinja<'a> {
         if expr.is_empty() {
             return Ok(Value::UNDEFINED);
         }
-        let expr = self.env.compile_expression(&expr)?;
+        let expr = self.env.compile_expression(&str)?;
         expr.eval(self.context())
     }
 }
