@@ -327,7 +327,7 @@ def test_cross_testing(
 
     assert (pkg / "info/paths.json").exists()
     # make sure that the recipe is renamed to `recipe.yaml` in the package
-    assert (pkg / "info/recipe/recipe.yaml")
+    assert (pkg / "info/recipe/recipe.yaml").exists()
 
 
 def test_additional_entrypoints(
