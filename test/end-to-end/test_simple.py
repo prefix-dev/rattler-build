@@ -323,6 +323,12 @@ def test_cross_testing(
         extra_args=["--target-platform", target_platform],
     )
 
+    pkg = get_extracted_package(tmp_path, "test-execution")
+
+    assert (pkg / "info/paths.json").exists()
+    # make sure that the recipe is renamed to `recipe.yaml` in the package
+    assert (pkg / "info/recipe/recipe.yaml").exists()
+
 
 def test_additional_entrypoints(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path

@@ -134,10 +134,23 @@ fn write_recipe_folder(
 ) -> Result<Vec<PathBuf>, PackagingError> {
     let recipe_folder = tmp_dir_path.join("info/recipe/");
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
+    let recipe_path = &output.build_configuration.directories.recipe_path;
 
     let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());
+
+    // Make sure that the recipe file is "recipe.yaml" in `info/recipe/`
+    if recipe_path.file_name() != Some("recipe.yaml".as_ref()) {
+        if let Some(name) = recipe_path.file_name() {
+            fs::rename(recipe_folder.join(name), recipe_folder.join("recipe.yaml"))?;
+            // Update the existing entry with the new recipe file.
+            if let Some(pos) = files.iter().position(|x| x == &recipe_folder.join(name)) {
+                files[pos] = recipe_folder.join("recipe.yaml");
+            }
+        }
+    }
+
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;
@@ -145,7 +158,7 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
-    // TODO(recipe): define how we want to render it exactly!
+    // Write out the "rendered" recipe as well (the recipe with all the variables replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
     rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
