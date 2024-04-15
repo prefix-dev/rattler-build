@@ -149,6 +149,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinSubpackage {
     /// The pin value.
+    #[serde(flatten)]
     pin_subpackage: Pin,
 }
 
@@ -166,6 +167,7 @@ impl PinSubpackage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinCompatible {
     /// The pin value.
+    #[serde(flatten)]
     pin_compatible: Pin,
 }
 
@@ -527,6 +529,10 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
 
 #[cfg(test)]
 mod test {
+    use std::str::FromStr;
+
+    use crate::recipe::jinja::PinExpression;
+
     use super::*;
 
     #[test]
@@ -550,5 +556,53 @@ mod test {
 
         let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
         insta::assert_yaml_snapshot!(deserialized);
+    }
+
+    #[test]
+    fn test_pin_package() {
+        let pin_subpackage = PinSubpackage {
+            pin_subpackage: Pin {
+                name: PackageName::from_str("foo").unwrap(),
+                max_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
+                exact: false,
+            },
+        };
+
+        let pin_compatible = PinCompatible {
+            pin_compatible: Pin {
+                name: PackageName::from_str("bar").unwrap(),
+                max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
+                min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                exact: false,
+            },
+        };
+
+        let pin_compatible_2 = PinCompatible {
+            pin_compatible: Pin {
+                name: PackageName::from_str("bar").unwrap(),
+                max_pin: None,
+                min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                exact: true,
+            },
+        };
+
+        let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
+        let compiler = Compiler {
+            language: "gcc".to_string(),
+        };
+
+        let requirements = Requirements {
+            build: vec![
+                Dependency::Spec(spec),
+                Dependency::PinSubpackage(pin_subpackage),
+                Dependency::PinCompatible(pin_compatible),
+                Dependency::PinCompatible(pin_compatible_2),
+                Dependency::Compiler(compiler),
+            ],
+            ..Default::default()
+        };
+
+        insta::assert_snapshot!(serde_yaml::to_string(&requirements).unwrap());
     }
 }
