@@ -138,14 +138,18 @@ fn write_recipe_folder(
 
     let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
 
+    let mut files = Vec::from(copy_result.copied_paths());
+
     // Make sure that the recipe file is "recipe.yaml" in `info/recipe/`
     if recipe_path.file_name() != Some("recipe.yaml".as_ref()) {
         if let Some(name) = recipe_path.file_name() {
             fs::rename(recipe_folder.join(name), recipe_folder.join("recipe.yaml"))?;
+            // Update the existing entry with the new recipe file.
+            if let Some(pos) = files.iter().position(|x| x == &recipe_folder.join(name)) {
+                files[pos] = recipe_folder.join("recipe.yaml");
+            }
         }
     }
-
-    let mut files = Vec::from(copy_result.copied_paths());
 
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
