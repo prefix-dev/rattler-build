@@ -314,6 +314,7 @@ mod tests {
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..SelectorConfig::default()
         };
 
