@@ -6,6 +6,15 @@ use patch::Patch;
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
 
+/// We try to guess the "strip level" for a patch application. This is done by checking
+/// what files are present in the work directory and comparing them to the paths in the patch.
+///
+/// If we find a file in the work directory that matches the path in the patch, we can guess the
+/// strip level and use that when invoking the `patch` command.
+///
+/// For example, a patch might contain a line saying something like: `a/repository/contents/file.c`.
+/// But in our work directory, we only have `contents/file.c`. In this case, we can guess that the
+/// strip level is 2 and we can apply the patch successfully.
 fn guess_strip_level(patch: &Path, work_dir: &Path) -> Result<usize, std::io::Error> {
     let text = fs_err::read_to_string(patch)?;
     let Ok(patches) = Patch::from_multiple(&text) else {
@@ -15,6 +24,10 @@ fn guess_strip_level(patch: &Path, work_dir: &Path) -> Result<usize, std::io::Er
     // Try to guess the strip level by checking if the path exists in the work directory
     for p in patches {
         let path = PathBuf::from(p.old.path.as_ref());
+        // This means the patch is creating an entirely new file so we can't guess the strip level
+        if path == Path::new("/dev/null") {
+            continue;
+        }
         for strip_level in 0..path.components().count() {
             let mut new_path = work_dir.to_path_buf();
             new_path.extend(path.components().skip(strip_level));
