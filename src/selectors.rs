@@ -71,7 +71,11 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            context.insert(key, Value::from_safe_string(v));
+            match v.to_lowercase().as_str() {
+                "true" => context.insert(key.clone(), Value::from(true)),
+                "false" => context.insert(key.clone(), Value::from(false)),
+                _ => context.insert(key, Value::from_safe_string(v)),
+            };
         }
 
         context
