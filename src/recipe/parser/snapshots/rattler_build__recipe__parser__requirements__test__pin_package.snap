@@ -1,0 +1,17 @@
+---
+source: src/recipe/parser/requirements.rs
+expression: "serde_yaml::to_string(&requirements).unwrap()"
+---
+build:
+- foo >=3.1
+- pin_subpackage:
+    name: foo
+    max_pin: x.x
+    min_pin: x.x.x.x
+    exact: false
+- pin_compatible:
+    name: bar
+    max_pin: x.x.x
+    min_pin: x.x
+    exact: false
+- compiler: gcc
