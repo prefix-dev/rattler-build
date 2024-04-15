@@ -566,7 +566,7 @@ mod test {
                 max_pin: Some(PinExpression::from_str("x.x").unwrap()),
                 min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
                 exact: false,
-            }
+            },
         };
 
         let pin_compatible = PinCompatible {
@@ -575,7 +575,7 @@ mod test {
                 max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
                 min_pin: Some(PinExpression::from_str("x.x").unwrap()),
                 exact: false,
-            }
+            },
         };
 
         let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
