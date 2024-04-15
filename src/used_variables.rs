@@ -26,9 +26,6 @@ use crate::recipe::{
 /// Extract all variables from a jinja statement
 fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
     match node {
-        Stmt::IfCond(stmt) => {
-            extract_variable_from_expression(&stmt.expr, variables);
-        }
         Stmt::Template(stmt) => {
             stmt.children.iter().for_each(|child| {
                 extract_variables(child, variables);
@@ -81,6 +78,13 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                         variables.insert(var.id.to_string());
                     }
                 }
+            }
+        }
+        Expr::IfExpr(ifexpr) => {
+            extract_variable_from_expression(&ifexpr.test_expr, variables);
+            extract_variable_from_expression(&ifexpr.true_expr, variables);
+            if let Some(false_expr) = &ifexpr.false_expr {
+                extract_variable_from_expression(false_expr, variables);
             }
         }
         _ => {}
@@ -305,6 +309,21 @@ mod test {
         assert!(used_vars.contains("c_compiler"));
         assert!(used_vars.contains("c_compiler_version"));
         assert!(used_vars.contains("abcdef"));
+    }
+
+    #[test]
+    fn test_conditional_compiler() {
+        let recipe = r#"build:
+            - ${{ compiler('c') if linux }}
+            - ${{ bla if linux else foo }}
+        "#;
+
+        let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe_node, recipe).unwrap();
+        assert!(used_vars.contains("c_compiler"));
+        assert!(used_vars.contains("c_compiler_version"));
+        assert!(used_vars.contains("bla"));
+        assert!(used_vars.contains("foo"));
     }
 
     #[test]
