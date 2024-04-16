@@ -3189,6 +3189,7 @@ dependencies = [
  "rattler_virtual_packages",
  "rayon",
  "reflink-copy",
+ "regex",
  "reqwest",
  "reqwest-middleware",
  "rstest",

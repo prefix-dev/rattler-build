@@ -1,6 +1,32 @@
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::{Component::*, Path, Prefix::Disk},
+};
 
 use rattler_conda_types::Platform;
+use regex::Regex;
+
+fn get_drive_letter(path: &Path) -> Option<char> {
+    path.components().find_map(|component| match component {
+        Prefix(prefix_component) => match prefix_component.kind() {
+            Disk(letter) => Some(letter as char),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+fn to_cygdrive(path: &Path) -> String {
+    let drive_letter = get_drive_letter(path)
+        .unwrap_or('c')
+        .to_lowercase()
+        .to_string();
+    format!(
+        "/cygdrive/{}/{}",
+        &drive_letter,
+        path.strip_prefix(&drive_letter).unwrap().to_string_lossy()
+    )
+}
 
 pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<String, String> {
     let win_arch = match target_platform {
@@ -38,8 +64,6 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
         "LIBRARY_LIB".to_string(),
         library_prefix.join("lib").to_string_lossy().to_string(),
     );
-
-    // vars.insert("CYGWIN_PREFIX", "".join(("/cygdrive/", drive.lower(), tail.replace("\\", "/"))));
 
     let default_vars = vec![
         "ALLUSERSPROFILE",
@@ -87,16 +111,27 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
         std::env::var("BUILD").unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
     );
 
-    // TODO
-    // get_default(
-    //     "CYGWIN_PREFIX", "".join(("/cygdrive/", drive.lower(), tail.replace("\\", "/")))
-    // )
+    vars.insert("CYGWIN_PREFIX".to_string(), to_cygdrive(prefix));
 
-    // for k in os.environ.keys():
-    //     if re.match("VS[0-9]{2,3}COMNTOOLS", k):
-    //         get_default(k)
-    //     elif re.match("VS[0-9]{4}INSTALLDIR", k):
-    //         get_default(k)
+    let re_vs_comntools = Regex::new(r"^VS[0-9]{2,3}COMNTOOLS$").unwrap();
+    let re_vs_installdir = Regex::new(r"^VS[0-9]{4}INSTALLDIR$").unwrap();
+
+    for (key, val) in std::env::vars() {
+        if re_vs_comntools.is_match(&key) || re_vs_installdir.is_match(&key) {
+            vars.insert(key, val);
+        }
+    }
 
     vars
+}
+
+#[cfg(test)]
+mod test {
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn test_cygdrive() {
+        let path = std::path::Path::new("C:\\Users\\user\\Documents");
+        let cygdrive = super::to_cygdrive(path);
+        assert_eq!(cygdrive, "/cygdrive/c/Users/user/Documents");
+    }
 }
