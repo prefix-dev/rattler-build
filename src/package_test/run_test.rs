@@ -77,6 +77,9 @@ pub enum TestError {
 
     #[error("could not determine target platform from package file (no index.json?)")]
     CouldNotDetermineTargetPlatform,
+
+    #[error("could not read index.json from package file")]
+    CouldNotReadIndexJson,
 }
 
 #[derive(Debug)]
@@ -180,6 +183,19 @@ pub struct TestConfiguration {
     pub channels: Vec<String>,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+    /// Environment variables to set
+    pub env_vars: std::collections::HashMap<String, String>,
+}
+
+pub fn env_vars_from_index_json(index_json: &IndexJson) -> std::collections::HashMap<String, String> {
+    let mut env_vars = std::collections::HashMap::new();
+
+    env_vars.insert("PKG_NAME".to_string(), index_json.name.as_normalized().to_string());
+    env_vars.insert("PKG_VERSION".to_string(), index_json.version.to_string());
+    env_vars.insert("PKG_BUILD".to_string(), index_json.build.clone());
+    env_vars.insert("PKG_BUILD_NUMBER".to_string(), index_json.build_number.to_string());
+
+    env_vars
 }
 
 /// Run a test for a single package
@@ -210,12 +226,12 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     // create the test prefix
     fs::create_dir_all(&config.test_prefix)?;
 
+    let index_json : IndexJson = rattler_package_streaming::seek::read_package_file(package_file)
+        .map_err(|_| TestError::CouldNotReadIndexJson)?;
+
     let target_platform = if let Some(tp) = config.target_platform {
         tp
     } else {
-        let index_json: IndexJson =
-            rattler_package_streaming::seek::read_package_file(package_file)
-                .map_err(|_| TestError::CouldNotDetermineTargetPlatform)?;
         let subdir = index_json
             .subdir
             .ok_or(TestError::CouldNotDetermineTargetPlatform)?;
@@ -266,6 +282,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     let config = TestConfiguration {
         target_platform: Some(target_platform),
         channels,
+        env_vars: 
         ..config.clone()
     };
 
