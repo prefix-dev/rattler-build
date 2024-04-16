@@ -193,7 +193,7 @@ pub fn env_vars_from_index_json(index_json: &IndexJson) -> std::collections::Has
     env_vars.insert("PKG_NAME".to_string(), index_json.name.as_normalized().to_string());
     env_vars.insert("PKG_VERSION".to_string(), index_json.version.to_string());
     env_vars.insert("PKG_BUILD".to_string(), index_json.build.clone());
-    env_vars.insert("PKG_BUILD_NUMBER".to_string(), index_json.build_number.to_string());
+    env_vars.insert("PKG_BUILDNUM".to_string(), index_json.build_number.to_string());
 
     env_vars
 }
