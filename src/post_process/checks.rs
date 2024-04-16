@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{metadata::Output, post_process::relink::RelinkError};
+use crate::{
+    metadata::Output,
+    post_process::{package_nature::PrefixInfo, relink::RelinkError},
+};
 use crate::{
     post_process::{package_nature::PackageNature, relink},
     render::resolved_dependencies::DependencyInfo,
@@ -213,40 +216,16 @@ pub fn perform_linking_checks(
 ) -> Result<(), LinkingCheckError> {
     let dynamic_linking = output.recipe.build().dynamic_linking();
     let system_libs = find_system_libs(output)?;
-    let conda_meta = output
-        .build_configuration
-        .directories
-        .host_prefix
-        .join("conda-meta");
 
-    let mut package_to_nature_map = HashMap::new();
-    let mut path_to_package_map = HashMap::new();
-    if conda_meta.exists() {
-        for entry in conda_meta.read_dir()? {
-            let entry = entry?;
-            let path = entry.path();
-            if path.extension().and_then(|v| v.to_str()) == Some("json") {
-                let record = PrefixRecord::from_path(path)?;
-                let package_nature = PackageNature::from_prefix_record(&record);
-                package_to_nature_map.insert(
-                    record.repodata_record.package_record.name.clone(),
-                    package_nature,
-                );
-                for file in record.files {
-                    path_to_package_map
-                        .insert(file, record.repodata_record.package_record.name.clone());
-                }
-            }
-        }
-    }
-    tracing::trace!("Package-nature map: {package_to_nature_map:#?}");
+    let prefix_info = PrefixInfo::from_prefix(output.prefix())?;
 
-    let resolved_run_dependencies = resolved_run_dependencies(output, &package_to_nature_map);
+    let resolved_run_dependencies =
+        resolved_run_dependencies(output, &prefix_info.package_to_nature);
     tracing::trace!("Resolved run dependencies: {resolved_run_dependencies:#?}",);
 
     // check all DSOs and what they are linking
-    let target_platform = output.build_configuration.target_platform;
-    let host_prefix = &output.build_configuration.directories.host_prefix;
+    let target_platform = output.target_platform();
+    let host_prefix = output.prefix();
     let mut package_files = Vec::new();
     for file in new_files.iter() {
         // Parse the DSO to get the list of libraries it links to
@@ -263,8 +242,8 @@ pub fn perform_linking_checks(
 
                     let lib = resolved.as_ref().unwrap_or(lib);
                     if let Ok(libpath) = lib.strip_prefix(host_prefix) {
-                        if let Some(package) = path_to_package_map.get(libpath) {
-                            if let Some(nature) = package_to_nature_map.get(package) {
+                        if let Some(package) = prefix_info.path_to_package.get(libpath) {
+                            if let Some(nature) = prefix_info.package_to_nature.get(package) {
                                 // Only take shared libraries into account.
                                 if nature == &PackageNature::DSOLibrary {
                                     file_dsos.push((libpath.to_path_buf(), package.clone()));

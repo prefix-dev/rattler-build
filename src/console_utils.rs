@@ -481,10 +481,15 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
             return;
         }
         let metadata = event.metadata();
+
+        let mut message = Vec::new();
+        event.record(&mut CustomVisitor::new(&mut message));
+        let message = String::from_utf8_lossy(&message);
+
         match *metadata.level() {
-            Level::WARN => println!("::warning ::{}", format_args!("{:?}", event)),
-            Level::ERROR => println!("::error ::{}", format_args!("{:?}", event)),
-            _ => {} // Ignore other levels
+            Level::ERROR => println!("::error ::{}", message),
+            Level::WARN => println!("::warning ::{}", message),
+            _ => {}
         }
     }
 }
