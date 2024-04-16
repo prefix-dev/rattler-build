@@ -23,10 +23,18 @@ fn to_cygdrive(path: &Path) -> String {
         return format!(
             "/cygdrive/{}/{}",
             drive_letter.to_lowercase(),
-            rest.map(|c| c.to_string_lossy()).collect::<Vec<_>>().join("/")
+            rest.map(|c| c.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/")
         );
     } else {
-        return format!("/cygdrive/c/{}", path.iter().map(|c| c.to_string_lossy()).collect::<Vec<_>>().join("/"));
+        return format!(
+            "/cygdrive/c/{}",
+            path.iter()
+                .map(|c| c.to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/")
+        );
     }
 }
 
