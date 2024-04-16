@@ -17,15 +17,17 @@ fn get_drive_letter(path: &Path) -> Option<char> {
 }
 
 fn to_cygdrive(path: &Path) -> String {
-    let drive_letter = get_drive_letter(path)
-        .unwrap_or('c')
-        .to_lowercase()
-        .to_string();
-    format!(
-        "/cygdrive/{}/{}",
-        &drive_letter,
-        path.strip_prefix(&drive_letter).unwrap().to_string_lossy()
-    )
+    if let Some(drive_letter) = get_drive_letter(path) {
+        // skip first component, which is the drive letter and the `\` after it
+        let rest = path.iter().skip(2);
+        return format!(
+            "/cygdrive/{}/{}",
+            drive_letter.to_lowercase(),
+            rest.map(|c| c.to_string_lossy()).collect::<Vec<_>>().join("/")
+        );
+    } else {
+        return format!("/cygdrive/c/{}", path.iter().map(|c| c.to_string_lossy()).collect::<Vec<_>>().join("/"));
+    }
 }
 
 pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<String, String> {
