@@ -10,7 +10,7 @@ fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     GlobBuilder::new(&glob).empty_alternates(true).build()
 }
 
-fn display_success(matches: &Vec<&PathBuf>, glob: &str, section: &str) {
+fn display_success(matches: &[&PathBuf], glob: &str, section: &str) {
     tracing::info!(
         "{} {section}: \"{}\" matched:",
         console::style(console::Emoji("✔", "")).green(),

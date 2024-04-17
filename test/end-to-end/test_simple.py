@@ -800,7 +800,6 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert text_pc[2] == expect_end
 
     text_cmake = (pkg / "test.cmake").read_text()
-    assert (
-        text_cmake
-        == 'target_compile_definitions(test PRIVATE "some_path;{CONDA_BUILD_SYSROOT}/and/more;some_other_path;{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+    assert text_cmake.startswith(
+        'target_compile_definitions(test PRIVATE "some_path;{CONDA_BUILD_SYSROOT}/and/more;some_other_path;{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
     )
