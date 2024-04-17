@@ -66,9 +66,9 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-22.04
             use-cross: true
-          # - target: powerpc64le-unknown-linux-musl
-          #   os: ubuntu-22.04
-          #   use-cross: true
+          - target: powerpc64le-unknown-linux-musl
+            os: ubuntu-22.04
+            use-cross: true
           - target: x86_64-apple-darwin
             os: macos-13
           - target: aarch64-apple-darwin
