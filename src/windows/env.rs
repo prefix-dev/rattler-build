@@ -20,21 +20,21 @@ fn to_cygdrive(path: &Path) -> String {
     if let Some(drive_letter) = get_drive_letter(path) {
         // skip first component, which is the drive letter and the `\` after it
         let rest = path.iter().skip(2);
-        return format!(
+        format!(
             "/cygdrive/{}/{}",
             drive_letter.to_lowercase(),
             rest.map(|c| c.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("/")
-        );
+        )
     } else {
-        return format!(
+        format!(
             "/cygdrive/c/{}",
             path.iter()
                 .map(|c| c.to_string_lossy())
                 .collect::<Vec<_>>()
                 .join("/")
-        );
+        )
     }
 }
 
