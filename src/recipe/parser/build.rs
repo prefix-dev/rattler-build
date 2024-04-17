@@ -5,7 +5,7 @@ use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};
-use super::{Dependency, FlattenErrors};
+use super::{Dependency, FlattenErrors, SerializableRegex};
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
@@ -109,10 +109,11 @@ pub struct Build {
     pub(super) post_process: Vec<PostProcess>,
 }
 
+/// Post process operations for regex based replacements
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcess {
     pub files: GlobVec,
-    pub regex: String,
+    pub regex: SerializableRegex,
     pub replacement: String,
 }
 
@@ -380,7 +381,7 @@ impl TryConvertNode<PostProcess> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PostProcess, Vec<PartialParsingError>> {
         let mut post_process = PostProcess {
             files: GlobVec::default(),
-            regex: String::new(),
+            regex: SerializableRegex::default(),
             replacement: String::new(),
         };
 

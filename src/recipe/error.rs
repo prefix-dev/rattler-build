@@ -152,6 +152,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::glob_parsing))]
     GlobParsing(#[from] globset::Error),
 
+    /// Error when parsing a regex.
+    #[diagnostic(code(error::glob_parsing))]
+    RegexParsing(#[from] regex::Error),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -260,6 +264,7 @@ impl fmt::Display for ErrorKind {
                 write!(f, "failed to parse entry point: {}", err)
             }
             ErrorKind::GlobParsing(err) => write!(f, "failed to parse glob: {}", err),
+            ErrorKind::RegexParsing(err) => write!(f, "failed to parse regex: {}", err),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
         }
     }
