@@ -138,7 +138,13 @@ impl Interpreter for BashInterpreter {
         tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["bash", "-e", &build_script_path_str];
+        let bash = which::which("bash").map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Could not find `bash` in PATH",
+            )
+        })?.to_string_lossy().to_string();
+        let cmd_args = [&bash, "-e", &build_script_path_str];
 
         let output = run_process_with_replacements(
             &cmd_args,
@@ -401,6 +407,7 @@ async fn run_process_with_replacements(
     command
         .current_dir(cwd)
         .args(&args[1..])
+        .env_clear()
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
