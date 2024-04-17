@@ -229,7 +229,7 @@ impl TryConvertNode<Vec<Dependency>> for RenderedNode {
             RenderedNode::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::Other,
-                label = "expected scalar or sequence"
+                label = format!("expected scalar or sequence for `{name}`")
             )]),
             RenderedNode::Null(_) => Ok(vec![]),
         }
@@ -512,7 +512,13 @@ impl IgnoreRunExports {
 impl TryConvertNode<IgnoreRunExports> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
         self.as_mapping()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    label = format!("expected a mapping for `{name}`")
+                )]
+            })
             .and_then(|m| m.try_convert(name))
     }
 }

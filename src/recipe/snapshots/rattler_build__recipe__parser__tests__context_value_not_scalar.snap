@@ -12,5 +12,4 @@ Error:   × Parsing: expected a scalar value.
    ·                       ╰── here
  4 │ 
    ╰────
-  help: `context` values must always be scalars
-
+  help: `context` values must always be scalars (strings)

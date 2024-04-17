@@ -119,7 +119,13 @@ impl GlobVec {
 impl TryConvertNode<GlobVec> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
         self.as_sequence()
-            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedSequence)])
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedSequence,
+                    label = format!("expected a list of globs strings for '{}'", name)
+                )]
+            })
             .and_then(|s| s.try_convert(name))
     }
 }
@@ -195,10 +201,11 @@ impl TryConvertNode<AllOrGlobVec> for RenderedNode {
         } else if let Some(scalar) = self.as_scalar() {
             scalar.try_convert(name)
         } else {
-            Err(vec![
-                _partialerror!(*self.span(), ErrorKind::ExpectedScalar),
-                _partialerror!(*self.span(), ErrorKind::ExpectedSequence),
-            ])
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                label = "expected a boolean value or a sequence of glob strings"
+            )])
         }
     }
 }

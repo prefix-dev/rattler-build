@@ -153,6 +153,7 @@ impl Recipe {
             vec![_partialerror!(
                 *root_node.span(),
                 ErrorKind::ExpectedMapping,
+                help = "root node must always be a map with keys like `package`, `source`, `build`, `requirements`, `tests`, `about`, `context` and `extra`"
             )]
         })?;
 
@@ -173,7 +174,7 @@ impl Recipe {
                         vec![_partialerror!(
                             *v.span(),
                             ErrorKind::ExpectedScalar,
-                            help = "`context` values must always be scalars"
+                            help = "`context` values must always be scalars (strings)"
                         )]
                     })?;
                     let rendered: Option<ScalarNode> =
