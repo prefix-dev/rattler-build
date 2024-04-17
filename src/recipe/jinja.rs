@@ -656,7 +656,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     // git version is too old in cross container for aarch64
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "powerpc64le"), target_os = "linux")))]
     fn eval_git() {
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
