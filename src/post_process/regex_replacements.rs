@@ -5,12 +5,12 @@ use crate::{metadata::Output, packaging::TempFiles};
 pub fn regex_post_process(temp_files: &TempFiles, output: &Output) -> Result<(), std::io::Error> {
     for post_process_step in output.recipe.build().post_process().iter() {
         for file in temp_files.files.iter() {
-            if post_process_step.files.is_match(&file) {
-                let file_contents = std::fs::read_to_string(&file)?;
+            if post_process_step.files.is_match(file) {
+                let file_contents = std::fs::read_to_string(file)?;
                 let new_contents = post_process_step
                     .regex
                     .replace_all(&file_contents, &post_process_step.replacement);
-                std::fs::write(&file, new_contents.as_bytes())?;
+                std::fs::write(file, new_contents.as_bytes())?;
             }
         }
     }
