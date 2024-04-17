@@ -271,7 +271,7 @@ impl TryConvertNode<Script> for RenderedMappingNode {
                 return Err(vec![_partialerror!(
                     *last_node.span(),
                     ErrorKind::InvalidField(last_node_name.into()),
-                    help = format!("cannot specify both `content` and `file`")
+                    help = "cannot specify both `content` and `file`"
                 )]);
             }
             (Some(file), None) => file.try_convert("file").map(ScriptContent::Path)?,

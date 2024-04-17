@@ -467,6 +467,7 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::EntryPointParsing(err),
+                help = format!("expected a string in the format of `command = module:function`")
             )]
         })
     }
