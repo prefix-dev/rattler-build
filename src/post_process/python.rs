@@ -153,7 +153,7 @@ pub fn compile_pyc(
 
 /// Find any .dist-info/INSTALLER files and replace the contents with "conda"
 /// This is to prevent pip from trying to uninstall the package when it is installed with conda
-pub fn python(output: &Output, temp_files: &TempFiles) -> Result<HashSet<PathBuf>, PackagingError> {
+pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf>, PackagingError> {
     let name = output.name();
     let version = output.version();
     let mut result = HashSet::new();

@@ -141,6 +141,7 @@ Recipe {
             ),
             ignore_binary_files: false,
         },
+        post_process: [],
     },
     requirements: Requirements {
         build: [

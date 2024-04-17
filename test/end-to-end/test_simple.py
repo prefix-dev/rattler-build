@@ -774,3 +774,32 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
         "rattler-build-demo": "1 win_4616a5c_0",
         "target_platform": "noarch",
     }
+
+
+def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "regex_post_process"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "regex-post-process")
+
+    assert (pkg / "info/paths.json").exists()
+
+    test_text = (pkg / "test.txt").read_text().splitlines()
+    assert test_text[0] == "Building the regex-post-process-replaced package"
+    assert test_text[1] == "Do not replace /some/path/to/sysroot/and/more this"
+
+    text_pc = (pkg / "test.pc").read_text().splitlines()
+    expect_begin = "I am a test file with $(CONDA_BUILD_SYSROOT_S)and/some/more"
+    expect_end = "and: $(CONDA_BUILD_SYSROOT_S)and/some/more"
+    assert text_pc[0] == expect_begin
+    assert text_pc[2] == expect_end
+
+    text_cmake = (pkg / "test.cmake").read_text()
+    assert text_cmake.startswith(
+        'target_compile_definitions(test PRIVATE "some_path;{CONDA_BUILD_SYSROOT}/and/more;some_other_path;{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+    )

@@ -24,6 +24,7 @@ mod glob_vec;
 mod helper;
 mod output;
 mod package;
+mod regex;
 mod requirements;
 mod script;
 mod skip;
@@ -36,6 +37,7 @@ pub use self::{
     glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
+    regex::SerializableRegex,
     requirements::{
         Compiler, Dependency, IgnoreRunExports, PinSubpackage, Requirements, RunExports,
     },

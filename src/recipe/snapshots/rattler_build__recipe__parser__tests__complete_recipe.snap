@@ -76,6 +76,12 @@ build:
       - bla/*.so
     ignore: true
     ignore_binary_files: true
+  post_process:
+  - files:
+    - '*.cmake'
+    - bla/
+    regex: complicated(.*)regex
+    replacement: simple_string
 requirements:
   build:
   - compiler: c
