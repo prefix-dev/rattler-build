@@ -239,7 +239,7 @@ fn git_lfs_pull() -> Result<(), SourceError> {
 
 #[cfg(test)]
 #[cfg(not(all(
-    any(target_arch = "aarch64", target_arch = "powerpc64le"),
+    any(target_arch = "aarch64", target_arch = "powerpc64"),
     target_os = "linux"
 )))]
 mod tests {
