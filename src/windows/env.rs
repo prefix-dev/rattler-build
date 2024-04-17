@@ -28,6 +28,7 @@ fn to_cygdrive(path: &Path) -> String {
                 .join("/")
         )
     } else {
+        // fallback to `c` if no drive letter is found
         format!(
             "/cygdrive/c/{}",
             path.iter()
