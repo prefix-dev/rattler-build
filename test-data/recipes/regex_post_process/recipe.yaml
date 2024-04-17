@@ -5,6 +5,7 @@ package:
 build:
   script:
     - echo "Building the regex-post-process package" > $PREFIX/test.txt
+    - echo "Do not replace /some/path/to/sysroot/and/more this" >> $PREFIX/test.txt
     - cp $RECIPE_DIR/test.pc $PREFIX/test.pc
     - cp $RECIPE_DIR/test.cmake $PREFIX/test.cmake
 
@@ -13,7 +14,7 @@ build:
         - "*.txt"
       regex: "regex-post-process"
       replacement: "regex-post-process-replaced"
-    - files: 
+    - files:
         - '*.pc'
       regex: (?:-L|-I)?"?([^;\s]+/sysroot/)
       replacement: '$(CONDA_BUILD_SYSROOT_S)'
