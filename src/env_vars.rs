@@ -197,7 +197,11 @@ fn force_color_vars() -> HashMap<String, String> {
     insert!(vars, "MAKE_TERMOUT", "1");
     insert!(vars, "CMAKE_COLOR_DIAGNOSTICS", "ON");
 
-    insert!(vars, "GCC_COLORS", "error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01");
+    insert!(
+        vars,
+        "GCC_COLORS",
+        "error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01"
+    );
 
     vars
 }
