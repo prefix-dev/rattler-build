@@ -32,7 +32,7 @@ pub struct GenerateRecipeOpts {
 /// Generate a recipe for a package
 pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
     match args.source {
-        Source::Pypi => {}, // generate_pypi_recipe(&args.package).await?,
+        Source::Pypi => {} // generate_pypi_recipe(&args.package).await?,
         Source::Cran => generate_r_recipe(&args.package).await?,
     }
 
