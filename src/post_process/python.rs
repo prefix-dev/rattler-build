@@ -316,6 +316,7 @@ pub(crate) fn create_entry_points(
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
             &output.prefix().to_string_lossy(),
+            output.target_platform().is_windows(),
             ep,
             // using target_platform is OK because this should never be noarch
             &PythonInfo::from_version(&python_version, *output.target_platform()).map_err(|e| {

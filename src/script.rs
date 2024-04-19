@@ -9,7 +9,6 @@ use rattler_shell::{
 use std::{
     borrow::Cow,
     collections::HashMap,
-    fmt::Write as WriteFmt,
     io::ErrorKind,
     path::{Path, PathBuf},
     process::Stdio,
@@ -73,14 +72,14 @@ impl ExecutionArgs {
 }
 
 trait Interpreter {
-    fn get_script<T: Shell + Copy>(
+    fn get_script<T: Shell + Copy + 'static>(
         &self,
         args: &ExecutionArgs,
         shell_type: T,
     ) -> Result<String, ActivationError> {
         let mut shell_script = shell::ShellScript::new(shell_type, Platform::current());
         for (k, v) in args.env_vars.iter() {
-            shell_script.set_env_var(k, v);
+            shell_script.set_env_var(k, v)?;
         }
         let host_prefix_activator =
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
@@ -109,14 +108,13 @@ trait Interpreter {
             };
 
             let build_activation = build_prefix_activator.activation(activation_vars)?;
-
-            writeln!(shell_script.contents, "{}", host_activation.script)?;
-            writeln!(shell_script.contents, "{}", build_activation.script)?;
+            shell_script.append_script(&host_activation.script);
+            shell_script.append_script(&build_activation.script);
         } else {
-            writeln!(shell_script.contents, "{}", host_activation.script)?;
+            shell_script.append_script(&host_activation.script);
         }
 
-        Ok(shell_script.contents)
+        Ok(shell_script.contents()?)
     }
 
     async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
@@ -164,7 +162,7 @@ impl Interpreter for BashInterpreter {
 }
 
 const CMDEXE_PREAMBLE: &str = r#"
-chcp 65001 > nul
+@chcp 65001 > nul
 IF "%CONDA_BUILD%" == "" (
     call ((script_path))
 )
@@ -179,7 +177,7 @@ impl Interpreter for CmdExeInterpreter {
         let build_env_path = args.work_dir.join("build_env.bat");
         let build_script_path = args.work_dir.join("conda_build.bat");
 
-        tokio::fs::write(&build_env_path, &script.replace('\n', "\r\n").as_bytes()).await?;
+        tokio::fs::write(&build_env_path, script).await?;
 
         let build_script = format!(
             "{}\n{}",

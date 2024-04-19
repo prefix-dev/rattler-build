@@ -2,12 +2,13 @@
 use clap::Parser;
 
 mod cran;
-mod pypi;
+
+// mod pypi;
 mod serialize;
 
 use cran::generate_r_recipe;
 
-use self::pypi::generate_pypi_recipe;
+// use self::pypi::generate_pypi_recipe;
 
 /// The source of the package to generate a recipe for
 #[derive(Debug, Clone, clap::ValueEnum)]
@@ -31,7 +32,7 @@ pub struct GenerateRecipeOpts {
 /// Generate a recipe for a package
 pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
     match args.source {
-        Source::Pypi => generate_pypi_recipe(&args.package).await?,
+        Source::Pypi => {}, // generate_pypi_recipe(&args.package).await?,
         Source::Cran => generate_r_recipe(&args.package).await?,
     }
 

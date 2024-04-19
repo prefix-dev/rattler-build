@@ -150,7 +150,7 @@ pub async fn load_repodatas(
     tool_configuration: &tool_configuration::Configuration,
     specs: &[MatchSpec],
 ) -> Result<(PathBuf, Vec<Vec<RepoDataRecord>>), anyhow::Error> {
-    let channel_config = ChannelConfig::default();
+    let channel_config = ChannelConfig::default_with_root_dir(std::env::current_dir()?);
     let cache_dir = rattler::default_cache_dir()?;
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;

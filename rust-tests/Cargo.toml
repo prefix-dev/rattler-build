@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 glob = "0.3.1"
-rattler_package_streaming = { version = "0.20.3", default-features = false }
-serde_json = "1.0.115"
+rattler_package_streaming = { version = "0.20.4", default-features = false }
+serde_json = "1.0.116"
 sha1 = "0.10.6"
 duct = "0.13.7"
