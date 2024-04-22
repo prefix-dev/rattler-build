@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt::{self, Debug, Formatter};
 use std::path::Path;
 
@@ -113,6 +114,17 @@ impl GlobVec {
 
             Self(glob_vec, Some(globset))
         }
+    }
+    
+    /// Let the positive globs pass and remove the negative / not-selected ones
+    pub(crate) fn filter_files(&self, difference: &mut std::collections::HashSet<std::path::PathBuf>, prefix: &Path) {
+        let mut to_keep = HashSet::new();
+        for file in difference.iter() {
+            if !self.is_match(file) {
+                to_keep.insert(file.clone());
+            }
+        }
+        *difference = to_keep;
     }
 }
 

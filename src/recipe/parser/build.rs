@@ -103,10 +103,15 @@ pub struct Build {
     /// Variant ignore and use keys
     #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
     pub(super) variant: VariantKeyUsage,
+    /// Prefix detection settings
     #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
     pub(super) prefix_detection: PrefixDetection,
+    /// Post-process operations for regex based replacements
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) post_process: Vec<PostProcess>,
+    /// Include files in the package
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) include_files: GlobVec,
 }
 
 /// Post process operations for regex based replacements
@@ -173,6 +178,11 @@ impl Build {
         self.always_include_files.globset()
     }
 
+    /// Get the include files settings.
+    pub fn include_files(&self) -> &GlobVec {
+        &self.include_files
+    }
+
     /// Get the prefix detection settings.
     pub const fn prefix_detection(&self) -> &PrefixDetection {
         &self.prefix_detection
@@ -211,7 +221,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             merge_build_and_host_envs,
             variant,
             prefix_detection,
-            post_process
+            post_process,
+            include_files
         }
 
         Ok(build)

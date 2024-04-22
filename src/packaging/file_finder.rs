@@ -10,7 +10,7 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use crate::metadata::Output;
+use crate::{metadata::Output, recipe::parser::GlobVec};
 
 use super::{file_mapper, PackagingError};
 
@@ -65,7 +65,7 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
-    pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>) -> Result<Self, io::Error> {
+    pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>, include_files: &GlobVec) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),
@@ -96,6 +96,11 @@ impl Files {
             .difference(&previous_files)
             .cloned()
             .collect::<HashSet<_>>();
+
+        // check if we have a glob pattern to include files
+        if !include_files.is_empty() {
+            include_files.filter_files(&mut difference, prefix);
+        }
 
         if let Some(always_include) = always_include {
             for file in current_files {

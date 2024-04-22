@@ -359,6 +359,7 @@ impl Output {
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
             self.recipe.build().always_include_files(),
+            self.recipe.build().include_files(),
         )?;
 
         package_conda(self, tool_configuration, &files_after)
