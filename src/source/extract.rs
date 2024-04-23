@@ -19,6 +19,40 @@ enum TarCompression<'a> {
     Lzop,
 }
 
+/// Checks whether file has known tarball extension
+pub fn is_tarball(file_name: &str) -> bool {
+    [
+        // Gzip
+        ".tar.gz",
+        ".tgz",
+        ".taz",
+        // Bzip2
+        ".tar.bz2",
+        ".tbz",
+        ".tbz2",
+        ".tz2",
+        // Xz2
+        ".tar.lzma",
+        ".tlz",
+        ".tar.xz",
+        ".txz",
+        // Zstd
+        ".tar.zst",
+        ".tzst",
+        // Compress
+        ".tar.Z",
+        ".taZ",
+        // Lzip
+        ".tar.lz",
+        // Lzop
+        ".tar.lzo",
+        // PlainTar
+        ".tar",
+    ]
+    .iter()
+    .any(|ext| file_name.ends_with(ext))
+}
+
 fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
     match ext
         .and_then(OsStr::to_str)
