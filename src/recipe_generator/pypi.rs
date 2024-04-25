@@ -1,6 +1,9 @@
 use async_once_cell::OnceCell;
 use miette::{IntoDiagnostic, WrapErr};
+use rattler_installs_packages::python_env::Pep508EnvMakers;
+use rattler_installs_packages::resolve::solve_options::ResolveOptions;
 use rattler_installs_packages::types::{ArtifactFromSource, Requirement, VersionOrUrl};
+use rattler_installs_packages::wheel_builder::WheelBuilder;
 use rattler_installs_packages::{
     artifacts::SDist,
     index::{ArtifactRequest, PackageDb, PackageSources},
@@ -8,6 +11,7 @@ use rattler_installs_packages::{
 };
 use serde::Deserialize;
 use std::path::Path;
+use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 use tokio::io::AsyncWriteExt;
 
@@ -78,8 +82,13 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         PackageSources::from(url::Url::parse("https://pypi.org/simple/").unwrap());
     let tempdir = tempfile::tempdir().into_diagnostic()?;
     let artifact_request = ArtifactRequest::FromIndex(NormalizedPackageName::from_str(package)?);
-    let package_db = PackageDb::new(package_sources, client_with_middlewares, tempdir.path())?;
+    let package_db = Arc::new(PackageDb::new(
+        package_sources,
+        client_with_middlewares,
+        tempdir.path(),
+    )?);
     let artifacts = package_db.available_artifacts(artifact_request).await?;
+
     // find first artifact or bail out
     let first_artifact = artifacts
         .into_iter()
@@ -92,8 +101,18 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         .find(|artifact| matches!(artifact.filename, ArtifactName::SDist(_)))
         .ok_or_else(|| miette::miette!("No source distribution found for {}", package))?;
 
+    let env_markers = Arc::new(Pep508EnvMakers::from_env().await.unwrap().0);
+    let wheel_builder = WheelBuilder::new(
+        package_db.clone(),
+        env_markers,
+        None,
+        ResolveOptions::default(),
+        Default::default(),
+    )
+    .unwrap();
+
     let metadata = package_db
-        .get_metadata(first_artifact.1, None)
+        .get_metadata(first_artifact.1, Some(&wheel_builder))
         .await?
         .ok_or_else(|| miette::miette!("No metadata found for {}", package))?;
 
@@ -133,30 +152,41 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         .await
         .wrap_err("failed to download sdist")?;
 
-    let sdist =
-        SDist::from_path(&sdist_path, &NormalizedPackageName::from(metadata.1.name)).unwrap();
+    // get the metadata
+    let wheel_metadata = metadata.1;
 
-    let pyproject_toml = sdist.read_pyproject_toml().into_diagnostic()?;
+    let sdist = SDist::from_path(
+        &sdist_path,
+        &NormalizedPackageName::from(wheel_metadata.name),
+    )
+    .unwrap();
+
+    let pyproject_toml = sdist.read_pyproject_toml().ok();
     let (_, mut pkg_info) = sdist.read_package_info().into_diagnostic()?;
 
-    for req in pyproject_toml.build_system.unwrap().requires {
-        recipe.requirements.host.push(pypi_requirement(&req).await?);
-    }
-    if let Some(project) = pyproject_toml.project {
-        if let Some(scripts) = project.scripts {
-            recipe.build.python.entry_points = scripts
-                .iter()
-                .map(|(k, v)| format!("{} = {}", k, v))
-                .collect();
+    if let Some(pyproject_toml) = pyproject_toml {
+        if let Some(build_system) = pyproject_toml.build_system {
+            for req in build_system.requires {
+                recipe.requirements.host.push(pypi_requirement(&req).await?);
+            }
         }
-        // recipe.about.license_file = project.license_files.map(|p| p.join(", "));
-        if let Some(urls) = project.urls {
-            recipe.about.repository = urls.get("Source Code").map(|s| s.to_string());
-            recipe.about.documentation = urls.get("Documentation").map(|s| s.to_string());
+
+        if let Some(project) = pyproject_toml.project {
+            if let Some(scripts) = project.scripts {
+                recipe.build.python.entry_points = scripts
+                    .iter()
+                    .map(|(k, v)| format!("{} = {}", k, v))
+                    .collect();
+            }
+            // recipe.about.license_file = project.license_files.map(|p| p.join(", "));
+            if let Some(urls) = project.urls {
+                recipe.about.repository = urls.get("Source Code").map(|s| s.to_string());
+                recipe.about.documentation = urls.get("Documentation").map(|s| s.to_string());
+            }
         }
     }
 
-    if let Some(python_req) = metadata.1.requires_python.as_ref() {
+    if let Some(python_req) = wheel_metadata.requires_python.as_ref() {
         recipe
             .requirements
             .host
@@ -170,7 +200,7 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
     }
     recipe.requirements.host.push("pip".to_string());
 
-    for pkg in metadata.1.requires_dist {
+    for pkg in wheel_metadata.requires_dist {
         recipe.requirements.run.push(pypi_requirement(&pkg).await?);
     }
 
