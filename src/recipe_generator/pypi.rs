@@ -107,7 +107,6 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         env_markers,
         None,
         ResolveOptions::default(),
-        Default::default(),
     )
     .unwrap();
 
