@@ -10,7 +10,7 @@ use crate::{
     recipe::parser::{GitRev, GitSource, Source},
     source::{
         checksum::Checksum,
-        extract::{extract_tar, extract_zip},
+        extract::{extract_tar, extract_zip, is_tarball},
     },
     system_tools::ToolError,
     tool_configuration,
@@ -170,12 +170,12 @@ pub async fn fetch_sources(
                     fs::create_dir_all(&dest_dir)?;
                 }
 
-                if res
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .contains(".tar")
-                {
+                if is_tarball(
+                    res.file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .as_ref(),
+                ) {
                     extract_tar(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if res.extension() == Some(OsStr::new("zip")) {
@@ -230,12 +230,13 @@ pub async fn fetch_sources(
                         "Copied {} files into isolated environment",
                         copy_result.copied_paths().len()
                     );
-                } else if src_path
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .contains(".tar")
-                {
+                } else if is_tarball(
+                    src_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .as_ref(),
+                ) {
                     extract_tar(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
                     tracing::info!("Extracted to {:?}", dest_dir);
                 } else if src_path.extension() == Some(OsStr::new("zip")) {
