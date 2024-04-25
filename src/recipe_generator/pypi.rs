@@ -139,8 +139,6 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
     let pyproject_toml = sdist.read_pyproject_toml().into_diagnostic()?;
     let (_, mut pkg_info) = sdist.read_package_info().into_diagnostic()?;
 
-    println!("{:?}", pyproject_toml);
-
     for req in pyproject_toml.build_system.unwrap().requires {
         recipe.requirements.host.push(pypi_requirement(&req).await?);
     }
