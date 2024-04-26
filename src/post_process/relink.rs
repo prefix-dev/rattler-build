@@ -163,6 +163,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     let encoded_prefix = &temp_files.encoded_prefix;
 
     let mut binaries = HashSet::new();
+    // allow to use tools from build prefix such as patchelf, install_name_tool, ...
+    let system_tools = output.system_tools.with_build_prefix(output.build_prefix());
 
     for (p, content_type) in temp_files.content_type_map() {
         let metadata = fs::symlink_metadata(p)?;
@@ -185,7 +187,7 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                 encoded_prefix,
                 &rpaths,
                 rpath_allowlist,
-                &output.system_tools,
+                &system_tools,
             )?;
             binaries.insert(p.clone());
         }
