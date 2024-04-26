@@ -33,6 +33,9 @@ pub struct Configuration {
 
     /// Whether to only render the build output
     pub render_only: bool,
+
+    /// Whether to solve the build output dependencies
+    pub no_solve: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -77,6 +80,7 @@ impl Default for Configuration {
             use_zstd: true,
             use_bz2: true,
             render_only: false,
+            no_solve: false,
         }
     }
 }

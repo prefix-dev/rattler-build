@@ -123,6 +123,7 @@ pub fn get_tool_config(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
+        no_solve: args.no_solve,
     }
 }
 
@@ -285,11 +286,15 @@ pub async fn get_build_output(
         };
 
         if args.render_only {
-            let output_with_resolved_dependencies = output
-                .resolve_dependencies(tool_config)
-                .await
-                .into_diagnostic()?;
-            outputs.push(output_with_resolved_dependencies);
+            if args.no_solve {
+                outputs.push(output);
+            } else {
+                let output_with_resolved_dependencies = output
+                    .resolve_dependencies(tool_config)
+                    .await
+                    .into_diagnostic()?;
+                outputs.push(output_with_resolved_dependencies);
+            }
             continue;
         }
         outputs.push(output);
@@ -416,6 +421,7 @@ pub async fn rebuild_from_args(
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
         render_only: false,
+        no_solve: false,
     };
 
     output
