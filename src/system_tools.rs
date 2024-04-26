@@ -279,6 +279,7 @@ mod tests {
             rattler_build_version: "0.0.0".to_string(),
             used_tools: Arc::new(Mutex::new(used_tools)),
             found_tools: Arc::new(Mutex::new(HashMap::new())),
+            build_prefix: None,
         };
 
         let json = serde_json::to_string_pretty(&system_tool).unwrap();
