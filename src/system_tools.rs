@@ -116,9 +116,6 @@ impl SystemTools {
     fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let which = |tool: &str| -> Result<PathBuf, which::Error> {
             if let Some(build_prefix) = &self.build_prefix {
-                // first check if we can find the tool in the build prefix.
-                let tool_path = build_prefix.join(tool);
-
                 let build_prefix_activator =
                     Activator::from_path(build_prefix, shell::Bash, Platform::current()).unwrap();
 
@@ -126,8 +123,8 @@ impl SystemTools {
                 let mut found_tool = which::which_in_global(&tool, paths)?;
 
                 // if the tool is found in the build prefix, return it
-                if found_tool.next().is_some() {
-                    return Ok(tool_path);
+                if let Some(found_tool) = found_tool.next() {
+                    return Ok(found_tool);
                 }
             }
             which::which(tool)
