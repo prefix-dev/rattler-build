@@ -15,7 +15,7 @@ use rattler_repodata_gateway::fetch::{
     CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
-use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
+use rattler_solve::{resolvo::Solver, ChannelPriority, SolverImpl, SolverTask};
 use reqwest_middleware::ClientWithMiddleware;
 
 use std::{
@@ -119,6 +119,7 @@ pub async fn create_environment(
         specs: specs.to_vec(),
         pinned_packages: Vec::new(),
         timeout: None,
+        channel_priority: ChannelPriority::Strict,
     };
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations

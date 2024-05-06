@@ -3,13 +3,13 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.15.0"
-authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
+version = "0.16.0"
+authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
 license = "BSD-3-Clause"
 readme = "README.md"
-description = "Rust crate to build conda packages on Windows, macOS and Linux"
+description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 
 [features]
@@ -19,24 +19,24 @@ rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/
 tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input']
 
 [dependencies]
-serde = { version = "1.0.198", features = ["derive"] }
+serde = { version = "1.0.200", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.23.0", default-features = false, features = ["cli-tools"] }
-rattler_conda_types = { version = "0.22.0", default-features = false }
+rattler = { version = "0.24.0", default-features = false, features = ["cli-tools"] }
+rattler_conda_types = { version = "0.22.1", default-features = false }
 rattler_digest = { version = "0.19.3", default-features = false }
-rattler_index = { version = "0.19.8", default-features = false }
-rattler_networking = { version = "0.20.2", default-features = false }
-rattler_repodata_gateway = { version = "0.19.8", default-features = false, features = [
+rattler_index = { version = "0.19.10", default-features = false }
+rattler_networking = { version = "0.20.5", default-features = false }
+rattler_repodata_gateway = { version = "0.19.11", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.20.1", default-features = false, features = [
+rattler_shell = { version = "0.20.2", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.20.7", default-features = false, features = [
+rattler_solve = { version = "0.21.1", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.19.8", default-features = false }
-rattler_package_streaming = { version = "0.20.5", default-features = false }
+rattler_virtual_packages = { version = "0.19.9", default-features = false }
+rattler_package_streaming = { version = "0.20.8", default-features = false }
 anyhow = "1.0.82"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
@@ -48,7 +48,7 @@ reqwest = { version = "0.12.4", default-features = false, features = [
 tokio = { version = "1.37.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.12.1"
 content_inspector = "0.2.4"
-serde_with = "3.8.0"
+serde_with = "3.8.1"
 url = "2.5.0"
 tracing = "0.1.40"
 clap = { version = "4.5.4", features = ["derive", "env", "cargo"] }
@@ -65,7 +65,7 @@ tracing-subscriber = { version = "0.3.18", features = [
 marked-yaml = { version = "0.5.2" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
-goblin = "0.8.0"
+goblin = "0.8.2"
 scroll = "0.12.0"
 pathdiff = "0.2.1"
 comfy-table = "7.1.1"
@@ -88,16 +88,16 @@ dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "6.0.1"
 clap_complete = "4.5.2"
-tokio-util = "0.7.10"
+tokio-util = "0.7.11"
 
 tar = "0.4.40"
-zip = { version = "1.1.1", default-features = false, features = [
+zip = { version = "1.1.4", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
 bzip2 = "0.4.4"
-base64 = "0.22.0"
-flate2 = "1.0.28"
+base64 = "0.22.1"
+flate2 = "1.0.30"
 xz2 = "0.1.7"
 zstd = "0.13.1"
 toml = "0.8.12"
