@@ -90,7 +90,7 @@ impl App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Debug)]
 pub struct CommonOpts {
     /// Output directory for build artifacts. Defaults to `./output`.
     #[clap(long, env = "CONDA_BLD_PATH")]
@@ -297,7 +297,7 @@ pub struct RebuildOpts {
 }
 
 /// Upload options.
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct UploadOpts {
     /// The package file to upload
     #[arg(global = true, required = false)]
@@ -392,7 +392,7 @@ pub struct AnacondaOpts {
     pub owner: String,
 
     /// The channel / label to upload the package to (e.g. main / rc)
-    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main", num_args = 1..)]
+    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main")]
     pub channel: Vec<String>,
 
     /// The Anaconda API key, if none is provided, the token is read from the keychain / auth-file
