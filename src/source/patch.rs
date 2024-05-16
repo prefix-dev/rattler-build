@@ -1,5 +1,5 @@
 //! Functions for applying patches to a work directory.
-use std::path::{Path, PathBuf};
+use std::{ops::Deref, path::{Path, PathBuf}};
 
 use patch::Patch;
 
@@ -23,7 +23,7 @@ fn guess_strip_level(patch: &Path, work_dir: &Path) -> Result<usize, std::io::Er
 
     // Try to guess the strip level by checking if the path exists in the work directory
     for p in patches {
-        let path = PathBuf::from(p.old.path.as_ref());
+        let path = PathBuf::from(p.old.path.deref());
         // This means the patch is creating an entirely new file so we can't guess the strip level
         if path == Path::new("/dev/null") {
             continue;
