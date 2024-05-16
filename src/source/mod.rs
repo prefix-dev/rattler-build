@@ -150,13 +150,15 @@ pub async fn fetch_sources(
                 }
             }
             Source::Url(src) => {
-                tracing::info!("Fetching source from URL: {}", src.url());
-
+                tracing::info!("Fetching source from URL: {:?}", src.urls());
+                let first_url = src.urls().first().expect("we should have at least one URL");
                 let file_name_from_url = src
-                    .url()
+                    .urls()
+                    .first()
+                    .expect("we should have at least one URL")
                     .path_segments()
                     .and_then(|segments| segments.last().map(|last| last.to_string()))
-                    .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
+                    .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
                 let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
                 let mut dest_dir = if let Some(target_directory) = src.target_directory() {
