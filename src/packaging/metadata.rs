@@ -13,7 +13,11 @@ use rattler_conda_types::{
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
 use std::{
-    borrow::Cow, collections::HashSet, io::Write, ops::Deref, path::{Path, PathBuf}
+    borrow::Cow,
+    collections::HashSet,
+    io::Write,
+    ops::Deref,
+    path::{Path, PathBuf},
 };
 
 #[cfg(target_family = "unix")]
@@ -76,7 +80,7 @@ fn contains_prefix_text(
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
-        let forward_slash : Cow<'_, str> = to_forward_slash_lossy(prefix);
+        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
         let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
             .next()
             .is_some();

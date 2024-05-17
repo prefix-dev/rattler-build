@@ -1,5 +1,8 @@
 //! Functions for applying patches to a work directory.
-use std::{ops::Deref, path::{Path, PathBuf}};
+use std::{
+    ops::Deref,
+    path::{Path, PathBuf},
+};
 
 use patch::Patch;
 

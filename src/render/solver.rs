@@ -11,16 +11,21 @@ use rattler_conda_types::{
     Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
     RepoDataRecord,
 };
-use rattler_repodata_gateway::{fetch::{
-    CacheResult, FetchRepoDataError, FetchRepoDataOptions,
-}, Reporter};
 use rattler_repodata_gateway::sparse::SparseRepoData;
+use rattler_repodata_gateway::{
+    fetch::{CacheResult, FetchRepoDataError, FetchRepoDataOptions},
+    Reporter,
+};
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolverImpl, SolverTask};
 use reqwest_middleware::ClientWithMiddleware;
 use url::Url;
 
 use std::{
-    future::ready, io::ErrorKind, path::{Path, PathBuf}, sync::Arc, time::Duration
+    future::ready,
+    io::ErrorKind,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
 };
 use tokio::task::JoinHandle;
 
