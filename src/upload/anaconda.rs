@@ -307,6 +307,10 @@ impl Anaconda {
         force: bool,
         package: &ExtractedPackage<'_>,
     ) -> miette::Result<bool> {
+        if channels.is_empty() {
+            return Err(miette!("No channel selected - please specify at least one channel for upload to Anaconda.org"));
+        }
+
         let sha256 = package.sha256().into_diagnostic()?;
 
         let package_name = package.package_name();
