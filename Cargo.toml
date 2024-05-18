@@ -19,34 +19,34 @@ rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/
 tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input']
 
 [dependencies]
-serde = { version = "1.0.200", features = ["derive"] }
+serde = { version = "1.0.202", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.24.0", default-features = false, features = ["cli-tools"] }
-rattler_conda_types = { version = "0.22.1", default-features = false }
-rattler_digest = { version = "0.19.3", default-features = false }
-rattler_index = { version = "0.19.10", default-features = false }
-rattler_networking = { version = "0.20.5", default-features = false }
-rattler_repodata_gateway = { version = "0.19.11", default-features = false, features = [
+rattler = { version = "0.25.0", default-features = false, features = ["cli-tools"] }
+rattler_conda_types = { version = "0.23.1", default-features = false }
+rattler_digest = { version = "0.19.4", default-features = false }
+rattler_index = { version = "0.19.12", default-features = false }
+rattler_networking = { version = "0.20.7", default-features = false }
+rattler_repodata_gateway = { version = "0.20.1", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.20.2", default-features = false, features = [
+rattler_shell = { version = "0.20.4", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.21.1", default-features = false, features = [
+rattler_solve = { version = "0.22.0", default-features = false, features = [
     "resolvo",
 ] }
-rattler_virtual_packages = { version = "0.19.9", default-features = false }
-rattler_package_streaming = { version = "0.20.8", default-features = false }
-anyhow = "1.0.82"
+rattler_virtual_packages = { version = "0.19.11", default-features = false }
+rattler_package_streaming = { version = "0.20.10", default-features = false }
+anyhow = "1.0.83"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
-serde_json = "1.0.116"
+serde_json = "1.0.117"
 reqwest = { version = "0.12.4", default-features = false, features = [
     "multipart",
 ] }
 tokio = { version = "1.37.0", features = ["rt", "macros", "rt-multi-thread"] }
-itertools = "0.12.1"
+itertools = "0.13.0"
 content_inspector = "0.2.4"
 serde_with = "3.8.1"
 url = "2.5.0"
@@ -72,7 +72,7 @@ comfy-table = "7.1.1"
 futures = "0.3.30"
 indicatif = "0.17.8"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
-thiserror = "1.0.59"
+thiserror = "1.0.60"
 tempfile = "3.10.1"
 chrono = "0.4.38"
 sha1 = "0.10.6"
@@ -82,7 +82,7 @@ ignore = "0.4.22"
 globset = "0.4.14"
 clap-verbosity-flag = "2.2.0"
 tracing-core = "0.1.32"
-petgraph = "0.6.4"
+petgraph = "0.6.5"
 indexmap = "2.2.6"
 dunce = "1.0.4"
 fs-err = "2.11.0"
@@ -91,7 +91,7 @@ clap_complete = "4.5.2"
 tokio-util = "0.7.11"
 
 tar = "0.4.40"
-zip = { version = "1.1.4", default-features = false, features = [
+zip = { version = "1.2.3", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
@@ -100,9 +100,9 @@ base64 = "0.22.1"
 flate2 = "1.0.30"
 xz2 = "0.1.7"
 zstd = "0.13.1"
-toml = "0.8.12"
+toml = "0.8.13"
 memmap2 = "0.9.4"
-reqwest-middleware = "0.3.0"
+reqwest-middleware = "0.3.1"
 rattler_installs_packages = { version = "0.9.0", default-features = false }
 async-once-cell = "0.5.3"
 terminal_size = "0.3.0"
@@ -118,7 +118,7 @@ patch = "0.7.0"
 regex = "1.10.4"
 
 [dev-dependencies]
-insta = { version = "1.38.0", features = ["yaml"] }
+insta = { version = "1.39.0", features = ["yaml"] }
 rstest = "0.19.0"
 tracing-test = "0.2.4"
 tracing-indicatif = "0.3.6"

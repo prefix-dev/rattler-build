@@ -11,17 +11,20 @@ use rattler_conda_types::{
     Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
     RepoDataRecord,
 };
-use rattler_repodata_gateway::fetch::{
-    CacheResult, DownloadProgress, FetchRepoDataError, FetchRepoDataOptions,
-};
 use rattler_repodata_gateway::sparse::SparseRepoData;
+use rattler_repodata_gateway::{
+    fetch::{CacheResult, FetchRepoDataError, FetchRepoDataOptions},
+    Reporter,
+};
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolverImpl, SolverTask};
 use reqwest_middleware::ClientWithMiddleware;
+use url::Url;
 
 use std::{
     future::ready,
     io::ErrorKind,
     path::{Path, PathBuf},
+    sync::Arc,
     time::Duration,
 };
 use tokio::task::JoinHandle;
@@ -120,6 +123,7 @@ pub async fn create_environment(
         pinned_packages: Vec::new(),
         timeout: None,
         channel_priority: ChannelPriority::Strict,
+        exclude_newer: None,
     };
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
@@ -513,6 +517,17 @@ async fn remove_package_from_environment(
     Ok(())
 }
 
+struct DownloadProgressReporter {
+    progress_bar: ProgressBar,
+}
+
+impl Reporter for DownloadProgressReporter {
+    fn on_download_progress(&self, _url: &Url, _index: usize, bytes: usize, total: Option<usize>) {
+        self.progress_bar.set_length(total.unwrap_or(bytes) as u64);
+        self.progress_bar.set_position(bytes as u64);
+    }
+}
+
 /// Given a channel and platform, download and cache the `repodata.json` for it. This function
 /// reports its progress via a CLI progressbar.
 async fn fetch_repo_data_records_with_progress(
@@ -532,7 +547,10 @@ async fn fetch_repo_data_records_with_progress(
     );
     progress_bar.enable_steady_tick(Duration::from_millis(100));
 
-    let download_progress_bar = progress_bar.clone();
+    let progress_reporter = DownloadProgressReporter {
+        progress_bar: progress_bar.clone(),
+    };
+
     // Download the repodata.json
     let result = rattler_repodata_gateway::fetch::fetch_repo_data(
         channel.platform_url(platform),
@@ -541,10 +559,7 @@ async fn fetch_repo_data_records_with_progress(
         FetchRepoDataOptions {
             ..Default::default()
         },
-        Some(Box::new(move |DownloadProgress { total, bytes }| {
-            download_progress_bar.set_length(total.unwrap_or(bytes));
-            download_progress_bar.set_position(bytes);
-        })),
+        Some(Arc::new(progress_reporter)),
     )
     .await;
 
