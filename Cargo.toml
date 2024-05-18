@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.16.0"
+version = "0.16.1"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
