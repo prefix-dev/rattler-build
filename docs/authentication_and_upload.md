@@ -92,20 +92,19 @@ rattler-build upload artifactory -u <url> -c <channel> <package_files>
 
 ### anaconda.org
 
-To upload to [anaconda.org](https://anaconda.org), you need to pass a owner,
-channel (with optional label) and API key. The API key is used to authenticate
-the upload.
+To upload to [anaconda.org](https://anaconda.org), you need to specify the owner
+and API key. The API key is used to authenticate the upload.
 
-The owner is the is owner of the distribution, for example, your user name or
-"conda-forge". The channel is `main` by default (which means something like
-`owner/main`), but optionally you can also specify labels, such as `main/rc` for
-release candidates.
+The owner is the owner of the distribution, for example, your user name or
+organization.
+
+One can also specify a label such as `dev` for release candidates using the
+`-c` flag. The default value is `main`.
 
 You can also add the `--force` argument to forcibly upload a new package (and
 overwrite any existing ones).
 
 ```bash
-export ANACONDA_OWNER=<your_username>
 export ANACONDA_API_KEY=<your_token>
-rattler-build upload anaconda -c <channel> <package_files>
+rattler-build upload anaconda -o <your_username> -c <label> <package_files>
 ```
