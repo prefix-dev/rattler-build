@@ -97,7 +97,7 @@ pub async fn create_environment(
     // this also requires the use of the `channel_config` so we have to do this manually.
     let channel_config = ChannelConfig::default_with_root_dir(std::env::current_dir()?);
     let channels = channels
-        .into_iter()
+        .iter()
         .map(|channel_str| Channel::from_str(channel_str, &channel_config))
         .collect::<Result<Vec<_>, _>>()?;
 
