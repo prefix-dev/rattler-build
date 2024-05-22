@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::package_test::TestError;
 use crate::recipe::parser::PackageContentsTest;
 use globset::{Glob, GlobBuilder, GlobSet};
-use rattler_conda_types::{package::PathsJson, Platform};
+use rattler_conda_types::{package::PathsJson, Arch, Platform};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);
@@ -132,7 +132,8 @@ impl PackageContentsTest {
                             .add(build_glob(format!("lib/{{,lib}}{lib}.*.dylib"))?)
                             .build()
                     }
-                } else if target_platform.is_linux() {
+                } else if target_platform.is_linux() || target_platform.arch() == Some(Arch::Wasm32)
+                {
                     if lib.glob().ends_with(".so")
                         || lib.glob().contains(".so.")
                         || lib.glob().ends_with(".a")
