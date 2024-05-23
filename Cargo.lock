@@ -345,7 +345,11 @@ checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -380,7 +384,11 @@ checksum = "c6fa2087f2753a7da8cc1c0dbfcf89579dd57458e36769de5ac750b4671737ca"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -780,7 +788,11 @@ dependencies = [
  "heck 0.5.0",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1006,7 +1018,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1017,7 +1033,11 @@ checksum = "733cabb43482b1a1b53eee8583c2b9e8684d592215ea83efd305dd31bc2f0178"
 dependencies = [
  "darling_core",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1068,7 +1088,11 @@ checksum = "67e77553c4162a157adbf834ebae5b415acbecbeafc7a74b0e886657506a7611"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1111,7 +1135,11 @@ checksum = "487585f4d0c6655fe74905e2504d8ad6908e4db67f744eb140876906c2f3175d"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1177,7 +1205,11 @@ dependencies = [
  "heck 0.4.1",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1189,7 +1221,11 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1210,7 +1246,11 @@ checksum = "5c785274071b1b420972453b306eeca06acf4633829db4223b58a2a8c5953bc4"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1307,10 +1347,14 @@ checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 name = "file_url"
 version = "0.1.1"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "itertools 0.12.1",
  "percent-encoding",
@@ -1501,7 +1545,11 @@ checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -1562,9 +1610,9 @@ dependencies = [
 
 [[package]]
 name = "getrandom"
-version = "0.2.14"
+version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94b22e06ecb0110981051723910cbf0b5f5e09a2062dd7663334ee79a9d1286c"
+checksum = "c4567c8db10ae91089c99af84c68c38da3ec2f087c3f82960bcdbf3656b6f4d7"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -2304,7 +2352,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "regex",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -2316,6 +2368,7 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 [[package]]
 name = "libc"
 <<<<<<< HEAD
+<<<<<<< HEAD
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
@@ -2324,6 +2377,11 @@ version = "0.2.153"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c198f91728a82281a64e1f4f9eeb25d82cb32a5de251c6bd1b5154d63a8e7bd"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+version = "0.2.155"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97b3888a4aecf77e811145cadf6eef5901f4782c53886191b2f693f24761847c"
+>>>>>>> 0df0667b (remove more code)
 
 [[package]]
 name = "libloading"
@@ -2539,7 +2597,11 @@ checksum = "49e7bc1560b95a3c4a25d03de42fe76ca718ab92d1a22a55b9b4cf67b3ae635c"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -2550,7 +2612,11 @@ checksum = "dcf09caffaac8068c346b6df2a7fc27a177fd20b39421a39ce0a211bde679a6c"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -2820,7 +2886,11 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -2889,7 +2959,11 @@ dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -3090,7 +3164,11 @@ dependencies = [
  "phf_shared",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
  "unicase",
 ]
 
@@ -3121,7 +3199,11 @@ checksum = "2f38a4412a78282e09a2cf38d195ea5420d15ba0602cb375210efbc877243965"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -3234,9 +3316,15 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
+<<<<<<< HEAD
 version = "1.0.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec96c6a92621310b51366f1e28d05ef11489516e93be030060e5fc12024a49d6"
+=======
+version = "1.0.83"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b33eb56c327dec362a9e55b3ad14f9d2f0904fb5a5b03b513ab5465399e9f43"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "unicode-ident",
 ]
@@ -3249,7 +3337,11 @@ checksum = "af066a9c399a26e020ada66a034357a868728e72cd426f3adcd35f80d88d88c8"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
  "version_check",
  "yansi",
 ]
@@ -3363,8 +3455,12 @@ version = "0.26.1"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.25.0"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "anyhow",
  "bytes",
@@ -3501,8 +3597,12 @@ version = "0.25.0"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.23.1"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "chrono",
  "file_url",
@@ -3532,10 +3632,14 @@ dependencies = [
 name = "rattler_digest"
 version = "0.19.4"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "blake2",
  "digest",
@@ -3555,8 +3659,12 @@ version = "0.19.14"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.19.12"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -3632,6 +3740,7 @@ dependencies = [
 name = "rattler_macros"
 version = "0.19.3"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
@@ -3639,6 +3748,12 @@ source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8
 dependencies = [
  "quote",
  "syn 2.0.66",
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+dependencies = [
+ "quote",
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -3648,8 +3763,12 @@ version = "0.20.8"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.20.7"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3683,8 +3802,12 @@ version = "0.21.1"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.20.10"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "bzip2",
  "chrono",
@@ -3713,8 +3836,12 @@ version = "0.20.3"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.20.1"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "anyhow",
  "async-compression",
@@ -3769,8 +3896,12 @@ version = "0.20.6"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.20.4"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "enum_dispatch",
  "indexmap 2.2.6",
@@ -3791,8 +3922,12 @@ version = "0.23.2"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.22.0"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "chrono",
  "futures",
@@ -3813,8 +3948,12 @@ version = "0.19.13"
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 version = "0.19.11"
+<<<<<<< HEAD
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "archspec",
  "libloading",
@@ -4136,7 +4275,11 @@ dependencies = [
  "regex",
  "relative-path",
  "rustc_version",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
  "unicode-ident",
 ]
 
@@ -4331,7 +4474,11 @@ checksum = "7f81c2fde025af7e69b1d1420531c8a8811ca898919db177141a85313b1cb932"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4409,7 +4556,11 @@ checksum = "500cbc0ebeb6f46627f50f3f5811ccf6bf00643be300b4c3eabc0ef55dc5b5ba"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4432,7 +4583,11 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4483,7 +4638,11 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4621,10 +4780,14 @@ dependencies = [
 name = "simple_spawn_blocking"
 version = "1.0.0"
 <<<<<<< HEAD
+<<<<<<< HEAD
 source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 =======
 source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#82764490552c5c5dfebf450bf98aef221b9b5af0"
 >>>>>>> f771ff02 (use the new gateway and installer)
+=======
+source = "git+https://github.com/baszalmstra/rattler?branch=refactor/installer#8eccee48c4a7330f61da096c58474f867564a512"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "tokio",
 ]
@@ -4729,7 +4892,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ff9eaf853dec4c8802325d8b6d3dffa86cc707fd7a1a4cdbf416e13b061787a"
 dependencies = [
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4769,7 +4936,11 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -4818,9 +4989,15 @@ dependencies = [
 
 [[package]]
 name = "syn"
+<<<<<<< HEAD
 version = "2.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c42f3f41a2de00b01c0aaad383c5a45241efc8b2d1eda5661812fda5f3cdcff5"
+=======
+version = "2.0.65"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d2863d96a84c6439701d7a38f9de935ec562c8832cc55d1dde0f513b52fad106"
+>>>>>>> 0df0667b (remove more code)
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4950,7 +5127,11 @@ checksum = "46c3384250002a6d5af4d114f2845d37b57521033f30d5c3f46c4d70e1197533"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -5052,7 +5233,11 @@ checksum = "5f5ae998a069d4b5aba8ee9dad856af7d520c3699e6159b185c2acd48155d39a"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -5204,7 +5389,11 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -5546,7 +5735,11 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
  "wasm-bindgen-shared",
 ]
 
@@ -5580,7 +5773,11 @@ checksum = "e94f17b526d0a461a191c78ea52bbce64071ed5c04c9ffe424dcb38f74171bb7"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -5721,7 +5918,11 @@ checksum = "f6fc35f58ecd95a9b71c4f2329b911016e6bec66b3f2e6a4aad86bd2e99e2f9b"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -5732,7 +5933,11 @@ checksum = "08990546bf4edef8f431fa6326e032865f27138718c587dc21bc0265bbcb57cc"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
@@ -6072,7 +6277,11 @@ checksum = "15e934569e47891f7d9411f1a451d947a60e000ab3bd24fbb970f000387d1b3b"
 dependencies = [
  "proc-macro2",
  "quote",
+<<<<<<< HEAD
  "syn 2.0.66",
+=======
+ "syn 2.0.65",
+>>>>>>> 0df0667b (remove more code)
 ]
 
 [[package]]
