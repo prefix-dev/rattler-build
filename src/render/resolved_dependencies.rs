@@ -117,7 +117,7 @@ impl DependencyInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizedRunDependencies {
     pub depends: Vec<DependencyInfo>,
-    pub constrains: Vec<DependencyInfo>,
+    pub run_constraints: Vec<DependencyInfo>,
     pub run_exports: Option<RunExportsJson>,
 }
 

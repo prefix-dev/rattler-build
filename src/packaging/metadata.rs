@@ -290,7 +290,7 @@ impl Output {
                 .collect(),
             constrains: finalized_dependencies
                 .run
-                .constrains
+                .run_constraints
                 .iter()
                 .map(|dep| dep.spec().to_string())
                 .dedup()

@@ -520,7 +520,7 @@ version is part of the package dependencies, list `numpy` as a requirement in
 `recipe.yaml` and use a `conda_build_config.yaml` file with multiple NumPy
 versions.
 
-### Run constrained
+### Run constraints
 
 Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.
@@ -530,25 +530,27 @@ specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pk
 
 ```yaml
 requirements:
-  run_constrained:
+  run_constraints:
     - optional-subpackage ==${{ version }}
 ```
 
 For example, let's say we have an environment that has package "a" installed at
-version 1.0. If we install package "b" that has a `run\_constrained` entry of
-"`a\>1.0`", then `mamba` would need to upgrade "a" in the environment in order to
+version 1.0. If we install package "b" that has a `run_constraints` entry of
+"`a >1.0`", then `mamba` would need to upgrade "a" in the environment in order to
 install "b".
 
 This is especially useful in the context of virtual packages, where the
-`run\_constrained` dependency is not a package that `mamba` manages, but rather a
+`run_constraints` dependency is not a package that `mamba` manages, but rather a
 [virtual
 package](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html)
 that represents a system property that `mamba` can't change. For example, a
-package on Linux may impose a `run\_constrained` dependency on `\_\_glibc\>=2.12`.
+package on Linux may impose a `run_constraints` dependency on `__glibc >=2.12`.
 This is the version bound consistent with CentOS 6. Software built against glibc
-2.12 will be compatible with CentOS 6. This `run\_constrained` dependency helps
+2.12 will be compatible with CentOS 6. This `run_constraints` dependency helps
 `mamba` tell the user that a given package can't be installed if their system
 glibc version is too old.
+
+In the `meta.yaml` format this was called `run_constrained`.
 
 ### Run exports
 
