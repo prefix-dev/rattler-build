@@ -81,6 +81,7 @@ fn contains_prefix_text(
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
         let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+
         let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
             .next()
             .is_some();

@@ -50,88 +50,103 @@ pub(crate) async fn url_src(
 ) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
     let checksum = Checksum::from_url_source(source).ok_or_else(|| {
-        SourceError::NoChecksum(format!("No checksum found for url: {}", source.url()))
+        SourceError::NoChecksum(format!("No checksum found for url(s): {:?}", source.urls()))
     })?;
 
-    if source.url().scheme() == "file" {
-        let local_path = source.url().to_file_path().map_err(|_| {
-            SourceError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid local file path",
-            ))
-        })?;
+    let mut last_error = None;
+    for url in source.urls() {
+        if url.scheme() == "file" {
+            let local_path = url.to_file_path().map_err(|_| {
+                SourceError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid local file path",
+                ))
+            })?;
 
-        if !local_path.is_file() {
-            return Err(SourceError::FileNotFound(local_path));
+            if !local_path.is_file() {
+                return Err(SourceError::FileNotFound(local_path));
+            }
+
+            if !checksum.validate(&local_path) {
+                return Err(SourceError::ValidationFailed);
+            }
+
+            tracing::info!("Using local source file.");
+            return Ok(local_path);
         }
 
-        if !checksum.validate(&local_path) {
+        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum).ok_or(
+            SourceError::UnknownErrorStr("Failed to build cache name from url"),
+        )?);
+        let cache_name = cache_dir.join(cache_name);
+
+        let metadata = fs::metadata(&cache_name);
+        if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
+            tracing::info!("Found valid source cache file.");
+            return Ok(cache_name.clone());
+        }
+
+        let client = reqwest::Client::new();
+        let download_size = {
+            let resp = client.head(url.as_str()).send().await?;
+            if resp.status().is_success() {
+                resp.headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|ct_len| ct_len.to_str().ok())
+                    .and_then(|ct_len| ct_len.parse().ok())
+                    .unwrap_or(0)
+            } else {
+                tracing::warn!(
+                    "Could not download file from: {}. Error {}",
+                    url,
+                    resp.status()
+                );
+                last_error = Some(resp.error_for_status());
+                continue;
+            }
+        };
+
+        let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
+            indicatif::ProgressBar::new(download_size)
+                .with_prefix("Downloading")
+                .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
+        );
+        progress_bar.set_message(
+            url.path_segments()
+                .and_then(|segs| segs.last())
+                .map(str::to_string)
+                .unwrap_or_else(|| "Unknown File".to_string()),
+        );
+        let mut file = tokio::fs::File::create(&cache_name).await?;
+
+        let request = client.get(url.clone());
+        let mut download = request.send().await?;
+
+        while let Some(chunk) = download.chunk().await? {
+            progress_bar.inc(chunk.len() as u64);
+            file.write_all(&chunk).await?;
+        }
+
+        progress_bar.finish();
+
+        file.flush().await?;
+
+        if !checksum.validate(&cache_name) {
+            tracing::error!("Checksum validation failed!");
+            fs::remove_file(&cache_name)?;
             return Err(SourceError::ValidationFailed);
         }
 
-        tracing::info!("Using local source file.");
-        return Ok(local_path);
+        return Ok(cache_name);
     }
 
-    let cache_name = PathBuf::from(cache_name_from_url(source.url(), &checksum).ok_or(
-        SourceError::UnknownErrorStr("Failed to build cache name from url"),
-    )?);
-    let cache_name = cache_dir.join(cache_name);
-
-    let metadata = fs::metadata(&cache_name);
-    if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
-        tracing::info!("Found valid source cache file.");
-        return Ok(cache_name.clone());
+    if let Some(Err(last_error)) = last_error {
+        Err(SourceError::Url(last_error))
+    } else {
+        Err(SourceError::UnknownError(
+            "Could not download any file".to_string(),
+        ))
     }
-
-    let client = reqwest::Client::new();
-    let download_size = {
-        let resp = client.head(source.url().as_str()).send().await?;
-        if resp.status().is_success() {
-            resp.headers()
-                .get(reqwest::header::CONTENT_LENGTH)
-                .and_then(|ct_len| ct_len.to_str().ok())
-                .and_then(|ct_len| ct_len.parse().ok())
-                .unwrap_or(0)
-        } else {
-            return Err(SourceError::UrlNotFile(source.url().clone()));
-        }
-    };
-
-    let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
-        indicatif::ProgressBar::new(download_size)
-            .with_prefix("Downloading")
-            .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
-    );
-    progress_bar.set_message(
-        source
-            .url()
-            .path_segments()
-            .and_then(|segs| segs.last())
-            .map(str::to_string)
-            .unwrap_or_else(|| "Unknown File".to_string()),
-    );
-    let mut file = tokio::fs::File::create(&cache_name).await?;
-
-    let request = client.get(source.url().as_str());
-    let mut download = request.send().await?;
-
-    while let Some(chunk) = download.chunk().await? {
-        progress_bar.inc(chunk.len() as u64);
-        file.write_all(&chunk).await?;
-    }
-
-    progress_bar.finish();
-
-    file.flush().await?;
-
-    if !checksum.validate(&cache_name) {
-        tracing::error!("Checksum validation failed!");
-        fs::remove_file(&cache_name)?;
-        return Err(SourceError::ValidationFailed);
-    }
-
-    Ok(cache_name)
 }
 
 #[cfg(test)]

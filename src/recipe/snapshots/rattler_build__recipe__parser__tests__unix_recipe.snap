@@ -14,21 +14,23 @@ Recipe {
     source: [
         Url(
             UrlSource {
-                url: Url {
-                    scheme: "https",
-                    cannot_be_a_base: false,
-                    username: "",
-                    password: None,
-                    host: Some(
-                        Domain(
-                            "github.com",
+                url: [
+                    Url {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "github.com",
+                            ),
                         ),
-                    ),
-                    port: None,
-                    path: "/xtensor-stack/xtensor/archive/0.24.6.tar.gz",
-                    query: None,
-                    fragment: None,
-                },
+                        port: None,
+                        path: "/xtensor-stack/xtensor/archive/0.24.6.tar.gz",
+                        query: None,
+                        fragment: None,
+                    },
+                ],
                 sha256: Some(
                     [
                         248,
