@@ -1,17 +1,19 @@
 use comfy_table::Table;
 
+use indicatif::ProgressStyle;
 use indicatif::{HumanBytes, ProgressBar};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{
     Channel, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
 };
 use rattler_repodata_gateway::Gateway;
-use rattler_repodata_gateway::Reporter;
 use rattler_solve::{resolvo::Solver, SolveStrategy, SolverImpl, SolverTask};
 use url::Url;
 
 use crate::tool_configuration;
 use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 fn print_as_table(packages: &Vec<RepoDataRecord>) {
     let mut table = Table::new();
@@ -126,6 +128,103 @@ pub async fn create_environment(
     Ok(required_packages)
 }
 
+struct GatewayReporter {
+    progress_bars: Arc<Mutex<Vec<ProgressBar>>>,
+    multi_progress: indicatif::MultiProgress,
+    progress_template: Option<ProgressStyle>,
+    finish_template: Option<ProgressStyle>,
+}
+
+struct GatewayReporterBuilder {
+    multi_progress: Option<indicatif::MultiProgress>,
+    progress_template: Option<ProgressStyle>,
+    finish_template: Option<ProgressStyle>,
+}
+
+impl Default for GatewayReporterBuilder {
+    fn default() -> Self {
+        Self {
+            multi_progress: None,
+            progress_template: None,
+            finish_template: None,
+        }
+    }
+}
+
+impl GatewayReporter {
+    pub fn builder() -> GatewayReporterBuilder {
+        GatewayReporterBuilder::default()
+    }
+}
+
+impl rattler_repodata_gateway::Reporter for GatewayReporter {
+    fn on_download_start(&self, _url: &Url) -> usize {
+        let progress_bar = self
+            .multi_progress
+            .add(ProgressBar::new(1))
+            .with_finish(indicatif::ProgressFinish::AndLeave);
+
+        progress_bar.enable_steady_tick(Duration::from_millis(100));
+
+        // use the configured style
+        if let Some(template) = &self.progress_template {
+            progress_bar.set_style(template.clone());
+        }
+        let mut progress_bars = self.progress_bars.lock().unwrap();
+        progress_bars.push(progress_bar);
+        progress_bars.len() - 1
+    }
+
+    fn on_download_complete(&self, url: &Url, index: usize) {
+        // Remove the progress bar from the multi progress
+        let pb = &self.progress_bars.lock().unwrap()[index];
+        if let Some(template) = &self.finish_template {
+            pb.set_style(template.clone());
+            pb.finish_with_message(format!("Done: {}", url));
+        } else {
+            pb.finish();
+        }
+    }
+
+    fn on_download_progress(&self, _url: &Url, index: usize, bytes: usize, total: Option<usize>) {
+        let progress_bar = &self.progress_bars.lock().unwrap()[index];
+        progress_bar.set_length(total.unwrap_or(bytes) as u64);
+        progress_bar.set_position(bytes as u64);
+    }
+}
+
+impl GatewayReporterBuilder {
+    #[must_use]
+    pub fn with_multi_progress(
+        mut self,
+        multi_progress: indicatif::MultiProgress,
+    ) -> GatewayReporterBuilder {
+        self.multi_progress = Some(multi_progress);
+        self
+    }
+
+    #[must_use]
+    pub fn with_progress_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
+        self.progress_template = Some(template);
+        self
+    }
+
+    #[must_use]
+    pub fn with_finish_template(mut self, template: ProgressStyle) -> GatewayReporterBuilder {
+        self.finish_template = Some(template);
+        self
+    }
+
+    pub fn finish(self) -> GatewayReporter {
+        GatewayReporter {
+            progress_bars: Arc::new(Mutex::new(Vec::new())),
+            multi_progress: self.multi_progress.expect("multi progress is required"),
+            progress_template: self.progress_template,
+            finish_template: self.finish_template,
+        }
+    }
+}
+
 /// Load repodata from channels. Only includes necessary records for platform & specs.
 pub async fn load_repodatas(
     channels: &[Url],
@@ -150,14 +249,46 @@ pub async fn load_repodatas(
         .map(|channel_str| Channel::from_str(channel_str, &channel_config))
         .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(gateway
+    let pb =
+        ProgressBar::new(50).with_style(tool_configuration.fancy_log_handler.default_bytes_style());
+
+    let test_pb = tool_configuration
+        .fancy_log_handler
+        .multi_progress()
+        .add(pb);
+    test_pb.finish();
+
+    let result = gateway
         .query(
             channels,
             [*target_platform, Platform::NoArch],
             specs.to_vec(),
         )
+        .with_reporter(
+            GatewayReporter::builder()
+                .with_multi_progress(
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                )
+                .with_progress_template(tool_configuration.fancy_log_handler.default_bytes_style())
+                .with_finish_template(
+                    tool_configuration
+                        .fancy_log_handler
+                        .finished_progress_style(),
+                )
+                .finish(),
+        )
         .recursive(true)
-        .await?)
+        .await?;
+
+    tool_configuration
+        .fancy_log_handler
+        .multi_progress()
+        .clear()?;
+
+    Ok(result)
 }
 
 pub async fn install_packages(
@@ -168,10 +299,6 @@ pub async fn install_packages(
 ) -> anyhow::Result<()> {
     let installed_packages = vec![];
 
-    tracing::info!(
-        "The following packages will be installed ({} total):",
-        required_packages.len()
-    );
     print_as_table(required_packages);
 
     if !required_packages.is_empty() {
@@ -210,15 +337,4 @@ pub async fn install_packages(
     }
 
     Ok(())
-}
-
-struct DownloadProgressReporter {
-    progress_bar: ProgressBar,
-}
-
-impl Reporter for DownloadProgressReporter {
-    fn on_download_progress(&self, _url: &Url, _index: usize, bytes: usize, total: Option<usize>) {
-        self.progress_bar.set_length(total.unwrap_or(bytes) as u64);
-        self.progress_bar.set_position(bytes as u64);
-    }
 }
