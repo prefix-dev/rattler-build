@@ -815,6 +815,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#what-goes-into-a-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      What goes into a package?
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What goes into a package?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filtering
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symlink-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Symlink Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -858,6 +891,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#what-goes-into-a-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      What goes into a package?
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="What goes into a package?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#filtering" class="md-nav__link">
+    <span class="md-ellipsis">
+      Filtering
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#symlink-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Symlink Handling
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -893,24 +959,73 @@ relocatable:</p>
 <ol>
 <li><strong>Binary object file conversion</strong>: Binary object files are converted to use
    relative paths using <code>install_name_tool</code> on macOS and <code>patchelf</code> on Linux.
-   This uses <code>$ORIGIN</code> for elf files on Linux and <code>@loader_path</code> for Mach-O files
-   on macOS to make the <code>rpath</code> relative to the executable / shared library.</li>
+   This uses <code>$ORIGIN</code> for elf files on Linux and <code>@loader_path</code> for Mach-O
+   files on macOS to make the <code>rpath</code> relative to the executable / shared
+   library.</li>
 <li><strong>Text file prefix registration</strong>: Any text file without <code>NULL</code> bytes
-   containing the placeholder prefix have the registered prefix replaced with the
-   install prefix.</li>
+   containing the placeholder prefix have the registered prefix replaced with
+   the install prefix.</li>
 <li><strong>Binary file prefix detection and registration</strong>: Binary files containing
-   the build prefix can be automatically registered. The registered files will
-   have their build prefix replaced with the install prefix at install time.
-   This works by padding the install prefix with null terminators, such that the
-   length of the binary file remains the same. The build prefix must be long
-   enough to accommodate any reasonable installation prefix. On macOS and Linux,
-   <code>rattler-build</code> pads the build prefix to 255 characters by appending
-   <code>_placehold</code> to the end of the build directory name.</li>
+the build prefix can be automatically registered. The registered files will have
+their build prefix replaced with the install prefix at install time. This works
+by padding the install prefix with null terminators, such that the length of the
+binary file remains the same. The build prefix must be long enough to
+accommodate any reasonable installation prefix. On macOS and Linux,
+<code>rattler-build</code> pads the build prefix to 255 characters by appending
+<code>_placehold</code> to the end of the build directory name.</li>
 </ol>
 <!--4. **Prefix replacement for specific binary files**: There may be cases where a
    file is identified as binary but requires the build prefix to be replaced as
    if it were text—without padding with null terminators. Such files can be
    listed in `build/has_prefix_files` in `meta.yaml`.-->
+
+<h2 id="what-goes-into-a-package">What goes into a package?<a class="headerlink" href="#what-goes-into-a-package" title="Permanent link">#</a></h2>
+<p>Generally speaking, any new files that are copied into the <code>$PREFIX</code> directory
+at build time are part of the new package. However, there is some filtering
+going on to exclude unwanted files, and <code>noarch: python</code> packages have special
+handling as well. The rules are as follows:</p>
+<h3 id="filtering">Filtering<a class="headerlink" href="#filtering" title="Permanent link">#</a></h3>
+<h4 id="general-file-filtering">General File Filtering<a class="headerlink" href="#general-file-filtering" title="Permanent link">#</a></h4>
+<p>Certain files are filtered out to prevent them from being included in the
+package. These include:</p>
+<ul>
+<li><strong>.pyo files</strong>: Optimized Python files are not included <a href="https://www.python.org/dev/peps/pep-0488/">because they are
+  considered harmful</a>.</li>
+<li><strong>.la files</strong>: Libtool archive files that are not needed at runtime.</li>
+<li><strong>.DS_Store files</strong>: macOS-specific files that are irrelevant to the package.</li>
+<li><strong>.git files and directories</strong>: Version control files, including <code>.gitignore</code>
+  and the <code>.git</code> directory, which are not needed in the package.</li>
+<li><strong>share/info/dir</strong> This file is ignored because it would be written from
+  multiple packages.</li>
+</ul>
+<h4 id="special-handling-for-noarch-python-packages">Special Handling for <code>noarch: python</code> Packages<a class="headerlink" href="#special-handling-for-noarch-python-packages" title="Permanent link">#</a></h4>
+<p>For packages marked as <code>noarch: python</code>, special transformations are applied to
+ensure compatibility across different platforms:</p>
+<ul>
+<li><strong>Stripping Python Library Prefix</strong>: The "lib/pythonX.X" prefix is removed,
+  retaining only the "site-packages" part of the path.</li>
+<li><strong>Skipping <code>__pycache__</code> Directories and <code>.pyc</code> Files</strong>: These are excluded
+  and recreated during installation (they are specific to the Python version).</li>
+<li><strong>Replacing <code>bin</code> and <code>Scripts</code> Directories</strong>:</li>
+<li>On Unix systems, the <code>bin</code> directory is replaced with <code>python-scripts</code>.</li>
+<li>On Windows systems, the <code>Scripts</code> directory is replaced with
+    <code>python-scripts</code>.</li>
+<li><strong>Remove explicitly mentioned entrypoints</strong>: For <code>noarch: python</code> packages,
+  entry points registered in the package are also taken into account. Files in
+  the <code>bin</code> or <code>Scripts</code> directories that match entry points are excluded to
+  avoid duplications.</li>
+</ul>
+<h3 id="symlink-handling">Symlink Handling<a class="headerlink" href="#symlink-handling" title="Permanent link">#</a></h3>
+<p>Symlinks are carefully managed to ensure they are relative rather than absolute,
+which aids in making the package relocatable:</p>
+<ul>
+<li>Absolute symlinks pointing within the <code>$PREFIX</code> are converted to relative
+  symlinks.</li>
+<li>On Unix systems, this conversion is handled directly by creating new relative
+  symlinks.</li>
+<li>On Windows, a warning is issued since symlink creation requires administrator
+  privileges.</li>
+</ul>
 
 
 
