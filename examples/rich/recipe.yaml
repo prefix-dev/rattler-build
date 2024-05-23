@@ -8,7 +8,9 @@ package:
   version: ${{ version }}
 
 source:
-  - url: https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+  - url:
+      - https://example.com/rich-${{ version }}.tar.gz  # this will give a 404!
+      - https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
     sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
 
 build:

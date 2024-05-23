@@ -150,12 +150,8 @@ pub async fn fetch_sources(
                 }
             }
             Source::Url(src) => {
-                tracing::info!("Fetching source from URL: {:?}", src.urls());
                 let first_url = src.urls().first().expect("we should have at least one URL");
-                let file_name_from_url = src
-                    .urls()
-                    .first()
-                    .expect("we should have at least one URL")
+                let file_name_from_url = first_url
                     .path_segments()
                     .and_then(|segments| segments.last().map(|last| last.to_string()))
                     .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
