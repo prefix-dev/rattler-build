@@ -1054,18 +1054,16 @@ The username and password are used to authenticate the upload.</p>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>artifactory<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <h3 id="anacondaorg">anaconda.org<a class="headerlink" href="#anacondaorg" title="Permanent link">#</a></h3>
-<p>To upload to <a href="https://anaconda.org">anaconda.org</a>, you need to pass a owner,
-channel (with optional label) and API key. The API key is used to authenticate
-the upload.</p>
-<p>The owner is the is owner of the distribution, for example, your user name or
-"conda-forge". The channel is <code>main</code> by default (which means something like
-<code>owner/main</code>), but optionally you can also specify labels, such as <code>main/rc</code> for
-release candidates.</p>
+<p>To upload to <a href="https://anaconda.org">anaconda.org</a>, you need to specify the owner
+and API key. The API key is used to authenticate the upload.</p>
+<p>The owner is the owner of the distribution, for example, your user name or
+organization.</p>
+<p>One can also specify a label such as <code>dev</code> for release candidates using the
+<code>-c</code> flag. The default value is <code>main</code>.</p>
 <p>You can also add the <code>--force</code> argument to forcibly upload a new package (and
 overwrite any existing ones).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_OWNER</span><span class="o">=</span>&lt;your_username&gt;
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-o<span class="w"> </span>&lt;your_username&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;label&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 
 
