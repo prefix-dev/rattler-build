@@ -1,7 +1,9 @@
 //! This module contains the functions to package a conda package from a given output.
 use fs_err as fs;
 use fs_err::File;
+use fs_extra::dir::CopyOptions;
 use rattler_conda_types::Platform;
+use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
@@ -77,7 +79,7 @@ pub enum PackagingError {
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
-) -> Result<Option<Vec<PathBuf>>, PackagingError> {
+) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
     if output.recipe.about().license_file.is_empty() {
         Ok(None)
     } else {
@@ -102,6 +104,10 @@ fn copy_license_files(
             &licenses_folder,
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .with_copy_options(CopyOptions {
+            overwrite: true,
+            ..Default::default()
+        })
         .use_gitignore(false)
         .run()?;
 
@@ -112,7 +118,7 @@ fn copy_license_files(
             .iter()
             .chain(copied_files_work_dir)
             .map(PathBuf::from)
-            .collect::<Vec<PathBuf>>();
+            .collect::<HashSet<PathBuf>>();
 
         if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
             let warn_str = "No include glob matched for copying license files";
