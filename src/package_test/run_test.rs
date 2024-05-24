@@ -106,7 +106,7 @@ impl Tests {
                 };
 
                 // copy all test files to a temporary directory and set it as the working directory
-                CopyDir::new(&path, tmp_dir.path()).run().map_err(|e| {
+                CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
                     TestError::IoError(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         format!("Failed to copy test files: {}", e),
