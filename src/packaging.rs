@@ -105,7 +105,7 @@ fn copy_license_files(
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
         .with_copy_options(CopyOptions {
-            // overwrite: true,
+            overwrite: true,
             ..Default::default()
         })
         .use_gitignore(false)
