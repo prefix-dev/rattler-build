@@ -474,7 +474,7 @@ mod test {
         let tmp_dir_path = tmp_dir.into_path();
         let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
-        fs_extra::dir::create_all(&dir, true).unwrap();
+        fs_err::create_dir_all(&dir).unwrap();
 
         // test.txt
         // test_dir/test.md
@@ -545,7 +545,8 @@ mod test {
             .unwrap();
         assert_eq!(copy_dir.copied_paths().len(), 2);
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
             .with_include_glob("test_copy_dir/")
             .with_exclude_glob("*.rst")
@@ -558,7 +559,8 @@ mod test {
             dest_dir.path().join("test_copy_dir/test_1.txt")
         );
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
             .with_include_glob("test_copy_dir/test_1.txt")
             .use_gitignore(false)
