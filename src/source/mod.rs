@@ -42,7 +42,7 @@ pub enum SourceError {
     WalkDir(#[from] walkdir::Error),
 
     #[error("FileSystem error: '{0}'")]
-    FileSystemError(fs_extra::error::Error),
+    FileSystemError(std::io::Error),
 
     #[error("StripPrefixError Error: {0}")]
     StripPrefixError(#[from] StripPrefixError),

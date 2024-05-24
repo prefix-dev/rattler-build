@@ -825,3 +825,14 @@ def test_filter_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     pp = paths["paths"]
     assert len(pp) == 1
     assert pp[0]["_path"] == "exists.txt"
+
+
+def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "double_license"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    # make sure that two license files in $SRC_DIR and $RECIPE_DIR raise an exception
+    with pytest.raises(Exception):
+        rattler_build(*args)

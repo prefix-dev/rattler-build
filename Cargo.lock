@@ -3408,7 +3408,6 @@ dependencies = [
  "dunce",
  "flate2",
  "fs-err",
- "fs_extra",
  "futures",
  "globset",
  "goblin",

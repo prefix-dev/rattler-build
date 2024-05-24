@@ -7,11 +7,30 @@ use std::{
 
 use fs_err::create_dir_all;
 
-use fs_extra::dir::CopyOptions;
 use ignore::WalkBuilder;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
 use super::SourceError;
+
+/// The copy options for the copy_dir function.
+pub struct CopyOptions {
+    /// Overwrite files if they already exist (default: false)
+    pub overwrite: bool,
+    /// Skip files if they already exist (default: false)
+    pub skip_exist: bool,
+    /// Buffer size for copying files (default: 8 MiB)
+    pub buffer_size: usize,
+}
+
+impl Default for CopyOptions {
+    fn default() -> Self {
+        Self {
+            overwrite: false,
+            skip_exist: false,
+            buffer_size: 8 * 1024 * 1024,
+        }
+    }
+}
 
 /// The copy_dir function accepts additionally a list of globs to ignore or include in the copy process.
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
@@ -45,7 +64,7 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             use_git_global: false,
             hidden: false,
-            copy_options: CopyOptions::new(),
+            copy_options: CopyOptions::default(),
         }
     }
 
@@ -128,12 +147,6 @@ impl<'a> CopyDir<'a> {
     #[allow(unused)]
     pub fn overwrite(mut self, b: bool) -> Self {
         self.copy_options.overwrite = b;
-        self
-    }
-
-    #[allow(unused)]
-    pub fn content_only(mut self, b: bool) -> Self {
-        self.copy_options.content_only = b;
         self
     }
 
@@ -236,12 +249,6 @@ impl<'a> CopyDir<'a> {
                             create_dir_all_cached(parent, paths_created)?;
                         }
 
-                        let file_options = fs_extra::file::CopyOptions {
-                            overwrite: self.copy_options.overwrite,
-                            skip_exist: self.copy_options.skip_exist,
-                            buffer_size: self.copy_options.buffer_size,
-                        };
-
                         // if file is a symlink, copy it as a symlink
                         if path.is_symlink() {
                             let link_target = fs_err::read_link(path)?;
@@ -250,7 +257,22 @@ impl<'a> CopyDir<'a> {
                             #[cfg(windows)]
                             std::os::windows::fs::symlink_file(link_target, &dest_path)?;
                         } else {
-                            reflink_or_copy(path, &dest_path, &file_options)
+                            if dest_path.exists() {
+                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                    tracing::error!("File already exists: {:?}", dest_path);
+                                } else if self.copy_options.skip_exist {
+                                    tracing::warn!(
+                                        "File already exists! Skipping file: {:?}",
+                                        dest_path
+                                    );
+                                } else if self.copy_options.overwrite {
+                                    tracing::warn!(
+                                        "File already exists! Overwriting file: {:?}",
+                                        dest_path
+                                    );
+                                }
+                            }
+                            reflink_or_copy(path, &dest_path, &self.copy_options)
                                 .map_err(SourceError::FileSystemError)?;
                         }
 
@@ -307,44 +329,23 @@ fn create_dir_all_cached(path: &Path, paths_created: &mut HashSet<PathBuf>) -> s
 /// Reflinks or copies a file. If reflinking fails the file is copied instead.
 ///
 /// The implementation of this function is partially taken from fs_extra.
-pub fn reflink_or_copy<P, Q>(
-    from: P,
-    to: Q,
-    options: &fs_extra::file::CopyOptions,
-) -> fs_extra::error::Result<()>
+pub fn reflink_or_copy<P, Q>(from: P, to: Q, options: &CopyOptions) -> std::io::Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
     let from = from.as_ref();
     if !from.exists() {
-        if let Some(msg) = from.to_str() {
-            let msg = format!("Path \"{}\" does not exist or you don't have access!", msg);
-            return Err(fs_extra::error::Error::new(
-                fs_extra::error::ErrorKind::NotFound,
-                &msg,
-            ));
-        }
-
-        return Err(fs_extra::error::Error::new(
-            fs_extra::error::ErrorKind::NotFound,
-            "Path does not exist or you don't have access!",
-        ));
+        let msg = format!(
+            "Path \"{}\" does not exist or you don't have access!",
+            from.to_str().unwrap_or("???")
+        );
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, msg));
     }
 
     if !from.is_file() {
-        if let Some(msg) = from.to_str() {
-            let msg = format!("Path \"{}\" is not a file!", msg);
-            return Err(fs_extra::error::Error::new(
-                fs_extra::error::ErrorKind::InvalidFile,
-                &msg,
-            ));
-        }
-
-        return Err(fs_extra::error::Error::new(
-            fs_extra::error::ErrorKind::NotFound,
-            "Path is not a file!",
-        ));
+        let msg = format!("Path \"{}\" is not a file!", from.to_str().unwrap_or("???"));
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg));
     }
 
     if to.as_ref().exists() {
@@ -353,16 +354,15 @@ where
                 return Ok(());
             }
 
-            if let Some(msg) = to.as_ref().to_str() {
-                return Err(fs_extra::error::Error::new(
-                    fs_extra::error::ErrorKind::AlreadyExists,
-                    msg,
-                ));
-            }
+            let msg = format!(
+                "Path \"{}\" already exists!",
+                to.as_ref().to_str().unwrap_or("???")
+            );
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, msg));
         }
 
         // Reflinking on windows cannot overwrite files. It will fail with a permission denied error.
-        fs_extra::file::remove(&to)?;
+        fs_err::remove_file(&to)?;
     }
 
     // Reflink or copy the file
@@ -474,7 +474,7 @@ mod test {
         let tmp_dir_path = tmp_dir.into_path();
         let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
-        fs_extra::dir::create_all(&dir, true).unwrap();
+        fs_err::create_dir_all(&dir).unwrap();
 
         // test.txt
         // test_dir/test.md
@@ -545,7 +545,8 @@ mod test {
             .unwrap();
         assert_eq!(copy_dir.copied_paths().len(), 2);
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
             .with_include_glob("test_copy_dir/")
             .with_exclude_glob("*.rst")
@@ -558,7 +559,8 @@ mod test {
             dest_dir.path().join("test_copy_dir/test_1.txt")
         );
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
             .with_include_glob("test_copy_dir/test_1.txt")
             .use_gitignore(false)
