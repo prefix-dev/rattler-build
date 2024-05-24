@@ -136,7 +136,13 @@ impl Interpreter for BashInterpreter {
         tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["bash", "-e", &build_script_path_str];
+        let cmd_args = [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-e",
+            &build_script_path_str,
+        ];
 
         let output = run_process_with_replacements(
             &cmd_args,
@@ -400,8 +406,10 @@ async fn run_process_with_replacements(
     replacements: &HashMap<String, String>,
 ) -> Result<std::process::Output, std::io::Error> {
     let mut command = tokio::process::Command::new(args[0]);
+
     command
         .current_dir(cwd)
+        .env_clear()
         .args(&args[1..])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
