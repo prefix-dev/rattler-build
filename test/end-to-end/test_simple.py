@@ -833,14 +833,6 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
         path_to_recipe,
         tmp_path,
     )
-
-    rattler_build(*args)
-    pkg = get_extracted_package(tmp_path, "filter_files")
-
-    assert (pkg / "info/paths.json").exists()
-
-    # parse paths json
-    paths = json.loads((pkg / "info/paths.json").read_text())
-    pp = paths["paths"]
-    assert len(pp) == 1
-    assert pp[0]["_path"] == "exists.txt"
+    # make sure that two license files in $SRC_DIR and $RECIPE_DIR raise an exception
+    with pytest.raises(Exception):
+        rattler_build(*args)

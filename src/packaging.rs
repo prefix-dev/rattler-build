@@ -20,7 +20,6 @@ pub use metadata::create_prefix_placeholder;
 
 use crate::metadata::Output;
 use crate::package_test::write_test_files;
-use crate::source::copy_dir::CopyOptions;
 use crate::{post_process, tool_configuration};
 
 #[allow(missing_docs)]
@@ -104,10 +103,6 @@ fn copy_license_files(
             &licenses_folder,
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
-        .with_copy_options(CopyOptions {
-            overwrite: true,
-            ..Default::default()
-        })
         .use_gitignore(false)
         .run()?;
 
