@@ -6,8 +6,6 @@ use std::{
     process::Command,
 };
 
-use fs_extra::dir::remove;
-
 use crate::system_tools::{SystemTools, Tool};
 use crate::{
     recipe::parser::{GitSource, GitUrl},
@@ -194,7 +192,7 @@ pub fn git_src(
         GitUrl::Path(path) => {
             if cache_path.exists() {
                 // Remove old cache so it can be overwritten.
-                if let Err(remove_error) = remove(&cache_path) {
+                if let Err(remove_error) = fs_err::remove_dir_all(&cache_path) {
                     tracing::error!("Failed to remove old cache directory: {}", remove_error);
                     return Err(SourceError::FileSystemError(remove_error));
                 }

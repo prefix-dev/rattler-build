@@ -24,6 +24,7 @@ use rattler_shell::activation::ActivationError;
 
 use crate::env_vars;
 use crate::recipe::parser::{Script, ScriptContent};
+use crate::source::copy_dir::CopyDir;
 use crate::{
     recipe::parser::{CommandsTestRequirements, PythonTest},
     render::solver::create_environment,
@@ -105,8 +106,7 @@ impl Tests {
                 };
 
                 // copy all test files to a temporary directory and set it as the working directory
-                let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-                fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+                CopyDir::new(&path, tmp_dir.path()).run().map_err(|e| {
                     TestError::IoError(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         format!("Failed to copy test files: {}", e),
@@ -487,8 +487,7 @@ async fn run_shell_test(
 
     // copy all test files to a temporary directory and set it as the working directory
     let tmp_dir = tempfile::tempdir()?;
-    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-    fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+    CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
         TestError::IoError(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to copy test files: {}", e),

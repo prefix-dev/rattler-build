@@ -1,7 +1,6 @@
 //! This module contains the functions to package a conda package from a given output.
 use fs_err as fs;
 use fs_err::File;
-use fs_extra::dir::CopyOptions;
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::io::Write;
@@ -21,6 +20,7 @@ pub use metadata::create_prefix_placeholder;
 
 use crate::metadata::Output;
 use crate::package_test::write_test_files;
+use crate::source::copy_dir::CopyOptions;
 use crate::{post_process, tool_configuration};
 
 #[allow(missing_docs)]
@@ -105,7 +105,7 @@ fn copy_license_files(
         )
         .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
         .with_copy_options(CopyOptions {
-            overwrite: true,
+            // overwrite: true,
             ..Default::default()
         })
         .use_gitignore(false)
