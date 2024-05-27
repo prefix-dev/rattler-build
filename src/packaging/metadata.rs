@@ -15,14 +15,15 @@ use rattler_digest::{compute_bytes_digest, compute_file_digest};
 use std::{
     borrow::Cow,
     collections::HashSet,
-    io::Write,
     ops::Deref,
     path::{Path, PathBuf},
 };
 
+use rattler_conda_types::package::PackageFile;
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::OsStrExt;
 
+use crate::hash::HashInput;
 use crate::{metadata::Output, recipe::parser::PrefixDetection};
 
 use super::{PackagingError, TempFiles};
@@ -200,6 +201,11 @@ impl Output {
         } else {
             Ok(None)
         }
+    }
+
+    /// Returns the contents of the `hash_input.json` file.
+    pub fn hash_input(&self) -> HashInput {
+        HashInput::from_variant(&self.build_configuration.variant)
     }
 
     /// Create the about.json file for the given output.
@@ -416,36 +422,36 @@ impl Output {
         temp_files: &TempFiles,
     ) -> Result<HashSet<PathBuf>, PackagingError> {
         let mut new_files = HashSet::new();
+        let root_dir = temp_files.temp_dir.path();
         let info_folder = temp_files.temp_dir.path().join("info");
         fs::create_dir_all(&info_folder)?;
 
-        let paths_json = File::create(info_folder.join("paths.json"))?;
-        let paths_json_struct = self.paths_json(temp_files)?;
-        serde_json::to_writer_pretty(paths_json, &paths_json_struct)?;
-        new_files.insert(info_folder.join("paths.json"));
+        let paths_json_path = root_dir.join(PathsJson::package_path());
+        let paths_json = File::create(&paths_json_path)?;
+        serde_json::to_writer_pretty(paths_json, &self.paths_json(temp_files)?)?;
+        new_files.insert(paths_json_path);
 
-        let index_json = File::create(info_folder.join("index.json"))?;
+        let index_json_path = root_dir.join(IndexJson::package_path());
+        let index_json = File::create(&index_json_path)?;
         serde_json::to_writer_pretty(index_json, &self.index_json()?)?;
-        new_files.insert(info_folder.join("index.json"));
+        new_files.insert(index_json_path);
 
-        let hash_input_json = File::create(info_folder.join("hash_input.json"))?;
-        serde_json::to_writer_pretty(hash_input_json, &self.build_configuration.hash.hash_input)?;
-        new_files.insert(info_folder.join("hash_input.json"));
+        let hash_input_path = info_folder.join("hash_input.json");
+        std::fs::write(&hash_input_path, self.hash_input().as_bytes())?;
+        new_files.insert(hash_input_path);
 
-        let about_json = File::create(info_folder.join("about.json"))?;
+        let about_json_path = root_dir.join(AboutJson::package_path());
+        let about_json = File::create(&about_json_path)?;
         serde_json::to_writer_pretty(about_json, &self.about_json())?;
-        new_files.insert(info_folder.join("about.json"));
+        new_files.insert(about_json_path);
 
         if let Some(run_exports) = self.run_exports_json()? {
-            let run_exports_json = File::create(info_folder.join("run_exports.json"))?;
+            let run_exports_path = root_dir.join(RunExportsJson::package_path());
+            let run_exports_json = File::create(&run_exports_path)?;
             serde_json::to_writer_pretty(run_exports_json, &run_exports)?;
-            new_files.insert(info_folder.join("run_exports.json"));
+            new_files.insert(run_exports_path);
         }
 
-        let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
-        variant_config.write_all(
-            serde_json::to_string_pretty(&self.build_configuration.variant)?.as_bytes(),
-        )?;
         Ok(new_files)
     }
 }
