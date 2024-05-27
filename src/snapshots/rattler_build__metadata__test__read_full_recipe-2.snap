@@ -1,5 +1,6 @@
 ---
 source: src/metadata.rs
+assertion_line: 733
 expression: output_curl
 ---
 recipe:
@@ -59,16 +60,12 @@ build_configuration:
 finalized_dependencies:
   build:
     specs:
-      - source: compiler
+      - compiler: c
         spec: clang_osx-arm64
-      - source: raw
-        spec: make
-      - source: raw
-        spec: perl
-      - source: raw
-        spec: pkg-config
-      - source: raw
-        spec: libtool
+      - source: make
+      - source: perl
+      - source: pkg-config
+      - source: libtool
     resolved:
       - build: he57ea6c_1
         build_number: 1

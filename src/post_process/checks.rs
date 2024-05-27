@@ -10,9 +10,9 @@ use crate::{
 };
 use crate::{
     post_process::{package_nature::PackageNature, relink},
-    render::resolved_dependencies::DependencyInfo,
 };
 
+use crate::render::resolved_dependencies::RunExportDependency;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use rattler_conda_types::{PackageName, PrefixRecord};
 
@@ -121,7 +121,7 @@ fn resolved_run_dependencies(
         .depends
         .iter()
         .filter(|dep| {
-            if let DependencyInfo::RunExport { from, .. } = dep {
+            if let Some(RunExportDependency { from, .. }) = dep.as_run_export() {
                 from != &String::from("build")
             } else {
                 true

@@ -633,7 +633,7 @@ mod test {
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
     use url::Url;
 
-    use crate::render::resolved_dependencies::{self, DependencyInfo};
+    use crate::render::resolved_dependencies::{self, SourceDependency};
 
     use super::{Directories, Output};
 
@@ -662,9 +662,9 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![DependencyInfo::Raw {
+            specs: vec![SourceDependency {
                 spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }],
+            }.into()],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),

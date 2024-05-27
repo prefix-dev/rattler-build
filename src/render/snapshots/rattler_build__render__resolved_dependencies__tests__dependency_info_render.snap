@@ -1,16 +1,12 @@
 ---
 source: src/render/resolved_dependencies.rs
+assertion_line: 970
 expression: yaml_str
 ---
-- source: raw
-  spec: xyz
-- source: variant
+- source: xyz
+- variant: bar
   spec: foo
-  variant: bar
-- source: compiler
+- compiler: c
   spec: foo
-- source: pin_subpackage
-  spec: baz
-- source: pin_compatible
-  spec: bat
-
+- pin_subpackage: baz
+- pin_compatible: bat
