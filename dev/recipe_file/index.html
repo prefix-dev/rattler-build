@@ -646,9 +646,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#run-constrained" class="md-nav__link">
+  <a href="#run-constraints" class="md-nav__link">
     <span class="md-ellipsis">
-      Run constrained
+      Run constraints
     </span>
   </a>
   
@@ -1339,9 +1339,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#run-constrained" class="md-nav__link">
+  <a href="#run-constraints" class="md-nav__link">
     <span class="md-ellipsis">
-      Run constrained
+      Run constraints
     </span>
   </a>
   
@@ -1869,7 +1869,7 @@ in incorrect/incomplete installation in other platforms.</p>
 </div>
 <h3 id="include-build-recipe">Include build recipe<a class="headerlink" href="#include-build-recipe" title="Permanent link">#</a></h3>
 <p>The recipe and rendered <code>recipe.yaml</code> file are included in
-the <code>package\_metadata</code> by default. You can disable this by passing
+the <code>package_metadata</code> by default. You can disable this by passing
 <code>--no-include-recipe</code> on the command line.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -1942,28 +1942,28 @@ specifications</a>.</p>
 version is part of the package dependencies, list <code>numpy</code> as a requirement in
 <code>recipe.yaml</code> and use a <code>conda_build_config.yaml</code> file with multiple NumPy
 versions.</p>
-<h3 id="run-constrained">Run constrained<a class="headerlink" href="#run-constrained" title="Permanent link">#</a></h3>
+<h3 id="run-constraints">Run constraints<a class="headerlink" href="#run-constraints" title="Permanent link">#</a></h3>
 <p>Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.</p>
 <p>Package names should follow the <a href="https://conda.io/projects/conda/en/latest/user-guide/concepts/pkg-specs.html#package-match-specifications">package match
 specifications</a>.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">run_constrained</span><span class="p">:</span>
+</span><span id="__span-27-2"><a id="__codelineno-27-2" name="__codelineno-27-2" href="#__codelineno-27-2"></a><span class="w">  </span><span class="nt">run_constraints</span><span class="p">:</span>
 </span><span id="__span-27-3"><a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">optional-subpackage ==${{ version }}</span>
 </span></code></pre></div>
 <p>For example, let's say we have an environment that has package "a" installed at
-version 1.0. If we install package "b" that has a <code>run\_constrained</code> entry of
-"<code>a\&gt;1.0</code>", then <code>mamba</code> would need to upgrade "a" in the environment in order to
+version 1.0. If we install package "b" that has a <code>run_constraints</code> entry of
+"<code>a &gt;1.0</code>", then <code>mamba</code> would need to upgrade "a" in the environment in order to
 install "b".</p>
 <p>This is especially useful in the context of virtual packages, where the
-<code>run\_constrained</code> dependency is not a package that <code>mamba</code> manages, but rather a
+<code>run_constraints</code> dependency is not a package that <code>mamba</code> manages, but rather a
 <a href="https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html">virtual
 package</a>
 that represents a system property that <code>mamba</code> can't change. For example, a
-package on Linux may impose a <code>run\_constrained</code> dependency on <code>\_\_glibc\&gt;=2.12</code>.
+package on Linux may impose a <code>run_constraints</code> dependency on <code>__glibc &gt;=2.12</code>.
 This is the version bound consistent with CentOS 6. Software built against glibc
-2.12 will be compatible with CentOS 6. This <code>run\_constrained</code> dependency helps
-<code>mamba</code> tell the user that a given package can't be installed if their system
+2.12 will be compatible with CentOS 6. This <code>run_constraints</code> dependency helps
+<code>mamba</code>, <code>conda</code> or <code>pixi</code> tell the user that a given package can't be installed if their system
 glibc version is too old.</p>
 <h3 id="run-exports">Run exports<a class="headerlink" href="#run-exports" title="Permanent link">#</a></h3>
 <p>Packages may have runtime requirements such as shared libraries (e.g. <code>zlib</code>), which are required for linking at build time, and for resolving the link at run time.
@@ -1971,13 +1971,13 @@ Such packages use <code>run_exports</code> for defining the runtime requirements
 <p>Example from <code>zlib</code>:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">    </span><span class="nt">run_exports</span><span class="p">:</span>
-</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">pin_subpackage(&#39;libzlib&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">exact=True)</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libzlib&#39;, exact=True) }}</span>
 </span></code></pre></div>
 <p>Run exports are weak by default. But you can also define strong <code>run_exports</code>.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-29-2"><a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">    </span><span class="nt">run_exports</span><span class="p">:</span>
 </span><span id="__span-29-3"><a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">      </span><span class="nt">strong</span><span class="p">:</span>
-</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="w"> </span><span class="nv">pin_subpackage(&#39;libzlib&#39;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">exact=True)</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</span><span id="__span-29-4"><a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libzlib&#39;, exact=True) }}</span>
 </span></code></pre></div>
 <h3 id="ignore-run-exports">Ignore run exports<a class="headerlink" href="#ignore-run-exports" title="Permanent link">#</a></h3>
 <p>There maybe cases where an upstream package has a problematic <code>run_exports</code> constraint.
