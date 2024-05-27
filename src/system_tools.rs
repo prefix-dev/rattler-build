@@ -24,6 +24,7 @@ pub enum ToolError {
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
     /// The rattler build tool itself
+    #[serde(rename = "rattler-build")]
     RattlerBuild,
     /// The patch tool
     Patch,
@@ -43,7 +44,7 @@ impl std::fmt::Display for Tool {
             f,
             "{}",
             match self {
-                Tool::RattlerBuild => "rattler_build".to_string(),
+                Tool::RattlerBuild => "rattler-build".to_string(),
                 Tool::Codesign => "codesign".to_string(),
                 Tool::Patch => "patch".to_string(),
                 Tool::Patchelf => "patchelf".to_string(),
