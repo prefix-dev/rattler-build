@@ -4,12 +4,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::post_process::{package_nature::PackageNature, relink};
 use crate::{
     metadata::Output,
     post_process::{package_nature::PrefixInfo, relink::RelinkError},
-};
-use crate::{
-    post_process::{package_nature::PackageNature, relink},
 };
 
 use crate::render::resolved_dependencies::RunExportDependency;

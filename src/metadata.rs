@@ -664,7 +664,8 @@ mod test {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
             specs: vec![SourceDependency {
                 spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }.into()],
+            }
+            .into()],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),

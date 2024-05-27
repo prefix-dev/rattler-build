@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{pin::PinError, solver::create_environment};
-use crate::recipe::parser::{Dependency};
+use crate::recipe::parser::Dependency;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -77,7 +77,7 @@ impl From<VariantDependency> for DependencyInfo {
 #[serde(deny_unknown_fields)]
 pub struct CompilerDependency {
     /// The language in the `{{ compiler('c') }}` call.
-    #[serde(rename="compiler")]
+    #[serde(rename = "compiler")]
     pub language: String,
 
     /// The resolved compiler spec
