@@ -517,6 +517,8 @@ mod test {
                 args: PinArgs {
                     max_pin: Some(PinExpression::from_str("x.x").unwrap()),
                     min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
+                    lower_bound: None,
+                    upper_bound: None,    
                     exact: false,
                 },
             },
@@ -528,6 +530,8 @@ mod test {
                 args: PinArgs {
                     max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
                     min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                    lower_bound: None,
+                    upper_bound: None,    
                     exact: false,
                 },
             },
@@ -539,6 +543,8 @@ mod test {
                 args: PinArgs {
                     max_pin: None,
                     min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                    lower_bound: None,
+                    upper_bound: None,    
                     exact: true,
                 },
             },

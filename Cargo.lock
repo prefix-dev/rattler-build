@@ -1307,8 +1307,7 @@ checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 [[package]]
 name = "file_url"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cd0e1a8a0c7a1829090615ebce07ebf31911031a08915ca869f1085f0e39032"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "itertools 0.12.1",
  "percent-encoding",
@@ -3352,8 +3351,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dd3466c926bb2be12b6b490707ba8697e213fead038471b6f294e51fa5d651e"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3477,8 +3475,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.23.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "710bd78894e121340be092497bc04df739e6e4c7e2db33afc2053f2285fd98f7"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "chrono",
  "file_url",
@@ -3507,8 +3504,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.19.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9cf69475918dd44152f7df690b13f2909f34cc762ae18a2e2c55824b546de161"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "blake2",
  "digest",
@@ -3524,8 +3520,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.19.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd1186b1cace0896dc53fd263ab7526684344afcf84311bb7a7c28639b72b2d7"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -3600,8 +3595,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.19.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10cef20e8356ea6840294e5754c6a8663b0eb1b97f29d517642f0f99215a2483"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "quote",
  "syn 2.0.64",
@@ -3610,8 +3604,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.20.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c89b7d329e2191c82cec5e6f25d27f7eff8b91d83d7d030c6f1ed5634cec963f"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3638,8 +3631,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.20.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9c3dec9d831f11c0d768f1ec06cd086dca71522326ef2a922541e6dce7a26e7"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "bzip2",
  "chrono",
@@ -3664,8 +3656,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.20.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3f7414f334098bd5fd13ebaf778622058a9cfce45134554248827a8314fe2a6"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -3711,8 +3702,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.20.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7694ac06d4f04e13f095401acfcaaf21d950cad057f216a700666c372b462de2"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.2.6",
@@ -3729,8 +3719,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e0b59c35fc267367537679c047e945a08f25458219212acd6335805fde8280bb"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "chrono",
  "futures",
@@ -3747,8 +3736,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.19.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b869a03e42ccb2d7da9852c1ada642e0e6a7457223485c7a754332618bbe6b7"
+source = "git+https://github.com/wolfv/rattler?branch=bump-characters#4fcdb39b7b11d78dd888a2f4d75d18c146e69026"
 dependencies = [
  "archspec",
  "libloading",

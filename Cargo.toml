@@ -137,17 +137,17 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-# [patch.crates-io]
-# rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+[patch.crates-io]
+rattler = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_index = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
+rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "bump-characters" }
 
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }

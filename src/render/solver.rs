@@ -126,6 +126,7 @@ pub async fn create_environment(
         timeout: None,
         channel_priority: ChannelPriority::Strict,
         exclude_newer: None,
+        strategy: Default::default(),
     };
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
