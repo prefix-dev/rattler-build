@@ -266,9 +266,7 @@ async fn execute_transaction(
     let package_cache = PackageCache::new(cache_dir.join("pkgs"));
 
     // Create an install driver which helps limit the number of concurrent filesystem operations
-    let install_driver = InstallDriver::builder()
-        .execute_link_scripts(true)
-        .finish();
+    let install_driver = InstallDriver::builder().execute_link_scripts(true).finish();
 
     // Define default installation options.
     let install_options = InstallOptions {
