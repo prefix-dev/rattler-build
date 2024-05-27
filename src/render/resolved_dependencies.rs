@@ -216,7 +216,8 @@ impl FinalizedRunDependencies {
         if !self.depends.is_empty() {
             let mut row = comfy_table::Row::new();
             row.add_cell(
-                comfy_table::Cell::new("Depends").add_attribute(comfy_table::Attribute::Bold),
+                comfy_table::Cell::new("Run dependencies")
+                    .add_attribute(comfy_table::Attribute::Bold),
             );
             table.add_row(row);
 
@@ -229,7 +230,8 @@ impl FinalizedRunDependencies {
         if !self.constrains.is_empty() {
             let mut row = comfy_table::Row::new();
             row.add_cell(
-                comfy_table::Cell::new("Constrains").add_attribute(comfy_table::Attribute::Bold),
+                comfy_table::Cell::new("Run constraints")
+                    .add_attribute(comfy_table::Attribute::Bold),
             );
             table.add_row(row);
 
