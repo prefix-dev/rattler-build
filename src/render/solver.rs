@@ -15,7 +15,7 @@ use rattler_repodata_gateway::{
     fetch::{CacheResult, FetchRepoDataError, FetchRepoDataOptions},
     Reporter,
 };
-use rattler_solve::{resolvo::Solver, ChannelPriority, SolverImpl, SolverTask};
+use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use reqwest_middleware::ClientWithMiddleware;
 use url::Url;
 
@@ -71,6 +71,8 @@ pub async fn create_environment(
     target_prefix: &Path,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
+    channel_priority: ChannelPriority,
+    solve_strategy: SolveStrategy,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
     // with this because we need to parse the `channel_config` when parsing matchspecs.
@@ -124,7 +126,8 @@ pub async fn create_environment(
         specs: specs.to_vec(),
         pinned_packages: Vec::new(),
         timeout: None,
-        channel_priority: ChannelPriority::Strict,
+        channel_priority,
+        strategy: solve_strategy,
         exclude_newer: None,
     };
 
@@ -368,6 +371,7 @@ async fn execute_operation(
                     &install_record.package_record,
                     install_record.url.clone(),
                     download_client.clone(),
+                    None,
                 )
                 .map_ok(|cache_dir| Some((install_record.clone(), cache_dir)))
                 .map_err(anyhow::Error::from)

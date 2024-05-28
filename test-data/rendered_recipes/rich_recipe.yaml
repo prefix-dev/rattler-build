@@ -62,6 +62,8 @@ build_configuration:
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812
   channels:
   - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: 2023-12-13T18:40:12.845800Z
   subpackages:
     rich:

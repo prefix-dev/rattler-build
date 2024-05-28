@@ -39,6 +39,7 @@ use metadata::Output;
 use miette::{IntoDiagnostic, WrapErr};
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
@@ -280,6 +281,8 @@ pub async fn get_build_output(
                 )
                 .into_diagnostic()?,
                 channels,
+                channel_priority: ChannelPriority::Strict,
+                solve_strategy: SolveStrategy::Highest,
                 timestamp,
                 subpackages: subpackages.clone(),
                 packaging_settings: PackagingSettings::from_args(
@@ -374,6 +377,8 @@ pub async fn run_test_from_args(
         target_platform: None,
         keep_test_prefix: false,
         channels,
+        channel_priority: ChannelPriority::Strict,
+        solve_strategy: SolveStrategy::Highest,
         tool_configuration: Configuration {
             client,
             fancy_log_handler,

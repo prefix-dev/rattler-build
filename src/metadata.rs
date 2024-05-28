@@ -19,6 +19,7 @@ use rattler_conda_types::{
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -224,7 +225,7 @@ impl PackagingSettings {
 }
 
 /// The configuration for a build of a package
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
@@ -240,6 +241,10 @@ pub struct BuildConfiguration {
     pub directories: Directories,
     /// The channels to use when resolving environments
     pub channels: Vec<Url>,
+    /// The channel priority that is used to resolve dependencies
+    pub channel_priority: ChannelPriority,
+    /// The solve strategy to use when resolving dependencies
+    pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
@@ -292,7 +297,7 @@ pub struct BuildSummary {
 
 /// A output. This is the central element that is passed to the `run_build` function
 /// and fully specifies all the options and settings to run the build.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
     pub recipe: Recipe,
@@ -693,7 +698,8 @@ mod test {
                     timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
-                    purls: Default::default(),
+                    purls: None,
+                    run_exports: None,
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

@@ -5,6 +5,7 @@ use std::vec;
 
 use miette::IntoDiagnostic;
 use rattler_index::index;
+use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
@@ -168,6 +169,8 @@ pub async fn run_build(
                 target_platform: Some(output.build_configuration.host_platform),
                 keep_test_prefix: tool_configuration.no_clean,
                 channels: output.reindex_channels().into_diagnostic()?,
+                channel_priority: ChannelPriority::Strict,
+                solve_strategy: SolveStrategy::Highest,
                 tool_configuration: tool_configuration.clone(),
             },
         )

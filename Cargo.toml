@@ -21,22 +21,23 @@ tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input
 [dependencies]
 serde = { version = "1.0.202", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.25.0", default-features = false, features = ["cli-tools"] }
-rattler_conda_types = { version = "0.23.1", default-features = false }
+rattler = { version = "0.26.1", default-features = false, features = ["cli-tools"] }
+rattler_conda_types = { version = "0.25.0", default-features = false }
 rattler_digest = { version = "0.19.4", default-features = false }
-rattler_index = { version = "0.19.12", default-features = false }
-rattler_networking = { version = "0.20.7", default-features = false }
-rattler_repodata_gateway = { version = "0.20.1", default-features = false, features = [
+rattler_index = { version = "0.19.14", default-features = false }
+rattler_networking = { version = "0.20.8", default-features = false }
+rattler_repodata_gateway = { version = "0.20.3", default-features = false, features = [
     "sparse",
 ] }
-rattler_shell = { version = "0.20.4", default-features = false, features = [
+rattler_shell = { version = "0.20.6", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.22.0", default-features = false, features = [
+rattler_solve = { version = "0.23.1", default-features = false, features = [
     "resolvo",
+    "serde"
 ] }
-rattler_virtual_packages = { version = "0.19.11", default-features = false }
-rattler_package_streaming = { version = "0.20.10", default-features = false }
+rattler_virtual_packages = { version = "0.19.13", default-features = false }
+rattler_package_streaming = { version = "0.21.1", default-features = false }
 anyhow = "1.0.83"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
