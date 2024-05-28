@@ -1,5 +1,5 @@
 //! The build module contains the code for running the build process for a given [`Output`]
-use rattler_conda_types::{MatchSpec, ParseStrictness};
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
 use std::path::PathBuf;
 use std::vec;
 
@@ -42,12 +42,10 @@ pub async fn skip_existing(
         .collect::<Result<Vec<_>, _>>()?;
 
     let channels = if only_local {
-        vec![first_output
-            .build_configuration
-            .directories
-            .output_dir
-            .to_string_lossy()
-            .to_string()]
+        vec![
+            Channel::from_directory(&first_output.build_configuration.directories.output_dir)
+                .base_url,
+        ]
     } else {
         all_channels
     };

@@ -31,6 +31,7 @@ perl = "5.32.1.*"
 pytest = "7.4.2.*"
 pyyaml = ">=6.0.1,<6.1"
 conda-package-handling = "2.2.0.*"
+requests = ">=2.32.2,<2.33"
 
 [feature.docs.dependencies]
 mkdocs = "1.5.3.*"
