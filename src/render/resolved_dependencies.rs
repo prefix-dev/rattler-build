@@ -463,6 +463,7 @@ pub fn apply_variant(
                                 let mut splitter = spec.split_whitespace();
                                 let version_spec = splitter.next().map(|v| VersionSpec::from_str(v, ParseStrictness::Strict)).transpose()?;
                                 let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
+                                let variant = name.as_normalized().to_string();
                                 let final_spec = MatchSpec {
                                     version: version_spec,
                                     build: build_spec,
@@ -470,7 +471,7 @@ pub fn apply_variant(
                                 };
                                 return Ok(VariantDependency {
                                     spec: final_spec,
-                                    variant: version.clone(),
+                                    variant,
                                 }.into());
                             }
                         }
