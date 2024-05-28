@@ -11,6 +11,8 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end -v -s"
 test = "cargo test"
 lint = "pre-commit run --all"
+
+[feature.docs.tasks]
 build-docs = "mkdocs build --strict"
 docs = "mkdocs serve"
 deploy-latest = "mike deploy --push --update-aliases $RELEASE_VERSION latest"
@@ -30,9 +32,14 @@ pytest = "7.4.2.*"
 pyyaml = ">=6.0.1,<6.1"
 conda-package-handling = "2.2.0.*"
 
-# Documentation building
+[feature.docs.dependencies]
 mkdocs = "1.5.3.*"
 mkdocs-material = ">=9.5.16,<9.7"
 pillow = ">=9.4.0"
 cairosvg = "2.7.1.*"
 mike = "2.0.0.*"
+
+[environments]
+# Using same solve group to keep the environment consistent in versions used and improving cache hits
+default = {solve-group = "default"}
+docs = {features = ["docs"], no-default-feature = true, solve-group = "default"}
