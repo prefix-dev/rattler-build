@@ -391,4 +391,4 @@ finalized_dependencies:
     run_exports: ~
 finalized_sources: ~
 system_tools:
-  rattler_build: 0.12.1
+  rattler-build: 0.12.1

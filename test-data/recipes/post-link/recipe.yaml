@@ -1,0 +1,16 @@
+package:
+  name: postlink
+  version: 0.1.0
+
+build:
+  skip:
+    - win
+  script:
+    - mkdir -p $PREFIX/bin
+    - echo 'touch $CONDA_PREFIX/POST-LINK-RAN' > $PREFIX/bin/.postlink-post-link.sh
+    - chmod +x $PREFIX/bin/.postlink-post-link.sh
+
+tests:
+  - script:
+      - test -f $CONDA_PREFIX/POST-LINK-RAN
+      - ls $CONDA_PREFIX/
