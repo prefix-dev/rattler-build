@@ -1,6 +1,6 @@
 ---
 source: src/metadata.rs
-assertion_line: 731
+assertion_line: 732
 expression: output
 ---
 recipe:
@@ -76,12 +76,9 @@ finalized_dependencies:
   build: ~
   host:
     specs:
-      - source: raw
-        spec: pip
-      - source: raw
-        spec: poetry-core >=1.0.0
-      - source: raw
-        spec: python ==3.10
+      - source: pip
+      - source: poetry-core >=1.0.0
+      - source: python ==3.10
     resolved:
       - build: h43b31ca_3_cpython
         build_number: 3
@@ -375,18 +372,13 @@ finalized_dependencies:
           - python
   run:
     depends:
-      - source: raw
-        spec: markdown-it-py >=2.2.0
-      - source: raw
-        spec: "pygments >=2.13.0,<3.0.0"
-      - source: raw
-        spec: python ==3.10
-      - source: raw
-        spec: "typing_extensions >=4.0.0,<5.0.0"
-      - source: run_export
-        spec: python
+      - source: markdown-it-py >=2.2.0
+      - source: "pygments >=2.13.0,<3.0.0"
+      - source: python ==3.10
+      - source: "typing_extensions >=4.0.0,<5.0.0"
+      - spec: python
         from: host
-        source_package: python
+        run_export: python
     constrains: []
     run_exports: ~
 finalized_sources: ~

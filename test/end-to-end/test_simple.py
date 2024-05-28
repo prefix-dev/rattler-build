@@ -736,8 +736,6 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pin = {
         "pin_subpackage": {
             "name": "rattler-build-demo",
-            "max_pin": None,
-            "min_pin": None,
             "exact": True,
         }
     }
@@ -762,8 +760,6 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pin = {
         "pin_subpackage": {
             "name": "rattler-build-demo",
-            "max_pin": None,
-            "min_pin": None,
             "exact": True,
         }
     }
@@ -834,8 +830,9 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
         tmp_path,
     )
     # make sure that two license files in $SRC_DIR and $RECIPE_DIR raise an exception
-    with pytest.raises(Exception):
+    with pytest.raises(CalledProcessError):
         rattler_build(*args)
+
 
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"

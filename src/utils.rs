@@ -185,6 +185,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
                     #[cfg(unix)]
                     permissions.set_mode(permissions.mode() | 0o200);
                     #[cfg(windows)]
+                    #[allow(clippy::permissions_set_readonly_false)]
                     permissions.set_readonly(false);
                     fs::set_permissions(file_path, permissions)?;
                 }
