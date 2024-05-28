@@ -631,14 +631,14 @@ impl VariantConfig {
                     Dependency::PinSubpackage(pin_sub) => {
                         let pin = pin_sub.pin_value();
                         let val = pin.name.as_normalized().to_owned();
-                        if pin.exact {
+                        if pin.args.exact {
                             exact_pins.insert(val);
                         }
                     }
                     Dependency::PinCompatible(pin_compatible) => {
                         let pin = pin_compatible.pin_value();
                         let val = pin.name.as_normalized().to_owned();
-                        if pin.exact {
+                        if pin.args.exact {
                             exact_pins.insert(val);
                         }
                     }
@@ -673,7 +673,7 @@ impl VariantConfig {
                     .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();
-                            if pin.exact {
+                            if pin.args.exact {
                                 let val = pin.name.as_normalized();
                                 if val != *name {
                                     // if other_recipes does not contain val, throw an error

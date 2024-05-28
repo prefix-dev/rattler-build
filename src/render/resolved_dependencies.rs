@@ -23,6 +23,7 @@ use thiserror::Error;
 
 use super::{pin::PinError, solver::create_environment};
 use crate::recipe::parser::Dependency;
+use crate::render::pin::PinArgs;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
 
@@ -97,6 +98,11 @@ impl From<CompilerDependency> for DependencyInfo {
 #[serde(deny_unknown_fields)]
 pub struct PinSubpackageDependency {
     #[serde(rename = "pin_subpackage")]
+    pub name: String,
+
+    #[serde(flatten)]
+    pub args: PinArgs,
+
     #[serde_as(as = "DisplayFromStr")]
     pub spec: MatchSpec,
 }
@@ -113,6 +119,11 @@ impl From<PinSubpackageDependency> for DependencyInfo {
 #[serde(deny_unknown_fields)]
 pub struct PinCompatibleDependency {
     #[serde(rename = "pin_compatible")]
+    pub name: String,
+
+    #[serde(flatten)]
+    pub args: PinArgs,
+
     #[serde_as(as = "DisplayFromStr")]
     pub spec: MatchSpec,
 }
@@ -487,7 +498,7 @@ pub fn apply_variant(
                             &Version::from_str(&subpackage.version)?,
                             &subpackage.build_string,
                         )?;
-                    Ok(PinSubpackageDependency { spec: pinned }.into())
+                    Ok(PinSubpackageDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
                 }
                 Dependency::PinCompatible(pin) => {
                     let name = &pin.pin_value().name;
@@ -500,7 +511,7 @@ pub fn apply_variant(
                             &pin_package.version,
                             &pin_package.build,
                         )?;
-                    Ok(PinCompatibleDependency { spec: pinned }.into())
+                    Ok(PinCompatibleDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
                 }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
@@ -959,11 +970,23 @@ mod tests {
             }
             .into(),
             PinSubpackageDependency {
+                name: "baz".to_string(),
                 spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
+                args: PinArgs {
+                    max_pin: Some("x.x".parse().unwrap()),
+                    min_pin: Some("x.x.x".parse().unwrap()),
+                    exact: true,
+                },
             }
             .into(),
             PinCompatibleDependency {
+                name: "bat".to_string(),
                 spec: MatchSpec::from_str("bat", ParseStrictness::Strict).unwrap(),
+                args: PinArgs {
+                    max_pin: Some("x.x".parse().unwrap()),
+                    min_pin: Some("x.x.x".parse().unwrap()),
+                    exact: true,
+                },
             }
             .into(),
         ];

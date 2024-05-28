@@ -538,6 +538,7 @@ mod test {
     use std::str::FromStr;
 
     use crate::recipe::jinja::PinExpression;
+    use crate::render::pin::PinArgs;
 
     use super::*;
 
@@ -569,27 +570,33 @@ mod test {
         let pin_subpackage = PinSubpackage {
             pin_subpackage: Pin {
                 name: PackageName::from_str("foo").unwrap(),
-                max_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
-                exact: false,
+                args: PinArgs {
+                    max_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                    min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
+                    exact: false,
+                }
             },
         };
 
         let pin_compatible = PinCompatible {
             pin_compatible: Pin {
                 name: PackageName::from_str("bar").unwrap(),
-                max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
-                min_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                exact: false,
+                args: PinArgs {
+                    max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
+                    min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                    exact: false,
+                }
             },
         };
 
         let pin_compatible_2 = PinCompatible {
             pin_compatible: Pin {
                 name: PackageName::from_str("bar").unwrap(),
-                max_pin: None,
-                min_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                exact: true,
+                args: PinArgs {
+                    max_pin: None,
+                    min_pin: Some(PinExpression::from_str("x.x").unwrap()),
+                    exact: true,
+                }
             },
         };
 
