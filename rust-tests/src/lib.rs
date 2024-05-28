@@ -367,7 +367,7 @@ mod tests {
                     }
                 }
             } else if actual.ne(&cmp) {
-                panic!("Expected {f} to be {cmp:?} but was {actual:?}");
+                panic!("Mismatch in {f}:\nExpected:\n  {cmp:?}{f}\nActual:\n  {actual:?}");
             }
         }
     }

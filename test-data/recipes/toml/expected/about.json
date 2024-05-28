@@ -1,6 +1,6 @@
 {
   "channels": [
-    "https://conda.anaconda.com/conda-forge/"
+    "https://conda.anaconda.org/conda-forge/"
   ],
   "home": "https://github.com/uiri/toml",
   "license": "MIT",
