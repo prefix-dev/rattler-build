@@ -25,6 +25,7 @@ use super::{pin::PinError, solver::create_environment};
 use crate::recipe::parser::Dependency;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
+use url::Url;
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
@@ -510,7 +511,7 @@ pub async fn install_environments(
 #[allow(clippy::for_kv_map)]
 async fn resolve_dependencies(
     output: &Output,
-    channels: &[String],
+    channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();

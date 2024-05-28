@@ -1,6 +1,6 @@
 ---
 source: src/metadata.rs
-assertion_line: 729
+assertion_line: 731
 expression: output
 ---
 recipe:
@@ -61,7 +61,7 @@ build_configuration:
     work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/work
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812
   channels:
-    - conda-forge
+    - "https://conda.anaconda.org/conda-forge"
   timestamp: "2023-12-13T18:40:12.845800Z"
   subpackages:
     rich:

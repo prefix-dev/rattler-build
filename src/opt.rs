@@ -205,7 +205,7 @@ pub struct BuildOpts {
     #[arg(long, default_value_t = Platform::current())]
     pub target_platform: Platform,
 
-    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
+    /// Add the channels needed for the recipe using this option. For more than one channel use it multiple times.
     /// The default channel is `conda-forge`.
     #[arg(short = 'c', long)]
     pub channel: Option<Vec<String>>,

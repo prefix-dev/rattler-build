@@ -36,9 +36,9 @@ use build::skip_existing;
 use dunce::canonicalize;
 use fs_err as fs;
 use metadata::Output;
-use miette::IntoDiagnostic;
+use miette::{IntoDiagnostic, WrapErr};
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Platform};
+use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
 use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
@@ -46,8 +46,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tool_configuration::Configuration;
-
-use crate::tool_configuration::SkipExisting;
 
 use {
     build::run_build,
@@ -129,6 +127,7 @@ pub fn get_tool_config(
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
         skip_existing: args.skip_existing,
+        ..Configuration::default()
     })
 }
 
@@ -252,10 +251,15 @@ pub async fn get_build_output(
 
         let name = recipe.package().name().clone();
         // Add the channels from the args and by default always conda-forge
+
         let channels = args
             .channel
             .clone()
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]);
+            .unwrap_or_else(|| vec!["conda-forge".to_string()])
+            .into_iter()
+            .map(|c| Channel::from_str(&c, &tool_config.channel_config).map(|c| c.base_url))
+            .collect::<Result<Vec<_>, _>>()
+            .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
 
@@ -349,15 +353,27 @@ pub async fn run_test_from_args(
     let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
         .into_diagnostic()?;
 
+    let channel_config = ChannelConfig::default_with_root_dir(
+        std::env::current_dir()
+            .into_diagnostic()
+            .context("failed to determine the current directory")?,
+    );
+
+    let channels = args
+        .channel
+        .unwrap_or_else(|| vec!["conda-forge".to_string()])
+        .into_iter()
+        .map(|name| Channel::from_str(&name, &channel_config).map(|c| c.base_url))
+        .collect::<Result<Vec<_>, _>>()
+        .into_diagnostic()?;
+
     let tempdir = tempfile::tempdir().into_diagnostic()?;
 
     let test_options = TestConfiguration {
         test_prefix: tempdir.path().to_path_buf(),
         target_platform: None,
         keep_test_prefix: false,
-        channels: args
-            .channel
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
+        channels,
         tool_configuration: Configuration {
             client,
             fancy_log_handler,
@@ -426,8 +442,7 @@ pub async fn rebuild_from_args(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
-        render_only: false,
-        skip_existing: SkipExisting::None,
+        ..Configuration::default()
     };
 
     output

@@ -1,6 +1,6 @@
 ---
 source: src/metadata.rs
-assertion_line: 729
+assertion_line: 731
 expression: output
 ---
 recipe:
@@ -44,7 +44,7 @@ build_configuration:
     work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/work
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293
   channels:
-    - conda-forge
+    - "https://conda.anaconda.org/conda-forge"
   timestamp: "2023-11-21T13:28:13.086796Z"
   subpackages:
     curl:

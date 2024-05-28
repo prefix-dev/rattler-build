@@ -237,7 +237,12 @@ impl Output {
                 .unwrap_or_default(),
             // TODO ?
             source_url: None,
-            channels: self.build_configuration.channels.clone(),
+            channels: self
+                .build_configuration
+                .channels
+                .iter()
+                .map(|c| c.to_string())
+                .collect(),
         };
 
         about_json

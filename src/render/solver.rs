@@ -8,8 +8,7 @@ use rattler::{
     package_cache::PackageCache,
 };
 use rattler_conda_types::{
-    Channel, ChannelConfig, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord,
-    RepoDataRecord,
+    Channel, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
 };
 use rattler_repodata_gateway::sparse::SparseRepoData;
 use rattler_repodata_gateway::{
@@ -70,7 +69,7 @@ pub async fn create_environment(
     specs: &[MatchSpec],
     target_platform: &Platform,
     target_prefix: &Path,
-    channels: &[String],
+    channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
@@ -80,7 +79,10 @@ pub async fn create_environment(
     tracing::info!("  Platform: {}", target_platform);
     tracing::info!("  Channels: ");
     for channel in channels {
-        tracing::info!("   - {}", channel);
+        tracing::info!(
+            "   - {}",
+            tool_configuration.channel_config.canonical_name(channel)
+        );
     }
     tracing::info!("  Specs:");
     for spec in specs {
@@ -150,20 +152,14 @@ pub async fn create_environment(
 
 /// Load repodata for given matchspecs and channels.
 pub async fn load_repodatas(
-    channels: &[String],
+    channels: &[Url],
     target_platform: &Platform,
     tool_configuration: &tool_configuration::Configuration,
     specs: &[MatchSpec],
 ) -> Result<(PathBuf, Vec<Vec<RepoDataRecord>>), anyhow::Error> {
-    let channel_config = ChannelConfig::default_with_root_dir(std::env::current_dir()?);
     let cache_dir = rattler::default_cache_dir()?;
     std::fs::create_dir_all(&cache_dir)
         .map_err(|e| anyhow::anyhow!("could not create cache directory: {}", e))?;
-
-    let channels = channels
-        .iter()
-        .map(|channel_str| Channel::from_str(channel_str, &channel_config))
-        .collect::<Result<Vec<_>, _>>()?;
 
     let platforms = [Platform::NoArch, *target_platform];
     let channel_urls = channels
@@ -180,12 +176,12 @@ pub async fn load_repodatas(
     let channel_and_platform_len = channel_urls.len();
     let repodata_download_client = tool_configuration.client.clone();
     let sparse_repo_datas = futures::stream::iter(channel_urls)
-        .map(move |(channel, platform)| {
+        .map(move |(url, platform)| {
             let repodata_cache = repodata_cache_path.clone();
             let download_client = repodata_download_client.clone();
             async move {
                 fetch_repo_data_records_with_progress(
-                    channel,
+                    Channel::from_url(url),
                     platform,
                     &repodata_cache,
                     download_client.clone(),
