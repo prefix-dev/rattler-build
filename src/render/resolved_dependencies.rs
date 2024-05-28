@@ -23,93 +23,235 @@ use thiserror::Error;
 
 use super::{pin::PinError, solver::create_environment};
 use crate::recipe::parser::Dependency;
+use crate::render::pin::PinArgs;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "source", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum DependencyInfo {
     /// The dependency is a direct dependency of the package, with a variant applied
     /// from the variant config
-    Variant {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-        variant: String,
-    },
+    Variant(VariantDependency),
+
     /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-    Compiler {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-    },
+    Compiler(CompilerDependency),
+
     /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
-    PinSubpackage {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-    },
+    PinSubpackage(PinSubpackageDependency),
+
     /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
-    PinCompatible {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-    },
+    PinCompatible(PinCompatibleDependency),
+
     /// This is a special run_exports dependency from another package
-    RunExport {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-        from: String,
-        source_package: String,
-    },
+    RunExport(RunExportDependency),
+
     /// This is a regular dependency of the package without any modifications
-    Raw {
-        #[serde_as(as = "DisplayFromStr")]
-        spec: MatchSpec,
-    },
+    Source(SourceDependency),
+}
+
+/// The dependency is a direct dependency of the package, with a variant applied
+/// from the variant config
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct VariantDependency {
+    /// The key in the config file.
+    pub variant: String,
+
+    /// The spec from the config file
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+}
+
+impl From<VariantDependency> for DependencyInfo {
+    fn from(value: VariantDependency) -> Self {
+        DependencyInfo::Variant(value)
+    }
+}
+
+/// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CompilerDependency {
+    /// The language in the `{{ compiler('c') }}` call.
+    #[serde(rename = "compiler")]
+    pub language: String,
+
+    /// The resolved compiler spec
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+}
+
+impl From<CompilerDependency> for DependencyInfo {
+    fn from(value: CompilerDependency) -> Self {
+        DependencyInfo::Compiler(value)
+    }
+}
+
+/// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PinSubpackageDependency {
+    #[serde(rename = "pin_subpackage")]
+    pub name: String,
+
+    #[serde(flatten)]
+    pub args: PinArgs,
+
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+}
+
+impl From<PinSubpackageDependency> for DependencyInfo {
+    fn from(value: PinSubpackageDependency) -> Self {
+        DependencyInfo::PinSubpackage(value)
+    }
+}
+
+/// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PinCompatibleDependency {
+    #[serde(rename = "pin_compatible")]
+    pub name: String,
+
+    #[serde(flatten)]
+    pub args: PinArgs,
+
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+}
+
+impl From<PinCompatibleDependency> for DependencyInfo {
+    fn from(value: PinCompatibleDependency) -> Self {
+        DependencyInfo::PinCompatible(value)
+    }
+}
+
+/// This is a special run_exports dependency from another package
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunExportDependency {
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+    pub from: String,
+    #[serde(rename = "run_export")]
+    pub source_package: String,
+}
+
+impl From<RunExportDependency> for DependencyInfo {
+    fn from(value: RunExportDependency) -> Self {
+        DependencyInfo::RunExport(value)
+    }
+}
+
+/// This is a regular dependency of the package without any modifications
+#[serde_as]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SourceDependency {
+    #[serde(rename = "source")]
+    #[serde_as(as = "DisplayFromStr")]
+    pub spec: MatchSpec,
+}
+
+impl From<SourceDependency> for DependencyInfo {
+    fn from(value: SourceDependency) -> Self {
+        DependencyInfo::Source(value)
+    }
 }
 
 impl DependencyInfo {
     /// Get the matchspec from a dependency info
     pub fn spec(&self) -> &MatchSpec {
         match self {
-            DependencyInfo::Variant { spec, .. } => spec,
-            DependencyInfo::Compiler { spec } => spec,
-            DependencyInfo::PinSubpackage { spec } => spec,
-            DependencyInfo::PinCompatible { spec } => spec,
-            DependencyInfo::RunExport { spec, .. } => spec,
-            DependencyInfo::Raw { spec } => spec,
+            DependencyInfo::Variant(spec) => &spec.spec,
+            DependencyInfo::Compiler(spec) => &spec.spec,
+            DependencyInfo::PinSubpackage(spec) => &spec.spec,
+            DependencyInfo::PinCompatible(spec) => &spec.spec,
+            DependencyInfo::RunExport(spec) => &spec.spec,
+            DependencyInfo::Source(spec) => &spec.spec,
         }
     }
 
     pub fn render(&self, long: bool) -> String {
         if !long {
             match self {
-                DependencyInfo::Variant { spec, .. } => format!("{} (V)", spec),
-                DependencyInfo::Compiler { spec } => format!("{} (C)", spec),
-                DependencyInfo::PinSubpackage { spec } => format!("{} (PS)", spec),
-                DependencyInfo::PinCompatible { spec } => format!("{} (PC)", spec),
-                DependencyInfo::RunExport {
-                    spec,
-                    from,
-                    source_package,
-                } => format!("{} (RE of [{}: {}])", spec, from, source_package),
-                DependencyInfo::Raw { spec } => spec.to_string(),
+                DependencyInfo::Variant(spec) => format!("{} (V)", &spec.spec),
+                DependencyInfo::Compiler(spec) => format!("{} (C)", &spec.spec),
+                DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", &spec.spec),
+                DependencyInfo::PinCompatible(spec) => format!("{} (PC)", &spec.spec),
+                DependencyInfo::RunExport(spec) => format!(
+                    "{} (RE of [{}: {}])",
+                    &spec.spec, &spec.from, &spec.source_package
+                ),
+                DependencyInfo::Source(spec) => spec.spec.to_string(),
             }
         } else {
             match self {
-                DependencyInfo::Variant { spec, .. } => format!("{} (from variant config)", spec),
-                DependencyInfo::Compiler { spec } => format!("{} (from compiler)", spec),
-                DependencyInfo::PinSubpackage { spec } => format!("{} (from pin subpackage)", spec),
-                DependencyInfo::PinCompatible { spec } => format!("{} (from pin compatible)", spec),
-                DependencyInfo::RunExport {
-                    spec,
-                    from,
-                    source_package,
-                } => format!(
+                DependencyInfo::Variant(spec) => format!("{} (from variant config)", &spec.spec),
+                DependencyInfo::Compiler(spec) => format!("{} (from compiler)", &spec.spec),
+                DependencyInfo::PinSubpackage(spec) => {
+                    format!("{} (from pin subpackage)", &spec.spec)
+                }
+                DependencyInfo::PinCompatible(spec) => {
+                    format!("{} (from pin compatible)", &spec.spec)
+                }
+                DependencyInfo::RunExport(spec) => format!(
                     "{} (run export by {} in {} env)",
-                    spec, source_package, from
+                    &spec.spec, &spec.from, &spec.source_package
                 ),
-                DependencyInfo::Raw { spec } => spec.to_string(),
+                DependencyInfo::Source(spec) => spec.spec.to_string(),
             }
+        }
+    }
+
+    pub fn as_variant(&self) -> Option<&VariantDependency> {
+        match self {
+            DependencyInfo::Variant(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn as_source(&self) -> Option<&SourceDependency> {
+        match self {
+            DependencyInfo::Source(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn as_run_export(&self) -> Option<&RunExportDependency> {
+        match self {
+            DependencyInfo::RunExport(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn as_pin_subpackage(&self) -> Option<&PinSubpackageDependency> {
+        match self {
+            DependencyInfo::PinSubpackage(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn as_pin_compatible(&self) -> Option<&PinCompatibleDependency> {
+        match self {
+            DependencyInfo::PinCompatible(spec) => Some(spec),
+            _ => None,
+        }
+    }
+
+    pub fn as_compiler(&self) -> Option<&CompilerDependency> {
+        match self {
+            DependencyInfo::Compiler(spec) => Some(spec),
+            _ => None,
         }
     }
 }
@@ -334,19 +476,20 @@ pub fn apply_variant(
                                 let mut splitter = spec.split_whitespace();
                                 let version_spec = splitter.next().map(|v| VersionSpec::from_str(v, ParseStrictness::Strict)).transpose()?;
                                 let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
+                                let variant = name.as_normalized().to_string();
                                 let final_spec = MatchSpec {
                                     version: version_spec,
                                     build: build_spec,
                                     ..m
                                 };
-                                return Ok(DependencyInfo::Variant {
+                                return Ok(VariantDependency {
                                     spec: final_spec,
-                                    variant: version.clone(),
-                                });
+                                    variant,
+                                }.into());
                             }
                         }
                     }
-                    Ok(DependencyInfo::Raw { spec: m })
+                    Ok(SourceDependency { spec: m }.into())
                 }
                 Dependency::PinSubpackage(pin) => {
                     let name = &pin.pin_value().name;
@@ -357,7 +500,7 @@ pub fn apply_variant(
                             &Version::from_str(&subpackage.version)?,
                             &subpackage.build_string,
                         )?;
-                    Ok(DependencyInfo::PinSubpackage { spec: pinned })
+                    Ok(PinSubpackageDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
                 }
                 Dependency::PinCompatible(pin) => {
                     let name = &pin.pin_value().name;
@@ -370,7 +513,7 @@ pub fn apply_variant(
                             &pin_package.version,
                             &pin_package.build,
                         )?;
-                    Ok(DependencyInfo::PinCompatible { spec: pinned })
+                    Ok(PinCompatibleDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
                 }
                 Dependency::Compiler(compiler) => {
                     if target_platform == &Platform::NoArch {
@@ -433,9 +576,10 @@ pub fn apply_variant(
                         format!("{}_{}", compiler_name, target_platform)
                     };
 
-                    Ok(DependencyInfo::Compiler {
+                    Ok(CompilerDependency {
+                        language: compiler_name,
                         spec: MatchSpec::from_str(&final_compiler, ParseStrictness::Strict)?,
-                    })
+                    }.into())
                 }
             }
         })
@@ -601,12 +745,12 @@ async fn resolve_dependencies(
                 continue;
             }
 
-            let dep = DependencyInfo::RunExport {
+            let dep = RunExportDependency {
                 spec,
                 from: env.to_string(),
                 source_package: name.as_normalized().to_string(),
             };
-            cloned.push(dep);
+            cloned.push(dep.into());
         }
         Ok(cloned)
     };
@@ -812,23 +956,41 @@ mod tests {
 
     #[test]
     fn test_dependency_info_render() {
-        let dep_info = vec![
-            DependencyInfo::Raw {
+        let dep_info: Vec<DependencyInfo> = vec![
+            SourceDependency {
                 spec: MatchSpec::from_str("xyz", ParseStrictness::Strict).unwrap(),
-            },
-            DependencyInfo::Variant {
+            }
+            .into(),
+            VariantDependency {
                 spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
                 variant: "bar".to_string(),
-            },
-            DependencyInfo::Compiler {
+            }
+            .into(),
+            CompilerDependency {
+                language: "c".to_string(),
                 spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
-            },
-            DependencyInfo::PinSubpackage {
+            }
+            .into(),
+            PinSubpackageDependency {
+                name: "baz".to_string(),
                 spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
-            },
-            DependencyInfo::PinCompatible {
+                args: PinArgs {
+                    max_pin: Some("x.x".parse().unwrap()),
+                    min_pin: Some("x.x.x".parse().unwrap()),
+                    exact: true,
+                },
+            }
+            .into(),
+            PinCompatibleDependency {
+                name: "bat".to_string(),
                 spec: MatchSpec::from_str("bat", ParseStrictness::Strict).unwrap(),
-            },
+                args: PinArgs {
+                    max_pin: Some("x.x".parse().unwrap()),
+                    min_pin: Some("x.x.x".parse().unwrap()),
+                    exact: true,
+                },
+            }
+            .into(),
         ];
         let yaml_str = serde_yaml::to_string(&dep_info).unwrap();
         insta::assert_snapshot!(yaml_str);
@@ -836,10 +998,10 @@ mod tests {
         // test deserialize
         let dep_info: Vec<DependencyInfo> = serde_yaml::from_str(&yaml_str).unwrap();
         assert_eq!(dep_info.len(), 5);
-        assert!(matches!(dep_info[0], DependencyInfo::Raw { .. }));
-        assert!(matches!(dep_info[1], DependencyInfo::Variant { .. }));
-        assert!(matches!(dep_info[2], DependencyInfo::Compiler { .. }));
-        assert!(matches!(dep_info[3], DependencyInfo::PinSubpackage { .. }));
-        assert!(matches!(dep_info[4], DependencyInfo::PinCompatible { .. }));
+        assert!(matches!(dep_info[0], DependencyInfo::Source(_)));
+        assert!(matches!(dep_info[1], DependencyInfo::Variant(_)));
+        assert!(matches!(dep_info[2], DependencyInfo::Compiler(_)));
+        assert!(matches!(dep_info[3], DependencyInfo::PinSubpackage(_)));
+        assert!(matches!(dep_info[4], DependencyInfo::PinCompatible(_)));
     }
 }
