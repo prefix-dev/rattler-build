@@ -910,7 +910,6 @@ mod tests {
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: Default::default(),
             hash: None,
@@ -924,7 +923,6 @@ mod tests {
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Win64,
-            host_platform: Platform::Win64,
             build_platform: Platform::Win64,
             ..Default::default()
         };
@@ -941,7 +939,6 @@ mod tests {
         let yaml_file = test_data_dir.join("variant_files/variant_config_1.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -957,7 +954,6 @@ mod tests {
         let yaml_file = test_data_dir.join("recipes/variants/variant_config.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -1026,7 +1022,6 @@ mod tests {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -1058,7 +1053,6 @@ mod tests {
         let yaml_file = test_data_dir.join("recipes/variants/python_variant.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::NoArch,
-            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };

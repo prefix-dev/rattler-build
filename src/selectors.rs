@@ -12,8 +12,6 @@ use rattler_conda_types::Platform;
 pub struct SelectorConfig {
     /// The target platform to render for
     pub target_platform: Platform,
-    /// The host platform (relevant for `noarch`)
-    pub host_platform: Platform,
     /// The build platform to render for
     pub build_platform: Platform,
     /// The hash, if available
@@ -25,6 +23,15 @@ pub struct SelectorConfig {
 }
 
 impl SelectorConfig {
+    /// Returns the host platform based on the target and build platform.
+    pub fn host_platform(&self) -> Platform {
+        if self.target_platform == Platform::NoArch {
+            self.build_platform
+        } else {
+            self.target_platform
+        }
+    }
+
     /// Turn this selector config into a context for jinja rendering
     pub fn into_context(self) -> BTreeMap<String, Value> {
         let mut context = BTreeMap::new();
@@ -34,7 +41,7 @@ impl SelectorConfig {
             Value::from_safe_string(self.target_platform.to_string()),
         );
 
-        if let Some(platform) = self.host_platform.only_platform() {
+        if let Some(platform) = self.host_platform().only_platform() {
             context.insert(
                 platform.to_string(),
                 Value::from_safe_string(platform.to_string()),
@@ -47,7 +54,7 @@ impl SelectorConfig {
 
         context.insert(
             "unix".to_string(),
-            Value::from(self.host_platform.is_unix()),
+            Value::from(self.host_platform().is_unix()),
         );
 
         context.insert(
@@ -93,7 +100,6 @@ impl Default for SelectorConfig {
     fn default() -> Self {
         Self {
             target_platform: Platform::current(),
-            host_platform: Platform::current(),
             build_platform: Platform::current(),
             hash: None,
             variant: Default::default(),

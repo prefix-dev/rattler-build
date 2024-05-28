@@ -317,7 +317,6 @@ mod tests {
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
-            host_platform: Platform::Linux64,
             ..SelectorConfig::default()
         };
 
@@ -332,7 +331,6 @@ mod tests {
 
         let selector_config_win = SelectorConfig {
             target_platform: Platform::Win64,
-            host_platform: Platform::Win64,
             ..SelectorConfig::default()
         };
 

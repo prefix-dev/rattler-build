@@ -302,7 +302,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         create_environment(
             &dependencies,
-            &platform,
+            platform,
             &prefix,
             &config.channels,
             &config.tool_configuration,
@@ -365,7 +365,7 @@ async fn run_python_test(
 
     create_environment(
         &dependencies,
-        &Platform::current(),
+        Platform::current(),
         prefix,
         &config.channels,
         &config.tool_configuration,
@@ -439,7 +439,7 @@ async fn run_shell_test(
 
         create_environment(
             &build_dependencies,
-            &platform,
+            platform,
             &build_prefix,
             &config.channels,
             &config.tool_configuration,
@@ -468,7 +468,7 @@ async fn run_shell_test(
     let run_env = prefix.join("run");
     create_environment(
         &dependencies,
-        &platform,
+        platform,
         &run_env,
         &config.channels,
         &config.tool_configuration,

@@ -164,7 +164,6 @@ pub async fn get_build_output(
     let selector_config = SelectorConfig {
         // We ignore noarch here
         target_platform: args.target_platform,
-        host_platform: args.target_platform,
         hash: None,
         build_platform: args.build_platform,
         variant: BTreeMap::new(),
@@ -214,7 +213,6 @@ pub async fn get_build_output(
             variant: discovered_output.used_vars.clone(),
             hash: Some(hash.clone()),
             target_platform: selector_config.target_platform,
-            host_platform: selector_config.host_platform,
             build_platform: selector_config.build_platform,
             experimental: args.common.experimental,
         };
@@ -263,7 +261,6 @@ pub async fn get_build_output(
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: args.target_platform,
                 build_platform: args.build_platform,
                 hash,
                 variant: discovered_output.used_vars.clone(),

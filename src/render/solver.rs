@@ -68,7 +68,7 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
 
 pub async fn create_environment(
     specs: &[MatchSpec],
-    target_platform: &Platform,
+    target_platform: Platform,
     target_prefix: &Path,
     channels: &[String],
     tool_configuration: &tool_configuration::Configuration,
@@ -151,7 +151,7 @@ pub async fn create_environment(
 /// Load repodata for given matchspecs and channels.
 pub async fn load_repodatas(
     channels: &[String],
-    target_platform: &Platform,
+    target_platform: Platform,
     tool_configuration: &tool_configuration::Configuration,
     specs: &[MatchSpec],
 ) -> Result<(PathBuf, Vec<Vec<RepoDataRecord>>), anyhow::Error> {
@@ -165,7 +165,7 @@ pub async fn load_repodatas(
         .map(|channel_str| Channel::from_str(channel_str, &channel_config))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let platforms = [Platform::NoArch, *target_platform];
+    let platforms = [Platform::NoArch, target_platform];
     let channel_urls = channels
         .iter()
         .flat_map(|channel| {
@@ -215,7 +215,7 @@ pub async fn load_repodatas(
 
 pub async fn install_packages(
     required_packages: &Vec<RepoDataRecord>,
-    target_platform: &Platform,
+    target_platform: Platform,
     target_prefix: &Path,
     cache_dir: &Path,
     tool_configuration: &tool_configuration::Configuration,
@@ -225,7 +225,7 @@ pub async fn install_packages(
     let transaction = Transaction::from_current_and_desired(
         installed_packages,
         required_packages.clone(),
-        *target_platform,
+        target_platform,
     )?;
 
     print_as_table(required_packages);

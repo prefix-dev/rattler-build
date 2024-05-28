@@ -226,8 +226,6 @@ impl PackagingSettings {
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
-    /// The host platform (usually target platform, but for `noarch` it's the build platform)
-    pub host_platform: Platform,
     /// The build platform (the platform that the build is running on)
     pub build_platform: Platform,
     /// The selected variant for this build
@@ -256,6 +254,16 @@ impl BuildConfiguration {
     /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform
+    }
+
+    /// Returns the host platform based on the target and build platform.
+    /// Usually target platform, but for `noarch` it's the build platform
+    pub fn host_platform(&self) -> Platform {
+        if self.target_platform == Platform::NoArch {
+            self.build_platform
+        } else {
+            self.target_platform
+        }
     }
 }
 
@@ -390,13 +398,13 @@ impl Output {
     }
 
     /// Shorthand to retrieve the target platform for this output
-    pub fn target_platform(&self) -> &Platform {
-        &self.build_configuration.target_platform
+    pub fn target_platform(&self) -> Platform {
+        self.build_configuration.target_platform
     }
 
     /// Shorthand to retrieve the target platform for this output
-    pub fn host_platform(&self) -> &Platform {
-        &self.build_configuration.host_platform
+    pub fn host_platform(&self) -> Platform {
+        self.build_configuration.host_platform()
     }
 
     /// Search for the resolved package with the given name in the host prefix

@@ -42,7 +42,7 @@ pub fn compile_pyc(
     } else {
         python_bin(
             &build_config.directories.host_prefix,
-            &build_config.host_platform,
+            &build_config.host_platform(),
         )
     };
 
@@ -319,7 +319,7 @@ pub(crate) fn create_entry_points(
             output.target_platform().is_windows(),
             ep,
             // using target_platform is OK because this should never be noarch
-            &PythonInfo::from_version(&python_version, *output.target_platform()).map_err(|e| {
+            &PythonInfo::from_version(&python_version, output.target_platform()).map_err(|e| {
                 PackagingError::CannotCreateEntryPoint(format!(
                     "Could not create python info: {}",
                     e
@@ -337,7 +337,7 @@ pub(crate) fn create_entry_points(
             // write exe launcher as well
             let exe_path = tmp_dir_path.join(format!("Scripts/{}.exe", ep.command));
             let mut exe = fs::File::create(&exe_path)?;
-            exe.write_all(get_windows_launcher(output.target_platform()))?;
+            exe.write_all(get_windows_launcher(&output.target_platform()))?;
 
             new_files.extend(vec![script_path, exe_path]);
         } else {

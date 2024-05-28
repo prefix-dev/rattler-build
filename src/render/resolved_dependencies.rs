@@ -477,7 +477,7 @@ pub async fn install_environments(
     if let Some(build_deps) = dependencies.build.as_ref() {
         install_packages(
             &build_deps.resolved,
-            &output.build_configuration.build_platform,
+            output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             &cache_dir,
             tool_configuration,
@@ -488,7 +488,7 @@ pub async fn install_environments(
     if let Some(host_deps) = dependencies.host.as_ref() {
         install_packages(
             &host_deps.resolved,
-            &output.build_configuration.host_platform,
+            output.build_configuration.host_platform(),
             &output.build_configuration.directories.host_prefix,
             &cache_dir,
             tool_configuration,
@@ -532,7 +532,7 @@ async fn resolve_dependencies(
 
         let env = create_environment(
             &match_specs,
-            &output.build_configuration.build_platform,
+            output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
             channels,
             tool_configuration,
@@ -632,7 +632,7 @@ async fn resolve_dependencies(
     let host_env = if !match_specs.is_empty() {
         let env = create_environment(
             &match_specs,
-            &output.build_configuration.host_platform,
+            output.build_configuration.host_platform(),
             &output.build_configuration.directories.host_prefix,
             channels,
             tool_configuration,

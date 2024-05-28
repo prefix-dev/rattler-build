@@ -10,7 +10,7 @@ use crate::metadata::Output;
 use crate::unix;
 use crate::windows;
 
-fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
         prefix.join("Lib")
     } else {
@@ -19,7 +19,7 @@ fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
     }
 }
 
-fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
 }
 

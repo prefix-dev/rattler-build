@@ -29,7 +29,6 @@ recipe:
       with URL syntax. It is used in command lines or scripts to transfer data.
 build_configuration:
   target_platform: osx-arm64
-  host_platform: osx-arm64
   build_platform: osx-arm64
   variant:
     target_platform: osx-arm64

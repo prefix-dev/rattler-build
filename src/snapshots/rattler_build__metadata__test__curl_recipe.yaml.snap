@@ -1,6 +1,6 @@
 ---
 source: src/metadata.rs
-assertion_line: 729
+assertion_line: 737
 expression: output
 ---
 recipe:
@@ -32,7 +32,6 @@ recipe:
     description: "Curl is an open source command line tool and library for transferring data\nwith URL syntax. It is used in command lines or scripts to transfer data."
 build_configuration:
   target_platform: osx-arm64
-  host_platform: osx-arm64
   build_platform: osx-arm64
   variant:
     target_platform: osx-arm64
