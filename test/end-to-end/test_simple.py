@@ -29,7 +29,7 @@ class RattlerBuild:
         recipe_folder: Path,
         output_folder: Path,
         variant_config: Optional[Path] = None,
-        custom_channels: list[str] | None = None,
+        custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
     ):
         if extra_args is None:
@@ -51,7 +51,7 @@ class RattlerBuild:
         recipe_folder: Path,
         output_folder: Path,
         variant_config: Optional[Path] = None,
-        custom_channels: list[str] | None = None,
+        custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
     ):
         args = self.build_args(
