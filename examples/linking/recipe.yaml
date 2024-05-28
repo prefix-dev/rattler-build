@@ -26,5 +26,11 @@ requirements:
 
 tests:
   - script:
-      - zlink
-      - ldd $PREFIX/bin/zlink
+    - if: linux
+      then:
+        - zlink
+        - ldd $PREFIX/bin/zlink
+    - if: osx
+      then:
+        - zlink
+        - otool -L $PREFIX/bin/zlink
