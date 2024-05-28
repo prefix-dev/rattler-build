@@ -95,7 +95,8 @@ impl Pin {
 
         // extract same amount of digits as the pin expression (in the form of x.x.x) from version str
         let min_pin = self
-            .args.min_pin
+            .args
+            .min_pin
             .clone()
             .unwrap_or_else(|| PinExpression("x.x.x.x.x.x".to_string()));
         // number of digits in pin expression
@@ -113,7 +114,8 @@ impl Pin {
         spec.push_str(&format!(" >={}", pin));
 
         let max_pin = self
-            .args.max_pin
+            .args
+            .max_pin
             .clone()
             .unwrap_or_else(|| PinExpression("x".to_string()));
 
@@ -207,7 +209,7 @@ impl Pin {
                 max_pin,
                 min_pin,
                 exact,
-            }
+            },
         }
     }
 }
@@ -224,7 +226,7 @@ mod test {
                 max_pin: Some(PinExpression("x.x.x".to_string())),
                 min_pin: Some(PinExpression("x.x.x".to_string())),
                 exact: false,
-            }
+            },
         };
 
         let version = Version::from_str("1.2.3").unwrap();
@@ -242,7 +244,7 @@ mod test {
                 max_pin: Some(PinExpression("x.x.x".to_string())),
                 min_pin: None,
                 exact: false,
-            }
+            },
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -254,7 +256,7 @@ mod test {
                 max_pin: None,
                 min_pin: Some(PinExpression("x.x.x".to_string())),
                 exact: false,
-            }
+            },
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -269,7 +271,7 @@ mod test {
                 max_pin: Some(PinExpression("x.x.x".to_string())),
                 min_pin: Some(PinExpression("x.x.x".to_string())),
                 exact: true,
-            }
+            },
         };
 
         let version = Version::from_str("1.2.3").unwrap();
