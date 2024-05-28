@@ -54,8 +54,7 @@ build_configuration:
     target_platform: noarch
   hash:
     hash: 4616a5c
-    hash_input: '{"target_platform": "noarch"}'
-    hash_prefix: py
+    prefix: py
   directories:
     host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
     build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/build_env
@@ -383,4 +382,4 @@ finalized_dependencies:
     constrains: []
     run_exports: null
 system_tools:
-  rattler_build: 0.12.1
+  rattler-build: 0.12.1

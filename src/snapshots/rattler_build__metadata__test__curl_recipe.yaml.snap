@@ -1,7 +1,7 @@
 ---
 source: src/metadata.rs
-assertion_line: 733
-expression: output_curl
+assertion_line: 730
+expression: output
 ---
 recipe:
   schema_version: 1
@@ -38,8 +38,6 @@ build_configuration:
     target_platform: osx-arm64
   hash:
     hash: 60d57d3
-    hash_input: "{\"target_platform\": \"osx-arm64\"}"
-    hash_prefix: ""
   directories:
     host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
     build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/build_env
@@ -642,4 +640,4 @@ finalized_dependencies:
     run_exports: ~
 finalized_sources: ~
 system_tools:
-  rattler_build: 0.12.1
+  rattler-build: 0.12.1
