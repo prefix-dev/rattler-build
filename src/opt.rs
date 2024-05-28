@@ -35,7 +35,7 @@ pub enum SubCommands {
     /// Generate a recipe from PyPI or CRAN
     GenerateRecipe(GenerateRecipeOpts),
 
-    /// Handle authentication to external repositories
+    /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
 }
 
@@ -92,8 +92,8 @@ impl App {
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
 #[derive(Parser, Clone, Debug)]
 pub struct CommonOpts {
-    /// Output directory for build artifacts. Defaults to `./output`.
-    #[clap(long, env = "CONDA_BLD_PATH")]
+    /// Output directory for build artifacts.
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
     pub output_dir: Option<PathBuf>,
 
     /// Enable support for repodata.json.zst
@@ -205,10 +205,9 @@ pub struct BuildOpts {
     #[arg(long, default_value_t = Platform::current())]
     pub target_platform: Platform,
 
-    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
-    /// The default channel is `conda-forge`.
-    #[arg(short = 'c', long)]
-    pub channel: Option<Vec<String>>,
+    /// Add a channel to search for dependencies in.
+    #[arg(short = 'c', long, default_value = "conda-forge")]
+    pub channel: Vec<String>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
@@ -218,7 +217,7 @@ pub struct BuildOpts {
     #[arg(long)]
     pub render_only: bool,
 
-    /// Render the recipe files with solving requirements.
+    /// Render the recipe files with solving dependencies.
     #[arg(long, requires("render_only"))]
     pub with_solve: bool,
 
@@ -226,7 +225,7 @@ pub struct BuildOpts {
     #[arg(long)]
     pub keep_build: bool,
 
-    /// Don't use build id(timestamp) when creating build directory name. Defaults to `false`.
+    /// Don't use build id(timestamp) when creating build directory name.
     #[arg(long)]
     pub no_build_id: bool,
 
@@ -239,15 +238,16 @@ pub struct BuildOpts {
     /// The number of threads to use for compression (only relevant when also using `--package-format conda`)
     pub compression_threads: Option<u32>,
 
-    /// Do not store the recipe in the final package
+    /// Don't store the recipe in the final package
     #[arg(long)]
     pub no_include_recipe: bool,
 
-    /// Do not run tests after building
+    /// Don't run the tests after building the package
     #[arg(long, default_value = "false")]
     pub no_test: bool,
 
-    /// Do not force colors in the output of the build script
+    /// Don't force colors in the output of the build script
+    /// TODO: IS THIS REQUIRED WITH THE INCLUSION OF THE `--color` FLAG?
     #[arg(long, default_value = "true")]
     pub color_build_log: bool,
 
@@ -259,7 +259,7 @@ pub struct BuildOpts {
     #[arg(long, default_value = "false", hide = !cfg!(feature = "tui"))]
     pub tui: bool,
 
-    /// Wether to skip packages that already exist in any channel
+    /// Whether to skip packages that already exist in any channel
     #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1)]
     pub skip_existing: SkipExisting,
 }

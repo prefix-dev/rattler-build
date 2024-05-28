@@ -123,6 +123,8 @@ nav:
   - Package specification: package_spec.md
   - Activation scripts: special_files.md
   - Internals: internals.md
+  - Reference:
+      - CLI: reference/cli.md
 
 plugins:
   - search

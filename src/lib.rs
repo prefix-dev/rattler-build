@@ -252,10 +252,7 @@ pub async fn get_build_output(
 
         let name = recipe.package().name().clone();
         // Add the channels from the args and by default always conda-forge
-        let channels = args
-            .channel
-            .clone()
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]);
+        let channels = args.channel.clone();
 
         let timestamp = chrono::Utc::now();
 
