@@ -1,7 +1,7 @@
 ---
 source: src/metadata.rs
-assertion_line: 728
-expression: output_rich
+assertion_line: 729
+expression: output
 ---
 recipe:
   schema_version: 1
@@ -54,8 +54,7 @@ build_configuration:
     target_platform: noarch
   hash:
     hash: 4616a5c
-    hash_input: "{\"target_platform\": \"noarch\"}"
-    hash_prefix: py
+    prefix: py
   directories:
     host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
     build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/build_env

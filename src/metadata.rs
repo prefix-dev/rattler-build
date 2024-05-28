@@ -622,6 +622,7 @@ mod tests {
 
 #[cfg(test)]
 mod test {
+    use rstest::*;
     use std::str::FromStr;
 
     use chrono::TimeZone;
@@ -716,21 +717,16 @@ mod test {
         assert_eq!("pip", parsed_yaml3.specs[0].render(false));
     }
 
-    #[test]
-    fn read_full_recipe() {
+    #[rstest]
+    #[case::rich("rich_recipe.yaml")]
+    #[case::curl("curl_recipe.yaml")]
+    fn read_full_recipe(#[case] recipe_path: String) {
         let test_data_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
-        let recipe_1 = test_data_dir.join("rich_recipe.yaml");
 
-        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
-
-        let output_rich: Output = serde_yaml::from_str(&recipe_1).unwrap();
-        assert_yaml_snapshot!(output_rich);
-
-        let recipe_2 = test_data_dir.join("curl_recipe.yaml");
-        let recipe_2 = std::fs::read_to_string(recipe_2).unwrap();
-        let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
-        assert_yaml_snapshot!(output_curl);
+        let recipe = std::fs::read_to_string(test_data_dir.join(&recipe_path)).unwrap();
+        let output: Output = serde_yaml::from_str(&recipe).unwrap();
+        assert_yaml_snapshot!(recipe_path, output);
     }
 
     #[test]
