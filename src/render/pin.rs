@@ -137,7 +137,7 @@ impl Pin {
                 .clone()
                 .with_segments(..cmp::min(pin_digits, version.segment_count()))
                 .ok_or_else(|| {
-                    PinError::CouldNotPin(format!("Failed to extract min_pin from version"))
+                    PinError::CouldNotPin("Failed to extract min_pin from version".to_string())
                 })?;
             pin_str.push_str(&format!(">={}", pin));
         };
@@ -155,7 +155,7 @@ impl Pin {
             }
 
             // increment last digit
-            let pin = increment(&version, pin_digits as i32)?;
+            let pin = increment(version, pin_digits as i32)?;
 
             if !pin_str.is_empty() {
                 pin_str.push(',')
