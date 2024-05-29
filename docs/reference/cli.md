@@ -71,58 +71,6 @@ Build a package from a recipe
 
 ##### **Options:**
 
-###### **Modifying result**
-
-- `--package-format <PACKAGE_FORMAT>`
-
-	The package format to use for the build. Can be one of `tar-bz2` or `conda`.
-You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
-
-	- Default value: `conda`
-
-- `--no-include-recipe`
-
-	Don't store the recipe in the final package
-
-	- Possible values: `true`, `false`
-
-
-- `--no-test`
-
-	Don't run the tests after building the package
-
-	- Default value: `false`
-	- Possible values: `true`, `false`
-
-
-- `--color-build-log`
-
-	Don't force colors in the output of the build script
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
-- `--output-dir <OUTPUT_DIR>`
-
-	Output directory for build artifacts.
-
-	- Default value: `./output`
-
-- `--skip-existing <SKIP_EXISTING>`
-
-	Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
-
-	- Default value: `none`
-	- Possible values:
-		- `none`:
-			Do not skip any packages
-		- `local`:
-			Skip packages that already exist locally
-		- `all`:
-			Skip packages that already exist in any channel
-
-
 - `-r`, `--recipe <RECIPE>`
 
 	The recipe file or directory containing `recipe.yaml`. Defaults to the current directory
@@ -231,6 +179,58 @@ You can also add a compression level to the package format, e.g. `tar-bz2:<numbe
 	- Possible values: `true`, `false`
 
 
+###### **Modifying result**
+
+- `--package-format <PACKAGE_FORMAT>`
+
+	The package format to use for the build. Can be one of `tar-bz2` or `conda`.
+You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
+
+	- Default value: `conda`
+
+- `--no-include-recipe`
+
+	Don't store the recipe in the final package
+
+	- Possible values: `true`, `false`
+
+
+- `--no-test`
+
+	Don't run the tests after building the package
+
+	- Default value: `false`
+	- Possible values: `true`, `false`
+
+
+- `--color-build-log`
+
+	Don't force colors in the output of the build script
+
+	- Default value: `true`
+	- Possible values: `true`, `false`
+
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+	- Default value: `./output`
+
+- `--skip-existing <SKIP_EXISTING>`
+
+	Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
+
+	- Default value: `none`
+	- Possible values:
+		- `none`:
+			Do not skip any packages
+		- `local`:
+			Skip packages that already exist locally
+		- `all`:
+			Skip packages that already exist in any channel
+
+
 
 
 
@@ -249,6 +249,14 @@ These test files are written at "package creation time" and are part of the pack
 **Usage:** `rattler-build test [OPTIONS] --package-file <PACKAGE_FILE>`
 
 ##### **Options:**
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+	- Default value: `./output`
 
 - `-c`, `--channel <CHANNEL>`
 
@@ -288,14 +296,6 @@ These test files are written at "package creation time" and are part of the pack
 	Path to an auth-file to read authentication information from
 
 
-###### **Modifying result**
-
-- `--output-dir <OUTPUT_DIR>`
-
-	Output directory for build artifacts.
-
-	- Default value: `./output`
-
 
 
 
@@ -306,6 +306,14 @@ Rebuild a package from a package file instead of a recipe
 **Usage:** `rattler-build rebuild [OPTIONS] --package-file <PACKAGE_FILE>`
 
 ##### **Options:**
+
+###### **Modifying result**
+
+- `--output-dir <OUTPUT_DIR>`
+
+	Output directory for build artifacts.
+
+	- Default value: `./output`
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
@@ -347,14 +355,6 @@ Rebuild a package from a package file instead of a recipe
 
 	Path to an auth-file to read authentication information from
 
-
-###### **Modifying result**
-
-- `--output-dir <OUTPUT_DIR>`
-
-	Output directory for build artifacts.
-
-	- Default value: `./output`
 
 
 
