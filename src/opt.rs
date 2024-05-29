@@ -17,13 +17,24 @@ use url::Url;
 /// Application subcommands.
 #[derive(Parser)]
 pub enum SubCommands {
-    /// Build a package
+    /// Build a package from a recipe
     Build(BuildOpts),
 
-    /// Test a package
+    /// Run a test for a single package
+    ///
+    /// This creates a temporary directory, copies the package file into it, and then runs the
+    /// indexing. It then creates a test environment that installs the package and any extra dependencies
+    /// specified in the package test dependencies file.
+    ///
+    /// With the activated test environment, the packaged test files are run:
+    ///
+    /// * `info/test/run_test.sh` or `info/test/run_test.bat` on Windows
+    /// * `info/test/run_test.py`
+    ///
+    /// These test files are written at "package creation time" and are part of the package.
     Test(TestOpts),
 
-    /// Rebuild a package
+    /// Rebuild a package from a package file instead of a recipe.
     Rebuild(RebuildOpts),
 
     /// Upload a package
@@ -253,7 +264,7 @@ pub struct BuildOpts {
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
-    /// Common options.
+    #[allow(missing_docs)]
     #[clap(flatten)]
     pub common: CommonOpts,
 
@@ -262,6 +273,9 @@ pub struct BuildOpts {
     pub tui: bool,
 
     /// Whether to skip packages that already exist in any channel
+    /// If set to `none`, do not skip any packages, default when not specified.
+    /// If set to `local`, only skip packages that already exist locally, default when using `--skip-existing.
+    /// If set to `all`, skip packages that already exist in any channel.
     #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result")]
     pub skip_existing: SkipExisting,
 }
@@ -327,7 +341,7 @@ pub enum ServerType {
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Quetz server.
+/// Upload to aQuetz server.
 /// Authentication is used from the keychain / auth-file.
 pub struct QuetzOpts {
     /// The URL to your Quetz server

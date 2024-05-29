@@ -1,11 +1,9 @@
 # Building a Rust package
 
-Building a Rust package is very straightforward with `rattler-build`. In this
-example, we build the a package for the `cargo-edit` utility, which is a utility
-for managing Cargo dependencies from the command line.
+We're using `rattler-build` to build a Rust package for the `cargo-edit` utility.
+This utility manages Cargo dependencies from the command line.
 
-One tiny challenge is that the Rust compiler is not "pre-configured" and we need to
-add a `variant_config.yaml` file to the package:
+To configure the Rust compiler, we add a `variant_config.yaml` file to the package:
 
 ```yaml title="variant_config.yaml"
 rust_compiler: rust
@@ -14,19 +12,14 @@ rust_compiler: rust
 This will tell `rattler-build` what to insert for the `${{ compiler('rust') }}` Jinja function.
 
 !!! note
-    The `${{ compiler(...) }}` functions are very useful in the context of
-    cross-compilation. When the function is evaluated it will insert the correct
-    compiler (as selected with the variant config) as well the
-    `target_platform`. The "rendered" compiler will look like `rust_linux-64`
-    when you are targeting the `linux-64` platform.
+    The `${{ compiler(...) }}` functions are very useful in the context of cross-compilation.
+    When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the `target_platform`.
+    The "rendered" compiler will look like `rust_linux-64` when you are targeting the `linux-64` platform.
 
     You can read more about this in the [cross-compilation](../compilers.md) section.
 
-Then we can write the recipe for the package like so:
 
 ```yaml title="recipe.yaml"
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-
 context:
   version: "0.11.9"
 
@@ -40,8 +33,7 @@ source:
 
 build:
   script:
-    # we bundle all the licenses of the dependencies into a THIRDPARTY.yml file and include it in the package
-    - cargo-bundle-licenses --format yaml --output ${SRC_DIR}/THIRDPARTY.yml
+    - cargo-bundle-licenses --format yaml --output ${SRC_DIR}/THIRDPARTY.yml  # !(1)
     - $BUILD_PREFIX/bin/cargo install --locked --bins --root ${PREFIX} --path .
 
 requirements:
@@ -51,7 +43,7 @@ requirements:
 
 tests:
   - script:
-      - cargo-upgrade --help
+      - cargo-upgrade --help # !(2)
 
 about:
   homepage: https://github.com/killercup/cargo-edit
@@ -62,6 +54,11 @@ about:
   description: "A utility for managing cargo dependencies from the command line."
   summary: "A utility for managing cargo dependencies from the command line."
 ```
+
+1. The `cargo-bundle-licenses` utility is used to bundle all the licenses of the dependencies into a `THIRDPARTY.yml` file.
+   This file is then included in the package. You should always include this file in your package when you are redistributing it.
+2. Running scripts in `bash` or `cmd.exe` to test the package build well, expects an exit code of `0` to pass the test.
+
 
 To build this recipe, simply run:
 
