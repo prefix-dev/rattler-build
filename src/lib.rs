@@ -255,7 +255,6 @@ pub async fn get_build_output(
         let channels = args
             .channel
             .clone()
-            .unwrap_or_else(|| vec!["conda-forge".to_string()])
             .into_iter()
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
             .collect::<Result<Vec<_>, _>>()
