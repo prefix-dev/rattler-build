@@ -172,23 +172,30 @@ impl Pin {
     }
 
     pub(crate) fn internal_repr(&self) -> String {
-        let max_pin_str = if let Some(max_pin) = &self.max_pin {
-            format!("{}", max_pin)
-        } else {
-            "".to_string()
-        };
-
-        let min_pin_str = if let Some(min_pin) = &self.min_pin {
-            format!("{}", min_pin)
-        } else {
-            "".to_string()
-        };
+        let max_pin_str = self
+            .max_pin
+            .as_ref()
+            .map_or("".to_string(), ToString::to_string);
+        let min_pin_str = self
+            .min_pin
+            .as_ref()
+            .map_or("".to_string(), ToString::to_string);
+        let upper_bound_str = self
+            .upper_bound
+            .as_ref()
+            .map_or("".to_string(), ToString::to_string);
+        let lower_bound_str = self
+            .lower_bound
+            .as_ref()
+            .map_or("".to_string(), ToString::to_string);
 
         format!(
-            "{} MAX_PIN={} MIN_PIN={} EXACT={}",
+            "{} MAX_PIN={} MIN_PIN={} LOWER_BOUND={} UPPER_BOUND={} EXACT={}",
             self.name.as_normalized(),
             max_pin_str,
             min_pin_str,
+            lower_bound_str,
+            upper_bound_str,
             self.exact
         )
     }
@@ -198,7 +205,9 @@ impl Pin {
         let name = parts[0].to_string();
         let max_pin = parts[1];
         let min_pin = parts[2];
-        let exact = parts[3];
+        let lower_bound = parts[3];
+        let upper_bound = parts[4];
+        let exact = parts[5];
 
         let max_pin = if max_pin == "MAX_PIN=" {
             None
@@ -218,14 +227,36 @@ impl Pin {
             Some(PinExpression::from_str(min_pin).expect("Could not parse min pin"))
         };
 
+        let lower_bound = if lower_bound == "LOWER_BOUND=" {
+            None
+        } else {
+            let lower_bound = lower_bound
+                .strip_prefix("LOWER_BOUND=")
+                .expect("Could not parse min pin: invalid prefix");
+            Some(lower_bound.to_string())
+        };
+
+        let upper_bound = if upper_bound == "UPPER_BOUND=" {
+            None
+        } else {
+            let upper_bound = upper_bound
+                .strip_prefix("UPPER_BOUND=")
+                .expect("Could not parse min pin: invalid prefix");
+            Some(upper_bound.to_string())
+        };
+
         let exact = exact == "EXACT=true";
         let package_name = PackageName::try_from(name)
             .expect("could not parse back package name from internal representation");
         Pin {
             name: package_name,
-            max_pin,
-            min_pin,
-            exact,
+            args: PinArgs {
+                max_pin,
+                min_pin,
+                lower_bound,
+                upper_bound,
+                exact,
+            },
         }
     }
 }
@@ -267,9 +298,13 @@ mod test {
     fn test_apply_pin() {
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
-            max_pin: Some(PinExpression("x.x.x".to_string())),
-            min_pin: Some(PinExpression("x.x.x".to_string())),
-            exact: false,
+            args: PinArgs {
+                max_pin: Some(PinExpression("x.x.x".to_string())),
+                min_pin: Some(PinExpression("x.x.x".to_string())),
+                lower_bound: None,
+                upper_bound: None,
+                exact: false,
+            }
         };
 
         let version = Version::from_str("1.2.3").unwrap();
@@ -283,9 +318,13 @@ mod test {
 
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
-            max_pin: Some(PinExpression("x.x.x".to_string())),
-            min_pin: None,
-            exact: false,
+            args: PinArgs {
+                max_pin: Some(PinExpression("x.x.x".to_string())),
+                min_pin: None,
+                lower_bound: None,
+                upper_bound: None,
+                exact: false,
+            }
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -293,9 +332,13 @@ mod test {
 
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
-            max_pin: None,
-            min_pin: Some(PinExpression("x.x.x".to_string())),
-            exact: false,
+            args: PinArgs {
+                max_pin: None,
+                min_pin: Some(PinExpression("x.x.x".to_string())),
+                lower_bound: None,
+                upper_bound: None,
+                exact: false,
+            }
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -306,9 +349,13 @@ mod test {
     fn test_apply_exact_pin() {
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
-            max_pin: Some(PinExpression("x.x.x".to_string())),
-            min_pin: Some(PinExpression("x.x.x".to_string())),
-            exact: true,
+            args: PinArgs {
+                max_pin: Some(PinExpression("x.x.x".to_string())),
+                min_pin: Some(PinExpression("x.x.x".to_string())),
+                lower_bound: None,
+                upper_bound: None,
+                exact: true,
+            }
         };
 
         let version = Version::from_str("1.2.3").unwrap();
@@ -321,11 +368,13 @@ mod test {
     fn test_pin_with_bounds() {
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
-            min_pin: Some(PinExpression("x.x.x".to_string())),
-            max_pin: None,
-            lower_bound: None,
-            upper_bound: Some("2.4".to_string()),
-            exact: false,
+            args: PinArgs {
+                min_pin: Some(PinExpression("x.x.x".to_string())),
+                max_pin: None,
+                lower_bound: None,
+                upper_bound: Some("2.4".to_string()),
+                exact: false,
+            }
         };
 
         let version = Version::from_str("1.2.3").unwrap();

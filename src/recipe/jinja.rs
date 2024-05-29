@@ -101,25 +101,45 @@ fn jinja_pin_function(
         args: PinArgs::default(),
     };
 
-    let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
-        PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
-            minijinja::Error::new(
-                minijinja::ErrorKind::SyntaxError,
-                format!("Invalid pin expression: {}", e),
-            )
-        })
-    };
+    let pin_expr_from_value =
+        |pin_expr: &minijinja::value::Value| -> Result<Option<PinExpression>, minijinja::Error> {
+            if pin_expr.is_none() {
+                Ok(None)
+            } else {
+                let pin_expr = PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
+                    minijinja::Error::new(
+                        minijinja::ErrorKind::SyntaxError,
+                        format!("Invalid pin expression: {}", e),
+                    )
+                })?;
+                Ok(Some(pin_expr))
+            }
+        };
 
     if let Some(kwargs) = kwargs {
         let max_pin = kwargs.get_attr("max_pin")?;
         if max_pin != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&max_pin)?;
-            pin.args.max_pin = Some(pin_expr);
+            pin.args.max_pin = pin_expr;
+        } else {
+            // Default value when max_pin is not provided
+            pin.args.max_pin = Some(PinExpression::from_str("x").unwrap());
         }
         let min = kwargs.get_attr("min_pin")?;
         if min != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&min)?;
-            pin.args.min_pin = Some(pin_expr);
+            pin.args.min_pin = pin_expr;
+        } else {
+            // Default value when min_pin is not provided
+            pin.args.min_pin = Some(PinExpression::from_str("x.x.x.x.x.x").unwrap());
+        }
+        let lower_bound = kwargs.get_attr("lower_bound")?;
+        if lower_bound != minijinja::value::Value::UNDEFINED {
+            pin.args.lower_bound = Some(lower_bound.to_string());
+        }
+        let upper_bound = kwargs.get_attr("upper_bound")?;
+        if upper_bound != minijinja::value::Value::UNDEFINED {
+            pin.args.upper_bound = Some(upper_bound.to_string());
         }
         let exact = kwargs.get_attr("exact")?;
         if exact != minijinja::value::Value::UNDEFINED {
