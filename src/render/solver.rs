@@ -135,20 +135,11 @@ struct GatewayReporter {
     finish_template: Option<ProgressStyle>,
 }
 
+#[derive(Default)]
 struct GatewayReporterBuilder {
     multi_progress: Option<indicatif::MultiProgress>,
     progress_template: Option<ProgressStyle>,
     finish_template: Option<ProgressStyle>,
-}
-
-impl Default for GatewayReporterBuilder {
-    fn default() -> Self {
-        Self {
-            multi_progress: None,
-            progress_template: None,
-            finish_template: None,
-        }
-    }
 }
 
 impl GatewayReporter {
