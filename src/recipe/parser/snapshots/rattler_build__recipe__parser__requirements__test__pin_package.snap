@@ -1,5 +1,6 @@
 ---
 source: src/recipe/parser/requirements.rs
+assertion_line: 619
 expression: "serde_yaml::to_string(&requirements).unwrap()"
 ---
 build:
@@ -8,15 +9,12 @@ build:
     name: foo
     max_pin: x.x
     min_pin: x.x.x.x
-    exact: false
 - pin_compatible:
     name: bar
     max_pin: x.x.x
     min_pin: x.x
-    exact: false
 - pin_compatible:
     name: bar
-    max_pin: null
     min_pin: x.x
     exact: true
 - compiler: gcc

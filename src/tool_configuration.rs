@@ -5,6 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use crate::console_utils::LoggingOutputHandler;
 use clap::ValueEnum;
+use rattler_conda_types::ChannelConfig;
 use rattler_networking::{
     authentication_storage::{self, backends::file::FileStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
@@ -51,6 +52,9 @@ pub struct Configuration {
 
     /// Wether to skip existing packages
     pub skip_existing: SkipExisting,
+
+    /// The channel configuration to use when parsing channels.
+    pub channel_config: ChannelConfig,
 }
 
 /// Get the authentication storage from the given file
@@ -100,6 +104,9 @@ impl Default for Configuration {
             use_bz2: true,
             render_only: false,
             skip_existing: SkipExisting::None,
+            channel_config: ChannelConfig::default_with_root_dir(
+                std::env::current_dir().unwrap_or_else(|_err| PathBuf::from("/")),
+            ),
         }
     }
 }

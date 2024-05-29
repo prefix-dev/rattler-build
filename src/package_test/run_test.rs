@@ -9,7 +9,7 @@
 
 use fs_err as fs;
 use rattler_conda_types::package::IndexJson;
-use rattler_conda_types::ParseStrictness;
+use rattler_conda_types::{Channel, ParseStrictness};
 use std::fmt::Write as fmt_write;
 use std::{
     path::{Path, PathBuf},
@@ -21,6 +21,7 @@ use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
 use rattler_shell::activation::ActivationError;
+use url::Url;
 
 use crate::env_vars;
 use crate::recipe::parser::{Script, ScriptContent};
@@ -177,7 +178,7 @@ pub struct TestConfiguration {
     pub keep_test_prefix: bool,
     /// The channels to use for the test – do not forget to add the local build outputs channel
     /// if desired
-    pub channels: Vec<String>,
+    pub channels: Vec<Url>,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
 }
@@ -261,7 +262,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     };
 
     let mut channels = config.channels.clone();
-    channels.insert(0, tmp_repo.path().to_string_lossy().to_string());
+    channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
 
     let config = TestConfiguration {
         target_platform: Some(target_platform),

@@ -3,6 +3,7 @@ use std::{
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     io::Write,
+    iter,
     path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
@@ -14,11 +15,12 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    PackageName, Platform, RepoDataRecord,
+    Channel, PackageName, Platform, RepoDataRecord,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 use crate::{
     console_utils::github_integration_enabled,
@@ -237,7 +239,7 @@ pub struct BuildConfiguration {
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments
-    pub channels: Vec<String>,
+    pub channels: Vec<Url>,
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
@@ -327,14 +329,14 @@ impl Output {
     }
 
     /// The channels to use when resolving dependencies
-    pub fn reindex_channels(&self) -> Result<Vec<String>, std::io::Error> {
+    pub fn reindex_channels(&self) -> Result<Vec<Url>, std::io::Error> {
         let output_dir = &self.build_configuration.directories.output_dir;
 
         index(output_dir, Some(&self.build_configuration.target_platform))?;
 
-        let mut channels = vec![output_dir.to_string_lossy().to_string()];
-        channels.extend(self.build_configuration.channels.clone());
-        Ok(channels)
+        Ok(iter::once(Channel::from_directory(output_dir).base_url)
+            .chain(self.build_configuration.channels.iter().cloned())
+            .collect())
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
@@ -634,7 +636,7 @@ mod test {
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
     use url::Url;
 
-    use crate::render::resolved_dependencies::{self, DependencyInfo};
+    use crate::render::resolved_dependencies::{self, SourceDependency};
 
     use super::{Directories, Output};
 
@@ -663,9 +665,10 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![DependencyInfo::Raw {
+            specs: vec![SourceDependency {
                 spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }],
+            }
+            .into()],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),

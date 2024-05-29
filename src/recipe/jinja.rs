@@ -7,6 +7,7 @@ use minijinja::value::Object;
 use minijinja::{Environment, Value};
 use rattler_conda_types::{PackageName, ParseStrictness, Version};
 
+use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
 
@@ -95,9 +96,7 @@ fn jinja_pin_function(
     // we translate the compiler into a YAML string
     let mut pin_subpackage = Pin {
         name,
-        max_pin: None,
-        min_pin: None,
-        exact: false,
+        args: PinArgs::default(),
     };
 
     let pin_expr_from_value = |pin_expr: &minijinja::value::Value| {
@@ -113,16 +112,16 @@ fn jinja_pin_function(
         let max_pin = kwargs.get_attr("max_pin")?;
         if max_pin != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&max_pin)?;
-            pin_subpackage.max_pin = Some(pin_expr);
+            pin_subpackage.args.max_pin = Some(pin_expr);
         }
         let min = kwargs.get_attr("min_pin")?;
         if min != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&min)?;
-            pin_subpackage.min_pin = Some(pin_expr);
+            pin_subpackage.args.min_pin = Some(pin_expr);
         }
         let exact = kwargs.get_attr("exact")?;
         if exact != minijinja::value::Value::UNDEFINED {
-            pin_subpackage.exact = exact.is_true();
+            pin_subpackage.args.exact = exact.is_true();
         }
     }
 

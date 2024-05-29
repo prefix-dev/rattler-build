@@ -41,7 +41,7 @@ build_configuration:
     work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/work
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293
   channels:
-  - conda-forge
+  - https://conda.anaconda.org/conda-forge
   timestamp: 2023-11-21T13:28:13.086796Z
   subpackages:
     curl:
@@ -55,16 +55,12 @@ build_configuration:
 finalized_dependencies:
   build:
     specs:
-    - source: compiler
+    - compiler: c
       spec: clang_osx-arm64
-    - source: raw
-      spec: make
-    - source: raw
-      spec: perl
-    - source: raw
-      spec: pkg-config
-    - source: raw
-      spec: libtool
+    - source: make
+    - source: perl
+    - source: pkg-config
+    - source: libtool
     resolved:
     - build: he57ea6c_1
       build_number: 1
