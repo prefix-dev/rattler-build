@@ -116,6 +116,8 @@ fn jinja_pin_function(
             }
         };
 
+    let max_pin_default = PinExpression::from_str("x").unwrap();
+    let min_pin_default = PinExpression::from_str("x.x.x.x.x.x").unwrap();
     if let Some(kwargs) = kwargs {
         let max_pin = kwargs.get_attr("max_pin")?;
         if max_pin != minijinja::value::Value::UNDEFINED {
@@ -123,7 +125,7 @@ fn jinja_pin_function(
             pin.args.max_pin = pin_expr;
         } else {
             // Default value when max_pin is not provided
-            pin.args.max_pin = Some(PinExpression::from_str("x").unwrap());
+            pin.args.max_pin = Some(max_pin_default);
         }
         let min = kwargs.get_attr("min_pin")?;
         if min != minijinja::value::Value::UNDEFINED {
@@ -131,7 +133,7 @@ fn jinja_pin_function(
             pin.args.min_pin = pin_expr;
         } else {
             // Default value when min_pin is not provided
-            pin.args.min_pin = Some(PinExpression::from_str("x.x.x.x.x.x").unwrap());
+            pin.args.min_pin = Some(min_pin_default);
         }
         let lower_bound = kwargs.get_attr("lower_bound")?;
         if lower_bound != minijinja::value::Value::UNDEFINED {
@@ -145,6 +147,11 @@ fn jinja_pin_function(
         if exact != minijinja::value::Value::UNDEFINED {
             pin.args.exact = exact.is_true();
         }
+    } else {
+        // Default value when max_pin is not provided
+        pin_subpackage.max_pin = Some(max_pin_default);
+        // Default value when min_pin is not provided
+        pin_subpackage.min_pin = Some(min_pin_default);
     }
 
     if internal_repr == "__PIN_SUBPACKAGE" {
@@ -1060,6 +1067,30 @@ mod tests {
             f();
             std::env::remove_var(key.as_ref());
         }
+    }
+    #[test]
+    fn eval_pin_subpackage() {
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+        let ps = |s| {
+            jinja
+                .eval(&format!("pin_subpackage(\"foo\", {})", s))
+                .unwrap()
+                .to_string()
+        };
+
+        assert_eq!(ps(""), "__PIN_SUBPACKAGE foo MAX_PIN=x MIN_PIN=x.x.x.x.x.x LOWER_BOUND= UPPER_BOUND= EXACT=false");
+        assert_eq!(ps("max_pin=None"), "__PIN_SUBPACKAGE foo MAX_PIN= MIN_PIN=x.x.x.x.x.x LOWER_BOUND= UPPER_BOUND= EXACT=false");
+        assert_eq!(
+            ps("max_pin=None, min_pin=None"),
+            "__PIN_SUBPACKAGE foo MAX_PIN= MIN_PIN= LOWER_BOUND= UPPER_BOUND= EXACT=false"
+        );
+        assert_eq!(ps("lower_bound='1.2.3'"), "__PIN_SUBPACKAGE foo MAX_PIN=x MIN_PIN=x.x.x.x.x.x LOWER_BOUND=1.2.3 UPPER_BOUND= EXACT=false");
     }
 
     #[test]
