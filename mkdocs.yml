@@ -125,6 +125,7 @@ nav:
   - Internals: internals.md
   - Reference:
       - CLI: reference/cli.md
+      - TEST_CLI: test.md
 
 plugins:
   - search

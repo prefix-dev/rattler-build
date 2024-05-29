@@ -115,6 +115,7 @@ reflink-copy = "0.1.17"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.10.4"
+clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 
 [dev-dependencies]
 insta = { version = "1.39.0", features = ["yaml"] }
@@ -137,7 +138,7 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-# [patch.crates-io]
+ [patch.crates-io]
 # rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 # rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 # rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
@@ -159,3 +160,4 @@ pre-build = [
 # rattler_solve = { path = "../rattler/crates/rattler_solve" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 # rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
+#clap-markdown = { path = "../clap-markdown" }

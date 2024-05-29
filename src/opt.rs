@@ -77,6 +77,9 @@ pub struct App {
         global = true
     )]
     pub color: Color,
+
+    #[arg(long, hide = true)]
+    pub markdown_help: bool,
 }
 
 impl App {
@@ -93,7 +96,7 @@ impl App {
 #[derive(Parser, Clone, Debug)]
 pub struct CommonOpts {
     /// Output directory for build artifacts.
-    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output")]
+    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output", verbatim_doc_comment, help_heading = "Modifying result")]
     pub output_dir: Option<PathBuf>,
 
     /// Enable support for repodata.json.zst
@@ -231,7 +234,7 @@ pub struct BuildOpts {
 
     /// The package format to use for the build. Can be one of `tar-bz2` or `conda`.
     /// You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
-    #[arg(long, default_value = "conda")]
+    #[arg(long, default_value = "conda", help_heading = "Modifying result", verbatim_doc_comment)]
     pub package_format: PackageFormatAndCompression,
 
     #[arg(long)]
@@ -239,16 +242,15 @@ pub struct BuildOpts {
     pub compression_threads: Option<u32>,
 
     /// Don't store the recipe in the final package
-    #[arg(long)]
+    #[arg(long, help_heading = "Modifying result")]
     pub no_include_recipe: bool,
 
     /// Don't run the tests after building the package
-    #[arg(long, default_value = "false")]
+    #[arg(long, default_value = "false", help_heading = "Modifying result")]
     pub no_test: bool,
 
     /// Don't force colors in the output of the build script
-    /// TODO: IS THIS REQUIRED WITH THE INCLUSION OF THE `--color` FLAG?
-    #[arg(long, default_value = "true")]
+    #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
     /// Common options.
@@ -260,7 +262,7 @@ pub struct BuildOpts {
     pub tui: bool,
 
     /// Whether to skip packages that already exist in any channel
-    #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1)]
+    #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result")]
     pub skip_existing: SkipExisting,
 }
 
