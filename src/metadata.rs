@@ -694,6 +694,8 @@ mod test {
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
                     purls: Default::default(),
+                    // TODO!
+                    run_exports: Default::default(),
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

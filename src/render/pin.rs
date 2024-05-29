@@ -1,10 +1,13 @@
 //! Evaluate pin expressions and apply them to resolved dependencies
 use std::{
+    cmp,
     fmt::{Display, Formatter},
     str::FromStr,
 };
 
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, Version, VersionBumpError, VersionBumpType};
+use rattler_conda_types::{
+    MatchSpec, PackageName, ParseStrictness, Version, VersionBumpError, VersionBumpType,
+};
 use serde::{de, Deserialize, Deserializer, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,11 +57,11 @@ pub struct Pin {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PinArgs {
     /// A pin to a version, using `x.x.x...` as syntax
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub max_pin: Option<PinExpression>,
 
     /// A minimum pin to a version, using `x.x.x...` as syntax
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub min_pin: Option<PinExpression>,
 
     /// A lower bound to a version, using a regular version string
@@ -84,17 +87,28 @@ pub enum PinError {
 
     #[error("max_pin or min_pin expression is empty string. Needs to be at least `x`")]
     EmptyPinExpression,
+
+    #[error("Could not increment version: {0}")]
+    VersionBump(#[from] VersionBumpError),
 }
 
-
-
-impl Pin {
-
-    pub fn increment(&self, version: &Version, segments: i32) -> Result<Version, VersionBumpError> {
-        let version = version.clone().with_segments(..segments as usize).unwrap();
-        version.bump_with_alpha(VersionBumpType::Segment(segments - 1 as i32))
+pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBumpError> {
+    if segments == 0 {
+        return Err(VersionBumpError::InvalidSegment { index: 0 });
     }
 
+    let version = version
+        .clone()
+        .with_segments(..cmp::min(version.segment_count(), segments as usize))
+        .unwrap();
+
+    Ok(version
+        .bump(VersionBumpType::Segment(segments - 1))?
+        .with_alpha()
+        .into_owned())
+}
+
+impl Pin {
     /// Apply the pin to a version and hash of a resolved package. If a max_pin, min_pin or exact pin
     /// are given, the pin is applied to the version accordingly.
     pub fn apply(&self, version: &Version, hash: &str) -> Result<MatchSpec, PinError> {
@@ -106,69 +120,55 @@ impl Pin {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?);
         }
 
-        let mut spec = self.name.as_normalized().to_string();
-        let version_str = version.to_string();
+        let mut pin_str = String::new();
 
         // extract same amount of digits as the pin expression (in the form of x.x.x) from version str
-        let min_pin = self
-            .min_pin
-            .clone()
-            .unwrap_or_else(|| PinExpression("x.x.x.x.x.x".to_string()));
-        // number of digits in pin expression
-        let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
-        if pin_digits == 0 {
-            return Err(PinError::EmptyPinExpression);
-        }
+        if let Some(lower_bound) = &self.args.lower_bound {
+            pin_str.push_str(&format!(">={}", lower_bound));
+        } else if let Some(min_pin) = &self.args.min_pin {
+            // number of digits in pin expression
+            let pin_digits = min_pin.0.chars().filter(|c| *c == 'x').count();
+            if pin_digits == 0 {
+                return Err(PinError::EmptyPinExpression);
+            }
 
             // get version string up the to pin_digits dot
-            let pin = version_str
-                .split('.')
-                .take(pin_digits)
-                .collect::<Vec<_>>()
-                .join(".");
-            format!(">={pin}")
+            let pin = version
+                .clone()
+                .with_segments(..cmp::min(pin_digits, version.segment_count()))
+                .ok_or_else(|| {
+                    PinError::CouldNotPin(format!("Failed to extract min_pin from version"))
+                })?;
+            pin_str.push_str(&format!(">={}", pin));
         };
-        spec.push_str(&format!(" {}", lower_bound));
 
-        let max_pin = self
-            .args
-            .max_pin
-            .clone()
-            .unwrap_or_else(|| PinExpression("x".to_string()));
+        if let Some(upper_bound) = &self.args.upper_bound {
+            if !pin_str.is_empty() {
+                pin_str.push(',')
+            }
+            pin_str.push_str(&format!("<{}", upper_bound));
+        } else if let Some(max_pin) = &self.args.max_pin {
+            // number of digits in pin expression
+            let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
+            if pin_digits == 0 {
+                return Err(PinError::EmptyPinExpression);
+            }
 
-        // number of digits in pin expression
-        let pin_digits = max_pin.0.chars().filter(|c| *c == 'x').count();
-        if pin_digits == 0 {
-            return Err(PinError::EmptyPinExpression);
-        }
-        // get version strip up the to pin_digits dot
-        let mut pin = version_str
-            .split('.')
-            .take(pin_digits)
-            .map(|s| s.to_string())
-            .collect::<Vec<_>>();
+            // increment last digit
+            let pin = increment(&version, pin_digits as i32)?;
 
-        // fill up with 0s
-        while pin.len() < pin_digits {
-            pin.push("0".to_string());
+            if !pin_str.is_empty() {
+                pin_str.push(',')
+            }
+            pin_str.push_str(&format!("<{}", pin));
         }
 
-        // increment last digit
-        let last = pin
-            .pop()
-            .unwrap_or_else(|| "0".to_string())
-            .parse::<u64>()
-            .map_err(|_| PinError::CouldNotPin(version_str.clone()))?
-            + 1;
-
-        pin.push(last.to_string());
-        let pin = pin.join(".");
-
-        spec.push(',');
-        spec.push_str(&format!("<{}", pin));
-
-        Ok(MatchSpec::from_str(spec.as_str(), ParseStrictness::Strict)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
+        let name = self.name.as_normalized().to_string();
+        Ok(MatchSpec::from_str(
+            format!("{name} {pin_str}").as_str().trim(),
+            ParseStrictness::Strict,
+        )
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
     }
 
     pub(crate) fn internal_repr(&self) -> String {
@@ -250,13 +250,13 @@ mod test {
         // load data from the test folder
         let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/pins.yaml");
         let file = fs_err::File::open(p).unwrap();
-        let pins : Vec<TestPinExpression> = serde_yaml::from_reader(file).unwrap();
+        let pins: Vec<TestPinExpression> = serde_yaml::from_reader(file).unwrap();
 
         for test in pins {
             let spec = test.spec;
             // split the spec in 3 parts (name, version, build string)
             let (version, hash) = spec.split_whitespace().collect_tuple().unwrap();
-            let version : Version = version.parse().unwrap();
+            let version: Version = version.parse().unwrap();
             let spec = test.pin.apply(&version, hash).unwrap();
             println!("{} -> {}", spec.to_string(), test.expected);
             assert_eq!(spec.to_string(), test.expected);
@@ -275,11 +275,11 @@ mod test {
         let version = Version::from_str("1.2.3").unwrap();
         let hash = "1234567890";
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4");
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4.0a0");
 
         let short_version = Version::from_str("1").unwrap();
         let spec = pin.apply(&short_version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1,<1.0.1");
+        assert_eq!(spec.to_string(), "foo >=1,<1.0.1.0a0");
 
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
@@ -289,7 +289,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4");
+        assert_eq!(spec.to_string(), "foo <1.2.4.0a0");
 
         let pin = Pin {
             name: PackageName::from_str("foo").unwrap(),
@@ -299,7 +299,7 @@ mod test {
         };
 
         let spec = pin.apply(&version, hash).unwrap();
-        assert_eq!(spec.to_string(), "foo >=1.2.3,<2");
+        assert_eq!(spec.to_string(), "foo >=1.2.3");
     }
 
     #[test]
@@ -332,5 +332,19 @@ mod test {
         let hash = "h1234_0";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3,<2.4");
+    }
+
+    #[test]
+    fn test_increment() {
+        fn increment_to_string(input: &str, segments: i32) -> String {
+            let version = Version::from_str(input).unwrap();
+            increment(&version, segments).unwrap().to_string()
+        }
+
+        assert_eq!(increment_to_string("1.2.3", 3), "1.2.4.0a0");
+        assert_eq!(increment_to_string("1.2.3", 2), "1.3.0a0");
+        assert_eq!(increment_to_string("1.2.3", 1), "2.0a0");
+        assert_eq!(increment_to_string("9d", 1), "10a");
+        assert_eq!(increment_to_string("9d", 2), "9d.1.0a0");
     }
 }
