@@ -104,7 +104,13 @@ impl App {
 #[derive(Parser, Clone, Debug)]
 pub struct CommonOpts {
     /// Output directory for build artifacts.
-    #[clap(long, env = "CONDA_BLD_PATH", default_value = "./output", verbatim_doc_comment, help_heading = "Modifying result")]
+    #[clap(
+        long,
+        env = "CONDA_BLD_PATH",
+        default_value = "./output",
+        verbatim_doc_comment,
+        help_heading = "Modifying result"
+    )]
     pub output_dir: Option<PathBuf>,
 
     /// Enable support for repodata.json.zst
@@ -242,7 +248,12 @@ pub struct BuildOpts {
 
     /// The package format to use for the build. Can be one of `tar-bz2` or `conda`.
     /// You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
-    #[arg(long, default_value = "conda", help_heading = "Modifying result", verbatim_doc_comment)]
+    #[arg(
+        long,
+        default_value = "conda",
+        help_heading = "Modifying result",
+        verbatim_doc_comment
+    )]
     pub package_format: PackageFormatAndCompression,
 
     #[arg(long)]

@@ -161,4 +161,4 @@ pre-build = [
 # rattler_solve = { path = "../rattler/crates/rattler_solve" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 # rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
-#clap-markdown = { path = "../clap-markdown" }
+# clap-markdown = { path = "../clap-markdown" }

@@ -38,7 +38,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          ref: ${{ github.head_ref }}
 
       - uses: prefix-dev/setup-pixi@v0.8.0
 
@@ -46,11 +46,16 @@ jobs:
         run: |
           pixi run build-docs
 
+      - name: Configure Git
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
       - name: Commit changes
         run: |
           git add docs/reference/cli.md
           git commit -m "docs: update CLI docs"
-          git push
+          git push origin HEAD:${{ github.head_ref }}
 
   build-docs:
     needs: generate-cli-docs
