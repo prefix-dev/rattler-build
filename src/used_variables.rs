@@ -66,6 +66,11 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                         variables.insert(format!("{}_compiler", &constant.value));
                         variables.insert(format!("{}_compiler_version", &constant.value));
                     }
+                } else if function == "stdlib" {
+                    if let Expr::Const(constant) = &call.args[0] {
+                        variables.insert(format!("{}_stdlib", &constant.value));
+                        variables.insert(format!("{}_stdlib_version", &constant.value));
+                    }
                 } else if function == "pin_subpackage" {
                     if let Expr::Const(constant) = &call.args[0] {
                         variables.insert(format!("{}", &constant.value));

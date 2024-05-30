@@ -1,6 +1,5 @@
 ---
 source: src/recipe/parser/requirements.rs
-assertion_line: 619
 expression: "serde_yaml::to_string(&requirements).unwrap()"
 ---
 build:
@@ -17,4 +16,4 @@ build:
     name: bar
     min_pin: x.x
     exact: true
-- compiler: gcc
+- compiler: cxx

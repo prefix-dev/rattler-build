@@ -148,9 +148,9 @@ Recipe {
     requirements: Requirements {
         build: [
             Compiler(
-                Compiler {
-                    language: "cxx",
-                },
+                Language(
+                    "cxx",
+                ),
             ),
             Spec(
                 MatchSpec {

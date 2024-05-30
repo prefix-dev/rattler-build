@@ -644,6 +644,7 @@ impl VariantConfig {
                     }
                     // Be explicit about the other cases, so we can add them later
                     Dependency::Compiler(_) => (),
+                    Dependency::Stdlib(_) => (),
                 });
 
                 // actually used vars

@@ -557,6 +557,7 @@ pub fn sort_build_outputs_topologically(
                 recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
                 recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
                 recipe::parser::Dependency::Compiler(_) => continue,
+                recipe::parser::Dependency::Stdlib(_) => continue,
             };
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 // do not point to self (circular dependency) - this can happen with

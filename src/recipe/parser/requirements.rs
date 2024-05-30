@@ -186,15 +186,12 @@ impl PinCompatible {
 /// it is always resolved with the target_platform.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Compiler {
-    /// The language such as c, cxx, rust, etc.
-    language: String,
-}
+pub struct Language(String);
 
-impl Compiler {
+impl Language {
     /// Get the language value as a string.
     pub fn language(&self) -> &str {
-        &self.language
+        &self.0
     }
 }
 
@@ -208,7 +205,9 @@ pub enum Dependency {
     /// A pin_compatible dependency
     PinCompatible(PinCompatible),
     /// A compiler dependency
-    Compiler(Compiler),
+    Compiler(Language),
+    /// A stdlib dependency
+    Stdlib(Language),
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
@@ -245,9 +244,14 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
                 .strip_prefix("__COMPILER ")
                 .expect("compiler without prefix");
             // Panic should never happen from this strip unless the prefix magic for the compiler
-            Ok(Dependency::Compiler(Compiler {
-                language: language.to_string(),
-            }))
+            Ok(Dependency::Compiler(Language(language.to_string())))
+        } else if self.contains("__STDLIB") {
+            let stdlib: String = self.try_convert(name)?;
+            let language = stdlib
+                .strip_prefix("__STDLIB ")
+                .expect("stdlib without prefix");
+            // Panic should never happen from this strip unless the prefix magic for the stdlib
+            Ok(Dependency::Stdlib(Language(language.to_string())))
         } else if self.contains("__PIN_SUBPACKAGE") {
             let pin_subpackage: String = self.try_convert(name)?;
 
@@ -286,7 +290,8 @@ impl<'de> Deserialize<'de> for Dependency {
         enum RawDependency {
             PinSubpackage(PinSubpackage),
             PinCompatible(PinCompatible),
-            Compiler(Compiler),
+            Compiler(Language),
+            Stdlib(Language),
         }
 
         #[derive(Deserialize)]
@@ -302,6 +307,7 @@ impl<'de> Deserialize<'de> for Dependency {
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
             RawSpec::Explicit(RawDependency::Compiler(dep)) => Dependency::Compiler(dep),
+            RawSpec::Explicit(RawDependency::Stdlib(dep)) => Dependency::Stdlib(dep),
         })
     }
 }
@@ -316,7 +322,8 @@ impl Serialize for Dependency {
         enum RawDependency<'a> {
             PinSubpackage(&'a PinSubpackage),
             PinCompatible(&'a PinCompatible),
-            Compiler(&'a Compiler),
+            Compiler(&'a Language),
+            Stdlib(&'a Language),
         }
 
         #[derive(Serialize)]
@@ -331,6 +338,7 @@ impl Serialize for Dependency {
             Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
             Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
             Dependency::Compiler(dep) => RawSpec::Explicit(RawDependency::Compiler(dep)),
+            Dependency::Stdlib(dep) => RawSpec::Explicit(RawDependency::Stdlib(dep)),
         };
 
         raw.serialize(serializer)
@@ -544,12 +552,10 @@ mod test {
 
     #[test]
     fn test_compiler_serde() {
-        let compiler = Compiler {
-            language: "gcc".to_string(),
-        };
+        let compiler = Language("cxx".to_string());
 
         let serialized = serde_yaml::to_string(&compiler).unwrap();
-        assert_eq!(serialized, "gcc\n");
+        assert_eq!(serialized, "cxx\n");
 
         let requirements = Requirements {
             build: vec![Dependency::Compiler(compiler)],
@@ -559,7 +565,7 @@ mod test {
         insta::assert_yaml_snapshot!(requirements);
 
         let yaml = serde_yaml::to_string(&requirements).unwrap();
-        assert_eq!(yaml, "build:\n- compiler: gcc\n");
+        assert_eq!(yaml, "build:\n- compiler: cxx\n");
 
         let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
         insta::assert_yaml_snapshot!(deserialized);
@@ -601,9 +607,7 @@ mod test {
         };
 
         let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
-        let compiler = Compiler {
-            language: "gcc".to_string(),
-        };
+        let compiler = Language("cxx".to_string());
 
         let requirements = Requirements {
             build: vec![

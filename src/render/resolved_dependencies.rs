@@ -581,6 +581,10 @@ pub fn apply_variant(
                         language: compiler_name,
                         spec: MatchSpec::from_str(&final_compiler, ParseStrictness::Strict)?,
                     }.into())
+                },
+                Dependency::Stdlib(_stdlib) => {
+                    // TODO: implement stdlib
+                    return Ok(SourceDependency { spec: "foo".parse().unwrap() }.into());
                 }
             }
         })

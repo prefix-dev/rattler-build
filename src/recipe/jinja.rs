@@ -93,7 +93,6 @@ fn jinja_pin_function(
         )
     })?;
 
-    // we translate the compiler into a YAML string
     let mut pin_subpackage = Pin {
         name,
         args: PinArgs::default(),
@@ -222,6 +221,11 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function("compiler", |lang: String| {
         // we translate the compiler into a YAML string
         Ok(format!("__COMPILER {}", lang.to_lowercase()))
+    });
+
+    env.add_function("stdlib", |lang: String| {
+        // we translate the stdlib into a YAML string
+        Ok(format!("__STDLIB {}", lang.to_lowercase()))
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {
