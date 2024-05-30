@@ -238,7 +238,7 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
             // try to convert from a YAML dictionary
             let dependency: Dependency =
                 serde_yaml::from_str(self.as_str()).expect("Internal repr error");
-            return Ok(dependency);
+            Ok(dependency)
         } else {
             let spec = self.try_convert(name)?;
             Ok(Dependency::Spec(spec))
