@@ -53,7 +53,7 @@ jobs:
         run: |
           git add docs/reference/cli.md
           git commit -m "docs: update CLI docs"
-          git push origin HEAD:${{ github.head_ref }}
+          git push
 
   build-docs:
     needs: generate-cli-docs
