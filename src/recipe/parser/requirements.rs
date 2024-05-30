@@ -150,7 +150,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
 pub struct PinSubpackage {
     /// The pin value.
     #[serde(flatten)]
-    pin_subpackage: Pin,
+    pub pin_subpackage: Pin,
 }
 
 impl PinSubpackage {
@@ -168,7 +168,7 @@ impl PinSubpackage {
 pub struct PinCompatible {
     /// The pin value.
     #[serde(flatten)]
-    pin_compatible: Pin,
+    pub pin_compatible: Pin,
 }
 
 impl PinCompatible {
@@ -237,7 +237,14 @@ impl TryConvertNode<Vec<Dependency>> for RenderedNode {
 
 impl TryConvertNode<Dependency> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<Dependency, Vec<PartialParsingError>> {
-        // compiler
+        // Pin subpackage and pin compatible are serialized into JSON by the `jinja` converter
+        if self.starts_with('{') {
+            // try to convert from a YAML dictionary
+            let pin_subpackage: Dependency =
+                serde_yaml::from_str(self.as_str()).expect("Internal repr error");
+            return Ok(pin_subpackage);
+        }
+
         if self.contains("__COMPILER") {
             let compiler: String = self.try_convert(name)?;
             let language = compiler
@@ -252,29 +259,8 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
                 .expect("stdlib without prefix");
             // Panic should never happen from this strip unless the prefix magic for the stdlib
             Ok(Dependency::Stdlib(Language(language.to_string())))
-        } else if self.contains("__PIN_SUBPACKAGE") {
-            let pin_subpackage: String = self.try_convert(name)?;
-
-            // Panic should never happen from this strip unless the
-            // prefix magic for the pin subpackage changes
-            let internal_repr = pin_subpackage
-                .strip_prefix("__PIN_SUBPACKAGE ")
-                .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
-            let pin_subpackage = Pin::from_internal_repr(internal_repr);
-            Ok(Dependency::PinSubpackage(PinSubpackage { pin_subpackage }))
-        } else if self.contains("__PIN_COMPATIBLE") {
-            let pin_compatible: String = self.try_convert(name)?;
-
-            // Panic should never happen from this strip unless the
-            // prefix magic for the pin compatible changes
-            let internal_repr = pin_compatible
-                .strip_prefix("__PIN_COMPATIBLE ")
-                .expect("pin compatible without prefix __PIN_COMPATIBLE ");
-            let pin_compatible = Pin::from_internal_repr(internal_repr);
-            Ok(Dependency::PinCompatible(PinCompatible { pin_compatible }))
         } else {
             let spec = self.try_convert(name)?;
-
             Ok(Dependency::Spec(spec))
         }
     }
@@ -360,12 +346,13 @@ impl TryConvertNode<MatchSpec> for RenderedNode {
 }
 
 impl TryConvertNode<MatchSpec> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
         MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
+            let str = self.as_str();
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::from(err),
-                label = format!("error parsing `{name}` as a match spec")
+                label = format!("error parsing `{str}` as a match spec")
             )]
         })
     }
@@ -621,5 +608,11 @@ mod test {
         };
 
         insta::assert_snapshot!(serde_yaml::to_string(&requirements).unwrap());
+    }
+
+    #[test]
+    fn test_deserialize_pin() {
+        let pin = "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true, spec: foo }}";
+        let _: Dependency = serde_yaml::from_str(pin).unwrap();
     }
 }

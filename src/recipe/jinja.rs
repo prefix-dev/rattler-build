@@ -11,6 +11,8 @@ use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
 
+use super::parser::{Dependency, PinCompatible, PinSubpackage};
+
 /// A type that hold the miniJinja environment and context for Jinja template processing.
 #[derive(Debug, Clone)]
 pub struct Jinja<'a> {
@@ -93,7 +95,7 @@ fn jinja_pin_function(
         )
     })?;
 
-    let mut pin_subpackage = Pin {
+    let mut pin = Pin {
         name,
         args: PinArgs::default(),
     };
@@ -111,24 +113,34 @@ fn jinja_pin_function(
         let max_pin = kwargs.get_attr("max_pin")?;
         if max_pin != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&max_pin)?;
-            pin_subpackage.args.max_pin = Some(pin_expr);
+            pin.args.max_pin = Some(pin_expr);
         }
         let min = kwargs.get_attr("min_pin")?;
         if min != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&min)?;
-            pin_subpackage.args.min_pin = Some(pin_expr);
+            pin.args.min_pin = Some(pin_expr);
         }
         let exact = kwargs.get_attr("exact")?;
         if exact != minijinja::value::Value::UNDEFINED {
-            pin_subpackage.args.exact = exact.is_true();
+            pin.args.exact = exact.is_true();
         }
     }
 
-    Ok(format!(
-        "{} {}",
-        internal_repr,
-        pin_subpackage.internal_repr()
-    ))
+    if internal_repr == "__PIN_SUBPACKAGE" {
+        Ok(
+            serde_json::to_string(&Dependency::PinSubpackage(PinSubpackage {
+                pin_subpackage: pin,
+            }))
+            .unwrap(),
+        )
+    } else {
+        Ok(
+            serde_json::to_string(&Dependency::PinCompatible(PinCompatible {
+                pin_compatible: pin,
+            }))
+            .unwrap(),
+        )
+    }
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
@@ -180,6 +192,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         experimental,
         ..
     } = config.clone();
+
     env.add_function("cdt", move |package_name: String| {
         use rattler_conda_types::Arch;
         let arch = build_platform.arch().or_else(|| target_platform.arch());
@@ -229,6 +242,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {
+        // return "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true }}".to_string();
         jinja_pin_function(name, kwargs, "__PIN_SUBPACKAGE")
     });
 

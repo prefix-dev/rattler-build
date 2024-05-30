@@ -584,7 +584,7 @@ pub fn apply_variant(
                 },
                 Dependency::Stdlib(_stdlib) => {
                     // TODO: implement stdlib
-                    return Ok(SourceDependency { spec: "foo".parse().unwrap() }.into());
+                    Ok(SourceDependency { spec: "foo".parse().unwrap() }.into())
                 }
             }
         })
