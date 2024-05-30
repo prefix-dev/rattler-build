@@ -11,6 +11,7 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end -v -s"
 test = "cargo test"
 lint = "pre-commit run --all"
+generate-cli-docs = "cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md"
 
 [feature.docs.tasks]
 build-docs = "mkdocs build --strict"

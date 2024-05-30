@@ -7,7 +7,6 @@ use std::{
 };
 
 use clap::{CommandFactory, Parser};
-use clap_markdown::print_help_markdown;
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
@@ -39,11 +38,6 @@ async fn main() -> miette::Result<()> {
         #[cfg(feature = "tui")]
         None
     };
-
-    if app.markdown_help {
-        print_help_markdown::<App>();
-        return Ok(());
-    }
 
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {

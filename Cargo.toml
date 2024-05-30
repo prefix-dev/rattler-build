@@ -17,6 +17,7 @@ default = ['native-tls']
 native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_installs_packages/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls', 'rattler_installs_packages/rustls-tls']
 tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input']
+generate-cli-docs = ["clap-markdown"]
 
 [dependencies]
 serde = { version = "1.0.202", features = ["derive"] }
@@ -115,7 +116,7 @@ reflink-copy = "0.1.17"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.10.4"
-clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
+clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.39.0", features = ["yaml"] }

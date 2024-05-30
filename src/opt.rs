@@ -88,9 +88,6 @@ pub struct App {
         global = true
     )]
     pub color: Color,
-
-    #[arg(long, hide = true)]
-    pub markdown_help: bool,
 }
 
 impl App {
