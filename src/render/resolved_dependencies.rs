@@ -450,7 +450,6 @@ pub fn apply_variant(
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
     let subpackages = &build_configuration.subpackages;
-    let target_platform = &build_configuration.target_platform;
 
     raw_specs
         .iter()
@@ -475,8 +474,12 @@ pub fn apply_variant(
 
                                 // we split at whitespace to separate into version and build
                                 let mut splitter = spec.split_whitespace();
-                                let version_spec = splitter.next().map(|v| VersionSpec::from_str(v, ParseStrictness::Strict)).transpose()?;
-                                let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
+                                let version_spec = splitter
+                                    .next()
+                                    .map(|v| VersionSpec::from_str(v, ParseStrictness::Strict))
+                                    .transpose()?;
+                                let build_spec =
+                                    splitter.next().map(StringMatcher::from_str).transpose()?;
                                 let variant = name.as_normalized().to_string();
                                 let final_spec = MatchSpec {
                                     version: version_spec,
@@ -486,7 +489,8 @@ pub fn apply_variant(
                                 return Ok(VariantDependency {
                                     spec: final_spec,
                                     variant,
-                                }.into());
+                                }
+                                .into());
                             }
                         }
                     }
@@ -494,97 +498,35 @@ pub fn apply_variant(
                 }
                 Dependency::PinSubpackage(pin) => {
                     let name = &pin.pin_value().name;
-                    let subpackage = subpackages.get(name).ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
-                    let pinned = pin
-                        .pin_value()
-                        .apply(
-                            &Version::from_str(&subpackage.version)?,
-                            &subpackage.build_string,
-                        )?;
-                    Ok(PinSubpackageDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
+                    let subpackage = subpackages
+                        .get(name)
+                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                    let pinned = pin.pin_value().apply(
+                        &Version::from_str(&subpackage.version)?,
+                        &subpackage.build_string,
+                    )?;
+                    Ok(PinSubpackageDependency {
+                        spec: pinned,
+                        name: name.as_normalized().to_string(),
+                        args: pin.pin_value().args.clone(),
+                    }
+                    .into())
                 }
                 Dependency::PinCompatible(pin) => {
                     let name = &pin.pin_value().name;
-                    let pin_package = compatibility_specs.get(name)
+                    let pin_package = compatibility_specs
+                        .get(name)
                         .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
 
                     let pinned = pin
                         .pin_value()
-                        .apply(
-                            &pin_package.version,
-                            &pin_package.build,
-                        )?;
-                    Ok(PinCompatibleDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
-                }
-                Dependency::Compiler(compiler) => {
-                    if target_platform == &Platform::NoArch {
-                        return Err(ResolveError::CompilerError("Noarch packages cannot have compilers".to_string()))
+                        .apply(&pin_package.version, &pin_package.build)?;
+                    Ok(PinCompatibleDependency {
+                        spec: pinned,
+                        name: name.as_normalized().to_string(),
+                        args: pin.pin_value().args.clone(),
                     }
-
-                    let compiler_variant = format!("{}_compiler", compiler.language());
-                    let compiler_name = variant
-                        .get(&compiler_variant)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| {
-                            if target_platform.is_linux() {
-                                let default_compiler = match compiler.language() {
-                                    "c" => "gcc".to_string(),
-                                    "cxx" => "gxx".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.language() {
-                                    "c" => "clang".to_string(),
-                                    "cxx" => "clangxx".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else if target_platform.is_windows() {
-                                let default_compiler = match compiler.language() {
-                                    // note with conda-build, these are dependent on the python version
-                                    // we could also check the variant for the python version here!
-                                    "c" => "vs2017".to_string(),
-                                    "cxx" => "vs2017".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else {
-                                "".to_string()
-                            }
-                        });
-
-                    if compiler_name.is_empty() {
-                        return Err(ResolveError::CompilerError(
-                            format!("Could not find compiler for {}. Configure {}_compiler in your variant config file for {target_platform}.", compiler.language(), compiler.language())));
-                    }
-
-                    let compiler_version_variant = format!("{}_version", compiler_variant);
-                    let compiler_version = variant.get(&compiler_version_variant);
-
-                    let final_compiler = if let Some(compiler_version) = compiler_version {
-                        format!(
-                            "{}_{} ={}",
-                            compiler_name, target_platform, compiler_version
-                        )
-                    } else {
-                        format!("{}_{}", compiler_name, target_platform)
-                    };
-
-                    Ok(CompilerDependency {
-                        language: compiler_name,
-                        spec: MatchSpec::from_str(&final_compiler, ParseStrictness::Strict)?,
-                    }.into())
-                },
-                Dependency::Stdlib(_stdlib) => {
-                    // TODO: implement stdlib
-                    Ok(SourceDependency { spec: "foo".parse().unwrap() }.into())
+                    .into())
                 }
             }
         })

@@ -39,6 +39,7 @@ use metadata::Output;
 use miette::{IntoDiagnostic, WrapErr};
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use recipe::parser::Dependency;
 use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
@@ -550,14 +551,12 @@ pub fn sort_build_outputs_topologically(
             .expect("We just inserted it");
         for dep in output.recipe.requirements().all() {
             let dep_name = match dep {
-                recipe::parser::Dependency::Spec(spec) => spec
+                Dependency::Spec(spec) => spec
                     .name
                     .clone()
                     .expect("MatchSpec should always have a name"),
-                recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
-                recipe::parser::Dependency::Compiler(_) => continue,
-                recipe::parser::Dependency::Stdlib(_) => continue,
+                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
             };
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 // do not point to self (circular dependency) - this can happen with

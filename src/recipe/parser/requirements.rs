@@ -204,10 +204,6 @@ pub enum Dependency {
     PinSubpackage(PinSubpackage),
     /// A pin_compatible dependency
     PinCompatible(PinCompatible),
-    /// A compiler dependency
-    Compiler(Language),
-    /// A stdlib dependency
-    Stdlib(Language),
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
@@ -240,25 +236,9 @@ impl TryConvertNode<Dependency> for RenderedScalarNode {
         // Pin subpackage and pin compatible are serialized into JSON by the `jinja` converter
         if self.starts_with('{') {
             // try to convert from a YAML dictionary
-            let pin_subpackage: Dependency =
+            let dependency: Dependency =
                 serde_yaml::from_str(self.as_str()).expect("Internal repr error");
-            return Ok(pin_subpackage);
-        }
-
-        if self.contains("__COMPILER") {
-            let compiler: String = self.try_convert(name)?;
-            let language = compiler
-                .strip_prefix("__COMPILER ")
-                .expect("compiler without prefix");
-            // Panic should never happen from this strip unless the prefix magic for the compiler
-            Ok(Dependency::Compiler(Language(language.to_string())))
-        } else if self.contains("__STDLIB") {
-            let stdlib: String = self.try_convert(name)?;
-            let language = stdlib
-                .strip_prefix("__STDLIB ")
-                .expect("stdlib without prefix");
-            // Panic should never happen from this strip unless the prefix magic for the stdlib
-            Ok(Dependency::Stdlib(Language(language.to_string())))
+            return Ok(dependency);
         } else {
             let spec = self.try_convert(name)?;
             Ok(Dependency::Spec(spec))
@@ -276,8 +256,6 @@ impl<'de> Deserialize<'de> for Dependency {
         enum RawDependency {
             PinSubpackage(PinSubpackage),
             PinCompatible(PinCompatible),
-            Compiler(Language),
-            Stdlib(Language),
         }
 
         #[derive(Deserialize)]
@@ -292,8 +270,6 @@ impl<'de> Deserialize<'de> for Dependency {
             RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
-            RawSpec::Explicit(RawDependency::Compiler(dep)) => Dependency::Compiler(dep),
-            RawSpec::Explicit(RawDependency::Stdlib(dep)) => Dependency::Stdlib(dep),
         })
     }
 }
@@ -308,8 +284,6 @@ impl Serialize for Dependency {
         enum RawDependency<'a> {
             PinSubpackage(&'a PinSubpackage),
             PinCompatible(&'a PinCompatible),
-            Compiler(&'a Language),
-            Stdlib(&'a Language),
         }
 
         #[derive(Serialize)]
@@ -323,8 +297,6 @@ impl Serialize for Dependency {
             Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
             Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
             Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
-            Dependency::Compiler(dep) => RawSpec::Explicit(RawDependency::Compiler(dep)),
-            Dependency::Stdlib(dep) => RawSpec::Explicit(RawDependency::Stdlib(dep)),
         };
 
         raw.serialize(serializer)
