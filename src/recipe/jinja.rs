@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
 use minijinja::{Environment, Value};
-use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version};
+use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
@@ -216,13 +216,12 @@ fn compiler_stdlib_eval(
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
-    use rattler_conda_types::version_spec::VersionSpec;
-
     let SelectorConfig {
         target_platform,
         build_platform,
         variant,
         experimental,
+        allow_undefined,
         ..
     } = config.clone();
 
@@ -315,7 +314,12 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     let variant_clone = variant.clone();
     env.add_function("stdlib", move |lang: String| {
-        compiler_stdlib_eval(&lang, target_platform, &variant_clone, "stdlib")
+        let res = compiler_stdlib_eval(&lang, target_platform, &variant_clone, "stdlib");
+        if allow_undefined {
+            Ok(res.unwrap_or_else(|_| "undefined".to_string()))
+        } else {
+            res
+        }
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {

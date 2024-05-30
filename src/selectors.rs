@@ -22,6 +22,8 @@ pub struct SelectorConfig {
     pub variant: BTreeMap<String, String>,
     /// Enable experimental features
     pub experimental: bool,
+    /// Allow undefined variables
+    pub allow_undefined: bool,
 }
 
 impl SelectorConfig {
@@ -98,6 +100,7 @@ impl Default for SelectorConfig {
             hash: None,
             variant: Default::default(),
             experimental: false,
+            allow_undefined: false,
         }
     }
 }

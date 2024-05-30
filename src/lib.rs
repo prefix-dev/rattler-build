@@ -169,6 +169,8 @@ pub async fn get_build_output(
         build_platform: args.build_platform,
         variant: BTreeMap::new(),
         experimental: args.common.experimental,
+        // allow undefined while finding the variants
+        allow_undefined: true,
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
@@ -217,6 +219,7 @@ pub async fn get_build_output(
             host_platform: selector_config.host_platform,
             build_platform: selector_config.build_platform,
             experimental: args.common.experimental,
+            allow_undefined: false,
         };
 
         let recipe =

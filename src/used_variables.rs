@@ -303,6 +303,7 @@ mod test {
             - if: osx
               then: osx-clang
             - ${{ compiler('c') }}
+            - ${{ stdlib('c') }}
             - ${{ pin_subpackage('abcdef') }}
         "#;
 
@@ -313,6 +314,8 @@ mod test {
         assert!(used_vars.contains("osx"));
         assert!(used_vars.contains("c_compiler"));
         assert!(used_vars.contains("c_compiler_version"));
+        assert!(used_vars.contains("c_stdlib"));
+        assert!(used_vars.contains("c_stdlib_version"));
         assert!(used_vars.contains("abcdef"));
     }
 
