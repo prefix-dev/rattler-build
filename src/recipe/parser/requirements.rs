@@ -510,27 +510,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_compiler_serde() {
-        let compiler = Language("cxx".to_string());
-
-        let serialized = serde_yaml::to_string(&compiler).unwrap();
-        assert_eq!(serialized, "cxx\n");
-
-        let requirements = Requirements {
-            build: vec![Dependency::Compiler(compiler)],
-            ..Default::default()
-        };
-
-        insta::assert_yaml_snapshot!(requirements);
-
-        let yaml = serde_yaml::to_string(&requirements).unwrap();
-        assert_eq!(yaml, "build:\n- compiler: cxx\n");
-
-        let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
-        insta::assert_yaml_snapshot!(deserialized);
-    }
-
-    #[test]
     fn test_pin_package() {
         let pin_subpackage = PinSubpackage {
             pin_subpackage: Pin {
@@ -566,7 +545,6 @@ mod test {
         };
 
         let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
-        let compiler = Language("cxx".to_string());
 
         let requirements = Requirements {
             build: vec![
@@ -574,7 +552,6 @@ mod test {
                 Dependency::PinSubpackage(pin_subpackage),
                 Dependency::PinCompatible(pin_compatible),
                 Dependency::PinCompatible(pin_compatible_2),
-                Dependency::Compiler(compiler),
             ],
             ..Default::default()
         };

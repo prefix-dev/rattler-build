@@ -37,9 +37,6 @@ pub enum DependencyInfo {
     /// from the variant config
     Variant(VariantDependency),
 
-    /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-    Compiler(CompilerDependency),
-
     /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
     PinSubpackage(PinSubpackageDependency),
 
@@ -70,26 +67,6 @@ pub struct VariantDependency {
 impl From<VariantDependency> for DependencyInfo {
     fn from(value: VariantDependency) -> Self {
         DependencyInfo::Variant(value)
-    }
-}
-
-/// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CompilerDependency {
-    /// The language in the `{{ compiler('c') }}` call.
-    #[serde(rename = "compiler")]
-    pub language: String,
-
-    /// The resolved compiler spec
-    #[serde_as(as = "DisplayFromStr")]
-    pub spec: MatchSpec,
-}
-
-impl From<CompilerDependency> for DependencyInfo {
-    fn from(value: CompilerDependency) -> Self {
-        DependencyInfo::Compiler(value)
     }
 }
 
@@ -174,7 +151,6 @@ impl DependencyInfo {
     pub fn spec(&self) -> &MatchSpec {
         match self {
             DependencyInfo::Variant(spec) => &spec.spec,
-            DependencyInfo::Compiler(spec) => &spec.spec,
             DependencyInfo::PinSubpackage(spec) => &spec.spec,
             DependencyInfo::PinCompatible(spec) => &spec.spec,
             DependencyInfo::RunExport(spec) => &spec.spec,
@@ -186,7 +162,6 @@ impl DependencyInfo {
         if !long {
             match self {
                 DependencyInfo::Variant(spec) => format!("{} (V)", &spec.spec),
-                DependencyInfo::Compiler(spec) => format!("{} (C)", &spec.spec),
                 DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", &spec.spec),
                 DependencyInfo::PinCompatible(spec) => format!("{} (PC)", &spec.spec),
                 DependencyInfo::RunExport(spec) => format!(
@@ -198,7 +173,6 @@ impl DependencyInfo {
         } else {
             match self {
                 DependencyInfo::Variant(spec) => format!("{} (from variant config)", &spec.spec),
-                DependencyInfo::Compiler(spec) => format!("{} (from compiler)", &spec.spec),
                 DependencyInfo::PinSubpackage(spec) => {
                     format!("{} (from pin subpackage)", &spec.spec)
                 }
@@ -245,13 +219,6 @@ impl DependencyInfo {
     pub fn as_pin_compatible(&self) -> Option<&PinCompatibleDependency> {
         match self {
             DependencyInfo::PinCompatible(spec) => Some(spec),
-            _ => None,
-        }
-    }
-
-    pub fn as_compiler(&self) -> Option<&CompilerDependency> {
-        match self {
-            DependencyInfo::Compiler(spec) => Some(spec),
             _ => None,
         }
     }
@@ -913,11 +880,6 @@ mod tests {
                 variant: "bar".to_string(),
             }
             .into(),
-            CompilerDependency {
-                language: "c".to_string(),
-                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
-            }
-            .into(),
             PinSubpackageDependency {
                 name: "baz".to_string(),
                 spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
@@ -944,11 +906,10 @@ mod tests {
 
         // test deserialize
         let dep_info: Vec<DependencyInfo> = serde_yaml::from_str(&yaml_str).unwrap();
-        assert_eq!(dep_info.len(), 5);
+        assert_eq!(dep_info.len(), 4);
         assert!(matches!(dep_info[0], DependencyInfo::Source(_)));
         assert!(matches!(dep_info[1], DependencyInfo::Variant(_)));
-        assert!(matches!(dep_info[2], DependencyInfo::Compiler(_)));
-        assert!(matches!(dep_info[3], DependencyInfo::PinSubpackage(_)));
-        assert!(matches!(dep_info[4], DependencyInfo::PinCompatible(_)));
+        assert!(matches!(dep_info[2], DependencyInfo::PinSubpackage(_)));
+        assert!(matches!(dep_info[3], DependencyInfo::PinCompatible(_)));
     }
 }

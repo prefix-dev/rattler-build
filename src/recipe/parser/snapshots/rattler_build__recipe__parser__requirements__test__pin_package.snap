@@ -16,4 +16,3 @@ build:
     name: bar
     min_pin: x.x
     exact: true
-- compiler: cxx
