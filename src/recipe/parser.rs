@@ -39,7 +39,8 @@ pub use self::{
     package::{OutputPackage, Package},
     regex::SerializableRegex,
     requirements::{
-        Compiler, Dependency, IgnoreRunExports, PinSubpackage, Requirements, RunExports,
+        Dependency, IgnoreRunExports, Language, PinCompatible, PinSubpackage, Requirements,
+        RunExports,
     },
     script::{Script, ScriptContent},
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
@@ -453,8 +454,13 @@ mod tests {
 
     #[test]
     fn test_complete_recipe() {
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            ..SelectorConfig::default()
+        };
         let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        let recipe = Recipe::from_yaml(recipe, selector_config).unwrap();
         assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
     }
 }

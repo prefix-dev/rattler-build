@@ -150,7 +150,7 @@ impl TryConvertNode<Requirements> for RenderedMappingNode {
 pub struct PinSubpackage {
     /// The pin value.
     #[serde(flatten)]
-    pin_subpackage: Pin,
+    pub pin_subpackage: Pin,
 }
 
 impl PinSubpackage {
@@ -168,7 +168,7 @@ impl PinSubpackage {
 pub struct PinCompatible {
     /// The pin value.
     #[serde(flatten)]
-    pin_compatible: Pin,
+    pub pin_compatible: Pin,
 }
 
 impl PinCompatible {
@@ -186,15 +186,12 @@ impl PinCompatible {
 /// it is always resolved with the target_platform.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct Compiler {
-    /// The language such as c, cxx, rust, etc.
-    language: String,
-}
+pub struct Language(String);
 
-impl Compiler {
+impl Language {
     /// Get the language value as a string.
     pub fn language(&self) -> &str {
-        &self.language
+        &self.0
     }
 }
 
@@ -207,8 +204,6 @@ pub enum Dependency {
     PinSubpackage(PinSubpackage),
     /// A pin_compatible dependency
     PinCompatible(PinCompatible),
-    /// A compiler dependency
-    Compiler(Compiler),
 }
 
 impl TryConvertNode<Vec<Dependency>> for RenderedNode {
@@ -238,39 +233,14 @@ impl TryConvertNode<Vec<Dependency>> for RenderedNode {
 
 impl TryConvertNode<Dependency> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<Dependency, Vec<PartialParsingError>> {
-        // compiler
-        if self.contains("__COMPILER") {
-            let compiler: String = self.try_convert(name)?;
-            let language = compiler
-                .strip_prefix("__COMPILER ")
-                .expect("compiler without prefix");
-            // Panic should never happen from this strip unless the prefix magic for the compiler
-            Ok(Dependency::Compiler(Compiler {
-                language: language.to_string(),
-            }))
-        } else if self.contains("__PIN_SUBPACKAGE") {
-            let pin_subpackage: String = self.try_convert(name)?;
-
-            // Panic should never happen from this strip unless the
-            // prefix magic for the pin subpackage changes
-            let internal_repr = pin_subpackage
-                .strip_prefix("__PIN_SUBPACKAGE ")
-                .expect("pin subpackage without prefix __PIN_SUBPACKAGE ");
-            let pin_subpackage = Pin::from_internal_repr(internal_repr);
-            Ok(Dependency::PinSubpackage(PinSubpackage { pin_subpackage }))
-        } else if self.contains("__PIN_COMPATIBLE") {
-            let pin_compatible: String = self.try_convert(name)?;
-
-            // Panic should never happen from this strip unless the
-            // prefix magic for the pin compatible changes
-            let internal_repr = pin_compatible
-                .strip_prefix("__PIN_COMPATIBLE ")
-                .expect("pin compatible without prefix __PIN_COMPATIBLE ");
-            let pin_compatible = Pin::from_internal_repr(internal_repr);
-            Ok(Dependency::PinCompatible(PinCompatible { pin_compatible }))
+        // Pin subpackage and pin compatible are serialized into JSON by the `jinja` converter
+        if self.starts_with('{') {
+            // try to convert from a YAML dictionary
+            let dependency: Dependency =
+                serde_yaml::from_str(self.as_str()).expect("Internal repr error");
+            Ok(dependency)
         } else {
             let spec = self.try_convert(name)?;
-
             Ok(Dependency::Spec(spec))
         }
     }
@@ -286,7 +256,6 @@ impl<'de> Deserialize<'de> for Dependency {
         enum RawDependency {
             PinSubpackage(PinSubpackage),
             PinCompatible(PinCompatible),
-            Compiler(Compiler),
         }
 
         #[derive(Deserialize)]
@@ -301,7 +270,6 @@ impl<'de> Deserialize<'de> for Dependency {
             RawSpec::String(spec) => Dependency::Spec(spec.parse().map_err(D::Error::custom)?),
             RawSpec::Explicit(RawDependency::PinSubpackage(dep)) => Dependency::PinSubpackage(dep),
             RawSpec::Explicit(RawDependency::PinCompatible(dep)) => Dependency::PinCompatible(dep),
-            RawSpec::Explicit(RawDependency::Compiler(dep)) => Dependency::Compiler(dep),
         })
     }
 }
@@ -316,7 +284,6 @@ impl Serialize for Dependency {
         enum RawDependency<'a> {
             PinSubpackage(&'a PinSubpackage),
             PinCompatible(&'a PinCompatible),
-            Compiler(&'a Compiler),
         }
 
         #[derive(Serialize)]
@@ -330,7 +297,6 @@ impl Serialize for Dependency {
             Dependency::Spec(dep) => RawSpec::String(dep.to_string()),
             Dependency::PinSubpackage(dep) => RawSpec::Explicit(RawDependency::PinSubpackage(dep)),
             Dependency::PinCompatible(dep) => RawSpec::Explicit(RawDependency::PinCompatible(dep)),
-            Dependency::Compiler(dep) => RawSpec::Explicit(RawDependency::Compiler(dep)),
         };
 
         raw.serialize(serializer)
@@ -352,12 +318,13 @@ impl TryConvertNode<MatchSpec> for RenderedNode {
 }
 
 impl TryConvertNode<MatchSpec> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
         MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
+            let str = self.as_str();
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::from(err),
-                label = format!("error parsing `{name}` as a match spec")
+                label = format!("error parsing `{str}` as a match spec")
             )]
         })
     }
@@ -543,29 +510,6 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_compiler_serde() {
-        let compiler = Compiler {
-            language: "gcc".to_string(),
-        };
-
-        let serialized = serde_yaml::to_string(&compiler).unwrap();
-        assert_eq!(serialized, "gcc\n");
-
-        let requirements = Requirements {
-            build: vec![Dependency::Compiler(compiler)],
-            ..Default::default()
-        };
-
-        insta::assert_yaml_snapshot!(requirements);
-
-        let yaml = serde_yaml::to_string(&requirements).unwrap();
-        assert_eq!(yaml, "build:\n- compiler: gcc\n");
-
-        let deserialized: Requirements = serde_yaml::from_str(&yaml).unwrap();
-        insta::assert_yaml_snapshot!(deserialized);
-    }
-
-    #[test]
     fn test_pin_package() {
         let pin_subpackage = PinSubpackage {
             pin_subpackage: Pin {
@@ -601,9 +545,6 @@ mod test {
         };
 
         let spec = MatchSpec::from_str("foo >=3.1", ParseStrictness::Strict).unwrap();
-        let compiler = Compiler {
-            language: "gcc".to_string(),
-        };
 
         let requirements = Requirements {
             build: vec![
@@ -611,11 +552,16 @@ mod test {
                 Dependency::PinSubpackage(pin_subpackage),
                 Dependency::PinCompatible(pin_compatible),
                 Dependency::PinCompatible(pin_compatible_2),
-                Dependency::Compiler(compiler),
             ],
             ..Default::default()
         };
 
         insta::assert_snapshot!(serde_yaml::to_string(&requirements).unwrap());
+    }
+
+    #[test]
+    fn test_deserialize_pin() {
+        let pin = "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true, spec: foo }}";
+        let _: Dependency = serde_yaml::from_str(pin).unwrap();
     }
 }

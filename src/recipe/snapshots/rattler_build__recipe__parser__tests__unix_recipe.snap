@@ -147,9 +147,23 @@ Recipe {
     },
     requirements: Requirements {
         build: [
-            Compiler(
-                Compiler {
-                    language: "cxx",
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "gxx_linux-64",
+                        },
+                    ),
+                    version: None,
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
                 },
             ),
             Spec(

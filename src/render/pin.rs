@@ -152,66 +152,6 @@ impl Pin {
         Ok(MatchSpec::from_str(spec.as_str(), ParseStrictness::Strict)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
     }
-
-    pub(crate) fn internal_repr(&self) -> String {
-        let max_pin_str = if let Some(max_pin) = &self.args.max_pin {
-            format!("{}", max_pin)
-        } else {
-            "".to_string()
-        };
-
-        let min_pin_str = if let Some(min_pin) = &self.args.min_pin {
-            format!("{}", min_pin)
-        } else {
-            "".to_string()
-        };
-
-        format!(
-            "{} MAX_PIN={} MIN_PIN={} EXACT={}",
-            self.name.as_normalized(),
-            max_pin_str,
-            min_pin_str,
-            self.args.exact
-        )
-    }
-
-    pub(crate) fn from_internal_repr(s: &str) -> Self {
-        let parts = s.split(' ').collect::<Vec<_>>();
-        let name = parts[0].to_string();
-        let max_pin = parts[1];
-        let min_pin = parts[2];
-        let exact = parts[3];
-
-        let max_pin = if max_pin == "MAX_PIN=" {
-            None
-        } else {
-            let max_pin = max_pin
-                .strip_prefix("MAX_PIN=")
-                .expect("Could not parse max pin: invalid prefix");
-            Some(PinExpression::from_str(max_pin).expect("Could not parse max pin"))
-        };
-
-        let min_pin = if min_pin == "MIN_PIN=" {
-            None
-        } else {
-            let min_pin = min_pin
-                .strip_prefix("MIN_PIN=")
-                .expect("Could not parse min pin: invalid prefix");
-            Some(PinExpression::from_str(min_pin).expect("Could not parse min pin"))
-        };
-
-        let exact = exact == "EXACT=true";
-        let package_name = PackageName::try_from(name)
-            .expect("could not parse back package name from internal representation");
-        Pin {
-            name: package_name,
-            args: PinArgs {
-                max_pin,
-                min_pin,
-                exact,
-            },
-        }
-    }
 }
 
 #[cfg(test)]

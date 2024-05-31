@@ -1,15 +1,18 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use std::process::Command;
+use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::Object;
 use minijinja::{Environment, Value};
-use rattler_conda_types::{PackageName, ParseStrictness, Version};
+use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
+
+use super::parser::{Dependency, PinCompatible, PinSubpackage};
 
 /// A type that hold the miniJinja environment and context for Jinja template processing.
 #[derive(Debug, Clone)]
@@ -93,8 +96,7 @@ fn jinja_pin_function(
         )
     })?;
 
-    // we translate the compiler into a YAML string
-    let mut pin_subpackage = Pin {
+    let mut pin = Pin {
         name,
         args: PinArgs::default(),
     };
@@ -112,29 +114,120 @@ fn jinja_pin_function(
         let max_pin = kwargs.get_attr("max_pin")?;
         if max_pin != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&max_pin)?;
-            pin_subpackage.args.max_pin = Some(pin_expr);
+            pin.args.max_pin = Some(pin_expr);
         }
         let min = kwargs.get_attr("min_pin")?;
         if min != minijinja::value::Value::UNDEFINED {
             let pin_expr = pin_expr_from_value(&min)?;
-            pin_subpackage.args.min_pin = Some(pin_expr);
+            pin.args.min_pin = Some(pin_expr);
         }
         let exact = kwargs.get_attr("exact")?;
         if exact != minijinja::value::Value::UNDEFINED {
-            pin_subpackage.args.exact = exact.is_true();
+            pin.args.exact = exact.is_true();
         }
     }
 
-    Ok(format!(
-        "{} {}",
-        internal_repr,
-        pin_subpackage.internal_repr()
-    ))
+    if internal_repr == "__PIN_SUBPACKAGE" {
+        Ok(
+            serde_json::to_string(&Dependency::PinSubpackage(PinSubpackage {
+                pin_subpackage: pin,
+            }))
+            .unwrap(),
+        )
+    } else {
+        Ok(
+            serde_json::to_string(&Dependency::PinCompatible(PinCompatible {
+                pin_compatible: pin,
+            }))
+            .unwrap(),
+        )
+    }
+}
+
+fn default_compiler(platform: Platform, language: &str) -> Option<String> {
+    if platform.is_windows() {
+        match language {
+            "c" => Some("vs2017"),
+            "cxx" => Some("vs2017"),
+            "fortran" => Some("gfortran"),
+            "rust" => Some("rust"),
+            _ => None,
+        }
+    } else if platform.is_osx() {
+        match language {
+            "c" => Some("clang"),
+            "cxx" => Some("clangxx"),
+            "fortran" => Some("gfortran"),
+            "rust" => Some("rust"),
+            _ => None,
+        }
+    } else {
+        match language {
+            "c" => Some("gcc"),
+            "cxx" => Some("gxx"),
+            "fortran" => Some("gfortran"),
+            "rust" => Some("rust"),
+            _ => None,
+        }
+    }
+    .map(|s| s.to_string())
+}
+
+fn compiler_stdlib_eval(
+    lang: &str,
+    platform: Platform,
+    variant: &Arc<BTreeMap<String, String>>,
+    prefix: &str,
+) -> Result<String, minijinja::Error> {
+    let variant_key = format!("{lang}_{prefix}");
+    let variant_key_version = format!("{lang}_{prefix}_version");
+
+    let default_fn = if prefix == "compiler" {
+        default_compiler
+    } else {
+        |_: Platform, _: &str| None
+    };
+
+    let res = if let Some(name) = variant
+        .get(&variant_key)
+        .cloned()
+        .or_else(|| default_fn(platform, lang))
+    {
+        // check if we also have a compiler version
+        if let Some(version) = variant.get(&variant_key_version) {
+            Some(format!("{name}_{platform} {version}"))
+        } else {
+            Some(format!("{name}_{platform}"))
+        }
+    } else {
+        None
+    };
+
+    if let Some(res) = res {
+        Ok(res)
+    } else {
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!(
+                "No {prefix} found for language: {lang}\nYou should add `{lang}_{prefix}` to your variant config file.",
+            ),
+        ))
+    }
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
-    use rattler_conda_types::version_spec::VersionSpec;
+    let SelectorConfig {
+        target_platform,
+        build_platform,
+        variant,
+        experimental,
+        allow_undefined,
+        ..
+    } = config.clone();
+
     let mut env = minijinja::Environment::new();
+
+    let variant = Arc::new(variant.clone());
 
     // Ok to unwrap here because we know that the syntax is valid
     env.set_syntax(minijinja::Syntax {
@@ -174,19 +267,13 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         }
     });
 
-    let SelectorConfig {
-        target_platform,
-        build_platform,
-        variant,
-        experimental,
-        ..
-    } = config.clone();
+    let variant_clone = variant.clone();
     env.add_function("cdt", move |package_name: String| {
         use rattler_conda_types::Arch;
         let arch = build_platform.arch().or_else(|| target_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
-        let cdt_arch = if let Some(s) = variant.get("cdt_arch") {
+        let cdt_arch = if let Some(s) = variant_clone.get("cdt_arch") {
             s.as_str()
         } else {
             match arch {
@@ -203,7 +290,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
             }
         };
 
-        let cdt_name = variant.get("cdt_name").map_or_else(
+        let cdt_name = variant_clone.get("cdt_name").map_or_else(
             || match arch {
                 Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7",
                 _ => "cos6",
@@ -219,12 +306,24 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         Ok(res)
     });
 
-    env.add_function("compiler", |lang: String| {
-        // we translate the compiler into a YAML string
-        Ok(format!("__COMPILER {}", lang.to_lowercase()))
+    // "${{ PREFIX }}" delay the expansion. -> $PREFIX on unix and %PREFIX% on windows?
+    let variant_clone = variant.clone();
+    env.add_function("compiler", move |lang: String| {
+        compiler_stdlib_eval(&lang, target_platform, &variant_clone, "compiler")
+    });
+
+    let variant_clone = variant.clone();
+    env.add_function("stdlib", move |lang: String| {
+        let res = compiler_stdlib_eval(&lang, target_platform, &variant_clone, "stdlib");
+        if allow_undefined {
+            Ok(res.unwrap_or_else(|_| "undefined".to_string()))
+        } else {
+            res
+        }
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {
+        // return "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true }}".to_string();
         jinja_pin_function(name, kwargs, "__PIN_SUBPACKAGE")
     });
 
