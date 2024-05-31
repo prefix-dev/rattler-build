@@ -266,9 +266,9 @@ impl BuildConfiguration {
     /// Construct a `SelectorConfig` from the given `BuildConfiguration`
     pub fn selector_config(&self) -> SelectorConfig {
         SelectorConfig {
-            target_platform: self.target_platform.clone(),
-            host_platform: self.host_platform.clone(),
-            build_platform: self.build_platform.clone(),
+            target_platform: self.target_platform,
+            host_platform: self.host_platform,
+            build_platform: self.build_platform,
             variant: self.variant.clone(),
             hash: Some(self.hash.clone()),
             experimental: false,
