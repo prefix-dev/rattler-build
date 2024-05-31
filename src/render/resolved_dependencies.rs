@@ -887,6 +887,7 @@ mod tests {
                     max_pin: Some("x.x".parse().unwrap()),
                     min_pin: Some("x.x.x".parse().unwrap()),
                     exact: true,
+                    ..Default::default()
                 },
             }
             .into(),
@@ -897,6 +898,7 @@ mod tests {
                     max_pin: Some("x.x".parse().unwrap()),
                     min_pin: Some("x.x.x".parse().unwrap()),
                     exact: true,
+                    ..Default::default()
                 },
             }
             .into(),

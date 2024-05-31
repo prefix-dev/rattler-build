@@ -126,6 +126,7 @@ pub async fn create_environment(
         timeout: None,
         channel_priority: ChannelPriority::Strict,
         exclude_newer: None,
+        strategy: Default::default(),
     };
 
     // Next, use a solver to solve this specific problem. This provides us with all the operations
@@ -368,6 +369,7 @@ async fn execute_operation(
                     &install_record.package_record,
                     install_record.url.clone(),
                     download_client.clone(),
+                    None,
                 )
                 .map_ok(|cache_dir| Some((install_record.clone(), cache_dir)))
                 .map_err(anyhow::Error::from)
