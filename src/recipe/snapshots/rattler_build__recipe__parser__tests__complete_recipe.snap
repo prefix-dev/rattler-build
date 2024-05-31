@@ -84,7 +84,7 @@ build:
     replacement: simple_string
 requirements:
   build:
-  - clang_osx-arm64
+  - gcc_linux-64
   - cmake
   host:
   - openssl
