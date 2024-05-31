@@ -57,7 +57,7 @@ pub async fn skip_existing(
         &match_specs,
     )
     .await
-    .unwrap();
+    .map_err(|e| miette::miette!("Failed to load repodata: {e}."))?;
 
     let existing_set = existing
         .iter()
