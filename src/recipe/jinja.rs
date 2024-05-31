@@ -124,10 +124,20 @@ fn jinja_pin_function(
     }
 
     if let Ok(lower_bound) = kwargs.get::<String>("lower_bound") {
-        pin.args.lower_bound = Some(lower_bound.to_string());
+        pin.args.lower_bound = Some(lower_bound.parse().map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Invalid lower bound: {}", e),
+            )
+        })?);
     }
     if let Ok(upper_bound) = kwargs.get::<String>("upper_bound") {
-        pin.args.upper_bound = Some(upper_bound.to_string());
+        pin.args.upper_bound = Some(upper_bound.parse().map_err(|e| {
+            minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                format!("Invalid upper bound: {}", e),
+            )
+        })?);
     }
     if let Ok(exact) = kwargs.get::<bool>("exact") {
         pin.args.exact = exact;
