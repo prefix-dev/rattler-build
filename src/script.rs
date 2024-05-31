@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use indexmap::IndexMap;
 use itertools::Itertools;
+use minijinja::Value;
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
@@ -19,7 +20,6 @@ use crate::{
     env_vars,
     metadata::Output,
     recipe::{
-        jinja::SelectorConfig,
         parser::{Script, ScriptContent},
         Jinja,
     },
@@ -324,7 +324,7 @@ impl Script {
         recipe_dir: &Path,
         run_prefix: &Path,
         build_prefix: Option<&PathBuf>,
-        selector_config: Option<SelectorConfig>,
+        mut jinja_config: Option<Jinja<'_>>,
     ) -> Result<(), std::io::Error> {
         let interpreter = self
             .interpreter()
@@ -350,14 +350,13 @@ impl Script {
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
-        let jinja_config = selector_config.map(|selector_config| {
-            let mut variant = selector_config.variant.clone();
-            variant.extend(env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
-            Jinja::new(SelectorConfig {
-                variant,
-                ..selector_config
-            })
-        });
+        for (k, v) in &env_vars {
+            jinja_config.as_mut().map(|jinja| {
+                jinja
+                    .context_mut()
+                    .insert(k.clone(), Value::from_safe_string(v.clone()))
+            });
+        }
 
         let contents = self.get_contents(recipe_dir, jinja_config)?;
 
@@ -396,7 +395,14 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+
         let selector_config = self.build_configuration.selector_config();
+        let mut jinja = Jinja::new(selector_config.clone());
+        for (k, v) in self.recipe.context.iter() {
+            jinja
+                .context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
 
         self.recipe
             .build()
@@ -407,7 +413,7 @@ impl Output {
                 &self.build_configuration.directories.recipe_dir,
                 &self.build_configuration.directories.host_prefix,
                 Some(&self.build_configuration.directories.build_prefix),
-                Some(selector_config),
+                Some(jinja),
             )
             .await?;
 
