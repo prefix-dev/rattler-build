@@ -4,6 +4,10 @@ expression: unix_recipe.unwrap()
 ---
 Recipe {
     schema_version: 1,
+    context: {
+        "name": "xtensor",
+        "version": "0.24.6",
+    },
     package: Package {
         name: PackageName {
             normalized: None,
