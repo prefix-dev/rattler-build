@@ -187,15 +187,15 @@ impl Recipe {
                     val.render(&jinja, &format!("context.{}", k.as_str()))?;
 
                 if let Some(rendered) = rendered {
-                    context.insert(k.as_str().to_owned(), rendered.as_str().to_string());
+                    context.insert(k.as_str().to_string(), rendered.as_str().to_string());
+                    // also immediately insert into jinja context so that the value can be used
+                    // in later jinja expressions
+                    jinja.context_mut().insert(
+                        k.as_str().to_string(),
+                        Value::from_safe_string(rendered.as_str().to_string()),
+                    );
                 }
             }
-        }
-
-        for (k, v) in context.iter() {
-            jinja
-                .context_mut()
-                .insert(k.clone(), Value::from_safe_string(v.clone()));
         }
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
