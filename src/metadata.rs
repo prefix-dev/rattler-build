@@ -29,7 +29,10 @@ use url::Url;
 use crate::{
     console_utils::github_integration_enabled,
     hash::HashInfo,
-    recipe::parser::{Recipe, Source},
+    recipe::{
+        jinja::SelectorConfig,
+        parser::{Recipe, Source},
+    },
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     tool_configuration,
@@ -278,6 +281,19 @@ impl BuildConfiguration {
     /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform
+    }
+
+    /// Construct a `SelectorConfig` from the given `BuildConfiguration`
+    pub fn selector_config(&self) -> SelectorConfig {
+        SelectorConfig {
+            target_platform: self.target_platform,
+            host_platform: self.host_platform,
+            build_platform: self.build_platform,
+            variant: self.variant.clone(),
+            hash: Some(self.hash.clone()),
+            experimental: false,
+            allow_undefined: false,
+        }
     }
 }
 
