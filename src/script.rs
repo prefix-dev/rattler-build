@@ -16,9 +16,13 @@ use std::{
 use tokio::io::AsyncBufReadExt as _;
 
 use crate::{
-    env_vars::{self},
+    env_vars,
     metadata::Output,
-    recipe::parser::{Script, ScriptContent},
+    recipe::{
+        jinja::SelectorConfig,
+        parser::{Script, ScriptContent},
+        Jinja,
+    },
 };
 
 const BASH_PREAMBLE: &str = r#"
@@ -238,7 +242,11 @@ impl Interpreter for PythonInterpreter {
 }
 
 impl Script {
-    fn get_contents(&self, recipe_dir: &Path) -> Result<String, std::io::Error> {
+    fn get_contents(
+        &self,
+        recipe_dir: &Path,
+        jinja_context: Option<Jinja>,
+    ) -> Result<String, std::io::Error> {
         let default_extension = if cfg!(windows) { "bat" } else { "sh" };
 
         let script_content = match self.contents() {
@@ -302,8 +310,11 @@ impl Script {
             ScriptContent::Commands(commands) => commands.iter().join("\n"),
             ScriptContent::Command(command) => command.to_owned(),
         };
-
-        Ok(script_content)
+        if let Some(jinja) = jinja_context {
+            Ok(jinja.render_str(&script_content).unwrap())
+        } else {
+            Ok(script_content)
+        }
     }
 
     pub async fn run_script(
@@ -313,12 +324,11 @@ impl Script {
         recipe_dir: &Path,
         run_prefix: &Path,
         build_prefix: Option<&PathBuf>,
+        selector_config: Option<SelectorConfig>,
     ) -> Result<(), std::io::Error> {
         let interpreter = self
             .interpreter()
             .unwrap_or(if cfg!(windows) { "cmd" } else { "bash" });
-
-        let contents = self.get_contents(recipe_dir)?;
 
         let secrets = self
             .secrets()
@@ -339,6 +349,17 @@ impl Script {
             .into_iter()
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
+
+        let jinja_config = selector_config.map(|selector_config| {
+            let mut variant = selector_config.variant.clone();
+            variant.extend(env_vars.iter().map(|(k, v)| (k.clone(), v.clone())));
+            Jinja::new(SelectorConfig {
+                variant,
+                ..selector_config
+            })
+        });
+
+        let contents = self.get_contents(recipe_dir, jinja_config)?;
 
         let exec_args = ExecutionArgs {
             script: contents,
@@ -375,6 +396,7 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+        let selector_config = self.build_configuration.selector_config();
 
         self.recipe
             .build()
@@ -385,6 +407,7 @@ impl Output {
                 &self.build_configuration.directories.recipe_dir,
                 &self.build_configuration.directories.host_prefix,
                 Some(&self.build_configuration.directories.build_prefix),
+                Some(selector_config),
             )
             .await?;
 
