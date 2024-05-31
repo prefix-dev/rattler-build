@@ -60,7 +60,7 @@
     min_pin: "x.x"
     max_pin: "x.x.x"
   spec: 5!1.2.3+3.4 hash
-  expected: "local >=5!1.2+3.4,<5!1.2.4.0a0+3.4"
+  expected: "local >=5!1.2+3.4,<5!1.2.4.0a0"
 - pin:
     name: "bounds"
     lower_bound: "1.2"

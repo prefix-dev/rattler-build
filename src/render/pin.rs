@@ -117,6 +117,7 @@ pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBum
     Ok(version
         .bump(VersionBumpType::Segment(segments - 1))?
         .with_alpha()
+        .remove_local()
         .into_owned())
 }
 
@@ -314,8 +315,10 @@ mod test {
         }
 
         assert_eq!(increment_to_string("1.2.3", 3), "1.2.4.0a0");
+        assert_eq!(increment_to_string("1.2.3+4.5", 3), "1.2.4.0a0");
         assert_eq!(increment_to_string("1.2.3", 2), "1.3.0a0");
         assert_eq!(increment_to_string("1.2.3", 1), "2.0a0");
+        assert_eq!(increment_to_string("1.2.3+3.4", 1), "2.0a0");
         assert_eq!(increment_to_string("9d", 1), "10a");
         assert_eq!(increment_to_string("9d", 2), "9d.1.0a0");
     }

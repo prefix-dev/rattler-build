@@ -215,9 +215,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.4.10"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c90a406b4495d129f00461241616194cb8a032c8d1c53c657f0961d5f8e0498"
+checksum = "cd066d0b4ef8ecb03a55319dc13aa6910616d0f44008a045bb1835af830abff5"
 dependencies = [
  "bzip2",
  "flate2",
@@ -1306,7 +1306,7 @@ checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 [[package]]
 name = "file_url"
 version = "0.1.1"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "itertools 0.12.1",
  "percent-encoding",
@@ -3349,7 +3349,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.26.1"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -3476,7 +3476,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.25.0"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "chrono",
  "file_url",
@@ -3505,7 +3505,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "0.19.4"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "blake2",
  "digest",
@@ -3521,7 +3521,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.19.14"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -3596,7 +3596,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "0.19.3"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "quote",
  "syn 2.0.66",
@@ -3605,7 +3605,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.20.8"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3635,7 +3635,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.21.1"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "bzip2",
  "chrono",
@@ -3660,7 +3660,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.20.3"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -3707,7 +3707,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.20.6"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.2.6",
@@ -3724,7 +3724,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "0.23.2"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "chrono",
  "futures",
@@ -3741,7 +3741,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "0.19.13"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "archspec",
  "libloading",
@@ -4547,7 +4547,7 @@ dependencies = [
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.0.0"
-source = "git+https://github.com/wolfv/rattler?branch=add-with-alpha#523c30cd66b177e7b418aab80c817140530e3644"
+source = "git+https://github.com/mamba-org/rattler?branch=main#6e6f242e153783b8be07b318055fd27845e8a7b3"
 dependencies = [
  "tokio",
 ]
@@ -4615,9 +4615,9 @@ dependencies = [
 
 [[package]]
 name = "spdx"
-version = "0.10.4"
+version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "29ef1a0fa1e39ac22972c8db23ff89aea700ab96aa87114e1fb55937a631a0c9"
+checksum = "47317bbaf63785b53861e1ae2d11b80d6b624211d42cb20efcd210ee6f8a14bc"
 dependencies = [
  "smallvec",
 ]
@@ -4950,9 +4950,9 @@ checksum = "b130bd8a58c163224b44e217b4239ca7b927d82bf6cc2fea1fc561d15056e3f7"
 
 [[package]]
 name = "tokio"
-version = "1.37.0"
+version = "1.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1adbebffeca75fcfd058afa480fb6c0b81e165a0323f9c9d39c9697e37c46787"
+checksum = "ba4f4a02a7a80d6f274636f0aa95c7e383b912d41fe721a31f29e29698585a4a"
 dependencies = [
  "backtrace",
  "bytes",
@@ -4969,9 +4969,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.2.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b8a1e28f2deaa14e508979454cb3a223b10b938b45af148bc0986de36f1923b"
+checksum = "5f5ae998a069d4b5aba8ee9dad856af7d520c3699e6159b185c2acd48155d39a"
 dependencies = [
  "proc-macro2",
  "quote",
