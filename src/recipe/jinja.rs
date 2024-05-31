@@ -4,7 +4,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::Object;
+use minijinja::value::{Kwargs, Object};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -86,7 +86,7 @@ impl<'a> Extend<(String, Value)> for Jinja<'a> {
 
 fn jinja_pin_function(
     name: String,
-    kwargs: Option<Value>,
+    kwargs: Kwargs,
     internal_repr: &str,
 ) -> Result<String, minijinja::Error> {
     let name = PackageName::try_from(name).map_err(|e| {
@@ -116,42 +116,21 @@ fn jinja_pin_function(
             }
         };
 
-    let max_pin_default = PinExpression::from_str("x").unwrap();
-    let min_pin_default = PinExpression::from_str("x.x.x.x.x.x").unwrap();
-    if let Some(kwargs) = kwargs {
-        let max_pin = kwargs.get_attr("max_pin")?;
-        if max_pin != minijinja::value::Value::UNDEFINED {
-            let pin_expr = pin_expr_from_value(&max_pin)?;
-            pin.args.max_pin = pin_expr;
-        } else {
-            // Default value when max_pin is not provided
-            pin.args.max_pin = Some(max_pin_default);
-        }
-        let min = kwargs.get_attr("min_pin")?;
-        if min != minijinja::value::Value::UNDEFINED {
-            let pin_expr = pin_expr_from_value(&min)?;
-            pin.args.min_pin = pin_expr;
-        } else {
-            // Default value when min_pin is not provided
-            pin.args.min_pin = Some(min_pin_default);
-        }
-        let lower_bound = kwargs.get_attr("lower_bound")?;
-        if lower_bound != minijinja::value::Value::UNDEFINED {
-            pin.args.lower_bound = Some(lower_bound.to_string());
-        }
-        let upper_bound = kwargs.get_attr("upper_bound")?;
-        if upper_bound != minijinja::value::Value::UNDEFINED {
-            pin.args.upper_bound = Some(upper_bound.to_string());
-        }
-        let exact = kwargs.get_attr("exact")?;
-        if exact != minijinja::value::Value::UNDEFINED {
-            pin.args.exact = exact.is_true();
-        }
-    } else {
-        // Default value when max_pin is not provided
-        pin_subpackage.max_pin = Some(max_pin_default);
-        // Default value when min_pin is not provided
-        pin_subpackage.min_pin = Some(min_pin_default);
+    if let Ok(max_pin) = kwargs.get::<Value>("max_pin") {
+        pin.args.max_pin = pin_expr_from_value(&max_pin)?;
+    }
+    if let Ok(min_pin) = kwargs.get::<Value>("min_pin") {
+        pin.args.min_pin = pin_expr_from_value(&min_pin)?;
+    }
+
+    if let Ok(lower_bound) = kwargs.get::<String>("lower_bound") {
+        pin.args.lower_bound = Some(lower_bound.to_string());
+    }
+    if let Ok(upper_bound) = kwargs.get::<String>("upper_bound") {
+        pin.args.upper_bound = Some(upper_bound.to_string());
+    }
+    if let Ok(exact) = kwargs.get::<bool>("exact") {
+        pin.args.exact = exact;
     }
 
     if internal_repr == "__PIN_SUBPACKAGE" {
@@ -349,12 +328,11 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         }
     });
 
-    env.add_function("pin_subpackage", |name: String, kwargs: Option<Value>| {
-        // return "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true }}".to_string();
+    env.add_function("pin_subpackage", |name: String, kwargs: Kwargs| {
         jinja_pin_function(name, kwargs, "__PIN_SUBPACKAGE")
     });
 
-    env.add_function("pin_compatible", |name: String, kwargs: Option<Value>| {
+    env.add_function("pin_compatible", |name: String, kwargs: Kwargs| {
         jinja_pin_function(name, kwargs, "__PIN_COMPATIBLE")
     });
 
@@ -1084,13 +1062,19 @@ mod tests {
                 .to_string()
         };
 
-        assert_eq!(ps(""), "__PIN_SUBPACKAGE foo MAX_PIN=x MIN_PIN=x.x.x.x.x.x LOWER_BOUND= UPPER_BOUND= EXACT=false");
-        assert_eq!(ps("max_pin=None"), "__PIN_SUBPACKAGE foo MAX_PIN= MIN_PIN=x.x.x.x.x.x LOWER_BOUND= UPPER_BOUND= EXACT=false");
+        assert_eq!(
+            ps(""),
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":\"x\"}}"
+        );
+        assert_eq!(
+            ps("max_pin=None"),
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":null}}"
+        );
         assert_eq!(
             ps("max_pin=None, min_pin=None"),
-            "__PIN_SUBPACKAGE foo MAX_PIN= MIN_PIN= LOWER_BOUND= UPPER_BOUND= EXACT=false"
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":null,\"max_pin\":null}}"
         );
-        assert_eq!(ps("lower_bound='1.2.3'"), "__PIN_SUBPACKAGE foo MAX_PIN=x MIN_PIN=x.x.x.x.x.x LOWER_BOUND=1.2.3 UPPER_BOUND= EXACT=false");
+        assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":\"x\",\"lower_bound\":\"1.2.3\"}}");
     }
 
     #[test]

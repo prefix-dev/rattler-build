@@ -54,15 +54,15 @@ pub struct Pin {
     pub args: PinArgs,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinArgs {
-    /// A pin to a version, using `x.x.x...` as syntax
-    #[serde(default)]
-    pub max_pin: Option<PinExpression>,
-
     /// A minimum pin to a version, using `x.x.x...` as syntax
     #[serde(default)]
     pub min_pin: Option<PinExpression>,
+
+    /// A pin to a version, using `x.x.x...` as syntax
+    #[serde(default)]
+    pub max_pin: Option<PinExpression>,
 
     /// A lower bound to a version, using a regular version string
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -75,6 +75,18 @@ pub struct PinArgs {
     /// If an exact pin is given, we pin the exact version & hash
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exact: bool,
+}
+
+impl Default for PinArgs {
+    fn default() -> Self {
+        Self {
+            max_pin: Some(PinExpression("x".to_string())),
+            min_pin: Some(PinExpression("x.x.x.x.x.x".to_string())),
+            lower_bound: None,
+            upper_bound: None,
+            exact: false,
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -170,95 +182,6 @@ impl Pin {
         )
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
     }
-
-    pub(crate) fn internal_repr(&self) -> String {
-        let max_pin_str = self
-            .max_pin
-            .as_ref()
-            .map_or("".to_string(), ToString::to_string);
-        let min_pin_str = self
-            .min_pin
-            .as_ref()
-            .map_or("".to_string(), ToString::to_string);
-        let upper_bound_str = self
-            .upper_bound
-            .as_ref()
-            .map_or("".to_string(), ToString::to_string);
-        let lower_bound_str = self
-            .lower_bound
-            .as_ref()
-            .map_or("".to_string(), ToString::to_string);
-
-        format!(
-            "{} MAX_PIN={} MIN_PIN={} LOWER_BOUND={} UPPER_BOUND={} EXACT={}",
-            self.name.as_normalized(),
-            max_pin_str,
-            min_pin_str,
-            lower_bound_str,
-            upper_bound_str,
-            self.exact
-        )
-    }
-
-    pub(crate) fn from_internal_repr(s: &str) -> Self {
-        let parts = s.split(' ').collect::<Vec<_>>();
-        let name = parts[0].to_string();
-        let max_pin = parts[1];
-        let min_pin = parts[2];
-        let lower_bound = parts[3];
-        let upper_bound = parts[4];
-        let exact = parts[5];
-
-        let max_pin = if max_pin == "MAX_PIN=" {
-            None
-        } else {
-            let max_pin = max_pin
-                .strip_prefix("MAX_PIN=")
-                .expect("Could not parse max pin: invalid prefix");
-            Some(PinExpression::from_str(max_pin).expect("Could not parse max pin"))
-        };
-
-        let min_pin = if min_pin == "MIN_PIN=" {
-            None
-        } else {
-            let min_pin = min_pin
-                .strip_prefix("MIN_PIN=")
-                .expect("Could not parse min pin: invalid prefix");
-            Some(PinExpression::from_str(min_pin).expect("Could not parse min pin"))
-        };
-
-        let lower_bound = if lower_bound == "LOWER_BOUND=" {
-            None
-        } else {
-            let lower_bound = lower_bound
-                .strip_prefix("LOWER_BOUND=")
-                .expect("Could not parse min pin: invalid prefix");
-            Some(lower_bound.to_string())
-        };
-
-        let upper_bound = if upper_bound == "UPPER_BOUND=" {
-            None
-        } else {
-            let upper_bound = upper_bound
-                .strip_prefix("UPPER_BOUND=")
-                .expect("Could not parse min pin: invalid prefix");
-            Some(upper_bound.to_string())
-        };
-
-        let exact = exact == "EXACT=true";
-        let package_name = PackageName::try_from(name)
-            .expect("could not parse back package name from internal representation");
-        Pin {
-            name: package_name,
-            args: PinArgs {
-                max_pin,
-                min_pin,
-                lower_bound,
-                upper_bound,
-                exact,
-            },
-        }
-    }
 }
 
 #[cfg(test)]
@@ -304,7 +227,7 @@ mod test {
                 lower_bound: None,
                 upper_bound: None,
                 exact: false,
-            }
+            },
         };
 
         let version = Version::from_str("1.2.3").unwrap();
@@ -324,7 +247,7 @@ mod test {
                 lower_bound: None,
                 upper_bound: None,
                 exact: false,
-            }
+            },
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -338,7 +261,7 @@ mod test {
                 lower_bound: None,
                 upper_bound: None,
                 exact: false,
-            }
+            },
         };
 
         let spec = pin.apply(&version, hash).unwrap();
@@ -355,7 +278,7 @@ mod test {
                 lower_bound: None,
                 upper_bound: None,
                 exact: true,
-            }
+            },
         };
 
         let version = Version::from_str("1.2.3").unwrap();
@@ -374,7 +297,7 @@ mod test {
                 lower_bound: None,
                 upper_bound: Some("2.4".to_string()),
                 exact: false,
-            }
+            },
         };
 
         let version = Version::from_str("1.2.3").unwrap();
