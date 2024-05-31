@@ -66,11 +66,11 @@ pub struct PinArgs {
 
     /// A lower bound to a version, using a regular version string
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub lower_bound: Option<String>,
+    pub lower_bound: Option<Version>,
 
     /// A upper bound to a version, using a regular version string
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub upper_bound: Option<String>,
+    pub upper_bound: Option<Version>,
 
     /// If an exact pin is given, we pin the exact version & hash
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
@@ -296,7 +296,7 @@ mod test {
                 min_pin: Some(PinExpression("x.x.x".to_string())),
                 max_pin: None,
                 lower_bound: None,
-                upper_bound: Some("2.4".to_string()),
+                upper_bound: Some("2.4".parse().unwrap()),
                 exact: false,
             },
         };
