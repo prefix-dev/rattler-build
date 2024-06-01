@@ -399,7 +399,6 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
 #[cfg(test)]
 mod test {
     use super::*;
-    use globset::{Glob, GlobSetBuilder};
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -423,10 +422,7 @@ mod test {
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
-        let globset = GlobSetBuilder::new()
-            .add(Glob::new("/usr/lib/custom**").unwrap())
-            .build()
-            .unwrap();
+        let globvec = GlobVec::from_vec(vec!["/usr/lib/custom**"]);
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib
@@ -438,7 +434,7 @@ mod test {
             &prefix,
             encoded_prefix,
             &[],
-            Some(&globset),
+            &globvec,
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;
@@ -484,7 +480,7 @@ mod test {
             &prefix,
             encoded_prefix,
             &[String::from("lib/")],
-            None,
+            &GlobVec::default(),
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;

@@ -533,11 +533,11 @@ mod tests {
     use tempfile::tempdir_in;
 
     use super::{install_name_tool, RelinkError};
-    use crate::post_process::relink::Relinker;
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,
     };
+    use crate::{post_process::relink::Relinker, recipe::parser::GlobVec};
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
@@ -663,7 +663,7 @@ mod tests {
                 tmp_prefix,
                 &encoded_prefix,
                 &[],
-                None,
+                &GlobVec::default(),
                 &SystemTools::default(),
             )
             .unwrap();
