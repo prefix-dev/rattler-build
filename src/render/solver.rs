@@ -4,10 +4,10 @@ use indicatif::ProgressStyle;
 use indicatif::{HumanBytes, ProgressBar};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{
-    Channel, GenericVirtualPackage, MatchSpec, Platform, PrefixRecord, RepoDataRecord,
+    Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord,
 };
 use rattler_repodata_gateway::Gateway;
-use rattler_solve::{resolvo::Solver, SolveStrategy, SolverImpl, SolverTask};
+use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
 use url::Url;
 
 use crate::tool_configuration;
@@ -74,8 +74,6 @@ pub async fn create_environment(
         tracing::info!("   - {}", spec);
     }
 
-    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
-
     let repo_data = load_repodatas(channels, target_platform, specs, tool_configuration).await?;
 
     // Determine virtual packages of the system. These packages define the capabilities of the
@@ -97,13 +95,8 @@ pub async fn create_environment(
     // need to solve. We do this by constructing a `SolverProblem`. This encapsulates all the
     // information required to be able to solve the problem.
     let solver_task = SolverTask {
-        locked_packages: installed_packages
-            .iter()
-            .map(|record| record.repodata_record.clone())
-            .collect(),
         virtual_packages,
         specs: specs.to_vec(),
-        strategy: SolveStrategy::Highest,
         ..SolverTask::from_iter(&repo_data)
     };
 
