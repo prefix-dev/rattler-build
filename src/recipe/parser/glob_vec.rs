@@ -20,7 +20,8 @@ use crate::recipe::error::{ErrorKind, PartialParsingError};
 pub struct GlobVec {
     include: Vec<Glob>,
     exclude: Vec<Glob>,
-    globset: Option<GlobSet>,
+    include_globset: Option<GlobSet>,
+    exclude_globset: Option<GlobSet>,
 }
 
 impl PartialEq for GlobVec {
@@ -64,22 +65,34 @@ impl<'de> Deserialize<'de> for GlobVec {
         if globs.is_empty() {
             Ok(GlobVec::default())
         } else {
-            let mut globset_builder = globset::GlobSetBuilder::new();
-            for glob in globs.iter() {
-                globset_builder.add(glob.clone());
-            }
-            let globset = globset_builder.build().map_err(serde::de::Error::custom)?;
-
-            Ok(Self {
-                include: globs,
-                exclude: Vec::new(),
-                globset: Some(globset),
-            })
+            Ok(Self::new(globs, Vec::new()).map_err(serde::de::Error::custom)?)
         }
     }
 }
 
 impl GlobVec {
+    /// Create a new GlobVec from a vector of globs
+    pub fn new(include: Vec<Glob>, exclude: Vec<Glob>) -> Result<Self, globset::Error> {
+        let mut globset_builder = globset::GlobSetBuilder::new();
+        for glob in include.iter() {
+            globset_builder.add(glob.clone());
+        }
+        let include_globset = globset_builder.build()?;
+
+        let mut globset_builder = globset::GlobSetBuilder::new();
+        for glob in exclude.iter() {
+            globset_builder.add(glob.clone());
+        }
+        let exclude_globset = globset_builder.build()?;
+
+        Ok(Self {
+            include,
+            exclude,
+            include_globset: Some(include_globset),
+            exclude_globset: Some(exclude_globset),
+        })
+    }
+
     /// Returns true if the globvec is empty
     pub fn is_empty(&self) -> bool {
         self.include.is_empty()
@@ -97,8 +110,13 @@ impl GlobVec {
 
     /// Returns true if the path matches any of the globs
     pub fn is_match(&self, path: &Path) -> bool {
-        if let Some(globset) = self.globset.as_ref() {
-            globset.is_match(path)
+        if let Some(globset) = self.include_globset.as_ref() {
+            let is_match = globset.is_match(path);
+            if let Some(exclude_globset) = self.exclude_globset.as_ref() {
+                is_match && !exclude_globset.is_match(path)
+            } else {
+                is_match
+            }
         } else {
             false
         }
@@ -124,7 +142,8 @@ impl GlobVec {
             Self {
                 include: glob_vec,
                 exclude: Vec::new(),
-                globset: Some(globset),
+                include_globset: Some(globset),
+                exclude_globset: None,
             }
         }
     }
@@ -174,19 +193,8 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
         if vec.is_empty() {
             Ok(GlobVec::default())
         } else {
-            let mut globset_builder = globset::GlobSetBuilder::new();
-            for glob in vec.iter() {
-                globset_builder.add(glob.clone());
-            }
-            let globset = globset_builder
-                .build()
-                .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?;
-
-            Ok(GlobVec {
-                include: vec,
-                exclude: Vec::new(),
-                globset: Some(globset),
-            })
+            Ok(GlobVec::new(vec, Vec::new())
+                .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
         }
     }
 }
@@ -297,13 +305,13 @@ mod tests {
         let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
         let globvec: GlobVec = tests_node.try_convert("globs").unwrap();
         assert_eq!(globvec.include.len(), 3);
-        assert_eq!(globvec.globset.as_ref().unwrap().len(), 3);
+        assert_eq!(globvec.include_globset.as_ref().unwrap().len(), 3);
 
         let as_yaml = serde_yaml::to_string(&globvec).unwrap();
         insta::assert_snapshot!(&as_yaml);
         let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
         assert_eq!(parsed_again.include.len(), 3);
-        assert_eq!(parsed_again.globset.as_ref().unwrap().len(), 3);
+        assert_eq!(parsed_again.include_globset.as_ref().unwrap().len(), 3);
     }
 
     #[test]
