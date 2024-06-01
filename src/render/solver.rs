@@ -232,13 +232,10 @@ pub async fn load_repodatas(
         .with_client(download_client.clone())
         .finish();
 
-    // Determine the channels to use from the command line or select the default. Like matchspecs
-    // this also requires the use of the `channel_config` so we have to do this manually.
-    let channel_config = ChannelConfig::default_with_root_dir(std::env::current_dir()?);
     let channels = channels
         .iter()
-        .map(|channel_str| Channel::from_str(channel_str, &channel_config))
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|url| Channel::from_url(url.clone()))
+        .collect::<Vec<_>>();
 
     let pb =
         ProgressBar::new(50).with_style(tool_configuration.fancy_log_handler.default_bytes_style());
