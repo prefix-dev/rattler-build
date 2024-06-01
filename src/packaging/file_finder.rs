@@ -65,7 +65,11 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
-    pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>, include_files: &GlobVec) -> Result<Self, io::Error> {
+    pub fn from_prefix(
+        prefix: &Path,
+        always_include: Option<&GlobSet>,
+        include_files: &GlobVec,
+    ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),

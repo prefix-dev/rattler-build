@@ -16,11 +16,15 @@ use crate::recipe::error::{ErrorKind, PartialParsingError};
 /// A vector of globs that is also immediately converted to a globset
 /// to enhance parser errors.
 #[derive(Default, Clone)]
-pub struct GlobVec(Vec<Glob>, Option<GlobSet>);
+pub struct GlobVec {
+    include: Vec<Glob>,
+    exclude: Vec<Glob>,
+    globset: Option<GlobSet>,
+}
 
 impl PartialEq for GlobVec {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.include == other.include && self.exclude == other.exclude
     }
 }
 
@@ -28,8 +32,8 @@ impl Eq for GlobVec {}
 
 impl Serialize for GlobVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
-        for glob in self.0.iter() {
+        let mut seq = serializer.serialize_seq(Some(self.include.len()))?;
+        for glob in self.include.iter() {
             seq.serialize_element(glob.glob())?;
         }
         seq.end()
@@ -39,7 +43,7 @@ impl Serialize for GlobVec {
 impl Debug for GlobVec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_list()
-            .entries(self.0.iter().map(|glob| glob.glob()))
+            .entries(self.include.iter().map(|glob| glob.glob()))
             .finish()
     }
 }
@@ -57,7 +61,7 @@ impl<'de> Deserialize<'de> for GlobVec {
         }
 
         if globs.is_empty() {
-            Ok(Self(globs, None))
+            Ok(GlobVec::default())
         } else {
             let mut globset_builder = globset::GlobSetBuilder::new();
             for glob in globs.iter() {
@@ -65,7 +69,11 @@ impl<'de> Deserialize<'de> for GlobVec {
             }
             let globset = globset_builder.build().map_err(serde::de::Error::custom)?;
 
-            Ok(Self(globs, Some(globset)))
+            Ok(Self {
+                include: globs,
+                exclude: Vec::new(),
+                globset: Some(globset),
+            })
         }
     }
 }
@@ -73,22 +81,22 @@ impl<'de> Deserialize<'de> for GlobVec {
 impl GlobVec {
     /// Returns true if the globvec is empty
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.include.is_empty()
     }
 
     /// Returns an iterator over the globs
     pub fn globs(&self) -> impl Iterator<Item = &Glob> {
-        self.0.iter()
+        self.include.iter()
     }
 
     /// Returns the globset if it exists
     pub fn globset(&self) -> Option<&GlobSet> {
-        self.1.as_ref()
+        self.globset.as_ref()
     }
 
     /// Returns true if the path matches any of the globs
     pub fn is_match(&self, path: &Path) -> bool {
-        if let Some(globset) = self.1.as_ref() {
+        if let Some(globset) = self.globset.as_ref() {
             globset.is_match(path)
         } else {
             false
@@ -104,7 +112,7 @@ impl GlobVec {
         }
 
         if glob_vec.is_empty() {
-            Self(glob_vec, None)
+            Self::default()
         } else {
             let mut globset_builder = globset::GlobSetBuilder::new();
             for glob in glob_vec.iter() {
@@ -112,12 +120,20 @@ impl GlobVec {
             }
             let globset = globset_builder.build().unwrap();
 
-            Self(glob_vec, Some(globset))
+            Self {
+                include: glob_vec,
+                exclude: Vec::new(),
+                globset: Some(globset),
+            }
         }
     }
-    
+
     /// Let the positive globs pass and remove the negative / not-selected ones
-    pub(crate) fn filter_files(&self, difference: &mut std::collections::HashSet<std::path::PathBuf>, prefix: &Path) {
+    pub(crate) fn filter_files(
+        &self,
+        difference: &mut std::collections::HashSet<std::path::PathBuf>,
+        prefix: &Path,
+    ) {
         let mut to_keep = HashSet::new();
         for file in difference.iter() {
             if !self.is_match(file) {
@@ -155,7 +171,7 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
         }
 
         if vec.is_empty() {
-            Ok(GlobVec(vec, None))
+            Ok(GlobVec::default())
         } else {
             let mut globset_builder = globset::GlobSetBuilder::new();
             for glob in vec.iter() {
@@ -165,7 +181,11 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
                 .build()
                 .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?;
 
-            Ok(GlobVec(vec, Some(globset)))
+            Ok(GlobVec {
+                include: vec,
+                exclude: Vec::new(),
+                globset: Some(globset),
+            })
         }
     }
 }
@@ -264,14 +284,14 @@ mod tests {
             .unwrap();
         let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
         let globvec: GlobVec = tests_node.try_convert("globs").unwrap();
-        assert_eq!(globvec.0.len(), 3);
-        assert_eq!(globvec.1.as_ref().unwrap().len(), 3);
+        assert_eq!(globvec.include.len(), 3);
+        assert_eq!(globvec.globset.as_ref().unwrap().len(), 3);
 
         let as_yaml = serde_yaml::to_string(&globvec).unwrap();
         insta::assert_snapshot!(&as_yaml);
         let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
-        assert_eq!(parsed_again.0.len(), 3);
-        assert_eq!(parsed_again.1.as_ref().unwrap().len(), 3);
+        assert_eq!(parsed_again.include.len(), 3);
+        assert_eq!(parsed_again.globset.as_ref().unwrap().len(), 3);
     }
 
     #[test]
