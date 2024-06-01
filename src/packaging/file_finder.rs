@@ -1,6 +1,5 @@
 use content_inspector::ContentType;
 use fs_err as fs;
-use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
 use std::{
     collections::{HashMap, HashSet},
@@ -67,7 +66,7 @@ impl Files {
     /// in the new_files set.
     pub fn from_prefix(
         prefix: &Path,
-        always_include: Option<&GlobSet>,
+        always_include: &GlobVec,
         include_files: &GlobVec,
     ) -> Result<Self, io::Error> {
         if !prefix.exists() {
@@ -106,7 +105,7 @@ impl Files {
             include_files.filter_files(&mut difference, prefix);
         }
 
-        if let Some(always_include) = always_include {
+        if !always_include.is_empty() {
             for file in current_files {
                 let file_without_prefix =
                     file.strip_prefix(prefix).expect("File should be in prefix");

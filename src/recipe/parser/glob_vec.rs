@@ -9,7 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::_partialerror;
 use crate::recipe::custom_yaml::{
-    HasSpan, RenderedNode, RenderedScalarNode, RenderedSequenceNode, TryConvertNode,
+    HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode,
+    TryConvertNode,
 };
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
@@ -90,9 +91,9 @@ impl GlobVec {
     }
 
     /// Returns the globset if it exists
-    pub fn globset(&self) -> Option<&GlobSet> {
-        self.globset.as_ref()
-    }
+    // fn globset(&self) -> Option<&GlobSet> {
+    //     self.globset.as_ref()
+    // }
 
     /// Returns true if the path matches any of the globs
     pub fn is_match(&self, path: &Path) -> bool {
@@ -146,15 +147,15 @@ impl GlobVec {
 
 impl TryConvertNode<GlobVec> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
-        self.as_sequence()
-            .ok_or_else(|| {
-                vec![_partialerror!(
-                    *self.span(),
-                    ErrorKind::ExpectedSequence,
-                    label = format!("expected a list of globs strings for '{}'", name)
-                )]
-            })
-            .and_then(|s| s.try_convert(name))
+        match self {
+            RenderedNode::Sequence(sequence) => sequence.try_convert(name),
+            RenderedNode::Mapping(mapping) => mapping.try_convert(name),
+            _ => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedSequence,
+                label = format!("expected a list of globs strings for '{}'", name)
+            )]),
+        }
     }
 }
 
@@ -187,6 +188,17 @@ impl TryConvertNode<GlobVec> for RenderedSequenceNode {
                 globset: Some(globset),
             })
         }
+    }
+}
+
+impl TryConvertNode<GlobVec> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
+        // todo
+        Err(vec![_partialerror!(
+            *self.span(),
+            ErrorKind::ExpectedSequence,
+            label = format!("expected a list of globs strings for '{}'", name)
+        )])
     }
 }
 

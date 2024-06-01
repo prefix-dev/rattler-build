@@ -316,11 +316,7 @@ pub fn perform_linking_checks(
             }
 
             // Check if we allow overlinking.
-            if dynamic_linking
-                .missing_dso_allowlist()
-                .map(|v| v.is_match(lib))
-                .unwrap_or(false)
-            {
+            if dynamic_linking.missing_dso_allowlist().is_match(lib) {
                 tracing::info!(
                     "{lib:?} is missing in run dependencies for {:?}, \
                     yet it is included in the allow list. Skipping...",

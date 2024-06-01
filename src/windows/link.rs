@@ -10,7 +10,10 @@ use fs_err::File;
 use goblin::pe::{header::DOS_MAGIC, PE};
 use scroll::Pread;
 
-use crate::post_process::relink::{RelinkError, Relinker};
+use crate::{
+    post_process::relink::{RelinkError, Relinker},
+    recipe::parser::GlobVec,
+};
 
 #[derive(Debug)]
 struct Dll {
@@ -100,7 +103,7 @@ impl Relinker for Dll {
         _prefix: &Path,
         _encoded_prefix: &Path,
         _custom_rpaths: &[String],
-        _rpath_allowlist: Option<&globset::GlobSet>,
+        _rpath_allowlist: &GlobVec,
         _system_tools: &crate::system_tools::SystemTools,
     ) -> Result<(), crate::post_process::relink::RelinkError> {
         // On Windows, we don't need to relink anything

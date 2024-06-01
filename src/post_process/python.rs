@@ -5,7 +5,6 @@
 //!   - Compiling `.py` files to `.pyc` files
 //!   - Replacing the contents of `.dist-info/INSTALLER` files with "conda"
 use fs_err as fs;
-use globset::GlobSet;
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
@@ -15,6 +14,7 @@ use std::process::Command;
 
 use crate::metadata::Output;
 use crate::packaging::{PackagingError, TempFiles};
+use crate::recipe::parser::GlobVec;
 use crate::utils::to_forward_slash_lossy;
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
@@ -31,7 +31,7 @@ pub fn compile_pyc(
     output: &Output,
     paths: &HashSet<PathBuf>,
     base_path: &Path,
-    skip_paths: Option<&GlobSet>,
+    skip_paths: &GlobVec,
 ) -> Result<HashSet<PathBuf>, PackagingError> {
     let build_config = &output.build_configuration;
     let python_interpreter = if output.build_configuration.cross_compilation() {
@@ -97,7 +97,7 @@ pub fn compile_pyc(
         }
     });
 
-    if let Some(skip_paths) = skip_paths {
+    if !skip_paths.is_empty() {
         py_files.retain(|p| {
             !skip_paths.is_match(
                 p.strip_prefix(base_path)
@@ -163,12 +163,7 @@ pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf
             output,
             &temp_files.files,
             temp_files.temp_dir.path(),
-            output
-                .recipe
-                .build()
-                .python()
-                .skip_pyc_compilation
-                .globset(),
+            &output.recipe.build().python().skip_pyc_compilation,
         )?);
 
         // create entry points if it is not a noarch package

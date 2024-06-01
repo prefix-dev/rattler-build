@@ -5,8 +5,8 @@ use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
+use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, ToolError};
-use globset::GlobSet;
 use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -94,7 +94,7 @@ pub trait Relinker {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: Option<&GlobSet>,
+        rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
     ) -> Result<(), RelinkError>;
 }

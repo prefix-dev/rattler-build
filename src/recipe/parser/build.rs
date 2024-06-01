@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
@@ -169,13 +168,13 @@ impl Build {
     }
 
     /// Get the always copy files settings.
-    pub fn always_copy_files(&self) -> Option<&GlobSet> {
-        self.always_copy_files.globset()
+    pub fn always_copy_files(&self) -> &GlobVec {
+        &self.always_copy_files
     }
 
     /// Get the always include files settings.
-    pub fn always_include_files(&self) -> Option<&GlobSet> {
-        self.always_include_files.globset()
+    pub fn always_include_files(&self) -> &GlobVec {
+        &self.always_include_files
     }
 
     /// Get the include files settings.
@@ -273,13 +272,13 @@ impl DynamicLinking {
     }
 
     /// Get the missing DSO allowlist.
-    pub fn missing_dso_allowlist(&self) -> Option<&GlobSet> {
-        self.missing_dso_allowlist.globset()
+    pub fn missing_dso_allowlist(&self) -> &GlobVec {
+        &self.missing_dso_allowlist
     }
 
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
-        self.rpath_allowlist.globset()
+    pub fn rpath_allowlist(&self) -> &GlobVec {
+        &self.rpath_allowlist
     }
 
     /// Get the overdepending behavior.

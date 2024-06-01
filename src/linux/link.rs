@@ -1,6 +1,5 @@
 //! Relink shared objects to use an relative path prefix
 
-use globset::GlobSet;
 use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
@@ -14,6 +13,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
+use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
 
@@ -135,7 +135,7 @@ impl Relinker for SharedObject {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: Option<&GlobSet>,
+        rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
@@ -172,7 +172,7 @@ impl Relinker for SharedObject {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
-                } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+                } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
                 }
@@ -197,10 +197,7 @@ impl Relinker for SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
-            } else if rpath_allowlist
-                .map(|glob| glob.is_match(rpath))
-                .unwrap_or(false)
-            {
+            } else if rpath_allowlist.is_match(rpath) {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpaths.push(rpath.clone());
             } else {
