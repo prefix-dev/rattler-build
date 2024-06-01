@@ -3,9 +3,7 @@ use comfy_table::Table;
 use indicatif::ProgressStyle;
 use indicatif::{HumanBytes, ProgressBar};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
-use rattler_conda_types::{
-    Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord,
-};
+use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
 use url::Url;
