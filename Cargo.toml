@@ -21,13 +21,13 @@ tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.26.1", default-features = false, features = ["cli-tools"] }
+rattler = { version = "0.26.1", default-features = false, features = ["cli-tools", "indicatif"] }
 rattler_conda_types = { version = "0.25.0", default-features = false }
 rattler_digest = { version = "0.19.4", default-features = false }
 rattler_index = { version = "0.19.14", default-features = false }
 rattler_networking = { version = "0.20.8", default-features = false }
 rattler_repodata_gateway = { version = "0.20.3", default-features = false, features = [
-    "sparse",
+    "gateway",
 ] }
 rattler_shell = { version = "0.20.6", default-features = false, features = [
     "sysinfo",

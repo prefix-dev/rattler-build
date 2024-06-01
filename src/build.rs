@@ -50,11 +50,11 @@ pub async fn skip_existing(
         all_channels
     };
 
-    let (_, existing) = load_repodatas(
+    let existing = load_repodatas(
         &channels,
         first_output.host_platform(),
-        tool_configuration,
         &match_specs,
+        tool_configuration,
     )
     .await
     .map_err(|e| miette::miette!("Failed to load repodata: {e}."))?;
