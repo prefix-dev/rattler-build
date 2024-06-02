@@ -79,7 +79,7 @@ build:
   post_process:
   - files:
     - '*.cmake'
-    - bla/
+    - bla/**
     regex: complicated(.*)regex
     replacement: simple_string
 requirements:
