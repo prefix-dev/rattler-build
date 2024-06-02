@@ -40,7 +40,7 @@ impl From<Vec<String>> for InnerGlobVec {
     fn from(vec: Vec<String>) -> Self {
         let vec = vec
             .into_iter()
-            .map(|glob| Glob::new(&glob).unwrap())
+            .map(|glob| to_glob(&glob).expect("glob parsing failed"))
             .collect();
         Self(vec)
     }
@@ -49,6 +49,15 @@ impl From<Vec<String>> for InnerGlobVec {
 impl From<Vec<Glob>> for InnerGlobVec {
     fn from(vec: Vec<Glob>) -> Self {
         Self(vec)
+    }
+}
+
+fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
+    if glob.ends_with('/') {
+        // we treat folders as globs that match everything in the folder
+        Glob::new(&format!("{}**", glob))
+    } else {
+        Glob::new(glob)
     }
 }
 
@@ -170,7 +179,7 @@ impl GlobVec {
     pub fn from_vec(vec: Vec<&str>) -> Self {
         let mut glob_vec = Vec::with_capacity(vec.len());
         for glob in vec.into_iter() {
-            glob_vec.push(Glob::new(glob).unwrap());
+            glob_vec.push(to_glob(glob).unwrap());
         }
 
         if glob_vec.is_empty() {
@@ -209,7 +218,7 @@ fn to_vector_of_globs(
     for item in sequence.iter() {
         let str: String = item.try_convert("globs")?;
         vec.push(
-            Glob::new(&str)
+            to_glob(&str)
                 .map_err(|err| vec![_partialerror!(*item.span(), ErrorKind::GlobParsing(err),)])?,
         );
     }
@@ -363,6 +372,16 @@ mod tests {
         let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
         assert_eq!(parsed_again.include.len(), 3);
         assert_eq!(parsed_again.include_globset.len(), 3);
+    }
+
+    #[test]
+    fn test_glob_match_folder() {
+        let globvec = GlobVec::from_vec(vec!["foo/"]);
+        assert!(globvec.is_match(Path::new("foo/bar")));
+        assert!(globvec.is_match(Path::new("foo/bla")));
+        assert!(globvec.is_match(Path::new("foo/bla/bar")));
+        assert!(!globvec.is_match(Path::new("bar")));
+        assert!(!globvec.is_match(Path::new("bla")));
     }
 
     #[test]
