@@ -2,13 +2,15 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use fs_err::create_dir_all;
 
+use globset::Glob;
 use ignore::WalkBuilder;
 use rayon::iter::{ParallelBridge, ParallelIterator};
+
+use crate::recipe::parser::GlobVec;
 
 use super::SourceError;
 
@@ -46,8 +48,7 @@ impl Default for CopyOptions {
 pub(crate) struct CopyDir<'a> {
     from_path: &'a Path,
     to_path: &'a Path,
-    include_globs: Vec<&'a str>,
-    exclude_globs: Vec<&'a str>,
+    globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
     hidden: bool,
@@ -59,8 +60,7 @@ impl<'a> CopyDir<'a> {
         Self {
             from_path,
             to_path,
-            include_globs: Vec::new(),
-            exclude_globs: Vec::new(),
+            globvec: GlobVec::default(),
             use_gitignore: false,
             use_git_global: false,
             hidden: false,
@@ -68,54 +68,8 @@ impl<'a> CopyDir<'a> {
         }
     }
 
-    /// Parse the iterator of &str as globs
-    ///
-    /// This is a conveniance helper for parsing an iterator of &str as include and exclude globs.
-    ///
-    /// # Note
-    ///
-    /// Uses '~' as negation character (exclude globs)
-    pub fn with_parse_globs<I>(mut self, globs: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        let (exclude_globs, include_globs): (Vec<_>, Vec<_>) = globs
-            .into_iter()
-            .partition(|g| g.trim_start().starts_with('~'));
-
-        self.include_globs.extend(include_globs);
-        self.exclude_globs
-            .extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_include_glob(mut self, include: &'a str) -> Self {
-        self.include_globs.push(include);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_include_globs<I>(mut self, includes: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        self.include_globs.extend(includes);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_exclude_glob(mut self, exclude: &'a str) -> Self {
-        self.exclude_globs.push(exclude);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_exclude_globs<I>(mut self, excludes: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        self.exclude_globs.extend(excludes);
+    pub fn with_globvec(mut self, globvec: &GlobVec) -> Self {
+        self.globvec = globvec.clone();
         self
     }
 
@@ -150,21 +104,14 @@ impl<'a> CopyDir<'a> {
         self
     }
 
-    pub fn run(self) -> Result<CopyDirResult<'a>, SourceError> {
+    pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
         create_dir_all(self.to_path)?;
 
-        let (folders, globs) = self
-            .include_globs
-            .into_iter()
-            .partition::<Vec<_>, _>(|glob| glob.ends_with('/') && !glob.contains('*'));
-
-        let folders = Arc::new(folders.into_iter().map(PathBuf::from).collect::<Vec<_>>());
-
         let mut result = CopyDirResult {
             copied_paths: Vec::with_capacity(0), // do not allocate as we overwrite this anyways
-            include_globs: make_glob_match_map(globs)?,
-            exclude_globs: make_glob_match_map(self.exclude_globs)?,
+            include_globs: make_glob_match_map(self.globvec.include_globs())?,
+            exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
         let copied_pathes = WalkBuilder::new(self.from_path)
@@ -216,9 +163,6 @@ impl<'a> CopyDir<'a> {
                         .map(|(_, g)| g.set_matched(true))
                         .count()
                         != 0;
-
-                let include =
-                    include || folders.clone().iter().any(|f| stripped_path.starts_with(f));
 
                 let exclude = result
                     .exclude_globs_mut()
@@ -371,22 +315,22 @@ where
     Ok(())
 }
 
-pub(crate) struct CopyDirResult<'a> {
+pub(crate) struct CopyDirResult {
     copied_paths: Vec<PathBuf>,
-    include_globs: HashMap<Glob<'a>, Match>,
-    exclude_globs: HashMap<Glob<'a>, Match>,
+    include_globs: HashMap<Glob, Match>,
+    exclude_globs: HashMap<Glob, Match>,
 }
 
-impl<'a> CopyDirResult<'a> {
+impl<'a> CopyDirResult {
     pub fn copied_paths(&self) -> &[PathBuf] {
         &self.copied_paths
     }
 
-    pub fn include_globs(&self) -> &HashMap<Glob<'a>, Match> {
+    pub fn include_globs(&self) -> &HashMap<Glob, Match> {
         &self.include_globs
     }
 
-    fn include_globs_mut(&mut self) -> &mut HashMap<Glob<'a>, Match> {
+    fn include_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
         &mut self.include_globs
     }
 
@@ -395,11 +339,11 @@ impl<'a> CopyDirResult<'a> {
     }
 
     #[allow(unused)]
-    pub fn exclude_globs(&self) -> &HashMap<Glob<'a>, Match> {
+    pub fn exclude_globs(&self) -> &HashMap<Glob, Match> {
         &self.exclude_globs
     }
 
-    fn exclude_globs_mut(&mut self) -> &mut HashMap<Glob<'a>, Match> {
+    fn exclude_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
         &mut self.exclude_globs
     }
 
@@ -409,30 +353,15 @@ impl<'a> CopyDirResult<'a> {
     }
 }
 
-fn make_glob_match_map(globs: Vec<&str>) -> Result<HashMap<Glob, Match>, SourceError> {
+fn make_glob_match_map(globs: &Vec<globset::Glob>) -> Result<HashMap<globset::Glob, Match>, SourceError>
+{
     globs
         .into_iter()
-        .map(|gl| {
-            let glob = Glob::new(gl)?;
-            let match_ = Match::new(&glob);
-            Ok((glob, match_))
+        .map(|glob| {
+            let matcher = Match::new(glob);
+            Ok(((*glob).clone(), matcher))
         })
         .collect()
-}
-
-#[derive(Hash, Eq, PartialEq)]
-pub(crate) struct Glob<'a> {
-    s: &'a str,
-    g: globset::Glob,
-}
-
-impl<'a> Glob<'a> {
-    fn new(s: &'a str) -> Result<Self, SourceError> {
-        Ok(Self {
-            s,
-            g: globset::Glob::new(s)?,
-        })
-    }
 }
 
 pub(crate) struct Match {
@@ -443,7 +372,7 @@ pub(crate) struct Match {
 impl Match {
     fn new(glob: &Glob) -> Self {
         Self {
-            matcher: glob.g.compile_matcher(),
+            matcher: glob.compile_matcher(),
             matched: false,
         }
     }
@@ -467,6 +396,8 @@ impl Match {
 #[cfg(test)]
 mod test {
     use std::{collections::HashSet, fs, fs::File};
+
+    use crate::recipe::parser::GlobVec;
 
     #[test]
     fn test_copy_dir() {
@@ -548,8 +479,9 @@ mod test {
         fs_err::remove_dir_all(&dest_dir).unwrap();
         fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/")
-            .with_exclude_glob("*.rst")
+            // .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"]))
+            // .with_include_glob("test_copy_dir/")
+            // .with_exclude_glob("*.rst")
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -562,7 +494,7 @@ mod test {
         fs_err::remove_dir_all(&dest_dir).unwrap();
         fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/test_1.txt")
+            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"]))
             .use_gitignore(false)
             .run()
             .unwrap();

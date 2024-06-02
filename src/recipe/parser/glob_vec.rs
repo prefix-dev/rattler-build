@@ -53,7 +53,7 @@ impl From<Vec<Glob>> for InnerGlobVec {
 }
 
 fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
-    if glob.ends_with('/') {
+    if glob.ends_with('/') && !glob.contains('*') {
         // we treat folders as globs that match everything in the folder
         Glob::new(&format!("{}**", glob))
     } else {
@@ -155,8 +155,13 @@ impl GlobVec {
     }
 
     /// Returns an iterator over the globs
-    pub fn globs(&self) -> impl Iterator<Item = &Glob> {
-        self.include.iter()
+    pub fn include_globs(&self) -> &Vec<Glob> {
+        &self.include
+    }
+
+    /// Returns an iterator over the globs
+    pub fn exclude_globs(&self) -> &Vec<Glob> {
+        &self.exclude
     }
 
     /// Returns true if the path matches any of the globs
