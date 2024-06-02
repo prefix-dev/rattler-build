@@ -1,9 +1,10 @@
 use std::fmt::{self, Debug, Formatter};
+use std::ops::Deref;
 use std::path::Path;
 
 use globset::{Glob, GlobSet};
 
-use serde::ser::SerializeSeq;
+use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize};
 
 use crate::_partialerror;
@@ -13,14 +14,36 @@ use crate::recipe::custom_yaml::{
 };
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
+/// Wrapper type to simplify serialization of Vec<Glob>
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct InnerGlobVec(Vec<Glob>);
+
+impl Deref for InnerGlobVec {
+    type Target = Vec<Glob>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl InnerGlobVec {
+    fn globset(&self) -> Result<GlobSet, globset::Error> {
+        let mut globset_builder = globset::GlobSetBuilder::new();
+        for glob in self.iter() {
+            globset_builder.add(glob.clone());
+        }
+        globset_builder.build()
+    }
+}
+
 /// A vector of globs that is also immediately converted to a globset
 /// to enhance parser errors.
 #[derive(Default, Clone)]
 pub struct GlobVec {
-    include: Vec<Glob>,
-    exclude: Vec<Glob>,
-    include_globset: Option<GlobSet>,
-    exclude_globset: Option<GlobSet>,
+    include: InnerGlobVec,
+    exclude: InnerGlobVec,
+    include_globset: GlobSet,
+    exclude_globset: GlobSet,
 }
 
 impl PartialEq for GlobVec {
@@ -31,13 +54,26 @@ impl PartialEq for GlobVec {
 
 impl Eq for GlobVec {}
 
-impl Serialize for GlobVec {
+impl Serialize for InnerGlobVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut seq = serializer.serialize_seq(Some(self.include.len()))?;
-        for glob in self.include.iter() {
+        let mut seq = serializer.serialize_seq(Some(self.len()))?;
+        for glob in self.iter() {
             seq.serialize_element(glob.glob())?;
         }
         seq.end()
+    }
+}
+
+impl Serialize for GlobVec {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if self.exclude.is_empty() {
+            self.include.serialize(serializer)
+        } else {
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry("include", &self.include)?;
+            map.serialize_entry("exclude", &self.exclude)?;
+            map.end()
+        }
     }
 }
 
@@ -72,23 +108,15 @@ impl<'de> Deserialize<'de> for GlobVec {
 impl GlobVec {
     /// Create a new GlobVec from a vector of globs
     pub fn new(include: Vec<Glob>, exclude: Vec<Glob>) -> Result<Self, globset::Error> {
-        let mut globset_builder = globset::GlobSetBuilder::new();
-        for glob in include.iter() {
-            globset_builder.add(glob.clone());
-        }
-        let include_globset = globset_builder.build()?;
-
-        let mut globset_builder = globset::GlobSetBuilder::new();
-        for glob in exclude.iter() {
-            globset_builder.add(glob.clone());
-        }
-        let exclude_globset = globset_builder.build()?;
-
+        let include = InnerGlobVec(include);
+        let exclude = InnerGlobVec(exclude);
+        let include_globset = include.globset()?;
+        let exclude_globset = exclude.globset()?;
         Ok(Self {
             include,
             exclude,
-            include_globset: Some(include_globset),
-            exclude_globset: Some(exclude_globset),
+            include_globset,
+            exclude_globset,
         })
     }
 
@@ -109,10 +137,11 @@ impl GlobVec {
 
     /// Returns true if the path matches any of the globs
     pub fn is_match(&self, path: &Path) -> bool {
-        if let Some(globset) = self.include_globset.as_ref() {
-            let is_match = globset.is_match(path);
-            if let Some(exclude_globset) = self.exclude_globset.as_ref() {
-                is_match && !exclude_globset.is_match(path)
+        if !self.is_empty() {
+            let is_match = self.include_globset.is_match(path);
+            // if exclude is empty, it matches nothing
+            if !self.exclude.is_empty() {
+                is_match && !self.exclude_globset.is_match(path)
             } else {
                 is_match
             }
@@ -132,17 +161,13 @@ impl GlobVec {
         if glob_vec.is_empty() {
             Self::default()
         } else {
-            let mut globset_builder = globset::GlobSetBuilder::new();
-            for glob in glob_vec.iter() {
-                globset_builder.add(glob.clone());
-            }
-            let globset = globset_builder.build().unwrap();
-
+            let include = InnerGlobVec(glob_vec);
+            let globset = include.globset().unwrap();
             Self {
-                include: glob_vec,
-                exclude: Vec::new(),
-                include_globset: Some(globset),
-                exclude_globset: None,
+                include,
+                exclude: InnerGlobVec::default(),
+                include_globset: globset,
+                exclude_globset: GlobSet::default(),
             }
         }
     }
@@ -316,13 +341,13 @@ mod tests {
         let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
         let globvec: GlobVec = tests_node.try_convert("globs").unwrap();
         assert_eq!(globvec.include.len(), 3);
-        assert_eq!(globvec.include_globset.as_ref().unwrap().len(), 3);
+        assert_eq!(globvec.include_globset.len(), 3);
 
         let as_yaml = serde_yaml::to_string(&globvec).unwrap();
         insta::assert_snapshot!(&as_yaml);
         let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
         assert_eq!(parsed_again.include.len(), 3);
-        assert_eq!(parsed_again.include_globset.as_ref().unwrap().len(), 3);
+        assert_eq!(parsed_again.include_globset.len(), 3);
     }
 
     #[test]
