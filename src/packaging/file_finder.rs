@@ -97,13 +97,13 @@ impl Files {
 
         let mut difference = current_files
             .difference(&previous_files)
-            .cloned()
             // If we have an include_files glob, we only include files that match the glob
             .filter(|f| {
                 include_files.is_empty()
                     || include_files
                         .is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             })
+            .cloned()
             .collect::<HashSet<_>>();
 
         if !always_include.is_empty() {

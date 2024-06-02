@@ -179,8 +179,8 @@ fn to_vector_of_globs(
 impl TryConvertNode<GlobVec> for RenderedSequenceNode {
     fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
         let vec = to_vector_of_globs(self)?;
-        Ok(GlobVec::new(vec, Vec::new())
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
+        GlobVec::new(vec, Vec::new())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
     }
 }
 
@@ -194,7 +194,7 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
             let key_str = key.as_str();
             match (key_str, value) {
                 ("include", RenderedNode::Sequence(seq)) => {
-                    include = to_vector_of_globs(&seq)?;
+                    include = to_vector_of_globs(seq)?;
                 }
                 ("exclude", RenderedNode::Sequence(seq)) => {
                     exclude = to_vector_of_globs(seq)?;
@@ -216,8 +216,8 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
             }
         }
 
-        Ok(GlobVec::new(include, exclude)
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
+        GlobVec::new(include, exclude)
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
     }
 }
 
