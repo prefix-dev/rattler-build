@@ -36,6 +36,22 @@ impl InnerGlobVec {
     }
 }
 
+impl From<Vec<String>> for InnerGlobVec {
+    fn from(vec: Vec<String>) -> Self {
+        let vec = vec
+            .into_iter()
+            .map(|glob| Glob::new(&glob).unwrap())
+            .collect();
+        Self(vec)
+    }
+}
+
+impl From<Vec<Glob>> for InnerGlobVec {
+    fn from(vec: Vec<Glob>) -> Self {
+        Self(vec)
+    }
+}
+
 /// A vector of globs that is also immediately converted to a globset
 /// to enhance parser errors.
 #[derive(Default, Clone)]
@@ -90,26 +106,30 @@ impl<'de> Deserialize<'de> for GlobVec {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut raw_globs: Vec<String> = Vec::deserialize(deserializer)?;
-        let mut globs = Vec::with_capacity(raw_globs.len());
-        for raw in raw_globs.drain(..) {
-            let glob = Glob::new(&raw).map_err(serde::de::Error::custom)?;
-            globs.push(glob);
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum GlobVecInput {
+            List(Vec<String>),
+            Map {
+                include: Vec<String>,
+                exclude: Vec<String>,
+            },
         }
 
-        if globs.is_empty() {
-            Ok(GlobVec::default())
-        } else {
-            Ok(Self::new(globs, Vec::new()).map_err(serde::de::Error::custom)?)
-        }
+        let input = GlobVecInput::deserialize(deserializer)?;
+        let (include, exclude) = match input {
+            GlobVecInput::List(list) => (list, Vec::new()),
+            GlobVecInput::Map { include, exclude } => (include, exclude),
+        };
+
+        GlobVec::new(include.into(), exclude.into())
+            .map_err(|e| serde::de::Error::custom(e.to_string()))
     }
 }
 
 impl GlobVec {
     /// Create a new GlobVec from a vector of globs
-    pub fn new(include: Vec<Glob>, exclude: Vec<Glob>) -> Result<Self, globset::Error> {
-        let include = InnerGlobVec(include);
-        let exclude = InnerGlobVec(exclude);
+    fn new(include: InnerGlobVec, exclude: InnerGlobVec) -> Result<Self, globset::Error> {
         let include_globset = include.globset()?;
         let exclude_globset = exclude.globset()?;
         Ok(Self {
@@ -204,7 +224,7 @@ fn to_vector_of_globs(
 impl TryConvertNode<GlobVec> for RenderedSequenceNode {
     fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
         let vec = to_vector_of_globs(self)?;
-        GlobVec::new(vec, Vec::new())
+        GlobVec::new(vec.into(), InnerGlobVec::default())
             .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
     }
 }
@@ -241,7 +261,7 @@ impl TryConvertNode<GlobVec> for RenderedMappingNode {
             }
         }
 
-        GlobVec::new(include, exclude)
+        GlobVec::new(include.into(), exclude.into())
             .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
     }
 }
