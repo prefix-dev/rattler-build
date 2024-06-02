@@ -150,11 +150,6 @@ impl GlobVec {
         self.include.iter()
     }
 
-    /// Returns the globset if it exists
-    // fn globset(&self) -> Option<&GlobSet> {
-    //     self.globset.as_ref()
-    // }
-
     /// Returns true if the path matches any of the globs
     pub fn is_match(&self, path: &Path) -> bool {
         if !self.is_empty() {
