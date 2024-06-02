@@ -162,35 +162,62 @@ impl TryConvertNode<GlobVec> for RenderedNode {
     }
 }
 
+fn to_vector_of_globs(
+    sequence: &RenderedSequenceNode,
+) -> Result<Vec<Glob>, Vec<PartialParsingError>> {
+    let mut vec = Vec::with_capacity(sequence.len());
+    for item in sequence.iter() {
+        let str: String = item.try_convert("globs")?;
+        vec.push(
+            Glob::new(&str)
+                .map_err(|err| vec![_partialerror!(*item.span(), ErrorKind::GlobParsing(err),)])?,
+        );
+    }
+    Ok(vec)
+}
+
 impl TryConvertNode<GlobVec> for RenderedSequenceNode {
     fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
-        let mut vec = Vec::with_capacity(self.len());
-        for item in self.iter() {
-            let str: String = item.try_convert(_name)?;
-            vec.push(
-                Glob::new(&str).map_err(|err| {
-                    vec![_partialerror!(*item.span(), ErrorKind::GlobParsing(err),)]
-                })?,
-            );
-        }
-
-        if vec.is_empty() {
-            Ok(GlobVec::default())
-        } else {
-            Ok(GlobVec::new(vec, Vec::new())
-                .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
-        }
+        let vec = to_vector_of_globs(self)?;
+        Ok(GlobVec::new(vec, Vec::new())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
     }
 }
 
 impl TryConvertNode<GlobVec> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
-        // todo
-        Err(vec![_partialerror!(
-            *self.span(),
-            ErrorKind::ExpectedSequence,
-            label = format!("expected a list of globs strings for '{}'", name)
-        )])
+        // find the `include` and `exclude` keys
+        let mut include = Vec::new();
+        let mut exclude = Vec::new();
+
+        for (key, value) in self.iter() {
+            let key_str = key.as_str();
+            match (key_str, value) {
+                ("include", RenderedNode::Sequence(seq)) => {
+                    include = to_vector_of_globs(&seq)?;
+                }
+                ("exclude", RenderedNode::Sequence(seq)) => {
+                    exclude = to_vector_of_globs(seq)?;
+                }
+                ("include" | "exclude", _) => {
+                    return Err(vec![_partialerror!(
+                        *value.span(),
+                        ErrorKind::ExpectedSequence,
+                        label = "expected a list of globs strings for `include` or `exclude`"
+                    )]);
+                }
+                _ => {
+                    return Err(vec![_partialerror!(
+                        *key.span(),
+                        ErrorKind::InvalidField(key_str.to_string().into()),
+                        help = format!("valid options for {} are `include` and `exclude`", name)
+                    )]);
+                }
+            }
+        }
+
+        Ok(GlobVec::new(include, exclude)
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?)
     }
 }
 
