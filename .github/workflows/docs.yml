@@ -47,13 +47,25 @@ jobs:
         run: |
           pixi run generate-cli-docs
 
-      - uses: EndBug/add-and-commit@v9
-        with:
-          message: "docs: update CLI docs"
-          committer_name: GitHub Actions
-          committer_email: 41898282+github-actions[bot]@users.noreply.github.com
-          add: 'docs/reference/cli.md'
+      - name: Check for changes
+        id: git_diff
+        run: |
+          git diff --exit-code || echo "has_changes=true" >> $GITHUB_ENV
 
+      - name: Output instructions if there are changes
+        if: env.has_changes == 'true'
+        run: |
+          echo "There are changes in the CLI docs."
+          echo "Please run the following commands to commit and push the changes:"
+          echo ""
+          echo "pixi run commit-cli-docs"
+          echo "git commit -am 'docs: update CLI docs'"
+          echo "git push"
+          echo ""
+
+      - name: Output message if there are no changes
+        if: env.has_changes != 'true'
+        run: echo "No changes detected."
 
   build-docs:
     needs: generate-cli-docs
