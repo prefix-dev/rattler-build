@@ -362,7 +362,7 @@ mod tests {
     #[test]
     fn test_include_globs() {
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"]),
+            include: GlobVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 
@@ -374,7 +374,7 @@ mod tests {
         test_glob_matches(&globs, paths).unwrap();
 
         let package_contents = PackageContentsTest {
-            include: GlobVec::from_vec(vec!["foo", "bar"]),
+            include: GlobVec::from_vec(vec!["foo", "bar"], None),
             ..Default::default()
         };
 

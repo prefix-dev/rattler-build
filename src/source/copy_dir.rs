@@ -126,13 +126,13 @@ impl<'a> CopyDir<'a> {
                     Err(e) => return Some(Err(e)),
                 };
 
-                // if the entry is a directory, ignore it for the final output
-                if entry
+                let is_dir = entry
                     .file_type()
                     .as_ref()
                     .map(|ft| ft.is_dir())
-                    .unwrap_or(false)
-                {
+                    .unwrap_or(false);
+                // if the entry is a directory, ignore it for the final output
+                if is_dir {
                     // if the dir is empty, check if we should create it anyways
                     if entry.path().read_dir().ok()?.next().is_some()
                         || !result.include_globs().is_empty()
@@ -153,6 +153,7 @@ impl<'a> CopyDir<'a> {
                     components.iter().collect()
                 };
 
+                // include everything
                 let include = result.include_globs().is_empty();
 
                 let include = include
@@ -321,7 +322,7 @@ pub(crate) struct CopyDirResult {
     exclude_globs: HashMap<Glob, Match>,
 }
 
-impl<'a> CopyDirResult {
+impl CopyDirResult {
     pub fn copied_paths(&self) -> &[PathBuf] {
         &self.copied_paths
     }
@@ -353,10 +354,9 @@ impl<'a> CopyDirResult {
     }
 }
 
-fn make_glob_match_map(globs: &Vec<globset::Glob>) -> Result<HashMap<globset::Glob, Match>, SourceError>
-{
+fn make_glob_match_map(globs: &Vec<Glob>) -> Result<HashMap<Glob, Match>, SourceError> {
     globs
-        .into_iter()
+        .iter()
         .map(|glob| {
             let matcher = Match::new(glob);
             Ok(((*glob).clone(), matcher))
@@ -432,7 +432,7 @@ mod test {
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
-            .with_include_glob("*.txt")
+            .with_globvec(&GlobVec::from_vec(vec!["*.txt"], None))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -441,13 +441,14 @@ mod test {
         assert_eq!(copy_dir.copied_paths()[0], dest_dir_2.join("test.txt"));
 
         let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
+
         // ignore all txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_3)
-            .with_exclude_glob("*.txt")
+            .with_globvec(&GlobVec::from_vec(vec![], Some(vec!["*.txt"])))
             .use_gitignore(false)
             .run()
             .unwrap();
-
+        println!("{:?}", copy_dir.copied_paths());
         assert_eq!(copy_dir.copied_paths().len(), 2);
         let expected = [
             dest_dir_3.join("test_dir/test.md"),
@@ -470,7 +471,7 @@ mod test {
         let dest_dir = tempfile::TempDir::new().unwrap();
 
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/")
+            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/"], None))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -479,9 +480,10 @@ mod test {
         fs_err::remove_dir_all(&dest_dir).unwrap();
         fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            // .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"]))
-            // .with_include_glob("test_copy_dir/")
-            // .with_exclude_glob("*.rst")
+            .with_globvec(&GlobVec::from_vec(
+                vec!["test_copy_dir/test_1.txt"],
+                Some(vec!["*.rst"]),
+            ))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -494,7 +496,7 @@ mod test {
         fs_err::remove_dir_all(&dest_dir).unwrap();
         fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"]))
+            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"], None))
             .use_gitignore(false)
             .run()
             .unwrap();

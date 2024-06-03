@@ -181,23 +181,27 @@ impl GlobVec {
 
     /// Only used for testing
     #[cfg(test)]
-    pub fn from_vec(vec: Vec<&str>) -> Self {
-        let mut glob_vec = Vec::with_capacity(vec.len());
-        for glob in vec.into_iter() {
-            glob_vec.push(to_glob(glob).unwrap());
-        }
+    pub fn from_vec(include: Vec<&str>, exclude: Option<Vec<&str>>) -> Self {
+        let include_vec: Vec<Glob> = include
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
+        let exclude_vec: Vec<Glob> = exclude
+            .unwrap_or_default()
+            .into_iter()
+            .map(|glob| to_glob(glob).unwrap())
+            .collect();
 
-        if glob_vec.is_empty() {
-            Self::default()
-        } else {
-            let include = InnerGlobVec(glob_vec);
-            let globset = include.globset().unwrap();
-            Self {
-                include,
-                exclude: InnerGlobVec::default(),
-                include_globset: globset,
-                exclude_globset: GlobSet::default(),
-            }
+        let include = InnerGlobVec(include_vec);
+        let globset = include.globset().unwrap();
+        let exclude = InnerGlobVec(exclude_vec);
+        let exclude_globset = exclude.globset().unwrap();
+
+        Self {
+            include,
+            exclude,
+            include_globset: globset,
+            exclude_globset: exclude_globset,
         }
     }
 }
@@ -207,10 +211,11 @@ impl TryConvertNode<GlobVec> for RenderedNode {
         match self {
             RenderedNode::Sequence(sequence) => sequence.try_convert(name),
             RenderedNode::Mapping(mapping) => mapping.try_convert(name),
+            RenderedNode::Scalar(scalar) => scalar.try_convert(name),
             _ => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedSequence,
-                label = format!("expected a list of globs strings for '{}'", name)
+                label = "expected a list of globs strings"
             )]),
         }
     }
@@ -228,6 +233,15 @@ fn to_vector_of_globs(
         );
     }
     Ok(vec)
+}
+
+impl TryConvertNode<GlobVec> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
+        let vec = vec![to_glob(self.as_str())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?];
+        GlobVec::new(vec.into(), InnerGlobVec::default())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
+    }
 }
 
 impl TryConvertNode<GlobVec> for RenderedSequenceNode {
@@ -381,12 +395,22 @@ mod tests {
 
     #[test]
     fn test_glob_match_folder() {
-        let globvec = GlobVec::from_vec(vec!["foo/"]);
+        let globvec = GlobVec::from_vec(vec!["foo/"], None);
         assert!(globvec.is_match(Path::new("foo/bar")));
         assert!(globvec.is_match(Path::new("foo/bla")));
         assert!(globvec.is_match(Path::new("foo/bla/bar")));
         assert!(!globvec.is_match(Path::new("bar")));
         assert!(!globvec.is_match(Path::new("bla")));
+    }
+
+    #[test]
+    fn test_glob_match_all_except() {
+        let globvec = GlobVec::from_vec(vec!["**"], Some(vec!["*.txt"]));
+        assert!(!globvec.is_match(Path::new("foo/bar.txt")));
+        assert!(globvec.is_match(Path::new("foo/bla")));
+        assert!(globvec.is_match(Path::new("foo/bla/bar")));
+        assert!(!globvec.is_match(Path::new("bar.txt")));
+        assert!(globvec.is_match(Path::new("bla")));
     }
 
     #[test]
