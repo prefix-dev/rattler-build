@@ -67,7 +67,7 @@ impl Files {
     pub fn from_prefix(
         prefix: &Path,
         always_include: &GlobVec,
-        include_files: &GlobVec,
+        files: &GlobVec,
     ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
@@ -97,10 +97,10 @@ impl Files {
 
         let mut difference = current_files
             .difference(&previous_files)
-            // If we have an include_files glob, we only include files that match the glob
+            // If we have an files glob, we only include files that match the glob
             .filter(|f| {
-                include_files.is_empty()
-                    || include_files
+                files.is_empty()
+                    || files
                         .is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             })
             .cloned()

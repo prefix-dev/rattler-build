@@ -144,7 +144,7 @@ Recipe {
             ignore_binary_files: false,
         },
         post_process: [],
-        include_files: [],
+        files: [],
     },
     requirements: Requirements {
         build: [

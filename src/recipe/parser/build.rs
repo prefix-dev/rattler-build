@@ -110,7 +110,7 @@ pub struct Build {
     pub(super) post_process: Vec<PostProcess>,
     /// Include files in the package
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) include_files: GlobVec,
+    pub(super) files: GlobVec,
 }
 
 /// Post process operations for regex based replacements
@@ -178,8 +178,8 @@ impl Build {
     }
 
     /// Get the include files settings.
-    pub fn include_files(&self) -> &GlobVec {
-        &self.include_files
+    pub fn files(&self) -> &GlobVec {
+        &self.files
     }
 
     /// Get the prefix detection settings.
@@ -221,7 +221,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             variant,
             prefix_detection,
             post_process,
-            include_files
+            files
         }
 
         Ok(build)
