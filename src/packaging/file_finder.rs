@@ -100,8 +100,7 @@ impl Files {
             // If we have an files glob, we only include files that match the glob
             .filter(|f| {
                 files.is_empty()
-                    || files
-                        .is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+                    || files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             })
             .cloned()
             .collect::<HashSet<_>>();

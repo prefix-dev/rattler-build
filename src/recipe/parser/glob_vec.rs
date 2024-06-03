@@ -391,6 +391,29 @@ mod tests {
         let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
         assert_eq!(parsed_again.include.len(), 3);
         assert_eq!(parsed_again.include_globset.len(), 3);
+
+        let yaml = r#"globs:
+        include: ["foo/", "bar", "baz/**/qux"]
+        exclude: ["foo/bar", "bar/*.txt"]
+        "#;
+
+        let yaml_root = RenderedNode::parse_yaml(0, yaml)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("globs").unwrap();
+        let globvec: GlobVec = tests_node.try_convert("globs").unwrap();
+        assert_eq!(globvec.include.len(), 3);
+        assert_eq!(globvec.include_globset.len(), 3);
+        assert_eq!(globvec.exclude.len(), 2);
+        assert_eq!(globvec.exclude_globset.len(), 2);
+
+        let as_yaml = serde_yaml::to_string(&globvec).unwrap();
+        insta::assert_snapshot!(&as_yaml);
+        let parsed_again: GlobVec = serde_yaml::from_str(&as_yaml).unwrap();
+        assert_eq!(parsed_again.include.len(), 3);
+        assert_eq!(parsed_again.include_globset.len(), 3);
+        assert_eq!(parsed_again.exclude.len(), 2);
+        assert_eq!(parsed_again.exclude_globset.len(), 2);
     }
 
     #[test]
