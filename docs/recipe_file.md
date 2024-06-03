@@ -1062,16 +1062,33 @@ build:
   string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
 ```
 
-#### `cmp` function
+#### `match` function
 
-This function matches the first argument (the package's MatchSpec) against the second
-argument (the version spec) and returns the resulting boolean.
+This function matches the first argument (the package version) against the second
+argument (the version spec) and returns the resulting boolean. This only works for packages
+defined in the "variant_config.yaml" file.
 
-```yaml
-cmp(python, '>=3.4')
+```yaml title="recipe.yaml"
+match(python, '>=3.4')
 ```
 
-Example: [`cmp` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+For example, you could require a certain dependency only for builds against python 3.4 and above:
+
+```yaml title="recipe.yaml"
+requirements:
+  build:
+    - if: match(python, '>=3.4')
+      then:
+        - some-dep
+```
+
+With a corresponding variant config that looks like the following:
+
+```yaml title="variant_config.yaml"
+python: ["3.2", "3.4", "3.6"]
+```
+
+Example: [`cmp` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
 #### `cdt` function
 

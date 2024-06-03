@@ -270,6 +270,45 @@ fn default_tests(env: &mut Environment) {
     env.add_test("false", minijinja::tests::is_false);
 }
 
+fn default_filters(env: &mut Environment) {
+    env.add_filter("version_to_buildstring", |s: String| {
+        // we first split the string by whitespace and take the first part
+        let s = s.split_whitespace().next().unwrap_or(&s);
+        // we then split the string by . and take the first two parts
+        let mut parts = s.split('.');
+        let major = parts.next().unwrap_or("");
+        let minor = parts.next().unwrap_or("");
+        format!("{}{}", major, minor)
+    });
+
+    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
+        s.split(sep.as_deref().unwrap_or(" "))
+            .map(|s| s.to_string())
+            .collect()
+    });
+
+    env.add_filter("replace", minijinja::filters::replace);
+    env.add_filter("lower", minijinja::filters::lower);
+    env.add_filter("upper", minijinja::filters::upper);
+    env.add_filter("int", minijinja::filters::int);
+    env.add_filter("abs", minijinja::filters::abs);
+    env.add_filter("bool", minijinja::filters::bool);
+    env.add_filter("default", minijinja::filters::default);
+    env.add_filter("first", minijinja::filters::first);
+    env.add_filter("last", minijinja::filters::last);
+    env.add_filter("length", minijinja::filters::length);
+    env.add_filter("list", minijinja::filters::list);
+    env.add_filter("join", minijinja::filters::join);
+    env.add_filter("min", minijinja::filters::min);
+    env.add_filter("max", minijinja::filters::max);
+    env.add_filter("reverse", minijinja::filters::reverse);
+    env.add_filter("slice", minijinja::filters::slice);
+    env.add_filter("batch", minijinja::filters::batch);
+    env.add_filter("sort", minijinja::filters::sort);
+    env.add_filter("trim", minijinja::filters::trim);
+    env.add_filter("unique", minijinja::filters::unique);
+}
+
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
@@ -282,7 +321,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     let mut env = Environment::empty();
     default_tests(&mut env);
-    let variant = Arc::new(variant.clone());
+    default_filters(&mut env);
 
     // Ok to unwrap here because we know that the syntax is valid
     env.set_syntax(minijinja::Syntax {
@@ -294,6 +333,8 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         comment_end: "}}#".into(),
     })
     .expect("is tested to be correct");
+
+    let variant = Arc::new(variant.clone());
 
     env.add_function("match", |a: &Value, spec: &str| {
         if let Some(variant) = a.as_str() {
@@ -384,43 +425,6 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function("pin_compatible", |name: String, kwargs: Kwargs| {
         jinja_pin_function(name, kwargs, "__PIN_COMPATIBLE")
     });
-
-    env.add_filter("version_to_buildstring", |s: String| {
-        // we first split the string by whitespace and take the first part
-        let s = s.split_whitespace().next().unwrap_or(&s);
-        // we then split the string by . and take the first two parts
-        let mut parts = s.split('.');
-        let major = parts.next().unwrap_or("");
-        let minor = parts.next().unwrap_or("");
-        format!("{}{}", major, minor)
-    });
-
-    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
-        s.split(sep.as_deref().unwrap_or(" "))
-            .map(|s| s.to_string())
-            .collect()
-    });
-
-    env.add_filter("replace", minijinja::filters::replace);
-    env.add_filter("lower", minijinja::filters::lower);
-    env.add_filter("upper", minijinja::filters::upper);
-    env.add_filter("int", minijinja::filters::int);
-    env.add_filter("abs", minijinja::filters::abs);
-    env.add_filter("bool", minijinja::filters::bool);
-    env.add_filter("default", minijinja::filters::default);
-    env.add_filter("first", minijinja::filters::first);
-    env.add_filter("last", minijinja::filters::last);
-    env.add_filter("length", minijinja::filters::length);
-    env.add_filter("list", minijinja::filters::list);
-    env.add_filter("join", minijinja::filters::join);
-    env.add_filter("min", minijinja::filters::min);
-    env.add_filter("max", minijinja::filters::max);
-    env.add_filter("reverse", minijinja::filters::reverse);
-    env.add_filter("slice", minijinja::filters::slice);
-    env.add_filter("batch", minijinja::filters::batch);
-    env.add_filter("sort", minijinja::filters::sort);
-    env.add_filter("trim", minijinja::filters::trim);
-    env.add_filter("unique", minijinja::filters::unique);
 
     env.add_function("load_from_file", move |path: String| {
         if !experimental {
