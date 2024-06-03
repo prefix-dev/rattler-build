@@ -3789,9 +3789,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_solve"
-version = "0.23.1"
+version = "0.23.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c392d5f93ca17b5a2a9f20f91eefecad790b5e772fa9a6ab6fad501002bd0249"
+checksum = "96b58a172466a9e7338e4fb05ebfa8b9b297de53a5735190880f9d8f17d409c2"
 dependencies = [
  "chrono",
  "futures",

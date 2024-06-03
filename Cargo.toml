@@ -32,7 +32,7 @@ rattler_repodata_gateway = { version = "0.20.3", default-features = false, featu
 rattler_shell = { version = "0.20.6", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.23.1", default-features = false, features = [
+rattler_solve = { version = "0.23.2", default-features = false, features = [
     "resolvo",
     "serde"
 ] }
