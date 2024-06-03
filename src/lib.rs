@@ -288,7 +288,6 @@ pub async fn get_build_output(
                 packaging_settings: PackagingSettings::from_args(
                     args.package_format.archive_type,
                     args.package_format.compression_level,
-                    args.compression_threads,
                 ),
                 store_recipe: !args.no_include_recipe,
                 force_colors: args.color_build_log && console::colors_enabled(),
@@ -382,7 +381,8 @@ pub async fn run_test_from_args(
             fancy_log_handler,
             // duplicate from `keep_test_prefix`?
             no_clean: false,
-            ..Default::default()
+            compression_threads: args.compression_threads,
+            ..Configuration::default()
         },
     };
 
@@ -445,6 +445,7 @@ pub async fn rebuild_from_args(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        compression_threads: args.compression_threads,
         ..Configuration::default()
     };
 

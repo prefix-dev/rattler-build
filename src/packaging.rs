@@ -315,7 +315,7 @@ pub fn package_conda(
                 tmp.temp_dir.path(),
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
-                packaging_settings.compression_threads,
+                tool_configuration.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
                 Some(Box::new(ProgressBar { progress_bar })),

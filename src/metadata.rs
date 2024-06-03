@@ -184,41 +184,20 @@ pub struct PackagingSettings {
     pub archive_type: ArchiveType,
     /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda` archives
     pub compression_level: i32,
-    /// How many threads to use for compression (only relevant for `.conda` archives)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub compression_threads: Option<u32>,
 }
 
 impl PackagingSettings {
     /// Create a new `PackagingSettings` from the command line arguments
     /// and the selected archive type.
-    pub fn from_args(
-        archive_type: ArchiveType,
-        compression_level: CompressionLevel,
-        compression_threads: Option<u32>,
-    ) -> Self {
+    pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
             ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
-        if compression_threads.is_some()
-            && compression_threads.unwrap() > 1
-            && archive_type != ArchiveType::Conda
-        {
-            tracing::warn!("Multi-threaded compression is only supported for conda archives");
-        }
-
-        let compression_threads = if archive_type == ArchiveType::Conda {
-            Some(compression_threads.unwrap_or(1))
-        } else {
-            None
-        };
-
         Self {
             archive_type,
             compression_level,
-            compression_threads,
         }
     }
 }

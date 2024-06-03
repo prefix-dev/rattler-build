@@ -54,7 +54,6 @@ build_configuration:
   packaging_settings:
     archive_type: tar_bz2
     compression_level: 3
-    compression_threads: 1
 finalized_dependencies:
   build:
     specs:
