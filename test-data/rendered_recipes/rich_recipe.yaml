@@ -73,7 +73,6 @@ build_configuration:
   packaging_settings:
     archive_type: conda
     compression_level: 21
-    compression_threads: 5
 finalized_dependencies:
   build: null
   host:
@@ -381,7 +380,6 @@ finalized_dependencies:
     - run_export: python
       spec: python
       from: host
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
   rattler-build: 0.12.1

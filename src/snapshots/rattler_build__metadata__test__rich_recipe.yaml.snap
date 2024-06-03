@@ -1,6 +1,5 @@
 ---
 source: src/metadata.rs
-assertion_line: 738
 expression: output
 ---
 recipe:
@@ -73,7 +72,6 @@ build_configuration:
   packaging_settings:
     archive_type: conda
     compression_level: 21
-    compression_threads: 5
 finalized_dependencies:
   build: ~
   host:
@@ -381,8 +379,7 @@ finalized_dependencies:
       - spec: python
         from: host
         run_export: python
-    constrains: []
-    run_exports: ~
+    constraints: []
 finalized_sources: ~
 system_tools:
   rattler-build: 0.12.1

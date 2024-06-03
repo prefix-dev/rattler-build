@@ -1,15 +1,14 @@
 # Writing a Python package
 
-Writing a Python package is fairly straightforward, especially for "Python-only"
-packages. But it becomes really interesting when compiled extensions are
-involved (we will look at this in the second example).
+Writing a Python package is fairly straightforward, especially for "Python-only" packages. 
+In the second example we will build a package for `numpy` which contains compiled code.
 
-The following recipe uses the `noarch: python` setting to build a `noarch`
-package that can be installed on any platform without modification. This is very
-handy for packages that are pure Python and do not contain any compiled
-extensions. Additionally, `noarch: python` packages work with a range of Python
-versions (contrary to packages with compiled extensions that are tied to a
-specific Python version).
+## A Python-only package
+The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification. 
+This is very handy for packages that are pure Python and do not contain any compiled extensions.
+
+Additionally, `noarch: python` packages work with a range of Python versions (contrary to packages with compiled extensions that are tied to a specific Python version).
+
 
 ```yaml title="recipe.yaml"
 context:
@@ -63,12 +62,18 @@ about:
 2. The `imports` section in the tests is used to check that the package is
    installed correctly and can be imported.
 
+### Running the recipe
+To build this recipe, simply run:
+
+```bash
+rattler-build build --recipe ./ipywidgets
+```
 
 ## A Python package with compiled extensions
 
-We will build a package for `numpy` – which most definitely contains compiled code.
-Since compiled code is `python` version-specific, we will need to specify the
-`python` version explictly. This is most easily done with a "variant config" file:
+We will build a package for `numpy` – which contains compiled code.
+Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly. 
+The best way to do this is with a "variant_config.yaml" file:
 
 ```yaml title="variant_config.yaml"
 python:
@@ -76,8 +81,7 @@ python:
   - 3.12
 ```
 
-This will replace any `python` found in the recipe with the versions specified in the
-`variant_config.yaml` file.
+This will replace any `python` found in the recipe with the versions specified in the `variant_config.yaml` file.
 
 ```yaml title="recipe.yaml"
 context:

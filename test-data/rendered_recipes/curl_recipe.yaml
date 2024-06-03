@@ -53,7 +53,6 @@ build_configuration:
   packaging_settings:
     archive_type: tar_bz2
     compression_level: 3
-    compression_threads: 1
 finalized_dependencies:
   build:
     specs:
@@ -634,7 +633,6 @@ finalized_dependencies:
   host: null
   run:
     depends: []
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
   rattler-build: 0.12.1

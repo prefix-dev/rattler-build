@@ -52,8 +52,7 @@ finalized_dependencies:
   host: null
   run:
     depends: []
-    constrains: []
-    run_exports: null
+    constraints: []
 finalized_sources:
 - git: https://github.com/prefix-dev/rattler-build
   rev: 4ae7bd207b437c3a5955788e6516339a84358e1c

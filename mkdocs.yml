@@ -101,9 +101,7 @@ nav:
     - "C++": tutorials/cpp.md
     - "Rust": tutorials/rust.md
   - High-level overview: highlevel.md
-  - Recipe file: recipe_file.md
   - Advanced options: build_options.md
-  - Jinja functions: available_jinja.md
   - Experimental features: experimental_features.md
 
   - Selector syntax: selectors.md
@@ -123,6 +121,10 @@ nav:
   - Package specification: package_spec.md
   - Activation scripts: special_files.md
   - Internals: internals.md
+  - Reference:
+      - Recipe file: reference/recipe_file.md
+      - CLI: reference/cli.md
+      - Jinja functions: reference/jinja.md
 
 plugins:
   - search

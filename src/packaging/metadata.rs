@@ -189,18 +189,13 @@ pub fn create_prefix_placeholder(
 
 impl Output {
     /// Create the run_exports.json file for the given output.
-    pub fn run_exports_json(&self) -> Result<Option<RunExportsJson>, PackagingError> {
-        if let Some(run_exports) = &self
+    pub fn run_exports_json(&self) -> Result<&RunExportsJson, PackagingError> {
+        Ok(&self
             .finalized_dependencies
             .as_ref()
             .ok_or(PackagingError::DependenciesNotFinalized)?
             .run
-            .run_exports
-        {
-            Ok(Some(run_exports.clone()))
-        } else {
-            Ok(None)
-        }
+            .run_exports)
     }
 
     /// Returns the contents of the `hash_input.json` file.
@@ -301,7 +296,7 @@ impl Output {
                 .collect(),
             constrains: finalized_dependencies
                 .run
-                .constrains
+                .constraints
                 .iter()
                 .map(|dep| dep.spec().to_string())
                 .dedup()
@@ -450,7 +445,8 @@ impl Output {
         serde_json::to_writer_pretty(about_json, &self.about_json())?;
         new_files.insert(about_json_path);
 
-        if let Some(run_exports) = self.run_exports_json()? {
+        let run_exports = self.run_exports_json()?;
+        if !run_exports.is_empty() {
             let run_exports_path = root_dir.join(RunExportsJson::package_path());
             let run_exports_json = File::create(&run_exports_path)?;
             serde_json::to_writer_pretty(run_exports_json, &run_exports)?;

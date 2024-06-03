@@ -226,9 +226,12 @@ impl DependencyInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizedRunDependencies {
+    #[serde(default)]
     pub depends: Vec<DependencyInfo>,
-    pub constrains: Vec<DependencyInfo>,
-    pub run_exports: Option<RunExportsJson>,
+    #[serde(default)]
+    pub constraints: Vec<DependencyInfo>,
+    #[serde(default, skip_serializing_if = "RunExportsJson::is_empty")]
+    pub run_exports: RunExportsJson,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -337,7 +340,7 @@ impl FinalizedRunDependencies {
             });
         }
 
-        if !self.constrains.is_empty() {
+        if !self.constraints.is_empty() {
             let mut row = comfy_table::Row::new();
             row.add_cell(
                 comfy_table::Cell::new("Run constraints")
@@ -345,7 +348,7 @@ impl FinalizedRunDependencies {
             );
             table.add_row(row);
 
-            self.constrains.iter().for_each(|d| {
+            self.constraints.iter().for_each(|d| {
                 let rendered = d.render(long);
                 table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
             });
@@ -751,20 +754,20 @@ async fn resolve_dependencies(
     let run_exports = output.recipe.requirements().run_exports();
 
     let run_exports = if !run_exports.is_empty() {
-        Some(RunExportsJson {
+        RunExportsJson {
             strong: render_run_exports(run_exports.strong())?,
             weak: render_run_exports(run_exports.weak())?,
             noarch: render_run_exports(run_exports.noarch())?,
             strong_constrains: render_run_exports(run_exports.strong_constraints())?,
             weak_constrains: render_run_exports(run_exports.weak_constraints())?,
-        })
+        }
     } else {
-        None
+        RunExportsJson::default()
     };
 
     let mut run_specs = FinalizedRunDependencies {
         depends,
-        constrains,
+        constraints: constrains,
         run_exports,
     };
 
@@ -786,11 +789,13 @@ async fn resolve_dependencies(
                     run_specs
                         .depends
                         .extend(clone_specs(name, "host", &rex.weak)?);
+                    run_specs.constraints.extend(clone_specs(
+                        name,
+                        "host",
+                        &rex.strong_constrains,
+                    )?);
                     run_specs
-                        .constrains
-                        .extend(clone_specs(name, "host", &rex.strong_constrains)?);
-                    run_specs
-                        .constrains
+                        .constraints
                         .extend(clone_specs(name, "host", &rex.weak_constrains)?);
                 }
             }
@@ -806,7 +811,7 @@ async fn resolve_dependencies(
                     run_specs
                         .depends
                         .extend(clone_specs(name, "build", &rex.strong)?);
-                    run_specs.constrains.extend(clone_specs(
+                    run_specs.constraints.extend(clone_specs(
                         name,
                         "build",
                         &rex.strong_constrains,
@@ -817,7 +822,7 @@ async fn resolve_dependencies(
     }
 
     // log a table of the rendered run dependencies
-    if run_specs.depends.is_empty() && run_specs.constrains.is_empty() {
+    if run_specs.depends.is_empty() && run_specs.constraints.is_empty() {
         tracing::info!("\nFinalized run dependencies: this output has no run dependencies");
     } else {
         tracing::info!("\nFinalized run dependencies:\n{}", run_specs);
