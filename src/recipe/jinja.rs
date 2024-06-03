@@ -231,6 +231,45 @@ fn compiler_stdlib_eval(
     }
 }
 
+fn default_tests(env: &mut Environment) {
+    env.add_test("undefined", minijinja::tests::is_undefined);
+    env.add_test("defined", minijinja::tests::is_defined);
+    env.add_test("none", minijinja::tests::is_none);
+    env.add_test("safe", minijinja::tests::is_safe);
+    env.add_test("escaped", minijinja::tests::is_safe);
+    env.add_test("odd", minijinja::tests::is_odd);
+    env.add_test("even", minijinja::tests::is_even);
+    env.add_test("number", minijinja::tests::is_number);
+    env.add_test("integer", minijinja::tests::is_integer);
+    env.add_test("int", minijinja::tests::is_integer);
+    env.add_test("float", minijinja::tests::is_float);
+    env.add_test("string", minijinja::tests::is_string);
+    env.add_test("sequence", minijinja::tests::is_sequence);
+
+    // operators
+    env.add_test("eq", minijinja::tests::is_eq);
+    env.add_test("==", minijinja::tests::is_eq);
+
+    env.add_test("ne", minijinja::tests::is_ne);
+    env.add_test("!=", minijinja::tests::is_ne);
+
+    env.add_test("lt", minijinja::tests::is_lt);
+    env.add_test("<", minijinja::tests::is_lt);
+
+    env.add_test("le", minijinja::tests::is_le);
+    env.add_test("<=", minijinja::tests::is_le);
+
+    env.add_test("gt", minijinja::tests::is_gt);
+    env.add_test(">", minijinja::tests::is_gt);
+
+    env.add_test("ge", minijinja::tests::is_ge);
+    env.add_test(">=", minijinja::tests::is_ge);
+
+    env.add_test("in", minijinja::tests::is_in);
+    env.add_test("true", minijinja::tests::is_true);
+    env.add_test("false", minijinja::tests::is_false);
+}
+
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
@@ -241,8 +280,8 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         ..
     } = config.clone();
 
-    let mut env = minijinja::Environment::new();
-
+    let mut env = Environment::empty();
+    default_tests(&mut env);
     let variant = Arc::new(variant.clone());
 
     // Ok to unwrap here because we know that the syntax is valid
@@ -256,7 +295,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     })
     .expect("is tested to be correct");
 
-    env.add_function("cmp", |a: &Value, spec: &str| {
+    env.add_function("match", |a: &Value, spec: &str| {
         if let Some(variant) = a.as_str() {
             // check if version matches spec
             let (version, _) = variant.split_once(' ').unwrap_or((variant, ""));
@@ -355,6 +394,33 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         let minor = parts.next().unwrap_or("");
         format!("{}{}", major, minor)
     });
+
+    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
+        s.split(sep.as_deref().unwrap_or(" "))
+            .map(|s| s.to_string())
+            .collect()
+    });
+
+    env.add_filter("replace", minijinja::filters::replace);
+    env.add_filter("lower", minijinja::filters::lower);
+    env.add_filter("upper", minijinja::filters::upper);
+    env.add_filter("int", minijinja::filters::int);
+    env.add_filter("abs", minijinja::filters::abs);
+    env.add_filter("bool", minijinja::filters::bool);
+    env.add_filter("default", minijinja::filters::default);
+    env.add_filter("first", minijinja::filters::first);
+    env.add_filter("last", minijinja::filters::last);
+    env.add_filter("length", minijinja::filters::length);
+    env.add_filter("list", minijinja::filters::list);
+    env.add_filter("join", minijinja::filters::join);
+    env.add_filter("min", minijinja::filters::min);
+    env.add_filter("max", minijinja::filters::max);
+    env.add_filter("reverse", minijinja::filters::reverse);
+    env.add_filter("slice", minijinja::filters::slice);
+    env.add_filter("batch", minijinja::filters::batch);
+    env.add_filter("sort", minijinja::filters::sort);
+    env.add_filter("trim", minijinja::filters::trim);
+    env.add_filter("unique", minijinja::filters::unique);
 
     env.add_function("load_from_file", move |path: String| {
         if !experimental {
@@ -1003,7 +1069,7 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
-    fn eval_cmp() {
+    fn eval_match() {
         let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7".to_string())]);
 
         let options = SelectorConfig {
@@ -1014,18 +1080,18 @@ mod tests {
         };
         let jinja = Jinja::new(options);
 
-        assert!(jinja.eval("cmp(python, '==3.7')").expect("test 1").is_true());
-        assert!(jinja.eval("cmp(python, '>=3.7')").expect("test 2").is_true());
-        assert!(jinja.eval("cmp(python, '>=3.7,<3.9')").expect("test 3").is_true());
+        assert!(jinja.eval("match(python, '==3.7')").expect("test 1").is_true());
+        assert!(jinja.eval("match(python, '>=3.7')").expect("test 2").is_true());
+        assert!(jinja.eval("match(python, '>=3.7,<3.9')").expect("test 3").is_true());
 
-        assert!(!jinja.eval("cmp(python, '!=3.7')").expect("test 4").is_true());
-        assert!(!jinja.eval("cmp(python, '<3.7')").expect("test 5").is_true());
-        assert!(!jinja.eval("cmp(python, '>3.5,<3.7')").expect("test 6").is_true());
+        assert!(!jinja.eval("match(python, '!=3.7')").expect("test 4").is_true());
+        assert!(!jinja.eval("match(python, '<3.7')").expect("test 5").is_true());
+        assert!(!jinja.eval("match(python, '>3.5,<3.7')").expect("test 6").is_true());
     }
 
     #[test]
     #[rustfmt::skip]
-    fn eval_complicated_cmp() {
+    fn eval_complicated_match() {
         let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7.* *_cpython".to_string())]);
 
         let options = SelectorConfig {
@@ -1036,13 +1102,13 @@ mod tests {
         };
         let jinja = Jinja::new(options);
 
-        assert!(jinja.eval("cmp(python, '==3.7')").expect("test 1").is_true());
-        assert!(jinja.eval("cmp(python, '>=3.7')").expect("test 2").is_true());
-        assert!(jinja.eval("cmp(python, '>=3.7,<3.9')").expect("test 3").is_true());
+        assert!(jinja.eval("match(python, '==3.7')").expect("test 1").is_true());
+        assert!(jinja.eval("match(python, '>=3.7')").expect("test 2").is_true());
+        assert!(jinja.eval("match(python, '>=3.7,<3.9')").expect("test 3").is_true());
 
-        assert!(!jinja.eval("cmp(python, '!=3.7')").expect("test 4").is_true());
-        assert!(!jinja.eval("cmp(python, '<3.7')").expect("test 5").is_true());
-        assert!(!jinja.eval("cmp(python, '>3.5,<3.7')").expect("test 6").is_true());
+        assert!(!jinja.eval("match(python, '!=3.7')").expect("test 4").is_true());
+        assert!(!jinja.eval("match(python, '<3.7')").expect("test 5").is_true());
+        assert!(!jinja.eval("match(python, '>3.5,<3.7')").expect("test 6").is_true());
     }
 
     fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn()) {
@@ -1085,6 +1151,30 @@ mod tests {
             "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":null,\"max_pin\":null}}"
         );
         assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":\"x\",\"lower_bound\":\"1.2.3\"}}");
+    }
+
+    #[test]
+    fn test_split() {
+        let options = SelectorConfig::default();
+
+        let mut jinja = Jinja::new(options);
+        let mut split_test = |s: &str, sep: Option<&str>| {
+            jinja
+                .context_mut()
+                .insert("var".to_string(), Value::from_safe_string(s.to_string()));
+
+            let func = if let Some(sep) = sep {
+                format!("split('{}')", sep)
+            } else {
+                "split".to_string()
+            };
+
+            jinja.eval(&format!("var | {func}")).unwrap().to_string()
+        };
+
+        assert_eq!(split_test("foo bar", None), "[\"foo\", \"bar\"]");
+        assert_eq!(split_test("foobar", None), "[\"foobar\"]");
+        assert_eq!(split_test("1.2.3", Some(".")), "[\"1\", \"2\", \"3\"]");
     }
 
     #[test]
