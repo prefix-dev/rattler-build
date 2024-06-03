@@ -14,7 +14,7 @@ build:
   script:
     - mkdir -p build
     - cd build
-    - cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PREFIX
+    - cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PREFIX ${CMAKE_ARGS}
     - ninja install
   dynamic_linking:
     overdepending_behavior: ignore
