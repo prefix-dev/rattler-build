@@ -55,6 +55,10 @@ pub struct Configuration {
 
     /// The channel configuration to use when parsing channels.
     pub channel_config: ChannelConfig,
+
+    /// How many threads to use for compression (only relevant for `.conda` archives).
+    /// This value is not serialized because the number of threads does not matter for the final result.
+    pub compression_threads: Option<u32>,
 }
 
 /// Get the authentication storage from the given file
@@ -107,6 +111,7 @@ impl Default for Configuration {
             channel_config: ChannelConfig::default_with_root_dir(
                 std::env::current_dir().unwrap_or_else(|_err| PathBuf::from("/")),
             ),
+            compression_threads: None,
         }
     }
 }

@@ -275,6 +275,10 @@ pub struct TestOpts {
     #[arg(short, long)]
     pub package_file: PathBuf,
 
+    /// The number of threads to use for compression.
+    #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
+    pub compression_threads: Option<u32>,
+
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -290,6 +294,10 @@ pub struct RebuildOpts {
     /// Do not run tests after building
     #[arg(long, default_value = "false")]
     pub no_test: bool,
+
+    /// The number of threads to use for compression.
+    #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
+    pub compression_threads: Option<u32>,
 
     /// Common options.
     #[clap(flatten)]
