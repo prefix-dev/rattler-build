@@ -62,6 +62,7 @@ jobs:
           echo "git commit -am 'docs: update CLI docs'"
           echo "git push"
           echo ""
+          exit 1
 
       - name: Output message if there are no changes
         if: env.has_changes != 'true'
