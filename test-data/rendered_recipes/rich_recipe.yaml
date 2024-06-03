@@ -379,7 +379,6 @@ finalized_dependencies:
     - run_export: python
       spec: python
       from: host
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
   rattler-build: 0.12.1
