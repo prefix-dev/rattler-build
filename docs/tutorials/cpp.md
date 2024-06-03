@@ -109,9 +109,6 @@ But which the package doesn't depend on itself.
 
     For more information please refer to the [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#how-to-enable-cross-compilation).
 
-## A C++ application
->>>>>>> c534253 (fix: cpp tutorial)
-
 ## Building A C++ application
 
 In this example, we'll build `poppler`, a C++ application for manipulating PDF files from the command line.
