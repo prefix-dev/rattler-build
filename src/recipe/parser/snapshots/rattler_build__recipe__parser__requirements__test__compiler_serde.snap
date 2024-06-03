@@ -3,5 +3,4 @@ source: src/recipe/parser/requirements.rs
 expression: requirements
 ---
 build:
-  - compiler: gcc
-
+  - compiler: cxx

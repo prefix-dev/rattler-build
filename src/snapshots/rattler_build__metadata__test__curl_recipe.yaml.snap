@@ -16,7 +16,7 @@ recipe:
     string: h60d57d3_0
   requirements:
     build:
-      - compiler: c
+      - clang_osx-arm64
       - make
       - perl
       - pkg-config
@@ -60,8 +60,7 @@ build_configuration:
 finalized_dependencies:
   build:
     specs:
-      - compiler: c
-        spec: clang_osx-arm64
+      - source: clang_osx-arm64
       - source: make
       - source: perl
       - source: pkg-config

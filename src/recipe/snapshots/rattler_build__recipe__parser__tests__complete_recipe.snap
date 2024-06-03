@@ -84,7 +84,7 @@ build:
     replacement: simple_string
 requirements:
   build:
-  - compiler: c
+  - gcc_linux-64
   - cmake
   host:
   - openssl

@@ -14,13 +14,11 @@ source:
 build:
   number: 0
   script:
-    - if: win
-      then: |
-        cmake -GNinja %SRC_DIR% %CMAKE_ARGS% -DBUILD_TESTS=OFF
-        ninja install
-      else: |
-        cmake -GNinja $SRC_DIR ${CMAKE_ARGS} -DBUILD_TESTS=OFF
-        ninja install
+    content: |
+      cmake -GNinja $SRC_DIR ${CMAKE_ARGS} -DBUILD_TESTS=OFF
+      ninja install
+    env:
+      FOO: COOL
 
 requirements:
   build:
