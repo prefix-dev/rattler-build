@@ -49,13 +49,13 @@ build:
   script:
     - if: win # (1)!
       then: |
-        cmake -GNinja \
-            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% \
+        cmake -GNinja ^
+            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
             %SRC_DIR%
         ninja install
       else: |
-        cmake ${CMAKE_ARGS} -GNinja -DBUILD_TESTS=OFF \
-              -DCMAKE_INSTALL_PREFIX=$PREFIX \
+        cmake -GNinja \
+              -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX \
               $SRC_DIR
         ninja install
 
@@ -69,15 +69,15 @@ requirements:
   run:
     - xtl >=0.7,<0.8
   run_constraints: # (3)!
-    - xsimd >=8.0.3,<10 
+    - xsimd >=8.0.3,<10
 
 tests:
   - package_contents:
       include: # (4)!
         - xtensor/xarray.hpp
       files: # (5)!
-        - share/cmake/xtensor/xtensorConfig.cmake
-        - share/cmake/xtensor/xtensorConfigVersion.cmake
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfig.cmake
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfigVersion.cmake
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor
@@ -99,6 +99,15 @@ extra:
 But which the package doesn't depend on itself.
 4. The `include` section specifies the header file to tested for existence.
 5. The `files` section specifies the files to be tested for existence, using a glob pattern.
+
+!!! note "`CMAKE_ARGS`"
+    It can be tedious to remember all the diffent variables one needs to pass to CMake to create the perfect build.
+    The `cmake` package on conda-forge introduces the`CMAKE_ARGS` environment variable.
+    This variable contains the necessary flags to make the package build correctly, also when cross-compiling from one machine to another.
+    Therefore, it is often not necesary to pass any additional flags to the `cmake` command.
+    However, because this is a tutorial we will show how to pass the necessary flags to `cmake` manually.
+
+    For more information please refer to the [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#how-to-enable-cross-compilation).
 
 ## Building A C++ application
 
