@@ -14,11 +14,17 @@ source:
 build:
   number: 0
   script:
-    content: |
-      cmake -GNinja $SRC_DIR ${CMAKE_ARGS} -DBUILD_TESTS=OFF
-      ninja install
-    env:
-      FOO: COOL
+    - if: win
+      then: |
+        cmake -GNinja ^
+            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
+            %SRC_DIR%
+        ninja install
+      else: |
+        cmake -GNinja \
+              -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX \
+              $SRC_DIR
+        ninja install
 
 requirements:
   build:
@@ -37,9 +43,8 @@ tests:
       include:
         - xtensor/xarray.hpp
       files:
-        - share/cmake/xtensor/xtensorConfig.cmake
-        - share/cmake/xtensor/xtensorConfigVersion.cmake
-
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfig.cmake
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfigVersion.cmake
 about:
   homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause
