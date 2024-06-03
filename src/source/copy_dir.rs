@@ -354,7 +354,7 @@ impl CopyDirResult {
     }
 }
 
-fn make_glob_match_map(globs: &Vec<Glob>) -> Result<HashMap<Glob, Match>, SourceError> {
+fn make_glob_match_map(globs: &[Glob]) -> Result<HashMap<Glob, Match>, SourceError> {
     globs
         .iter()
         .map(|glob| {
