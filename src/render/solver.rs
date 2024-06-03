@@ -5,7 +5,7 @@ use indicatif::{HumanBytes, ProgressBar};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
 use rattler_repodata_gateway::Gateway;
-use rattler_solve::{resolvo::Solver, SolverImpl, SolverTask};
+use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use url::Url;
 
 use crate::tool_configuration;
@@ -54,6 +54,8 @@ pub async fn create_environment(
     target_prefix: &Path,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
+    channel_priority: ChannelPriority,
+    solve_strategy: SolveStrategy,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
     // with this because we need to parse the `channel_config` when parsing matchspecs.
@@ -95,6 +97,8 @@ pub async fn create_environment(
     let solver_task = SolverTask {
         virtual_packages,
         specs: specs.to_vec(),
+        channel_priority,
+        strategy: solve_strategy,
         ..SolverTask::from_iter(&repo_data)
     };
 

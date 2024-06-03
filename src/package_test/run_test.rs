@@ -21,6 +21,7 @@ use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
 use rattler_shell::activation::ActivationError;
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
 use crate::env_vars;
@@ -168,7 +169,7 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
 }
 
 /// The configuration for a test
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
@@ -179,6 +180,10 @@ pub struct TestConfiguration {
     /// The channels to use for the test – do not forget to add the local build outputs channel
     /// if desired
     pub channels: Vec<Url>,
+    /// The channel priority that is used to resolve dependencies
+    pub channel_priority: ChannelPriority,
+    /// The solve strategy to use when resolving dependencies
+    pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
 }
@@ -307,6 +312,8 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
             &prefix,
             &config.channels,
             &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -370,6 +377,8 @@ async fn run_python_test(
         prefix,
         &config.channels,
         &config.tool_configuration,
+        config.channel_priority,
+        config.solve_strategy,
     )
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
@@ -444,6 +453,8 @@ async fn run_shell_test(
             &build_prefix,
             &config.channels,
             &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -473,6 +484,8 @@ async fn run_shell_test(
         &run_env,
         &config.channels,
         &config.tool_configuration,
+        config.channel_priority,
+        config.solve_strategy,
     )
     .await
     .map_err(TestError::TestEnvironmentSetup)?;

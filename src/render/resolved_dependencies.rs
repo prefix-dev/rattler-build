@@ -593,6 +593,8 @@ async fn resolve_dependencies(
             &output.build_configuration.directories.build_prefix,
             channels,
             tool_configuration,
+            output.build_configuration.channel_priority,
+            output.build_configuration.solve_strategy,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -693,6 +695,8 @@ async fn resolve_dependencies(
             &output.build_configuration.directories.host_prefix,
             channels,
             tool_configuration,
+            output.build_configuration.channel_priority,
+            output.build_configuration.solve_strategy,
         )
         .await
         .map_err(ResolveError::from)?;

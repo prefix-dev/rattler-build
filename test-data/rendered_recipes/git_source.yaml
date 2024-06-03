@@ -36,6 +36,8 @@ build_configuration:
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826
   channels:
     - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: 2024-01-04T14:50:26.411202Z
   subpackages:
     git_source:

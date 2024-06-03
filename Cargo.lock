@@ -3748,6 +3748,7 @@ dependencies = [
  "rattler_conda_types",
  "rattler_digest",
  "resolvo",
+ "serde",
  "tempfile",
  "thiserror",
  "tracing",
