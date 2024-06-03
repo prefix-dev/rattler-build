@@ -14,7 +14,7 @@
         <link rel="prev" href="../tutorials/rust/">
       
       
-        <link rel="next" href="../recipe_file/">
+        <link rel="next" href="../build_options/">
       
       
       <link rel="icon" href="../assets/favicon.png">
@@ -510,51 +510,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../recipe_file/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Recipe file
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../build_options/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     Advanced options
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../available_jinja/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Jinja functions
   </span>
   
 
@@ -843,6 +803,116 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/recipe_file/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Recipe file
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CLI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -930,29 +1000,40 @@ the future.</p>
 <code>recipe.yaml</code> file that specifies how the package is to be built and what the
 dependencies are. From the recipe file, <code>rattler-build</code> executes several steps:</p>
 <ol>
-<li>Parse the recipe file and evaluate conditional parts (we will see that later,
-   but parts of the recipe can be conditional, e.g. on Windows vs. macOS)</li>
-<li>Retrieve all source files specified in the recipe, such as <code>.tar.gz</code> files,
-   <code>git</code> repositories or even local paths. Additionally, this step will apply
-   patches that can be specified alongside the source file.</li>
-<li>Download and install dependencies into temporary "host" and "build"
-   workspaces. Any dependencies that are needed at build time are installed in
-   this step.</li>
-<li>Execute the build script to build/compile the source code and "install" it
-   into the host environment.</li>
-<li>Collect <em>all</em> files that are new in the "host" environment (because the build
-   script just created them) and apply some transformations if necessary;
-   specifically, we edit the <code>rpath</code> on Linux and macOS to help make binaries
-   relocatable.</li>
-<li>Bundle all the files in a package and write out any additional metadata into
-   the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files. This
-   also creates the test files that are bundled with the package.</li>
-<li>If any tests are specified in the recipe, then those tests are run. The package
-   is considered "done" if it passes all of the tests, otherwise we move it to a
-   "broken" place.</li>
+<li><strong>Rendering</strong>:</li>
 </ol>
-<p>After this process, a package is created. This package can be uploaded to somewhere
-like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
+<p>Parse the recipe file and evaluate conditionals, Jinja expressions, and
+   variables, and variants.</p>
+<ol>
+<li><strong>Fetch source</strong>:</li>
+</ol>
+<p>Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths. 
+   Additionally, this step will apply patches that can be specified alongside the source file.</p>
+<ol>
+<li><strong>Install build environments</strong>:</li>
+</ol>
+<p>Download and install dependencies into temporary "host" and "build" workspaces.
+   Any dependencies that are needed at build time are installed in this step.</p>
+<ol>
+<li><strong>Build source</strong>:</li>
+</ol>
+<p>Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
+<ol>
+<li><strong>Prepare package files</strong>:</li>
+</ol>
+<p>Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
+   specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
+<ol>
+<li><strong>Package</strong>:</li>
+</ol>
+<p>Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
+   This also creates the test files that are bundled with the package.</p>
+<ol>
+<li><strong>Test</strong>:</li>
+</ol>
+<p>Run any tests specified in the recipe.
+   The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
+<p>After this process, a package is created. This package can be uploaded to somewhere like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
 <h3 id="how-to-run-rattler-build">How to run <code>rattler-build</code><a class="headerlink" href="#how-to-run-rattler-build" title="Permanent link">#</a></h3>
 <p>Running <code>rattler-build</code> is straightforward. It can be done on the command line:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
@@ -1134,16 +1215,16 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../recipe_file/"
+              href="../build_options/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Recipe file"
+              aria-label="Next: Advanced options"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Recipe file
+                  Advanced options
                 </div>
               </div>
               <div class="md-footer__button md-icon">

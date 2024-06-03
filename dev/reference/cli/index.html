@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/tutorials/rust/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/reference/cli/">
       
       
-        <link rel="prev" href="../cpp/">
+        <link rel="prev" href="../recipe_file/">
       
       
-        <link rel="next" href="../../highlevel/">
+        <link rel="next" href="../jinja/">
       
       
       <link rel="icon" href="../../assets/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Rust - rattler-build</title>
+        <title>CLI - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Rust - rattler-build" >
+        <meta  property="og:title"  content="CLI - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/rust.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/reference/cli.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/tutorials/rust/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/reference/cli/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Rust - rattler-build" >
+        <meta  name="twitter:title"  content="CLI - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/rust.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/reference/cli.png" >
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#building-a-rust-package" class="md-skip">
+        <a href="#command-line-help-for-rattler-build" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Rust
+              CLI
             
           </span>
         </div>
@@ -310,8 +310,6 @@
       
   
   
-    
-  
   
   
     
@@ -323,11 +321,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -341,7 +339,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -355,7 +353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../python/" class="md-nav__link">
+      <a href="../../tutorials/python/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -376,7 +374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpp/" class="md-nav__link">
+      <a href="../../tutorials/cpp/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -394,19 +392,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../tutorials/rust/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -415,7 +404,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -752,8 +740,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -763,11 +753,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" checked>
         
           
           <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="">
@@ -781,7 +771,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_19">
             <span class="md-nav__icon md-icon"></span>
             Reference
@@ -795,7 +785,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/recipe_file/" class="md-nav__link">
+      <a href="../recipe_file/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -813,10 +803,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    CLI
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -825,6 +835,104 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rattler-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      rattler-build
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rattler-build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    <span class="md-ellipsis">
+      build
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test" class="md-nav__link">
+    <span class="md-ellipsis">
+      test
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      rebuild
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      upload
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      completion
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      generate-recipe
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      auth
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -837,7 +945,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jinja/" class="md-nav__link">
+      <a href="../jinja/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -878,6 +986,92 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#rattler-build" class="md-nav__link">
+    <span class="md-ellipsis">
+      rattler-build
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="rattler-build">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#build" class="md-nav__link">
+    <span class="md-ellipsis">
+      build
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#test" class="md-nav__link">
+    <span class="md-ellipsis">
+      test
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rebuild" class="md-nav__link">
+    <span class="md-ellipsis">
+      rebuild
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#upload" class="md-nav__link">
+    <span class="md-ellipsis">
+      upload
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#completion" class="md-nav__link">
+    <span class="md-ellipsis">
+      completion
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#generate-recipe" class="md-nav__link">
+    <span class="md-ellipsis">
+      generate-recipe
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#auth" class="md-nav__link">
+    <span class="md-ellipsis">
+      auth
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -891,7 +1085,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/tutorials/rust.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/reference/cli.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -899,64 +1093,588 @@
   
 
 
-<h1 id="building-a-rust-package">Building a Rust package<a class="headerlink" href="#building-a-rust-package" title="Permanent link">#</a></h1>
-<p>We're using <code>rattler-build</code> to build a Rust package for the <code>cargo-edit</code> utility.
-This utility manages Cargo dependencies from the command line.</p>
-<p>To configure the Rust compiler, we add a <code>variant_config.yaml</code> file to the package:</p>
-<div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">rust_compiler</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rust</span>
-</span></code></pre></div>
-<p>This will tell <code>rattler-build</code> what to insert for the <code>${{ compiler('rust') }}</code> Jinja function.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The <code>${{ compiler(...) }}</code> functions are very useful in the context of cross-compilation.
-When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the <code>target_platform</code>.
-The "rendered" compiler will look like <code>rust_linux-64</code> when you are targeting the <code>linux-64</code> platform.</p>
-<p>You can read more about this in the <a href="../../compilers/">cross-compilation</a> section.</p>
-</div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.11.9&quot;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cargo-edit</span>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/killercup/cargo-edit/archive/refs/tags/v${{ version }}.tar.gz</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">46670295e2323fc2f826750cdcfb2692fbdbea87122fe530a07c50c8dba1d3d7</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cargo-bundle-licenses --format yaml --output ${SRC_DIR}/THIRDPARTY.yml</span><span class="w">  </span><span class="c1"># !(1)</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">$BUILD_PREFIX/bin/cargo install --locked --bins --root ${PREFIX} --path .</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;rust&#39;) }}</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cargo-bundle-licenses</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="nt">tests</span><span class="p">:</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cargo-upgrade --help</span><span class="w"> </span><span class="c1"># !(2)</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="nt">about</span><span class="p">:</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/killercup/cargo-edit</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MIT</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">THIRDPARTY.yml</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">utility</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">managing</span><span class="nv"> </span><span class="s">cargo</span><span class="nv"> </span><span class="s">dependencies</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">command</span><span class="nv"> </span><span class="s">line.&quot;</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;A</span><span class="nv"> </span><span class="s">utility</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">managing</span><span class="nv"> </span><span class="s">cargo</span><span class="nv"> </span><span class="s">dependencies</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">command</span><span class="nv"> </span><span class="s">line.&quot;</span>
-</span></code></pre></div>
-<ol>
-<li>The <code>cargo-bundle-licenses</code> utility is used to bundle all the licenses of the dependencies into a <code>THIRDPARTY.yml</code> file.
-   This file is then included in the package. You should always include this file in your package when you are redistributing it.</li>
-<li>Running scripts in <code>bash</code> or <code>cmd.exe</code> to test the package build well, expects an exit code of <code>0</code> to pass the test.</li>
-</ol>
-<p>To build this recipe, simply run:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span>--recipe<span class="w"> </span>./cargo-edit/recipe.yaml<span class="w"> </span><span class="se">\</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span>--variant-config<span class="w"> </span>./cargo-edit/variant_config.yaml
-</span></code></pre></div>
+<h1 id="command-line-help-for-rattler-build">Command-Line Help for <code>rattler-build</code><a class="headerlink" href="#command-line-help-for-rattler-build" title="Permanent link">#</a></h1>
+<p>This document contains the help content for the <code>rattler-build</code> command-line program.</p>
+<h2 id="rattler-build"><code>rattler-build</code><a class="headerlink" href="#rattler-build" title="Permanent link">#</a></h2>
+<p><strong>Usage:</strong> <code>rattler-build [OPTIONS] [COMMAND]</code></p>
+<h5 id="subcommands"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands" title="Permanent link">#</a></h5>
+<ul>
+<li><code>build</code> — Build a package from a recipe</li>
+<li><code>test</code> — Run a test for a single package</li>
+<li><code>rebuild</code> — Rebuild a package from a package file instead of a recipe</li>
+<li><code>upload</code> — Upload a package</li>
+<li><code>completion</code> — Generate shell completion script</li>
+<li><code>generate-recipe</code> — Generate a recipe from PyPI or CRAN</li>
+<li><code>auth</code> — Handle authentication to external channels</li>
+</ul>
+<h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-v</code>, <code>--verbose</code></p>
+<p>Increase logging verbosity</p>
+</li>
+<li>
+<p><code>-q</code>, <code>--quiet</code></p>
+<p>Decrease logging verbosity</p>
+</li>
+<li>
+<p><code>--log-style &lt;LOG_STYLE&gt;</code></p>
+<p>Logging style</p>
+<ul>
+<li>Default value: <code>fancy</code></li>
+<li>Possible values:<ul>
+<li><code>fancy</code>:
+    Use fancy logging output</li>
+<li><code>json</code>:
+    Use JSON logging output</li>
+<li><code>plain</code>:
+    Use plain logging output</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>--color &lt;COLOR&gt;</code></p>
+<p>Enable or disable colored output from rattler-build. Also honors the <code>CLICOLOR</code> and <code>CLICOLOR_FORCE</code> environment variable</p>
+<ul>
+<li>Default value: <code>auto</code></li>
+<li>Possible values:<ul>
+<li><code>always</code>:
+    Always use colors</li>
+<li><code>never</code>:
+    Never use colors</li>
+<li><code>auto</code>:
+    Use colors when the output is a terminal</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="build"><code>build</code><a class="headerlink" href="#build" title="Permanent link">#</a></h3>
+<p>Build a package from a recipe</p>
+<p><strong>Usage:</strong> <code>rattler-build build [OPTIONS]</code></p>
+<h5 id="options_1"><strong>Options:</strong><a class="headerlink" href="#options_1" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
+<p>The recipe file or directory containing <code>recipe.yaml</code>. Defaults to the current directory</p>
+<ul>
+<li>Default value: <code>.</code></li>
+</ul>
+</li>
+<li>
+<p><code>--recipe-dir &lt;RECIPE_DIR&gt;</code></p>
+<p>The directory that contains recipes</p>
+</li>
+<li>
+<p><code>--up-to &lt;UP_TO&gt;</code></p>
+<p>Build recipes up to the specified package</p>
+</li>
+<li>
+<p><code>--build-platform &lt;BUILD_PLATFORM&gt;</code></p>
+<p>The build platform to use for the build (e.g. for building with emulation, or rendering)</p>
+<ul>
+<li>Default value: <code>linux-64</code></li>
+</ul>
+</li>
+<li>
+<p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
+<p>The target platform for the build</p>
+<ul>
+<li>Default value: <code>linux-64</code></li>
+</ul>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>Add a channel to search for dependencies in</p>
+<ul>
+<li>Default value: <code>conda-forge</code></li>
+</ul>
+</li>
+<li>
+<p><code>-m</code>, <code>--variant-config &lt;VARIANT_CONFIG&gt;</code></p>
+<p>Variant configuration files for the build</p>
+</li>
+<li>
+<p><code>--render-only</code></p>
+<p>Render the recipe files without executing the build</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--with-solve</code></p>
+<p>Render the recipe files with solving dependencies</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--keep-build</code></p>
+<p>Keep intermediate build artifacts after the build</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--no-build-id</code></p>
+<p>Don't use build id(timestamp) when creating build directory name</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
+<p>The number of threads to use for compression (only relevant when also using <code>--package-format conda</code>)</p>
+</li>
+<li>
+<p><code>--use-zstd</code></p>
+<p>Enable support for repodata.json.zst</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--use-bz2</code></p>
+<p>Enable support for repodata.json.bz2</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
+<p>Path to an auth-file to read authentication information from</p>
+</li>
+<li>
+<p><code>--tui</code></p>
+<p>Launch the terminal user interface</p>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+</ul>
+<h6 id="modifying-result"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--package-format &lt;PACKAGE_FORMAT&gt;</code></p>
+<p>The package format to use for the build. Can be one of <code>tar-bz2</code> or <code>conda</code>.
+You can also add a compression level to the package format, e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number&gt;</code> (from -7 to 22).</p>
+<ul>
+<li>Default value: <code>conda</code></li>
+</ul>
+</li>
+<li>
+<p><code>--no-include-recipe</code></p>
+<p>Don't store the recipe in the final package</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--no-test</code></p>
+<p>Don't run the tests after building the package</p>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--color-build-log</code></p>
+<p>Don't force colors in the output of the build script</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+<li>
+<p><code>--skip-existing &lt;SKIP_EXISTING&gt;</code></p>
+<p>Whether to skip packages that already exist in any channel If set to <code>none</code>, do not skip any packages, default when not specified. If set to <code>local</code>, only skip packages that already exist locally, default when using <code>--skip-existing. If set to</code>all`, skip packages that already exist in any channel</p>
+<ul>
+<li>Default value: <code>none</code></li>
+<li>Possible values:<ul>
+<li><code>none</code>:
+    Do not skip any packages</li>
+<li><code>local</code>:
+    Skip packages that already exist locally</li>
+<li><code>all</code>:
+    Skip packages that already exist in any channel</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="test"><code>test</code><a class="headerlink" href="#test" title="Permanent link">#</a></h3>
+<p>Run a test for a single package</p>
+<p>This creates a temporary directory, copies the package file into it, and then runs the indexing. It then creates a test environment that installs the package and any extra dependencies specified in the package test dependencies file.</p>
+<p>With the activated test environment, the packaged test files are run:</p>
+<ul>
+<li><code>info/test/run_test.sh</code> or <code>info/test/run_test.bat</code> on Windows * <code>info/test/run_test.py</code></li>
+</ul>
+<p>These test files are written at "package creation time" and are part of the package.</p>
+<p><strong>Usage:</strong> <code>rattler-build test [OPTIONS] --package-file &lt;PACKAGE_FILE&gt;</code></p>
+<h5 id="options_2"><strong>Options:</strong><a class="headerlink" href="#options_2" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>Channels to use when testing</p>
+</li>
+<li>
+<p><code>-p</code>, <code>--package-file &lt;PACKAGE_FILE&gt;</code></p>
+<p>The package file to test</p>
+</li>
+<li>
+<p><code>--use-zstd</code></p>
+<p>Enable support for repodata.json.zst</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--use-bz2</code></p>
+<p>Enable support for repodata.json.bz2</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
+<p>Path to an auth-file to read authentication information from</p>
+</li>
+</ul>
+<h6 id="modifying-result_1"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_1" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="rebuild"><code>rebuild</code><a class="headerlink" href="#rebuild" title="Permanent link">#</a></h3>
+<p>Rebuild a package from a package file instead of a recipe</p>
+<p><strong>Usage:</strong> <code>rattler-build rebuild [OPTIONS] --package-file &lt;PACKAGE_FILE&gt;</code></p>
+<h5 id="options_3"><strong>Options:</strong><a class="headerlink" href="#options_3" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-p</code>, <code>--package-file &lt;PACKAGE_FILE&gt;</code></p>
+<p>The package file to rebuild</p>
+</li>
+<li>
+<p><code>--no-test</code></p>
+<p>Do not run tests after building</p>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--use-zstd</code></p>
+<p>Enable support for repodata.json.zst</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--use-bz2</code></p>
+<p>Enable support for repodata.json.bz2</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
+<p>Path to an auth-file to read authentication information from</p>
+</li>
+</ul>
+<h6 id="modifying-result_2"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_2" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="upload"><code>upload</code><a class="headerlink" href="#upload" title="Permanent link">#</a></h3>
+<p>Upload a package</p>
+<p><strong>Usage:</strong> <code>rattler-build upload [OPTIONS] [PACKAGE_FILES]... &lt;COMMAND&gt;</code></p>
+<h5 id="subcommands_1"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_1" title="Permanent link">#</a></h5>
+<ul>
+<li><code>quetz</code> — Upload to aQuetz server. Authentication is used from the keychain / auth-file</li>
+<li><code>artifactory</code> — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file</li>
+<li><code>prefix</code> — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file</li>
+<li><code>anaconda</code> — Options for uploading to a Anaconda.org server</li>
+</ul>
+<h5 id="arguments"><strong>Arguments:</strong><a class="headerlink" href="#arguments" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE_FILES&gt;</code></p>
+<p>The package file to upload</p>
+</li>
+</ul>
+<h5 id="options_4"><strong>Options:</strong><a class="headerlink" href="#options_4" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--use-zstd</code></p>
+<p>Enable support for repodata.json.zst</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--use-bz2</code></p>
+<p>Enable support for repodata.json.bz2</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
+<p>Path to an auth-file to read authentication information from</p>
+</li>
+</ul>
+<h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
+<ul>
+<li>Default value: <code>./output</code></li>
+</ul>
+</li>
+</ul>
+<h4 id="quetz"><code>quetz</code><a class="headerlink" href="#quetz" title="Permanent link">#</a></h4>
+<p>Upload to aQuetz server. Authentication is used from the keychain / auth-file</p>
+<p><strong>Usage:</strong> <code>rattler-build upload quetz [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNEL&gt;</code></p>
+<h5 id="options_5"><strong>Options:</strong><a class="headerlink" href="#options_5" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
+<p>The URL to your Quetz server</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>The URL to your channel</p>
+</li>
+<li>
+<p><code>-a</code>, <code>--api-key &lt;API_KEY&gt;</code></p>
+<p>The Quetz API key, if none is provided, the token is read from the keychain / auth-file</p>
+</li>
+</ul>
+<h4 id="artifactory"><code>artifactory</code><a class="headerlink" href="#artifactory" title="Permanent link">#</a></h4>
+<p>Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file</p>
+<p><strong>Usage:</strong> <code>rattler-build upload artifactory [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNEL&gt;</code></p>
+<h5 id="options_6"><strong>Options:</strong><a class="headerlink" href="#options_6" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
+<p>The URL to your Artifactory server</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>The URL to your channel</p>
+</li>
+<li>
+<p><code>-r</code>, <code>--username &lt;USERNAME&gt;</code></p>
+<p>Your Artifactory username</p>
+</li>
+<li>
+<p><code>-p</code>, <code>--password &lt;PASSWORD&gt;</code></p>
+<p>Your Artifactory password</p>
+</li>
+</ul>
+<h4 id="prefix"><code>prefix</code><a class="headerlink" href="#prefix" title="Permanent link">#</a></h4>
+<p>Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file</p>
+<p><strong>Usage:</strong> <code>rattler-build upload prefix [OPTIONS] --channel &lt;CHANNEL&gt;</code></p>
+<h5 id="options_7"><strong>Options:</strong><a class="headerlink" href="#options_7" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
+<p>The URL to the prefix.dev server (only necessary for self-hosted instances)</p>
+<ul>
+<li>Default value: <code>https://prefix.dev</code></li>
+</ul>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>The channel to upload the package to</p>
+</li>
+<li>
+<p><code>-a</code>, <code>--api-key &lt;API_KEY&gt;</code></p>
+<p>The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file</p>
+</li>
+</ul>
+<h4 id="anaconda"><code>anaconda</code><a class="headerlink" href="#anaconda" title="Permanent link">#</a></h4>
+<p>Options for uploading to a Anaconda.org server</p>
+<p><strong>Usage:</strong> <code>rattler-build upload anaconda [OPTIONS] --owner &lt;OWNER&gt;</code></p>
+<h5 id="options_8"><strong>Options:</strong><a class="headerlink" href="#options_8" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-o</code>, <code>--owner &lt;OWNER&gt;</code></p>
+<p>The owner of the distribution (e.g. conda-forge or your username)</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p>The channel / label to upload the package to (e.g. main / rc)</p>
+<ul>
+<li>Default value: <code>main</code></li>
+</ul>
+</li>
+<li>
+<p><code>-a</code>, <code>--api-key &lt;API_KEY&gt;</code></p>
+<p>The Anaconda API key, if none is provided, the token is read from the keychain / auth-file</p>
+</li>
+<li>
+<p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
+<p>The URL to the Anaconda server</p>
+<ul>
+<li>Default value: <code>https://api.anaconda.org</code></li>
+</ul>
+</li>
+<li>
+<p><code>-f</code>, <code>--force</code></p>
+<p>Replace files on conflict</p>
+<ul>
+<li>Default value: <code>false</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="completion"><code>completion</code><a class="headerlink" href="#completion" title="Permanent link">#</a></h3>
+<p>Generate shell completion script</p>
+<p><strong>Usage:</strong> <code>rattler-build completion [OPTIONS]</code></p>
+<h5 id="options_9"><strong>Options:</strong><a class="headerlink" href="#options_9" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-s</code>, <code>--shell &lt;SHELL&gt;</code></p>
+<p>Shell</p>
+<ul>
+<li>Possible values: <code>bash</code>, <code>elvish</code>, <code>fish</code>, <code>powershell</code>, <code>zsh</code></li>
+</ul>
+</li>
+</ul>
+<h3 id="generate-recipe"><code>generate-recipe</code><a class="headerlink" href="#generate-recipe" title="Permanent link">#</a></h3>
+<p>Generate a recipe from PyPI or CRAN</p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe &lt;SOURCE&gt; &lt;PACKAGE&gt;</code></p>
+<h5 id="arguments_1"><strong>Arguments:</strong><a class="headerlink" href="#arguments_1" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;SOURCE&gt;</code></p>
+<p>Type of package to generate a recipe for</p>
+<ul>
+<li>Possible values:<ul>
+<li><code>pypi</code>:
+    Generate a recipe for a Python package from PyPI</li>
+<li><code>cran</code>:
+    Generate a recipe for an R package from CRAN</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>
+<p><code>&lt;PACKAGE&gt;</code></p>
+<p>Name of the package to generate</p>
+</li>
+</ul>
+<h3 id="auth"><code>auth</code><a class="headerlink" href="#auth" title="Permanent link">#</a></h3>
+<p>Handle authentication to external channels</p>
+<p><strong>Usage:</strong> <code>rattler-build auth &lt;COMMAND&gt;</code></p>
+<h5 id="subcommands_2"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_2" title="Permanent link">#</a></h5>
+<ul>
+<li><code>login</code> — Store authentication information for a given host</li>
+<li><code>logout</code> — Remove authentication information for a given host</li>
+</ul>
+<h4 id="login"><code>login</code><a class="headerlink" href="#login" title="Permanent link">#</a></h4>
+<p>Store authentication information for a given host</p>
+<p><strong>Usage:</strong> <code>rattler-build auth login [OPTIONS] &lt;HOST&gt;</code></p>
+<h5 id="arguments_2"><strong>Arguments:</strong><a class="headerlink" href="#arguments_2" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;HOST&gt;</code></p>
+<p>The host to authenticate with (e.g. repo.prefix.dev)</p>
+</li>
+</ul>
+<h5 id="options_10"><strong>Options:</strong><a class="headerlink" href="#options_10" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>--token &lt;TOKEN&gt;</code></p>
+<p>The token to use (for authentication with prefix.dev)</p>
+</li>
+<li>
+<p><code>--username &lt;USERNAME&gt;</code></p>
+<p>The username to use (for basic HTTP authentication)</p>
+</li>
+<li>
+<p><code>--password &lt;PASSWORD&gt;</code></p>
+<p>The password to use (for basic HTTP authentication)</p>
+</li>
+<li>
+<p><code>--conda-token &lt;CONDA_TOKEN&gt;</code></p>
+<p>The token to use on anaconda.org / quetz authentication</p>
+</li>
+</ul>
+<h4 id="logout"><code>logout</code><a class="headerlink" href="#logout" title="Permanent link">#</a></h4>
+<p>Remove authentication information for a given host</p>
+<p><strong>Usage:</strong> <code>rattler-build auth logout &lt;HOST&gt;</code></p>
+<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;HOST&gt;</code></p>
+<p>The host to remove authentication for</p>
+</li>
+</ul>
+<hr/>
+
+<p><small><i>
+    This document was generated automatically by
+    <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
+</i></small></p>
 
 
 
@@ -1028,9 +1746,9 @@ The "rendered" compiler will look like <code>rust_linux-64</code> when you are t
           
             
             <a
-              href="../cpp/"
+              href="../recipe_file/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: C++"
+              aria-label="Previous: Recipe file"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1041,7 +1759,7 @@ The "rendered" compiler will look like <code>rust_linux-64</code> when you are t
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  C++
+                  Recipe file
                 </div>
               </div>
             </a>
@@ -1051,16 +1769,16 @@ The "rendered" compiler will look like <code>rust_linux-64</code> when you are t
           
             
             <a
-              href="../../highlevel/"
+              href="../jinja/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: High-level overview"
+              aria-label="Next: Jinja functions"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  High-level overview
+                  Jinja functions
                 </div>
               </div>
               <div class="md-footer__button md-icon">

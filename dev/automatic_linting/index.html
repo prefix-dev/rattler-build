@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#automatic-linting-in-vscode" class="md-skip">
+        <a href="#enabling-automatic-linting-in-vscode" class="md-skip">
           Skip to content
         </a>
       
@@ -443,51 +443,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../recipe_file/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Recipe file
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../build_options/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     Advanced options
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../available_jinja/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Jinja functions
   </span>
   
 
@@ -786,6 +746,116 @@
   
 
     
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" >
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/recipe_file/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Recipe file
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/cli/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CLI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/jinja/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Jinja functions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
   </ul>
 </nav>
                   </div>
@@ -827,17 +897,13 @@
   
 
 
-<h1 id="automatic-linting-in-vscode">Automatic linting in VSCode<a class="headerlink" href="#automatic-linting-in-vscode" title="Permanent link">#</a></h1>
-<p>The new recipe format comes with a strict JSON scheme. You can find the scheme
-<a href="https://github.com/prefix-dev/recipe-format">in this repository</a>.</p>
-<p>It is implemented with <code>pydantic</code> and renders to a JSON schema file. The <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML
-language server extension in
-VSCode</a>
-can recognize the scheme and give helpful hints during editing.</p>
-<p>With the YAML language server installed, the automatic linting can be enabled by
-adding the following line to the top of the recipe file:</p>
+<h1 id="enabling-automatic-linting-in-vscode">Enabling Automatic Linting in VSCode<a class="headerlink" href="#enabling-automatic-linting-in-vscode" title="Permanent link">#</a></h1>
+<p>Our new recipe format adheres to a strict JSON schema, which you can access <a href="https://github.com/prefix-dev/recipe-format">here</a>.</p>
+<p>This schema is implemented using <code>pydantic</code> and can be rendered into a JSON schema file. The <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML language server extension in VSCode</a> is capable of recognizing this schema, providing useful hints during the editing process.</p>
+<p>To enable automatic linting with the YAML language server, you need to add the following line at the beginning of your recipe file:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json</span>
 </span></code></pre></div>
+<p><strong>Alternatively</strong>, if you prefer not to add this line to your file, you can install the <a href="https://marketplace.visualstudio.com/items?itemName=remcohaszing.schemastore">JSON Schema Store Catalog extension</a>. This extension will also enable automatic linting for your recipe files.</p>
 
 
 

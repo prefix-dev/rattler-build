@@ -8,16 +8,16 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/recipe_file/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/reference/recipe_file/">
       
       
-        <link rel="prev" href="../highlevel/">
+        <link rel="prev" href="../../internals/">
       
       
-        <link rel="next" href="../build_options/">
+        <link rel="next" href="../cli/">
       
       
-      <link rel="icon" href="../assets/favicon.png">
+      <link rel="icon" href="../../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.20">
     
     
@@ -26,10 +26,10 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.66ac8b77.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.66ac8b77.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +48,9 @@
       
     
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -63,7 +63,7 @@
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_file.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/reference/recipe_file.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,7 +71,7 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/recipe_file/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/reference/recipe_file/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
@@ -79,7 +79,7 @@
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/recipe_file.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/reference/recipe_file.png" >
       
     
     
@@ -124,7 +124,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../assets/powerdrill.png" alt="logo">
+  <img src="../../assets/powerdrill.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -266,7 +266,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../assets/powerdrill.png" alt="logo">
+  <img src="../../assets/powerdrill.png" alt="logo">
 
     </a>
     rattler-build
@@ -293,7 +293,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -353,7 +353,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/python/" class="md-nav__link">
+      <a href="../../tutorials/python/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -374,7 +374,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/cpp/" class="md-nav__link">
+      <a href="../../tutorials/cpp/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -395,7 +395,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/rust/" class="md-nav__link">
+      <a href="../../tutorials/rust/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -423,7 +423,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../highlevel/" class="md-nav__link">
+      <a href="../../highlevel/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -438,6 +438,348 @@
     
       
       
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build_options/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Advanced options
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental_features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experimental features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../selectors/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Selector syntax
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../build_script/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Build script
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../variants/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Variants
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../compilers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compilers and cross compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../cli_usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    CLI Usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tui/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Terminal User Interface (TUI)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../authentication_and_upload/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Authentication & upload
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../automatic_linting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Automatic recipe linting
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing packages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../rebuild/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Reproducible builds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../package_spec/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Package specification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../special_files/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Activation scripts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../internals/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Internals
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_19" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_19" id="__nav_19_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Reference
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_19_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_19">
+            <span class="md-nav__icon md-icon"></span>
+            Reference
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
   
   
     
@@ -834,19 +1176,20 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../build_options/" class="md-nav__link">
+      <a href="../cli/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Advanced options
+    CLI
   </span>
   
 
@@ -854,15 +1197,16 @@
     </li>
   
 
-    
-      
-      
+              
+            
+              
+                
   
   
   
   
     <li class="md-nav__item">
-      <a href="../available_jinja/" class="md-nav__link">
+      <a href="../jinja/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -874,283 +1218,11 @@
     </li>
   
 
-    
+              
+            
+          </ul>
+        </nav>
       
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../experimental_features/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Experimental features
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../selectors/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Selector syntax
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../build_script/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Build script
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../variants/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Variants
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../compilers/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Compilers and cross compilation
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../cli_usage/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    CLI Usage
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tui/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Terminal User Interface (TUI)
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../authentication_and_upload/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Authentication & upload
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../automatic_linting/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Automatic recipe linting
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Testing packages
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../rebuild/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Reproducible builds
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../package_spec/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Package specification
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../special_files/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Activation scripts
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../internals/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Internals
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1535,7 +1607,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/recipe_file.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/reference/recipe_file.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -1614,7 +1686,7 @@ Or, using <code>yaml.schemas</code>,
 </span></code></pre></div>
 Read more about this <a href="https://github.com/redhat-developer/yaml-language-server">here</a>.</p>
 </details>
-<p>See more in the <a href="../automatic_linting/">automatic linting</a> chapter.</p>
+<p>See more in the <a href="../../automatic_linting/">automatic linting</a> chapter.</p>
 <!--
 Quick start (from conda-build)
 ------------------------------
@@ -1875,7 +1947,7 @@ the <code>package_metadata</code> by default. You can disable this by passing
 <p class="admonition-title">Note</p>
 <p>There are many more options in the build section. These additional options control
 how variants are computed, prefix replacements, and more.
-See the <a href="../build_options/">full build options</a> for more information.</p>
+See the <a href="../../build_options/">full build options</a> for more information.</p>
 </div>
 <h2 id="requirements-section">Requirements section<a class="headerlink" href="#requirements-section" title="Permanent link">#</a></h2>
 <p>Specifies the build and runtime requirements. Dependencies of these requirements
@@ -2387,7 +2459,7 @@ removed.</p>
 </span><span id="__span-57-16"><a id="__codelineno-57-16" name="__codelineno-57-16" href="#__codelineno-57-16"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://path/to/windows/source</span>
 </span></code></pre></div>
 <p>A selector is a valid Python statement that is executed. You can read more about
-them in the <a href="../selectors/">"Selectors in recipes" chapter</a>.</p>
+them in the <a href="../../selectors/">"Selectors in recipes" chapter</a>.</p>
 <p>The use of the Python version selectors, <code>py27</code>, <code>py34</code>, etc. is discouraged in
 favor of the more general comparison operators. Additional selectors in this
 series will not be added to <code>conda-build</code>.</p>
@@ -2424,8 +2496,8 @@ items under a single selector:</p>
 </div>
 <h3 id="jinja-functions">Jinja functions<a class="headerlink" href="#jinja-functions" title="Permanent link">#</a></h3>
 <ul>
-<li><a href="../experimental_features/#load-from-files"><code>load_from_file</code></a></li>
-<li><a href="../experimental_features/#git-functions"><code>git.*</code> functions</a></li>
+<li><a href="../../experimental_features/#load-from-files"><code>load_from_file</code></a></li>
+<li><a href="../../experimental_features/#git-functions"><code>git.*</code> functions</a></li>
 </ul>
 
 
@@ -2498,9 +2570,9 @@ items under a single selector:</p>
           
             
             <a
-              href="../highlevel/"
+              href="../../internals/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: High-level overview"
+              aria-label="Previous: Internals"
             >
               <div class="md-footer__button md-icon">
                 
@@ -2511,7 +2583,7 @@ items under a single selector:</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  High-level overview
+                  Internals
                 </div>
               </div>
             </a>
@@ -2521,16 +2593,16 @@ items under a single selector:</p>
           
             
             <a
-              href="../build_options/"
+              href="../cli/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Advanced options"
+              aria-label="Next: CLI"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Advanced options
+                  CLI
                 </div>
               </div>
               <div class="md-footer__button md-icon">
@@ -2559,7 +2631,7 @@ items under a single selector:</p>
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img src="../assets/logo_dark.svg" alt="">
+                <img src="../../assets/logo_dark.svg" alt="">
             </a>
         </div>
 
@@ -2614,10 +2686,10 @@ items under a single selector:</p>
       <div class="md-progress" data-md-component="progress" role="progressbar"></div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.dd8806f2.min.js"></script>
+      <script src="../../assets/javascripts/bundle.dd8806f2.min.js"></script>
       
     
   </body>
