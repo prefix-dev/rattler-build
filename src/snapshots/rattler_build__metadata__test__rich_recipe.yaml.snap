@@ -1,6 +1,6 @@
 ---
 source: src/metadata.rs
-assertion_line: 732
+assertion_line: 734
 expression: output
 ---
 recipe:
@@ -379,8 +379,7 @@ finalized_dependencies:
       - spec: python
         from: host
         run_export: python
-    constrains: []
-    run_exports: ~
+    constraints: []
 finalized_sources: ~
 system_tools:
   rattler-build: 0.12.1

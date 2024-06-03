@@ -632,7 +632,6 @@ finalized_dependencies:
   host: null
   run:
     depends: []
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
   rattler-build: 0.12.1
