@@ -71,7 +71,6 @@ build_configuration:
   packaging_settings:
     archive_type: conda
     compression_level: 21
-    compression_threads: 5
 finalized_dependencies:
   build: null
   host:
