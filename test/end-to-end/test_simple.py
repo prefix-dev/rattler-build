@@ -837,6 +837,7 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     with pytest.raises(CalledProcessError):
         rattler_build(*args)
 
+
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
@@ -854,6 +855,7 @@ def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pp = paths["paths"]
     assert len(pp) == 1
     assert pp[0]["_path"] == "bin/.postlink-post-link.sh"
+
 
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"

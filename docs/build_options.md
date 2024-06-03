@@ -8,6 +8,51 @@ There are some specialized build options to control various features:
 
 These are all found under the `build` key in the `recipe.yaml`.
 
+## Include only certain files in the package
+
+Sometimes you may want to include only a subset of the files installed by the build process in
+your package. For this, the `files` key can be used. Only _new_ files are considered for inclusion (ie. files that were not in the host environment beforehand).
+
+```yaml title="recipe.yaml"
+build:
+  # select files to be included in the package
+  # this can be used to remove files from the package, even if they are installed in the
+  # environment
+  files: list of globs
+```
+
+For example, to only include the header files in a package, you could use:
+
+```yaml title="recipe.yaml"
+build:
+  files:
+    - include/**/*.h
+```
+
+Glob patterns throughout the recipe file can also use a flexible `include` / `exclude` pair, such as:
+
+```yaml title="recipe.yaml"
+build:
+  files:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
+
+!!! note "Glob patterns"
+    Glob patterns are used througout the build options to specify files. The
+    patterns are matched against the relative path of the file in the build
+    directory.
+    Patterns can contain `*` to match any number of characters, `?` to match a
+    single character, and `**` to match any number of directories.
+
+    For example:
+
+    - `*.txt` matches all files ending in `.txt`
+    - `**/*.txt` matches all files ending in `.txt` in any directory
+    - `**/test_*.txt` matches all files starting with `test_` and ending in `.txt` in any directory
+
 ## Always include and always copy files
 
 There are some options that control the inclusion of files in the final package.
@@ -37,19 +82,6 @@ build:
   # do not soft- or hard-link these files, but always copy them was `no_link`
   always_copy_files: list of globs
 ```
-
-!!! note "Glob patterns"
-    Glob patterns are used througout the build options to specify files. The
-    patterns are matched against the relative path of the file in the build
-    directory.
-    Patterns can contain `*` to match any number of characters, `?` to match a
-    single character, and `**` to match any number of directories.
-
-    For example:
-
-    - `*.txt` matches all files ending in `.txt`
-    - `**/*.txt` matches all files ending in `.txt` in any directory
-    - `**/test_*.txt` matches all files starting with `test_` and ending in `.txt` in any directory
 
 ## Merge build and host environments
 

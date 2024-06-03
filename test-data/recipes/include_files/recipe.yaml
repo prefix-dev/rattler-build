@@ -8,7 +8,7 @@ build:
       - include/*
     exclude:
       - "*.exe"
-  
+
   script: |
     mkdir -p $PREFIX/include
     mkdir -p $PREFIX/lib

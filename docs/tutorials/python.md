@@ -1,10 +1,10 @@
 # Writing a Python package
 
-Writing a Python package is fairly straightforward, especially for "Python-only" packages. 
+Writing a Python package is fairly straightforward, especially for "Python-only" packages.
 In the second example we will build a package for `numpy` which contains compiled code.
 
 ## A Python-only package
-The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification. 
+The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification.
 This is very handy for packages that are pure Python and do not contain any compiled extensions.
 
 Additionally, `noarch: python` packages work with a range of Python versions (contrary to packages with compiled extensions that are tied to a specific Python version).
@@ -72,7 +72,7 @@ rattler-build build --recipe ./ipywidgets
 ## A Python package with compiled extensions
 
 We will build a package for `numpy` – which contains compiled code.
-Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly. 
+Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly.
 The best way to do this is with a "variant_config.yaml" file:
 
 ```yaml title="variant_config.yaml"
