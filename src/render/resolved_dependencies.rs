@@ -37,9 +37,6 @@ pub enum DependencyInfo {
     /// from the variant config
     Variant(VariantDependency),
 
-    /// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-    Compiler(CompilerDependency),
-
     /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
     PinSubpackage(PinSubpackageDependency),
 
@@ -70,26 +67,6 @@ pub struct VariantDependency {
 impl From<VariantDependency> for DependencyInfo {
     fn from(value: VariantDependency) -> Self {
         DependencyInfo::Variant(value)
-    }
-}
-
-/// This is a special compiler dependency (e.g. `{{ compiler('c') }}`
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CompilerDependency {
-    /// The language in the `{{ compiler('c') }}` call.
-    #[serde(rename = "compiler")]
-    pub language: String,
-
-    /// The resolved compiler spec
-    #[serde_as(as = "DisplayFromStr")]
-    pub spec: MatchSpec,
-}
-
-impl From<CompilerDependency> for DependencyInfo {
-    fn from(value: CompilerDependency) -> Self {
-        DependencyInfo::Compiler(value)
     }
 }
 
@@ -174,7 +151,6 @@ impl DependencyInfo {
     pub fn spec(&self) -> &MatchSpec {
         match self {
             DependencyInfo::Variant(spec) => &spec.spec,
-            DependencyInfo::Compiler(spec) => &spec.spec,
             DependencyInfo::PinSubpackage(spec) => &spec.spec,
             DependencyInfo::PinCompatible(spec) => &spec.spec,
             DependencyInfo::RunExport(spec) => &spec.spec,
@@ -186,7 +162,6 @@ impl DependencyInfo {
         if !long {
             match self {
                 DependencyInfo::Variant(spec) => format!("{} (V)", &spec.spec),
-                DependencyInfo::Compiler(spec) => format!("{} (C)", &spec.spec),
                 DependencyInfo::PinSubpackage(spec) => format!("{} (PS)", &spec.spec),
                 DependencyInfo::PinCompatible(spec) => format!("{} (PC)", &spec.spec),
                 DependencyInfo::RunExport(spec) => format!(
@@ -198,7 +173,6 @@ impl DependencyInfo {
         } else {
             match self {
                 DependencyInfo::Variant(spec) => format!("{} (from variant config)", &spec.spec),
-                DependencyInfo::Compiler(spec) => format!("{} (from compiler)", &spec.spec),
                 DependencyInfo::PinSubpackage(spec) => {
                     format!("{} (from pin subpackage)", &spec.spec)
                 }
@@ -245,13 +219,6 @@ impl DependencyInfo {
     pub fn as_pin_compatible(&self) -> Option<&PinCompatibleDependency> {
         match self {
             DependencyInfo::PinCompatible(spec) => Some(spec),
-            _ => None,
-        }
-    }
-
-    pub fn as_compiler(&self) -> Option<&CompilerDependency> {
-        match self {
-            DependencyInfo::Compiler(spec) => Some(spec),
             _ => None,
         }
     }
@@ -450,7 +417,6 @@ pub fn apply_variant(
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
     let subpackages = &build_configuration.subpackages;
-    let target_platform = &build_configuration.target_platform;
 
     raw_specs
         .iter()
@@ -475,8 +441,12 @@ pub fn apply_variant(
 
                                 // we split at whitespace to separate into version and build
                                 let mut splitter = spec.split_whitespace();
-                                let version_spec = splitter.next().map(|v| VersionSpec::from_str(v, ParseStrictness::Strict)).transpose()?;
-                                let build_spec = splitter.next().map(StringMatcher::from_str).transpose()?;
+                                let version_spec = splitter
+                                    .next()
+                                    .map(|v| VersionSpec::from_str(v, ParseStrictness::Strict))
+                                    .transpose()?;
+                                let build_spec =
+                                    splitter.next().map(StringMatcher::from_str).transpose()?;
                                 let variant = name.as_normalized().to_string();
                                 let final_spec = MatchSpec {
                                     version: version_spec,
@@ -486,7 +456,8 @@ pub fn apply_variant(
                                 return Ok(VariantDependency {
                                     spec: final_spec,
                                     variant,
-                                }.into());
+                                }
+                                .into());
                             }
                         }
                     }
@@ -494,93 +465,35 @@ pub fn apply_variant(
                 }
                 Dependency::PinSubpackage(pin) => {
                     let name = &pin.pin_value().name;
-                    let subpackage = subpackages.get(name).ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
-                    let pinned = pin
-                        .pin_value()
-                        .apply(
-                            &Version::from_str(&subpackage.version)?,
-                            &subpackage.build_string,
-                        )?;
-                    Ok(PinSubpackageDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
+                    let subpackage = subpackages
+                        .get(name)
+                        .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
+                    let pinned = pin.pin_value().apply(
+                        &Version::from_str(&subpackage.version)?,
+                        &subpackage.build_string,
+                    )?;
+                    Ok(PinSubpackageDependency {
+                        spec: pinned,
+                        name: name.as_normalized().to_string(),
+                        args: pin.pin_value().args.clone(),
+                    }
+                    .into())
                 }
                 Dependency::PinCompatible(pin) => {
                     let name = &pin.pin_value().name;
-                    let pin_package = compatibility_specs.get(name)
+                    let pin_package = compatibility_specs
+                        .get(name)
                         .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
 
                     let pinned = pin
                         .pin_value()
-                        .apply(
-                            &pin_package.version,
-                            &pin_package.build,
-                        )?;
-                    Ok(PinCompatibleDependency { spec: pinned, name: name.as_normalized().to_string(), args: pin.pin_value().args.clone() }.into())
-                }
-                Dependency::Compiler(compiler) => {
-                    if target_platform == &Platform::NoArch {
-                        return Err(ResolveError::CompilerError("Noarch packages cannot have compilers".to_string()))
+                        .apply(&pin_package.version, &pin_package.build)?;
+                    Ok(PinCompatibleDependency {
+                        spec: pinned,
+                        name: name.as_normalized().to_string(),
+                        args: pin.pin_value().args.clone(),
                     }
-
-                    let compiler_variant = format!("{}_compiler", compiler.language());
-                    let compiler_name = variant
-                        .get(&compiler_variant)
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| {
-                            if target_platform.is_linux() {
-                                let default_compiler = match compiler.language() {
-                                    "c" => "gcc".to_string(),
-                                    "cxx" => "gxx".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else if target_platform.is_osx() {
-                                let default_compiler = match compiler.language() {
-                                    "c" => "clang".to_string(),
-                                    "cxx" => "clangxx".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else if target_platform.is_windows() {
-                                let default_compiler = match compiler.language() {
-                                    // note with conda-build, these are dependent on the python version
-                                    // we could also check the variant for the python version here!
-                                    "c" => "vs2017".to_string(),
-                                    "cxx" => "vs2017".to_string(),
-                                    "fortran" => "gfortran".to_string(),
-                                    "rust" => "rust".to_string(),
-                                    _ => "".to_string()
-                                };
-                                default_compiler
-                            } else {
-                                "".to_string()
-                            }
-                        });
-
-                    if compiler_name.is_empty() {
-                        return Err(ResolveError::CompilerError(
-                            format!("Could not find compiler for {}. Configure {}_compiler in your variant config file for {target_platform}.", compiler.language(), compiler.language())));
-                    }
-
-                    let compiler_version_variant = format!("{}_version", compiler_variant);
-                    let compiler_version = variant.get(&compiler_version_variant);
-
-                    let final_compiler = if let Some(compiler_version) = compiler_version {
-                        format!(
-                            "{}_{} ={}",
-                            compiler_name, target_platform, compiler_version
-                        )
-                    } else {
-                        format!("{}_{}", compiler_name, target_platform)
-                    };
-
-                    Ok(CompilerDependency {
-                        language: compiler_name,
-                        spec: MatchSpec::from_str(&final_compiler, ParseStrictness::Strict)?,
-                    }.into())
+                    .into())
                 }
             }
         })
@@ -612,8 +525,6 @@ pub async fn install_environments(
     output: &Output,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
-    let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
-
     let dependencies = output
         .finalized_dependencies
         .as_ref()
@@ -624,7 +535,6 @@ pub async fn install_environments(
             &build_deps.resolved,
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
-            &cache_dir,
             tool_configuration,
         )
         .await?;
@@ -635,7 +545,6 @@ pub async fn install_environments(
             &host_deps.resolved,
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
-            &cache_dir,
             tool_configuration,
         )
         .await?;
@@ -967,11 +876,6 @@ mod tests {
                 variant: "bar".to_string(),
             }
             .into(),
-            CompilerDependency {
-                language: "c".to_string(),
-                spec: MatchSpec::from_str("foo", ParseStrictness::Strict).unwrap(),
-            }
-            .into(),
             PinSubpackageDependency {
                 name: "baz".to_string(),
                 spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
@@ -979,6 +883,7 @@ mod tests {
                     max_pin: Some("x.x".parse().unwrap()),
                     min_pin: Some("x.x.x".parse().unwrap()),
                     exact: true,
+                    ..Default::default()
                 },
             }
             .into(),
@@ -989,6 +894,7 @@ mod tests {
                     max_pin: Some("x.x".parse().unwrap()),
                     min_pin: Some("x.x.x".parse().unwrap()),
                     exact: true,
+                    ..Default::default()
                 },
             }
             .into(),
@@ -998,11 +904,10 @@ mod tests {
 
         // test deserialize
         let dep_info: Vec<DependencyInfo> = serde_yaml::from_str(&yaml_str).unwrap();
-        assert_eq!(dep_info.len(), 5);
+        assert_eq!(dep_info.len(), 4);
         assert!(matches!(dep_info[0], DependencyInfo::Source(_)));
         assert!(matches!(dep_info[1], DependencyInfo::Variant(_)));
-        assert!(matches!(dep_info[2], DependencyInfo::Compiler(_)));
-        assert!(matches!(dep_info[3], DependencyInfo::PinSubpackage(_)));
-        assert!(matches!(dep_info[4], DependencyInfo::PinCompatible(_)));
+        assert!(matches!(dep_info[2], DependencyInfo::PinSubpackage(_)));
+        assert!(matches!(dep_info[3], DependencyInfo::PinCompatible(_)));
     }
 }

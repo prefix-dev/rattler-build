@@ -1,20 +1,17 @@
 ---
 source: src/render/resolved_dependencies.rs
-assertion_line: 994
 expression: yaml_str
 ---
 - source: xyz
 - variant: bar
   spec: foo
-- compiler: c
-  spec: foo
 - pin_subpackage: baz
-  max_pin: x.x
   min_pin: x.x.x
+  max_pin: x.x
   exact: true
   spec: baz
 - pin_compatible: bat
-  max_pin: x.x
   min_pin: x.x.x
+  max_pin: x.x
   exact: true
   spec: bat

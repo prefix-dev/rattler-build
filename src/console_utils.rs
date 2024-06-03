@@ -296,10 +296,16 @@ impl LoggingOutputHandler {
         }
     }
 
-    fn with_indent_levels(&self, template: &str) -> String {
+    /// Return a string with the current indentation level (bars added to the front of the string).
+    pub fn with_indent_levels(&self, template: &str) -> String {
         let state = self.state.lock().unwrap();
         let indent_str = indent_levels(state.indentation_level);
         format!("{} {}", indent_str, template)
+    }
+
+    /// Return the multi-progress instance.
+    pub fn multi_progress(&self) -> &MultiProgress {
+        &self.progress_bars
     }
 
     /// Returns the style to use for a progressbar that is currently in progress.

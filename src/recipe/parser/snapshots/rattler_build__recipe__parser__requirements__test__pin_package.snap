@@ -1,20 +1,19 @@
 ---
 source: src/recipe/parser/requirements.rs
-assertion_line: 619
 expression: "serde_yaml::to_string(&requirements).unwrap()"
 ---
 build:
 - foo >=3.1
 - pin_subpackage:
     name: foo
-    max_pin: x.x
     min_pin: x.x.x.x
+    max_pin: x.x
 - pin_compatible:
     name: bar
+    min_pin: x.x
     max_pin: x.x.x
-    min_pin: x.x
 - pin_compatible:
     name: bar
     min_pin: x.x
+    max_pin: null
     exact: true
-- compiler: gcc

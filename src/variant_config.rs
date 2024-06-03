@@ -642,8 +642,6 @@ impl VariantConfig {
                             exact_pins.insert(val);
                         }
                     }
-                    // Be explicit about the other cases, so we can add them later
-                    Dependency::Compiler(_) => (),
                 });
 
                 // actually used vars
