@@ -47,16 +47,13 @@ jobs:
         run: |
           pixi run generate-cli-docs
 
-      - name: Configure Git
-        run: |
-          git config --global user.name '${{ github.triggering_actor }}'
-          git config --global user.email '${{ github.triggering_actor }}@users.noreply.github.com'
+      - uses: EndBug/add-and-commit@v9
+        with:
+          message: "docs: update CLI docs"
+          committer_name: GitHub Actions
+          committer_email: 41898282+github-actions[bot]@users.noreply.github.com
+          add: 'docs/reference/cli.md'
 
-      - name: Commit changes
-        run: |
-          git add docs/reference/cli.md
-          git commit -m "docs: update CLI docs"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}          
 
   build-docs:
     needs: generate-cli-docs
