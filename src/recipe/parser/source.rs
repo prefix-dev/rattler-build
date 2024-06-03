@@ -41,7 +41,7 @@ impl Source {
         }
     }
 
-    /// Get the folder.
+    /// Get the directory.
     pub fn target_directory(&self) -> Option<&PathBuf> {
         match self {
             Self::Git(git) => git.target_directory(),

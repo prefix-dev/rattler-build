@@ -38,6 +38,7 @@ async fn main() -> miette::Result<()> {
         #[cfg(feature = "tui")]
         None
     };
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();

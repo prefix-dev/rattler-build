@@ -35,7 +35,7 @@ pub struct Configuration {
     /// The authenticated reqwest download client to use
     pub client: ClientWithMiddleware,
 
-    /// Set this to true if you want to keep the build folder after the build is done
+    /// Set this to true if you want to keep the build directory after the build is done
     pub no_clean: bool,
 
     /// Whether to skip the test phase
