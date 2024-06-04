@@ -20,6 +20,7 @@ use crate::{
 
 mod about;
 mod build;
+mod cache;
 mod glob_vec;
 mod helper;
 mod output;
@@ -34,6 +35,7 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, DynamicLinking, PrefixDetection},
+    cache::Cache,
     glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
@@ -59,6 +61,9 @@ pub struct Recipe {
     pub schema_version: u64,
     /// The package information
     pub package: Package,
+    /// The cache build that should be used for this package
+    /// This is the same for all outputs of a recipe
+    pub cache: Option<Cache>,
     /// The information about where to obtain the sources
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
@@ -203,6 +208,7 @@ impl Recipe {
         let mut requirements = Requirements::default();
         let mut tests = Vec::default();
         let mut about = About::default();
+        let mut cache = None;
 
         rendered_node
             .iter()
@@ -219,6 +225,7 @@ impl Recipe {
                             "The recipe field is only allowed in conjunction with multiple outputs"
                     )])
                     }
+                    "cache" => cache = Some(value.try_convert(key_str)?),
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
                     "requirements" => requirements = value.try_convert(key_str)?,
@@ -262,6 +269,7 @@ impl Recipe {
                     help = "add the required field `package`"
                 )]
             })?,
+            cache,
             build,
             source,
             requirements,

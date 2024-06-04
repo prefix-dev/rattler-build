@@ -63,6 +63,9 @@ pub struct Directories {
     /// The path where the recipe is located
     #[serde(skip)]
     pub recipe_path: PathBuf,
+    /// The folder where the cache is located
+    #[serde(skip)]
+    pub cache_dir: PathBuf,
     /// The host prefix is the directory where host dependencies are installed
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
     pub host_prefix: PathBuf,
@@ -110,6 +113,7 @@ impl Directories {
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
+        let cache_dir = output_dir.join("build_cache");
         let recipe_dir = recipe_path
             .parent()
             .ok_or_else(|| {
@@ -138,6 +142,7 @@ impl Directories {
         let directories = Directories {
             build_dir: build_dir.clone(),
             build_prefix: build_dir.join("build_env"),
+            cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,

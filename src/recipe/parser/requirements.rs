@@ -98,7 +98,7 @@ impl Requirements {
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
-            .chain(self.run_constraints.iter())
+        // .chain(self.run_constraints.iter())
     }
 
     /// Check if all requirements are empty.

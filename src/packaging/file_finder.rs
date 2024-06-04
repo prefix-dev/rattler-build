@@ -94,7 +94,6 @@ impl Files {
         };
 
         let current_files = record_files(prefix)?;
-
         let mut difference = current_files
             .difference(&previous_files)
             // If we have an files glob, we only include files that match the glob
