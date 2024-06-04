@@ -175,9 +175,7 @@ impl GlobVec {
         // if include is empty, it matches everything. Otherwise we check!
         let is_match = self.include.is_empty() || self.include_globset.is_match(path);
         // if exclude is empty, it matches everything. Otherwise we check!
-        let is_match =
-            is_match && (self.exclude.is_empty() || !self.exclude_globset.is_match(path));
-        is_match
+        is_match && (self.exclude.is_empty() || !self.exclude_globset.is_match(path))
     }
 
     /// Only used for testing
