@@ -260,6 +260,7 @@ impl<'de> Deserialize<'de> for Dependency {
 
         #[derive(Deserialize)]
         #[serde(untagged)]
+        #[allow(clippy::large_enum_variant)]
         enum RawSpec {
             String(String),
             Explicit(#[serde(with = "serde_yaml::with::singleton_map")] RawDependency),
