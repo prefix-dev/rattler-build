@@ -1034,10 +1034,10 @@
 
 
 <h1 id="writing-a-python-package">Writing a Python package<a class="headerlink" href="#writing-a-python-package" title="Permanent link">#</a></h1>
-<p>Writing a Python package is fairly straightforward, especially for "Python-only" packages. 
+<p>Writing a Python package is fairly straightforward, especially for "Python-only" packages.
 In the second example we will build a package for <code>numpy</code> which contains compiled code.</p>
 <h2 id="a-python-only-package">A Python-only package<a class="headerlink" href="#a-python-only-package" title="Permanent link">#</a></h2>
-<p>The following recipe uses the <code>noarch: python</code> setting to build a <code>noarch</code> package that can be installed on any platform without modification. 
+<p>The following recipe uses the <code>noarch: python</code> setting to build a <code>noarch</code> package that can be installed on any platform without modification.
 This is very handy for packages that are pure Python and do not contain any compiled extensions.</p>
 <p>Additionally, <code>noarch: python</code> packages work with a range of Python versions (contrary to packages with compiled extensions that are tied to a specific Python version).</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">context</span><span class="p">:</span>
@@ -1097,7 +1097,7 @@ This is very handy for packages that are pure Python and do not contain any comp
 </span></code></pre></div>
 <h2 id="a-python-package-with-compiled-extensions">A Python package with compiled extensions<a class="headerlink" href="#a-python-package-with-compiled-extensions" title="Permanent link">#</a></h2>
 <p>We will build a package for <code>numpy</code> – which contains compiled code.
-Since compiled code is <code>python</code> version-specific, we will need to specify the <code>python</code> version explicitly. 
+Since compiled code is <code>python</code> version-specific, we will need to specify the <code>python</code> version explicitly.
 The best way to do this is with a "variant_config.yaml" file:</p>
 <div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.11</span>
