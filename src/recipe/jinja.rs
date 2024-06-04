@@ -340,10 +340,10 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function(
         "cmp",
         |_: &Value, _: &Value| -> Result<(), minijinja::Error> {
-            return Err(minijinja::Error::new(
+            Err(minijinja::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
                 "`cmp` is not supported anymore. Please use `match` instead.",
-            ));
+            ))
         },
     );
 
