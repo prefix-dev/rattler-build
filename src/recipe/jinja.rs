@@ -1234,4 +1234,11 @@ mod tests {
                 .is_true());
         });
     }
+
+    #[test]
+    fn test_unavailable() {
+        let jinja = Jinja::new(Default::default());
+        assert!(jinja.eval("cmp(python, '==3.7')").is_err());
+        assert!(jinja.eval("${{ \"foo\" | escape }}").is_err());
+    }
 }
