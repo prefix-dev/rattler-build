@@ -20,7 +20,7 @@ use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
-use rattler_shell::activation::ActivationError;
+use rattler_shell::{activation::ActivationError, shell::Shell, shell::ShellEnum};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
@@ -92,8 +92,9 @@ impl Tests {
     async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let mut env_vars = env_vars::os_vars(environment, &Platform::current());
-        env_vars.retain(|key, _| key != "PATH");
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(environment, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         env_vars.insert(
             "PREFIX".to_string(),
             environment.to_string_lossy().to_string(),
@@ -490,8 +491,9 @@ async fn run_shell_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
-    env_vars.retain(|key, _| key != "PATH");
+    let platform = Platform::current();
+    let mut env_vars = env_vars::os_vars(prefix, &platform);
+    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
     env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
     let script = Script {

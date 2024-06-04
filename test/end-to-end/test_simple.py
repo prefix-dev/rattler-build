@@ -846,5 +846,18 @@ def test_include_files(
     rattler_build(*args)
 
     pkg = get_extracted_package(tmp_path, "include_files")
-
     assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+def test_nushell_implicit_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "nushell-implicit/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nushell")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello, world!" == content

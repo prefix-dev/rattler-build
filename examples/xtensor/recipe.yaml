@@ -13,24 +13,13 @@ source:
   sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 build:
   number: 0
-  script:
-    - if: win
-      then: |
-        cmake -GNinja ^
-            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
-            %SRC_DIR%
-        ninja install
-      else: |
-        cmake -GNinja \
-              -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX \
-              $SRC_DIR
-        ninja install
 
 requirements:
   build:
     - ${{ compiler('cxx') }}
     - cmake
     - ninja
+    - nushell
   host:
     - xtl >=0.7,<0.8
   run:
