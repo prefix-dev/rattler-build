@@ -10,8 +10,10 @@ These are all found under the `build` key in the `recipe.yaml`.
 
 ## Include only certain files in the package
 
-Sometimes you may want to include only a subset of the files installed by the build process in
-your package. For this, the `files` key can be used. Only _new_ files are considered for inclusion (ie. files that were not in the host environment beforehand).
+Sometimes you may want to include only a subset of the files installed by the
+build process in your package. For this, the `files` key can be used. Only _new_
+files are considered for inclusion (ie. files that were not in the host
+environment beforehand).
 
 ```yaml title="recipe.yaml"
 build:
@@ -29,7 +31,8 @@ build:
     - include/**/*.h
 ```
 
-Glob patterns throughout the recipe file can also use a flexible `include` / `exclude` pair, such as:
+Glob patterns throughout the recipe file can also use a flexible `include` /
+`exclude` pair, such as:
 
 ```yaml title="recipe.yaml"
 build:
@@ -40,38 +43,45 @@ build:
       - include/**/private.h
 ```
 
-!!! note "Glob patterns"
-    Glob patterns are used througout the build options to specify files. The
-    patterns are matched against the relative path of the file in the build
-    directory.
-    Patterns can contain `*` to match any number of characters, `?` to match a
-    single character, and `**` to match any number of directories.
+### Glob evaluation
 
-    For example:
+Glob patterns are used throughout the build options to specify files. The
+patterns are matched against the relative path of the file in the build
+directory. Patterns can contain `*` to match any number of characters, `?` to
+match a single character, and `**` to match any number of directories.
 
-    - `*.txt` matches all files ending in `.txt`
-    - `**/*.txt` matches all files ending in `.txt` in any directory
-    - `**/test_*.txt` matches all files starting with `test_` and ending in `.txt` in any directory
+For example:
+
+- `*.txt` matches all files ending in `.txt`
+- `**/*.txt` matches all files ending in `.txt` in any directory
+- `**/test_*.txt` matches all files starting with `test_` and ending in `.txt`
+  in any directory
+- `foo/` matches all files under the `foo` directory
+
+The globs are always evaluted relative to the prefix directory. If you have no
+`include` globs, but an `exclude` glob, then all files are included except those
+that match the `exclude` glob.
 
 ## Always include and always copy files
 
 There are some options that control the inclusion of files in the final package.
 
 The `always_include_files` option can be used to include files even if they are
-already in the environment as part of some other host dependency. This is normally
-"clobbering" and should be used with caution (since packages should not have any overlapping files).
+already in the environment as part of some other host dependency. This is
+normally "clobbering" and should be used with caution (since packages should not
+have any overlapping files).
 
-The `always_copy_files` option can be used to copy files instead of linking them.
-This is useful for files that might be modified inside the environment (e.g. configuration files).
-Normally, files are linked from a central cache into the environment to save space – that means
-that files modified in one environment will be modified in all environments. This is not always
-desirable, and in that case you can use the `always_copy_files` option.
+The `always_copy_files` option can be used to copy files instead of linking
+them. This is useful for files that might be modified inside the environment
+(e.g. configuration files). Normally, files are linked from a central cache into
+the environment to save space – that means that files modified in one
+environment will be modified in all environments. This is not always desirable,
+and in that case you can use the `always_copy_files` option.
 
-??? note "How `always_copy_files` works"
-    The `always_copy_files` option works by setting the `no_link` option in the
-    `info/paths.json` to `true` for the files in question. This means that the
-    files are copied instead of linked when the package is installed.
-
+??? note "How `always_copy_files` works" The `always_copy_files` option works by
+setting the `no_link` option in the `info/paths.json` to `true` for the
+files in question. This means that the files are copied instead of linked
+when the package is installed.
 
 ```yaml title="recipe.yaml"
 build:
@@ -167,7 +177,6 @@ build:
 
     # used to prefer this variant less
     down_prioritize_variant: integer (defaults to 0, higher is less preferred)
-
 ```
 
 ## Dynamic linking configuration
@@ -192,8 +201,8 @@ If you want to stop `rattler-build` from relocating the binaries, you can set
 `binary_relocation` to `false`. If you want to only relocate some binaries, you
 can select the relevant ones with a glob pattern.
 
-To read more about `rpath`s and how rattler-build creates relocatable binary packages,
-see the [internals](internals.md) docs.
+To read more about `rpath`s and how rattler-build creates relocatable binary
+packages, see the [internals](internals.md) docs.
 
 If you link against some libraries (possibly even outside of the prefix, in a
 system location), then you can use the `missing_dso_allowlist` to allow linking
@@ -201,12 +210,12 @@ against these and suppress any warnings. This list is pre-populated with a list
 of known system libraries on the different operating systems.
 
 As part of the post-processing, `rattler-build` checks for overlinking and
-overdepending. "Overlinking" is when a binary links against a library that is not
-specified in the run requirements. This is usually a mistake because the library
-would not be present in the environment when the package is installed.
+overdepending. "Overlinking" is when a binary links against a library that is
+not specified in the run requirements. This is usually a mistake because the
+library would not be present in the environment when the package is installed.
 
-Conversely, "overdepending" is when a library is part of the run requirements, but
-is not actually used by any of the binaries/libraries in the package.
+Conversely, "overdepending" is when a library is part of the run requirements,
+but is not actually used by any of the binaries/libraries in the package.
 
 ```yaml title="recipe.yaml"
 build:

@@ -151,7 +151,7 @@ impl GlobVec {
 
     /// Returns true if the globvec is empty
     pub fn is_empty(&self) -> bool {
-        self.include.is_empty()
+        self.include.is_empty() && self.exclude.is_empty()
     }
 
     /// Returns an iterator over the globs
@@ -164,19 +164,19 @@ impl GlobVec {
         &self.exclude
     }
 
-    /// Returns true if the path matches any of the globs
+    /// Returns true if the path matches any include glob and does not match any exclude glob
+    /// If there are no globs at all, we match nothing.
+    /// If there is no include glob, we match everything except the exclude globs.
     pub fn is_match(&self, path: &Path) -> bool {
-        if !self.is_empty() {
-            let is_match = self.include_globset.is_match(path);
-            // if exclude is empty, it matches nothing
-            if !self.exclude.is_empty() {
-                is_match && !self.exclude_globset.is_match(path)
-            } else {
-                is_match
-            }
-        } else {
-            false
+        // if both include & exclude are empty, we match nothing
+        if self.is_empty() {
+            return false;
         }
+        // if include is empty, it matches everything. Otherwise we check!
+        let is_match = self.include.is_empty() || self.include_globset.is_match(path);
+        // if exclude is empty, it matches everything. Otherwise we check!
+        let is_match = is_match && (self.exclude.is_empty() || !self.exclude_globset.is_match(path));
+        is_match
     }
 
     /// Only used for testing
@@ -434,6 +434,18 @@ mod tests {
         assert!(globvec.is_match(Path::new("foo/bla/bar")));
         assert!(!globvec.is_match(Path::new("bar.txt")));
         assert!(globvec.is_match(Path::new("bla")));
+
+        // empty include should be the same
+        let globvec = GlobVec::from_vec(vec![], Some(vec!["*.txt"]));
+        assert!(!globvec.is_match(Path::new("foo/bar.txt")));
+        assert!(globvec.is_match(Path::new("foo/bla")));
+        assert!(globvec.is_match(Path::new("foo/bla/bar")));
+        assert!(!globvec.is_match(Path::new("bar.txt")));
+        assert!(globvec.is_match(Path::new("bla")));
+
+        // empty everything should match nothing
+        let globvec = GlobVec::from_vec(vec![], None);
+        assert!(!globvec.is_match(Path::new("foo/bar.txt")));
     }
 
     #[test]
