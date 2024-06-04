@@ -1174,14 +1174,14 @@
 <p><code>--build-platform &lt;BUILD_PLATFORM&gt;</code></p>
 <p>The build platform to use for the build (e.g. for building with emulation, or rendering)</p>
 <ul>
-<li>Default value: <code>linux-64</code></li>
+<li>Default value: current platform</li>
 </ul>
 </li>
 <li>
 <p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
 <p>The target platform for the build</p>
 <ul>
-<li>Default value: <code>linux-64</code></li>
+<li>Default value: current platform</li>
 </ul>
 </li>
 <li>
@@ -1340,6 +1340,10 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 <p>The package file to test</p>
 </li>
 <li>
+<p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
+<p>The number of threads to use for compression</p>
+</li>
+<li>
 <p><code>--use-zstd</code></p>
 <p>Enable support for repodata.json.zst</p>
 <ul>
@@ -1393,6 +1397,10 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 <li>Default value: <code>false</code></li>
 <li>Possible values: <code>true</code>, <code>false</code></li>
 </ul>
+</li>
+<li>
+<p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
+<p>The number of threads to use for compression</p>
 </li>
 <li>
 <p><code>--use-zstd</code></p>
