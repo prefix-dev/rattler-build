@@ -71,10 +71,17 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            match v.to_lowercase().as_str() {
-                "true" => context.insert(key.clone(), Value::from(true)),
-                "false" => context.insert(key.clone(), Value::from(false)),
-                _ => context.insert(key, Value::from_safe_string(v)),
+            let v_lower = v.to_lowercase();
+            match v_lower.as_str() {
+                "true" | "yes" => context.insert(key.clone(), Value::from(true)),
+                "false" | "no" => context.insert(key.clone(), Value::from(false)),
+                _ => {
+                    if let Ok(v_num) = v.parse::<i64>() {
+                        context.insert(key.clone(), Value::from(v_num))
+                    } else {
+                        context.insert(key.clone(), Value::from_safe_string(v))
+                    }
+                }
             };
         }
 
