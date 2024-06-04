@@ -75,13 +75,6 @@ pub async fn skip_existing(
 
     // Retain only the outputs that do not exist yet
     outputs.retain(|output| {
-        tracing::info!(
-            "Checking: {}-{}-{}",
-            output.name().as_normalized(),
-            output.version(),
-            output.build_string().unwrap_or_default()
-        );
-        tracing::info!("Existing: {:?}", existing_set);
         let exists = existing_set.contains(&format!(
             "{}-{}-{}",
             output.name().as_normalized(),
