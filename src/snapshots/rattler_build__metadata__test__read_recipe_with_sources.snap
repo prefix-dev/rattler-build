@@ -1,6 +1,5 @@
 ---
 source: src/metadata.rs
-assertion_line: 742
 expression: git_source_output
 ---
 recipe:
@@ -41,6 +40,8 @@ build_configuration:
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_git_source_1704379826
   channels:
     - "https://conda.anaconda.org/conda-forge"
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: "2024-01-04T14:50:26.411202Z"
   subpackages:
     git_source:
@@ -55,8 +56,7 @@ finalized_dependencies:
   host: ~
   run:
     depends: []
-    constrains: []
-    run_exports: ~
+    constraints: []
 finalized_sources:
   - git: "https://github.com/prefix-dev/rattler-build"
     rev: 4ae7bd207b437c3a5955788e6516339a84358e1c

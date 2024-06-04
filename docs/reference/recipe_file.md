@@ -79,7 +79,7 @@ The schema (and `pydantic` source file) can be found in this repository:
     Read more about this [here](https://github.com/redhat-developer/yaml-language-server).
 
 
-See more in the [automatic linting](./automatic_linting.md) chapter.
+See more in the [automatic linting](../automatic_linting.md) chapter.
 
 <!--
 Quick start (from conda-build)
@@ -431,7 +431,7 @@ the `package_metadata` by default. You can disable this by passing
 !!! note
     There are many more options in the build section. These additional options control
     how variants are computed, prefix replacements, and more.
-    See the [full build options](./build_options.md) for more information.
+    See the [full build options](../build_options.md) for more information.
 
 
 ## Requirements section
@@ -1134,7 +1134,7 @@ source:
 ```
 
 A selector is a valid Python statement that is executed. You can read more about
-them in the ["Selectors in recipes" chapter](./selectors.md).
+them in the ["Selectors in recipes" chapter](../selectors.md).
 
 The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
 favor of the more general comparison operators. Additional selectors in this
@@ -1180,5 +1180,5 @@ tests:
 
 ### Jinja functions
 
-- [`load_from_file`](./experimental_features.md#load-from-files)
-- [`git.*` functions](./experimental_features.md#git-functions)
+- [`load_from_file`](../experimental_features.md#load-from-files)
+- [`git.*` functions](../experimental_features.md#git-functions)

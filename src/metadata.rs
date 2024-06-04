@@ -19,6 +19,7 @@ use rattler_conda_types::{
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -184,41 +185,20 @@ pub struct PackagingSettings {
     pub archive_type: ArchiveType,
     /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda` archives
     pub compression_level: i32,
-    /// How many threads to use for compression (only relevant for `.conda` archives)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub compression_threads: Option<u32>,
 }
 
 impl PackagingSettings {
     /// Create a new `PackagingSettings` from the command line arguments
     /// and the selected archive type.
-    pub fn from_args(
-        archive_type: ArchiveType,
-        compression_level: CompressionLevel,
-        compression_threads: Option<u32>,
-    ) -> Self {
+    pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
             ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
-        if compression_threads.is_some()
-            && compression_threads.unwrap() > 1
-            && archive_type != ArchiveType::Conda
-        {
-            tracing::warn!("Multi-threaded compression is only supported for conda archives");
-        }
-
-        let compression_threads = if archive_type == ArchiveType::Conda {
-            Some(compression_threads.unwrap_or(1))
-        } else {
-            None
-        };
-
         Self {
             archive_type,
             compression_level,
-            compression_threads,
         }
     }
 }
@@ -240,6 +220,10 @@ pub struct BuildConfiguration {
     pub directories: Directories,
     /// The channels to use when resolving environments
     pub channels: Vec<Url>,
+    /// The channel priority that is used to resolve dependencies
+    pub channel_priority: ChannelPriority,
+    /// The solve strategy to use when resolving dependencies
+    pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
     /// All subpackages coming from this output or other outputs from the same recipe
@@ -292,7 +276,7 @@ pub struct BuildSummary {
 
 /// A output. This is the central element that is passed to the `run_build` function
 /// and fully specifies all the options and settings to run the build.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
     pub recipe: Recipe,
@@ -693,9 +677,8 @@ mod test {
                     timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
-                    purls: Default::default(),
-                    // TODO!
-                    run_exports: Default::default(),
+                    purls: None,
+                    run_exports: None,
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")

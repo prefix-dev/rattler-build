@@ -39,6 +39,7 @@ use metadata::Output;
 use miette::{IntoDiagnostic, WrapErr};
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use recipe::parser::Dependency;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -259,7 +260,6 @@ pub async fn get_build_output(
         let channels = args
             .channel
             .clone()
-            .unwrap_or_else(|| vec!["conda-forge".to_string()])
             .into_iter()
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
             .collect::<Result<Vec<_>, _>>()
@@ -284,12 +284,13 @@ pub async fn get_build_output(
                 )
                 .into_diagnostic()?,
                 channels,
+                channel_priority: ChannelPriority::Strict,
+                solve_strategy: SolveStrategy::Highest,
                 timestamp,
                 subpackages: subpackages.clone(),
                 packaging_settings: PackagingSettings::from_args(
                     args.package_format.archive_type,
                     args.package_format.compression_level,
-                    args.compression_threads,
                 ),
                 store_recipe: !args.no_include_recipe,
                 force_colors: args.color_build_log && console::colors_enabled(),
@@ -378,12 +379,15 @@ pub async fn run_test_from_args(
         target_platform: None,
         keep_test_prefix: false,
         channels,
+        channel_priority: ChannelPriority::Strict,
+        solve_strategy: SolveStrategy::Highest,
         tool_configuration: Configuration {
             client,
             fancy_log_handler,
             // duplicate from `keep_test_prefix`?
             no_clean: false,
-            ..Default::default()
+            compression_threads: args.compression_threads,
+            ..Configuration::default()
         },
     };
 
@@ -446,6 +450,7 @@ pub async fn rebuild_from_args(
         no_test: args.no_test,
         use_zstd: args.common.use_zstd,
         use_bz2: args.common.use_bz2,
+        compression_threads: args.compression_threads,
         ..Configuration::default()
     };
 

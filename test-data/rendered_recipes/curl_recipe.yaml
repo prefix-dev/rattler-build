@@ -42,6 +42,8 @@ build_configuration:
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293
   channels:
   - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: 2023-11-21T13:28:13.086796Z
   subpackages:
     curl:
@@ -51,7 +53,6 @@ build_configuration:
   packaging_settings:
     archive_type: tar_bz2
     compression_level: 3
-    compression_threads: 1
 finalized_dependencies:
   build:
     specs:
@@ -632,7 +633,6 @@ finalized_dependencies:
   host: null
   run:
     depends: []
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
   rattler-build: 0.12.1

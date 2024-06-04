@@ -11,12 +11,14 @@ license = "BSD-3-Clause"
 readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
+default-run = "rattler-build"
 
 [features]
 default = ['native-tls']
 native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_installs_packages/native-tls']
 rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls', 'rattler_installs_packages/rustls-tls']
 tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input']
+generate-cli-docs = ["clap-markdown"]
 
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
@@ -34,6 +36,7 @@ rattler_shell = { version = "0.20.6", default-features = false, features = [
 ] }
 rattler_solve = { version = "0.23.2", default-features = false, features = [
     "resolvo",
+    "serde"
 ] }
 rattler_virtual_packages = { version = "0.19.13", default-features = false }
 rattler_package_streaming = { version = "0.21.1", default-features = false }
@@ -115,6 +118,7 @@ reflink-copy = "0.1.17"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.10.4"
+clap-markdown = { version = "0.1.3", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.39.0", features = ["yaml"] }
@@ -148,6 +152,8 @@ rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" 
 rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
 rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main"}
+
 
 # rattler = { path = "../rattler/crates/rattler" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
@@ -159,3 +165,4 @@ rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", bran
 # rattler_solve = { path = "../rattler/crates/rattler_solve" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 # rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
+#clap-markdown = { path = "../clap-markdown" }
