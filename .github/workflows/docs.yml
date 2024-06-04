@@ -58,7 +58,7 @@ jobs:
           echo "There are changes in the CLI docs."
           echo "Please run the following commands to commit and push the changes:"
           echo ""
-          echo "pixi run commit-cli-docs"
+          echo "pixi run generate-cli-docs"
           echo "git commit -am 'docs: update CLI docs'"
           echo "git push"
           echo ""
