@@ -3,6 +3,7 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
+    str::FromStr,
 };
 
 use indexmap::IndexSet;
@@ -16,13 +17,16 @@ use crate::{
     _partialerror,
     hash::HashInfo,
     recipe::{
-        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, ParsingError, PartialParsingError},
         parser::Recipe,
         Jinja, Render,
     },
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
+    utils::VariantValue,
 };
 use crate::{recipe::parser::Dependency, utils::NormalizedKeyBTreeMap};
 use petgraph::{algo::toposort, graph::DiGraph};
@@ -36,7 +40,7 @@ pub struct DiscoveredOutput {
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
     pub node: Node,
-    pub used_vars: BTreeMap<String, String>,
+    pub used_vars: BTreeMap<String, VariantValue>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -274,11 +278,15 @@ impl VariantConfig {
         // always insert target_platform and build_platform
         final_config.variants.insert(
             "target_platform".into(),
-            vec![selector_config.target_platform.to_string()],
+            vec![VariantValue::String(
+                selector_config.target_platform.to_string(),
+            )],
         );
         final_config.variants.insert(
             "build_platform".into(),
-            vec![selector_config.build_platform.to_string()],
+            vec![VariantValue::String(
+                selector_config.build_platform.to_string(),
+            )],
         );
 
         Ok(final_config)
@@ -311,7 +319,7 @@ impl VariantConfig {
     pub fn combinations(
         &self,
         used_vars: &HashSet<String>,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+    ) -> Result<Vec<BTreeMap<String, VariantValue>>, VariantError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
         let used_zip_keys = zip_keys
@@ -360,7 +368,7 @@ impl VariantConfig {
                 combination
                     .iter()
                     .cloned()
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<BTreeMap<String, VariantValue>>()
             })
             .collect();
         Ok(result)
@@ -586,7 +594,7 @@ impl VariantConfig {
         let mut recipes = IndexSet::new();
         for combination in combinations {
             let mut other_recipes =
-                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
+                HashMap::<String, (String, String, BTreeMap<String, VariantValue>)>::new();
 
             for (_, (name, output, used_vars, target_platform)) in outputs_map.iter() {
                 let mut used_variables = used_vars.clone();
@@ -604,7 +612,10 @@ impl VariantConfig {
 
                 let mut combination = combination.clone();
                 // we need to overwrite the target_platform in case of `noarch`.
-                combination.insert("target_platform".to_string(), target_platform.to_string());
+                combination.insert(
+                    "target_platform".to_string(),
+                    VariantValue::String(target_platform.to_string()),
+                );
 
                 let selector_config_with_variant =
                     selector_config.new_with_variant(combination.clone(), *target_platform);
@@ -655,7 +666,10 @@ impl VariantConfig {
                 for p in exact_pins {
                     match other_recipes.get(&p) {
                         Some((version, build, _)) => {
-                            used_filtered.insert(p.clone(), format!("{} {}", version, build));
+                            used_filtered.insert(
+                                p.clone(),
+                                VariantValue::String(format!("{} {}", version, build)),
+                            );
                         }
                         None => {
                             return Err(VariantError::MissingOutput(p));
@@ -679,7 +693,10 @@ impl VariantConfig {
                                         Some((version, build, _)) => {
                                             used_filtered.insert(
                                                 val.to_owned(),
-                                                format!("{} {}", version, build),
+                                                VariantValue::String(format!(
+                                                    "{} {}",
+                                                    version, build
+                                                )),
                                             );
                                         }
                                         None => {
@@ -784,10 +801,29 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
     }
 }
 
+impl TryConvertNode<VariantValue> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<VariantValue, Vec<PartialParsingError>> {
+        match self {
+            RenderedNode::Scalar(scalar) => scalar.try_convert(name),
+            _ => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::ExpectedScalar,
+                help = "A scalar value is expected here"
+            )]),
+        }
+    }
+}
+
+impl TryConvertNode<VariantValue> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<VariantValue, Vec<PartialParsingError>> {
+        Ok(VariantValue::from_str(self.as_str()).unwrap())
+    }
+}
+
 #[derive(Debug, Clone)]
 enum VariantKey {
-    Key(String, Vec<String>),
-    ZipKey(HashMap<String, Vec<String>>),
+    Key(String, Vec<VariantValue>),
+    ZipKey(HashMap<String, Vec<VariantValue>>),
 }
 
 impl VariantKey {
@@ -798,7 +834,7 @@ impl VariantKey {
         }
     }
 
-    pub fn at(&self, index: usize) -> Option<Vec<(String, String)>> {
+    pub fn at(&self, index: usize) -> Option<Vec<(String, VariantValue)>> {
         match self {
             VariantKey::Key(key, values) => {
                 values.get(index).map(|v| vec![(key.clone(), v.clone())])
@@ -874,8 +910,8 @@ pub enum VariantError {
 fn find_combinations(
     variant_keys: &[VariantKey],
     index: usize,
-    current: &mut Vec<(String, String)>,
-    result: &mut Vec<Vec<(String, String)>>,
+    current: &mut Vec<(String, VariantValue)>,
+    result: &mut Vec<Vec<(String, VariantValue)>>,
 ) {
     if index == variant_keys.len() {
         result.push(current.clone());
@@ -969,7 +1005,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<String, VariantValue>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)
@@ -983,8 +1019,14 @@ mod tests {
     #[test]
     fn test_variant_combinations() {
         let mut variants = NormalizedKeyBTreeMap::new();
-        variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
-        variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
+        variants.insert(
+            "a".to_string(),
+            vec!["1".parse().unwrap(), "2".parse().unwrap()],
+        );
+        variants.insert(
+            "b".to_string(),
+            vec!["3".parse().unwrap(), "4".parse().unwrap()],
+        );
         let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];
 
         let used_vars = vec!["a".to_string()].into_iter().collect();
@@ -1003,17 +1045,29 @@ mod tests {
 
         config.variants.insert(
             "c".to_string(),
-            vec!["5".to_string(), "6".to_string(), "7".to_string()],
+            vec![
+                "5".parse().unwrap(),
+                "6".parse().unwrap(),
+                "7".parse().unwrap(),
+            ],
         );
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
-            .into_iter()
-            .collect();
+        let used_vars = vec![
+            "a".parse().unwrap(),
+            "b".parse().unwrap(),
+            "c".parse().unwrap(),
+        ]
+        .into_iter()
+        .collect();
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2 * 3);
 
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
-            .into_iter()
-            .collect();
+        let used_vars = vec![
+            "a".parse().unwrap(),
+            "b".parse().unwrap(),
+            "c".parse().unwrap(),
+        ]
+        .into_iter()
+        .collect();
         config.zip_keys = None;
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
@@ -1071,7 +1125,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<String, VariantValue>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)

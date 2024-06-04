@@ -9,6 +9,7 @@ use std::{
 use crate::{
     metadata::{BuildConfiguration, Output},
     tool_configuration,
+    utils::VariantValue,
 };
 use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
@@ -432,14 +433,12 @@ pub fn apply_variant(
                             if let Some(version) = variant.get(name.as_normalized()) {
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
-                                let mut spec = version.clone();
+                                let mut spec = version.to_string();
 
                                 // check if all characters are alphanumeric or ., in that case add
                                 // a '=' to get "startswith" behavior
                                 if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={}", version);
-                                } else {
-                                    spec = version.clone();
+                                    spec = format!("={}", spec);
                                 }
 
                                 // we split at whitespace to separate into version and build
