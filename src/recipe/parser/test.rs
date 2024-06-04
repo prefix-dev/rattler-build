@@ -30,14 +30,13 @@ pub struct CommandsTestRequirements {
 /// The files that should be copied to the test directory (they are stored in the package)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
-    // TODO parse as globs
     /// Files to be copied from the source directory to the test directory.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub source: GlobVec,
 
     /// Files to be copied from the recipe directory to the test directory.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub recipe: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub recipe: GlobVec,
 }
 
 /// A test that executes a script in a freshly created environment

@@ -82,8 +82,6 @@ fn copy_license_files(
     if output.recipe.about().license_file.is_empty() {
         Ok(None)
     } else {
-        let license_globs = output.recipe.about().license_file.clone();
-
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
@@ -91,7 +89,7 @@ fn copy_license_files(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
-        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .with_globvec(&output.recipe.about().license_file)
         .use_gitignore(false)
         .run()?;
 
@@ -102,7 +100,7 @@ fn copy_license_files(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
-        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .with_globvec(&output.recipe.about().license_file)
         .use_gitignore(false)
         .run()?;
 
@@ -359,6 +357,7 @@ impl Output {
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
             self.recipe.build().always_include_files(),
+            self.recipe.build().files(),
         )?;
 
         package_conda(self, tool_configuration, &files_after)

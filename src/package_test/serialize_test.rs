@@ -64,7 +64,7 @@ impl CommandsTest {
                 &output.build_configuration.directories.recipe_dir,
                 folder,
             )
-            .with_parse_globs(globs.iter().map(AsRef::as_ref))
+            .with_globvec(globs)
             .use_gitignore(true)
             .run()?;
 
@@ -77,7 +77,7 @@ impl CommandsTest {
                 &output.build_configuration.directories.work_dir,
                 folder,
             )
-            .with_parse_globs(globs.iter().map(AsRef::as_ref))
+            .with_globvec(globs)
             .use_gitignore(true)
             .run()?;
 

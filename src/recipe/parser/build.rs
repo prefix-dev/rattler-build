@@ -1,6 +1,5 @@
 use std::str::FromStr;
 
-use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
@@ -103,10 +102,15 @@ pub struct Build {
     /// Variant ignore and use keys
     #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
     pub(super) variant: VariantKeyUsage,
+    /// Prefix detection settings
     #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
     pub(super) prefix_detection: PrefixDetection,
+    /// Post-process operations for regex based replacements
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(super) post_process: Vec<PostProcess>,
+    /// Include files in the package
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub(super) files: GlobVec,
 }
 
 /// Post process operations for regex based replacements
@@ -164,13 +168,18 @@ impl Build {
     }
 
     /// Get the always copy files settings.
-    pub fn always_copy_files(&self) -> Option<&GlobSet> {
-        self.always_copy_files.globset()
+    pub fn always_copy_files(&self) -> &GlobVec {
+        &self.always_copy_files
     }
 
     /// Get the always include files settings.
-    pub fn always_include_files(&self) -> Option<&GlobSet> {
-        self.always_include_files.globset()
+    pub fn always_include_files(&self) -> &GlobVec {
+        &self.always_include_files
+    }
+
+    /// Get the include files settings.
+    pub fn files(&self) -> &GlobVec {
+        &self.files
     }
 
     /// Get the prefix detection settings.
@@ -211,7 +220,8 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             merge_build_and_host_envs,
             variant,
             prefix_detection,
-            post_process
+            post_process,
+            files
         }
 
         Ok(build)
@@ -262,13 +272,13 @@ impl DynamicLinking {
     }
 
     /// Get the missing DSO allowlist.
-    pub fn missing_dso_allowlist(&self) -> Option<&GlobSet> {
-        self.missing_dso_allowlist.globset()
+    pub fn missing_dso_allowlist(&self) -> &GlobVec {
+        &self.missing_dso_allowlist
     }
 
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
-        self.rpath_allowlist.globset()
+    pub fn rpath_allowlist(&self) -> &GlobVec {
+        &self.rpath_allowlist
     }
 
     /// Get the overdepending behavior.

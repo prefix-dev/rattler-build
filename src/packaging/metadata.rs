@@ -383,10 +383,7 @@ impl Output {
                 )?;
 
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
-                let no_link = always_copy_files
-                    .as_ref()
-                    .map(|g| g.is_match(&relative_path))
-                    .unwrap_or(false);
+                let no_link = always_copy_files.is_match(&relative_path);
                 paths_json.paths.push(PathsEntry {
                     sha256: Some(digest),
                     relative_path,

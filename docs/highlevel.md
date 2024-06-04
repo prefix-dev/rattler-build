@@ -19,7 +19,7 @@ dependencies are. From the recipe file, `rattler-build` executes several steps:
 
 2. **Fetch source**:
 
-   Retrieve specified source files, such as `.tar.gz` files, `git` repositories, local paths. 
+   Retrieve specified source files, such as `.tar.gz` files, `git` repositories, local paths.
    Additionally, this step will apply patches that can be specified alongside the source file.
 
 3. **Install build environments**:

@@ -19,7 +19,7 @@ use crate::{
     validate_keys,
 };
 
-use super::FlattenErrors;
+use super::{FlattenErrors, GlobVec};
 
 /// About information.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -40,8 +40,8 @@ pub struct About {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_family: Option<String>,
     /// The license file(s) of the package.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub license_file: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub license_file: GlobVec,
     /// The license URL of the package.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub license_url: Option<Url>,

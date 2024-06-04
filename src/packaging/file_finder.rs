@@ -1,6 +1,5 @@
 use content_inspector::ContentType;
 use fs_err as fs;
-use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
 use std::{
     collections::{HashMap, HashSet},
@@ -10,7 +9,7 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use crate::metadata::Output;
+use crate::{metadata::Output, recipe::parser::GlobVec};
 
 use super::{file_mapper, PackagingError};
 
@@ -65,7 +64,11 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
-    pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>) -> Result<Self, io::Error> {
+    pub fn from_prefix(
+        prefix: &Path,
+        always_include: &GlobVec,
+        files: &GlobVec,
+    ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),
@@ -94,10 +97,15 @@ impl Files {
 
         let mut difference = current_files
             .difference(&previous_files)
+            // If we have an files glob, we only include files that match the glob
+            .filter(|f| {
+                files.is_empty()
+                    || files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            })
             .cloned()
             .collect::<HashSet<_>>();
 
-        if let Some(always_include) = always_include {
+        if !always_include.is_empty() {
             for file in current_files {
                 let file_without_prefix =
                     file.strip_prefix(prefix).expect("File should be in prefix");

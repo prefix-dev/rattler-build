@@ -855,3 +855,23 @@ def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     pp = paths["paths"]
     assert len(pp) == 1
     assert pp[0]["_path"] == "bin/.postlink-post-link.sh"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "include_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "include_files")
+
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    pp = paths["paths"]
+    assert len(pp) == 2
+    assert pp[0]["_path"] == "include/include_file.c"
+    assert pp[1]["_path"] == "include/include_file.h"
