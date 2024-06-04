@@ -13,5 +13,5 @@ requirements:
     - if: linux
       then: ${{ cdt("cairo") }}
   run:
-    - if: cmp(python, "3.3")
+    - if: match(python, "3.3")
       then: asyncio
