@@ -1,11 +1,11 @@
 /// This is a separate binary not included in the main rattler-build binary.
 /// Used to generate the documentation for the rattler-build binary.
-use rattler_conda_types::Platform;
 
 #[cfg(feature = "generate-cli-docs")]
 fn main() {
     use clap_markdown::help_markdown;
     use rattler_build::opt::App;
+    use rattler_conda_types::Platform;
 
     let help = help_markdown::<App>();
 
