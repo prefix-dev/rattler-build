@@ -4,11 +4,11 @@ expression: err
 ---
   × Failed to parse recipe
 
-Error:   × Parsing: failed to render Jinja expression: syntax error
+Error:   × Parsing: failed to render Jinja expression: syntax error: unexpected
+  │ character (in <expression>:1)
    ╭─[7:7]
  6 │   skip:
  7 │     - asd;asd;123
    ·       ─────┬─────
    ·            ╰── here
    ╰────
-

@@ -87,13 +87,13 @@ Build a package from a recipe
 
 	The build platform to use for the build (e.g. for building with emulation, or rendering)
 
-	- Default value: `linux-64`
+	- Default value: current platform
 
 - `--target-platform <TARGET_PLATFORM>`
 
 	The target platform for the build
 
-	- Default value: `linux-64`
+	- Default value: current platform
 
 - `-c`, `--channel <CHANNEL>`
 
@@ -256,6 +256,11 @@ These test files are written at "package creation time" and are part of the pack
 	The package file to test
 
 
+- `--compression-threads <COMPRESSION_THREADS>`
+
+	The number of threads to use for compression
+
+
 - `--use-zstd`
 
 	Enable support for repodata.json.zst
@@ -314,6 +319,11 @@ Rebuild a package from a package file instead of a recipe
 
 	- Default value: `false`
 	- Possible values: `true`, `false`
+
+
+- `--compression-threads <COMPRESSION_THREADS>`
+
+	The number of threads to use for compression
 
 
 - `--use-zstd`
@@ -661,4 +671,3 @@ Remove authentication information for a given host
     This document was generated automatically by
     <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
 </i></small>
-

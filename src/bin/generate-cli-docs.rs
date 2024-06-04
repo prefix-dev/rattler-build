@@ -3,10 +3,19 @@
 
 #[cfg(feature = "generate-cli-docs")]
 fn main() {
-    use clap_markdown::print_help_markdown;
+    use clap_markdown::help_markdown;
     use rattler_build::opt::App;
+    use rattler_conda_types::Platform;
 
-    print_help_markdown::<App>();
+    let help = help_markdown::<App>();
+
+    let target_default_platform = format!("Default value: `{}`", Platform::current());
+    let help = help.replace(
+        target_default_platform.as_str(),
+        format!("Default value: current platform").as_str(),
+    );
+
+    print!("{}", help);
 }
 
 #[cfg(not(feature = "generate-cli-docs"))]

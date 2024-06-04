@@ -236,7 +236,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::InvalidValue((key, s)) => write!(f, "invalid value for `{key}`: `{s}`."),
             ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
-                write!(f, "failed to render Jinja expression: {}", err.kind())
+                write!(f, "failed to render Jinja expression: {}", err)
             }
             ErrorKind::IfSelectorConditionNotBool(err) => {
                 write!(f, "condition in `if` selector must be a boolean: {}", err)
