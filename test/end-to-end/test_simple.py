@@ -713,6 +713,7 @@ def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 
     assert (pkg / "info/index.json").exists()
 
+
 def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "noarch_variant"
 
@@ -876,16 +877,27 @@ def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     assert pp[0]["_path"] == "include/include_file.c"
     assert pp[1]["_path"] == "include/include_file.h"
 
-def test_pydantic_true_false(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+
+def test_pydantic_true_false(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
     path_to_recipe = recipes / "if_else"
-    output = rattler_build(*args, "--variant-config", recipes / "if_else/variant.yaml", "--render-only")
+
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = rattler_build(
+        *args, "--variant-config", recipes / "if_else/variant.yaml", "--render-only"
+    )
     print(output)
     # parse json
     render = json.loads(output)
 
     assert len(render) == 2
     assert render[0]["recipe"]["package"]["name"] == "if_else_test"
-    assert render[0]["recipe"]["requirements"]["host"] == ['pydantic >=2', 'test']
+    assert render[0]["recipe"]["requirements"]["host"] == ["pydantic >=2", "test"]
 
     assert render[1]["recipe"]["package"]["name"] == "if_else_test"
-    assert render[1]["recipe"]["requirements"]["host"] == ['pydantic >=1,<2', 'notest']
+    assert render[1]["recipe"]["requirements"]["host"] == ["pydantic >=1,<2", "notest"]
