@@ -10,7 +10,10 @@ fn main() {
     let help = help_markdown::<App>();
 
     let target_default_platform = format!("Default value: `{}`", Platform::current());
-    let help = help.replace(target_default_platform.as_str(), format!("Default value: current platform").as_str());
+    let help = help.replace(
+        target_default_platform.as_str(),
+        format!("Default value: current platform").as_str(),
+    );
 
     print!("{}", help);
 }
