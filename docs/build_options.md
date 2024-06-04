@@ -60,7 +60,7 @@ For example:
 
 The globs are always evaluted relative to the prefix directory. If you have no
 `include` globs, but an `exclude` glob, then all files are included except those
-that match the `exclude` glob.
+that match the `exclude` glob. This is equivalent to `include: ['**']`.
 
 ## Always include and always copy files
 
