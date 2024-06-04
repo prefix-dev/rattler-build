@@ -851,7 +851,8 @@ impl IfSelector {
             vec![_partialerror!(
                 *self.cond.span(),
                 ErrorKind::JinjaRendering(err),
-                label = "error evaluating if-selector condition"
+                label = err.to_string(),
+                help = "error evaluating if-selector condition"
             )]
         })?;
 

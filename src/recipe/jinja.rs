@@ -336,6 +336,17 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     let variant = Arc::new(variant.clone());
 
+    // Deprecated function
+    env.add_function(
+        "cmp",
+        |_: &Value, _: &Value| -> Result<(), minijinja::Error> {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::InvalidOperation,
+                "`cmp` is not supported anymore. Please use `match` instead.",
+            ));
+        },
+    );
+
     env.add_function("match", |a: &Value, spec: &str| {
         if let Some(variant) = a.as_str() {
             // check if version matches spec
