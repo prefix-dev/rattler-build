@@ -264,7 +264,7 @@ impl Output {
             let channels = self.reindex_channels().unwrap();
 
             let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
+                resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
                     .await
                     .unwrap();
 
@@ -284,8 +284,8 @@ impl Output {
             // find the new files in the prefix and add them to the cache
             let new_files = Files::from_prefix(
                 &self.build_configuration.directories.host_prefix,
-                &cache.build.always_include_files(),
-                &cache.build.files(),
+                cache.build.always_include_files(),
+                cache.build.files(),
             )
             .into_diagnostic()?;
 

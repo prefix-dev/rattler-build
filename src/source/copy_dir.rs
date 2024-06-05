@@ -46,7 +46,7 @@ pub(crate) fn copy_file(
     let dest_path = to.as_ref();
 
     if path.is_dir() {
-        create_dir_all_cached(&dest_path, paths_created)?;
+        create_dir_all_cached(dest_path, paths_created)?;
         Ok(())
     } else {
         // create dir if parent does not exist
@@ -58,9 +58,9 @@ pub(crate) fn copy_file(
         if path.is_symlink() {
             let link_target = fs_err::read_link(path)?;
             #[cfg(unix)]
-            fs_err::os::unix::fs::symlink(link_target, &dest_path)?;
+            fs_err::os::unix::fs::symlink(link_target, dest_path)?;
             #[cfg(windows)]
-            std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+            std::os::windows::fs::symlink_file(link_target, dest_path)?;
             Ok(())
         } else {
             if dest_path.exists() {
@@ -72,7 +72,7 @@ pub(crate) fn copy_file(
                     tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
                 }
             }
-            reflink_or_copy(path, &dest_path, options).map_err(SourceError::FileSystemError)?;
+            reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
             Ok(())
         }
     }

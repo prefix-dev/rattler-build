@@ -910,7 +910,7 @@ impl Output {
                 .reindex_channels()
                 .map_err(ResolveError::RefreshChannelError)?;
             let finalized_dependencies = resolve_dependencies(
-                &self.recipe.requirements(),
+                self.recipe.requirements(),
                 &self,
                 &channels,
                 tool_configuration,
