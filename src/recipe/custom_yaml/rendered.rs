@@ -254,6 +254,11 @@ impl RenderedScalarNode {
             _ => None,
         }
     }
+
+    /// Try to parse the value as integer
+    pub fn as_integer(&self) -> Option<i64> {
+        self.value.parse().ok()
+    }
 }
 
 impl HasSpan for RenderedScalarNode {
@@ -343,46 +348,6 @@ impl From<bool> for RenderedScalarNode {
         }
     }
 }
-macro_rules! scalar_from_to_number {
-    ($t:ident, $as:ident) => {
-        impl From<$t> for RenderedScalarNode {
-            #[doc = "Convert from "]
-            #[doc = stringify!($t)]
-            #[doc = r#" into a node"#]
-            fn from(value: $t) -> Self {
-                format!("{}", value).into()
-            }
-        }
-
-        impl RenderedScalarNode {
-            #[doc = "Treat the scalar node as "]
-            #[doc = stringify!($t)]
-            #[doc = r#".
-
-If this scalar node's value can be represented properly as
-a number of the right kind then return it.  This is essentially
-a shortcut for using the `FromStr` trait on the return value of
-`.as_str()`."#]
-            pub fn $as(&self) -> Option<$t> {
-                use std::str::FromStr;
-                $t::from_str(&self.value).ok()
-            }
-        }
-    };
-}
-
-scalar_from_to_number!(i8, as_i8);
-scalar_from_to_number!(i16, as_i16);
-scalar_from_to_number!(i32, as_i32);
-scalar_from_to_number!(i64, as_i64);
-scalar_from_to_number!(i128, as_i128);
-scalar_from_to_number!(isize, as_isize);
-scalar_from_to_number!(u8, as_u8);
-scalar_from_to_number!(u16, as_u16);
-scalar_from_to_number!(u32, as_u32);
-scalar_from_to_number!(u64, as_u64);
-scalar_from_to_number!(u128, as_u128);
-scalar_from_to_number!(usize, as_usize);
 
 /// A marked YAML sequence node
 ///
@@ -711,5 +676,37 @@ impl Render<RenderedSequenceNode> for SequenceNodeInternal {
         rendered.retain(|item| !matches!(item, RenderedNode::Null(_)));
 
         Ok(RenderedSequenceNode::from(rendered))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::RenderedScalarNode;
+
+    #[test]
+    fn test_scalar_value() {
+        let scalar = RenderedScalarNode::from("test");
+        assert_eq!(scalar.as_str(), "test");
+
+        let scalar = RenderedScalarNode::from("true");
+        assert_eq!(scalar.as_bool(), Some(true));
+
+        let scalar = RenderedScalarNode::from("false");
+        assert_eq!(scalar.as_bool(), Some(false));
+
+        let scalar = RenderedScalarNode::from("123");
+        assert_eq!(scalar.as_integer(), Some(123));
+
+        let scalar = RenderedScalarNode::from("123.45");
+        assert_eq!(scalar.as_integer(), None);
+
+        let scalar = RenderedScalarNode::from("'true'");
+        assert_eq!(scalar.as_bool(), None);
+
+        let scalar = RenderedScalarNode::from("'123'");
+        assert_eq!(scalar.as_integer(), None);
+
+        let scalar = RenderedScalarNode::from("'123'");
+        assert_eq!(scalar.as_str(), "'123'");
     }
 }

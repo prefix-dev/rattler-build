@@ -487,6 +487,7 @@ impl From<bool> for ScalarNode {
         }
     }
 }
+
 macro_rules! scalar_from_to_number {
     ($t:ident, $as:ident) => {
         impl From<$t> for ScalarNode {
@@ -628,7 +629,7 @@ impl fmt::Debug for SequenceNode {
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
 /// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
-/// Because ther is an example that on the `context` key-value definition, a later
+/// Because there is an example that on the `context` key-value definition, a later
 /// key was defined as a jinja string using previous values, we need to care about
 /// insertion order we use [`IndexMap`] for this.
 ///

@@ -9,7 +9,6 @@ use std::{
 use crate::{
     metadata::{BuildConfiguration, Output},
     tool_configuration,
-    utils::VariantValue,
 };
 use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;

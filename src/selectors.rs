@@ -72,18 +72,17 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            let v_lower = v.to_string().to_lowercase();
-            match v_lower.as_str() {
-                "true" | "yes" => context.insert(key.clone(), Value::from(true)),
-                "false" | "no" => context.insert(key.clone(), Value::from(false)),
-                _ => {
-                    if let Ok(v_num) = v_lower.parse::<i64>() {
-                        context.insert(key.clone(), Value::from(v_num))
-                    } else {
-                        context.insert(key.clone(), Value::from_safe_string(v.to_string()))
-                    }
+            match v {
+                VariantValue::String(s) => {
+                    context.insert(key, Value::from_safe_string(s));
                 }
-            };
+                VariantValue::Number(n) => {
+                    context.insert(key, Value::from(n));
+                }
+                VariantValue::Boolean(b) => {
+                    context.insert(key, Value::from(b));
+                }
+            }
         }
 
         context

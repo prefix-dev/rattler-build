@@ -815,7 +815,7 @@ impl TryConvertNode<VariantValue> for RenderedNode {
 }
 
 impl TryConvertNode<VariantValue> for RenderedScalarNode {
-    fn try_convert(&self, name: &str) -> Result<VariantValue, Vec<PartialParsingError>> {
+    fn try_convert(&self, _name: &str) -> Result<VariantValue, Vec<PartialParsingError>> {
         Ok(VariantValue::from_str(self.as_str()).unwrap())
     }
 }
