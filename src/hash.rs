@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use sha1::{Digest, Sha1};
 
+use crate::utils::VariantValue;
+
 /// A hash will be added if all of these are true for any dependency:
 ///
 /// 1. package is an explicit dependency in build, host, or run deps
@@ -94,12 +96,17 @@ pub struct HashInput(String);
 
 impl HashInput {
     /// Create a new hash input from a variant
-    pub fn from_variant(variant: &BTreeMap<String, String>) -> Self {
+    pub fn from_variant(variant: &BTreeMap<String, VariantValue>) -> Self {
+        // TODO maybe re-asses what `conda-build` does here - keep numbers or format as string?
+        let input: BTreeMap<String, String> = variant
+            .iter()
+            .map(|(k, v)| (k.clone(), v.to_string()))
+            .collect();
         let mut buf = Vec::new();
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
 
         // BTree has sorted keys, which is important for hashing
-        variant
+        input
             .serialize(&mut ser)
             .expect("Failed to serialize input");
 
@@ -124,7 +131,7 @@ impl std::fmt::Display for HashInfo {
 }
 
 impl HashInfo {
-    fn hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
+    fn hash_prefix(variant: &BTreeMap<String, VariantValue>, noarch: &NoArchType) -> String {
         if noarch.is_python() {
             return "py".to_string();
         }
@@ -148,7 +155,7 @@ impl HashInfo {
 
             map.insert(
                 prefix.to_string(),
-                short_version_from_spec(version_spec, version_length),
+                short_version_from_spec(&version_spec.to_string(), version_length),
             );
         }
 
@@ -174,7 +181,7 @@ impl HashInfo {
     }
 
     /// Compute the build string for a given variant
-    pub fn from_variant(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> Self {
+    pub fn from_variant(variant: &BTreeMap<String, VariantValue>, noarch: &NoArchType) -> Self {
         Self {
             hash: Self::hash_from_input(&HashInput::from_variant(variant)),
             prefix: Self::hash_prefix(variant, noarch),
@@ -188,25 +195,24 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
-    fn test_hash() {
+    fn test_hash() -> Result<(), Box<dyn std::error::Error>> {
         let mut input = BTreeMap::new();
-        input.insert("rust_compiler".to_string(), "rust".to_string());
-        input.insert("build_platform".to_string(), "osx-64".to_string());
-        input.insert("c_compiler".to_string(), "clang".to_string());
-        input.insert("target_platform".to_string(), "osx-arm64".to_string());
-        input.insert("openssl".to_string(), "3".to_string());
+        input.insert("rust_compiler".to_string(), "rust".parse()?);
+        input.insert("build_platform".to_string(), "osx-64".parse()?);
+        input.insert("c_compiler".to_string(), "clang".parse()?);
+        input.insert("target_platform".to_string(), "osx-arm64".parse()?);
+        input.insert("openssl".to_string(), "3".parse()?);
         input.insert(
             "CONDA_BUILD_SYSROOT".to_string(),
-            "/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk".to_string(),
+            "/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk".parse()?,
         );
-        input.insert(
-            "channel_targets".to_string(),
-            "conda-forge main".to_string(),
-        );
-        input.insert("python".to_string(), "3.11.* *_cpython".to_string());
-        input.insert("c_compiler_version".to_string(), "14".to_string());
+        input.insert("channel_targets".to_string(), "conda-forge main".parse()?);
+        input.insert("python".to_string(), "3.11.* *_cpython".parse()?);
+        input.insert("c_compiler_version".to_string(), "14".parse()?);
 
         let build_string_from_output = HashInfo::from_variant(&input, &NoArchType::none());
         assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");
+
+        Ok(())
     }
 }

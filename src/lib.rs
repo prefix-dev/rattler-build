@@ -200,9 +200,9 @@ pub async fn get_build_output(
             .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
             .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
             .set_header(vec!["Variant", "Version"]);
-        for (key, value) in discovered_output.used_vars.iter() {
-            table.add_row(vec![key, value]);
-        }
+        // for (key, value) in discovered_output.used_vars.iter() {
+        //     table.add_row(vec![key, value]);
+        // }
         tracing::info!("\n{}\n", table);
     }
     drop(enter);

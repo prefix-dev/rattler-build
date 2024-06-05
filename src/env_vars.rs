@@ -80,8 +80,9 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
     }
 
     if let Some(npy_version) = output.variant().get("numpy") {
-        let np_ver = npy_version.split('.').collect::<Vec<_>>();
-        let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
+        let np_ver = npy_version.to_string();
+        let parts = np_ver.split('.').collect::<Vec<_>>();
+        let np_ver = format!("{}.{}", parts[0], parts[1]);
 
         result.insert("NPY_VER".to_string(), np_ver);
     }
@@ -101,7 +102,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, String> {
     let mut result = HashMap::<String, String>::new();
 
     if let Some(r_ver) = output.variant().get("r-base") {
-        result.insert("R_VER".to_string(), r_ver.clone());
+        result.insert("R_VER".to_string(), r_ver.to_string());
 
         let r_bin = if output.host_platform().is_windows() {
             output.prefix().join("Scripts/R.exe")

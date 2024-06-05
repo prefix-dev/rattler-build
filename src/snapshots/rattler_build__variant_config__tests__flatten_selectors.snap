@@ -7,12 +7,12 @@ zip_keys: ~
 c_compiler:
   - super_g++
 cplusplus:
-  - "10"
-  - "1000"
+  - 10
+  - 1000
 cxx_compiler:
   - super_gcc
 python:
   - "3.7"
   - "3.8"
 unix_level:
-  - "1"
+  - 1

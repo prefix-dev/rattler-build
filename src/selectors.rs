@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::{hash::HashInfo, recipe::jinja::Env, recipe::jinja::Git};
 
+use crate::utils::VariantValue;
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
 
@@ -19,7 +20,7 @@ pub struct SelectorConfig {
     /// The hash, if available
     pub hash: Option<HashInfo>,
     /// The variant config
-    pub variant: BTreeMap<String, String>,
+    pub variant: BTreeMap<String, VariantValue>,
     /// Enable experimental features
     pub experimental: bool,
     /// Allow undefined variables
@@ -71,7 +72,17 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            context.insert(key, Value::from_safe_string(v));
+            match v {
+                VariantValue::String(s) => {
+                    context.insert(key, Value::from_safe_string(s));
+                }
+                VariantValue::Number(n) => {
+                    context.insert(key, Value::from(n));
+                }
+                VariantValue::Boolean(b) => {
+                    context.insert(key, Value::from(b));
+                }
+            }
         }
 
         context
@@ -80,7 +91,7 @@ impl SelectorConfig {
     /// Create a new selector config from an existing one, replacing the variant
     pub fn new_with_variant(
         &self,
-        variant: BTreeMap<String, String>,
+        variant: BTreeMap<String, VariantValue>,
         target_platform: Platform,
     ) -> Self {
         Self {

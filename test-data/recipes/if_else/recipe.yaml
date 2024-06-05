@@ -1,0 +1,18 @@
+package:
+  name: if_else_test
+  version: '0.1.0'
+
+build:
+  noarch: python
+  number: 0
+
+requirements:
+  host:
+    - if: new_pydantic
+      then:
+        - pydantic >=2
+      else:
+        - pydantic >=1,<2
+    # test inline if else
+    - ${{ 'test' if new_pydantic }}
+    - ${{ 'notest' if not new_pydantic }}

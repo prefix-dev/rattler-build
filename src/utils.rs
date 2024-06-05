@@ -8,6 +8,7 @@ use std::collections::btree_map::IntoIter;
 use std::collections::BTreeMap;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::str::FromStr;
 use std::{
     path::{Component, Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
@@ -76,6 +77,44 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     }
 }
 
+/// FOO
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Hash)]
+#[serde(untagged)]
+pub enum VariantValue {
+    /// BOO
+    String(String),
+    /// BOO
+    Number(i64),
+    /// BOO
+    Boolean(bool),
+}
+
+impl FromStr for VariantValue {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(value) = s.parse::<i64>() {
+            return Ok(VariantValue::Number(value));
+        }
+        match s.to_lowercase().as_str() {
+            "true" => return Ok(VariantValue::Boolean(true)),
+            "false" => return Ok(VariantValue::Boolean(false)),
+            _ => {}
+        }
+        Ok(VariantValue::String(s.to_string()))
+    }
+}
+
+impl ToString for VariantValue {
+    fn to_string(&self) -> String {
+        match self {
+            VariantValue::String(s) => s.to_string(),
+            VariantValue::Number(n) => n.to_string(),
+            VariantValue::Boolean(b) => b.to_string(),
+        }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 
@@ -84,7 +123,7 @@ pub struct NormalizedKeyBTreeMap {
     #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
     #[serde(flatten)]
     /// the inner map
-    pub map: BTreeMap<String, Vec<String>>,
+    pub map: BTreeMap<String, Vec<VariantValue>>,
 }
 
 impl NormalizedKeyBTreeMap {
@@ -101,24 +140,24 @@ impl NormalizedKeyBTreeMap {
     }
 
     /// Inserts a key-value pair into the map, where key is normalized
-    pub fn insert(&mut self, key: String, value: Vec<String>) {
+    pub fn insert(&mut self, key: String, value: Vec<VariantValue>) {
         let normalized_key = Self::normalize_key(&key);
         self.map.insert(normalized_key, value);
     }
 
     /// Returns a reference to the value corresponding to the key.
     /// Key is normalized
-    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
+    pub fn get(&self, key: &str) -> Option<&Vec<VariantValue>> {
         // Change value type as needed
         let normalized_key = Self::normalize_key(key);
         self.map.get(&normalized_key)
     }
 }
 
-impl Extend<(String, Vec<String>)> for NormalizedKeyBTreeMap {
+impl Extend<(String, Vec<VariantValue>)> for NormalizedKeyBTreeMap {
     fn extend<T>(&mut self, iter: T)
     where
-        T: IntoIterator<Item = (String, Vec<String>)>,
+        T: IntoIterator<Item = (String, Vec<VariantValue>)>,
     {
         for (key, value) in iter {
             match self.map.entry(Self::normalize_key(&key)) {
@@ -135,14 +174,14 @@ impl Extend<(String, Vec<String>)> for NormalizedKeyBTreeMap {
 
 impl NormalizedKeyBTreeMap {
     /// Gets an iterator over the entries of the map, sorted by key.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Vec<VariantValue>)> {
         self.map.iter()
     }
 }
 
 impl IntoIterator for NormalizedKeyBTreeMap {
-    type Item = (String, Vec<String>);
-    type IntoIter = IntoIter<String, Vec<String>>;
+    type Item = (String, Vec<VariantValue>);
+    type IntoIter = IntoIter<String, Vec<VariantValue>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.into_iter()
@@ -150,8 +189,8 @@ impl IntoIterator for NormalizedKeyBTreeMap {
 }
 
 impl<'a> IntoIterator for &'a NormalizedKeyBTreeMap {
-    type Item = (&'a String, &'a Vec<String>);
-    type IntoIter = std::collections::btree_map::Iter<'a, String, Vec<String>>;
+    type Item = (&'a String, &'a Vec<VariantValue>);
+    type IntoIter = std::collections::btree_map::Iter<'a, String, Vec<VariantValue>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter()

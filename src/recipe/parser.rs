@@ -184,10 +184,20 @@ impl Recipe {
                         val.render(&jinja, &format!("context.{}", k.as_str()))?;
 
                     if let Some(rendered) = rendered {
-                        jinja.context_mut().insert(
-                            k.as_str().to_owned(),
-                            Value::from_safe_string(rendered.as_str().to_string()),
-                        );
+                        if let Some(b) = rendered.as_bool() {
+                            jinja
+                                .context_mut()
+                                .insert(k.as_str().to_owned(), Value::from(b));
+                        } else if let Some(i) = rendered.as_i64() {
+                            jinja
+                                .context_mut()
+                                .insert(k.as_str().to_owned(), Value::from(i));
+                        } else {
+                            jinja.context_mut().insert(
+                                k.as_str().to_owned(),
+                                Value::from_safe_string(rendered.as_str().to_string()),
+                            );
+                        }
                     }
                     Ok(())
                 })
