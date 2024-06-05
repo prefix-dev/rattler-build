@@ -8,6 +8,7 @@ use std::{
 
 use crate::{
     metadata::{BuildConfiguration, Output},
+    recipe::parser::Requirements,
     tool_configuration,
 };
 use indicatif::HumanBytes;
@@ -596,8 +597,8 @@ pub async fn install_environments(
 /// 3. Resolve the dependencies
 /// 4. Download the packages
 /// 5. Extract the run exports from the downloaded packages (for the next environment)
-#[allow(clippy::for_kv_map)]
-async fn resolve_dependencies(
+pub(crate) async fn resolve_dependencies(
+    requirements: &Requirements,
     output: &Output,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
@@ -607,12 +608,11 @@ async fn resolve_dependencies(
     let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
     let pkgs_dir = cache_dir.join("pkgs");
 
-    let reqs = &output.recipe.requirements();
     let mut compatibility_specs = HashMap::new();
 
-    let build_env = if !reqs.build.is_empty() && !merge_build_host {
+    let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let specs = apply_variant(
-            reqs.build(),
+            requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
         )?;
@@ -660,7 +660,7 @@ async fn resolve_dependencies(
 
     // host env
     let mut specs = apply_variant(
-        reqs.host(),
+        requirements.host(),
         &output.build_configuration,
         &compatibility_specs,
     )?;
@@ -710,7 +710,7 @@ async fn resolve_dependencies(
     if merge_build_host {
         // add the reqs of build to host
         let specs = apply_variant(
-            reqs.build(),
+            requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
         )?;
@@ -757,10 +757,14 @@ async fn resolve_dependencies(
         None
     };
 
-    let depends = apply_variant(&reqs.run, &output.build_configuration, &compatibility_specs)?;
+    let mut depends = apply_variant(
+        &requirements.run,
+        &output.build_configuration,
+        &compatibility_specs,
+    )?;
 
-    let constrains = apply_variant(
-        &reqs.run_constraints,
+    let mut constrains = apply_variant(
+        &requirements.run_constraints,
         &output.build_configuration,
         &compatibility_specs,
     )?;
@@ -790,6 +794,29 @@ async fn resolve_dependencies(
     } else {
         RunExportsJson::default()
     };
+
+    // add in dependencies from the finalized cache
+    tracing::info!("FINALIZED CACHE{:?}", output.finalized_cache_dependencies);
+    if let Some(finalized_cache) = &output.finalized_cache_dependencies {
+        tracing::info!(
+            "Adding dependencies from finalized cache: {:?}",
+            finalized_cache.run.depends
+        );
+        depends = depends
+            .iter()
+            .chain(finalized_cache.run.depends.iter())
+            .cloned()
+            .collect();
+        tracing::info!(
+            "Adding constraints from finalized cache: {:?}",
+            finalized_cache.run.constraints
+        );
+        constrains = constrains
+            .iter()
+            .chain(finalized_cache.run.constraints.iter())
+            .cloned()
+            .collect();
+    }
 
     let mut run_specs = FinalizedRunDependencies {
         depends,
@@ -857,9 +884,8 @@ async fn resolve_dependencies(
     }
 
     Ok(FinalizedDependencies {
-        // build_env is empty now!
-        build: build_env.map(|(env, _)| env),
-        host: host_env.map(|(env, _)| env),
+        build: build_env,
+        host: host_env,
         run: run_specs,
     })
 }
@@ -883,8 +909,13 @@ impl Output {
             let channels = self
                 .reindex_channels()
                 .map_err(ResolveError::RefreshChannelError)?;
-            let finalized_dependencies =
-                resolve_dependencies(&self, &channels, tool_configuration).await?;
+            let finalized_dependencies = resolve_dependencies(
+                &self.recipe.requirements(),
+                &self,
+                &channels,
+                tool_configuration,
+            )
+            .await?;
 
             // The output with the resolved dependencies
             Output {

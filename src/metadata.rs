@@ -29,6 +29,7 @@ use crate::{
     recipe::parser::{Recipe, Source},
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
+    utils::remove_dir_all_force,
 };
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -113,6 +114,7 @@ impl Directories {
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
+        // TODO move this into build_dir, and keep build_dir consistent.
         let cache_dir = output_dir.join("build_cache");
         let recipe_dir = recipe_path
             .parent()
@@ -151,6 +153,25 @@ impl Directories {
         };
 
         Ok(directories)
+    }
+
+    /// Remove all directories except for the cache directory
+    pub fn clean(&self) -> Result<(), std::io::Error> {
+        if self.build_dir.exists() {
+            let folders = self.build_dir.read_dir()?;
+            for folder in folders {
+                let folder = folder?;
+
+                if folder.path() == self.cache_dir {
+                    continue;
+                }
+
+                if folder.file_type()?.is_dir() {
+                    remove_dir_all_force(&folder.path())?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Creates the build directory.
@@ -290,6 +311,8 @@ pub struct Output {
     /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
     /// During the `run_build` functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
+    /// The finalized dependencies from the cache (if there is a cache instruction)
+    pub finalized_cache_dependencies: Option<FinalizedDependencies>,
     /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
     /// to build this output.
     pub finalized_sources: Option<Vec<Source>>,
