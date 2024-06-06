@@ -64,6 +64,7 @@ class RattlerBuild:
         )
         return self(*args)
 
+
 @pytest.fixture
 def rattler_build():
     if os.environ.get("RATTLER_BUILD_PATH"):
@@ -83,6 +84,7 @@ def rattler_build():
             return RattlerBuild(debug_path)
 
     raise FileNotFoundError("Could not find rattler-build executable")
+
 
 @pytest.fixture
 def snapshot_json(snapshot):
@@ -586,7 +588,9 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+def test_git_submodule(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "git_source_submodule"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -604,7 +608,8 @@ def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     # parse the rendered recipe
     rendered_recipe = yaml.safe_load(text)
-    snapshot_json == rendered_recipe["finalized_sources"]
+    assert snapshot_json == rendered_recipe["finalized_sources"]
+
 
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
@@ -659,7 +664,9 @@ def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+def test_symlink_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "symlink"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -669,7 +676,7 @@ def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     rattler_build(*args)
 
     pkg = get_extracted_package(tmp_path, "symlink")
-    snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
 
 
 @pytest.mark.skipif(
@@ -782,7 +789,9 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_filter_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+def test_filter_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "filter_files"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -792,8 +801,7 @@ def test_filter_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build(*args)
     pkg = get_extracted_package(tmp_path, "filter_files")
 
-    snapshot_json == json.loads((pkg / "info/paths.json").read_text())
-
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
 
 
 def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -810,7 +818,9 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+def test_post_link(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "post-link"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -819,12 +829,15 @@ def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, s
     rattler_build(*args)
 
     pkg = get_extracted_package(tmp_path, "postlink")
-    snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
 
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+def test_include_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "include_files"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -834,4 +847,4 @@ def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     pkg = get_extracted_package(tmp_path, "include_files")
 
-    snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
