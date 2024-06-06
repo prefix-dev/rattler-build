@@ -155,7 +155,7 @@ impl Script {
     /// Get the secrets environment variables.
     ///
     /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information.
+    /// contain sensitive information.
     ///
     /// # Warning
     /// Use with care because this might make recipes no longer reproducible on other machines.
@@ -200,16 +200,19 @@ impl TryConvertNode<Script> for RenderedNode {
 
 impl TryConvertNode<Script> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<Script, Vec<PartialParsingError>> {
-        Ok(ScriptContent::CommandOrPath(self.as_str().to_owned()).into())
+        Ok(ScriptContent::CommandOrPath(self.source().to_owned()).into())
     }
 }
 
 impl TryConvertNode<Script> for RenderedSequenceNode {
-    fn try_convert(&self, name: &str) -> Result<Script, Vec<PartialParsingError>> {
-        let strings = self
-            .iter()
-            .map(|node| node.try_convert(name))
-            .collect::<Result<Vec<String>, _>>()?;
+    fn try_convert(&self, _name: &str) -> Result<Script, Vec<PartialParsingError>> {
+        let mut strings: Vec<String> = Vec::new();
+
+        for string in self.iter() {
+            if let RenderedNode::Scalar(s) = string {
+                strings.push(s.source().to_owned());
+            }
+        }
 
         if strings.len() == 1 {
             Ok(ScriptContent::CommandOrPath(strings[0].clone()).into())

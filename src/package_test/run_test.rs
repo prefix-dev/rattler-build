@@ -116,7 +116,7 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -128,7 +128,7 @@ impl Tests {
                 };
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
                     .await
                     .map_err(|_| TestError::TestFailed)?;
             }
@@ -396,7 +396,7 @@ async fn run_python_test(
 
     let tmp_dir = tempfile::tempdir()?;
     script
-        .run_script(Default::default(), tmp_dir.path(), path, prefix, None)
+        .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
         .await
         .map_err(|_| TestError::TestFailed)?;
 
@@ -411,7 +411,7 @@ async fn run_python_test(
             ..Script::default()
         };
         script
-            .run_script(Default::default(), path, path, prefix, None)
+            .run_script(Default::default(), path, path, prefix, None, None)
             .await
             .map_err(|_| TestError::TestFailed)?;
 
@@ -510,7 +510,14 @@ async fn run_shell_test(
 
     tracing::info!("Testing commands:");
     script
-        .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
+        .run_script(
+            env_vars,
+            tmp_dir.path(),
+            path,
+            &run_env,
+            build_env.as_ref(),
+            None,
+        )
         .await
         .map_err(|_| TestError::TestFailed)?;
 

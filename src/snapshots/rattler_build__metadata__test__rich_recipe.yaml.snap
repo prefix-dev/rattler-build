@@ -4,6 +4,7 @@ expression: output
 ---
 recipe:
   schema_version: 1
+  context: {}
   package:
     name: rich
     version: 13.4.2
