@@ -74,6 +74,44 @@ impl ExecutionArgs {
     }
 }
 
+// TODO use this function from rattler once released
+fn prefix_path_entries(prefix: &Path, platform: &Platform) -> Vec<PathBuf> {
+    if platform.is_windows() {
+        vec![
+            prefix.to_path_buf(),
+            prefix.join("Library/mingw-w64/bin"),
+            prefix.join("Library/usr/bin"),
+            prefix.join("Library/bin"),
+            prefix.join("Scripts"),
+            prefix.join("bin"),
+        ]
+    } else {
+        vec![prefix.join("bin")]
+    }
+}
+
+fn find_interpreter(
+    name: &str,
+    build_prefix: Option<&PathBuf>,
+    platform: &Platform,
+) -> Result<Option<PathBuf>, which::Error> {
+    let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
+
+    let path = std::env::var("PATH").unwrap_or_default();
+    if let Some(build_prefix) = build_prefix {
+        let mut prepend_path = prefix_path_entries(build_prefix, platform)
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        prepend_path.push(path);
+        return Ok(
+            which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())?.next(),
+        );
+    }
+
+    Ok(which::which_in_global(exe_name, Some(path))?.next())
+}
+
 trait Interpreter {
     fn get_script<T: Shell + Copy + 'static>(
         &self,
@@ -121,6 +159,12 @@ trait Interpreter {
     }
 
     async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
+
+    async fn find_interpreter(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<Option<PathBuf>, which::Error>;
 }
 
 struct BashInterpreter;
@@ -161,6 +205,14 @@ impl Interpreter for BashInterpreter {
         }
 
         Ok(())
+    }
+
+    async fn find_interpreter(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<Option<PathBuf>, which::Error> {
+        find_interpreter("bash", build_prefix, platform)
     }
 }
 
@@ -253,20 +305,16 @@ impl Interpreter for NuShellInterpreter {
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
 
-        let path = activation_variables
-            .get(nushell.path_var(&args.execution_platform))
-            .cloned()
-            .unwrap_or_default();
-
-        let nu_path = which::which_in_global("nu", Some(path))
-            .expect("failed to search PATH variable")
-            .next()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "NuShell executable not found in PATH",
-                )
-            })?
+        let nu_path =
+            match find_interpreter("nu", args.build_prefix.as_ref(), &args.execution_platform) {
+                Ok(Some(path)) => path,
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "NuShell executable not found in PATH",
+                    ));
+                }
+            }
             .to_string_lossy()
             .to_string();
 
@@ -292,6 +340,14 @@ impl Interpreter for NuShellInterpreter {
         }
 
         Ok(())
+    }
+
+    async fn find_interpreter(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<Option<PathBuf>, which::Error> {
+        find_interpreter("nu", build_prefix, platform)
     }
 }
 
@@ -348,6 +404,22 @@ impl Interpreter for CmdExeInterpreter {
 
         Ok(())
     }
+
+    async fn find_interpreter(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<Option<PathBuf>, which::Error> {
+        // check if COMSPEC is set to cmd.exe
+        if let Ok(comspec) = std::env::var("COMSPEC") {
+            if comspec.to_lowercase().contains("cmd.exe") {
+                return Ok(Some(PathBuf::from(comspec)));
+            }
+        }
+
+        // check if cmd.exe is in PATH
+        find_interpreter("cmd", build_prefix, platform)
+    }
 }
 
 struct PythonInterpreter;
@@ -368,6 +440,14 @@ impl Interpreter for PythonInterpreter {
         } else {
             BashInterpreter.run(args).await
         }
+    }
+
+    async fn find_interpreter(
+        &self,
+        build_prefix: Option<&PathBuf>,
+        platform: &Platform,
+    ) -> Result<Option<PathBuf>, which::Error> {
+        find_interpreter("python", build_prefix, platform)
     }
 }
 
