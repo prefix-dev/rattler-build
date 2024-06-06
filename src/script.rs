@@ -101,9 +101,8 @@ fn find_interpreter(
     if let Some(build_prefix) = build_prefix {
         let mut prepend_path = prefix_path_entries(build_prefix, platform)
             .into_iter()
-            .map(|p| p.to_string_lossy().to_string())
             .collect::<Vec<_>>();
-        prepend_path.push(path);
+        prepend_path.extend(std::env::split_paths(&path));
         return Ok(
             which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())?.next(),
         );
