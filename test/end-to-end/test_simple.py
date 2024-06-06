@@ -10,6 +10,7 @@ import pytest
 import requests
 import yaml
 from conda_package_handling.api import extract
+from syrupy.extensions.json import JSONSnapshotExtension
 
 
 class RattlerBuild:
@@ -83,6 +84,11 @@ def rattler_build():
             return RattlerBuild(debug_path)
 
     raise FileNotFoundError("Could not find rattler-build executable")
+
+
+@pytest.fixture
+def snapshot_json(snapshot):
+    return snapshot.use_extension(JSONSnapshotExtension)
 
 
 def test_functionality(rattler_build: RattlerBuild):
@@ -582,7 +588,9 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_git_submodule(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "git_source_submodule"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -600,12 +608,7 @@ def test_git_submodule(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     # parse the rendered recipe
     rendered_recipe = yaml.safe_load(text)
-    sources = rendered_recipe["finalized_sources"]
-
-    assert len(sources) == 1
-    source = sources[0]
-    assert source["git"] == "https://github.com/wjakob/nanobind/"
-    assert source["rev"] == "8e1f8408b37d994fb987440859eb977af39be8c3"
+    assert snapshot_json == rendered_recipe["finalized_sources"]
 
 
 @pytest.mark.skipif(
@@ -661,7 +664,9 @@ def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_symlink_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "symlink"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -669,33 +674,9 @@ def test_symlink_recipe(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
     )
 
     rattler_build(*args)
+
     pkg = get_extracted_package(tmp_path, "symlink")
-
-    assert (pkg / "info/paths.json").exists()
-    # parse paths.json
-    paths = json.loads((pkg / "info/paths.json").read_text())
-    pp = paths["paths"]
-    assert len(pp) == 3
-
-    for p in paths["paths"]:
-        if p["_path"] == "bin/symlink-to-lib":
-            assert p["path_type"] == "softlink"
-            assert (
-                p["sha256"]
-                == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-            )
-        if p["_path"] == "bin/symlink":
-            assert p["path_type"] == "softlink"
-            assert (
-                p["sha256"]
-                == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
-            )
-        if p["_path"] == "lib/symlink/symlink-target":
-            assert p["path_type"] == "hardlink"
-            assert (
-                p["sha256"]
-                == "f2ca1bb6c7e907d06dafe4687e579fce76b37e4e93b7605022da52e6ccc26fd2"
-            )
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
 
 
 @pytest.mark.skipif(
@@ -808,7 +789,9 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_filter_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_filter_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "filter_files"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -818,13 +801,7 @@ def test_filter_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     rattler_build(*args)
     pkg = get_extracted_package(tmp_path, "filter_files")
 
-    assert (pkg / "info/paths.json").exists()
-
-    # parse paths json
-    paths = json.loads((pkg / "info/paths.json").read_text())
-    pp = paths["paths"]
-    assert len(pp) == 1
-    assert pp[0]["_path"] == "exists.txt"
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
 
 
 def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -841,7 +818,9 @@ def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_post_link(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "post-link"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -850,17 +829,15 @@ def test_post_link(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build(*args)
 
     pkg = get_extracted_package(tmp_path, "postlink")
-
-    paths = json.loads((pkg / "info/paths.json").read_text())
-    pp = paths["paths"]
-    assert len(pp) == 1
-    assert pp[0]["_path"] == "bin/.postlink-post-link.sh"
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
 
 
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_include_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     path_to_recipe = recipes / "include_files"
     args = rattler_build.build_args(
         path_to_recipe,
@@ -870,8 +847,4 @@ def test_include_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     pkg = get_extracted_package(tmp_path, "include_files")
 
-    paths = json.loads((pkg / "info/paths.json").read_text())
-    pp = paths["paths"]
-    assert len(pp) == 2
-    assert pp[0]["_path"] == "include/include_file.c"
-    assert pp[1]["_path"] == "include/include_file.h"
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
