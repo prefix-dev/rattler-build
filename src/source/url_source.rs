@@ -36,7 +36,11 @@ fn split_filename(filename: &str) -> (String, String) {
     (stem_without_tar.to_string(), full_extension)
 }
 
-fn cache_name_from_url(url: &url::Url, checksum: &Checksum, with_extension: bool) -> Option<String> {
+fn cache_name_from_url(
+    url: &url::Url,
+    checksum: &Checksum,
+    with_extension: bool,
+) -> Option<String> {
     let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
     let (stem, extension) = split_filename(filename);
     let checksum = checksum.to_hex();
@@ -45,6 +49,58 @@ fn cache_name_from_url(url: &url::Url, checksum: &Checksum, with_extension: bool
     } else {
         Some(format!("{}_{}", stem, &checksum[0..8]))
     }
+}
+
+async fn fetch_remote(
+    url: &url::Url,
+    target: &Path,
+    tool_configuration: tool_configuration::Configuration,
+) -> Result<(), SourceError> {
+    let client = reqwest::Client::new();
+    let download_size = {
+        let resp = client.head(url.as_str()).send().await?;
+        if resp.status().is_success() {
+            resp.headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .and_then(|ct_len| ct_len.to_str().ok())
+                .and_then(|ct_len| ct_len.parse().ok())
+                .unwrap_or(0)
+        } else {
+            tracing::warn!(
+                "Could not download file from: {}. Error {}",
+                url,
+                resp.status()
+            );
+            last_error = Some(resp.error_for_status());
+            continue;
+        }
+    };
+
+    let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
+        indicatif::ProgressBar::new(download_size)
+            .with_prefix("Downloading")
+            .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
+    );
+    progress_bar.set_message(
+        url.path_segments()
+            .and_then(|segs| segs.last())
+            .map(str::to_string)
+            .unwrap_or_else(|| "Unknown File".to_string()),
+    );
+    let mut file = tokio::fs::File::create(&target).await?;
+
+    let request = client.get(url.clone());
+    let mut download = request.send().await?;
+
+    while let Some(chunk) = download.chunk().await? {
+        progress_bar.inc(chunk.len() as u64);
+        file.write_all(&chunk).await?;
+    }
+
+    progress_bar.finish();
+
+    file.flush().await?;
+    Ok(())
 }
 
 pub(crate) async fn url_src(
@@ -90,61 +146,12 @@ pub(crate) async fn url_src(
             return Ok(cache_name.clone());
         }
 
-        let client = reqwest::Client::new();
-        let download_size = {
-            let resp = client.head(url.as_str()).send().await?;
-            if resp.status().is_success() {
-                resp.headers()
-                    .get(reqwest::header::CONTENT_LENGTH)
-                    .and_then(|ct_len| ct_len.to_str().ok())
-                    .and_then(|ct_len| ct_len.parse().ok())
-                    .unwrap_or(0)
-            } else {
-                tracing::warn!(
-                    "Could not download file from: {}. Error {}",
-                    url,
-                    resp.status()
-                );
-                last_error = Some(resp.error_for_status());
-                continue;
-            }
-        };
-
-        let progress_bar = tool_configuration.fancy_log_handler.add_progress_bar(
-            indicatif::ProgressBar::new(download_size)
-                .with_prefix("Downloading")
-                .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
-        );
-        progress_bar.set_message(
-            url.path_segments()
-                .and_then(|segs| segs.last())
-                .map(str::to_string)
-                .unwrap_or_else(|| "Unknown File".to_string()),
-        );
-        let mut file = tokio::fs::File::create(&cache_name).await?;
-
-        let request = client.get(url.clone());
-        let mut download = request.send().await?;
-
-        while let Some(chunk) = download.chunk().await? {
-            progress_bar.inc(chunk.len() as u64);
-            file.write_all(&chunk).await?;
-        }
-
-        progress_bar.finish();
-
-        file.flush().await?;
-
         if !checksum.validate(&cache_name) {
             tracing::error!("Checksum validation failed!");
             fs::remove_file(&cache_name)?;
             return Err(SourceError::ValidationFailed);
         }
-
-
     }
-
-
 
     if let Some(Err(last_error)) = last_error {
         Err(SourceError::Url(last_error))
