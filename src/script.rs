@@ -407,7 +407,14 @@ impl Script {
                 let recipe_file = if path.extension().is_none() {
                     extensions
                         .iter()
-                        .map(|ext| recipe_dir.join(path.with_extension(ext)))
+                        .map(|ext| {
+                            let with_ext = path.with_extension(ext);
+                            if with_ext.is_absolute() {
+                                with_ext
+                            } else {
+                                recipe_dir.join(with_ext)
+                            }
+                        })
                         .find(|p| p.is_file())
                         .ok_or_else(|| {
                             std::io::Error::new(
