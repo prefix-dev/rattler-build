@@ -407,7 +407,7 @@ impl Script {
                 let recipe_file = if path.extension().is_none() {
                     extensions
                         .iter()
-                        .map(|ext| path.with_extension(ext))
+                        .map(|ext| recipe_dir.join(path.with_extension(ext)))
                         .find(|p| p.is_file())
                         .ok_or_else(|| {
                             std::io::Error::new(
