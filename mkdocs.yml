@@ -94,34 +94,40 @@ extra:
 
 nav:
   - Home: index.md
+  - High-level overview: highlevel.md
   # - Tutorials:
   #     - Writing a recipe: tutorials/writing_recipe.md
   - Examples:
     - "Python": tutorials/python.md
     - "C++": tutorials/cpp.md
     - "Rust": tutorials/rust.md
-  - High-level overview: highlevel.md
-  - Advanced options: build_options.md
-  - Experimental features: experimental_features.md
 
-  - Selector syntax: selectors.md
-  - Build script: build_script.md
-  - Variants: variants.md
+  - Build options:
 
-  - Compilers and cross compilation: compilers.md
+    - Advanced options: build_options.md
+    - Experimental features: experimental_features.md
 
-  - CLI Usage: cli_usage.md
-  - Terminal User Interface (TUI): tui.md
-  - Authentication & upload: authentication_and_upload.md
-  - Automatic recipe linting: automatic_linting.md
+    - Selector syntax (if/then): selectors.md
+    - Build script: build_script.md
+    - Variants: variants.md
 
-  - Testing packages: testing.md
-  - Reproducible builds: rebuild.md
+    - Compilers and cross compilation: compilers.md
 
-  - Package specification: package_spec.md
-  - Activation scripts: special_files.md
-  - Internals: internals.md
-  - Reference:
+  - Testing:
+    - Testing packages: testing.md
+    - Reproducible builds: rebuild.md
+
+  - User Experience:
+    - Terminal User Interface (TUI): tui.md
+    - Authentication & upload: authentication_and_upload.md
+    - Automatic recipe linting: automatic_linting.md
+
+  - Package:
+    - Package specification: package_spec.md
+    - Package scripts: special_files.md
+    - Package Internals: internals.md
+
+  - References:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
       - Jinja functions: reference/jinja.md
