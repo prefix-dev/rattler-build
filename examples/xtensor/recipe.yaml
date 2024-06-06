@@ -1,5 +1,3 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-
 context:
   name: xtensor
   version: 0.24.6
@@ -32,8 +30,8 @@ tests:
       include:
         - xtensor/xarray.hpp
       files:
-        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfig.cmake
-        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfigVersion.cmake
+        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
+        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
 about:
   homepage: https://github.com/xtensor-stack/xtensor
   license: BSD-3-Clause

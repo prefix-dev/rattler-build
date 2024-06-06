@@ -389,7 +389,7 @@ impl Script {
             ScriptContent::Default => {
                 for extension in extensions {
                     let recipe_file = recipe_dir.join(Path::new("build").with_extension(extension));
-                    match std::fs::read_to_string(&recipe_file) {
+                    match fs_err::read_to_string(&recipe_file) {
                         Err(err) if err.kind() == ErrorKind::NotFound => continue,
                         Err(e) => {
                             return Err(e);
@@ -426,7 +426,7 @@ impl Script {
                     path.to_owned()
                 };
 
-                match std::fs::read_to_string(&recipe_file) {
+                match fs_err::read_to_string(&recipe_file) {
                     Err(e) => Err(e),
                     Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                 }
@@ -438,7 +438,7 @@ impl Script {
                 let path_ext = Path::new(path).extension().and_then(OsStr::to_str);
                 if !path.contains('\n') && (extensions.iter().any(|ext| path_ext == Some(*ext))) {
                     let recipe_file = recipe_dir.join(Path::new(path));
-                    match std::fs::read_to_string(&recipe_file) {
+                    match fs_err::read_to_string(&recipe_file) {
                         Err(err) if err.kind() == ErrorKind::NotFound => {}
                         Err(e) => {
                             return Err(e);
