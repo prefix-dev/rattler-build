@@ -252,7 +252,25 @@ impl Interpreter for NuShellInterpreter {
         tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["nu", &build_script_path_str];
+
+        let path = activation_variables
+            .get(nushell.path_var(&args.execution_platform))
+            .cloned()
+            .unwrap_or_default();
+
+        let nu_path = which::which_in_global("nu", Some(path))
+            .expect("failed to search PATH variable")
+            .next()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "NuShell executable not found in PATH",
+                )
+            })?
+            .to_string_lossy()
+            .to_string();
+
+        let cmd_args = [nu_path.as_str(), build_script_path_str.as_str()];
 
         let output = run_process_with_replacements(
             &cmd_args,
