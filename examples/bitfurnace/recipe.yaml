@@ -1,0 +1,31 @@
+context:
+  name: bitfurnace
+  version: 0.1.0
+
+package:
+  name: ${{ name|lower }}
+  version: ${{ version }}
+
+source:
+  git: https://github.com/mamba-org/bitfurnace
+
+build:
+  number: 0
+  noarch: python
+  script: pip install .
+
+requirements:
+  host:
+    - python
+    - pip
+
+about:
+  homepage: https://github.com/mamba-org/bitfurnace
+  license: BSD-3-Clause
+  license_file: LICENSE
+  summary: Cross platform build helpers for conda-forge
+  repository: https://github.com/mamba-org/bitfurnace
+
+extra:
+  recipe-maintainers:
+    - some-maintainer
