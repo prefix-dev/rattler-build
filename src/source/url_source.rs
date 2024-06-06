@@ -228,7 +228,7 @@ mod tests {
             ("example.zip", ("example", ".zip")),
             ("example.tar", ("example", ".tar")),
             ("example", ("example", "")),
-            (".hidden.tar.gz", (".hidden", ".tar.gz")),
+            (".hidden.tar.gz", ("_hidden", ".tar.gz")),
         ];
 
         for (filename, expected) in test_cases {
@@ -251,7 +251,7 @@ mod tests {
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
                     "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
                 ).unwrap()),
-                "snowflake-3.13.27_6a15e95e.zip",
+                "snowflake-3_13_27_6a15e95e.zip",
             ),
             (
                 "https://example.com/example.tar.gz",
@@ -265,7 +265,7 @@ mod tests {
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
                     "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
                 ).unwrap()),
-                "micromamba-12.23.12_63fd8a1d.tar.gz",
+                "micromamba-12_23_12_63fd8a1d.tar.gz",
             ),
         ];
 
