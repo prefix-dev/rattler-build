@@ -36,11 +36,15 @@ fn split_filename(filename: &str) -> (String, String) {
     (stem_without_tar.to_string(), full_extension)
 }
 
-fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
+fn cache_name_from_url(url: &url::Url, checksum: &Checksum, with_extension: bool) -> Option<String> {
     let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
     let (stem, extension) = split_filename(filename);
     let checksum = checksum.to_hex();
-    Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
+    if with_extension {
+        Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
+    } else {
+        Some(format!("{}_{}", stem, &checksum[0..8]))
+    }
 }
 
 pub(crate) async fn url_src(
@@ -75,7 +79,7 @@ pub(crate) async fn url_src(
             return Ok(local_path);
         }
 
-        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum).ok_or(
+        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum, true).ok_or(
             SourceError::UnknownErrorStr("Failed to build cache name from url"),
         )?);
         let cache_name = cache_dir.join(cache_name);
@@ -137,8 +141,10 @@ pub(crate) async fn url_src(
             return Err(SourceError::ValidationFailed);
         }
 
-        return Ok(cache_name);
+
     }
+
+
 
     if let Some(Err(last_error)) = last_error {
         Err(SourceError::Url(last_error))
@@ -207,7 +213,7 @@ mod tests {
 
         for (url, checksum, expected) in cases {
             let url = Url::parse(url).unwrap();
-            let name = cache_name_from_url(&url, &checksum).unwrap();
+            let name = cache_name_from_url(&url, &checksum, true).unwrap();
             assert_eq!(name, expected);
         }
     }
