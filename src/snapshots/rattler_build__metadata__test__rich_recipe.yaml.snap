@@ -98,6 +98,11 @@ finalized_dependencies:
         license: Python-2.0
         md5: 79f489d167f29b2f1d6d628b34dad49c
         name: python
+        run_exports:
+          weak:
+            - python_abi 3.10.* *_cp310
+          noarch:
+            - python
         sha256: 2c116191cf46984ae171973beb86fe8914f3833db23865b052db3bdf1276c92c
         size: 12899235
         subdir: osx-arm64
@@ -364,12 +369,6 @@ finalized_dependencies:
         fn: setuptools-68.2.2-pyhd8ed1ab_0.conda
         url: "https://conda.anaconda.org/conda-forge/noarch/setuptools-68.2.2-pyhd8ed1ab_0.conda"
         channel: "https://conda.anaconda.org/conda-forge/"
-    run_exports:
-      python:
-        weak:
-          - python_abi 3.10.* *_cp310
-        noarch:
-          - python
   run:
     depends:
       - source: markdown-it-py >=2.2.0

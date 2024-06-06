@@ -685,7 +685,6 @@ mod test {
                     .unwrap(),
                 channel: "test".into(),
             }],
-            run_exports: Default::default(),
         };
 
         // test yaml roundtrip
