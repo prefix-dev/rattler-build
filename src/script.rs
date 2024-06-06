@@ -2,7 +2,7 @@
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rattler_conda_types::Platform;
-use rattler_shell::activation::PathModificationBehavior;
+use rattler_shell::activation::{prefix_path_entries, PathModificationBehavior};
 use rattler_shell::shell::{NuShell, ShellEnum};
 use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
@@ -71,22 +71,6 @@ impl ExecutionArgs {
         });
 
         replacements
-    }
-}
-
-// TODO use this function from rattler once released
-fn prefix_path_entries(prefix: &Path, platform: &Platform) -> Vec<PathBuf> {
-    if platform.is_windows() {
-        vec![
-            prefix.to_path_buf(),
-            prefix.join("Library/mingw-w64/bin"),
-            prefix.join("Library/usr/bin"),
-            prefix.join("Library/bin"),
-            prefix.join("Scripts"),
-            prefix.join("bin"),
-        ]
-    } else {
-        vec![prefix.join("bin")]
     }
 }
 

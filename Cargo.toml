@@ -23,22 +23,22 @@ generate-cli-docs = ["clap-markdown"]
 [dependencies]
 serde = { version = "1.0.203", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.26.3", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler = { version = "0.26.4", default-features = false, features = ["cli-tools", "indicatif"] }
 rattler_conda_types = { version = "0.25.2", default-features = false }
 rattler_digest = { version = "0.19.4", default-features = false }
-rattler_index = { version = "0.19.16", default-features = false }
+rattler_index = { version = "0.19.17", default-features = false }
 rattler_networking = { version = "0.20.8", default-features = false }
 rattler_repodata_gateway = { version = "0.20.5", default-features = false, features = [
     "gateway",
 ] }
-rattler_shell = { version = "0.20.8", default-features = false, features = [
+rattler_shell = { version = "0.20.9", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.24.1", default-features = false, features = [
+rattler_solve = { version = "0.24.2", default-features = false, features = [
     "resolvo",
     "serde"
 ] }
-rattler_virtual_packages = { version = "0.19.5", default-features = false }
+rattler_virtual_packages = { version = "0.19.15", default-features = false }
 rattler_package_streaming = { version = "0.21.3", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
@@ -48,7 +48,7 @@ serde_json = "1.0.117"
 reqwest = { version = "0.12.4", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.37.0", features = ["rt", "macros", "rt-multi-thread"] }
+tokio = { version = "1.38.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
 serde_with = "3.8.1"
@@ -79,7 +79,7 @@ thiserror = "1.0.61"
 tempfile = "3.10.1"
 chrono = "0.4.38"
 sha1 = "0.10.6"
-spdx = "0.10.4"
+spdx = "0.10.6"
 ignore = "0.4.22"
 globset = "0.4.14"
 clap-verbosity-flag = "2.2.0"
@@ -92,8 +92,8 @@ which = "6.0.1"
 clap_complete = "4.5.2"
 tokio-util = "0.7.11"
 
-tar = "0.4.40"
-zip = { version = "2.1.1", default-features = false, features = [
+tar = "0.4.41"
+zip = { version = "2.1.3", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
@@ -102,7 +102,7 @@ base64 = "0.22.1"
 flate2 = "1.0.30"
 xz2 = "0.1.7"
 zstd = "0.13.1"
-toml = "0.8.13"
+toml = "0.8.14"
 memmap2 = "0.9.4"
 reqwest-middleware = "0.3.1"
 rattler_installs_packages = { version = "0.9.0", default-features = false }
@@ -122,8 +122,8 @@ clap-markdown = { version = "0.1.3", optional = true }
 
 [dev-dependencies]
 insta = { version = "1.39.0", features = ["yaml"] }
-rstest = "0.19.0"
-tracing-test = "0.2.4"
+rstest = "0.21.0"
+tracing-test = "0.2.5"
 tracing-indicatif = "0.3.6"
 
 [profile.dev.package."*"]
