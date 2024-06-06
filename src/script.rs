@@ -168,7 +168,7 @@ struct NuShellInterpreter;
 
 const NUSHELL_PREAMBLE: &str = r#"
 ## Start of bash preamble
-if not "CONDA_BUILD" in $env {
+if not ("CONDA_BUILD" in $env) {
     source-env ((script_path))
 }
 
