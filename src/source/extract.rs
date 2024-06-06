@@ -117,6 +117,8 @@ pub(crate) fn extract_tar(
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
 
+    fs::create_dir_all(target_directory)?;
+
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
     let progress_bar = log_handler.add_progress_bar(
         indicatif::ProgressBar::new(len)
@@ -155,6 +157,7 @@ pub(crate) fn extract_zip(
 ) -> Result<(), SourceError> {
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
+    fs::create_dir_all(target_directory)?;
 
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
     let progress_bar = log_handler.add_progress_bar(

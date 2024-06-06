@@ -1,14 +1,19 @@
 //! This module contains the implementation of the fetching for a `UrlSource` struct.
 
 use std::{
+    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
 
-use crate::{recipe::parser::UrlSource, tool_configuration};
+use crate::{
+    recipe::parser::UrlSource,
+    source::extract::{extract_tar, extract_zip},
+    tool_configuration,
+};
 use tokio::io::AsyncWriteExt;
 
-use super::{checksum::Checksum, SourceError};
+use super::{checksum::Checksum, extract::is_tarball, SourceError};
 
 fn split_filename(filename: &str) -> (String, String) {
     let stem = Path::new(filename)
@@ -33,6 +38,9 @@ fn split_filename(filename: &str) -> (String, String) {
         "".to_string()
     };
 
+    // remove any dots from the stem
+    let stem_without_tar = stem_without_tar.replace('.', "_");
+
     (stem_without_tar.to_string(), full_extension)
 }
 
@@ -54,25 +62,21 @@ fn cache_name_from_url(
 async fn fetch_remote(
     url: &url::Url,
     target: &Path,
-    tool_configuration: tool_configuration::Configuration,
+    tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
     let client = reqwest::Client::new();
     let download_size = {
         let resp = client.head(url.as_str()).send().await?;
-        if resp.status().is_success() {
-            resp.headers()
+        match resp.error_for_status() {
+            Ok(resp) => resp
+                .headers()
                 .get(reqwest::header::CONTENT_LENGTH)
                 .and_then(|ct_len| ct_len.to_str().ok())
                 .and_then(|ct_len| ct_len.parse().ok())
-                .unwrap_or(0)
-        } else {
-            tracing::warn!(
-                "Could not download file from: {}. Error {}",
-                url,
-                resp.status()
-            );
-            last_error = Some(resp.error_for_status());
-            continue;
+                .unwrap_or(0),
+            Err(e) => {
+                return Err(SourceError::Url(e));
+            }
         }
     };
 
@@ -101,6 +105,42 @@ async fn fetch_remote(
 
     file.flush().await?;
     Ok(())
+}
+
+fn extracted_folder(path: &Path) -> PathBuf {
+    let filename = path.file_name().unwrap_or_default().to_string_lossy();
+    // remove everything after first dot
+    let filename = filename.split('.').next().unwrap_or_default();
+    path.with_file_name(filename)
+}
+
+fn extract_to_cache(
+    path: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<PathBuf, SourceError> {
+    let target = extracted_folder(path);
+
+    if target.is_dir() {
+        tracing::info!("Using extracted directory from cache: {:?}", target);
+        return Ok(target);
+    }
+
+    if is_tarball(
+        path.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .as_ref(),
+    ) {
+        tracing::info!("Extracting tar file to cache: {:?}", path);
+        extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    } else if path.extension() == Some(OsStr::new("zip")) {
+        tracing::info!("Extracting zip file to cache: {:?}", path);
+        extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    }
+
+    Ok(path.to_path_buf())
 }
 
 pub(crate) async fn url_src(
@@ -143,18 +183,29 @@ pub(crate) async fn url_src(
         let metadata = fs::metadata(&cache_name);
         if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
             tracing::info!("Found valid source cache file.");
-            return Ok(cache_name.clone());
+            return extract_to_cache(&cache_name, tool_configuration);
         }
 
-        if !checksum.validate(&cache_name) {
-            tracing::error!("Checksum validation failed!");
-            fs::remove_file(&cache_name)?;
-            return Err(SourceError::ValidationFailed);
+        match fetch_remote(url, &cache_name, tool_configuration).await {
+            Ok(_) => {
+                tracing::info!("Downloaded file from {}", url);
+
+                if !checksum.validate(&cache_name) {
+                    tracing::error!("Checksum validation failed!");
+                    fs::remove_file(&cache_name)?;
+                    return Err(SourceError::ValidationFailed);
+                }
+
+                return extract_to_cache(&cache_name, tool_configuration);
+            }
+            Err(e) => {
+                last_error = Some(e);
+            }
         }
     }
 
-    if let Some(Err(last_error)) = last_error {
-        Err(SourceError::Url(last_error))
+    if let Some(last_error) = last_error {
+        Err(last_error)
     } else {
         Err(SourceError::UnknownError(
             "Could not download any file".to_string(),

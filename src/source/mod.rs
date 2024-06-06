@@ -157,7 +157,8 @@ pub async fn fetch_sources(
                     .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
                 let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
-                let mut dest_dir = if let Some(target_directory) = src.target_directory() {
+
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
@@ -168,25 +169,23 @@ pub async fn fetch_sources(
                     fs::create_dir_all(&dest_dir)?;
                 }
 
-                if is_tarball(
-                    res.file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .as_ref(),
-                ) {
-                    extract_tar(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted to {:?}", dest_dir);
-                } else if res.extension() == Some(OsStr::new("zip")) {
-                    extract_zip(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted zip to {:?}", dest_dir);
+                // Copy source code to work dir
+                if res.is_dir() {
+                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+                    tool_configuration.fancy_log_handler.wrap_in_progress(
+                        "copying source into isolated environment",
+                        || {
+                            copy_dir::CopyDir::new(&res, &dest_dir)
+                                .use_gitignore(false)
+                                .run()
+                        },
+                    )?;
                 } else {
-                    if let Some(file_name) = src.file_name() {
-                        dest_dir = dest_dir.join(file_name);
-                    } else {
-                        dest_dir = dest_dir.join(file_name_from_url);
-                    }
-                    fs::copy(&res, &dest_dir)?;
-                    tracing::info!("Downloaded to {:?}", dest_dir);
+                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+
+                    let file_name = src.file_name().unwrap_or(&file_name_from_url);
+                    let target = dest_dir.join(file_name);
+                    fs::copy(&res, &target)?;
                 }
 
                 if !src.patches().is_empty() {
