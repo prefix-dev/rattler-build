@@ -142,6 +142,12 @@ pub fn language_vars(output: &Output) -> HashMap<String, String> {
 pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     let mut vars = HashMap::<String, String>::new();
 
+    let path_var = if platform.is_windows() {
+        "Path"
+    } else {
+        "PATH"
+    };
+
     vars.insert(
         "CPU_COUNT".to_string(),
         env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string()),
@@ -164,7 +170,9 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     };
 
     vars.insert("SHLIB_EXT".to_string(), shlib_ext);
-    vars.insert("PATH".to_string(), env::var("PATH").unwrap_or_default());
+    if let Ok(path) = env::var(path_var) {
+        vars.insert(path_var.to_string(), path);
+    }
 
     if cfg!(target_family = "windows") {
         vars.extend(windows::env::default_env_vars(prefix, platform));

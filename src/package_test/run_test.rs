@@ -20,7 +20,7 @@ use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
-use rattler_shell::activation::ActivationError;
+use rattler_shell::{activation::ActivationError, shell::Shell, shell::ShellEnum};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
@@ -48,8 +48,8 @@ pub enum TestError {
     #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
 
-    #[error("failed to run test")]
-    TestFailed,
+    #[error("failed to run test: {0}")]
+    TestFailed(String),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
@@ -92,8 +92,9 @@ impl Tests {
     async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let mut env_vars = env_vars::os_vars(environment, &Platform::current());
-        env_vars.retain(|key, _| key != "PATH");
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(environment, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         env_vars.insert(
             "PREFIX".to_string(),
             environment.to_string_lossy().to_string(),
@@ -118,7 +119,7 @@ impl Tests {
                 script
                     .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
                     .await
-                    .map_err(|_| TestError::TestFailed)?;
+                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
             Tests::Python(path) => {
                 let script = Script {
@@ -130,7 +131,7 @@ impl Tests {
                 script
                     .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
                     .await
-                    .map_err(|_| TestError::TestFailed)?;
+                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
         }
         Ok(())
@@ -245,7 +246,8 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     let cache_dir = rattler::default_cache_dir()?;
 
-    let pkg = ArchiveIdentifier::try_from_path(package_file).ok_or(TestError::TestFailed)?;
+    let pkg = ArchiveIdentifier::try_from_path(package_file)
+        .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
     // if the package is already in the cache, remove it. TODO make this based on SHA256 instead!
     let cache_key = CacheKey::from(pkg.clone());
@@ -279,16 +281,14 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
         tracing::error!("Failed to extract package: {:?}", e);
-        TestError::TestFailed
+        TestError::TestFailed(format!("failed to extract package: {:?}", e))
     })?;
 
     // extract package in place
     if package_folder.join("info/test").exists() {
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
         let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
-            serde_json::from_str(&std::fs::read_to_string(
-                package_folder.join(&test_dep_json),
-            )?)?
+            serde_json::from_str(&fs::read_to_string(package_folder.join(&test_dep_json))?)?
         } else {
             Vec::new()
         };
@@ -398,7 +398,7 @@ async fn run_python_test(
     script
         .run_script(Default::default(), tmp_dir.path(), path, prefix, None)
         .await
-        .map_err(|_| TestError::TestFailed)?;
+        .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
     tracing::info!(
         "{} python imports test passed!",
@@ -413,7 +413,7 @@ async fn run_python_test(
         script
             .run_script(Default::default(), path, path, prefix, None)
             .await
-            .map_err(|_| TestError::TestFailed)?;
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
         tracing::info!(
             "{} pip check passed!",
@@ -490,8 +490,9 @@ async fn run_shell_test(
     .await
     .map_err(TestError::TestEnvironmentSetup)?;
 
-    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
-    env_vars.retain(|key, _| key != "PATH");
+    let platform = Platform::current();
+    let mut env_vars = env_vars::os_vars(prefix, &platform);
+    env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
     env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
     let script = Script {
@@ -512,7 +513,7 @@ async fn run_shell_test(
     script
         .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
         .await
-        .map_err(|_| TestError::TestFailed)?;
+        .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
     Ok(())
 }

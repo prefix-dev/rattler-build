@@ -1,5 +1,6 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
+use fs_err as fs;
 use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
@@ -444,7 +445,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
                 "Experimental feature: provide the `--experimental` flag to enable this feature",
             ));
         }
-        let src = std::fs::read_to_string(&path).map_err(|e| {
+        let src = fs::read_to_string(&path).map_err(|e| {
             minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
         })?;
         // tracing::info!("loading from path: {path}");
