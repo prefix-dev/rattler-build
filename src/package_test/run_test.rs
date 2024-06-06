@@ -288,9 +288,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     if package_folder.join("info/test").exists() {
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
         let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
-            serde_json::from_str(&std::fs::read_to_string(
-                package_folder.join(&test_dep_json),
-            )?)?
+            serde_json::from_str(&fs::read_to_string(package_folder.join(&test_dep_json))?)?
         } else {
             Vec::new()
         };
