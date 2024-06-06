@@ -24,7 +24,7 @@ impl Output {
         // hash for the cache ...
         if let Some(cache) = &self.recipe.cache {
             // we need to apply the variant to the cache requirements though
-            let mut requirement_names = cache
+            let requirement_names = cache
                 .requirements
                 .build_time()
                 .filter_map(|x| {
@@ -38,17 +38,22 @@ impl Output {
                     None
                 })
                 .collect::<HashSet<_>>();
-            // always insert the target platform and build platform
-            requirement_names.insert("target_platform".to_string());
-            requirement_names.insert("build_platform".to_string());
 
             // intersect variant with requirements
             let mut selected_variant = BTreeMap::new();
             for key in requirement_names.iter() {
                 if let Some(value) = self.variant().get(key) {
-                    selected_variant.insert(key, value.clone());
+                    selected_variant.insert(key.as_ref(), value.clone());
                 }
             }
+            // always insert the target platform and build platform
+            // we are using the `host_platform` here because for the cache it should not matter wether it's being
+            // build for `noarch` or not (one can have mixed outputs, in fact).
+            selected_variant.insert("host_platform", self.host_platform().to_string());
+            selected_variant.insert(
+                "build_platform",
+                self.build_configuration.build_platform.to_string(),
+            );
 
             let cache_key = (cache, selected_variant);
             // serialize to json and hash

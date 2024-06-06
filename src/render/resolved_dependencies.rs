@@ -609,13 +609,17 @@ pub(crate) async fn resolve_dependencies(
     let pkgs_dir = cache_dir.join("pkgs");
 
     let mut compatibility_specs = HashMap::new();
+    tracing::info!("Requirements: {:?}", requirements);
 
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
+        tracing::info!("BC: {:?}", output.build_configuration);
+
         let specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
         )?;
+        tracing::info!("specs: {:?}", specs);
 
         let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
 
@@ -796,17 +800,37 @@ pub(crate) async fn resolve_dependencies(
     };
 
     // add in dependencies from the finalized cache
-    tracing::info!("FINALIZED CACHE{:?}", output.finalized_cache_dependencies);
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
         tracing::info!(
             "Adding dependencies from finalized cache: {:?}",
             finalized_cache.run.depends
         );
+        // let mut exported_depends = vec![];
+
+        // if let Some(build_env) = &finalized_cache.build {
+        //     for (name, rex) in &build_env.run_exports {
+        //         exported_depends.extend(clone_specs(name, "build", &rex.strong)?);
+        //     }
+        // }
+
+        // if let Some(host_env) = &finalized_cache.host {
+        //     for (name, rex) in &host_env.run_exports {
+        //         exported_depends.extend(clone_specs(name, "host", &rex.strong)?);
+        //         exported_depends.extend(clone_specs(name, "host", &rex.weak)?);
+        //     }
+        // }
+
+        // find the run exports from the cache
+        // let run_exports = collect_run_exports_from_env(&finalized_cache.run.resolved, &pkgs_dir, |_| {
+        //     true
+        // })
+
         depends = depends
             .iter()
             .chain(finalized_cache.run.depends.iter())
             .cloned()
             .collect();
+
         tracing::info!(
             "Adding constraints from finalized cache: {:?}",
             finalized_cache.run.constraints

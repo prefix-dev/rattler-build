@@ -216,7 +216,11 @@ fn compiler_stdlib_eval(
     {
         // check if we also have a compiler version
         if let Some(version) = variant.get(&variant_key_version) {
-            Some(format!("{name}_{platform} {version}"))
+            if version.chars().all(|a| a.is_alphanumeric() || a == '.') {
+                Some(format!("{name}_{platform} ={version}"))
+            } else {
+                Some(format!("{name}_{platform} {version}"))
+            }
         } else {
             Some(format!("{name}_{platform}"))
         }
