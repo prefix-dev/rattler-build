@@ -107,6 +107,11 @@ finalized_dependencies:
       fn: python-3.10.0-h43b31ca_3_cpython.tar.bz2
       url: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.10.0-h43b31ca_3_cpython.tar.bz2
       channel: https://conda.anaconda.org/conda-forge/
+      run_exports:
+        weak:
+          - python_abi 3.10.* *_cp310
+        noarch:
+          - python
     - build: h57fd34a_0
       build_number: 0
       depends: []
@@ -365,12 +370,6 @@ finalized_dependencies:
       fn: setuptools-68.2.2-pyhd8ed1ab_0.conda
       url: https://conda.anaconda.org/conda-forge/noarch/setuptools-68.2.2-pyhd8ed1ab_0.conda
       channel: https://conda.anaconda.org/conda-forge/
-    run_exports:
-      python:
-        weak:
-        - python_abi 3.10.* *_cp310
-        noarch:
-        - python
   run:
     depends:
     - source: markdown-it-py >=2.2.0

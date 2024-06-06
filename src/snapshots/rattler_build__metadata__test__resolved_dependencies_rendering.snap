@@ -1,6 +1,5 @@
 ---
 source: src/metadata.rs
-assertion_line: 703
 expression: resolved_dependencies
 ---
 specs:
@@ -22,4 +21,3 @@ resolved:
     fn: test-1.2.3-h123.tar.bz2
     url: "https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2"
     channel: test
-run_exports: {}
