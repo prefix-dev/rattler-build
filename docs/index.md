@@ -31,10 +31,10 @@ Other options are:
 === "Conda"
     ```shell
     conda install rattler-build -c conda-forge
-    
+
     mamba install rattler-build -c conda-forge
     micromamba install rattler-build -c conda-forge
-    
+
     pixi global install rattler-build
     pixi add rattler-build # To a pixi project
     ```
@@ -56,7 +56,7 @@ Other options are:
     Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
 ### Completion
-When installing `rattler-build` you might want to enable shell completion. 
+When installing `rattler-build` you might want to enable shell completion.
 Do this by running the `rattler-build completion` command in the activation of your shell.
 
 ```sh

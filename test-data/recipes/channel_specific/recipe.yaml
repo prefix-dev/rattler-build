@@ -1,0 +1,7 @@
+package:
+  name: channel_specific
+  version: 1.0.0
+
+requirements:
+  host:
+    - quantstack::sphinx
