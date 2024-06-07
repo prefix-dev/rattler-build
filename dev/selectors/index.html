@@ -591,9 +591,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-cmp-function" class="md-nav__link">
+  <a href="#the-match-function" class="md-nav__link">
     <span class="md-ellipsis">
-      The cmp function
+      The match function
     </span>
   </a>
   
@@ -1151,9 +1151,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#the-cmp-function" class="md-nav__link">
+  <a href="#the-match-function" class="md-nav__link">
     <span class="md-ellipsis">
-      The cmp function
+      The match function
     </span>
   </a>
   
@@ -1308,7 +1308,7 @@ when the Python version is 3.8.</p>
 </div>
 <p>The comparison is a string comparison done by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a>, so it is important to use the correct string
 representation of the variant.
-Use the <code>cmp</code> function to compare versions.</p>
+Use the <code>match</code> function to compare versions.</p>
 <div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
@@ -1324,18 +1324,20 @@ Use the <code>cmp</code> function to compare versions.</p>
    to
    use the correct string representation of the variant.</li>
 </ol>
-<h3 id="the-cmp-function">The <code>cmp</code> function<a class="headerlink" href="#the-cmp-function" title="Permanent link">#</a></h3>
-<p>Inside selectors, one can use a special <code>cmp</code> function to test if the selected
-variant version has a matching version. For example, having the follwing variants file, we could use the these tests:</p>
+<h3 id="the-match-function">The <code>match</code> function<a class="headerlink" href="#the-match-function" title="Permanent link">#</a></h3>
+<p>!!!  note "Rename from <code>cmp</code> to <code>match</code>"
+    The <code>cmp</code> function has been renamed to <code>match</code> to better reflect its purpose.</p>
+<p>Inside selectors, one can use a special <code>match</code> function to test if the selected variant version has a matching version.
+For example, having the following variants file, we could use the these tests:</p>
 <div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
 </span></code></pre></div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmp(python, &quot;3.8&quot;)</span><span class="w">    </span><span class="c1"># true, false</span>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;3.8&quot;)</span><span class="w">    </span><span class="c1"># true, false</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmp(python, &quot;&gt;=3.8&quot;)</span><span class="w">  </span><span class="c1"># true, true</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&gt;=3.8&quot;)</span><span class="w">  </span><span class="c1"># true, true</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmp(python, &quot;&lt;3.8&quot;)</span><span class="w">   </span><span class="c1"># false, false (1)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w">   </span><span class="c1"># false, false (1)</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
 </span></code></pre></div>
 <ol>
@@ -1344,7 +1346,7 @@ variant version has a matching version. For example, having the follwing variant
 <p>This function eliminates the need to implement any Python-specific <code>conda-build</code>
 selectors (such as <code>py3k</code>, <code>py38</code>, etc.) or the <code>py</code> and <code>npy</code> integers.</p>
 <p>Please note that during the <em>initial</em> phase of rendering we do not know the
-variant, and thus the <code>cmp</code> condition always evaluates to <code>true</code>.</p>
+variant, and thus the <code>match</code> condition always evaluates to <code>true</code>.</p>
 <h3 id="selector-evaluation">Selector evaluation<a class="headerlink" href="#selector-evaluation" title="Permanent link">#</a></h3>
 <p>Except for the rattler-build specific selectors, the selectors are evaluated using the <code>minijinja</code> engine. This means
 that the selectors are evaluated by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> thus Python like expressions.

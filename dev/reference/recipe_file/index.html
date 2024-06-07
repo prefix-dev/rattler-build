@@ -2619,7 +2619,7 @@ defined in the "variant_config.yaml" file.</p>
 <p>With a corresponding variant config that looks like the following:</p>
 <div class="language-yaml highlight"><span class="filename">variant_config.yaml</span><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a><span class="nt">python</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;3.2&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.4&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;3.6&quot;</span><span class="p p-Indicator">]</span>
 </span></code></pre></div>
-<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml"><code>cmp</code> usage example</a></p>
+<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml"><code>match</code> usage example</a></p>
 <h4 id="cdt-function"><code>cdt</code> function<a class="headerlink" href="#cdt-function" title="Permanent link">#</a></h4>
 <p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic.</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a><span class="c1"># on x86_64 system</span>
@@ -2627,7 +2627,7 @@ defined in the "variant_config.yaml" file.</p>
 </span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a><span class="c1"># on aarch64 system</span>
 </span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-aarch64</span>
 </span></code></pre></div>
-<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml"><code>cdt</code> usage example</a></p>
+<p>Example: <a href="https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml"><code>cdt</code> usage example</a></p>
 <h2 id="preprocessing-selectors">Preprocessing selectors<a class="headerlink" href="#preprocessing-selectors" title="Permanent link">#</a></h2>
 <p>You can add selectors to any item, and the selector is evaluated in a
 preprocessing stage. If a selector evaluates to <code>true</code>, the item is flattened
