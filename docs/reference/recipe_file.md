@@ -1088,7 +1088,7 @@ With a corresponding variant config that looks like the following:
 python: ["3.2", "3.4", "3.6"]
 ```
 
-Example: [`cmp` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
+Example: [`match` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
 #### `cdt` function
 
@@ -1101,7 +1101,7 @@ cdt('package-name') # outputs: package-name-cos6-x86_64
 cdt('package-name') # outputs: package-name-cos6-aarch64
 ```
 
-Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
 
 ## Preprocessing selectors

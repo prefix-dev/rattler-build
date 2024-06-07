@@ -89,7 +89,7 @@ when the Python version is 3.8.
 !!! note "String comparison"
 The comparison is a string comparison done by [`minijinja`][minijinja], so it is important to use the correct string
 representation of the variant.
-Use the `cmp` function to compare versions.
+Use the `match` function to compare versions.
 
 ```yaml title="variants.yaml"
 python:
@@ -109,10 +109,13 @@ requirements:
    to
    use the correct string representation of the variant.
 
-### The `cmp` function
+### The `match` function
 
-Inside selectors, one can use a special `cmp` function to test if the selected
-variant version has a matching version. For example, having the follwing variants file, we could use the these tests:
+!!!  note "Rename from `cmp` to `match`"
+    The `cmp` function has been renamed to `match` to better reflect its purpose.
+
+Inside selectors, one can use a special `match` function to test if the selected variant version has a matching version.
+For example, having the following variants file, we could use the these tests:
 
 ```yaml title="variants.yaml"
 python:
@@ -121,11 +124,11 @@ python:
 ```
 
 ```yaml title="recipe.yaml"
-- if: cmp(python, "3.8")    # true, false
+- if: match(python, "3.8")    # true, false
   then: mydep
-- if: cmp(python, ">=3.8")  # true, true
+- if: match(python, ">=3.8")  # true, true
   then: mydep
-- if: cmp(python, "<3.8")   # false, false (1)
+- if: match(python, "<3.8")   # false, false (1)
   then: mydep
 ```
 
@@ -135,7 +138,7 @@ This function eliminates the need to implement any Python-specific `conda-build`
 selectors (such as `py3k`, `py38`, etc.) or the `py` and `npy` integers.
 
 Please note that during the _initial_ phase of rendering we do not know the
-variant, and thus the `cmp` condition always evaluates to `true`.
+variant, and thus the `match` condition always evaluates to `true`.
 
 ### Selector evaluation
 
