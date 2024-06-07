@@ -712,7 +712,7 @@ pub(crate) async fn resolve_dependencies(
 
     let mut match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
     if merge_build_host {
-        // add the reqs of build to host
+        // add the requirements of build to host
         let specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
@@ -805,25 +805,6 @@ pub(crate) async fn resolve_dependencies(
             "Adding dependencies from finalized cache: {:?}",
             finalized_cache.run.depends
         );
-        // let mut exported_depends = vec![];
-
-        // if let Some(build_env) = &finalized_cache.build {
-        //     for (name, rex) in &build_env.run_exports {
-        //         exported_depends.extend(clone_specs(name, "build", &rex.strong)?);
-        //     }
-        // }
-
-        // if let Some(host_env) = &finalized_cache.host {
-        //     for (name, rex) in &host_env.run_exports {
-        //         exported_depends.extend(clone_specs(name, "host", &rex.strong)?);
-        //         exported_depends.extend(clone_specs(name, "host", &rex.weak)?);
-        //     }
-        // }
-
-        // find the run exports from the cache
-        // let run_exports = collect_run_exports_from_env(&finalized_cache.run.resolved, &pkgs_dir, |_| {
-        //     true
-        // })
 
         depends = depends
             .iter()
@@ -908,8 +889,8 @@ pub(crate) async fn resolve_dependencies(
     }
 
     Ok(FinalizedDependencies {
-        build: build_env,
-        host: host_env,
+        build: build_env.map(|(env, _)| env),
+        host: host_env.map(|(env, _)| env),
         run: run_specs,
     })
 }
