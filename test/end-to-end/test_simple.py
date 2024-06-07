@@ -861,3 +861,23 @@ def test_nushell_implicit_recipe(
     assert (pkg / "info/paths.json").exists()
     content = (pkg / "hello.txt").read_text()
     assert "Hello, world!" == content
+
+
+def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "channel_specific/recipe.yaml",
+        tmp_path,
+        extra_args="-c conda-forge -c quantstack".split(),
+    )
+    pkg = get_extracted_package(tmp_path, "channel_specific")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load yaml
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    rendered_recipe = yaml.safe_load(text)
+    print(text)
+    deps = rendered_recipe["finalized_dependencies"]["host"]["resolved"]
+
+    for d in deps:
+        if d["name"] == "sphinx":
+            assert d["channel"] == "https://conda.anaconda.org/quantstack/"
