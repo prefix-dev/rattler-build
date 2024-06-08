@@ -7,7 +7,6 @@ recipe:
   package:
     name: git_source
     version: "1"
-  cache: ~
   source:
     - git: "https://github.com/prefix-dev/rattler-build"
       rev: refs/tags/v0.1.0

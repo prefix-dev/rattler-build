@@ -63,6 +63,7 @@ pub struct Recipe {
     pub package: Package,
     /// The cache build that should be used for this package
     /// This is the same for all outputs of a recipe
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache: Option<Cache>,
     /// The information about where to obtain the sources
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

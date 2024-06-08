@@ -6,7 +6,6 @@ schema_version: 1
 package:
   name: single_output
   version: 0.1.0
-cache: null
 source:
 - url: https://github.com/test/test-package.tar.gz
   sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
