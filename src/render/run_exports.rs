@@ -33,6 +33,21 @@ impl IgnoreRunExports {
             strings
                 .iter()
                 .map(|s| MatchSpec::from_str(s, ParseStrictness::Strict))
+                .filter_map(|result| match result {
+                    Ok(spec) => {
+                        if spec
+                            .name
+                            .as_ref()
+                            .map(|n| !self.by_name().contains(n))
+                            .unwrap_or(false)
+                        {
+                            Some(Ok(spec))
+                        } else {
+                            None
+                        }
+                    }
+                    Err(e) => Some(Err(e)),
+                })
                 .collect()
         };
 
@@ -45,6 +60,10 @@ impl IgnoreRunExports {
         };
 
         for (name, run_export) in run_export_map.iter() {
+            if self.from_package().contains(name) {
+                continue;
+            }
+
             filtered_run_exports.noarch.extend(
                 to_specs(&run_export.noarch)?
                     .into_iter()

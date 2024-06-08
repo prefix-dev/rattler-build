@@ -844,7 +844,7 @@ pub(crate) async fn resolve_dependencies(
     // filter the host run exports
     let host_run_exports = host_env
         .as_ref()
-        .map(|h| h.run_exports(false))
+        .map(|h| h.run_exports(true))
         .unwrap_or_default();
     let host_run_exports = ignore_run_exports.filter(&host_run_exports, "host")?;
 
