@@ -7,6 +7,7 @@ recipe:
   package:
     name: rich
     version: 13.4.2
+  cache: ~
   source:
     - url: "https://pypi.io/packages/source/r/rich/rich-13.4.2.tar.gz"
       sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
@@ -379,6 +380,7 @@ finalized_dependencies:
         from: host
         run_export: python
     constraints: []
+finalized_cache_dependencies: ~
 finalized_sources: ~
 system_tools:
   rattler-build: 0.12.1

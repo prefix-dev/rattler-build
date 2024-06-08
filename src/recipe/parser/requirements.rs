@@ -1,5 +1,4 @@
 //! Parsing for the requirements section of the recipe.
-
 use crate::recipe::parser::FlattenErrors;
 use indexmap::IndexSet;
 use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};

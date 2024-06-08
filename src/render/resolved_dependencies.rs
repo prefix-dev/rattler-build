@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use super::{pin::PinError, solver::create_environment};
-use crate::recipe::parser::{Dependency, IgnoreRunExports};
+use crate::recipe::parser::Dependency;
 use crate::render::pin::PinArgs;
 use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
@@ -317,6 +317,34 @@ impl ResolvedDependencies {
         }
         table
     }
+
+    /// Collect run exports from this environment
+    /// If `direct_only` is set to true, only the run exports of the direct dependencies are collected
+    fn run_exports(&self, direct_only: bool) -> HashMap<PackageName, RunExportsJson> {
+        let mut result = HashMap::new();
+        for record in &self.resolved {
+            // If there are no run exports, we don't need to do anything.
+            let Some(run_exports) = &record.package_record.run_exports else {
+                continue;
+            };
+
+            // If the specific package is a transitive dependency we ignore the run exports
+            if direct_only
+                && !self.specs.iter().any(|s| {
+                    if let DependencyInfo::Source(s) = s {
+                        s.spec.name.as_ref() == Some(&record.package_record.name)
+                    } else {
+                        false
+                    }
+                })
+            {
+                continue;
+            }
+
+            result.insert(record.package_record.name.clone(), run_exports.clone());
+        }
+        result
+    }
 }
 
 impl FinalizedRunDependencies {
@@ -524,39 +552,6 @@ fn amend_run_exports(
     Ok(())
 }
 
-fn collect_run_exports_from_env(
-    specs: &[MatchSpec],
-    env: &[RepoDataRecord],
-    ignore_run_exports: &IgnoreRunExports,
-) -> HashMap<PackageName, RunExportsJson> {
-    let mut result = HashMap::new();
-    for record in env {
-        // If there are no run exports, we don't need to do anything.
-        let Some(run_exports) = &record.package_record.run_exports else {
-            continue;
-        };
-
-        // If the specific package is a transitive dependency we ignore the run exports
-        if !specs
-            .iter()
-            .any(|m| Some(&record.package_record.name) == m.name.as_ref())
-        {
-            continue;
-        }
-
-        // If the package is in the ignore list, we can skip it.
-        if ignore_run_exports
-            .from_package()
-            .contains(&record.package_record.name)
-        {
-            continue;
-        }
-
-        result.insert(record.package_record.name.clone(), run_exports.clone());
-    }
-    result
-}
-
 pub async fn install_environments(
     output: &Output,
     tool_configuration: &tool_configuration::Configuration,
@@ -589,6 +584,95 @@ pub async fn install_environments(
     Ok(())
 }
 
+/// This function renders the run exports into `RunExportsJson` format
+/// This function applies any variant information or `pin_subpackage` specifications to the run exports.
+fn render_run_exports(
+    output: &Output,
+    compatibility_specs: &HashMap<PackageName, PackageRecord>,
+) -> Result<RunExportsJson, ResolveError> {
+    let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
+        let rendered = apply_variant(run_export, &output.build_configuration, compatibility_specs)?;
+        Ok(rendered
+            .iter()
+            .map(|dep| dep.spec().to_string())
+            .collect::<Vec<_>>())
+    };
+
+    let run_exports = output.recipe.requirements().run_exports();
+
+    if !run_exports.is_empty() {
+        Ok(RunExportsJson {
+            strong: render_run_exports(run_exports.strong())?,
+            weak: render_run_exports(run_exports.weak())?,
+            noarch: render_run_exports(run_exports.noarch())?,
+            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
+            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
+        })
+    } else {
+        Ok(RunExportsJson::default())
+    }
+}
+
+// fn propagate_run_exports_to_run(
+//     finalized_dependencies: &mut FinalizedDependencies,
+//     output: &Output,
+// ) {
+//     // filter out the run exports from the build env
+//     let build_env = finalized_dependencies.build.as_ref();
+
+//     // Propagate run exports from host env to run env
+//     if let Some((_, run_exports)) = &host_env {
+//         match output.build_configuration.target_platform {
+//             Platform::NoArch => {
+//                 for (name, rex) in run_exports {
+//                     run_specs
+//                         .depends
+//                         .extend(add_run_export_specs(name, "host", &rex.noarch)?);
+//                 }
+//             }
+//             _ => {
+//                 for (name, rex) in run_exports {
+//                     run_specs
+//                         .depends
+//                         .extend(add_run_export_specs(name, "host", &rex.strong)?);
+//                     run_specs
+//                         .depends
+//                         .extend(add_run_export_specs(name, "host", &rex.weak)?);
+//                     run_specs.constraints.extend(add_run_export_specs(
+//                         name,
+//                         "host",
+//                         &rex.strong_constrains,
+//                     )?);
+//                     run_specs.constraints.extend(add_run_export_specs(
+//                         name,
+//                         "host",
+//                         &rex.weak_constrains,
+//                     )?);
+//                 }
+//             }
+//         }
+//     }
+
+//     // We also have to propagate the _strong_ run exports of the build environment to the run environment
+//     if let Some((_, run_exports)) = &build_env {
+//         match output.build_configuration.target_platform {
+//             Platform::NoArch => {}
+//             _ => {
+//                 for (name, rex) in run_exports {
+//                     run_specs
+//                         .depends
+//                         .extend(add_run_export_specs(name, "build", &rex.strong)?);
+//                     run_specs.constraints.extend(add_run_export_specs(
+//                         name,
+//                         "build",
+//                         &rex.strong_constrains,
+//                     )?);
+//                 }
+//             }
+//         }
+//     }
+// }
+
 /// This function resolves the dependencies of a recipe.
 /// To do this, we have to run a couple of steps:
 ///
@@ -612,18 +696,18 @@ pub(crate) async fn resolve_dependencies(
     tracing::info!("Requirements: {:?}", requirements);
 
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
-        tracing::info!("BC: {:?}", output.build_configuration);
-
-        let specs = apply_variant(
+        let build_env_specs = apply_variant(
             requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
         )?;
-        tracing::info!("specs: {:?}", specs);
 
-        let match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+        let match_specs = build_env_specs
+            .iter()
+            .map(|s| s.spec().clone())
+            .collect::<Vec<_>>();
 
-        let mut env = create_environment(
+        let mut resolved = create_environment(
             &match_specs,
             &output.build_configuration.build_platform,
             &output.build_configuration.directories.build_prefix,
@@ -636,26 +720,17 @@ pub(crate) async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         // Add the run exports to the records that don't have them yet.
-        amend_run_exports(&mut env, &pkgs_dir).map_err(ResolveError::CouldNotCollectRunExports)?;
+        amend_run_exports(&mut resolved, &pkgs_dir)
+            .map_err(ResolveError::CouldNotCollectRunExports)?;
 
-        // Determine the run exports of this environment
-        let run_exports = collect_run_exports_from_env(
-            &match_specs,
-            &env,
-            output.recipe.requirements.ignore_run_exports(),
-        );
-
-        env.iter().for_each(|r| {
+        resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
         });
 
-        Some((
-            ResolvedDependencies {
-                specs,
-                resolved: env,
-            },
-            run_exports,
-        ))
+        Some(ResolvedDependencies {
+            specs: build_env_specs,
+            resolved,
+        })
     } else {
         fs::create_dir_all(&output.build_configuration.directories.build_prefix)
             .expect("Could not create build prefix");
@@ -663,54 +738,26 @@ pub(crate) async fn resolve_dependencies(
     };
 
     // host env
-    let mut specs = apply_variant(
+    let mut host_env_specs = apply_variant(
         requirements.host(),
         &output.build_configuration,
         &compatibility_specs,
     )?;
 
-    let add_run_export_specs = |name: &PackageName,
-                                source_env: &str,
-                                specs: &[String]|
-     -> Result<Vec<DependencyInfo>, ResolveError> {
-        let mut cloned = Vec::new();
-        for spec in specs {
-            let spec = MatchSpec::from_str(spec, ParseStrictness::Strict)?;
-            let in_ignore_run_exports = |pkg| {
-                output
-                    .recipe
-                    .requirements()
-                    .ignore_run_exports()
-                    .by_name()
-                    .contains(pkg)
-            };
-            if spec
-                .name
-                .as_ref()
-                .map(in_ignore_run_exports)
-                .unwrap_or_default()
-            {
-                continue;
-            }
+    // Apply the strong run exports from the build environment to the host environment
+    let build_run_exports = build_env
+        .as_ref()
+        .map(|b| b.run_exports(true))
+        .unwrap_or_default();
 
-            let dep = RunExportDependency {
-                spec,
-                from: source_env.to_string(),
-                source_package: name.as_normalized().to_string(),
-            };
-            cloned.push(dep.into());
-        }
-        Ok(cloned)
-    };
+    let ignore_run_exports = output.recipe.requirements.ignore_run_exports();
+    let build_run_exports = ignore_run_exports.filter(&build_run_exports, "build")?;
+    host_env_specs.extend(build_run_exports.strong.iter().cloned());
 
-    // add the run exports of the build environment
-    if let Some((_, run_exports)) = &build_env {
-        for (name, run_exports) in run_exports {
-            specs.extend(add_run_export_specs(name, "build", &run_exports.strong)?);
-        }
-    }
-
-    let mut match_specs = specs.iter().map(|s| s.spec().clone()).collect::<Vec<_>>();
+    let mut match_specs = host_env_specs
+        .iter()
+        .map(|s| s.spec().clone())
+        .collect::<Vec<_>>();
     if merge_build_host {
         // add the requirements of build to host
         let specs = apply_variant(
@@ -722,7 +769,7 @@ pub(crate) async fn resolve_dependencies(
     }
 
     let host_env = if !match_specs.is_empty() {
-        let mut env = create_environment(
+        let mut resolved = create_environment(
             &match_specs,
             &output.build_configuration.host_platform,
             &output.build_configuration.directories.host_prefix,
@@ -735,26 +782,17 @@ pub(crate) async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         // Add the run exports to the records that don't have them yet.
-        amend_run_exports(&mut env, &pkgs_dir).map_err(ResolveError::CouldNotCollectRunExports)?;
+        amend_run_exports(&mut resolved, &pkgs_dir)
+            .map_err(ResolveError::CouldNotCollectRunExports)?;
 
-        // Determine the run exports of this environment
-        let run_exports = collect_run_exports_from_env(
-            &match_specs,
-            &env,
-            output.recipe.requirements.ignore_run_exports(),
-        );
-
-        env.iter().for_each(|r| {
+        resolved.iter().for_each(|r| {
             compatibility_specs.insert(r.package_record.name.clone(), r.package_record.clone());
         });
 
-        Some((
-            ResolvedDependencies {
-                specs,
-                resolved: env,
-            },
-            run_exports,
-        ))
+        Some(ResolvedDependencies {
+            specs: host_env_specs,
+            resolved,
+        })
     } else {
         fs::create_dir_all(&output.build_configuration.directories.host_prefix)
             .expect("Could not create host prefix");
@@ -767,37 +805,11 @@ pub(crate) async fn resolve_dependencies(
         &compatibility_specs,
     )?;
 
-    let mut constrains = apply_variant(
+    let mut constraints = apply_variant(
         &requirements.run_constraints,
         &output.build_configuration,
         &compatibility_specs,
     )?;
-
-    let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
-        let rendered = apply_variant(
-            run_export,
-            &output.build_configuration,
-            &compatibility_specs,
-        )?;
-        Ok(rendered
-            .iter()
-            .map(|dep| dep.spec().to_string())
-            .collect::<Vec<_>>())
-    };
-
-    let run_exports = output.recipe.requirements().run_exports();
-
-    let run_exports = if !run_exports.is_empty() {
-        RunExportsJson {
-            strong: render_run_exports(run_exports.strong())?,
-            weak: render_run_exports(run_exports.weak())?,
-            noarch: render_run_exports(run_exports.noarch())?,
-            strong_constrains: render_run_exports(run_exports.strong_constraints())?,
-            weak_constrains: render_run_exports(run_exports.weak_constraints())?,
-        }
-    } else {
-        RunExportsJson::default()
-    };
 
     // add in dependencies from the finalized cache
     if let Some(finalized_cache) = &output.finalized_cache_dependencies {
@@ -809,6 +821,7 @@ pub(crate) async fn resolve_dependencies(
         depends = depends
             .iter()
             .chain(finalized_cache.run.depends.iter())
+            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
             .cloned()
             .collect();
 
@@ -816,70 +829,68 @@ pub(crate) async fn resolve_dependencies(
             "Adding constraints from finalized cache: {:?}",
             finalized_cache.run.constraints
         );
-        constrains = constrains
+        constraints = constraints
             .iter()
             .chain(finalized_cache.run.constraints.iter())
+            .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
             .cloned()
             .collect();
+
+        // re-compute the run exports from the cache host & build environment
     }
 
-    let mut run_specs = FinalizedRunDependencies {
+    let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
+
+    // filter the host run exports
+    let host_run_exports = host_env
+        .as_ref()
+        .map(|h| h.run_exports(false))
+        .unwrap_or_default();
+    let host_run_exports = ignore_run_exports.filter(&host_run_exports, "host")?;
+
+    // add the host run exports to the run dependencies
+    if output.target_platform() == &Platform::NoArch {
+        // ignore build noarch depends
+        depends.extend(host_run_exports.noarch.iter().cloned());
+    } else {
+        depends.extend(build_run_exports.strong.iter().cloned());
+        depends.extend(host_run_exports.strong.iter().cloned());
+        depends.extend(host_run_exports.weak.iter().cloned());
+        // add the constraints
+        constraints.extend(build_run_exports.strong_constraints.iter().cloned());
+        constraints.extend(host_run_exports.strong_constraints.iter().cloned());
+        constraints.extend(host_run_exports.weak_constraints.iter().cloned());
+    }
+
+    if let Some(cache) = &output.finalized_cache_dependencies {
+        // add in the run exports from the cache
+        // filter run dependencies that came from run exports
+        let ignore_run_exports = output.recipe.requirements.ignore_run_exports();
+        // Note: these run exports are already filtered
+        let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
+            DependencyInfo::RunExport(run_export) => {
+                let source_package: Option<PackageName> = run_export.source_package.parse().ok();
+                let spec_name = &run_export.spec.name;
+
+                let by_name = spec_name
+                    .as_ref()
+                    .map(|n| ignore_run_exports.by_name().contains(n))
+                    .unwrap_or(false);
+                let by_package = source_package
+                    .map(|s| ignore_run_exports.from_package().contains(&s))
+                    .unwrap_or(false);
+
+                !by_name && !by_package
+            }
+            _ => false,
+        });
+    }
+
+    let run_specs = FinalizedRunDependencies {
         depends,
-        constraints: constrains,
-        run_exports,
+        constraints,
+        run_exports: rendered_run_exports,
     };
-
-    // Propagate run exports from host env to run env
-    if let Some((_, run_exports)) = &host_env {
-        match output.build_configuration.target_platform {
-            Platform::NoArch => {
-                for (name, rex) in run_exports {
-                    run_specs
-                        .depends
-                        .extend(add_run_export_specs(name, "host", &rex.noarch)?);
-                }
-            }
-            _ => {
-                for (name, rex) in run_exports {
-                    run_specs
-                        .depends
-                        .extend(add_run_export_specs(name, "host", &rex.strong)?);
-                    run_specs
-                        .depends
-                        .extend(add_run_export_specs(name, "host", &rex.weak)?);
-                    run_specs.constraints.extend(add_run_export_specs(
-                        name,
-                        "host",
-                        &rex.strong_constrains,
-                    )?);
-                    run_specs.constraints.extend(add_run_export_specs(
-                        name,
-                        "host",
-                        &rex.weak_constrains,
-                    )?);
-                }
-            }
-        }
-    }
-
-    // We also have to propagate the _strong_ run exports of the build environment to the run environment
-    if let Some((_, run_exports)) = &build_env {
-        match output.build_configuration.target_platform {
-            Platform::NoArch => {}
-            _ => {
-                for (name, rex) in run_exports {
-                    run_specs
-                        .depends
-                        .extend(add_run_export_specs(name, "build", &rex.strong)?);
-                    run_specs.constraints.extend(add_run_export_specs(
-                        name,
-                        "build",
-                        &rex.strong_constrains,
-                    )?);
-                }
-            }
-        }
-    }
 
     // log a table of the rendered run dependencies
     if run_specs.depends.is_empty() && run_specs.constraints.is_empty() {
@@ -889,8 +900,8 @@ pub(crate) async fn resolve_dependencies(
     }
 
     Ok(FinalizedDependencies {
-        build: build_env.map(|(env, _)| env),
-        host: host_env.map(|(env, _)| env),
+        build: build_env,
+        host: host_env,
         run: run_specs,
     })
 }

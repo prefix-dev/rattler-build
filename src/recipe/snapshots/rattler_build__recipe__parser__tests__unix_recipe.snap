@@ -11,6 +11,7 @@ Recipe {
         },
         version: "0.24.6",
     },
+    cache: None,
     source: [
         Url(
             UrlSource {
