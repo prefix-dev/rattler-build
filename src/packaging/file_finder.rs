@@ -101,7 +101,6 @@ impl Files {
                 files.is_empty()
                     || files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
             })
-            .filter(|f| !f.is_dir() || f.is_symlink())
             .cloned()
             .collect::<HashSet<_>>();
 

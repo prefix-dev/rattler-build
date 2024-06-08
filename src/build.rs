@@ -297,6 +297,9 @@ impl Output {
             let mut copied_files = Vec::new();
             let copy_options = CopyOptions::default();
             for file in &new_files.new_files {
+                if file.is_dir() && !file.is_symlink() {
+                    continue;
+                }
                 let stripped = file
                     .strip_prefix(&host_prefix)
                     .expect("File should be in prefix");
