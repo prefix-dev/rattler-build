@@ -15,6 +15,33 @@ pub use crate::selectors::SelectorConfig;
 
 use super::parser::{Dependency, PinCompatible, PinSubpackage};
 
+/// The internal representation of the pin function.
+pub enum InternalRepr {
+    /// The pin function is used to pin a subpackage.
+    PinSubpackage,
+    /// The pin function is used to pin a compatible package.
+    PinCompatible,
+}
+
+impl InternalRepr {
+    fn to_json(&self, pin: &Pin) -> String {
+        match self {
+            InternalRepr::PinSubpackage => {
+                serde_json::to_string(&Dependency::PinSubpackage(PinSubpackage {
+                    pin_subpackage: pin.clone(),
+                }))
+                .unwrap()
+            }
+            InternalRepr::PinCompatible => {
+                serde_json::to_string(&Dependency::PinCompatible(PinCompatible {
+                    pin_compatible: pin.clone(),
+                }))
+                .unwrap()
+            }
+        }
+    }
+}
+
 /// A type that hold the miniJinja environment and context for Jinja template processing.
 #[derive(Debug, Clone)]
 pub struct Jinja<'a> {
@@ -88,7 +115,7 @@ impl<'a> Extend<(String, Value)> for Jinja<'a> {
 fn jinja_pin_function(
     name: String,
     kwargs: Kwargs,
-    internal_repr: &str,
+    internal_repr: InternalRepr,
 ) -> Result<String, minijinja::Error> {
     let name = PackageName::try_from(name).map_err(|e| {
         minijinja::Error::new(
@@ -144,21 +171,7 @@ fn jinja_pin_function(
         pin.args.exact = exact;
     }
 
-    if internal_repr == "__PIN_SUBPACKAGE" {
-        Ok(
-            serde_json::to_string(&Dependency::PinSubpackage(PinSubpackage {
-                pin_subpackage: pin,
-            }))
-            .unwrap(),
-        )
-    } else {
-        Ok(
-            serde_json::to_string(&Dependency::PinCompatible(PinCompatible {
-                pin_compatible: pin,
-            }))
-            .unwrap(),
-        )
-    }
+    Ok(internal_repr.to_json(&pin))
 }
 
 fn default_compiler(platform: Platform, language: &str) -> Option<String> {
@@ -431,11 +444,11 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     });
 
     env.add_function("pin_subpackage", |name: String, kwargs: Kwargs| {
-        jinja_pin_function(name, kwargs, "__PIN_SUBPACKAGE")
+        jinja_pin_function(name, kwargs, InternalRepr::PinSubpackage)
     });
 
     env.add_function("pin_compatible", |name: String, kwargs: Kwargs| {
-        jinja_pin_function(name, kwargs, "__PIN_COMPATIBLE")
+        jinja_pin_function(name, kwargs, InternalRepr::PinCompatible)
     });
 
     env.add_function("load_from_file", move |path: String| {
