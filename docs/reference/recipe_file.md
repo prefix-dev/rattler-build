@@ -1049,8 +1049,8 @@ Jinja.
 There are three functions:
 
 - `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
-- `env.get_default("ENV_VAR", "undefined")` will insert the value of "ENV_VAR"
-  into the recipe or, if "ENV_VAR" is not defined, the specified default value
+- `env.get("ENV_VAR", default="undefined")` will insert the value of `ENV_VAR`
+  into the recipe or, if `ENV_VAR` is not defined, the specified default value
   (in this case "undefined")
 - `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
   to any value
