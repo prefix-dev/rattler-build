@@ -15,5 +15,4 @@ build:
 - pin_compatible:
     name: bar
     lower_bound: x.x
-    upper_bound: null
     exact: true

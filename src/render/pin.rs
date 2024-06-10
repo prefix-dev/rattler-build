@@ -78,11 +78,11 @@ pub struct Pin {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinArgs {
     /// A minimum pin to a version, using `x.x.x...` as syntax
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lower_bound: Option<PinBound>,
 
     /// A pin to a version, using `x.x.x...` as syntax
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upper_bound: Option<PinBound>,
 
     /// If an exact pin is given, we pin the exact version & hash

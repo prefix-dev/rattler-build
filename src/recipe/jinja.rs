@@ -1106,11 +1106,11 @@ mod tests {
         );
         assert_eq!(
             ps("upper_bound=None"),
-            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"x.x.x.x.x.x\",\"upper_bound\":null}}"
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"x.x.x.x.x.x\"}}"
         );
         assert_eq!(
             ps("upper_bound=None, lower_bound=None"),
-            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":null,\"upper_bound\":null}}"
+            "{\"pin_subpackage\":{\"name\":\"foo\"}}"
         );
         assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}");
     }
