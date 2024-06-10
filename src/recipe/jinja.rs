@@ -23,15 +23,6 @@ pub enum InternalRepr {
     PinCompatible,
 }
 
-impl From<InternalRepr> for &str {
-    fn from(repr: InternalRepr) -> &'static str {
-        match repr {
-            InternalRepr::PinSubpackage => "__PIN_SUBPACKAGE",
-            InternalRepr::PinCompatible => "__PIN_COMPATIBLE",
-        }
-    }
-}
-
 impl InternalRepr {
     fn to_json(&self, pin: &Pin) -> String {
         match self {
