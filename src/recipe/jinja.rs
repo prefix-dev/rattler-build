@@ -129,46 +129,37 @@ fn jinja_pin_function(
         args: PinArgs::default(),
     };
 
-    let pin_expr_from_value =
-        |pin_expr: &minijinja::value::Value| -> Result<Option<PinExpression>, minijinja::Error> {
-            if pin_expr.is_none() {
-                Ok(None)
-            } else {
-                let pin_expr = PinExpression::from_str(&pin_expr.to_string()).map_err(|e| {
-                    minijinja::Error::new(
-                        minijinja::ErrorKind::SyntaxError,
-                        format!("Invalid pin expression: {}", e),
-                    )
-                })?;
-                Ok(Some(pin_expr))
-            }
-        };
-
-    if let Ok(max_pin) = kwargs.get::<Value>("max_pin") {
-        pin.args.max_pin = pin_expr_from_value(&max_pin)?;
-    }
-    if let Ok(min_pin) = kwargs.get::<Value>("min_pin") {
-        pin.args.min_pin = pin_expr_from_value(&min_pin)?;
-    }
-
-    if let Ok(lower_bound) = kwargs.get::<String>("lower_bound") {
-        pin.args.lower_bound = Some(lower_bound.parse().map_err(|e| {
-            minijinja::Error::new(
-                minijinja::ErrorKind::SyntaxError,
-                format!("Invalid lower bound: {}", e),
-            )
-        })?);
-    }
-    if let Ok(upper_bound) = kwargs.get::<String>("upper_bound") {
-        pin.args.upper_bound = Some(upper_bound.parse().map_err(|e| {
-            minijinja::Error::new(
-                minijinja::ErrorKind::SyntaxError,
-                format!("Invalid upper bound: {}", e),
-            )
-        })?);
-    }
     if let Ok(exact) = kwargs.get::<bool>("exact") {
         pin.args.exact = exact;
+        // No more arguments should be accepted if `exact` is set
+        kwargs.assert_all_used()?;
+        pin.args.lower_bound = None;
+        pin.args.upper_bound = None;
+    }
+
+    if let Ok(lower_bound) = kwargs.get::<Option<String>>("lower_bound") {
+        if let Some(lower_bound) = lower_bound {
+            pin.args.lower_bound = Some(lower_bound.parse().map_err(|e| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::SyntaxError,
+                    format!("Invalid lower bound: {}", e),
+                )
+            })?);
+        } else if kwargs.has("lower_bound") {
+            pin.args.lower_bound = None;
+        }
+    }
+    if let Ok(upper_bound) = kwargs.get::<Option<String>>("upper_bound") {
+        if let Some(upper_bound) = upper_bound {
+            pin.args.upper_bound = Some(upper_bound.parse().map_err(|e| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::SyntaxError,
+                    format!("Invalid upper bound: {}", e),
+                )
+            })?);
+        } else if kwargs.has("upper_bound") {
+            pin.args.upper_bound = None;
+        }
     }
 
     Ok(internal_repr.to_json(&pin))
@@ -1111,17 +1102,17 @@ mod tests {
 
         assert_eq!(
             ps(""),
-            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":\"x\"}}"
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"x.x.x.x.x.x\",\"upper_bound\":\"x\"}}"
         );
         assert_eq!(
-            ps("max_pin=None"),
-            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":null}}"
+            ps("upper_bound=None"),
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"x.x.x.x.x.x\"}}"
         );
         assert_eq!(
-            ps("max_pin=None, min_pin=None"),
-            "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":null,\"max_pin\":null}}"
+            ps("upper_bound=None, lower_bound=None"),
+            "{\"pin_subpackage\":{\"name\":\"foo\"}}"
         );
-        assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"min_pin\":\"x.x.x.x.x.x\",\"max_pin\":\"x\",\"lower_bound\":\"1.2.3\"}}");
+        assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}");
     }
 
     #[test]

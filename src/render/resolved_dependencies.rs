@@ -917,8 +917,8 @@ mod tests {
                 name: "baz".to_string(),
                 spec: MatchSpec::from_str("baz", ParseStrictness::Strict).unwrap(),
                 args: PinArgs {
-                    max_pin: Some("x.x".parse().unwrap()),
-                    min_pin: Some("x.x.x".parse().unwrap()),
+                    upper_bound: Some("x.x".parse().unwrap()),
+                    lower_bound: Some("x.x.x".parse().unwrap()),
                     exact: true,
                     ..Default::default()
                 },
@@ -928,8 +928,8 @@ mod tests {
                 name: "bat".to_string(),
                 spec: MatchSpec::from_str("bat", ParseStrictness::Strict).unwrap(),
                 args: PinArgs {
-                    max_pin: Some("x.x".parse().unwrap()),
-                    min_pin: Some("x.x.x".parse().unwrap()),
+                    upper_bound: Some("x.x".parse().unwrap()),
+                    lower_bound: Some("x.x.x".parse().unwrap()),
                     exact: true,
                     ..Default::default()
                 },

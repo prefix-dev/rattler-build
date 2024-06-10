@@ -717,8 +717,6 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pin = {
         "pin_subpackage": {
             "name": "rattler-build-demo",
-            "min_pin": "x.x.x.x.x.x",
-            "max_pin": "x",
             "exact": True,
         }
     }
@@ -743,8 +741,6 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     pin = {
         "pin_subpackage": {
             "name": "rattler-build-demo",
-            "min_pin": "x.x.x.x.x.x",
-            "max_pin": "x",
             "exact": True,
         }
     }

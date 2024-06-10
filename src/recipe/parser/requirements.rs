@@ -505,7 +505,6 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
 mod test {
     use std::str::FromStr;
 
-    use crate::recipe::jinja::PinExpression;
     use crate::render::pin::PinArgs;
 
     use super::*;
@@ -516,10 +515,8 @@ mod test {
             pin_subpackage: Pin {
                 name: PackageName::from_str("foo").unwrap(),
                 args: PinArgs {
-                    max_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                    min_pin: Some(PinExpression::from_str("x.x.x.x").unwrap()),
-                    lower_bound: None,
-                    upper_bound: None,
+                    lower_bound: Some("x.x.x.x".parse().unwrap()),
+                    upper_bound: Some("x.x".parse().unwrap()),
                     exact: false,
                 },
             },
@@ -529,10 +526,8 @@ mod test {
             pin_compatible: Pin {
                 name: PackageName::from_str("bar").unwrap(),
                 args: PinArgs {
-                    max_pin: Some(PinExpression::from_str("x.x.x").unwrap()),
-                    min_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                    lower_bound: None,
-                    upper_bound: None,
+                    lower_bound: Some("x.x".parse().unwrap()),
+                    upper_bound: Some("x.x.x".parse().unwrap()),
                     exact: false,
                 },
             },
@@ -542,9 +537,7 @@ mod test {
             pin_compatible: Pin {
                 name: PackageName::from_str("bar").unwrap(),
                 args: PinArgs {
-                    max_pin: None,
-                    min_pin: Some(PinExpression::from_str("x.x").unwrap()),
-                    lower_bound: None,
+                    lower_bound: Some("x.x".parse().unwrap()),
                     upper_bound: None,
                     exact: true,
                 },
@@ -568,7 +561,7 @@ mod test {
 
     #[test]
     fn test_deserialize_pin() {
-        let pin = "{ pin_subpackage: { name: foo, max_pin: x.x.x, min_pin: x.x, exact: true, spec: foo }}";
+        let pin = "{ pin_subpackage: { name: foo, upper_bound: x.x.x, lower_bound: x.x, exact: true, spec: foo }}";
         let _: Dependency = serde_yaml::from_str(pin).unwrap();
     }
 }
