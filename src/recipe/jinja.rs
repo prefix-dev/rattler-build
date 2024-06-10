@@ -729,10 +729,7 @@ impl Object for Env {
                 let name: (&str,) = from_args(args)?;
                 self.exists(name.0)
             }
-            name => Err(minijinja::Error::new(
-                minijinja::ErrorKind::UnknownMethod,
-                format!("object has no method named {name}"),
-            )),
+            _ => Err(minijinja::Error::from(minijinja::ErrorKind::UnknownMethod)),
         }
     }
 }
