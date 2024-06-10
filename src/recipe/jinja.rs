@@ -5,7 +5,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::{Kwargs, Object};
+use minijinja::value::{from_args, Kwargs, Object};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -687,6 +687,28 @@ impl std::fmt::Display for Env {
     }
 }
 
+impl Env {
+    fn get(&self, env_var: &str, kwargs: Kwargs) -> Result<Value, minijinja::Error> {
+        let default_value = kwargs.get::<String>("default").ok();
+        kwargs.assert_all_used()?;
+
+        match std::env::var(env_var) {
+            Ok(r) => Ok(Value::from(r)),
+            Err(_) => match default_value {
+                Some(default_value) => Ok(Value::from(default_value)),
+                None => Err(minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    format!("Environment variable {env_var} not found"),
+                )),
+            },
+        }
+    }
+
+    fn exists(&self, env_var: &str) -> Result<Value, minijinja::Error> {
+        Ok(Value::from(std::env::var(env_var).is_ok()))
+    }
+}
+
 impl Object for Env {
     fn kind(&self) -> minijinja::value::ObjectKind<'_> {
         minijinja::value::ObjectKind::Plain
@@ -700,89 +722,12 @@ impl Object for Env {
     ) -> Result<Value, minijinja::Error> {
         match name {
             "get" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`get` requires at least one argument",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`get` only accepts one argument",
-                    ));
-                }
-                let Some(key) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`get` requires a string argument",
-                    ));
-                };
-                match std::env::var(key) {
-                    Ok(r) => Ok(Value::from(r)),
-                    Err(e) => Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        e.to_string(),
-                    )),
-                }
-            }
-            "get_default" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`get_default` requires at least two arguments",
-                    ));
-                };
-                let Some(key) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`get_default` requires string arguments",
-                    ));
-                };
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`get_default` requires at least two arguments",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`get_default` only accepts two arguments",
-                    ));
-                }
-                let Some(default) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`get_default` requires string arguments",
-                    ));
-                };
-                let ret = std::env::var(key).unwrap_or_else(|_| default.to_string());
-                Ok(Value::from(ret))
+                let (args, kwargs) = from_args(args)?;
+                self.get(args, kwargs)
             }
             "exists" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`exists` requires at least one argument",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`exists` only accepts one argument",
-                    ));
-                }
-                let Some(key) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`exists` requires a string argument",
-                    ));
-                };
-                Ok(Value::from(std::env::var(key).is_ok()))
+                let name: (&str,) = from_args(args)?;
+                self.exists(name.0)
             }
             name => Err(minijinja::Error::new(
                 minijinja::ErrorKind::UnknownMethod,
@@ -1226,14 +1171,14 @@ mod tests {
             assert!(jinja.eval("env.get('RANDOM_JINJA_ENV_VAR2')").is_err());
             assert_eq!(
                 jinja
-                    .eval("env.get_default('RANDOM_JINJA_ENV_VAR', 'true')")
+                    .eval("env.get('RANDOM_JINJA_ENV_VAR', default='true')")
                     .expect("test 3")
                     .as_str(),
                 Some("false")
             );
             assert_eq!(
                 jinja
-                    .eval("env.get_default('RANDOM_JINJA_ENV_VAR2', 'true')")
+                    .eval("env.get('RANDOM_JINJA_ENV_VAR2', default='true')")
                     .expect("test 4")
                     .as_str(),
                 Some("true")
