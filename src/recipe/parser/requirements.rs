@@ -505,7 +505,6 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
 mod test {
     use std::str::FromStr;
 
-    use crate::recipe::jinja::PinExpression;
     use crate::render::pin::PinArgs;
 
     use super::*;

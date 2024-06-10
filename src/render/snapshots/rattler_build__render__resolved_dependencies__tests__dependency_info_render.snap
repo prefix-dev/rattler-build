@@ -6,12 +6,12 @@ expression: yaml_str
 - variant: bar
   spec: foo
 - pin_subpackage: baz
-  min_pin: x.x.x
-  max_pin: x.x
+  lower_bound: x.x.x
+  upper_bound: x.x
   exact: true
   spec: baz
 - pin_compatible: bat
-  min_pin: x.x.x
-  max_pin: x.x
+  lower_bound: x.x.x
+  upper_bound: x.x
   exact: true
   spec: bat
