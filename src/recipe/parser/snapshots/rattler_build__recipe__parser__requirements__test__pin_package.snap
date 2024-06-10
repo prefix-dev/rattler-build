@@ -6,14 +6,14 @@ build:
 - foo >=3.1
 - pin_subpackage:
     name: foo
-    min_pin: x.x.x.x
-    max_pin: x.x
+    lower_bound: x.x.x.x
+    upper_bound: x.x
 - pin_compatible:
     name: bar
-    min_pin: x.x
-    max_pin: x.x.x
+    lower_bound: x.x
+    upper_bound: x.x.x
 - pin_compatible:
     name: bar
-    min_pin: x.x
-    max_pin: null
+    lower_bound: x.x
+    upper_bound: null
     exact: true
