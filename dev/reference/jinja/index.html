@@ -1292,15 +1292,20 @@
 
 
 <h1 id="jinja-functions-that-can-be-used-in-the-recipe">Jinja functions that can be used in the recipe<a class="headerlink" href="#jinja-functions-that-can-be-used-in-the-recipe" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the recipe.</p>
+<p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the
+recipe.</p>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
 <h3 id="the-compiler-function">The compiler function<a class="headerlink" href="#the-compiler-function" title="Permanent link">#</a></h3>
-<p>The compiler function can be used to put together a compiler that works for the current platform and the compilation "<code>target_platform</code>".
-The syntax looks like: <code>${{ compiler('c') }}</code> where <code>'c'</code> signifies the programming language that is used.</p>
+<p>The compiler function can be used to put together a compiler that works for the
+current platform and the compilation "<code>target_platform</code>". The syntax looks like:
+<code>${{ compiler('c') }}</code> where <code>'c'</code> signifies the programming language that is
+used.</p>
 <p>This function evaluates to <code>&lt;compiler&gt;_&lt;target_platform&gt; &lt;compiler_version&gt;</code>.
-For example, when compiling <em>on</em> <code>linux</code> and <em>to</em> <code>linux-64</code>, this function evaluates to <code>gcc_linux-64</code>.</p>
-<p>The values can be influenced by the <code>variant_configuration</code>.
-The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with influence. See below for an example:</p>
+For example, when compiling <em>on</em> <code>linux</code> and <em>to</em> <code>linux-64</code>, this function
+evaluates to <code>gcc_linux-64</code>.</p>
+<p>The values can be influenced by the <code>variant_configuration</code>. The
+<code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</code> variables are the keys with
+influence. See below for an example:</p>
 <h4 id="usage-in-a-recipe">Usage in a recipe<a class="headerlink" href="#usage-in-a-recipe" title="Permanent link">#</a></h4>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
@@ -1312,8 +1317,12 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="nt">c_compiler_version</span><span class="p">:</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9.0</span>
 </span></code></pre></div>
-<p>The variables shown above would select the <code>clang</code> compiler in version <code>9.0</code>. Note that the final output will still contain the <code>target_platform</code>, so that the full compiler will read <code>clang_linux-64 9.0</code> when compiling with <code>--target-platform linux-64</code>.</p>
-<p><code>rattler-build</code> defines some default compilers for the following languages (inherited from <code>conda-build</code>):</p>
+<p>The variables shown above would select the <code>clang</code> compiler in version <code>9.0</code>.
+Note that the final output will still contain the <code>target_platform</code>, so that the
+full compiler will read <code>clang_linux-64 9.0</code> when compiling with
+<code>--target-platform linux-64</code>.</p>
+<p><code>rattler-build</code> defines some default compilers for the following languages
+(inherited from <code>conda-build</code>):</p>
 <ul>
 <li><code>c</code>: <code>gcc</code> on Linux, <code>clang</code> on <code>osx</code> and <code>vs2017</code> on Windows</li>
 <li><code>cxx</code>: <code>gxx</code> on Linux, <code>clangxx</code> on <code>osx</code> and <code>vs2017</code> on Windows</li>
@@ -1321,9 +1330,12 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
 <li><code>rust</code>: <code>rust</code></li>
 </ul>
 <h3 id="the-stdlib-function">The <code>stdlib</code> function<a class="headerlink" href="#the-stdlib-function" title="Permanent link">#</a></h3>
-<p>The <code>stdlib</code> function closely mirrors the compiler function. It can be used to put together a standard library that works for the current platform and the compilation "<code>target_platform</code>".</p>
+<p>The <code>stdlib</code> function closely mirrors the compiler function. It can be used to
+put together a standard library that works for the current platform and the
+compilation "<code>target_platform</code>".</p>
 <p>Usage: <code>${{ stdlib('c') }}</code></p>
-<p>Results in <code>&lt;stdlib&gt;_&lt;target_platform&gt; &lt;stdlib_version&gt;</code>. And uses the variant variables <code>&lt;lang&gt;_stdlib</code> and <code>&lt;lang&gt;_stdlib_version</code> to influence the output.</p>
+<p>Results in <code>&lt;stdlib&gt;_&lt;target_platform&gt; &lt;stdlib_version&gt;</code>. And uses the variant
+variables <code>&lt;lang&gt;_stdlib</code> and <code>&lt;lang&gt;_stdlib_version</code> to influence the output.</p>
 <h4 id="usage-in-a-recipe_1">Usage in a recipe:<a class="headerlink" href="#usage-in-a-recipe_1" title="Permanent link">#</a></h4>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
@@ -1340,40 +1352,69 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.17</span>
 </span></code></pre></div>
 <h3 id="the-pin-functions">The <code>pin</code> functions<a class="headerlink" href="#the-pin-functions" title="Permanent link">#</a></h3>
-<p>A pin is created based on the version input (from a subpackage or a package resolution).</p>
+<p>A pin is created based on the version input (from a subpackage or a package
+resolution).</p>
 <p>The pin functions take the following five arguments:</p>
 <ul>
-<li><code>min_pin</code> (default: <code>"x.x.x.x.x.x"</code>): The minimum pin to be used. When set to <code>None</code>, no lower bound is set.</li>
-<li><code>max_pin</code> (default: <code>"x"</code>): The maximum pin to be used. When set to <code>None</code>, no upper bound is set.</li>
+<li><code>min_pin</code> (default: <code>"x.x.x.x.x.x"</code>): The minimum pin to be used. When set to
+  <code>None</code>, no lower bound is set.</li>
+<li><code>max_pin</code> (default: <code>"x"</code>): The maximum pin to be used. When set to <code>None</code>, no
+  upper bound is set.</li>
 </ul>
-<p>These "pins" are applied to the version input to create the lower and upper bounds. For example, if the version is <code>3.10.5</code> with <code>min_pin="x.x", max_pin="x.x.x"</code>, the lower bound will be <code>3.10</code> and the upper bound will be <code>3.10.6.0a0</code>. The <code>max_pin</code> will increment the last selected segment of the version by <code>1</code>, and append <code>.0a0</code> to the end to prevent any alpha versions from being selected.</p>
-<p>If the last segment of the version contains a letter (e.g. <code>9e</code> or <code>1.1.1j</code>), then incrementing the version will set that letter to <code>a</code>, e.g. <code>9e</code> will become <code>10a</code>, and <code>1.1.1j</code> will become <code>1.1.2a</code>. In this case, also no <code>0a0</code> is appended to the end.</p>
-<p>Sometimes you want to strongly connect your outputs. This can be achieved with the following input:</p>
+<p>These "pins" are applied to the version input to create the lower and upper
+bounds. For example, if the version is <code>3.10.5</code> with <code>min_pin="x.x",
+max_pin="x.x.x"</code>, the lower bound will be <code>3.10</code> and the upper bound will be
+<code>3.10.6.0a0</code>. The <code>max_pin</code> will increment the last selected segment of the
+version by <code>1</code>, and append <code>.0a0</code> to the end to prevent any alpha versions from
+being selected.</p>
+<p>If the last segment of the version contains a letter (e.g. <code>9e</code> or <code>1.1.1j</code>),
+then incrementing the version will set that letter to <code>a</code>, e.g. <code>9e</code> will become
+<code>10a</code>, and <code>1.1.1j</code> will become <code>1.1.2a</code>. In this case, also no <code>0a0</code> is
+appended to the end.</p>
+<p>Sometimes you want to strongly connect your outputs. This can be achieved with
+the following input:</p>
 <ul>
-<li><code>exact=True</code> (default: <code>False</code>): This will pin the version exactly to the version of the output, incl. the build string.</li>
+<li><code>exact=True</code> (default: <code>False</code>): This will pin the version exactly to the
+  version of the output, incl. the build string.</li>
 </ul>
-<p>To override the lower or upper bound with a hard-coded value, you can use the following input:</p>
+<p>To override the lower or upper bound with a hard-coded value, you can use the
+following input:</p>
 <ul>
-<li><code>lower_bound</code> (default: <code>None</code>): This will override the lower bound with the given value.</li>
-<li><code>upper_bound</code> (default: <code>None</code>): This will override the upper bound with the given value.</li>
+<li><code>lower_bound</code> (default: <code>None</code>): This will override the lower bound with the
+  given value.</li>
+<li><code>upper_bound</code> (default: <code>None</code>): This will override the upper bound with the
+  given value.</li>
 </ul>
-<p>Both <code>lower_bound</code> and <code>upper_bound</code> expect a valid version string (e.g. <code>1.2.3</code>).</p>
+<p>Both <code>lower_bound</code> and <code>upper_bound</code> expect a valid version string (e.g.
+<code>1.2.3</code>).</p>
 <h4 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h4>
 <ul>
-<li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x") }}</code> creates a pin to another output in the recipe. With an input of <code>3.1.5</code>, this would create a pin of <code>mypkg &gt;=3.1,&lt;3.2.0a0</code>.</li>
-<li><code>${{ pin_subpackage("other_output", exact=True) }}</code> creates a pin to another output in the recipe with an exact version.</li>
-<li><code>${{ pin_subpackage("other_output", lower_bound="1.2.3", upper_bound="1.2.4") }}</code> creates a pin to another output in the recipe with a lower bound of <code>1.2.3</code> and an upper bound of <code>1.2.4</code>. This is equivalent to writing <code>other_output &gt;=1.2.3,&lt;1.2.4</code>.</li>
+<li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x") }}</code> creates a pin
+  to another output in the recipe. With an input of <code>3.1.5</code>, this would create a
+  pin of <code>mypkg &gt;=3.1,&lt;3.2.0a0</code>.</li>
+<li><code>${{ pin_subpackage("other_output", exact=True) }}</code> creates a pin to another
+  output in the recipe with an exact version.</li>
+<li><code>${{ pin_subpackage("other_output", lower_bound="1.2.3", upper_bound="1.2.4")
+  }}</code> creates a pin to another output in the recipe with a lower bound of
+  <code>1.2.3</code> and an upper bound of <code>1.2.4</code>. This is equivalent to writing
+  <code>other_output &gt;=1.2.3,&lt;1.2.4</code>.</li>
 </ul>
 <h4 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h4>
-<p>The pin compatible function works exactly as the <code>pin_subpackage</code> function, but it pins the package in the run requirements based on the resolved package of the <code>host</code> or <code>build</code> section.</p>
+<p>The pin compatible function works exactly as the <code>pin_subpackage</code> function, but
+it pins the package in the run requirements based on the resolved package of the
+<code>host</code> or <code>build</code> section.</p>
 <ul>
-<li><code>pin_compatible</code> pins a package in the run requirements based on the resolved package of the <code>host</code> or <code>build</code> section.</li>
+<li><code>pin_compatible</code> pins a package in the run requirements based on the resolved
+  package of the <code>host</code> or <code>build</code> section.</li>
 </ul>
 <h3 id="the-cdt-function">The <code>cdt</code> function<a class="headerlink" href="#the-cdt-function" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ cdt("mypkg") }}</code> creates a cross-dependency to another output in the recipe.</li>
+<li><code>${{ cdt("mypkg") }}</code> creates a cross-dependency to another output in the
+  recipe.</li>
 </ul>
-<p>This function helps add Core Dependency Tree packages as dependencies by converting packages as required according to hard-coded logic. See below for an example of how this function can be used:</p>
+<p>This function helps add Core Dependency Tree packages as dependencies by
+converting packages as required according to hard-coded logic. See below for an
+example of how this function can be used:</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># on x86_64 system</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="l l-Scalar l-Scalar-Plain">cdt(&#39;package-name&#39;)</span><span class="w"> </span><span class="c1"># outputs: package-name-cos6-x86_64</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># on aarch64 system</span>
@@ -1381,25 +1422,35 @@ The <code>&lt;lang&gt;_compiler</code> and <code>&lt;lang&gt;_compiler_version</
 </span></code></pre></div>
 <h3 id="the-hash-variable">The <code>hash</code> variable<a class="headerlink" href="#the-hash-variable" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ hash }}</code> is the variant hash and is useful in the build string computation.</li>
+<li><code>${{ hash }}</code> is the variant hash and is useful in the build string
+  computation.</li>
 </ul>
 <h3 id="the-version_to_buildstring-function">The <code>version_to_buildstring</code> function<a class="headerlink" href="#the-version_to_buildstring-function" title="Permanent link">#</a></h3>
 <ul>
-<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant to a build string (it removes the <code>.</code> character and takes only the first two elements of the version).</li>
+<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant
+  to a build string (it removes the <code>.</code> character and takes only the first two
+  elements of the version).</li>
 </ul>
 <h3 id="the-env-object">The <code>env</code> object<a class="headerlink" href="#the-env-object" title="Permanent link">#</a></h3>
-<p>You can use the <code>env</code> object to retrieve environment variables and forward them to your build script. There are two ways to do this:</p>
-<ul>
-<li><code>${{ env.get("MY_ENV_VAR") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or throw an error if it is not set.</li>
-<li><code>${{ env.get_default("MY_ENV_VAR", "default_value") }}</code> will return the value of the environment variable <code>MY_ENV_VAR</code> or <code>"default_value"</code> if it is not set.</li>
-</ul>
+<p>You can use the <code>env</code> object to retrieve environment variables and forward them
+to your build script. <code>${{ env.get("MY_ENV_VAR") }}</code> will return the value of
+the environment variable <code>MY_ENV_VAR</code> or throw an error if it is not set.</p>
+<p>To supply a default value when the environment variable is not set, you can use
+<code>${{ env.get("MY_ENV_VAR", default="default_value") }}</code>. In this case, if
+<code>MY_ENV_VAR</code> is not set, the value <code>default_value</code> will be returned (and no
+error is thrown).</p>
 <p>You can also check for the existence of an environment variable:</p>
 <ul>
-<li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
+<li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment
+  variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
 </ul>
 <h2 id="default-jinja-filters">Default Jinja filters<a class="headerlink" href="#default-jinja-filters" title="Permanent link">#</a></h2>
-<p>The following Jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into characters (e.g. <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version }}.tar.gz</code>).</p>
-<p>Navigate to the <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#built-in-filters">Minijinja documentation</a> for a list of all available built-in filters.</p>
+<p>The following Jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into
+characters (e.g. <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version
+}}.tar.gz</code>).</p>
+<p>Navigate to the <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#built-in-filters">Minijinja
+documentation</a>
+for a list of all available built-in filters.</p>
 
 
 

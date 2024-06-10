@@ -2593,8 +2593,8 @@ Jinja.</p>
 <p>There are three functions:</p>
 <ul>
 <li><code>env.get("ENV_VAR")</code> will insert the value of "ENV_VAR" into the recipe.</li>
-<li><code>env.get_default("ENV_VAR", "undefined")</code> will insert the value of "ENV_VAR"
-  into the recipe or, if "ENV_VAR" is not defined, the specified default value
+<li><code>env.get("ENV_VAR", default="undefined")</code> will insert the value of <code>ENV_VAR</code>
+  into the recipe or, if <code>ENV_VAR</code> is not defined, the specified default value
   (in this case "undefined")</li>
 <li><code>env.exists("ENV_VAR")</code> returns a boolean true of false if the env var is set
   to any value</li>
