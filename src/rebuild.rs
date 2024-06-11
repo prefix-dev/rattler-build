@@ -1,6 +1,10 @@
 //! The rebuild module contains rebuild helper functions.
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{self, Permissions},
+    os::unix::fs::PermissionsExt,
+    path::{Path, PathBuf},
+};
 
 use rattler_conda_types::package::ArchiveType;
 
@@ -12,6 +16,7 @@ fn folder_from_tar_bz2(
 ) -> Result<(), std::io::Error> {
     let reader = std::fs::File::open(archive_path)?;
     let mut archive = rattler_package_streaming::read::stream_tar_bz2(reader);
+    archive.set_preserve_permissions(true);
 
     for entry in archive.entries()? {
         let mut entry = entry?;
@@ -23,8 +28,7 @@ fn folder_from_tar_bz2(
                     std::fs::create_dir_all(parent_folder)?;
                 }
             }
-            let mut dest_file = std::fs::File::create(dest_file)?;
-            std::io::copy(&mut entry, &mut dest_file)?;
+            entry.unpack(dest_file)?;
         }
     }
     Ok(())
@@ -45,6 +49,8 @@ fn folder_from_conda(
         todo!("Not implemented yet");
     };
 
+    archive.set_preserve_permissions(true);
+
     for entry in archive.entries()? {
         let mut entry = entry?;
         let path = entry.path()?;
@@ -55,8 +61,7 @@ fn folder_from_conda(
                     std::fs::create_dir_all(parent_folder)?;
                 }
             }
-            let mut dest_file = std::fs::File::create(dest_file)?;
-            std::io::copy(&mut entry, &mut dest_file)?;
+            entry.unpack(dest_file)?;
         }
     }
     Ok(())
