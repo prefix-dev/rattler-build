@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.16.2"
+version = "0.17.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -52,9 +52,9 @@ tokio = { version = "1.38.0", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
 serde_with = "3.8.1"
-url = "2.5.0"
+url = "2.5.1"
 tracing = "0.1.40"
-clap = { version = "4.5.4", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.7", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=1.0.14", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -89,7 +89,7 @@ indexmap = "2.2.6"
 dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "6.0.1"
-clap_complete = "4.5.2"
+clap_complete = "4.5.5"
 tokio-util = "0.7.11"
 
 tar = "0.4.41"
@@ -114,10 +114,10 @@ crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "4.0.1", optional = true }
 throbber-widgets-tui = { version = "0.5.0", optional = true }
 tui-input = { version = "0.8.0", optional = true }
-reflink-copy = "0.1.17"
+reflink-copy = "0.1.18"
 rayon = "1.10.0"
 patch = "0.7.0"
-regex = "1.10.4"
+regex = "1.10.5"
 clap-markdown = { version = "0.1.3", optional = true }
 
 [dev-dependencies]
