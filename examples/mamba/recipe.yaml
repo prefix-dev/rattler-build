@@ -51,7 +51,7 @@ outputs:
       run:
         - libsolv >=0.7.23
       run_exports:
-        - ${{ pin_subpackage('libmamba', max_pin='x.x') }}
+        - ${{ pin_subpackage('libmamba', upper_bound='x.x') }}
       ignore_run_exports:
         by_name:
           - spdlog
@@ -112,7 +112,7 @@ outputs:
         - python
         - ${{ pin_subpackage('libmamba', exact=True) }}
       run_exports:
-        - ${{ pin_subpackage('libmambapy', max_pin='x.x') }}
+        - ${{ pin_subpackage('libmambapy', upper_bound='x.x') }}
       ignore_run_exports:
         by_name:
           - spdlog

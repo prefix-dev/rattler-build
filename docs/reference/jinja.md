@@ -87,19 +87,22 @@ c_stdlib_version:
 A pin is created based on the version input (from a subpackage or a package
 resolution).
 
-The pin functions take the following five arguments:
+The pin functions take the following three arguments:
 
-- `min_pin` (default: `"x.x.x.x.x.x"`): The minimum pin to be used. When set to
-  `None`, no lower bound is set.
-- `max_pin` (default: `"x"`): The maximum pin to be used. When set to `None`, no
-  upper bound is set.
+- `lower_bound` (default: `"x.x.x.x.x.x"`): The lower bound pin expression to be
+  used. When set to `None`, no lower bound is set.
+- `upper_bound` (default: `"x"`): The maximum pin to be used. When set to
+  `None`, no upper bound is set.
 
-These "pins" are applied to the version input to create the lower and upper
-bounds. For example, if the version is `3.10.5` with `min_pin="x.x",
-max_pin="x.x.x"`, the lower bound will be `3.10` and the upper bound will be
-`3.10.6.0a0`. The `max_pin` will increment the last selected segment of the
-version by `1`, and append `.0a0` to the end to prevent any alpha versions from
-being selected.
+The lower bound and upper bound can either be a "pin expression" (only `x` and
+`.` are allowed) or a hard-coded version string.
+
+A "pin expression" is applied to the version input to create the lower and upper
+bounds. For example, if the version is `3.10.5` with a  `lower_bound="x.x",
+upper_bound="x.x.x"`, the lower bound will be `3.10` and the upper bound will be
+`3.10.6.0a0`. A pin expression for the `upper_bound` will increment the last
+selected segment of the version by `1`, and append `.0a0` to the end to prevent
+any alpha versions from being selected.
 
 If the last segment of the version contains a letter (e.g. `9e` or `1.1.1j`),
 then incrementing the version will set that letter to `a`, e.g. `9e` will become
@@ -125,7 +128,7 @@ Both `lower_bound` and `upper_bound` expect a valid version string (e.g.
 
 #### The `pin_subpackage` function
 
-- `${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x") }}` creates a pin
+- `${{ pin_subpackage("mypkg", lower_bound="x.x", upper_bound="x.x") }}` creates a pin
   to another output in the recipe. With an input of `3.1.5`, this would create a
   pin of `mypkg >=3.1,<3.2.0a0`.
 - `${{ pin_subpackage("other_output", exact=True) }}` creates a pin to another

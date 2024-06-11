@@ -23,7 +23,7 @@ outputs:
         - python >=3.10
         - pip
       run:
-        - ${{ pin_subpackage(name_a, min_pin="x.x.x") }}
+        - ${{ pin_subpackage(name_a, lower_bound="x.x.x") }}
         - python >=3.10
   - package:
       name: ${{ name_a }}
