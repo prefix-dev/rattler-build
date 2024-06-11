@@ -3,6 +3,7 @@
 //! rattler-build library.
 
 pub mod build;
+pub mod cache;
 pub mod console_utils;
 pub mod metadata;
 pub mod opt;
@@ -296,6 +297,7 @@ pub async fn get_build_output(
                 force_colors: args.color_build_log && console::colors_enabled(),
             },
             finalized_dependencies: None,
+            finalized_cache_dependencies: None,
             finalized_sources: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),

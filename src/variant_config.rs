@@ -402,6 +402,7 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
+
             let noarch_type = parsed_recipe.build().noarch();
             // add in any host and build dependencies
             used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
@@ -519,8 +520,7 @@ impl VariantConfig {
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
             let build_time_requirements = parsed_recipe
-                .requirements()
-                .build_time()
+                .build_time_requirements()
                 .cloned()
                 .filter_map(|dep| {
                     // here we filter python as a variant and don't take it's passed variants
@@ -620,29 +620,30 @@ impl VariantConfig {
                     })?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
-                let requirements = parsed_recipe.requirements();
-                requirements.build_time().for_each(|dep| match dep {
-                    Dependency::Spec(spec) => {
-                        if let Some(name) = &spec.name {
-                            let val = name.as_normalized().to_owned();
-                            used_variables.insert(val);
+                parsed_recipe
+                    .build_time_requirements()
+                    .for_each(|dep| match dep {
+                        Dependency::Spec(spec) => {
+                            if let Some(name) = &spec.name {
+                                let val = name.as_normalized().to_owned();
+                                used_variables.insert(val);
+                            }
                         }
-                    }
-                    Dependency::PinSubpackage(pin_sub) => {
-                        let pin = pin_sub.pin_value();
-                        let val = pin.name.as_normalized().to_owned();
-                        if pin.args.exact {
-                            exact_pins.insert(val);
+                        Dependency::PinSubpackage(pin_sub) => {
+                            let pin = pin_sub.pin_value();
+                            let val = pin.name.as_normalized().to_owned();
+                            if pin.args.exact {
+                                exact_pins.insert(val);
+                            }
                         }
-                    }
-                    Dependency::PinCompatible(pin_compatible) => {
-                        let pin = pin_compatible.pin_value();
-                        let val = pin.name.as_normalized().to_owned();
-                        if pin.args.exact {
-                            exact_pins.insert(val);
+                        Dependency::PinCompatible(pin_compatible) => {
+                            let pin = pin_compatible.pin_value();
+                            let val = pin.name.as_normalized().to_owned();
+                            if pin.args.exact {
+                                exact_pins.insert(val);
+                            }
                         }
-                    }
-                });
+                    });
 
                 // actually used vars
                 let mut used_filtered = combination
@@ -663,11 +664,12 @@ impl VariantConfig {
                     }
                 }
 
-                requirements
+                parsed_recipe
+                    .requirements()
                     .run
                     .iter()
-                    .chain(requirements.run_constraints.iter())
-                    .chain(requirements.run_exports().all())
+                    .chain(parsed_recipe.requirements().run_constraints.iter())
+                    .chain(parsed_recipe.requirements().run_exports().all())
                     .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();

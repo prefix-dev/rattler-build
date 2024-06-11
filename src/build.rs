@@ -11,7 +11,6 @@ use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
 use crate::recipe::parser::TestType;
 use crate::render::solver::load_repodatas;
-use crate::utils::remove_dir_all_force;
 use crate::{package_test, tool_configuration};
 
 /// Check if the build should be skipped because it already exists in any of the channels
@@ -127,6 +126,8 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    let output = output.build_or_fetch_cache(tool_configuration).await?;
+
     let output = output
         .resolve_dependencies(tool_configuration)
         .await
@@ -156,7 +157,7 @@ pub async fn run_build(
     }
 
     if !tool_configuration.no_clean {
-        remove_dir_all_force(&directories.build_dir).into_diagnostic()?;
+        directories.clean().into_diagnostic()?;
     }
 
     if tool_configuration.no_test {
@@ -180,8 +181,8 @@ pub async fn run_build(
 
     drop(enter);
 
-    if !tool_configuration.no_clean && directories.build_dir.exists() {
-        remove_dir_all_force(&directories.build_dir).into_diagnostic()?;
+    if !tool_configuration.no_clean {
+        directories.clean().into_diagnostic()?;
     }
 
     Ok((output, result))

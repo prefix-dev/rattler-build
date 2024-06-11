@@ -94,7 +94,6 @@ impl Files {
         };
 
         let current_files = record_files(prefix)?;
-
         let mut difference = current_files
             .difference(&previous_files)
             // If we have an files glob, we only include files that match the glob
@@ -110,7 +109,7 @@ impl Files {
                 let file_without_prefix =
                     file.strip_prefix(prefix).expect("File should be in prefix");
                 if always_include.is_match(file_without_prefix) {
-                    tracing::info!("Forcing inclusion of file: {:?}", file);
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
                     difference.insert(file);
                 }
             }

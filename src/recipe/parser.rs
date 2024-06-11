@@ -20,6 +20,7 @@ use crate::{
 
 mod about;
 mod build;
+mod cache;
 mod glob_vec;
 mod helper;
 mod output;
@@ -34,6 +35,7 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, DynamicLinking, PrefixDetection},
+    cache::Cache,
     glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
@@ -59,6 +61,10 @@ pub struct Recipe {
     pub schema_version: u64,
     /// The package information
     pub package: Package,
+    /// The cache build that should be used for this package
+    /// This is the same for all outputs of a recipe
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Cache>,
     /// The information about where to obtain the sources
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
@@ -150,6 +156,7 @@ impl Recipe {
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
         let hash = jinja_opt.hash.clone();
+        let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
@@ -203,6 +210,7 @@ impl Recipe {
         let mut requirements = Requirements::default();
         let mut tests = Vec::default();
         let mut about = About::default();
+        let mut cache = None;
 
         rendered_node
             .iter()
@@ -218,6 +226,17 @@ impl Recipe {
                         help =
                             "The recipe field is only allowed in conjunction with multiple outputs"
                     )])
+                    }
+                    "cache" => {
+                        if experimental {
+                            cache = Some(value.try_convert(key_str)?)
+                        } else {
+                            return Err(vec![_partialerror!(
+                                *key.span(),
+                                ErrorKind::ExperimentalOnly("cache".to_string()),
+                                help = "The `cache` key is only allowed in experimental mode (`--experimental`)"
+                            )])
+                        }
                     }
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
@@ -262,6 +281,7 @@ impl Recipe {
                     help = "add the required field `package`"
                 )]
             })?,
+            cache,
             build,
             source,
             requirements,

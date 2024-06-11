@@ -188,6 +188,10 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     x = actual_run_export["weak"][0]
     assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
 
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json.get("depends") is None
+
 
 def host_subdir():
     """return conda subdir based on current platform"""
@@ -877,3 +881,24 @@ def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     for d in deps:
         if d["name"] == "sphinx":
             assert d["channel"] == "https://conda.anaconda.org/quantstack/"
+
+
+def test_run_exports_from(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "run_exports_from",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "run_exports_test")
+
+    assert (pkg / "info/run_exports.json").exists()
+
+    actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
+    assert set(actual_run_export.keys()) == {"weak"}
+    assert len(actual_run_export["weak"]) == 1
+    x = actual_run_export["weak"][0]
+    assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
+
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json.get("depends") is None

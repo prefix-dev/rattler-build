@@ -1,5 +1,4 @@
 //! Parsing for the requirements section of the recipe.
-
 use crate::recipe::parser::FlattenErrors;
 use indexmap::IndexSet;
 use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness};
@@ -17,6 +16,8 @@ use crate::{
     },
     render::pin::Pin,
 };
+
+use super::Recipe;
 
 /// The requirements at build- and runtime are defined in the `requirements` section of the recipe.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -54,6 +55,22 @@ pub struct Requirements {
     /// Ignore run-exports by name or from certain packages
     #[serde(default, skip_serializing_if = "IgnoreRunExports::is_empty")]
     pub ignore_run_exports: IgnoreRunExports,
+}
+
+impl Recipe {
+    /// Retrieve all build time requirements, including those from the cache.
+    pub fn build_time_requirements(&self) -> Box<dyn Iterator<Item = &Dependency> + '_> {
+        if let Some(cache) = self.cache.as_ref() {
+            Box::new(
+                cache
+                    .requirements
+                    .build_time()
+                    .chain(self.requirements.build_time()),
+            )
+        } else {
+            Box::new(self.requirements.build_time())
+        }
+    }
 }
 
 impl Requirements {
@@ -98,7 +115,7 @@ impl Requirements {
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
-            .chain(self.run_constraints.iter())
+        // .chain(self.run_constraints.iter())
     }
 
     /// Check if all requirements are empty.

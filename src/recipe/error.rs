@@ -160,6 +160,10 @@ pub enum ErrorKind {
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
     Other,
+
+    /// Error when parsing a field that is experimental only
+    #[diagnostic(code(error::experimental))]
+    ExperimentalOnly(String),
 }
 
 /// Partial error type, almost the same as the [`ParsingError`] but without the source string.
@@ -266,6 +270,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::GlobParsing(err) => write!(f, "failed to parse glob: {}", err),
             ErrorKind::RegexParsing(err) => write!(f, "failed to parse regex: {}", err),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
+            ErrorKind::ExperimentalOnly(s) => write!(f, "experimental only: `{}`.", s),
         }
     }
 }
