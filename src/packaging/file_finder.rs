@@ -109,7 +109,7 @@ impl Files {
                 let file_without_prefix =
                     file.strip_prefix(prefix).expect("File should be in prefix");
                 if always_include.is_match(file_without_prefix) {
-                    tracing::info!("Forcing inclusion of file: {:?}", file);
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
                     difference.insert(file);
                 }
             }

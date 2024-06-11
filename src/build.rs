@@ -1,9 +1,7 @@
 //! The build module contains the code for running the build process for a given [`Output`]
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
-use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::path::PathBuf;
-use std::{fs, vec};
+use std::vec;
 
 use miette::IntoDiagnostic;
 use rattler_index::index;
@@ -11,12 +9,9 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::metadata::Output;
 use crate::package_test::TestConfiguration;
-use crate::packaging::Files;
-use crate::recipe::parser::{Requirements, TestType};
-use crate::render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies};
+use crate::recipe::parser::TestType;
 use crate::render::solver::load_repodatas;
-use crate::source::copy_dir::{copy_file, CopyOptions};
-use crate::{env_vars, package_test, tool_configuration};
+use crate::{package_test, tool_configuration};
 
 /// Check if the build should be skipped because it already exists in any of the channels
 pub async fn skip_existing(
@@ -191,137 +186,4 @@ pub async fn run_build(
     }
 
     Ok((output, result))
-}
-
-///  Cache for a build
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Cache {
-    /// ads
-    pub requirements: Requirements,
-    /// asd
-    pub finalized_dependencies: FinalizedDependencies,
-    /// asd
-    pub prefix_files: Vec<PathBuf>,
-}
-
-impl Output {
-    pub(crate) async fn build_or_fetch_cache(
-        &self,
-        tool_configuration: &crate::tool_configuration::Configuration,
-    ) -> Result<Self, miette::Error> {
-        // if we don't have a cache, we need to run the cache build with our current workdir, and then return the cache
-        let span = tracing::info_span!("Running cache build");
-        let _enter = span.enter();
-
-        let host_prefix = self.build_configuration.directories.host_prefix.clone();
-        let target_platform = self.build_configuration.target_platform;
-        let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
-
-        if let Some(cache) = &self.recipe.cache {
-            // TODO this is a placeholder for the cache key
-            println!("Cache key: {}", self.cache_key().into_diagnostic()?);
-            let cache_key = format!("bld_{}", self.cache_key().into_diagnostic()?);
-
-            let cache_dir = self
-                .build_configuration
-                .directories
-                .cache_dir
-                .join(cache_key);
-
-            // restore the cache if it exists by copying the files to the prefix
-            if cache_dir.exists() {
-                tracing::info!("Restoring cache from {:?}", cache_dir);
-                let cache: Cache = serde_json::from_str(
-                    &fs::read_to_string(cache_dir.join("cache.json")).into_diagnostic()?,
-                )
-                .unwrap();
-                let copy_options = CopyOptions {
-                    skip_exist: true,
-                    ..Default::default()
-                };
-                let mut paths_created = HashSet::new();
-                for f in &cache.prefix_files {
-                    tracing::info!("Restoring: {:?}", f);
-                    let dest = &host_prefix.join(f);
-                    let source = &cache_dir.join("prefix").join(f);
-                    copy_file(source, dest, &mut paths_created, &copy_options).into_diagnostic()?;
-                }
-
-                return Ok(Output {
-                    finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
-                    ..self.clone()
-                });
-            }
-
-            // create directories (would be done by env creation)
-            fs::create_dir_all(&self.build_configuration.directories.work_dir).into_diagnostic()?;
-            fs::create_dir_all(&self.build_configuration.directories.host_prefix)
-                .into_diagnostic()?;
-            fs::create_dir_all(&self.build_configuration.directories.build_prefix)
-                .into_diagnostic()?;
-
-            let channels = self.reindex_channels().unwrap();
-
-            let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
-                    .await
-                    .unwrap();
-
-            cache
-                .build
-                .script()
-                .run_script(
-                    env_vars,
-                    &self.build_configuration.directories.work_dir,
-                    &self.build_configuration.directories.recipe_dir,
-                    &self.build_configuration.directories.host_prefix,
-                    Some(&self.build_configuration.directories.build_prefix),
-                )
-                .await
-                .into_diagnostic()?;
-
-            // find the new files in the prefix and add them to the cache
-            let new_files = Files::from_prefix(
-                &self.build_configuration.directories.host_prefix,
-                cache.build.always_include_files(),
-                cache.build.files(),
-            )
-            .into_diagnostic()?;
-
-            // create the cache dir and copy the new files to it
-            let prefix_cache_dir = cache_dir.join("prefix");
-            fs::create_dir_all(&prefix_cache_dir).into_diagnostic()?;
-
-            let mut creation_cache = HashSet::new();
-            let mut copied_files = Vec::new();
-            let copy_options = CopyOptions::default();
-            for file in &new_files.new_files {
-                if file.is_dir() && !file.is_symlink() {
-                    continue;
-                }
-                let stripped = file
-                    .strip_prefix(&host_prefix)
-                    .expect("File should be in prefix");
-                let dest = &prefix_cache_dir.join(stripped);
-                copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
-                copied_files.push(stripped.to_path_buf());
-            }
-
-            // save the cache
-            let cache = Cache {
-                requirements: cache.requirements.clone(),
-                finalized_dependencies: finalized_dependencies.clone(),
-                prefix_files: copied_files,
-            };
-            let cache_file = cache_dir.join("cache.json");
-            fs::write(cache_file, serde_json::to_string(&cache).unwrap()).into_diagnostic()?;
-            Ok(Output {
-                finalized_cache_dependencies: Some(finalized_dependencies),
-                ..self.clone()
-            })
-        } else {
-            Ok(self.clone())
-        }
-    }
 }

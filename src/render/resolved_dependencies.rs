@@ -693,7 +693,6 @@ pub(crate) async fn resolve_dependencies(
     let pkgs_dir = cache_dir.join("pkgs");
 
     let mut compatibility_specs = HashMap::new();
-    tracing::info!("Requirements: {:?}", requirements);
 
     let build_env = if !requirements.build.is_empty() && !merge_build_host {
         let build_env_specs = apply_variant(

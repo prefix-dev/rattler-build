@@ -1,9 +1,21 @@
 //! Functions to deal with the build cache
-use std::collections::{BTreeMap, HashSet};
-
+use fs_err as fs;
+use miette::IntoDiagnostic;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 
-use crate::{metadata::Output, recipe::parser::Dependency};
+use crate::{
+    env_vars,
+    metadata::Output,
+    packaging::Files,
+    recipe::parser::{Dependency, Requirements},
+    render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies},
+    source::copy_dir::{copy_file, CopyOptions},
+};
 
 /// Error type for cache key generation
 #[derive(Debug, thiserror::Error)]
@@ -14,6 +26,17 @@ pub enum CacheKeyError {
     /// Error serializing cache key with serde_json
     #[error("Error serializing cache: {0}")]
     Serde(#[from] serde_json::Error),
+}
+
+///  Cache information for a build
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Cache {
+    /// The requirements that were used to build the cache
+    pub requirements: Requirements,
+    /// The finalized dependencies
+    pub finalized_dependencies: FinalizedDependencies,
+    /// The prefix files that are included in the cache
+    pub prefix_files: Vec<PathBuf>,
 }
 
 impl Output {
@@ -64,6 +87,126 @@ impl Output {
             Ok(format!("{:x}", result))
         } else {
             Err(CacheKeyError::NoCacheKeyAvailable)
+        }
+    }
+
+    /// Restore an existing cache from a cache directory
+    async fn restore_cache(&self, cache_dir: PathBuf) -> Result<Output, miette::Error> {
+        let cache: Cache = serde_json::from_str(
+            &fs::read_to_string(cache_dir.join("cache.json")).into_diagnostic()?,
+        )
+        .into_diagnostic()?;
+        let copy_options = CopyOptions {
+            skip_exist: true,
+            ..Default::default()
+        };
+
+        let mut paths_created = HashSet::new();
+        for f in &cache.prefix_files {
+            tracing::info!("Restoring from cache: {:?}", f);
+            let dest = self.prefix().join(f);
+            let source = &cache_dir.join("prefix").join(f);
+            copy_file(source, dest, &mut paths_created, &copy_options).into_diagnostic()?;
+        }
+
+        return Ok(Output {
+            finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
+            ..self.clone()
+        });
+    }
+
+    pub(crate) async fn build_or_fetch_cache(
+        &self,
+        tool_configuration: &crate::tool_configuration::Configuration,
+    ) -> Result<Self, miette::Error> {
+        // if we don't have a cache, we need to run the cache build with our current workdir, and then return the cache
+        let span = tracing::info_span!("Running cache build");
+        let _enter = span.enter();
+
+        let target_platform = self.build_configuration.target_platform;
+        let mut env_vars = env_vars::vars(self, "BUILD");
+        env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+
+        if let Some(cache) = &self.recipe.cache {
+            tracing::info!("Cache key: {:?}", self.cache_key().into_diagnostic()?);
+            let cache_key = format!("bld_{}", self.cache_key().into_diagnostic()?);
+
+            let cache_dir = self
+                .build_configuration
+                .directories
+                .cache_dir
+                .join(cache_key);
+
+            // restore the cache if it exists by copying the files to the prefix
+            if cache_dir.exists() {
+                tracing::info!("Restoring cache from {:?}", cache_dir);
+                return self.restore_cache(cache_dir).await;
+            }
+
+            let channels = self.reindex_channels().unwrap();
+
+            let finalized_dependencies =
+                resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
+                    .await
+                    .unwrap();
+
+            cache
+                .build
+                .script()
+                .run_script(
+                    env_vars,
+                    &self.build_configuration.directories.work_dir,
+                    &self.build_configuration.directories.recipe_dir,
+                    &self.build_configuration.directories.host_prefix,
+                    Some(&self.build_configuration.directories.build_prefix),
+                )
+                .await
+                .into_diagnostic()?;
+
+            // find the new files in the prefix and add them to the cache
+            let new_files = Files::from_prefix(
+                self.prefix(),
+                cache.build.always_include_files(),
+                cache.build.files(),
+            )
+            .into_diagnostic()?;
+
+            // create the cache dir and copy the new files to it
+            let prefix_cache_dir = cache_dir.join("prefix");
+            fs::create_dir_all(&prefix_cache_dir).into_diagnostic()?;
+
+            let mut creation_cache = HashSet::new();
+            let mut copied_files = Vec::new();
+            let copy_options = CopyOptions::default();
+            for file in &new_files.new_files {
+                // skip directories (if they are not a symlink)
+                // directories are implicitly created by the files
+                if file.is_dir() && !file.is_symlink() {
+                    continue;
+                }
+                let stripped = file
+                    .strip_prefix(self.prefix())
+                    .expect("File should be in prefix");
+                let dest = &prefix_cache_dir.join(stripped);
+                copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
+                copied_files.push(stripped.to_path_buf());
+            }
+
+            // save the cache
+            let cache = Cache {
+                requirements: cache.requirements.clone(),
+                finalized_dependencies: finalized_dependencies.clone(),
+                prefix_files: copied_files,
+            };
+            let cache_file = cache_dir.join("cache.json");
+            fs::write(cache_file, serde_json::to_string(&cache).unwrap()).into_diagnostic()?;
+
+            Ok(Output {
+                finalized_cache_dependencies: Some(finalized_dependencies),
+                ..self.clone()
+            })
+        } else {
+            Ok(self.clone())
         }
     }
 }
