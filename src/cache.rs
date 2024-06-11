@@ -109,10 +109,10 @@ impl Output {
             copy_file(source, dest, &mut paths_created, &copy_options).into_diagnostic()?;
         }
 
-        return Ok(Output {
+        Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
             ..self.clone()
-        });
+        })
     }
 
     pub(crate) async fn build_or_fetch_cache(

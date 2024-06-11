@@ -233,7 +233,7 @@ impl Recipe {
                         } else {
                             return Err(vec![_partialerror!(
                                 *key.span(),
-                                ErrorKind::ExperimentalOnly("cache".to_string().into()),
+                                ErrorKind::ExperimentalOnly("cache".to_string()),
                                 help = "The `cache` key is only allowed in experimental mode (`--experimental`)"
                             )])
                         }
