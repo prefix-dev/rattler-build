@@ -156,6 +156,7 @@ impl Recipe {
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
         let hash = jinja_opt.hash.clone();
+        let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
@@ -226,7 +227,17 @@ impl Recipe {
                             "The recipe field is only allowed in conjunction with multiple outputs"
                     )])
                     }
-                    "cache" => cache = Some(value.try_convert(key_str)?),
+                    "cache" => {
+                        if experimental {
+                            cache = Some(value.try_convert(key_str)?)
+                        } else {
+                            return Err(vec![_partialerror!(
+                                *key.span(),
+                                ErrorKind::ExperimentalOnly("cache".to_string().into()),
+                                help = "The `cache` key is only allowed in experimental mode (`--experimental`)"
+                            )])
+                        }
+                    }
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
                     "requirements" => requirements = value.try_convert(key_str)?,
