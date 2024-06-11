@@ -26,7 +26,6 @@ pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
-pub mod rebuild;
 pub mod recipe_generator;
 mod unix;
 pub mod upload;
@@ -39,6 +38,7 @@ use metadata::Output;
 use miette::{IntoDiagnostic, WrapErr};
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use rattler_package_streaming::archive::Archive;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use recipe::parser::Dependency;
 use std::{
@@ -416,7 +416,12 @@ pub async fn rebuild_from_args(
     // and then run the rendered recipe with the same arguments as the original build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+    let path = PathBuf::from("info/recipe");
+    let archive = Archive::try_from(args.package_file).into_diagnostic()?;
+
+    archive
+        .extract_a_folder(&path, temp_folder.path())
+        .into_diagnostic()?;
 
     let temp_dir = temp_folder.into_path();
 

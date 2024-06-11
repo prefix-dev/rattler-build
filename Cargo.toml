@@ -155,14 +155,14 @@ pre-build = [
 clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main"}
 
 
-# rattler = { path = "../rattler/crates/rattler" }
-# rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
-# rattler_digest = { path = "../rattler/crates/rattler_digest" }
-# rattler_index = { path = "../rattler/crates/rattler_index" }
-# rattler_networking = { path = "../rattler/crates/rattler_networking" }
-# rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
-# rattler_shell = { path = "../rattler/crates/rattler_shell" }
-# rattler_solve = { path = "../rattler/crates/rattler_solve" }
-# rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-# rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
+rattler = { path = "../rattler-1/crates/rattler" }
+rattler_conda_types = { path = "../rattler-1/crates/rattler_conda_types" }
+rattler_digest = { path = "../rattler-1/crates/rattler_digest" }
+rattler_index = { path = "../rattler-1/crates/rattler_index" }
+rattler_networking = { path = "../rattler-1/crates/rattler_networking" }
+rattler_repodata_gateway = { path = "../rattler-1/crates/rattler_repodata_gateway" }
+rattler_shell = { path = "../rattler-1/crates/rattler_shell" }
+rattler_solve = { path = "../rattler-1/crates/rattler_solve" }
+rattler_virtual_packages = { path = "../rattler-1/crates/rattler_virtual_packages" }
+rattler_package_streaming = { path = "../rattler-1/crates/rattler_package_streaming" }
 #clap-markdown = { path = "../clap-markdown" }
