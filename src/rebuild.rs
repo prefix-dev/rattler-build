@@ -1,10 +1,6 @@
 //! The rebuild module contains rebuild helper functions.
 
-use std::{
-    fs::{self, Permissions},
-    os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use rattler_conda_types::package::ArchiveType;
 
