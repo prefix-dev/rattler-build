@@ -484,9 +484,76 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 pub(crate) struct Git {
     pub(crate) experimental: bool,
 }
+
 impl std::fmt::Display for Git {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Git")
+    }
+}
+
+fn get_command_output(command: &str, args: &[&str]) -> Result<String, minijinja::Error> {
+    let output = Command::new(command).args(args).output().map_err(|e| {
+        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+    })?;
+
+    if !output.status.success() {
+        Err(minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        ))
+    } else {
+        Ok(String::from_utf8(output.stdout).map_err(|e| {
+            minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
+        })?)
+    }
+}
+
+impl Git {
+    fn head_rev(&self, src: &str) -> Result<Value, minijinja::Error> {
+        let result = get_command_output("git", &["ls-remote", src, "HEAD"])?
+            .lines()
+            .next()
+            .and_then(|s| s.split_ascii_whitespace().nth(0))
+            .ok_or_else(|| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "Failed to get the HEAD".to_string(),
+                )
+            })?
+            .to_string();
+        Ok(Value::from(result))
+    }
+
+    fn latest_tag_rev(&self, src: &str) -> Result<Value, minijinja::Error> {
+        let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
+            .lines()
+            .last()
+            .and_then(|s| s.split_ascii_whitespace().nth(0))
+            .ok_or_else(|| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "Failed to get the latest tag".to_string(),
+                )
+            })?
+            .to_string();
+        Ok(Value::from(result))
+    }
+
+    fn latest_tag(&self, src: &str) -> Result<Value, minijinja::Error> {
+        let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
+            .lines()
+            .last()
+            .and_then(|s| s.split_ascii_whitespace().nth(1))
+            .and_then(|s| s.strip_prefix("refs/tags/"))
+            .map(|s| s.trim_end_matches("^{}"))
+            .ok_or_else(|| {
+                minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "Failed to get the latest tag".to_string(),
+                )
+            })?
+            .to_string();
+        Ok(Value::from(result))
     }
 }
 
@@ -507,165 +574,11 @@ impl Object for Git {
                 "Experimental feature: provide the `--experimental` flag to enable this feature",
             ));
         }
+        let (src,) = from_args(args)?;
         match name {
-            "head_rev" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`head_hash` requires at least one argument",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`head_hash` only accepts one argument",
-                    ));
-                }
-                let Some(src) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`head_hash` requires a string argument",
-                    ));
-                };
-                let output = Command::new("git")
-                    .args(["ls-remote", src, "HEAD"])
-                    .output()
-                    .map_err(|e| {
-                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
-                    })?;
-                let value = if !output.status.success() {
-                    Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        String::from_utf8_lossy(&output.stderr).to_string(),
-                    ))?
-                } else {
-                    String::from_utf8(output.stdout)
-                        .map_err(|e| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                e.to_string(),
-                            )
-                        })?
-                        .lines()
-                        .next()
-                        .and_then(|s| s.split_ascii_whitespace().nth(0))
-                        .ok_or_else(|| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                "Failed to get the HEAD".to_string(),
-                            )
-                        })?
-                        .to_string()
-                };
-                Ok(Value::from(value))
-            }
-            "latest_tag_rev" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`latest_tag_rev` requires at least one argument",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag_rev` only accepts one argument",
-                    ));
-                }
-                let Some(src) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag_rev` requires a string argument",
-                    ));
-                };
-                let output = Command::new("git")
-                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
-                    .output()
-                    .map_err(|e| {
-                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
-                    })?;
-                let value = if !output.status.success() {
-                    Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        String::from_utf8_lossy(&output.stderr).to_string(),
-                    ))?
-                } else {
-                    String::from_utf8(output.stdout)
-                        .map_err(|e| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                e.to_string(),
-                            )
-                        })?
-                        .lines()
-                        .last()
-                        .and_then(|s| s.split_ascii_whitespace().nth(0))
-                        .ok_or_else(|| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                "Failed to get the latest tag".to_string(),
-                            )
-                        })?
-                        .to_string()
-                };
-                Ok(Value::from(value))
-            }
-            "latest_tag" => {
-                let mut args = args.iter();
-                let Some(arg) = args.next() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::MissingArgument,
-                        "`latest_tag` requires at least one argument",
-                    ));
-                };
-                if args.next().is_some() {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag` only accepts one argument",
-                    ));
-                }
-                let Some(src) = arg.as_str() else {
-                    return Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        "`latest_tag` requires a string argument",
-                    ));
-                };
-                let output = Command::new("git")
-                    .args(["ls-remote", "--sort=v:refname", "--tags", src])
-                    .output()
-                    .map_err(|e| {
-                        minijinja::Error::new(minijinja::ErrorKind::InvalidOperation, e.to_string())
-                    })?;
-                let value = if !output.status.success() {
-                    Err(minijinja::Error::new(
-                        minijinja::ErrorKind::InvalidOperation,
-                        String::from_utf8_lossy(&output.stderr).to_string(),
-                    ))?
-                } else {
-                    String::from_utf8(output.stdout)
-                        .map_err(|e| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                e.to_string(),
-                            )
-                        })?
-                        .lines()
-                        .last()
-                        .and_then(|s| s.split_ascii_whitespace().nth(1))
-                        .and_then(|s| s.strip_prefix("refs/tags/"))
-                        .map(|s| s.trim_end_matches("^{}"))
-                        .ok_or_else(|| {
-                            minijinja::Error::new(
-                                minijinja::ErrorKind::InvalidOperation,
-                                "Failed to get the latest tag".to_string(),
-                            )
-                        })?
-                        .to_string()
-                };
-                Ok(Value::from(value))
-            }
+            "head_rev" => self.head_rev(src),
+            "latest_tag_rev" => self.latest_tag_rev(src),
+            "latest_tag" => self.latest_tag(src),
             name => Err(minijinja::Error::new(
                 minijinja::ErrorKind::UnknownMethod,
                 format!("object has no method named {name}"),
