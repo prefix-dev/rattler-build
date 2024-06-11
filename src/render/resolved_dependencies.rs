@@ -747,14 +747,13 @@ pub(crate) async fn resolve_dependencies(
     let mut build_run_exports = output
         .finalized_cache_dependencies
         .as_ref()
-        .map(|cache| cache.build.as_ref().map(|b| b.run_exports(true)))
-        .flatten()
+        .and_then(|cache| cache.build.as_ref().map(|b| b.run_exports(true)))
         .unwrap_or_default();
 
     // Update the run exports from the cache with the ones from the build
-    build_env
-        .as_ref()
-        .map(|b| build_run_exports.extend(b.run_exports(true)));
+    if let Some(build_env) = &build_env {
+        build_run_exports.extend(build_env.run_exports(true));
+    }
 
     let ignore_run_exports = output.recipe.requirements.ignore_run_exports();
     let build_run_exports = ignore_run_exports.filter(&build_run_exports, "build")?;
@@ -851,14 +850,13 @@ pub(crate) async fn resolve_dependencies(
     let mut host_run_exports = output
         .finalized_cache_dependencies
         .as_ref()
-        .map(|cache| cache.host.as_ref().map(|b| b.run_exports(true)))
-        .flatten()
+        .and_then(|cache| cache.host.as_ref().map(|b| b.run_exports(true)))
         .unwrap_or_default();
 
     // Add in the host run exports from the current output
-    host_env
-        .as_ref()
-        .map(|h| host_run_exports.extend(h.run_exports(true)));
+    if let Some(host_env) = &host_env {
+        host_run_exports.extend(host_env.run_exports(true));
+    }
 
     // And filter the run exports
     let host_run_exports = ignore_run_exports.filter(&host_run_exports, "host")?;
