@@ -459,25 +459,18 @@ impl ResolvedScriptContents {
 
 impl Script {
     fn find_file(&self, recipe_dir: &Path, extensions: &[&str], path: &Path) -> Option<PathBuf> {
+        let path = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            recipe_dir.join(path)
+        };
+
         if path.extension().is_none() {
             extensions
                 .iter()
-                .map(|ext| {
-                    let with_ext = path.with_extension(ext);
-                    if with_ext.is_absolute() {
-                        with_ext
-                    } else {
-                        recipe_dir.join(with_ext)
-                    }
-                })
+                .map(|ext| path.with_extension(ext))
                 .find(|p| p.is_file())
         } else {
-            let path = if path.is_absolute() {
-                path.to_path_buf()
-            } else {
-                recipe_dir.join(path)
-            };
-
             if path.is_file() {
                 Some(path)
             } else {
