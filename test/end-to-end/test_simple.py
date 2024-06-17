@@ -902,3 +902,27 @@ def test_run_exports_from(
 
     index_json = json.loads((pkg / "info/index.json").read_text())
     assert index_json.get("depends") is None
+
+
+def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "script",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "script-test")
+
+    # grab paths.json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "script-executed.txt"
+
+    rattler_build.build(
+        recipes / "script/recipe_with_extensions.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "script-test-ext")
+
+    # grab paths.json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "script-executed.txt"

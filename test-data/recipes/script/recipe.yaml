@@ -1,0 +1,8 @@
+package:
+  name: script-test
+  version: 0.1.0
+
+build:
+  script:
+    # make sure this script is executed with either `.bat` or `.sh` extension
+    file: script
