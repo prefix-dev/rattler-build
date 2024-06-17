@@ -194,6 +194,8 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
             "cxx" => Some("vs2017"),
             "fortran" => Some("gfortran"),
             "rust" => Some("rust"),
+            "go" => Some("go"),
+            "go-nocgo" => Some("go-nocgo"),
             _ => None,
         }
     } else if platform.is_osx() {
@@ -202,6 +204,8 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
             "cxx" => Some("clangxx"),
             "fortran" => Some("gfortran"),
             "rust" => Some("rust"),
+            "go" => Some("go"),
+            "go-nocgo" => Some("go-nocgo"),
             _ => None,
         }
     } else {
@@ -210,6 +214,8 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
             "cxx" => Some("gxx"),
             "fortran" => Some("gfortran"),
             "rust" => Some("rust"),
+            "go" => Some("go"),
+            "go-nocgo" => Some("go-nocgo"),
             _ => None,
         }
     }
