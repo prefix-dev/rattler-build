@@ -1,0 +1,8 @@
+package:
+  name: script-test-ext
+  version: 0.1.0
+
+build:
+  script:
+    # make sure this script is executed with either `.bat` or `.sh` extension
+    file: ${{ "script.bat" if win else "script.sh" }}
