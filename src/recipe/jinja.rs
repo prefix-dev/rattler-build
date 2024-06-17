@@ -188,36 +188,34 @@ fn jinja_pin_function(
 }
 
 fn default_compiler(platform: Platform, language: &str) -> Option<String> {
-    if platform.is_windows() {
-        match language {
-            "c" => Some("vs2017"),
-            "cxx" => Some("vs2017"),
-            "fortran" => Some("gfortran"),
-            "rust" => Some("rust"),
-            "go" => Some("go"),
-            "go-nocgo" => Some("go-nocgo"),
-            _ => None,
-        }
-    } else if platform.is_osx() {
-        match language {
-            "c" => Some("clang"),
-            "cxx" => Some("clangxx"),
-            "fortran" => Some("gfortran"),
-            "rust" => Some("rust"),
-            "go" => Some("go"),
-            "go-nocgo" => Some("go-nocgo"),
-            _ => None,
-        }
-    } else {
-        match language {
-            "c" => Some("gcc"),
-            "cxx" => Some("gxx"),
-            "fortran" => Some("gfortran"),
-            "rust" => Some("rust"),
-            "go" => Some("go"),
-            "go-nocgo" => Some("go-nocgo"),
-            _ => None,
-        }
+    match language {
+        // Platform agnostic compilers
+        "fortran" => Some("gfortran"),
+        "rust" => Some("rust"),
+        "go" => Some("go"),
+        "go-nocgo" => Some("go-nocgo"),
+        // Platform specific compilers
+        _ => {
+            if platform.is_windows() {
+                match language {
+                    "c" => Some("vs2017"),
+                    "cxx" => Some("vs2017"),
+                    _ => None,
+                }
+            } else if platform.is_osx() {
+                match language {
+                    "c" => Some("clang"),
+                    "cxx" => Some("clangxx"),
+                    _ => None,
+                }
+            } else {
+                match language {
+                    "c" => Some("gcc"),
+                    "cxx" => Some("gxx"),
+                    _ => None,
+                }
+            }
+        },
     }
     .map(|s| s.to_string())
 }
