@@ -12,7 +12,6 @@ use std::ffi::OsStr;
 use std::io::Error;
 use std::{
     collections::HashMap,
-    io::ErrorKind,
     path::{Path, PathBuf},
     process::Stdio,
 };
@@ -459,6 +458,34 @@ impl ResolvedScriptContents {
 }
 
 impl Script {
+    fn find_file(&self, recipe_dir: &Path, extensions: &[&str], path: &Path) -> Option<PathBuf> {
+        if path.extension().is_none() {
+            extensions
+                .iter()
+                .map(|ext| {
+                    let with_ext = path.with_extension(ext);
+                    if with_ext.is_absolute() {
+                        with_ext
+                    } else {
+                        recipe_dir.join(with_ext)
+                    }
+                })
+                .find(|p| p.is_file())
+        } else {
+            let path = if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                recipe_dir.join(path)
+            };
+
+            if path.is_file() {
+                Some(path)
+            } else {
+                None
+            }
+        }
+    }
+
     fn get_contents(
         &self,
         recipe_dir: &Path,
@@ -468,68 +495,48 @@ impl Script {
             // No script was specified, so we try to read the default script. If the file cannot be
             // found we return an empty string.
             ScriptContent::Default => {
-                for extension in extensions {
-                    let recipe_file = recipe_dir.join(Path::new("build").with_extension(extension));
+                let recipe_file = self.find_file(recipe_dir, extensions, &Path::new("build"));
+                if let Some(recipe_file) = recipe_file {
                     match fs_err::read_to_string(&recipe_file) {
-                        Err(err) if err.kind() == ErrorKind::NotFound => continue,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                        Ok(content) => {
-                            return Ok(ResolvedScriptContents::Path(recipe_file, content))
-                        }
+                        Err(e) => Err(e),
+                        Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
                     }
+                } else {
+                    Ok(ResolvedScriptContents::Missing)
                 }
-                Ok(ResolvedScriptContents::Missing)
             }
 
             // The scripts path was explicitly specified. If the file cannot be found we error out.
             ScriptContent::Path(path) => {
-                let recipe_file = if path.extension().is_none() {
-                    extensions
-                        .iter()
-                        .map(|ext| {
-                            let with_ext = path.with_extension(ext);
-                            if with_ext.is_absolute() {
-                                with_ext
-                            } else {
-                                recipe_dir.join(with_ext)
-                            }
-                        })
-                        .find(|p| p.is_file())
-                        .ok_or_else(|| {
-                            std::io::Error::new(
-                                std::io::ErrorKind::NotFound,
-                                format!("could not resolve recipe file {:?}", path.display()),
-                            )
-                        })?
+                let recipe_file = self.find_file(recipe_dir, extensions, path);
+                if let Some(recipe_file) = recipe_file {
+                    match fs_err::read_to_string(&recipe_file) {
+                        Err(e) => Err(e),
+                        Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
+                    }
                 } else {
-                    path.to_owned()
-                };
-
-                match fs_err::read_to_string(&recipe_file) {
-                    Err(e) => Err(e),
-                    Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
+                    Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        format!("could not resolve recipe file {:?}", path.display()),
+                    ))
                 }
             }
             // The scripts content was specified but it is still ambiguous whether it is a path or the
             // contents of the string. Try to read the file as a script but fall back to using the string
             // as the contents itself if the file is missing.
             ScriptContent::CommandOrPath(path) => {
-                let path_ext = Path::new(path).extension().and_then(OsStr::to_str);
-                if !path.contains('\n') && (extensions.iter().any(|ext| path_ext == Some(*ext))) {
-                    let recipe_file = recipe_dir.join(Path::new(path));
-                    match fs_err::read_to_string(&recipe_file) {
-                        Err(err) if err.kind() == ErrorKind::NotFound => {}
-                        Err(e) => {
-                            return Err(e);
-                        }
-                        Ok(content) => {
-                            return Ok(ResolvedScriptContents::Path(recipe_file, content))
-                        }
-                    };
+                if path.contains('\n') {
+                    return Ok(ResolvedScriptContents::Inline(path.clone()));
                 }
-                Ok(ResolvedScriptContents::Inline(path.clone()))
+                let resolved_path = self.find_file(recipe_dir, extensions, &Path::new(path));
+                if let Some(resolved_path) = resolved_path {
+                    match fs_err::read_to_string(&resolved_path) {
+                        Err(e) => Err(e),
+                        Ok(content) => Ok(ResolvedScriptContents::Path(resolved_path, content)),
+                    }
+                } else {
+                    Ok(ResolvedScriptContents::Inline(path.clone()))
+                }
             }
             ScriptContent::Commands(commands) => {
                 Ok(ResolvedScriptContents::Inline(commands.iter().join("\n")))
