@@ -1354,19 +1354,21 @@ variables <code>&lt;lang&gt;_stdlib</code> and <code>&lt;lang&gt;_stdlib_version
 <h3 id="the-pin-functions">The <code>pin</code> functions<a class="headerlink" href="#the-pin-functions" title="Permanent link">#</a></h3>
 <p>A pin is created based on the version input (from a subpackage or a package
 resolution).</p>
-<p>The pin functions take the following five arguments:</p>
+<p>The pin functions take the following three arguments:</p>
 <ul>
-<li><code>min_pin</code> (default: <code>"x.x.x.x.x.x"</code>): The minimum pin to be used. When set to
-  <code>None</code>, no lower bound is set.</li>
-<li><code>max_pin</code> (default: <code>"x"</code>): The maximum pin to be used. When set to <code>None</code>, no
-  upper bound is set.</li>
+<li><code>lower_bound</code> (default: <code>"x.x.x.x.x.x"</code>): The lower bound pin expression to be
+  used. When set to <code>None</code>, no lower bound is set.</li>
+<li><code>upper_bound</code> (default: <code>"x"</code>): The maximum pin to be used. When set to
+  <code>None</code>, no upper bound is set.</li>
 </ul>
-<p>These "pins" are applied to the version input to create the lower and upper
-bounds. For example, if the version is <code>3.10.5</code> with <code>min_pin="x.x",
-max_pin="x.x.x"</code>, the lower bound will be <code>3.10</code> and the upper bound will be
-<code>3.10.6.0a0</code>. The <code>max_pin</code> will increment the last selected segment of the
-version by <code>1</code>, and append <code>.0a0</code> to the end to prevent any alpha versions from
-being selected.</p>
+<p>The lower bound and upper bound can either be a "pin expression" (only <code>x</code> and
+<code>.</code> are allowed) or a hard-coded version string.</p>
+<p>A "pin expression" is applied to the version input to create the lower and upper
+bounds. For example, if the version is <code>3.10.5</code> with a  <code>lower_bound="x.x",
+upper_bound="x.x.x"</code>, the lower bound will be <code>3.10</code> and the upper bound will be
+<code>3.10.6.0a0</code>. A pin expression for the <code>upper_bound</code> will increment the last
+selected segment of the version by <code>1</code>, and append <code>.0a0</code> to the end to prevent
+any alpha versions from being selected.</p>
 <p>If the last segment of the version contains a letter (e.g. <code>9e</code> or <code>1.1.1j</code>),
 then incrementing the version will set that letter to <code>a</code>, e.g. <code>9e</code> will become
 <code>10a</code>, and <code>1.1.1j</code> will become <code>1.1.2a</code>. In this case, also no <code>0a0</code> is
@@ -1389,7 +1391,7 @@ following input:</p>
 <code>1.2.3</code>).</p>
 <h4 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h4>
 <ul>
-<li><code>${{ pin_subpackage("mypkg", min_pin="x.x", max_pin="x.x") }}</code> creates a pin
+<li><code>${{ pin_subpackage("mypkg", lower_bound="x.x", upper_bound="x.x") }}</code> creates a pin
   to another output in the recipe. With an input of <code>3.1.5</code>, this would create a
   pin of <code>mypkg &gt;=3.1,&lt;3.2.0a0</code>.</li>
 <li><code>${{ pin_subpackage("other_output", exact=True) }}</code> creates a pin to another
