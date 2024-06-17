@@ -162,6 +162,28 @@ fn jinja_pin_function(
         }
     }
 
+    if let Ok(min_pin) = kwargs.get::<String>("min_pin") {
+        return Err(minijinja::Error::new(
+            minijinja::ErrorKind::SyntaxError,
+            format!(
+                "`min_pin` is not supported anymore. Please use `lower_bound='{}'` instead.",
+                min_pin
+            ),
+        ));
+    }
+
+    if let Ok(max_pin) = kwargs.get::<String>("max_pin") {
+        return Err(minijinja::Error::new(
+            minijinja::ErrorKind::SyntaxError,
+            format!(
+                "`max_pin` is not supported anymore. Please use `upper_bound='{}'` instead.",
+                max_pin
+            ),
+        ));
+    }
+
+    kwargs.assert_all_used()?;
+
     Ok(internal_repr.to_json(&pin))
 }
 
