@@ -495,7 +495,7 @@ impl Script {
             // No script was specified, so we try to read the default script. If the file cannot be
             // found we return an empty string.
             ScriptContent::Default => {
-                let recipe_file = self.find_file(recipe_dir, extensions, &Path::new("build"));
+                let recipe_file = self.find_file(recipe_dir, extensions, Path::new("build"));
                 if let Some(recipe_file) = recipe_file {
                     match fs_err::read_to_string(&recipe_file) {
                         Err(e) => Err(e),
@@ -528,7 +528,7 @@ impl Script {
                 if path.contains('\n') {
                     return Ok(ResolvedScriptContents::Inline(path.clone()));
                 }
-                let resolved_path = self.find_file(recipe_dir, extensions, &Path::new(path));
+                let resolved_path = self.find_file(recipe_dir, extensions, Path::new(path));
                 if let Some(resolved_path) = resolved_path {
                     match fs_err::read_to_string(&resolved_path) {
                         Err(e) => Err(e),
