@@ -1,0 +1,155 @@
+# Converting a recipe from conda-build
+
+The recipe format of `rattler-build` differs in some aspects from `conda-build`.
+This document aims to help you convert a recipe from `conda-build` to
+`rattler-build`.
+
+## Automatic conversion
+
+To convert a recipe from `meta.yaml` to `recipe.yaml` you can use the automatic
+conversion utility.
+
+To install `conda-recipe-manager`, run 
+
+```bash
+pixi global install conda-recipe-manager
+# or
+conda install -c conda-forge conda-recipe-manager
+```
+
+Then, run the conversion utility:
+
+```bash
+conda-recipe-manager convert my-recipe/meta.yaml
+```
+
+This will print the converted recipe to the console. You can save it to a file
+by redirecting the output:
+
+```bash
+conda-recipe-manager convert my-recipe/meta.yaml > recipe.yaml
+```
+
+To learn more about the tool, or contribute, find the [repository
+here](https://github.com/conda-incubator/conda-recipe-manager/).
+
+## Converting Jinja and selectors
+
+To use `jinja` in the new recipes, you need to keep in mind two conversions. The
+`{% set var = value %}` syntax is replaced by the `context` section in the new
+recipe format.
+
+```
+{% set var = value %}
+```
+
+becomes
+
+```yaml
+context:
+  var: value
+```
+
+To use the values or other Jinja expressions (e.g. from the variant config) you
+can use the `${{ var }}` syntax. Note the `$` sign before the curly braces - it
+makes Jinja fully compatible with the YAML format.
+
+```
+# instead of {{ var }}
+${{ var }}
+```
+
+## Converting selectors
+
+`conda-build` has a line based "selector" system, to e.g. disable certain fields
+on Windows vs. Unix.
+
+In rattler-build we use two different syntaxes: an `if/else/then` map or a
+inline jinja expression.
+
+A typical selector in `conda-build` looks something like this:
+
+```yaml
+requirements:
+  host:
+    - pywin32  # [win]
+```
+
+To convert this to `rattler-build` syntax, you can use one of the following two
+syntaxes:
+
+```yaml
+requirements:
+  host:
+    - ${{ "pywin32" if win }}  # empty strings are automatically filtered
+    # or 
+    - if: win
+      then:
+        - pywin32  # this list extends the outer list
+```
+
+## Converting the recipe script
+
+We still support the `build.sh` script, but we renamed the `bld.bat` script to `build.bat` to be more consistent with the `build.sh` script.
+You can also choose a different name for your script:
+
+```yaml
+build:
+  # note: if there is no extension, we will try to find .sh on unix and .bat on windows
+  script: my_build_script
+```
+
+There are also new ways of writing scripts, for [example with `nushell` or `python`].
+
+## Converting the recipe structure
+
+There are a few differences in the recipe structure. However, the schema will
+tell you quite easily what is expected and you should see red squiggly lines in
+your editor (e.g. VSCode) if you make a mistake.
+
+Here are a few differences:
+
+- `build.run_exports` is now `requirements.run_exports`
+- `requirements.run_constrained` is now `requirements.run_constraints`
+- `build.ignore_run_exports` is now `requirements.ignore_run_exports.by_name`
+- `build.ignore_run_exports_from` is now
+  `requirements.ignore_run_exports.from_package`
+- A `git` source now uses `git`, `rev` and not `git_url` and `git_rev`, e.g.
+  ```yaml
+  git: https://github.com/foo/bar.git
+  rev: 1.2.3
+  ```
+
+## Converting the test section
+
+The `test` section is renamed to `tests` and is a list of independent tests.
+Each test runs in its own environment.
+
+Let's have a look at converting an existing test section:
+
+```yaml
+test:
+  imports:
+    - mypackage
+  commands:
+    - mypackage --version
+```
+
+This would now be split into two tests:
+
+```yaml
+tests:
+  - script:
+      - mypackage --version
+  - python: 
+      imports:
+        - mypackage
+      # by default we perform a `pip check` in the python test but it can be disabled by setting this to false
+      pip_check: false
+```
+
+The `script` tests also take a `requirements` section with `run` and `build`
+requirements. The `build` requirements can be used to install emulators and
+similar tools that need to run to execute tests in a cross-compilation
+environment.
+
