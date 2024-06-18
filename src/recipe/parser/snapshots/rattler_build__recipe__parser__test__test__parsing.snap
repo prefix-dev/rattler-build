@@ -2,8 +2,6 @@
 source: src/recipe/parser/test.rs
 expression: yaml_serde
 ---
-- test_type: python
-  imports:
+- imports:
   - numpy.testing
   - numpy.matrix
-

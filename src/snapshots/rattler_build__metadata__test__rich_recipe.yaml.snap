@@ -27,11 +27,9 @@ recipe:
       - python ==3.10
       - "typing_extensions >=4.0.0,<5.0.0"
   tests:
-    - test_type: python
-      imports:
+    - imports:
         - rich
-    - test_type: command
-      script:
+    - script:
         - pip check
       requirements:
         run:

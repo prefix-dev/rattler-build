@@ -120,9 +120,7 @@ requirements:
     from_package:
     - python
 tests:
-- test_type: command
-  script:
-  - echo FOO
+- script: echo FOO
   requirements:
     run:
     - bash
@@ -133,8 +131,7 @@ tests:
     - include/**
     - src/*.c
     - src_file.txt
-- test_type: package_contents
-  files:
+- files:
   - test.txt
   - license.txt
   site_packages:
@@ -150,8 +147,7 @@ tests:
   include:
   - test.h
   - test.h*
-- test_type: python
-  imports:
+- imports:
   - numpy
   - pypy
   pip_check: false

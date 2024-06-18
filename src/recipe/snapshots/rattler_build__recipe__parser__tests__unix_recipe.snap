@@ -365,12 +365,19 @@ Recipe {
         ),
         Command(
             CommandsTest {
-                script: [
-                    "test -d ${PREFIX}/include/xtensor",
-                    "test -f ${PREFIX}/include/xtensor/xarray.hpp",
-                    "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake",
-                    "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
-                ],
+                script: Script {
+                    interpreter: None,
+                    env: {},
+                    secrets: [],
+                    content: Commands(
+                        [
+                            "test -d ${PREFIX}/include/xtensor",
+                            "test -f ${PREFIX}/include/xtensor/xarray.hpp",
+                            "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfig.cmake",
+                            "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
+                        ],
+                    ),
+                },
                 requirements: CommandsTestRequirements {
                     run: [],
                     build: [],

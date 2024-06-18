@@ -345,11 +345,18 @@ Recipe {
         ),
         Command(
             CommandsTest {
-                script: [
-                    "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
-                ],
+                script: Script {
+                    interpreter: None,
+                    env: {},
+                    secrets: [],
+                    content: Commands(
+                        [
+                            "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                        ],
+                    ),
+                },
                 requirements: CommandsTestRequirements {
                     run: [],
                     build: [],

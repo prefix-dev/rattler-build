@@ -13,7 +13,7 @@ use crate::{
     validate_keys,
 };
 
-use super::{glob_vec::GlobVec, FlattenErrors};
+use super::{glob_vec::GlobVec, FlattenErrors, Script};
 
 /// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub struct CommandsTestFiles {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
     /// The script to run
-    pub script: Vec<String>,
+    pub script: Script,
     /// The (extra) requirements for the test.
     /// Similar to the `requirements` section in the recipe the `build` requirements
     /// are of the build-computer architecture and the `run` requirements are of the
@@ -104,9 +104,9 @@ pub struct DownstreamTest {
     pub downstream: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// The test type enum
-#[serde(rename_all = "snake_case", tag = "test_type")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum TestType {
     /// A Python test.
     Python(PythonTest),
@@ -308,13 +308,13 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
 
         validate_keys!(commands_test, self.iter(), script, requirements, files);
 
-        if commands_test.script.is_empty() {
-            Err(vec![_partialerror!(
-                *self.span(),
-                ErrorKind::MissingField("script".into()),
-                help = "expected field `script` to be a list of commands"
-            )])?;
-        }
+        // if commands_test.script.is_empty() {
+        //     Err(vec![_partialerror!(
+        //         *self.span(),
+        //         ErrorKind::MissingField("script".into()),
+        //         help = "expected field `script` to be a list of commands"
+        //     )])?;
+        // }
 
         Ok(commands_test)
     }
@@ -355,6 +355,8 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
 
 #[cfg(test)]
 mod test {
+    use std::fs;
+
     use super::TestType;
     use insta::assert_snapshot;
 
@@ -391,5 +393,23 @@ mod test {
             }
             _ => panic!("expected python test"),
         }
+    }
+
+    #[test]
+    fn test_script_parsing() {
+        let test_data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let text = fs::read_to_string(test_data_dir.join("recipes/test-section/script-test.yaml"))
+            .unwrap();
+
+        // parse the YAML
+        let yaml_root = RenderedNode::parse_yaml(0, &text)
+            .map_err(|err| vec![err])
+            .unwrap();
+
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
     }
 }

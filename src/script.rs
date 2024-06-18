@@ -612,6 +612,14 @@ impl Script {
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
+        let work_dir = if let Some(cwd) = self.cwd.as_ref() {
+            run_prefix.join(cwd)
+        } else {
+            work_dir.to_owned()
+        };
+
+        tracing::debug!("Running script in {}", work_dir.display());
+
         let exec_args = ExecutionArgs {
             script: contents,
             env_vars,
@@ -619,7 +627,7 @@ impl Script {
             build_prefix: build_prefix.map(|p| p.to_owned()),
             run_prefix: run_prefix.to_owned(),
             execution_platform: Platform::current(),
-            work_dir: work_dir.to_owned(),
+            work_dir,
         };
 
         match interpreter {
