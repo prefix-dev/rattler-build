@@ -215,7 +215,7 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
                     _ => None,
                 }
             }
-        },
+        }
     }
     .map(|s| s.to_string())
 }
