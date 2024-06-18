@@ -9,7 +9,7 @@ This document aims to help you convert a recipe from `conda-build` to
 To convert a recipe from `meta.yaml` to `recipe.yaml` you can use the automatic
 conversion utility.
 
-To install `conda-recipe-manager`, run 
+To install `conda-recipe-manager`, run
 
 ```bash
 pixi global install conda-recipe-manager
@@ -36,27 +36,39 @@ here](https://github.com/conda-incubator/conda-recipe-manager/).
 ## Converting Jinja and selectors
 
 To use `jinja` in the new recipes, you need to keep in mind two conversions. The
-`{% set var = value %}` syntax is replaced by the `context` section in the new
+`{% set version = "1.2.3" %}` syntax is replaced by the `context` section in the new
 recipe format.
 
 ```
-{% set var = value %}
+{% set version = "1.2.3" %}
 ```
 
 becomes
 
 ```yaml
 context:
-  var: value
+  version: "1.2.3"
 ```
 
 To use the values or other Jinja expressions (e.g. from the variant config) you
-can use the `${{ var }}` syntax. Note the `$` sign before the curly braces - it
+can use the `${{ version }}` syntax. Note the `$` sign before the curly braces - it
 makes Jinja fully compatible with the YAML format.
 
+```yaml title="meta.yaml"
+# instead of
+package:
+  version: "{{ version }}"
+source:
+  url: https://example.com/foo-{{ version }}.tar.gz
 ```
-# instead of {{ var }}
-${{ var }}
+
+becomes
+
+```yaml title="recipe.yaml"
+package:
+  version: ${{ version }}
+source:
+  url: https://example.com/foo-${{ version }}.tar.gz
 ```
 
 ## Converting selectors
@@ -69,7 +81,7 @@ inline jinja expression.
 
 A typical selector in `conda-build` looks something like this:
 
-```yaml
+```yaml title="meta.yaml"
 requirements:
   host:
     - pywin32  # [win]
@@ -78,11 +90,11 @@ requirements:
 To convert this to `rattler-build` syntax, you can use one of the following two
 syntaxes:
 
-```yaml
+```yaml title="recipe.yaml"
 requirements:
   host:
     - ${{ "pywin32" if win }}  # empty strings are automatically filtered
-    # or 
+    # or
     - if: win
       then:
         - pywin32  # this list extends the outer list
@@ -90,7 +102,9 @@ requirements:
 
 ## Converting the recipe script
 
-We still support the `build.sh` script, but we renamed the `bld.bat` script to `build.bat` to be more consistent with the `build.sh` script.
+We still support the `build.sh` script, but the `bld.bat` script was renamed to `build.bat`
+in order to be more consistent with the `build.sh` script.
+
 You can also choose a different name for your script:
 
 ```yaml
@@ -99,7 +113,7 @@ build:
   script: my_build_script
 ```
 
-There are also new ways of writing scripts, for [example with `nushell` or `python`].
+There are also new ways of writing scripts, for [example with `nushell` or `python`](build_script.md)
 
 ## Converting the recipe structure
 
@@ -114,10 +128,10 @@ Here are a few differences:
 - `build.ignore_run_exports` is now `requirements.ignore_run_exports.by_name`
 - `build.ignore_run_exports_from` is now
   `requirements.ignore_run_exports.from_package`
-- A `git` source now uses `git`, `rev` and not `git_url` and `git_rev`, e.g.
+- A `git` source now uses `git`, `tag`, ... and not `git_url` and `git_rev`, e.g.
   ```yaml
   git: https://github.com/foo/bar.git
-  rev: 1.2.3
+  tag: 1.2.3
   ```
 
 ## Converting the test section
@@ -127,7 +141,7 @@ Each test runs in its own environment.
 
 Let's have a look at converting an existing test section:
 
-```yaml
+```yaml title="meta.yaml"
 test:
   imports:
     - mypackage
@@ -137,14 +151,15 @@ test:
 
 This would now be split into two tests:
 
-```yaml
+```yaml title="recipe.yaml"
 tests:
   - script:
       - mypackage --version
-  - python: 
+  - python:
       imports:
         - mypackage
-      # by default we perform a `pip check` in the python test but it can be disabled by setting this to false
+      # by default we perform a `pip check` in the python test but
+      # it can be disabled by setting this to false
       pip_check: false
 ```
 
@@ -152,4 +167,3 @@ The `script` tests also take a `requirements` section with `run` and `build`
 requirements. The `build` requirements can be used to install emulators and
 similar tools that need to run to execute tests in a cross-compilation
 environment.
-

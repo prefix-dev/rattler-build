@@ -7,7 +7,7 @@ your build steps. Anything that your build script copies into the `$PREFIX` or
 
 For example, this `build.sh`:
 
-```bash
+```bash title="build.sh"
 mkdir -p $PREFIX/bin
 cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh
 ```
@@ -24,6 +24,19 @@ because `cmd.exe` won't understand it on Windows.
 
 `build.sh` is run with `bash` and `build.bat` is run with `cmd.exe`.
 
+```yaml title="recipe.yaml"
+build:
+  script:
+    - if: unix
+      then:
+        - mkdir -p $PREFIX/bin
+        - cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh
+    - if: win
+      then:
+        - mkdir %PREFIX%\bin
+        - copy %RECIPE_DIR%\my_script_with_recipe.bat %PREFIX%\bin\super-cool-script.bat
+```
+
 ## Environment variables
 
 There are many environment variables that are automatically set during the build
@@ -32,10 +45,11 @@ process.
 However, you can also set your own environment variables easily in the `script`
 section of your recipe:
 
-```yaml
+```yaml title="recipe.yaml"
 build:
   script:
     # Either use `content` or `file` to specify the script
+    # Note: this script only works on Unix :)
     content: |
       echo $FOO
       echo $BAR
@@ -52,7 +66,63 @@ build:
       - BAZ
 ```
 
-### Environment variables set during the build process
+## Alternative script interpreters
+
+With `rattler-build` and the new recipe syntax you can select an `interpreter`
+for your script.
+
+So far, the following interpreters are supported:
+
+- `bash` (default on Unix)
+- `cmd.exe` (default on Windows)
+- `nushell`
+- `python`
+
+!!! note
+    Using alternative interpreters is less battle-tested than using `bash` or
+    `cmd.exe`. If you encounter any issues, please
+    [open an issue](https://github.com/prefix-dev/rattler-build/issues/new).
+
+### Using `nushell`
+
+In order to use `nushell` you can select the `interpreter: nu` or have a
+`build.nu` file in your recipe directory. Nushell works on Windows, macOS and
+Linux with the same syntax.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: nu
+    content: |
+      echo "Hello from nushell!"
+
+# Note: it's required to have `nushell` in the `build` section of your recipe!
+requirements:
+  build:
+    - nushell
+```
+
+### Using `python`
+
+In order to use `python` you can select the `interpreter: python` or have a
+`build.py` file in your recipe directory and `python` in the
+`requirements/build` section.
+
+```yaml title="recipe.yaml"
+build:
+  script:
+    interpreter: python
+    content: |
+      print("Hello from Python!")
+
+# Note: it's required to have `python` in the `build` section of your recipe!
+requirements:
+  build:
+    - python
+```
+
+
+## Default environment variables set during the build process
 
 During the build process, the following environment variables are set, on
 Windows with `build.bat` and on macOS and Linux with `build.sh`. By default,
@@ -60,77 +130,118 @@ these are the only variables available to your build script. Unless otherwise
 noted, no variables are inherited from the shell environment in which you invoke
 `conda-build`. To override this behavior, see :ref:`inherited-env-vars`.
 
-`ARCH` : Either `32` or `64`, to specify whether the build is 32-bit or 64-bit.
-The value depends on the ARCH environment variable and defaults to the
-architecture the interpreter running conda was compiled with.
+`ARCH`
 
-`CMAKE_GENERATOR` : The CMake generator string for the current build
-environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it
-is generated according to the Visual Studio version activated at build time, for
-example, `Visual Studio 9 2008 Win64`.
+: Either `32` or `64`, to specify whether the build is 32-bit or 64-bit.
+  The value depends on the ARCH environment variable and defaults to the
+  architecture the interpreter running conda was compiled with.
 
-`CONDA_BUILD=1` : Always set to indicate that the conda-build process is
-running.
+`CMAKE_GENERATOR`
 
-`CPU_COUNT` : Represents the number of CPUs on the system.
+: The CMake generator string for the current build
+  environment. On Linux systems, this is always `Unix Makefiles`. On Windows, it
+  is generated according to the Visual Studio version activated at build time, for
+  example, `Visual Studio 9 2008 Win64`.
 
-`SHLIB_EXT` : Denotes the shared library extension specific to the operating
-system (e.g. `.so` for Linux, `.dylib` for macOS, and `.dll` for Windows).
+`CONDA_BUILD=1`
 
-`HTTP_PROXY` : Inherited from the user's shell environment, specifying the HTTP
-proxy settings.
+: Always set to indicate that the conda-build process is
+  running.
 
-`HTTPS_PROXY` : Similar to HTTP_PROXY, this is inherited from the user's shell
-environment and specifies the HTTPS proxy settings.
+`CPU_COUNT`
 
-`LANG` : Inherited from the user's shell environment, defining the system
-language and locale settings.
+: Represents the number of CPUs on the system.
 
-`MAKEFLAGS` : Inherited from the user's shell environment. This can be used to
-set additional arguments for the make command, such as -j2 to utilize 2 CPU
-cores for building the recipe.
+`SHLIB_EXT`
 
-`PY_VER` : Specifies the Python version against which the build is occurring.
-This can be modified with a `variant_config.yaml` file.
+: Denotes the shared library extension specific to the operating
+  system (e.g. `.so` for Linux, `.dylib` for macOS, and `.dll` for Windows).
 
-`PATH` : Inherited from the user's shell environment and augmented with the
-activated host and build prefixes.
+`HTTP_PROXY`, `HTTPS_PROXY`
 
-`PREFIX` : The build prefix to which the build script should install the
-software.
+: Inherited from the user's shell environment, specifying the HTTP and HTTPS
+  proxy settings.
 
-`PKG_BUILDNUM` : Indicates the build number of the package currently being
-built.
+`LANG`
 
-`PKG_NAME` : The name of the package that is being built.
+: Inherited from the user's shell environment, defining the system
+  language and locale settings.
 
-`PKG_VERSION` : The version of the package currently under construction.
+`MAKEFLAGS`
 
-`PKG_BUILD_STRING` : The complete build string of the package being built,
-including the hash (e.g. py311h21422ab_0).
+: Inherited from the user's shell environment. This can be used to
+  set additional arguments for the make command, such as -j2 to utilize 2 CPU
+  cores for building the recipe.
 
-`PKG_HASH` : Represents the hash of the package being built, excluding the
-leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.
+`PY_VER`
 
-`PYTHON` : The path to the Python executable in the host prefix. Python is
-installed in the host prefix only when it is listed as a host requirement.
+: Specifies the Python version against which the build is occurring.
+  This can be modified with a `variant_config.yaml` file.
 
-`R` : The path to the R executable in the build prefix. R is installed in the
-build prefix only when it is listed as a build requirement.
+`PATH`
 
-`RECIPE_DIR` : The directory where the recipe is located.
+: Inherited from the user's shell environment and augmented with the
+  activated host and build prefixes.
 
-`SP_DIR` : The location of Python's site-packages, where Python libraries are
-installed.
+`PREFIX`
 
-`SRC_DIR` : The path to where the source code is unpacked or cloned. If the
-source file is not a recognized archive format, this directory contains a copy
-of the source file.
+: The build prefix to which the build script should install the
+  software.
 
-`STDLIB_DIR` : The location of Python's standard library.
+`PKG_BUILDNUM`
 
-`build_platform` : Represents the native subdirectory of the conda executable,
-indicating the platform for which the build is occurring.
+: Indicates the build number of the package currently being built.
+
+`PKG_NAME`
+
+: The name of the package that is being built.
+
+`PKG_VERSION`
+
+: The version of the package currently under construction.
+
+`PKG_BUILD_STRING`
+
+: The complete build string of the package being built,
+  including the hash (e.g. py311h21422ab_0).
+
+`PKG_HASH`
+
+: Represents the hash of the package being built, excluding the
+  leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.
+
+`PYTHON`
+
+: The path to the Python executable in the host prefix. Python is
+  installed in the host prefix only when it is listed as a host requirement.
+
+`R`
+
+: The path to the R executable in the build prefix. R is installed in the
+  build prefix only when it is listed as a build requirement.
+
+`RECIPE_DIR`
+
+: The directory where the recipe is located.
+
+`SP_DIR`
+
+: The location of Python's site-packages, where Python libraries are installed.
+
+`SRC_DIR`
+
+: The path to where the source code is unpacked or cloned. If the
+  source file is not a recognized archive format, this directory contains a copy
+  of the source file.
+
+`STDLIB_DIR`
+
+: The location of Python's standard library.
+
+`build_platform`
+
+: Represents the native subdirectory of the conda executable,
+  indicating the platform for which the build is occurring.
 
 
 Removed from `conda-build` are:
@@ -238,57 +349,6 @@ The environment variable listed in the following table is defined only on Linux.
 | `DEJAGNU`        | The path to the dejagnu testing framework used by the GCC test suite.                                                          |
 | `DISPLAY`        | The X11 display to use for graphical applications.                                                                             |
 | `BUILD`          | Target triple (`{build_arch}-conda_{build_distro}-linux-gnu`) where build_distro is one of `cos6` or `cos7`, for Centos 6 or 7 |
-
-
-## Alternative script interpreters
-
-With `rattler-build` and the new recipe syntax you can select an `interpreter`
-for your script.
-
-So far, the following interpreters are supported:
-
-- `bash` (default on Unix)
-- `cmd.exe` (default on Windows)
-- `nushell`
-- `python`
-
-### Using `nushell`
-
-In order to use `nushell` you can select the `interpreter: nu` or have a
-`build.nu` file in your recipe directory. Nushell works on Windows, macOS and
-Linux with the same syntax.
-
-```yaml
-build:
-  script:
-    interpreter: nu
-    content: |
-      echo "Hello from nushell!"
-
-# Note: it's required to have `nushell` in the `build` section of your recipe!
-requirements:
-  build:
-    - nushell
-```
-
-### Using `python`
-
-In order to use `python` you can select the `interpreter: python` or have a
-`build.py` file in your recipe directory and `python` in the
-`requirements/build` section.
-
-```yaml
-build:
-  script:
-    interpreter: python
-    content: |
-      print("Hello from Python!")
-
-# Note: it's required to have `python` in the `build` section of your recipe!
-requirements:
-  build:
-    - python
-```
 
 <!--
 
