@@ -161,12 +161,12 @@ impl rattler_repodata_gateway::Reporter for GatewayReporter {
         progress_bars.len() - 1
     }
 
-    fn on_download_complete(&self, url: &Url, index: usize) {
+    fn on_download_complete(&self, _url: &Url, index: usize) {
         // Remove the progress bar from the multi progress
         let pb = &self.progress_bars.lock().unwrap()[index];
         if let Some(template) = &self.finish_template {
             pb.set_style(template.clone());
-            pb.finish_with_message(format!("Done: {}", url));
+            pb.finish_with_message(format!("Done"));
         } else {
             pb.finish();
         }
