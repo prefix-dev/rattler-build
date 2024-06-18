@@ -1196,12 +1196,18 @@ example, on Linux:</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>cp<span class="w"> </span>deactivate-mypkg.sh<span class="w"> </span><span class="nv">$PREFIX</span>/etc/conda/deactivate.d/10-deactivate-mypkg.sh
 </span></code></pre></div>
 <h2 id="post-link-and-pre-unlink-scripts">Post-link and pre-unlink scripts<a class="headerlink" href="#post-link-and-pre-unlink-scripts" title="Permanent link">#</a></h2>
-<p>The <code>post-link</code> and <code>pre-unlink</code> scripts are executed when the package is installed or
-uninstalled. They are both heavily discouraged and currently not implemented in <code>rattler</code>,
-<code>rattler-build</code>, and <code>pixi</code>.</p>
-<p>To create a <code>post-link</code> script for your package, you need to add <code>&lt;package_name&gt;-post-link.{sh/bat}</code> to the <code>bin/</code> folder of your package.
-The same is applicable for <code>pre-unlink</code> scripts, just with the name <code>&lt;package_name&gt;-pre-unlink.{sh/bat}</code>.</p>
-<p>For example, for <code>mypkg</code>, you would add <code>mypkg-post-link.sh</code> to the <code>bin/</code> folder of your package.</p>
+<p>The <code>post-link</code> and <code>pre-unlink</code> scripts are executed when the package is installed or uninstalled. They are both heavily discouraged but implemented for compatibility with conda in <code>rattler-build</code> since version 0.17.</p>
+<p>For a <code>post-link</code> script to be executed when a package is installed, the built package needs to have a <code>.&lt;package_name&gt;-post-link.{sh/bat}</code> in its <code>bin/</code> folder. The same is applicable for <code>pre-unlink</code> scripts, just with the name <code>.&lt;package_name&gt;-pre-unlink.{sh/bat}</code> (note the leading period). For example, for a package <code>mypkg</code>, you would need to have a <code>.mypkg-post-link.sh</code> in its <code>bin/</code> folder.</p>
+<p>To make sure the scripts are included in the correct location, use your recipe's <a href="../build_script/">build script or <code>build/script</code> key</a>. For example, assuming you have a <code>post-link.sh</code> script in your source, alongside the recipe in the recipe's folder, the following configuration will copy it correctly:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">script</span><span class="p p-Indicator">:</span><span class="w"> </span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdir -p $PREFIX/bin</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cp $RECIPE_DIR/post-link.sh $PREFIX/bin/.mypkg-post-link.sh</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">chmod +x $PREFIX/bin/.mypkg-post-link.sh</span>
+</span></code></pre></div>
+<p>The <code>$PREFIX</code> and <code>$RECIPE_DIR</code> environment variables will be <a href="../build_script/#environment-variables">set during the build process</a> to help you specify the correct paths.</p>
 
 
 
