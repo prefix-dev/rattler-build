@@ -429,6 +429,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../converting_from_conda_build/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Converting from conda-build
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -600,17 +621,50 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Environment variables">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternative-script-interpreters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternative script interpreters
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative script interpreters">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#environment-variables-set-during-the-build-process" class="md-nav__link">
+  <a href="#using-nushell" class="md-nav__link">
     <span class="md-ellipsis">
-      Environment variables set during the build process
+      Using nushell
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#using-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using python
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-environment-variables-set-during-the-build-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default environment variables set during the build process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default environment variables set during the build process">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#unix" class="md-nav__link">
@@ -1136,17 +1190,50 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Environment variables">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#alternative-script-interpreters" class="md-nav__link">
+    <span class="md-ellipsis">
+      Alternative script interpreters
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Alternative script interpreters">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#environment-variables-set-during-the-build-process" class="md-nav__link">
+  <a href="#using-nushell" class="md-nav__link">
     <span class="md-ellipsis">
-      Environment variables set during the build process
+      Using nushell
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#using-python" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using python
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-environment-variables-set-during-the-build-process" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default environment variables set during the build process
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default environment variables set during the build process">
+      <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#unix" class="md-nav__link">
@@ -1191,7 +1278,7 @@ the build script for Windows. These scripts contain the logic that carries out
 your build steps. Anything that your build script copies into the <code>$PREFIX</code> or
 <code>%PREFIX%</code> folder will be included in your output package.</p>
 <p>For example, this <code>build.sh</code>:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/bin
+<div class="language-bash highlight"><span class="filename">build.sh</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$PREFIX</span>/bin
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>cp<span class="w"> </span><span class="nv">$RECIPE_DIR</span>/my_script_with_recipe.sh<span class="w"> </span><span class="nv">$PREFIX</span>/bin/super-cool-script.sh
 </span></code></pre></div>
 <p>There are many environment variables defined for you to use in build.sh and
@@ -1203,8 +1290,88 @@ list of string commands. Any commands you put there must be able to run on every
 platform for which you build. For example, you can't use the <code>cp</code> command
 because <code>cmd.exe</code> won't understand it on Windows.</p>
 <p><code>build.sh</code> is run with <code>bash</code> and <code>build.bat</code> is run with <code>cmd.exe</code>.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdir -p $PREFIX/bin</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cp $RECIPE_DIR/my_script_with_recipe.sh $PREFIX/bin/super-cool-script.sh</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdir %PREFIX%\bin</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">copy %RECIPE_DIR%\my_script_with_recipe.bat %PREFIX%\bin\super-cool-script.bat</span>
+</span></code></pre></div>
 <h2 id="environment-variables">Environment variables<a class="headerlink" href="#environment-variables" title="Permanent link">#</a></h2>
-<h3 id="environment-variables-set-during-the-build-process">Environment variables set during the build process<a class="headerlink" href="#environment-variables-set-during-the-build-process" title="Permanent link">#</a></h3>
+<p>There are many environment variables that are automatically set during the build
+process.</p>
+<p>However, you can also set your own environment variables easily in the <code>script</code>
+section of your recipe:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="c1"># Either use `content` or `file` to specify the script</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="c1"># Note: this script only works on Unix :)</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="no">echo $FOO</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">      </span><span class="no">echo $BAR</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">      </span><span class="no">echo &quot;Secret value: $BAZ&quot;</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="c1"># hard coded value for `FOO`</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">      </span><span class="nt">FOO</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo&quot;</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">      </span><span class="c1"># Forward a value from the &quot;outer&quot; environment</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="c1"># Without `default=...`, the build process will error if `BAR` is not set</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">      </span><span class="nt">BAR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ env.get(&quot;BAR&quot;, default=&quot;NOBAR&quot;) }}</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">    </span><span class="nt">secrets</span><span class="p">:</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">      </span><span class="c1"># This value is a secret and will be masked in the logs and not stored in the rendered recipe</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">      </span><span class="c1"># The value needs to be available as an environment variable in the outer environment</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BAZ</span>
+</span></code></pre></div>
+<h2 id="alternative-script-interpreters">Alternative script interpreters<a class="headerlink" href="#alternative-script-interpreters" title="Permanent link">#</a></h2>
+<p>With <code>rattler-build</code> and the new recipe syntax you can select an <code>interpreter</code>
+for your script.</p>
+<p>So far, the following interpreters are supported:</p>
+<ul>
+<li><code>bash</code> (default on Unix)</li>
+<li><code>cmd.exe</code> (default on Windows)</li>
+<li><code>nushell</code></li>
+<li><code>python</code></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Using alternative interpreters is less battle-tested than using <code>bash</code> or
+<code>cmd.exe</code>. If you encounter any issues, please
+<a href="https://github.com/prefix-dev/rattler-build/issues/new">open an issue</a>.</p>
+</div>
+<h3 id="using-nushell">Using <code>nushell</code><a class="headerlink" href="#using-nushell" title="Permanent link">#</a></h3>
+<p>In order to use <code>nushell</code> you can select the <code>interpreter: nu</code> or have a
+<code>build.nu</code> file in your recipe directory. Nushell works on Windows, macOS and
+Linux with the same syntax.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nu</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">      </span><span class="no">echo &quot;Hello from nushell!&quot;</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Note: it&#39;s required to have `nushell` in the `build` section of your recipe!</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nushell</span>
+</span></code></pre></div>
+<h3 id="using-python">Using <code>python</code><a class="headerlink" href="#using-python" title="Permanent link">#</a></h3>
+<p>In order to use <code>python</code> you can select the <code>interpreter: python</code> or have a
+<code>build.py</code> file in your recipe directory and <code>python</code> in the
+<code>requirements/build</code> section.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="nt">interpreter</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">      </span><span class="no">print(&quot;Hello from Python!&quot;)</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1"># Note: it&#39;s required to have `python` in the `build` section of your recipe!</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span></code></pre></div>
+<h2 id="default-environment-variables-set-during-the-build-process">Default environment variables set during the build process<a class="headerlink" href="#default-environment-variables-set-during-the-build-process" title="Permanent link">#</a></h2>
 <p>During the build process, the following environment variables are set, on
 Windows with <code>build.bat</code> and on macOS and Linux with <code>build.sh</code>. By default,
 these are the only variables available to your build script. Unless otherwise
@@ -1212,61 +1379,126 @@ noted, no variables are inherited from the shell environment in which you invoke
 <code>conda-build</code>. To override this behavior, see :ref:<code>inherited-env-vars</code>.</p>
 <dl>
 <dt><code>ARCH</code></dt>
-<dd>Either <code>32</code> or <code>64</code>, to specify whether the build is 32-bit or 64-bit. The value depends on the ARCH environment variable and defaults to the architecture the interpreter running conda was compiled with.</dd>
+<dd>
+<p>Either <code>32</code> or <code>64</code>, to specify whether the build is 32-bit or 64-bit.
+  The value depends on the ARCH environment variable and defaults to the
+  architecture the interpreter running conda was compiled with.</p>
+</dd>
 <dt><code>CMAKE_GENERATOR</code></dt>
-<dd>The CMake generator string for the current build environment. On Linux systems, this is always <code>Unix Makefiles</code>. On Windows, it is generated according to the Visual Studio version activated at build time, for example, <code>Visual Studio 9 2008 Win64</code>.</dd>
+<dd>
+<p>The CMake generator string for the current build
+  environment. On Linux systems, this is always <code>Unix Makefiles</code>. On Windows, it
+  is generated according to the Visual Studio version activated at build time, for
+  example, <code>Visual Studio 9 2008 Win64</code>.</p>
+</dd>
 <dt><code>CONDA_BUILD=1</code></dt>
-<dd>Always set to indicate that the conda-build process is running.</dd>
+<dd>
+<p>Always set to indicate that the conda-build process is
+  running.</p>
+</dd>
 <dt><code>CPU_COUNT</code></dt>
-<dd>Represents the number of CPUs on the system.</dd>
+<dd>
+<p>Represents the number of CPUs on the system.</p>
+</dd>
 <dt><code>SHLIB_EXT</code></dt>
-<dd>Denotes the shared library extension specific to the operating system (e.g. <code>.so</code> for Linux, <code>.dylib</code> for macOS, and <code>.dll</code> for Windows).</dd>
-<dt><code>HTTP_PROXY</code></dt>
-<dd>Inherited from the user's shell environment, specifying the HTTP proxy settings.</dd>
-<dt><code>HTTPS_PROXY</code></dt>
-<dd>Similar to HTTP_PROXY, this is inherited from the user's shell environment and specifies the HTTPS proxy settings.</dd>
+<dd>
+<p>Denotes the shared library extension specific to the operating
+  system (e.g. <code>.so</code> for Linux, <code>.dylib</code> for macOS, and <code>.dll</code> for Windows).</p>
+</dd>
+<dt><code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code></dt>
+<dd>
+<p>Inherited from the user's shell environment, specifying the HTTP and HTTPS
+  proxy settings.</p>
+</dd>
 <dt><code>LANG</code></dt>
-<dd>Inherited from the user's shell environment, defining the system language and locale settings.</dd>
+<dd>
+<p>Inherited from the user's shell environment, defining the system
+  language and locale settings.</p>
+</dd>
 <dt><code>MAKEFLAGS</code></dt>
-<dd>Inherited from the user's shell environment. This can be used to set additional arguments for the make command, such as -j2 to utilize 2 CPU cores for building the recipe.</dd>
+<dd>
+<p>Inherited from the user's shell environment. This can be used to
+  set additional arguments for the make command, such as -j2 to utilize 2 CPU
+  cores for building the recipe.</p>
+</dd>
 <dt><code>PY_VER</code></dt>
-<dd>Specifies the Python version against which the build is occurring. This can be modified with a <code>variant_config.yaml</code> file.</dd>
+<dd>
+<p>Specifies the Python version against which the build is occurring.
+  This can be modified with a <code>variant_config.yaml</code> file.</p>
+</dd>
 <dt><code>PATH</code></dt>
-<dd>Inherited from the user's shell environment and augmented with the activated host and build prefixes.</dd>
+<dd>
+<p>Inherited from the user's shell environment and augmented with the
+  activated host and build prefixes.</p>
+</dd>
 <dt><code>PREFIX</code></dt>
-<dd>The build prefix to which the build script should install the software.</dd>
+<dd>
+<p>The build prefix to which the build script should install the
+  software.</p>
+</dd>
 <dt><code>PKG_BUILDNUM</code></dt>
-<dd>Indicates the build number of the package currently being built.</dd>
+<dd>
+<p>Indicates the build number of the package currently being built.</p>
+</dd>
 <dt><code>PKG_NAME</code></dt>
-<dd>The name of the package that is being built.</dd>
+<dd>
+<p>The name of the package that is being built.</p>
+</dd>
 <dt><code>PKG_VERSION</code></dt>
-<dd>The version of the package currently under construction.</dd>
+<dd>
+<p>The version of the package currently under construction.</p>
+</dd>
 <dt><code>PKG_BUILD_STRING</code></dt>
-<dd>The complete build string of the package being built, including the hash (e.g. py311h21422ab_0).</dd>
+<dd>
+<p>The complete build string of the package being built,
+  including the hash (e.g. py311h21422ab_0).</p>
+</dd>
 <dt><code>PKG_HASH</code></dt>
-<dd>Represents the hash of the package being built, excluding the leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.</dd>
+<dd>
+<p>Represents the hash of the package being built, excluding the
+  leading 'h' (e.g. 21422ab). This is applicable from conda-build 3.0 onwards.</p>
+</dd>
 <dt><code>PYTHON</code></dt>
-<dd>The path to the Python executable in the host prefix. Python is installed in the host prefix only when it is listed as a host requirement.</dd>
+<dd>
+<p>The path to the Python executable in the host prefix. Python is
+  installed in the host prefix only when it is listed as a host requirement.</p>
+</dd>
 <dt><code>R</code></dt>
-<dd>The path to the R executable in the build prefix. R is installed in the build prefix only when it is listed as a build requirement.</dd>
+<dd>
+<p>The path to the R executable in the build prefix. R is installed in the
+  build prefix only when it is listed as a build requirement.</p>
+</dd>
 <dt><code>RECIPE_DIR</code></dt>
-<dd>The directory where the recipe is located.</dd>
+<dd>
+<p>The directory where the recipe is located.</p>
+</dd>
 <dt><code>SP_DIR</code></dt>
-<dd>The location of Python's site-packages, where Python libraries are installed.</dd>
+<dd>
+<p>The location of Python's site-packages, where Python libraries are installed.</p>
+</dd>
 <dt><code>SRC_DIR</code></dt>
-<dd>The path to where the source code is unpacked or cloned. If the source file is not a recognized archive format, this directory contains a copy of the source file.</dd>
+<dd>
+<p>The path to where the source code is unpacked or cloned. If the
+  source file is not a recognized archive format, this directory contains a copy
+  of the source file.</p>
+</dd>
 <dt><code>STDLIB_DIR</code></dt>
-<dd>The location of Python's standard library.</dd>
+<dd>
+<p>The location of Python's standard library.</p>
+</dd>
 <dt><code>build_platform</code></dt>
-<dd>Represents the native subdirectory of the conda executable, indicating the platform for which the build is occurring.</dd>
+<dd>
+<p>Represents the native subdirectory of the conda executable,
+  indicating the platform for which the build is occurring.</p>
+</dd>
 </dl>
 <p>Removed from <code>conda-build</code> are:
 - <code>NPY_VER</code>
 - <code>PY3K</code></p>
 <h4 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">#</a></h4>
-<p>Unix-style packages on Windows are built in a special <code>Library</code> directory under the build
-prefix. The environment variables listed in the following table are defined only
-on Windows.</p>
+<p>Unix-style packages on Windows are built in a special <code>Library</code> directory under
+the build prefix. The environment variables listed in the following table are
+defined only on Windows.</p>
 <table>
 <thead>
 <tr>

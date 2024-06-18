@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/package_spec/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/converting_from_conda_build/">
       
       
-        <link rel="prev" href="../automatic_linting/">
+        <link rel="prev" href="../tutorials/rust/">
       
       
-        <link rel="next" href="../special_files/">
+        <link rel="next" href="../build_options/">
       
       
       <link rel="icon" href="../assets/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Package specification - rattler-build</title>
+        <title>Converting from conda-build - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Package specification - rattler-build" >
+        <meta  property="og:title"  content="Converting from conda-build - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/package_spec.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/converting_from_conda_build.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/package_spec/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/converting_from_conda_build/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Package specification - rattler-build" >
+        <meta  name="twitter:title"  content="Converting from conda-build - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/package_spec.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/converting_from_conda_build.png" >
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#package-specification" class="md-skip">
+        <a href="#converting-a-recipe-from-conda-build" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Package specification
+              Converting from conda-build
             
           </span>
         </div>
@@ -330,8 +330,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -341,11 +343,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -359,7 +361,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -433,10 +435,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../converting_from_conda_build/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Converting from conda-build
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -445,6 +467,80 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#automatic-conversion" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic conversion
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-jinja-and-selectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting Jinja and selectors
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-selectors" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting selectors
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-recipe-script" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting the recipe script
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-recipe-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting the recipe structure
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-test-section" class="md-nav__link">
+    <span class="md-ellipsis">
+      Converting the test section
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -833,8 +929,6 @@
       
   
   
-    
-  
   
   
     
@@ -846,11 +940,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
           <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
@@ -864,7 +958,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_7">
             <span class="md-nav__icon md-icon"></span>
             Package
@@ -875,30 +969,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Package specification
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../package_spec/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -907,104 +981,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#package-filename" class="md-nav__link">
-    <span class="md-ellipsis">
-      Package filename
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#special-files-in-packages" class="md-nav__link">
-    <span class="md-ellipsis">
-      Special files in packages
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#package-metadata" class="md-nav__link">
-    <span class="md-ellipsis">
-      Package metadata
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Package metadata">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#infoindexjson" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/index.json
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#infopathsjson" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/paths.json
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#infolicense" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/license/&lt;...&gt;
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#infoaboutjson" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/about.json
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#inforecipe" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/recipe/&lt;...&gt;
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1196,80 +1172,56 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#package-filename" class="md-nav__link">
+  <a href="#automatic-conversion" class="md-nav__link">
     <span class="md-ellipsis">
-      Package filename
+      Automatic conversion
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#special-files-in-packages" class="md-nav__link">
+  <a href="#converting-jinja-and-selectors" class="md-nav__link">
     <span class="md-ellipsis">
-      Special files in packages
+      Converting Jinja and selectors
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#package-metadata" class="md-nav__link">
+  <a href="#converting-selectors" class="md-nav__link">
     <span class="md-ellipsis">
-      Package metadata
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Package metadata">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#infoindexjson" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/index.json
+      Converting selectors
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#infopathsjson" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-recipe-script" class="md-nav__link">
     <span class="md-ellipsis">
-      info/paths.json
+      Converting the recipe script
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#infolicense" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-recipe-structure" class="md-nav__link">
     <span class="md-ellipsis">
-      info/license/&lt;...&gt;
+      Converting the recipe structure
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#infoaboutjson" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#converting-the-test-section" class="md-nav__link">
     <span class="md-ellipsis">
-      info/about.json
+      Converting the test section
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#inforecipe" class="md-nav__link">
-    <span class="md-ellipsis">
-      info/recipe/&lt;...&gt;
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -1288,7 +1240,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/package_spec.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/converting_from_conda_build.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -1296,217 +1248,134 @@
   
 
 
-<h1 id="package-specification">Package specification<a class="headerlink" href="#package-specification" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> produces "conda" packages. These packages work with the <code>mamba</code>
-and <code>conda</code> package managers, and they work cross-platform on Windows, Linux and
-macOS.</p>
-<p>By default, a conda package is a <code>tar.bz2</code> archive which contains:</p>
-<ul>
-<li>Metadata under the <code>info/</code> directory</li>
-<li>A collection of files that are installed directly into an install prefix</li>
-</ul>
-<p>The format is identical across platforms and operating systems. During the
-install process, all files are extracted into the install prefix, except the
-ones in <code>info/</code>. Installing a conda package into an environment is similar to
-executing the following commands:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>&lt;environment<span class="w"> </span>prefix&gt;
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>tar<span class="w"> </span>xjf<span class="w"> </span>mypkg-1.0.0-h2134.tar.bz2
+<h1 id="converting-a-recipe-from-conda-build">Converting a recipe from conda-build<a class="headerlink" href="#converting-a-recipe-from-conda-build" title="Permanent link">#</a></h1>
+<p>The recipe format of <code>rattler-build</code> differs in some aspects from <code>conda-build</code>.
+This document aims to help you convert a recipe from <code>conda-build</code> to
+<code>rattler-build</code>.</p>
+<h2 id="automatic-conversion">Automatic conversion<a class="headerlink" href="#automatic-conversion" title="Permanent link">#</a></h2>
+<p>To convert a recipe from <code>meta.yaml</code> to <code>recipe.yaml</code> you can use the automatic
+conversion utility.</p>
+<p>To install <code>conda-recipe-manager</code>, run</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pixi<span class="w"> </span>global<span class="w"> </span>install<span class="w"> </span>conda-recipe-manager
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>conda<span class="w"> </span>install<span class="w"> </span>-c<span class="w"> </span>conda-forge<span class="w"> </span>conda-recipe-manager
 </span></code></pre></div>
-<p>Only files, including symbolic links, are part of a conda package. Directories
-are not included. Directories are created and removed as needed, but you cannot
-create an empty directory from the tar archive directly.</p>
-<p>There is also a newer archive type, suffixed with <code>.conda</code>. This archive type
-consists of an outer "zip" archive that is not compressed, and two inner
-archives that are compressed with <code>zstd</code>, which is very fast for decompression.</p>
-<p>The inner archives are split into <code>info</code> and <code>pkg</code> files, which makes it
-possible to extract only the <code>info</code> part of the archive (only the metadata),
-which is often smaller in size.</p>
-<h3 id="package-filename">Package filename<a class="headerlink" href="#package-filename" title="Permanent link">#</a></h3>
-<p>A conda package conforms to the following filename:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>&lt;name&gt;-&lt;version&gt;-&lt;hash&gt;.tar.bz2 OR &lt;name&gt;-&lt;version&gt;-&lt;hash&gt;.conda
+<p>Then, run the conversion utility:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>conda-recipe-manager<span class="w"> </span>convert<span class="w"> </span>my-recipe/meta.yaml
 </span></code></pre></div>
-<h2 id="special-files-in-packages">Special files in packages<a class="headerlink" href="#special-files-in-packages" title="Permanent link">#</a></h2>
-<p>There are some special files in a package:</p>
-<ul>
-<li>activation and deactivation scripts that are executed when the environment is
-  activated or deactivated</li>
-<li>post-link and pre-unlink scripts that are executed when the package is
-  installed or uninstalled</li>
-</ul>
-<p>You can read more about these files in the <a href="../special_files/">activation scripts and other special
-files</a> section.</p>
-<h2 id="package-metadata">Package metadata<a class="headerlink" href="#package-metadata" title="Permanent link">#</a></h2>
-<p>The <code>info/</code> directory contains all metadata about a package. Files in this
-location are not installed under the install prefix. Although you are free to
-add any file to this directory, conda only inspects the content of the files
-discussed below:</p>
-<h3 id="infoindexjson"><code>info/index.json</code><a class="headerlink" href="#infoindexjson" title="Permanent link">#</a></h3>
-<p>This file contains basic information about the package, such as name, version,
-build string, and dependencies. The content of this file is stored in
-<code>repodata.json</code>, which is the repository index file, hence the name
-<code>index.json</code>. The JSON object is a dictionary containing the keys shown below.</p>
-<dl>
-<dt><code>name: string</code></dt>
-<dd>
-<p>The lowercase name of the package. May contain lowercase characters,
-underscores, and dashes.</p>
-</dd>
-<dt><code>version: string</code></dt>
-<dd>
-<p>The package version. May not contain "<code>-</code>". Acknowledges <a href="https://www.python.org/dev/peps/pep-0440/">PEP
-440</a>.</p>
-</dd>
-<dt><code>build: string</code></dt>
-<dd>
-<p>The build string. May not contain "<code>-</code>". Differentiates builds of packages with
-  otherwise identical names and versions, such as:</p>
-</dd>
-</dl>
-<ul>
-<li>A build with other dependencies, such as Python 3.4 instead of Python 2.7.</li>
-<li>A bug fix in the build process.</li>
-<li>Some different optional dependencies, such as MKL versus ATLAS linkage.
-    Nothing in conda actually inspects the build string. Strings such as
-    <code>np18py34_1</code> are designed only for human readability and conda never parses
-    them.</li>
-</ul>
-<dl>
-<dt><code>build_number: integer</code></dt>
-<dd>
-<p>A non-negative integer representing the build number of the package. Unlike
-  the build string, the <code>build_number</code> is inspected by conda. Conda uses it to
-  sort packages that have otherwise identical names and versions to determine
-  the latest one. This is important because new builds that contain bug fixes
-  for the way a package is built may be added to a repository.</p>
-</dd>
-<dt><code>depends: list of match specs</code></dt>
-<dd>
-<p>A list of dependency specifications, where each element is a string. These
-come from the <code>run</code> section of the recipe or any run exports of dependencies.</p>
-</dd>
-<dt><code>constrains: list of match specs</code></dt>
-<dd>
-<p>A list of optional dependency constraints. The packages listed under
-<code>constrains</code> are not installed by default, but if they are installed they have
-  to respect the constraints.</p>
-</dd>
-<dt><code>subdir: string</code></dt>
-<dd>
-<p>The subdir (like <code>linux-64</code>) of this package.</p>
-</dd>
-<dt><code>arch: string</code></dt>
-<dd>
-<p>Optional. The architecture the package is built for. EXAMPLE: <code>x86_64</code>. This
-key is generally not used (duplicate information from <code>sudir</code>).</p>
-</dd>
-<dt><code>platform: string</code></dt>
-<dd>
-<p>Optional. The OS that the package is built for, e.g. <code>osx</code>. This key is
-generally not used (duplicate information from <code>sudir</code>).</p>
-</dd>
-</dl>
-<h3 id="infopathsjson"><code>info/paths.json</code><a class="headerlink" href="#infopathsjson" title="Permanent link">#</a></h3>
-<p>The
-<a href="https://docs.rs/rattler_conda_types/latest/rattler_conda_types/package/struct.PathsJson.html"><code>paths.json</code></a>
-file lists all files that are installed into the environment.</p>
-<p>It consists of a list of <a href="https://docs.rs/rattler_conda_types/latest/rattler_conda_types/package/struct.PathsEntry.html">path
-entries</a>,
-each with the following keys:</p>
-<dl>
-<dt><code>_path: string</code></dt>
-<dd>
-<p>The relative path of the file</p>
-</dd>
-<dt><code>path_type: optional, string</code></dt>
-<dd>
-<p>The type of linking, can be <code>hardlink</code>, <code>softlink</code>, or <code>directory</code>. Default is
-  <code>hardlink</code>.</p>
-</dd>
-<dt><code>file_mode: - optional, string</code></dt>
-<dd>
-<p>The file mode can be <code>binary</code> or <code>text</code>. This is only relevant for prefix
-  replacement.</p>
-</dd>
-<dt><code>prefix_placeholder: optional, string</code></dt>
-<dd>
-<p>The prefix placeholder string that is encoded in the text or binary file, which
-  is replaced at installation time. Note that this prefix placeholder uses
-  <code>/</code> even on Windows.</p>
-</dd>
-<dt><code>no_link: bool, optional</code></dt>
-<dd>
-<p>Determines whether this file should be linked or not when installing the package
-  (linking the file from the cache into the environment). Defaults to <code>false</code>.</p>
-</dd>
-<dt><code>sha256: string</code></dt>
-<dd>
-<p>The <code>SHA256</code> hash of the file. For symbolic links it contains the <code>SHA256</code> hash of
-  the file pointed to.</p>
-</dd>
-<dt><code>size_in_bytes: number</code></dt>
-<dd>
-<p>The size, in bytes, of the file. For symbolic links, it contains the file size
-  of the file pointed to.</p>
-</dd>
-</dl>
-<blockquote>
-<p>Due to the way the binary replacement works, the placeholder prefix must be
-longer than the install prefix.</p>
-</blockquote>
-<h3 id="infolicense"><code>info/license/&lt;...&gt;</code><a class="headerlink" href="#infolicense" title="Permanent link">#</a></h3>
-<p>All licenses mentioned in the recipe are copied to this folder.</p>
-<h3 id="infoaboutjson"><code>info/about.json</code><a class="headerlink" href="#infoaboutjson" title="Permanent link">#</a></h3>
-<p>Optional file. Contains the entries of the "about" section of the recipe of the
-<code>recipe.yaml</code> file. The following keys are added to <code>info/about.json</code> if present
-in the build recipe:</p>
-<div class="admonition note">
-<p class="admonition-title">Renamed fields</p>
-<p>The new recipe spec renamed a few fields (from conda-build's original
-implementation). This means that some fields in the <code>about.json</code> file still
-have the old names (for backwards compatibility), while you would generally
-use different names in the recipe.</p>
+<p>This will print the converted recipe to the console. You can save it to a file
+by redirecting the output:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>conda-recipe-manager<span class="w"> </span>convert<span class="w"> </span>my-recipe/meta.yaml<span class="w"> </span>&gt;<span class="w"> </span>recipe.yaml
+</span></code></pre></div>
+<p>To learn more about the tool, or contribute, find the <a href="https://github.com/conda-incubator/conda-recipe-manager/">repository
+here</a>.</p>
+<h2 id="converting-jinja-and-selectors">Converting Jinja and selectors<a class="headerlink" href="#converting-jinja-and-selectors" title="Permanent link">#</a></h2>
+<p>To use <code>jinja</code> in the new recipes, you need to keep in mind two conversions. The
+<code>{% set version = "1.2.3" %}</code> syntax is replaced by the <code>context</code> section in the new
+recipe format.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>{% set version = &quot;1.2.3&quot; %}
+</span></code></pre></div>
+<p>becomes</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.2.3&quot;</span>
+</span></code></pre></div>
+<p>To use the values or other Jinja expressions (e.g. from the variant config) you
+can use the <code>${{ version }}</code> syntax. Note the <code>$</code> sign before the curly braces - it
+makes Jinja fully compatible with the YAML format.</p>
+<div class="language-yaml highlight"><span class="filename">meta.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># instead of</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/foo-{{ version }}.tar.gz</span>
+</span></code></pre></div>
+<p>becomes</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://example.com/foo-${{ version }}.tar.gz</span>
+</span></code></pre></div>
+<h2 id="converting-selectors">Converting selectors<a class="headerlink" href="#converting-selectors" title="Permanent link">#</a></h2>
+<p><code>conda-build</code> has a line based "selector" system, to e.g. disable certain fields
+on Windows vs. Unix.</p>
+<p>In rattler-build we use two different syntaxes: an <code>if/else/then</code> map or a
+inline jinja expression.</p>
+<p>A typical selector in <code>conda-build</code> looks something like this:</p>
+<div class="language-yaml highlight"><span class="filename">meta.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pywin32</span><span class="w">  </span><span class="c1"># [win]</span>
+</span></code></pre></div>
+<p>To convert this to <code>rattler-build</code> syntax, you can use one of the following two
+syntaxes:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;pywin32&quot; if win }}</span><span class="w">  </span><span class="c1"># empty strings are automatically filtered</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="c1"># or</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pywin32</span><span class="w">  </span><span class="c1"># this list extends the outer list</span>
+</span></code></pre></div>
+<h2 id="converting-the-recipe-script">Converting the recipe script<a class="headerlink" href="#converting-the-recipe-script" title="Permanent link">#</a></h2>
+<p>We still support the <code>build.sh</code> script, but the <code>bld.bat</code> script was renamed to <code>build.bat</code>
+in order to be more consistent with the <code>build.sh</code> script.</p>
+<p>You can also choose a different name for your script:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="c1"># note: if there is no extension, we will try to find .sh on unix and .bat on windows</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_build_script</span>
+</span></code></pre></div>
+<p>There are also new ways of writing scripts, for <a href="../build_script/">example with <code>nushell</code> or <code>python</code></a></p>
+<div class="admonition danger">
+<p class="admonition-title">Variant keys in build scripts</p>
+<p><code>conda-build</code> tries to analyze the build scripts for any usage of variant keys. We do <em>not</em> attempt that.
+If you want to use variant keys in your build script that are not used anywhere else you need to manually
+add them to your script environment, e.g.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo $MY_VARIANT</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">env</span><span class="p">:</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">MY_VARIANT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ my_variant }}</span>
+</span></code></pre></div>
 </div>
-<dl>
-<dt><code>home: url (from about.homepage)</code></dt>
-<dd>
-<p>The URL of the homepage of the package.</p>
-</dd>
-<dt><code>dev_url: url (from about.repository)</code></dt>
-<dd>
-<p>The URL of the development repository of the package.</p>
-</dd>
-<dt><code>doc_url: url (from about.documentation)</code></dt>
-<dd>
-<p>The URL of the documentation of the package.</p>
-</dd>
-<dt><code>license_url: url</code></dt>
-<dd>
-<p>The URL of the license of the package.</p>
-</dd>
-<dt><code>license: string (from about.license)</code></dt>
-<dd>
-<p>The SPDX license identifier of the package.</p>
-</dd>
-<dt><code>summary: string</code></dt>
-<dd>
-<p>A short summary of the package.</p>
-</dd>
-<dt><code>description: string</code></dt>
-<dd>
-<p>A longer description of the package.</p>
-</dd>
-<dt><code>license_family: string</code></dt>
-<dd>
-<p>(this field is not used anymore as we rely on SPDX license identifiers)</p>
-</dd>
-</dl>
-<h3 id="inforecipe"><code>info/recipe/&lt;...&gt;</code><a class="headerlink" href="#inforecipe" title="Permanent link">#</a></h3>
-<p>A directory containing the full contents of the build recipe. This folder also
-contains a rendered version of the recipe (<code>rendered_recipe.yaml</code>). This
-rendered version is used for the <code>rebuild</code> command. However, note that currently
-this format is still in flux and can change at any time.</p>
-<p>You can also use <code>--no-include-recipe</code> to disable the inclusion of the recipe in
-the package.</p>
+<h2 id="converting-the-recipe-structure">Converting the recipe structure<a class="headerlink" href="#converting-the-recipe-structure" title="Permanent link">#</a></h2>
+<p>There are a few differences in the recipe structure. However, the schema will
+tell you quite easily what is expected and you should see red squiggly lines in
+your editor (e.g. VSCode) if you make a mistake.</p>
+<p>Here are a few differences:</p>
+<ul>
+<li><code>build.run_exports</code> is now <code>requirements.run_exports</code></li>
+<li><code>requirements.run_constrained</code> is now <code>requirements.run_constraints</code></li>
+<li><code>build.ignore_run_exports</code> is now <code>requirements.ignore_run_exports.by_name</code></li>
+<li><code>build.ignore_run_exports_from</code> is now
+  <code>requirements.ignore_run_exports.from_package</code></li>
+<li>A <code>git</code> source now uses <code>git</code>, <code>tag</code>, ... and not <code>git_url</code> and <code>git_rev</code>, e.g.
+  <div class="language-yaml highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="nt">git</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/foo/bar.git</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="nt">tag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.2.3</span>
+</span></code></pre></div></li>
+</ul>
+<h2 id="converting-the-test-section">Converting the test section<a class="headerlink" href="#converting-the-test-section" title="Permanent link">#</a></h2>
+<p>The <code>test</code> section is renamed to <code>tests</code> and is a list of independent tests.
+Each test runs in its own environment.</p>
+<p>Let's have a look at converting an existing test section:</p>
+<div class="language-yaml highlight"><span class="filename">meta.yaml</span><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="nt">test</span><span class="p">:</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">  </span><span class="nt">imports</span><span class="p">:</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="w">  </span><span class="nt">commands</span><span class="p">:</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage --version</span>
+</span></code></pre></div>
+<p>This would now be split into two tests:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage --version</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">      </span><span class="nt">imports</span><span class="p">:</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">      </span><span class="c1"># by default we perform a `pip check` in the python test but</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">      </span><span class="c1"># it can be disabled by setting this to false</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">      </span><span class="nt">pip_check</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+</span></code></pre></div>
+<p>The <code>script</code> tests also take a <code>requirements</code> section with <code>run</code> and <code>build</code>
+requirements. The <code>build</code> requirements can be used to install emulators and
+similar tools that need to run to execute tests in a cross-compilation
+environment.</p>
 
 
 
@@ -1578,9 +1447,9 @@ the package.</p>
           
             
             <a
-              href="../automatic_linting/"
+              href="../tutorials/rust/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Automatic recipe linting"
+              aria-label="Previous: Rust"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1591,7 +1460,7 @@ the package.</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Automatic recipe linting
+                  Rust
                 </div>
               </div>
             </a>
@@ -1601,16 +1470,16 @@ the package.</p>
           
             
             <a
-              href="../special_files/"
+              href="../build_options/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Package scripts"
+              aria-label="Next: Advanced options"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Package scripts
+                  Advanced options
                 </div>
               </div>
               <div class="md-footer__button md-icon">
