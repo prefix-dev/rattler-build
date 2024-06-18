@@ -330,13 +330,12 @@ impl ResolvedDependencies {
 
             // If the specific package is a transitive dependency we ignore the run exports
             if direct_only
-                && !self.specs.iter().any(|s| {
-                    if let DependencyInfo::Source(s) = s {
-                        s.spec.name.as_ref() == Some(&record.package_record.name)
-                    } else {
-                        false
-                    }
-                })
+                && !self
+                    .specs
+                    .iter()
+                    // Run export dependencies are not direct dependencies
+                    .filter(|s| !matches!(s, DependencyInfo::RunExport(_)))
+                    .any(|s| s.spec().name.as_ref() == Some(&record.package_record.name))
             {
                 continue;
             }
@@ -840,8 +839,6 @@ pub(crate) async fn resolve_dependencies(
             .filter(|c| !matches!(c, DependencyInfo::RunExport(_)))
             .cloned()
             .collect();
-
-        // re-compute the run exports from the cache host & build environment
     }
 
     let rendered_run_exports = render_run_exports(output, &compatibility_specs)?;
