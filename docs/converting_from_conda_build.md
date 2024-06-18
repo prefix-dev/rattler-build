@@ -115,6 +115,19 @@ build:
 
 There are also new ways of writing scripts, for [example with `nushell` or `python`](build_script.md)
 
+!!!danger "Variant keys in build scripts"
+    `conda-build` tries to analyze the build scripts for any usage of variant keys. We do _not_ attempt that.
+    If you want to use variant keys in your build script that are not used anywhere else you need to manually
+    add them to your script environment, e.g.
+
+    ```yaml title="recipe.yaml"
+    build:
+      script:
+        content: echo $MY_VARIANT
+        env:
+          MY_VARIANT: ${{ my_variant }}
+    ```
+
 ## Converting the recipe structure
 
 There are a few differences in the recipe structure. However, the schema will
