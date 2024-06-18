@@ -470,12 +470,10 @@ impl Script {
                 .iter()
                 .map(|ext| path.with_extension(ext))
                 .find(|p| p.is_file())
+        } else if path.is_file() {
+            Some(path)
         } else {
-            if path.is_file() {
-                Some(path)
-            } else {
-                None
-            }
+            None
         }
     }
 

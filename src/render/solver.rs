@@ -166,7 +166,7 @@ impl rattler_repodata_gateway::Reporter for GatewayReporter {
         let pb = &self.progress_bars.lock().unwrap()[index];
         if let Some(template) = &self.finish_template {
             pb.set_style(template.clone());
-            pb.finish_with_message(format!("Done"));
+            pb.finish_with_message("Done".to_string());
         } else {
             pb.finish();
         }
