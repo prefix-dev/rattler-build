@@ -101,6 +101,7 @@ nav:
     - "Python": tutorials/python.md
     - "C++": tutorials/cpp.md
     - "Rust": tutorials/rust.md
+    - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:
 

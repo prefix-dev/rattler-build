@@ -592,7 +592,7 @@ Using a runtime depenedency name:
 ```yaml
   requirements:
     ignore_run_exports:
-      from_name:
+      by_name:
         - libzlib
 ```
 
