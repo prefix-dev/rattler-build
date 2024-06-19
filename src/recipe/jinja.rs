@@ -188,36 +188,42 @@ fn jinja_pin_function(
 }
 
 fn default_compiler(platform: Platform, language: &str) -> Option<String> {
-    match language {
-        // Platform agnostic compilers
-        "fortran" => Some("gfortran"),
-        "rust" => Some("rust"),
-        "go" => Some("go"),
-        "go-nocgo" => Some("go-nocgo"),
-        // Platform specific compilers
-        _ => {
-            if platform.is_windows() {
-                match language {
-                    "c" => Some("vs2017"),
-                    "cxx" => Some("vs2017"),
-                    _ => None,
-                }
-            } else if platform.is_osx() {
-                match language {
-                    "c" => Some("clang"),
-                    "cxx" => Some("clangxx"),
-                    _ => None,
-                }
-            } else {
-                match language {
-                    "c" => Some("gcc"),
-                    "cxx" => Some("gxx"),
-                    _ => None,
+    Some(
+        match language {
+            // Platform agnostic compilers
+            "fortran" => "gfortran",
+            lang if !["c", "cxx"].contains(&lang) => lang,
+            // Platform specific compilers
+            _ => {
+                if platform.is_windows() {
+                    match language {
+                        "c" => "vs2017",
+                        "cxx" => "vs2017",
+                        _ => unreachable!(),
+                    }
+                } else if platform.is_osx() {
+                    match language {
+                        "c" => "clang",
+                        "cxx" => "clangxx",
+                        _ => unreachable!(),
+                    }
+                } else if matches!(platform, Platform::EmscriptenWasm32) {
+                    match language {
+                        "c" => "emscripten",
+                        "cxx" => "emscripten",
+                        _ => unreachable!(),
+                    }
+                } else {
+                    match language {
+                        "c" => "gcc",
+                        "cxx" => "gxx",
+                        _ => unreachable!(),
+                    }
                 }
             }
         }
-    }
-    .map(|s| s.to_string())
+        .to_string(),
+    )
 }
 
 fn compiler_stdlib_eval(
@@ -1130,5 +1136,23 @@ mod tests {
         let jinja = Jinja::new(Default::default());
         assert!(jinja.eval("cmp(python, '==3.7')").is_err());
         assert!(jinja.eval("${{ \"foo\" | escape }}").is_err());
+    }
+
+    #[test]
+    fn test_default_compiler() {
+        let platform = Platform::Linux64;
+        assert_eq!("gxx", default_compiler(platform, "cxx").unwrap());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
+        assert_eq!("gcc", default_compiler(platform, "c").unwrap());
+
+        let platform = Platform::Linux32;
+        assert_eq!("gxx", default_compiler(platform, "cxx").unwrap());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
+        assert_eq!("gcc", default_compiler(platform, "c").unwrap());
+
+        let platform = Platform::Win64;
+        assert_eq!("vs2017", default_compiler(platform, "cxx").unwrap());
+        assert_eq!("vs2017", default_compiler(platform, "c").unwrap());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
     }
 }
