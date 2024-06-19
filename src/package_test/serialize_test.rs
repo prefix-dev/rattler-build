@@ -63,10 +63,7 @@ pub(crate) fn write_test_files(
     let mut tests = output.recipe.tests().clone();
 
     // remove the package contents tests as they are not needed in the final package
-    tests.retain(|test| match test {
-        TestType::PackageContents { .. } => false,
-        _ => true,
-    });
+    tests.retain(|test| !matches!(test, TestType::PackageContents { .. }));
 
     // For each `Command` test, we need to copy the test files to the package
     for (idx, test) in tests.iter_mut().enumerate() {
