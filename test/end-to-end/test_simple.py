@@ -926,3 +926,51 @@ def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     paths = json.loads((pkg / "info/paths.json").read_text())
     assert len(paths["paths"]) == 1
     assert paths["paths"][0]["_path"] == "script-executed.txt"
+
+
+    # #[test]
+    # fn test_noarch_flask() {
+    #     let tmp = tmp("test_noarch_flask");
+    #     let rattler_build = rattler().build(recipes().join("flask"), tmp.as_dir(), None, None);
+
+    #     assert!(rattler_build.status.success());
+
+    #     let pkg = get_extracted_package(tmp.as_dir(), "flask");
+    #     // this is to ensure that the clone happens correctly
+    #     let license = pkg.join("info/licenses/LICENSE.rst");
+    #     assert!(license.exists());
+
+    #     assert!(pkg.join("info/tests/1/run_test.sh").exists());
+    #     assert!(pkg.join("info/tests/1/run_test.bat").exists());
+    #     assert!(pkg
+    #         .join("info/tests/1/test_time_dependencies.json")
+    #         .exists());
+
+    #     assert!(pkg.join("info/tests/0/python_test.json").exists());
+    #     // make sure that the entry point does not exist
+    #     assert!(!pkg.join("python-scripts/flask").exists());
+
+    #     assert!(pkg.join("info/link.json").exists())
+    # }
+
+def test_noarch_flask(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot):
+    rattler_build.build(
+        recipes / "flask",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "flask")
+
+    # this is to ensure that the clone happens correctly
+    license = pkg / "info/licenses/LICENSE.rst"
+    assert license.exists()
+
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # check that the snapshot matches
+    test_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    assert test_yaml == snapshot
+
+    # make sure that the entry point does not exist
+    assert not (pkg / "python-scripts/flask").exists()
+
+    assert (pkg / "info/link.json").exists()

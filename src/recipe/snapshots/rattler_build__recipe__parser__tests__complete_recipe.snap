@@ -148,10 +148,11 @@ tests:
     include:
     - test.h
     - test.h*
-- imports:
-  - numpy
-  - pypy
-  pip_check: false
+- python:
+    imports:
+    - numpy
+    - pypy
+    pip_check: false
 about:
   homepage: https://cool-website.com/
   repository: https://github.com/some-repo/some-package

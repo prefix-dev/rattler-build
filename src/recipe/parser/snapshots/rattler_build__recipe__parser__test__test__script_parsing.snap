@@ -2,9 +2,10 @@
 source: src/recipe/parser/test.rs
 expression: yaml_serde
 ---
-- imports:
-  - numpy.testing
-  - numpy.matrix
+- python:
+    imports:
+    - numpy.testing
+    - numpy.matrix
 - script: echo "FOO"
 - script:
     interpreter: python

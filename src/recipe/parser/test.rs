@@ -108,8 +108,11 @@ pub struct DownstreamTest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TestType {
-    /// A Python test.
-    Python(PythonTest),
+    /// A Python test that will test if the imports are available and run `pip check`
+    Python {
+        /// The imports to test and the `pip check` flag
+        python: PythonTest,
+    },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
     /// A test that runs the tests of a downstream package
@@ -206,8 +209,8 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 
             match key_str {
                 "python" => {
-                    let imports = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::Python(imports);
+                    let python = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Python{ python };
                 }
                 "script" | "requirements" | "files"  => {
                     let commands = self.try_convert(key_str)?;
@@ -395,9 +398,9 @@ mod test {
         let t = tests.get(0);
 
         match t {
-            Some(TestType::Python(python_test)) => {
-                assert_eq!(python_test.imports, vec!["numpy.testing", "numpy.matrix"]);
-                assert_eq!(python_test.pip_check, true);
+            Some(TestType::Python { python }) => {
+                assert_eq!(python.imports, vec!["numpy.testing", "numpy.matrix"]);
+                assert_eq!(python.pip_check, true);
             }
             _ => panic!("expected python test"),
         }
