@@ -342,7 +342,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
                 TestType::Python(p) => p.run_test(&pkg, &package_folder, &prefix, &config).await?,
                 TestType::Downstream(_) => println!("Not implemented"),
                 // This test already runs during the build process
-                TestType::PackageContents(_) => {}
+                TestType::PackageContents { .. } => {}
             }
         }
 

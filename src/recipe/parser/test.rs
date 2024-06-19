@@ -115,11 +115,15 @@ pub enum TestType {
     /// A test that runs the tests of a downstream package
     Downstream(DownstreamTest),
     /// A test that checks the contents of the package
-    PackageContents(PackageContentsTest),
+    PackageContents {
+        /// The package contents to test against
+        // Note we use a struct for better serialization
+        package_contents: PackageContentsTest,
+    },
 }
 
+/// Package content test that compares the contents of the package with the expected contents.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-/// PackageContent
 pub struct PackageContentsTest {
     /// file paths, direct and/or globs
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -171,7 +175,9 @@ impl TryConvertNode<TestType> for RenderedNode {
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(TestType::PackageContents(PackageContentsTest::default())),
+            RenderedNode::Null(_) => Ok(TestType::PackageContents {
+                package_contents: PackageContentsTest::default(),
+            }),
         }
     }
 }
@@ -191,7 +197,9 @@ pub fn as_mapping(
 
 impl TryConvertNode<TestType> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<TestType, Vec<PartialParsingError>> {
-        let mut test = TestType::PackageContents(PackageContentsTest::default());
+        let mut test = TestType::PackageContents {
+            package_contents: PackageContentsTest::default(),
+        };
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
@@ -211,7 +219,7 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                 }
                 "package_contents" => {
                     let package_contents = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::PackageContents(package_contents);
+                    test = TestType::PackageContents { package_contents };
                 }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
@@ -308,13 +316,13 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
 
         validate_keys!(commands_test, self.iter(), script, requirements, files);
 
-        // if commands_test.script.is_empty() {
-        //     Err(vec![_partialerror!(
-        //         *self.span(),
-        //         ErrorKind::MissingField("script".into()),
-        //         help = "expected field `script` to be a list of commands"
-        //     )])?;
-        // }
+        if commands_test.script.is_default() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("script".into()),
+                help = "expected field `script` to be a list of commands"
+            )])?;
+        }
 
         Ok(commands_test)
     }

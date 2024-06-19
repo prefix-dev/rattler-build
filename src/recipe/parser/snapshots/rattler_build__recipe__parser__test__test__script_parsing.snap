@@ -25,3 +25,15 @@ expression: yaml_serde
     - foo/*
     recipe:
     - test/*
+- downstream: foo
+- downstream: bar
+- package_contents:
+    files:
+    - foo
+    - bar
+- package_contents:
+    lib:
+    - libfoo.so
+    - libbar.so
+    include:
+    - xtensor/xarray.hpp
