@@ -131,22 +131,23 @@ tests:
     - include/**
     - src/*.c
     - src_file.txt
-- files:
-  - test.txt
-  - license.txt
-  site_packages:
-  - numpy
-  - numpy/foo/__init__.py
-  bin:
-  - test
-  - test.exe
-  - foo*
-  lib:
-  - test
-  - test.so.*
-  include:
-  - test.h
-  - test.h*
+- package_contents:
+    files:
+    - test.txt
+    - license.txt
+    site_packages:
+    - numpy
+    - numpy/foo/__init__.py
+    bin:
+    - test
+    - test.exe
+    - foo*
+    lib:
+    - test
+    - test.so.*
+    include:
+    - test.h
+    - test.h*
 - imports:
   - numpy
   - pypy

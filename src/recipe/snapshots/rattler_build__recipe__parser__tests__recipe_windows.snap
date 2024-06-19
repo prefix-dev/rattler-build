@@ -330,8 +330,8 @@ Recipe {
         },
     },
     tests: [
-        PackageContents(
-            PackageContentsTest {
+        PackageContents {
+            package_contents: PackageContentsTest {
                 files: [
                     "share/cmake/xtensor/xtensorConfig.cmake",
                     "share/cmake/xtensor/xtensorConfigVersion.cmake",
@@ -343,7 +343,7 @@ Recipe {
                     "xtensor/xarray.hpp",
                 ],
             },
-        ),
+        },
         Command(
             CommandsTest {
                 script: Script {
