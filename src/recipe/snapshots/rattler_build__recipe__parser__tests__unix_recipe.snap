@@ -105,6 +105,7 @@ Recipe {
             content: CommandOrPath(
                 "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
             ),
+            cwd: None,
         },
         noarch: NoArchType(
             None,
@@ -377,6 +378,7 @@ Recipe {
                             "test -f ${PREFIX}/share/cmake/xtensor/xtensorConfigVersion.cmake",
                         ],
                     ),
+                    cwd: None,
                 },
                 requirements: CommandsTestRequirements {
                     run: [],

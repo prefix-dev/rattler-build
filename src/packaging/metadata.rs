@@ -343,6 +343,11 @@ impl Output {
 
             let relative_path = p.strip_prefix(temp_files.temp_dir.path())?.to_path_buf();
 
+            // skip any info files as they are not part of the paths.json
+            if relative_path.starts_with("info") {
+                continue;
+            }
+
             if !p.exists() {
                 if p.is_symlink() {
                     tracing::warn!(

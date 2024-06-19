@@ -68,9 +68,11 @@ pub(crate) fn write_test_files(
             let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
             let files = command_test.write_to_folder(&folder, output)?;
-            test_files.extend(files);
-            // store the cwd in the rendered test
-            command_test.script.cwd = Some(cwd);
+            if !files.is_empty() {
+                test_files.extend(files);
+                // store the cwd in the rendered test
+                command_test.script.cwd = Some(cwd);
+            }
         }
     }
 
