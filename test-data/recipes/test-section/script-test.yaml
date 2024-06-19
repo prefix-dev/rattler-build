@@ -1,0 +1,26 @@
+tests:
+  - python:
+      imports:
+        - numpy.testing
+        - numpy.matrix
+  - script:
+      - echo "FOO"
+  - script:
+      interpreter: python
+      content: |
+        import numpy as np
+        np.testing.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
+  - script:
+      file: test.sh
+      interpreter: bash
+      env:
+        FOO: BAR
+        BAZ: QUX
+      secrets:
+        - ABC
+        - DEF
+    files:
+      source:
+        - foo/*
+      recipe:
+        - test/*

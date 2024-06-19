@@ -1,0 +1,27 @@
+---
+source: src/recipe/parser/test.rs
+expression: yaml_serde
+---
+- imports:
+  - numpy.testing
+  - numpy.matrix
+- script: echo "FOO"
+- script:
+    interpreter: python
+    content: |
+      import numpy as np
+      np.testing.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
+- script:
+    interpreter: bash
+    env:
+      BAZ: QUX
+      FOO: BAR
+    secrets:
+    - ABC
+    - DEF
+    file: test.sh
+  files:
+    source:
+    - foo/*
+    recipe:
+    - test/*
