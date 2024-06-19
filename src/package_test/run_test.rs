@@ -62,6 +62,9 @@ pub enum TestError {
     #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
 
+    #[error("failed to parse tests from `info/tests/tests.yaml`: {0}")]
+    TestYamlParseError(#[from] serde_yaml::Error),
+
     #[error("failed to parse JSON from test files: {0}")]
     TestJSONParseError(#[from] serde_json::Error),
 
@@ -328,13 +331,8 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
     }
 
     if package_folder.join("info/tests/tests.yaml").exists() {
-        // These are the new style tests
-
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
-        let tests: Vec<TestType> = serde_yaml::from_str(&tests).unwrap();
-
-        // let test_folder = package_folder.join("info/tests");
-        // let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
+        let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
         for test in tests {
             match test {
@@ -344,17 +342,13 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
                         .run_test(&pkg, &package_folder, &prefix, &config)
                         .await?
                 }
-                TestType::Downstream(_) => println!("Not implemented"),
-                // This test already runs during the build process
+                TestType::Downstream(_) => {
+                    tracing::warn!("Downstream tests are not yet implemented in rattler-build")
+                }
+                // This test already runs during the build process and we don't need to run it again
                 TestType::PackageContents { .. } => {}
             }
         }
-
-        // // for each enumerated test, we load and run it
-        // while let Some(entry) = read_dir.next_entry().await? {
-        //     tracing::info!("test {:?}", entry.path());
-        //     run_individual_test(&pkg, &entry.path(), &prefix, &config).await?;
-        // }
 
         tracing::info!(
             "{} all tests passed!",
@@ -526,26 +520,3 @@ impl CommandsTest {
         Ok(())
     }
 }
-
-// async fn run_individual_test(
-//     pkg: &ArchiveIdentifier,
-//     path: &Path,
-//     prefix: &Path,
-//     config: &TestConfiguration,
-// ) -> Result<(), TestError> {
-//     if path.join("python_test.json").exists() {
-//         run_python_test(pkg, path, prefix, config).await?;
-//     } else if path.join("run_test.sh").exists() || path.join("run_test.bat").exists() {
-//         // run shell test
-//         run_shell_test(pkg, path, prefix, config).await?;
-//     } else {
-//         // no test found
-//     }
-
-//     tracing::info!(
-//         "{} test passed!",
-//         console::style(console::Emoji("✔", "")).green()
-//     );
-
-//     Ok(())
-// }
