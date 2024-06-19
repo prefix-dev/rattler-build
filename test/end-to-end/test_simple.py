@@ -927,7 +927,6 @@ def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert len(paths["paths"]) == 1
     assert paths["paths"][0]["_path"] == "script-executed.txt"
 
-
     # #[test]
     # fn test_noarch_flask() {
     #     let tmp = tmp("test_noarch_flask");
@@ -953,7 +952,10 @@ def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     #     assert!(pkg.join("info/link.json").exists())
     # }
 
-def test_noarch_flask(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot):
+
+def test_noarch_flask(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
     rattler_build.build(
         recipes / "flask",
         tmp_path,
