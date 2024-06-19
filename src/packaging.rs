@@ -213,8 +213,11 @@ pub fn package_conda(
 
     let info_folder = tmp.temp_dir.path().join("info");
 
-    tracing::info!("Writing metadata for package");
+    tracing::info!("Writing test files");
+    let test_files = write_test_files(output, tmp.temp_dir.path())?;
+    tmp.add_files(test_files);
 
+    tracing::info!("Writing metadata for package");
     tmp.add_files(output.write_metadata(&tmp)?);
 
     // TODO move things below also to metadata.rs
@@ -228,10 +231,6 @@ pub fn package_conda(
         let recipe_files = write_recipe_folder(output, tmp.temp_dir.path())?;
         tmp.add_files(recipe_files);
     }
-
-    tracing::info!("Writing test files");
-    let test_files = write_test_files(output, tmp.temp_dir.path())?;
-    tmp.add_files(test_files);
 
     tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages

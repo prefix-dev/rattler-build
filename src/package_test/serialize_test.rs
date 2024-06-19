@@ -1,26 +1,12 @@
+use std::path::{Path, PathBuf};
+
 use fs_err as fs;
-use fs_err::File;
-use rattler_conda_types::Platform;
-use std::{
-    io::Write,
-    path::{Path, PathBuf},
-};
 
 use crate::{
     metadata::Output,
     packaging::PackagingError,
-    recipe::parser::{CommandsTest, DownstreamTest, PythonTest, TestType},
+    recipe::parser::{CommandsTest, TestType},
 };
-
-impl DownstreamTest {
-    fn write_to_folder(&self, folder: &Path) -> Result<Vec<PathBuf>, PackagingError> {
-        fs::create_dir_all(folder)?;
-        let path = folder.join("downstream_test.json");
-        let mut file = File::create(&path)?;
-        file.write_all(serde_json::to_string(self)?.as_bytes())?;
-        Ok(vec![path])
-    }
-}
 
 impl CommandsTest {
     fn write_to_folder(
@@ -28,34 +14,10 @@ impl CommandsTest {
         folder: &Path,
         output: &Output,
     ) -> Result<Vec<PathBuf>, PackagingError> {
-        let mut command_files = vec![];
-        let mut test_files = vec![];
+        let mut test_files = Vec::new();
 
-        fs::create_dir_all(folder)?;
-
-        let target_platform = &output.build_configuration.target_platform;
-        if target_platform.is_windows() || target_platform == &Platform::NoArch {
-            command_files.push(folder.join("run_test.bat"));
-        }
-
-        if target_platform.is_unix() || target_platform == &Platform::NoArch {
-            command_files.push(folder.join("run_test.sh"));
-        }
-
-        for cf in command_files {
-            let mut file = File::create(&cf)?;
-            for el in &self.script {
-                writeln!(file, "{}\n", el)?;
-            }
-            test_files.push(cf);
-        }
-
-        if !self.requirements.is_empty() {
-            let test_dependencies = &self.requirements;
-            let test_file = folder.join("test_time_dependencies.json");
-            let mut file = File::create(&test_file)?;
-            file.write_all(serde_json::to_string(&test_dependencies)?.as_bytes())?;
-            test_files.push(test_file);
+        if !self.files.recipe.is_empty() || !self.files.source.is_empty() {
+            fs::create_dir_all(folder)?;
         }
 
         if !self.files.recipe.is_empty() {
@@ -88,15 +50,6 @@ impl CommandsTest {
     }
 }
 
-impl PythonTest {
-    fn write_to_folder(&self, folder: &Path) -> Result<Vec<PathBuf>, PackagingError> {
-        fs::create_dir_all(folder)?;
-        let path = folder.join("python_test.json");
-        serde_json::to_writer(&File::create(&path)?, self)?;
-        Ok(vec![path])
-    }
-}
-
 /// Write out the test files for the final package
 pub(crate) fn write_test_files(
     output: &Output,
@@ -104,16 +57,34 @@ pub(crate) fn write_test_files(
 ) -> Result<Vec<PathBuf>, PackagingError> {
     let mut test_files = Vec::new();
 
-    for (idx, test) in output.recipe.tests().iter().enumerate() {
-        let folder = tmp_dir_path.join(format!("info/tests/{}", idx));
-        let files = match test {
-            TestType::Python(python_test) => python_test.write_to_folder(&folder)?,
-            TestType::Command(command_test) => command_test.write_to_folder(&folder, output)?,
-            TestType::Downstream(downstream_test) => downstream_test.write_to_folder(&folder)?,
-            TestType::PackageContents(_) => Vec::new(),
-        };
-        test_files.extend(files);
+    let name = output.name().as_normalized();
+
+    // extract test section from the original recipe
+    let mut tests = output.recipe.tests().clone();
+
+    // remove the package contents tests as they are not needed in the final package
+    tests.retain(|test| !matches!(test, TestType::PackageContents { .. }));
+
+    // For each `Command` test, we need to copy the test files to the package
+    for (idx, test) in tests.iter_mut().enumerate() {
+        if let TestType::Command(ref mut command_test) = test {
+            let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
+            let folder = tmp_dir_path.join(&cwd);
+            let files = command_test.write_to_folder(&folder, output)?;
+            if !files.is_empty() {
+                test_files.extend(files);
+                // store the cwd in the rendered test
+                command_test.script.cwd = Some(cwd);
+            }
+        }
     }
+
+    let test_file_dir = tmp_dir_path.join("info/tests");
+    fs::create_dir_all(&test_file_dir)?;
+
+    let test_file = test_file_dir.join("tests.yaml");
+    fs::write(&test_file, serde_yaml::to_string(&tests)?)?;
+    test_files.push(test_file);
 
     Ok(test_files)
 }

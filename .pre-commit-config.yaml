@@ -1,4 +1,4 @@
-exclude: '(\.patch|\.diff|\.snap|test-data/recipes/test-parsing/.+)$'
+exclude: '(\.patch|\.diff|\.snap|\.ambr|test-data/recipes/test-parsing/.+)$'
 
 repos:
   -   repo: https://github.com/pre-commit/pre-commit-hooks

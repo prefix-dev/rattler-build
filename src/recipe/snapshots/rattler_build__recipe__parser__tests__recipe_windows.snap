@@ -105,6 +105,7 @@ Recipe {
             content: CommandOrPath(
                 "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install",
             ),
+            cwd: None,
         },
         noarch: NoArchType(
             None,
@@ -329,8 +330,8 @@ Recipe {
         },
     },
     tests: [
-        PackageContents(
-            PackageContentsTest {
+        PackageContents {
+            package_contents: PackageContentsTest {
                 files: [
                     "share/cmake/xtensor/xtensorConfig.cmake",
                     "share/cmake/xtensor/xtensorConfigVersion.cmake",
@@ -342,14 +343,22 @@ Recipe {
                     "xtensor/xarray.hpp",
                 ],
             },
-        ),
+        },
         Command(
             CommandsTest {
-                script: [
-                    "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
-                ],
+                script: Script {
+                    interpreter: None,
+                    env: {},
+                    secrets: [],
+                    content: Commands(
+                        [
+                            "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                        ],
+                    ),
+                    cwd: None,
+                },
                 requirements: CommandsTestRequirements {
                     run: [],
                     build: [],

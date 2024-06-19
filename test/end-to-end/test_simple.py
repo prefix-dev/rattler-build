@@ -926,3 +926,28 @@ def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     paths = json.loads((pkg / "info/paths.json").read_text())
     assert len(paths["paths"]) == 1
     assert paths["paths"][0]["_path"] == "script-executed.txt"
+
+
+def test_noarch_flask(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
+    rattler_build.build(
+        recipes / "flask",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "flask")
+
+    # this is to ensure that the clone happens correctly
+    license_file = pkg / "info/licenses/LICENSE.rst"
+    assert license_file.exists()
+
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # check that the snapshot matches
+    test_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    assert test_yaml == snapshot
+
+    # make sure that the entry point does not exist
+    assert not (pkg / "python-scripts/flask").exists()
+
+    assert (pkg / "info/link.json").exists()

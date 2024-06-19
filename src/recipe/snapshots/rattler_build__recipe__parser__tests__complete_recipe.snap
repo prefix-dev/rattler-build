@@ -120,9 +120,7 @@ requirements:
     from_package:
     - python
 tests:
-- test_type: command
-  script:
-  - echo FOO
+- script: echo FOO
   requirements:
     run:
     - bash
@@ -133,28 +131,28 @@ tests:
     - include/**
     - src/*.c
     - src_file.txt
-- test_type: package_contents
-  files:
-  - test.txt
-  - license.txt
-  site_packages:
-  - numpy
-  - numpy/foo/__init__.py
-  bin:
-  - test
-  - test.exe
-  - foo*
-  lib:
-  - test
-  - test.so.*
-  include:
-  - test.h
-  - test.h*
-- test_type: python
-  imports:
-  - numpy
-  - pypy
-  pip_check: false
+- package_contents:
+    files:
+    - test.txt
+    - license.txt
+    site_packages:
+    - numpy
+    - numpy/foo/__init__.py
+    bin:
+    - test
+    - test.exe
+    - foo*
+    lib:
+    - test
+    - test.so.*
+    include:
+    - test.h
+    - test.h*
+- python:
+    imports:
+    - numpy
+    - pypy
+    pip_check: false
 about:
   homepage: https://cool-website.com/
   repository: https://github.com/some-repo/some-package

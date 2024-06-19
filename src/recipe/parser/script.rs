@@ -10,7 +10,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{borrow::Cow, collections::BTreeMap, path::PathBuf};
 
 /// Defines the script to run to build the package.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Script {
     /// The interpreter to use for the script.
     pub interpreter: Option<String>,
@@ -22,6 +22,9 @@ pub struct Script {
     pub secrets: Vec<String>,
     /// The contents of the script, either a path or a list of commands.
     pub content: ScriptContent,
+
+    /// The current working directory for the script.
+    pub cwd: Option<PathBuf>,
 }
 
 impl Serialize for Script {
@@ -51,13 +54,18 @@ impl Serialize for Script {
                 secrets: &'a Vec<String>,
                 #[serde(skip_serializing_if = "Option::is_none", flatten)]
                 content: Option<RawScriptContent<'a>>,
+                #[serde(skip_serializing_if = "Option::is_none")]
+                cwd: Option<&'a PathBuf>,
             },
         }
 
         let raw_script = match &self.content {
             ScriptContent::CommandOrPath(content) => RawScript::CommandOrPath(content),
             ScriptContent::Commands(content)
-                if self.interpreter.is_none() && self.env.is_empty() && self.secrets.is_empty() =>
+                if self.interpreter.is_none()
+                    && self.env.is_empty()
+                    && self.secrets.is_empty()
+                    && self.cwd.is_none() =>
             {
                 RawScript::Commands(content)
             }
@@ -65,6 +73,7 @@ impl Serialize for Script {
                 interpreter: self.interpreter.as_ref(),
                 env: &self.env,
                 secrets: &self.secrets,
+                cwd: self.cwd.as_ref(),
                 content: match &self.content {
                     ScriptContent::Command(content) => Some(RawScriptContent::Command { content }),
                     ScriptContent::Commands(content) => {
@@ -106,7 +115,10 @@ impl<'de> Deserialize<'de> for Script {
                 env: BTreeMap<String, String>,
                 #[serde(default)]
                 secrets: Vec<String>,
+                #[serde(default, flatten)]
                 content: Option<RawScriptContent>,
+                #[serde(default)]
+                cwd: Option<PathBuf>,
             },
         }
 
@@ -119,10 +131,12 @@ impl<'de> Deserialize<'de> for Script {
                 env,
                 secrets,
                 content,
+                cwd,
             } => Self {
                 interpreter,
                 env,
                 secrets,
+                cwd: cwd.map(PathBuf::from),
                 content: match content {
                     Some(RawScriptContent::Command { content }) => ScriptContent::Command(content),
                     Some(RawScriptContent::Commands { content }) => {
@@ -180,6 +194,7 @@ impl From<ScriptContent> for Script {
             env: Default::default(),
             secrets: Default::default(),
             content: value,
+            cwd: None,
         }
     }
 }
@@ -287,12 +302,13 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             secrets,
             interpreter,
             content,
+            cwd: None,
         })
     }
 }
 
 /// Describes the contents of the script as defined in [`Script`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum ScriptContent {
     /// Uses the default build script.
     #[default]
