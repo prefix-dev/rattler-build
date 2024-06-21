@@ -89,7 +89,12 @@ enum Tests {
 }
 
 impl Tests {
-    async fn run(&self, environment: &Path, cwd: &Path, pkg_vars: &HashMap<String, String>) -> Result<(), TestError> {
+    async fn run(
+        &self,
+        environment: &Path,
+        cwd: &Path,
+        pkg_vars: &HashMap<String, String>,
+    ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
         let platform = Platform::current();
@@ -193,11 +198,20 @@ pub struct TestConfiguration {
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     let mut res = HashMap::new();
 
-    res.insert("PKG_NAME".to_string(), index_json.name.as_normalized().to_string());
+    res.insert(
+        "PKG_NAME".to_string(),
+        index_json.name.as_normalized().to_string(),
+    );
     res.insert("PKG_VERSION".to_string(), index_json.version.to_string());
     res.insert("PKG_BUILD_STRING".to_string(), index_json.build.clone());
-    res.insert("PKG_BUILDNUM".to_string(), index_json.build_number.to_string());
-    res.insert("PKG_BUILD_NUMBER".to_string(), index_json.build_number.to_string());
+    res.insert(
+        "PKG_BUILDNUM".to_string(),
+        index_json.build_number.to_string(),
+    );
+    res.insert(
+        "PKG_BUILD_NUMBER".to_string(),
+        index_json.build_number.to_string(),
+    );
 
     res
 }
@@ -352,7 +366,10 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         for test in tests {
             match test {
-                TestType::Command(c) => c.run_test(&pkg, &package_folder, &prefix, &config, &env).await?,
+                TestType::Command(c) => {
+                    c.run_test(&pkg, &package_folder, &prefix, &config, &env)
+                        .await?
+                }
                 TestType::Python { python } => {
                     python
                         .run_test(&pkg, &package_folder, &prefix, &config)
@@ -457,7 +474,7 @@ impl CommandsTest {
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
-        pkg_vars: &HashMap<String, String>
+        pkg_vars: &HashMap<String, String>,
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
 
