@@ -11,6 +11,7 @@ use fs_err as fs;
 use rattler_conda_types::package::IndexJson;
 use rattler_conda_types::{Channel, ParseStrictness};
 use std::fmt::Write as fmt_write;
+use std::io::Write;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -25,7 +26,7 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
 use crate::env_vars;
-use crate::recipe::parser::{CommandsTest, Script, ScriptContent, TestType};
+use crate::recipe::parser::{CommandsTest, DownstreamTest, Script, ScriptContent, TestType};
 use crate::source::copy_dir::CopyDir;
 use crate::{recipe::parser::PythonTest, render::solver::create_environment, tool_configuration};
 
@@ -210,7 +211,12 @@ pub struct TestConfiguration {
 ///
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
+#[async_recursion::async_recursion]
+pub async fn run_test(
+    package_file: &Path,
+    config: &TestConfiguration,
+    downstream_package: Option<PathBuf>,
+) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
 
     // create the test prefix
@@ -239,6 +245,23 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
                 .ok_or(TestError::MissingPackageFileName)?,
         ),
     )?;
+
+    // Also copy the downstream package if it exists
+    if let Some(ref downstream_package) = downstream_package {
+        std::fs::copy(
+            downstream_package,
+            subdir.join(
+                downstream_package
+                    .file_name()
+                    .ok_or(TestError::MissingPackageFileName)?,
+            ),
+        )?;
+    }
+
+    // if there is a downstream package, that's the one we actually want to test
+    let package_file = downstream_package
+        .as_deref()
+        .unwrap_or_else(|| package_file);
 
     // index the temporary channel
     index(tmp_repo.path(), Some(&target_platform))?;
@@ -342,8 +365,15 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
                         .run_test(&pkg, &package_folder, &prefix, &config)
                         .await?
                 }
+                TestType::Downstream(downstream) if downstream_package.is_none() => {
+                    downstream
+                        .run_test(&pkg, &package_file, &prefix, &config)
+                        .await?
+                }
                 TestType::Downstream(_) => {
-                    tracing::warn!("Downstream tests are not yet implemented in rattler-build")
+                    tracing::info!(
+                        "Skipping downstream test as we are already testing a downstream package"
+                    )
                 }
                 // This test already runs during the build process and we don't need to run it again
                 TestType::PackageContents { .. } => {}
@@ -356,7 +386,9 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         );
     }
 
-    fs::remove_dir_all(prefix)?;
+    if prefix.exists() {
+        fs::remove_dir_all(prefix)?;
+    }
 
     Ok(())
 }
@@ -516,6 +548,87 @@ impl CommandsTest {
             .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+impl DownstreamTest {
+    /// Execute the command test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let downstream_spec = self.downstream.clone();
+
+        // first try to resolve an environment with the downstream spec and our
+        // current package
+        let match_specs = [
+            MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
+            MatchSpec::from_str(
+                format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+                ParseStrictness::Lenient,
+            )?,
+        ];
+        let render_only_tool_config = tool_configuration::Configuration {
+            render_only: true,
+            ..config.tool_configuration.clone()
+        };
+
+        let target_platform = config.target_platform.unwrap_or_else(Platform::current);
+
+        let resolved = create_environment(
+            &match_specs,
+            &target_platform,
+            prefix,
+            &config.channels,
+            &render_only_tool_config,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await;
+
+        match resolved {
+            Ok(solution) => {
+                let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
+                // we found a solution, so let's run the downstream test with that particular package!
+                let downstream_package = solution
+                    .iter()
+                    .find(|s| s.package_record.name == spec_name)
+                    .ok_or_else(|| {
+                        TestError::TestFailed(
+                            "Could not find package in the resolved environment".to_string(),
+                        )
+                    })?;
+
+                let temp_dir = tempfile::tempdir()?;
+                let package_file = temp_dir.path().join(&downstream_package.file_name);
+
+                if downstream_package.url.scheme() == "file" {
+                    fs::copy(
+                        downstream_package.url.to_file_path().unwrap(),
+                        &package_file,
+                    )?;
+                } else {
+                    let package_dl = reqwest::get(downstream_package.url.clone()).await.unwrap();
+                    // write out the package to a temporary directory
+                    let mut file = fs::File::create(&package_file)?;
+                    let bytes = package_dl.bytes().await.unwrap();
+                    file.write_all(&bytes)?;
+                }
+
+                // run the test with the downstream package
+                tracing::info!("Running downstream test with {:?}", &package_file);
+                run_test(&path, config, Some(package_file)).await?;
+            }
+            Err(e) => {
+                // ignore the error
+                tracing::warn!("Downstream test could not run - unsolvable? {:?}", e);
+            }
+        }
 
         Ok(())
     }

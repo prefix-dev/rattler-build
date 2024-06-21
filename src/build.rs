@@ -174,6 +174,7 @@ pub async fn run_build(
                 solve_strategy: SolveStrategy::Highest,
                 tool_configuration: tool_configuration.clone(),
             },
+            None,
         )
         .await
         .into_diagnostic()?;
