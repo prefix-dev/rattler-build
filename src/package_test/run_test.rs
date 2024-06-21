@@ -8,8 +8,9 @@
 //! * `files` - check if a list of files exist
 
 use fs_err as fs;
-use rattler_conda_types::package::IndexJson;
+use rattler_conda_types::package::{IndexJson, PackageFile};
 use rattler_conda_types::{Channel, ParseStrictness};
+use std::collections::HashMap;
 use std::fmt::Write as fmt_write;
 use std::{
     path::{Path, PathBuf},
@@ -88,12 +89,13 @@ enum Tests {
 }
 
 impl Tests {
-    async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
+    async fn run(&self, environment: &Path, cwd: &Path, pkg_vars: &HashMap<String, String>) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(pkg_vars.clone());
         env_vars.insert(
             "PREFIX".to_string(),
             environment.to_string_lossy().to_string(),
@@ -186,6 +188,18 @@ pub struct TestConfiguration {
     pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+}
+
+fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
+    let mut res = HashMap::new();
+
+    res.insert("PKG_NAME".to_string(), index_json.name.as_normalized().to_string());
+    res.insert("PKG_VERSION".to_string(), index_json.version.to_string());
+    res.insert("PKG_BUILD_STRING".to_string(), index_json.build.clone());
+    res.insert("PKG_BUILDNUM".to_string(), index_json.build_number.to_string());
+    res.insert("PKG_BUILD_NUMBER".to_string(), index_json.build_number.to_string());
+
+    res
 }
 
 /// Run a test for a single package
@@ -283,6 +297,8 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         TestError::TestFailed(format!("failed to extract package: {:?}", e))
     })?;
 
+    let index_json = IndexJson::from_package_directory(&package_folder)?;
+    let env = env_vars_from_package(&index_json);
     // extract package in place
     if package_folder.join("info/test").exists() {
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
@@ -321,7 +337,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder).await?;
+            test.run(&prefix, &test_folder, &env).await?;
         }
 
         tracing::info!(
@@ -336,7 +352,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
         for test in tests {
             match test {
-                TestType::Command(c) => c.run_test(&pkg, &package_folder, &prefix, &config).await?,
+                TestType::Command(c) => c.run_test(&pkg, &package_folder, &prefix, &config, &env).await?,
                 TestType::Python { python } => {
                     python
                         .run_test(&pkg, &package_folder, &prefix, &config)
@@ -441,6 +457,7 @@ impl CommandsTest {
         path: &Path,
         prefix: &Path,
         config: &TestConfiguration,
+        pkg_vars: &HashMap<String, String>
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
 
@@ -500,6 +517,7 @@ impl CommandsTest {
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(prefix, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(pkg_vars.clone());
         env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
 
         // copy all test files to a temporary directory and set it as the working directory

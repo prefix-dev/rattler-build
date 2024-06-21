@@ -25,3 +25,15 @@ tests:
       recipe:
         - testfile.txt
         - testfolder/
+  - script:
+    - if: unix
+      then:
+        - test $PKG_VERSION = "0.1.0"
+        - test $PKG_NAME = "test-execution"
+        - test $PKG_BUILDNUM = "0"
+        - test $PKG_BUILD_STRING = "0.1.0-0"
+      else:
+        - if not %PKG_VERSION% == "0.1.0" (exit 1)
+        - if not %PKG_NAME% == "test-execution" (exit 1)
+        - if not %PKG_BUILDNUM% == "0" (exit 1)
+        - if not %PKG_BUILD_STRING% == "0.1.0-0" (exit 1)
