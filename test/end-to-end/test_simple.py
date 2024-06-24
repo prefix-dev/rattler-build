@@ -64,6 +64,9 @@ class RattlerBuild:
         )
         return self(*args)
 
+    def test(self, package, *args: Any, **kwds: Any) -> Any:
+        return self("test", "--package-file", package, *args, stderr=STDOUT, **kwds)
+
 
 @pytest.fixture
 def rattler_build():
@@ -951,3 +954,33 @@ def test_noarch_flask(
     assert not (pkg / "python-scripts/flask").exists()
 
     assert (pkg / "info/link.json").exists()
+
+
+def test_downstream_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "downstream_test/succeed.yaml",
+        tmp_path,
+    )
+
+    pkg = next(tmp_path.rglob("**/upstream-good-*"))
+    test_result = rattler_build.test(pkg, "-c", str(tmp_path))
+    print("OUT", test_result)
+    assert "Running downstream test for package: downstream-good" in test_result
+    assert "Downstream test could not run" not in test_result
+    assert "Running test in downstream package" in test_result
+
+    rattler_build.build(
+        recipes / "downstream_test/fail_prelim.yaml",
+        tmp_path,
+    )
+
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.build(
+            recipes / "downstream_test/fail.yaml",
+            tmp_path,
+        )
+
+        assert "│ Failing test in downstream package" in e.value.output
+        assert "│ Downstream test failed" in e.value.output

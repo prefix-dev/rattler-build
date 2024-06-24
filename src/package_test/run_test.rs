@@ -259,9 +259,7 @@ pub async fn run_test(
     }
 
     // if there is a downstream package, that's the one we actually want to test
-    let package_file = downstream_package
-        .as_deref()
-        .unwrap_or_else(|| package_file);
+    let package_file = downstream_package.as_deref().unwrap_or(package_file);
 
     // index the temporary channel
     index(tmp_repo.path(), Some(&target_platform))?;
@@ -367,7 +365,7 @@ pub async fn run_test(
                 }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
-                        .run_test(&pkg, &package_file, &prefix, &config)
+                        .run_test(&pkg, package_file, &prefix, &config)
                         .await?
                 }
                 TestType::Downstream(_) => {
@@ -402,6 +400,9 @@ impl PythonTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running python test");
+        let _guard = span.enter();
+
         let match_spec = MatchSpec::from_str(
             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
             ParseStrictness::Lenient,
@@ -475,6 +476,9 @@ impl CommandsTest {
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
+
+        let span = tracing::info_span!("Running script test");
+        let _guard = span.enter();
 
         let build_env = if !deps.build.is_empty() {
             tracing::info!("Installing build dependencies");
@@ -564,6 +568,9 @@ impl DownstreamTest {
     ) -> Result<(), TestError> {
         let downstream_spec = self.downstream.clone();
 
+        let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+        let _guard = span.enter();
+
         // first try to resolve an environment with the downstream spec and our
         // current package
         let match_specs = [
@@ -622,11 +629,19 @@ impl DownstreamTest {
 
                 // run the test with the downstream package
                 tracing::info!("Running downstream test with {:?}", &package_file);
-                run_test(&path, config, Some(package_file)).await?;
+                run_test(path, config, Some(package_file.clone()))
+                    .await
+                    .map_err(|e| {
+                        tracing::error!("Downstream test with {:?} failed", &package_file);
+                        e
+                    })?;
             }
             Err(e) => {
                 // ignore the error
-                tracing::warn!("Downstream test could not run - unsolvable? {:?}", e);
+                tracing::warn!(
+                    "Downstream test could not run. Environment might be unsolvable: {:?}",
+                    e
+                );
             }
         }
 

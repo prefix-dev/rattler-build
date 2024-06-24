@@ -400,7 +400,7 @@ pub async fn run_test_from_args(
         .to_string_lossy()
         .to_string();
 
-    let span = tracing::info_span!("Running tests for ", recipe = %package_name);
+    let span = tracing::info_span!("Running tests for", package = %package_name);
     let _enter = span.enter();
     package_test::run_test(&package_file, &test_options, None)
         .await
