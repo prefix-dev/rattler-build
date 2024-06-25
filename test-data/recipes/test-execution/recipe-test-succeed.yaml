@@ -36,4 +36,4 @@ tests:
         - if not "%PKG_VERSION%" == "0.1.0" (exit 1)
         - if not "%PKG_NAME%" == "test-execution" (exit 1)
         - if not "%PKG_BUILDNUM%" == "0" (exit 1)
-        - if not "%PKG_BUILD_STRING%" != "" (exit 1)
+        - if not "%PKG_BUILD_STRING%" == "" (exit 1)
