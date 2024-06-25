@@ -1,0 +1,16 @@
+outputs:
+  - package:
+      name: upstream-fail
+      version: 2.0.0
+    build:
+      script:
+        - if: unix
+          then:
+            - touch $PREFIX/fail.txt
+        - if: win
+          then:
+            - echo "empty" > %PREFIX%\fail.txt
+    tests:
+      - script:
+          - echo "Running test"
+      - downstream: downstream-fail

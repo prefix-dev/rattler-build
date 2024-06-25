@@ -3429,6 +3429,7 @@ dependencies = [
  "ansi-to-tui",
  "anyhow",
  "async-once-cell",
+ "async-recursion",
  "base64 0.22.1",
  "bzip2",
  "chrono",

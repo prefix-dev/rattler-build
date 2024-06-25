@@ -94,6 +94,7 @@ impl<'a> field::Visit for CustomVisitor<'a> {
         self.result = match field.name() {
             "message" => write!(self.writer, "{:?}", value),
             "recipe" => write!(self.writer, " recipe: {:?}", value),
+            "package" => write!(self.writer, " package: {:?}", value),
             _ => Ok(()),
         };
     }

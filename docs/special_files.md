@@ -37,7 +37,7 @@ To make sure the scripts are included in the correct location, use your recipe's
 ```yaml
 build:
   ...
-  script: 
+  script:
     - ...
     - mkdir -p $PREFIX/bin
     - cp $RECIPE_DIR/post-link.sh $PREFIX/bin/.mypkg-post-link.sh
