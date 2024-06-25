@@ -15,8 +15,8 @@ use rattler_package_streaming::write::{
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles};
-pub use metadata::create_prefix_placeholder;
+pub use file_finder::{content_type, Files, TempFiles};
+pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 
 use crate::metadata::Output;
 use crate::package_test::write_test_files;

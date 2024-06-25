@@ -28,8 +28,9 @@ use crate::{metadata::Output, recipe::parser::PrefixDetection};
 
 use super::{PackagingError, TempFiles};
 
+/// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
-fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
+pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
     #[cfg(target_family = "windows")]
@@ -59,7 +60,7 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
 
 /// This function requires we know the file content we are matching against is UTF-8
 /// In case the source is non utf-8 it will fail with a read error
-fn contains_prefix_text(
+pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
     target_platform: &Platform,
