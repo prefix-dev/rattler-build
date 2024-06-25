@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.18.0"
+version = "0.18.1"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -44,7 +44,7 @@ anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
-serde_json = "1.0.117"
+serde_json = "1.0.118"
 reqwest = { version = "0.12.5", default-features = false, features = [
     "multipart",
 ] }
@@ -65,7 +65,7 @@ tracing-subscriber = { version = "0.3.18", features = [
     "ansi",
     "json"
 ] }
-marked-yaml = { version = "0.5.2" }
+marked-yaml = { version = "0.6.1" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
 goblin = "0.8.2"
@@ -89,7 +89,7 @@ indexmap = "2.2.6"
 dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "6.0.1"
-clap_complete = "4.5.5"
+clap_complete = "4.5.6"
 tokio-util = "0.7.11"
 
 tar = "0.4.41"
@@ -109,7 +109,7 @@ rattler_installs_packages = { version = "0.9.0", default-features = false }
 async-once-cell = "0.5.3"
 terminal_size = "0.3.0"
 memchr = "2.7.4"
-ratatui = { version = "0.26.3", optional = true }
+ratatui = { version = "0.27.0", optional = true }
 crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "4.0.1", optional = true }
 throbber-widgets-tui = { version = "0.5.0", optional = true }
