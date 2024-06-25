@@ -966,7 +966,7 @@ def test_downstream_test(
 
     pkg = next(tmp_path.rglob("**/upstream-good-*"))
     test_result = rattler_build.test(pkg, "-c", str(tmp_path))
-    print("OUT", test_result)
+
     assert "Running downstream test for package: downstream-good" in test_result
     assert "Downstream test could not run" not in test_result
     assert "Running test in downstream package" in test_result

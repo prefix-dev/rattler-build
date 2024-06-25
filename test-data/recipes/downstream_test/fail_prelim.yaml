@@ -24,6 +24,5 @@ outputs:
           - if: win
             then:
             - if exist "%PREFIX%\\fail.txt" (
-                echo Failing test in downstream package
-                exit /b 1
+                echo "Failing test in downstream package" && exit /b 1
               )
