@@ -35,6 +35,7 @@ set -x
 
 const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
 
+#[derive(Debug)]
 pub struct ExecutionArgs {
     pub script: ResolvedScriptContents,
     pub env_vars: IndexMap<String, String>,
