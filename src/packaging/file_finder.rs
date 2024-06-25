@@ -37,6 +37,8 @@ pub struct TempFiles {
     content_type_map: HashMap<PathBuf, Option<ContentType>>,
 }
 
+/// Determine the content type of a path by reading the first 1024 bytes of the file
+/// and checking for a BOM or NULL-byte.
 pub fn content_type(path: &Path) -> Result<Option<ContentType>, io::Error> {
     if path.is_dir() || path.is_symlink() {
         return Ok(None);
