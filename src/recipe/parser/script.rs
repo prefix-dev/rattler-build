@@ -59,16 +59,16 @@ impl Serialize for Script {
             },
         }
 
+        let only_content = self.interpreter.is_none()
+            && self.env.is_empty()
+            && self.secrets.is_empty()
+            && self.cwd.is_none();
+
         let raw_script = match &self.content {
-            ScriptContent::CommandOrPath(content) => RawScript::CommandOrPath(content),
-            ScriptContent::Commands(content)
-                if self.interpreter.is_none()
-                    && self.env.is_empty()
-                    && self.secrets.is_empty()
-                    && self.cwd.is_none() =>
-            {
-                RawScript::Commands(content)
+            ScriptContent::CommandOrPath(content) if only_content => {
+                RawScript::CommandOrPath(content)
             }
+            ScriptContent::Commands(content) if only_content => RawScript::Commands(content),
             _ => RawScript::Object {
                 interpreter: self.interpreter.as_ref(),
                 env: &self.env,
@@ -81,7 +81,9 @@ impl Serialize for Script {
                     }
                     ScriptContent::Path(file) => Some(RawScriptContent::Path { file }),
                     ScriptContent::Default => None,
-                    ScriptContent::CommandOrPath(_) => unreachable!(),
+                    ScriptContent::CommandOrPath(content) => {
+                        Some(RawScriptContent::Command { content })
+                    }
                 },
             },
         };
