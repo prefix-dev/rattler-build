@@ -84,7 +84,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8438af3d7e7dccdb98eff55e5351587d9bec2294daff505fc9a061bd14d22db0"
 dependencies = [
  "nom",
- "ratatui 0.27.0",
+ "ratatui",
  "simdutf8",
  "smallvec",
  "thiserror",
@@ -645,9 +645,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.100"
+version = "1.0.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c891175c3fb232128f48de6590095e59198bbeb8620c310be349bfc3afd12c7b"
+checksum = "ac367972e516d45567c7eafc73d24e1c193dcf200a8d94e9db7b3d38b349572d"
 dependencies = [
  "jobserver",
  "libc",
@@ -1131,9 +1131,9 @@ checksum = "56ce8c6da7551ec6c462cbaf3bfbc75131ebbfa1c944aeaa9dab51ca1c5f0c3b"
 
 [[package]]
 name = "either"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3dca9240753cf90908d7e4aac30f630662b02aebaa1b58a3cadabdb23385b58b"
+checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "elsa"
@@ -3378,27 +3378,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratatui"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d16546c5b5962abf8ce6e2881e722b4e0ae3b6f1a08a26ae3573c55853ca68d3"
-dependencies = [
- "bitflags 2.6.0",
- "cassowary",
- "compact_str",
- "crossterm",
- "itertools 0.13.0",
- "lru",
- "paste",
- "stability",
- "strum",
- "strum_macros",
- "unicode-segmentation",
- "unicode-truncate",
- "unicode-width",
-]
-
-[[package]]
 name = "rattler"
 version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3483,7 +3462,7 @@ dependencies = [
  "patch",
  "pathdiff",
  "petgraph",
- "ratatui 0.27.0",
+ "ratatui",
  "rattler",
  "rattler_conda_types",
  "rattler_digest",
@@ -5022,7 +5001,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "431b847a60fc7b1df94a5b1bcb3cdd7027bb0013b431b08038505e8891c577a2"
 dependencies = [
  "rand",
- "ratatui 0.26.3",
+ "ratatui",
 ]
 
 [[package]]
