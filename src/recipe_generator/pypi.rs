@@ -17,6 +17,8 @@ use tokio::io::AsyncWriteExt;
 
 use crate::recipe_generator::serialize;
 
+use super::write_recipe;
+
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
     conda_name: String,
@@ -75,7 +77,7 @@ async fn pypi_requirement(req: &Requirement) -> miette::Result<String> {
     Ok(res)
 }
 
-pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
+pub async fn generate_pypi_recipe(package: &str, write: bool) -> miette::Result<()> {
     let client = reqwest::Client::new();
     let client_with_middlewares = reqwest_middleware::ClientBuilder::new(client).build();
     let package_sources =
@@ -224,7 +226,11 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         res.push('\n');
     }
 
-    print!("{}", res);
+    if write {
+        write_recipe(package, &res).into_diagnostic()?;
+    } else {
+        print!("{}", res);
+    }
 
     Ok(())
 }
