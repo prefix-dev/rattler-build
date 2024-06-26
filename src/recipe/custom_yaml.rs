@@ -61,9 +61,7 @@ pub enum Node {
 
 /// Parse YAML from a string and return a Node representing the content.
 pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<marked_yaml::Node, ParsingError> {
-    let options = LoaderOptions {
-        error_on_duplicate_keys: true,
-    };
+    let options = LoaderOptions::default().error_on_duplicate_keys(true);
     let yaml = parse_yaml_with_options(init_span_index, src, options)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
 
