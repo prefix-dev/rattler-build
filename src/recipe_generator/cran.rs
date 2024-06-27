@@ -129,6 +129,40 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     Ok(compute_bytes_digest::<Sha256>(&bytes))
 }
 
+// According to https://stat.ethz.ch/R-manual/R-devel/doc/html/packages.html
+const R_BUILTINS : [&'static str; 29] = [
+    "base",
+    "boot",
+    "class",
+    "cluster",
+    "codetools",
+    "compiler",
+    "datasets",
+    "foreign",
+    "graphics",
+    "grDevices",
+    "grid",
+    "KernSmooth",
+    "lattice",
+    "MASS",
+    "Matrix",
+    "methods",
+    "mgcv",
+    "nlme",
+    "nnet",
+    "parallel",
+    "rpart",
+    "spatial",
+    "splines",
+    "stats",
+    "stats4",
+    "survival",
+    "tcltk",
+    "tools",
+    "utils",
+];
+
+
 pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()> {
     eprintln!("Generating R recipe for {}", package);
     let package_info = reqwest::get(&format!(
@@ -173,29 +207,18 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
         recipe.requirements.build.extend(build_requirements.clone());
     }
 
-    let builtins = [
-        "utils",
-        "stats",
-        "graphics",
-        "grDevices",
-        "datasets",
-        "methods",
-        "base",
-    ];
-
     recipe.requirements.host = vec!["r-base".to_string()];
     recipe.requirements.run = vec!["r-base".to_string()];
 
     for dep in package_info._dependencies.iter() {
         // skip builtins
-        if builtins.contains(&dep.package.as_str()) {
+        if R_BUILTINS.contains(&dep.package.as_str()) {
             continue;
         }
 
         if dep.package == "R" {
             // get r-base
             let rbase = format_r_package("base", dep.version.as_ref());
-            // recipe.requirements.build.push(rbase);
             recipe.requirements.host.push(rbase);
         } else if dep.role == "Depends" {
         } else if dep.role == "LinkingTo" {
