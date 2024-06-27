@@ -32,13 +32,17 @@ pub struct GenerateRecipeOpts {
     /// Whether to write the recipe to a folder
     #[arg(short, long)]
     pub write: bool,
+
+    /// Whether to generate the whole dependency tree
+    #[arg(short, long)]
+    pub tree: bool,
 }
 
 /// Generate a recipe for a package
 pub async fn generate_recipe(args: GenerateRecipeOpts) -> miette::Result<()> {
     match args.source {
         Source::Pypi => generate_pypi_recipe(&args.package, args.write).await?,
-        Source::Cran => generate_r_recipe(&args.package, args.write).await?,
+        Source::Cran => generate_r_recipe(&args.package, args.write, args.tree).await?,
     }
 
     Ok(())

@@ -1,3 +1,5 @@
+use std::{collections::HashSet, path::PathBuf};
+
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{compute_bytes_digest, Sha256Hash};
@@ -96,6 +98,14 @@ fn map_license(license: &str) -> (Option<String>, Option<String>) {
         ("GPL-2", "GPL-2.0-only"),
         ("GPL (>= 3)", "GPL-3.0-or-later"),
         ("GPL (>= 2)", "GPL-2.0-or-later"),
+        ("Apache License (== 2)", "Apache-2.0"),
+        ("Apache License (== 2.0)", "Apache-2.0"),
+        ("Apache License (>= 2)", "Apache-2.0"),
+        ("LGPL (>= 2.1)", "LGPL-2.1-or-later"),
+        ("LGPL (>= 2)", "LGPL-2.0-or-later"),
+        ("LGPL (>= 3)", "LGPL-3.0-or-later"),
+        ("MIT", "MIT"),
+        ("BSD_2_Clause", "BSD-2-Clause"),
         ("BSD_3_Clause", "BSD-3-Clause"),
     ];
 
@@ -106,7 +116,7 @@ fn map_license(license: &str) -> (Option<String>, Option<String>) {
 
     if file.trim().starts_with("file") {
         let file = file.split_whitespace().last().unwrap();
-        (Some(res), Some(file.to_string()))
+        (Some(res.trim().to_string()), Some(file.to_string()))
     } else {
         (Some(res), None)
     }
@@ -129,40 +139,27 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     Ok(compute_bytes_digest::<Sha256>(&bytes))
 }
 
-// According to https://stat.ethz.ch/R-manual/R-devel/doc/html/packages.html
-const R_BUILTINS: [&str; 29] = [
+// Found when running `installed.packages()` in an `r-base` environment
+// Updated for `R 4.4.1`
+const R_BUILTINS: &[&str] = &[
     "base",
-    "boot",
-    "class",
-    "cluster",
-    "codetools",
     "compiler",
     "datasets",
-    "foreign",
     "graphics",
     "grDevices",
     "grid",
-    "KernSmooth",
-    "lattice",
-    "MASS",
-    "Matrix",
     "methods",
-    "mgcv",
-    "nlme",
-    "nnet",
     "parallel",
-    "rpart",
-    "spatial",
     "splines",
     "stats",
     "stats4",
-    "survival",
     "tcltk",
     "tools",
     "utils",
 ];
 
-pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()> {
+#[async_recursion::async_recursion]
+pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette::Result<()> {
     eprintln!("Generating R recipe for {}", package);
     let package_info = reqwest::get(&format!(
         "https://cran.r-universe.dev/api/packages/{}",
@@ -177,7 +174,9 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
     let mut recipe = serialize::Recipe::default();
 
     recipe.package.name = format_r_package(&package_info.Package.to_lowercase(), None);
-    recipe.package.version = package_info.Version.clone();
+    // some versions have a `-` in them (i think that's like a build number in debian)
+    // we just replace it with a `.`
+    recipe.package.version = package_info.Version.replace('-', ".").clone();
 
     let url = Url::parse(&format!(
         "https://cran.r-project.org/src/contrib/{}",
@@ -209,6 +208,7 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
     recipe.requirements.host = vec!["r-base".to_string()];
     recipe.requirements.run = vec!["r-base".to_string()];
 
+    let mut remaining_deps = HashSet::new();
     for dep in package_info._dependencies.iter() {
         // skip builtins
         if R_BUILTINS.contains(&dep.package.as_str()) {
@@ -225,6 +225,8 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
                 .requirements
                 .host
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
+            recipe.requirements.build.extend(build_requirements.clone());
+            remaining_deps.insert(dep.package.clone());
         } else if dep.role == "Imports" {
             recipe
                 .requirements
@@ -234,9 +236,7 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
                 .requirements
                 .host
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
-        }
-        if dep.role == "LinkingTo" {
-            recipe.requirements.build.extend(build_requirements.clone());
+            remaining_deps.insert(dep.package.clone());
         }
         if dep.role == "Suggests" {
             recipe.requirements.run.push(format!(
@@ -251,7 +251,11 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
     recipe.requirements.build = recipe.requirements.build.into_iter().unique().collect();
     recipe.requirements.run = recipe.requirements.run.into_iter().unique().collect();
 
-    recipe.about.homepage = package_info.URL.clone();
+    if let Some(url) = package_info.URL.clone() {
+        let url = url.split_once(',').unwrap_or((url.as_str(), "")).0;
+        recipe.about.homepage = Some(url.to_string());
+    }
+
     recipe.about.summary = Some(package_info.Title.clone());
     recipe.about.description = Some(package_info.Description.clone());
     (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
@@ -285,6 +289,16 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
     } else {
         print!("{}", final_recipe);
+    }
+
+    if tree {
+        for dep in remaining_deps {
+            let r_package = format_r_package(&dep, None);
+
+            if !PathBuf::from(r_package).exists() {
+                generate_r_recipe(&dep, write, tree).await?;
+            }
+        }
     }
 
     Ok(())
