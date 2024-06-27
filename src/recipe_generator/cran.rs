@@ -130,7 +130,7 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
 }
 
 // According to https://stat.ethz.ch/R-manual/R-devel/doc/html/packages.html
-const R_BUILTINS : [&'static str; 29] = [
+const R_BUILTINS: [&str; 29] = [
     "base",
     "boot",
     "class",
@@ -161,7 +161,6 @@ const R_BUILTINS : [&'static str; 29] = [
     "tools",
     "utils",
 ];
-
 
 pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()> {
     eprintln!("Generating R recipe for {}", package);
