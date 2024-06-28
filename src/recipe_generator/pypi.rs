@@ -1,4 +1,5 @@
 use async_once_cell::OnceCell;
+use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use rattler_installs_packages::python_env::Pep508EnvMakers;
 use rattler_installs_packages::resolve::solve_options::ResolveOptions;
@@ -23,6 +24,16 @@ use super::write_recipe;
 struct CondaPyPiNameMapping {
     conda_name: String,
     pypi_name: String,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct PyPIOpts {
+    /// Name of the package to generate
+    pub package: String,
+
+    /// Whether to write the recipe to a folder
+    #[arg(short, long)]
+    pub write: bool,
 }
 
 /// Downloads and caches the conda-forge conda-to-pypi name mapping.
@@ -77,7 +88,8 @@ async fn pypi_requirement(req: &Requirement) -> miette::Result<String> {
     Ok(res)
 }
 
-pub async fn generate_pypi_recipe(package: &str, write: bool) -> miette::Result<()> {
+pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
+    let package = &opts.package;
     let client = reqwest::Client::new();
     let client_with_middlewares = reqwest_middleware::ClientBuilder::new(client).build();
     let package_sources =
@@ -226,7 +238,7 @@ pub async fn generate_pypi_recipe(package: &str, write: bool) -> miette::Result<
         res.push('\n');
     }
 
-    if write {
+    if opts.write {
         write_recipe(package, &res).into_diagnostic()?;
     } else {
         print!("{}", res);

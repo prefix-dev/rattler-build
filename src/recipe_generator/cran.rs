@@ -1,5 +1,6 @@
 use std::{collections::HashSet, path::PathBuf};
 
+use clap::Parser;
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{compute_bytes_digest, Sha256Hash};
@@ -26,7 +27,7 @@ pub struct PackageInfo {
     pub Packaged: Packaged,
     pub Repository: String,
     #[serde(rename = "Date/Publication")]
-    pub DatePublication: String,
+    pub DatePublication: Option<String>,
     pub MD5sum: String,
     pub _user: String,
     pub _type: String,
@@ -42,7 +43,7 @@ pub struct PackageInfo {
     pub _host: String,
     pub _status: String,
     pub _pkgdocs: String,
-    pub _srconly: String,
+    pub _srconly: Option<String>,
     pub _winbinary: String,
     pub _macbinary: String,
     pub _wasmbinary: String,
@@ -56,6 +57,24 @@ pub struct PackageInfo {
 pub struct Packaged {
     pub Date: String,
     pub User: String,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct CranOpts {
+    /// The R Universe to fetch the package from (defaults to `cran`)
+    #[arg(short, long)]
+    universe: Option<String>,
+
+    /// Wether to create recipes for the whole dependency tree or not
+    #[arg(short, long)]
+    tree: bool,
+
+    /// Name of the package to generate
+    pub package: String,
+
+    /// Whether to write the recipe to a folder
+    #[arg(short, long)]
+    pub write: bool,
 }
 
 #[allow(non_snake_case)]
@@ -159,10 +178,12 @@ const R_BUILTINS: &[&str] = &[
 ];
 
 #[async_recursion::async_recursion]
-pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette::Result<()> {
+pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
+    let package = &opts.package;
     eprintln!("Generating R recipe for {}", package);
+    let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
-        "https://cran.r-universe.dev/api/packages/{}",
+        "https://{universe}.r-universe.dev/api/packages/{}",
         package
     ))
     .await
@@ -283,18 +304,18 @@ pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette
         }
     }
 
-    if write {
+    if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
     } else {
         print!("{}", final_recipe);
     }
 
-    if tree {
+    if opts.tree {
         for dep in remaining_deps {
             let r_package = format_r_package(&dep, None);
 
             if !PathBuf::from(r_package).exists() {
-                generate_r_recipe(&dep, write, tree).await?;
+                generate_r_recipe(opts).await?;
             }
         }
     }
