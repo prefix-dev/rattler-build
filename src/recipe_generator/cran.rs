@@ -219,7 +219,6 @@ pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette
             // get r-base
             let rbase = format_r_package("base", dep.version.as_ref());
             recipe.requirements.host.push(rbase);
-        } else if dep.role == "Depends" {
         } else if dep.role == "LinkingTo" {
             recipe
                 .requirements
@@ -227,7 +226,7 @@ pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
             recipe.requirements.build.extend(build_requirements.clone());
             remaining_deps.insert(dep.package.clone());
-        } else if dep.role == "Imports" {
+        } else if dep.role == "Imports" || dep.role == "Depends" {
             recipe
                 .requirements
                 .run
@@ -237,8 +236,7 @@ pub async fn generate_r_recipe(package: &str, write: bool, tree: bool) -> miette
                 .host
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
             remaining_deps.insert(dep.package.clone());
-        }
-        if dep.role == "Suggests" {
+        } else if dep.role == "Suggests" {
             recipe.requirements.run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
