@@ -1,3 +1,6 @@
+use clap::Parser;
+use std::{collections::HashMap, collections::HashSet, path::PathBuf};
+
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{compute_bytes_digest, Sha256Hash};
@@ -24,7 +27,7 @@ pub struct PackageInfo {
     pub Packaged: Packaged,
     pub Repository: String,
     #[serde(rename = "Date/Publication")]
-    pub DatePublication: String,
+    pub DatePublication: Option<String>,
     pub MD5sum: String,
     pub _user: String,
     pub _type: String,
@@ -40,7 +43,7 @@ pub struct PackageInfo {
     pub _host: String,
     pub _status: String,
     pub _pkgdocs: String,
-    pub _srconly: String,
+    pub _srconly: Option<String>,
     pub _winbinary: String,
     pub _macbinary: String,
     pub _wasmbinary: String,
@@ -54,6 +57,24 @@ pub struct PackageInfo {
 pub struct Packaged {
     pub Date: String,
     pub User: String,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct CranOpts {
+    /// The R Universe to fetch the package from (defaults to `cran`)
+    #[arg(short, long)]
+    universe: Option<String>,
+
+    /// Wether to create recipes for the whole dependency tree or not
+    #[arg(short, long)]
+    tree: bool,
+
+    /// Name of the package to generate
+    pub package: String,
+
+    /// Whether to write the recipe to a folder
+    #[arg(short, long)]
+    pub write: bool,
 }
 
 #[allow(non_snake_case)]
@@ -83,33 +104,66 @@ pub struct Dependency {
 }
 
 fn map_license(license: &str) -> (Option<String>, Option<String>) {
-    // replace `|` with ` OR `
-    // map GPL-3 to GPL-3.0-only
-    // map GPL-2 to GPL-2.0-only
-
-    // split at `+`
-    let (license, file) = license.rsplit_once('+').unwrap_or((license, ""));
-
-    let license_replacements = [
-        ("|", " OR "),
+    let license_replacements: HashMap<&str, &str> = [
         ("GPL-3", "GPL-3.0-only"),
         ("GPL-2", "GPL-2.0-only"),
         ("GPL (>= 3)", "GPL-3.0-or-later"),
+        ("GPL (>= 3.0)", "GPL-3.0-or-later"),
         ("GPL (>= 2)", "GPL-2.0-or-later"),
-        ("BSD_3_Clause", "BSD-3-Clause"),
-    ];
+        ("GPL (>= 2.0)", "GPL-2.0-or-later"),
+        ("GPL (== 3)", "GPL-3.0-only"),
+        ("GPL (== 2)", "GPL-2.0-only"),
+        ("LGPL-3", "LGPL-3.0-only"),
+        ("LGPL-2", "LGPL-2.0-only"),
+        ("LGPL-2.1", "LGPL-2.1-only"),
+        ("LGPL (>= 3)", "LGPL-3.0-or-later"),
+        ("LGPL (>= 2)", "LGPL-2.0-or-later"),
+        ("LGPL (>= 2.1)", "LGPL-2.1-or-later"),
+        ("BSD_3_clause", "BSD-3-Clause"),
+        ("BSD_2_clause", "BSD-2-Clause"),
+        ("Apache License (== 2.0)", "Apache-2.0"),
+        ("Apache License 2.0", "Apache-2.0"),
+        ("MIT License", "MIT"),
+        ("CC0", "CC0-1.0"),
+        ("CC BY 4.0", "CC-BY-4.0"),
+        ("CC BY-NC 4.0", "CC-BY-NC-4.0"),
+        ("CC BY-SA 4.0", "CC-BY-SA-4.0"),
+        ("AGPL-3", "AGPL-3.0-only"),
+        ("AGPL (>= 3)", "AGPL-3.0-or-later"),
+        ("EPL", "EPL-1.0"),
+        ("EUPL", "EUPL-1.1"),
+        ("Mozilla Public License 1.0", "MPL-1.0"),
+        ("Mozilla Public License 2.0", "MPL-2.0"),
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
-    let mut res = license.to_string();
-    for (from, to) in license_replacements.iter() {
-        res = res.replace(from, to);
+    // Split the license string at '|' to separate licenses
+    let parts: Vec<&str> = license.split(&['|', '+']).map(str::trim).collect();
+
+    let mut final_licenses = Vec::new();
+    let mut license_file = None;
+
+    for part in parts {
+        if part.to_lowercase().contains("file") {
+            // This part contains the file specification
+            license_file = part.split_whitespace().last().map(|s| s.to_string());
+        } else {
+            // This part is a license
+            println!("Part: {} - looking for replacement", part);
+            let mapped = license_replacements.get(part).map_or(part, |&s| s);
+            final_licenses.push(mapped.to_string());
+        }
     }
 
-    if file.trim().starts_with("file") {
-        let file = file.split_whitespace().last().unwrap();
-        (Some(res), Some(file.to_string()))
+    let final_license = if final_licenses.is_empty() {
+        None
     } else {
-        (Some(res), None)
-    }
+        Some(final_licenses.join(" OR "))
+    };
+
+    (final_license, license_file)
 }
 
 fn format_r_package(package: &str, version: Option<&String>) -> String {
@@ -129,10 +183,32 @@ pub async fn fetch_package_sha256sum(url: &Url) -> Result<Sha256Hash, miette::Er
     Ok(compute_bytes_digest::<Sha256>(&bytes))
 }
 
-pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()> {
+// Found when running `installed.packages()` in an `r-base` environment
+// Updated for `R 4.4.1`
+const R_BUILTINS: &[&str] = &[
+    "base",
+    "compiler",
+    "datasets",
+    "graphics",
+    "grDevices",
+    "grid",
+    "methods",
+    "parallel",
+    "splines",
+    "stats",
+    "stats4",
+    "tcltk",
+    "tools",
+    "utils",
+];
+
+#[async_recursion::async_recursion]
+pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
+    let package = &opts.package;
     eprintln!("Generating R recipe for {}", package);
+    let universe = opts.universe.as_deref().unwrap_or("cran");
     let package_info = reqwest::get(&format!(
-        "https://cran.r-universe.dev/api/packages/{}",
+        "https://{universe}.r-universe.dev/api/packages/{}",
         package
     ))
     .await
@@ -144,7 +220,9 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
     let mut recipe = serialize::Recipe::default();
 
     recipe.package.name = format_r_package(&package_info.Package.to_lowercase(), None);
-    recipe.package.version = package_info.Version.clone();
+    // some versions have a `-` in them (i think that's like a build number in debian)
+    // we just replace it with a `.`
+    recipe.package.version = package_info.Version.replace('-', ".").clone();
 
     let url = Url::parse(&format!(
         "https://cran.r-project.org/src/contrib/{}",
@@ -173,37 +251,28 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
         recipe.requirements.build.extend(build_requirements.clone());
     }
 
-    let builtins = [
-        "utils",
-        "stats",
-        "graphics",
-        "grDevices",
-        "datasets",
-        "methods",
-        "base",
-    ];
-
     recipe.requirements.host = vec!["r-base".to_string()];
     recipe.requirements.run = vec!["r-base".to_string()];
 
+    let mut remaining_deps = HashSet::new();
     for dep in package_info._dependencies.iter() {
         // skip builtins
-        if builtins.contains(&dep.package.as_str()) {
+        if R_BUILTINS.contains(&dep.package.as_str()) {
             continue;
         }
 
         if dep.package == "R" {
             // get r-base
             let rbase = format_r_package("base", dep.version.as_ref());
-            // recipe.requirements.build.push(rbase);
             recipe.requirements.host.push(rbase);
-        } else if dep.role == "Depends" {
         } else if dep.role == "LinkingTo" {
             recipe
                 .requirements
                 .host
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
-        } else if dep.role == "Imports" {
+            recipe.requirements.build.extend(build_requirements.clone());
+            remaining_deps.insert(dep.package.clone());
+        } else if dep.role == "Imports" || dep.role == "Depends" {
             recipe
                 .requirements
                 .run
@@ -212,11 +281,8 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
                 .requirements
                 .host
                 .push(format_r_package(&dep.package, dep.version.as_ref()));
-        }
-        if dep.role == "LinkingTo" {
-            recipe.requirements.build.extend(build_requirements.clone());
-        }
-        if dep.role == "Suggests" {
+            remaining_deps.insert(dep.package.clone());
+        } else if dep.role == "Suggests" {
             recipe.requirements.run.push(format!(
                 "SUGGEST {}",
                 format_r_package(&dep.package, dep.version.as_ref())
@@ -229,7 +295,11 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
     recipe.requirements.build = recipe.requirements.build.into_iter().unique().collect();
     recipe.requirements.run = recipe.requirements.run.into_iter().unique().collect();
 
-    recipe.about.homepage = package_info.URL.clone();
+    if let Some(url) = package_info.URL.clone() {
+        let url = url.split_once(',').unwrap_or((url.as_str(), "")).0;
+        recipe.about.homepage = Some(url.to_string());
+    }
+
     recipe.about.summary = Some(package_info.Title.clone());
     recipe.about.description = Some(package_info.Description.clone());
     (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
@@ -259,11 +329,89 @@ pub async fn generate_r_recipe(package: &str, write: bool) -> miette::Result<()>
         }
     }
 
-    if write {
+    if opts.write {
         write_recipe(&recipe.package.name, &final_recipe).into_diagnostic()?;
     } else {
         print!("{}", final_recipe);
     }
 
+    if opts.tree {
+        for dep in remaining_deps {
+            let r_package = format_r_package(&dep, None);
+
+            if !PathBuf::from(r_package).exists() {
+                generate_r_recipe(opts).await?;
+            }
+        }
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_license_mapping() {
+        let test_cases = vec![
+            // Simple cases
+            ("GPL-3", "GPL-3.0-only", None),
+            ("MIT", "MIT", None),
+            ("Apache License 2.0", "Apache-2.0", None),
+            // Cases with file LICENSE
+            ("GPL-3 + file LICENSE", "GPL-3.0-only", Some("LICENSE")),
+            ("MIT + file LICENCE", "MIT", Some("LICENCE")),
+            // Compound licenses
+            ("GPL-2 | MIT", "GPL-2.0-only OR MIT", None),
+            (
+                "Apache License 2.0 | file LICENSE",
+                "Apache-2.0",
+                Some("LICENSE"),
+            ),
+            // Version ranges
+            ("GPL (>= 2)", "GPL-2.0-or-later", None),
+            ("LGPL (>= 3)", "LGPL-3.0-or-later", None),
+            // More complex cases
+            (
+                "GPL (>= 2) | BSD_3_clause + file LICENSE",
+                "GPL-2.0-or-later OR BSD-3-Clause",
+                Some("LICENSE"),
+            ),
+            ("LGPL-2.1 | file LICENSE", "LGPL-2.1-only", Some("LICENSE")),
+            (
+                "GPL (>= 2.0) | file LICENCE",
+                "GPL-2.0-or-later",
+                Some("LICENCE"),
+            ),
+            // Cases that should remain unchanged
+            ("Unlimited", "Unlimited", None),
+            ("GPL (>= 2.15.1)", "GPL (>= 2.15.1)", None),
+            // Creative Commons licenses
+            ("CC BY-SA 4.0", "CC-BY-SA-4.0", None),
+            ("CC BY-NC-ND 3.0 US", "CC BY-NC-ND 3.0 US", None), // This one doesn't have a direct SPDX mapping
+            // Multiple licenses with file
+            (
+                "GPL-2 | GPL-3 | MIT + file LICENSE",
+                "GPL-2.0-only OR GPL-3.0-only OR MIT",
+                Some("LICENSE"),
+            ),
+        ];
+
+        for (input, expected_license, expected_file) in test_cases {
+            let (mapped_license, license_file) = map_license(input);
+            assert_eq!(
+                mapped_license.as_deref(),
+                Some(expected_license),
+                "Failed for input: {}",
+                input
+            );
+            assert_eq!(
+                license_file.as_deref(),
+                expected_file,
+                "Failed for input: {}",
+                input
+            );
+        }
+    }
 }
