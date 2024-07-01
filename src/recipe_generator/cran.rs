@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-use std::{collections::HashSet, path::PathBuf};
-
 use clap::Parser;
-=======
-use std::collections::HashMap;
+use std::{collections::HashMap, collections::HashSet, path::PathBuf};
 
->>>>>>> 9d92c18 (add some more licenses)
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{compute_bytes_digest, Sha256Hash};
