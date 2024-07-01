@@ -1,6 +1,11 @@
+<<<<<<< HEAD
 use std::{collections::HashSet, path::PathBuf};
 
 use clap::Parser;
+=======
+use std::collections::HashMap;
+
+>>>>>>> 9d92c18 (add some more licenses)
 use itertools::Itertools;
 use miette::IntoDiagnostic;
 use rattler_digest::{compute_bytes_digest, Sha256Hash};
@@ -104,41 +109,66 @@ pub struct Dependency {
 }
 
 fn map_license(license: &str) -> (Option<String>, Option<String>) {
-    // replace `|` with ` OR `
-    // map GPL-3 to GPL-3.0-only
-    // map GPL-2 to GPL-2.0-only
-
-    // split at `+`
-    let (license, file) = license.rsplit_once('+').unwrap_or((license, ""));
-
-    let license_replacements = [
-        ("|", " OR "),
+    let license_replacements: HashMap<&str, &str> = [
         ("GPL-3", "GPL-3.0-only"),
         ("GPL-2", "GPL-2.0-only"),
         ("GPL (>= 3)", "GPL-3.0-or-later"),
+        ("GPL (>= 3.0)", "GPL-3.0-or-later"),
         ("GPL (>= 2)", "GPL-2.0-or-later"),
-        ("Apache License (== 2)", "Apache-2.0"),
-        ("Apache License (== 2.0)", "Apache-2.0"),
-        ("Apache License (>= 2)", "Apache-2.0"),
-        ("LGPL (>= 2.1)", "LGPL-2.1-or-later"),
-        ("LGPL (>= 2)", "LGPL-2.0-or-later"),
+        ("GPL (>= 2.0)", "GPL-2.0-or-later"),
+        ("GPL (== 3)", "GPL-3.0-only"),
+        ("GPL (== 2)", "GPL-2.0-only"),
+        ("LGPL-3", "LGPL-3.0-only"),
+        ("LGPL-2", "LGPL-2.0-only"),
+        ("LGPL-2.1", "LGPL-2.1-only"),
         ("LGPL (>= 3)", "LGPL-3.0-or-later"),
-        ("MIT", "MIT"),
-        ("BSD_2_Clause", "BSD-2-Clause"),
-        ("BSD_3_Clause", "BSD-3-Clause"),
-    ];
+        ("LGPL (>= 2)", "LGPL-2.0-or-later"),
+        ("LGPL (>= 2.1)", "LGPL-2.1-or-later"),
+        ("BSD_3_clause", "BSD-3-Clause"),
+        ("BSD_2_clause", "BSD-2-Clause"),
+        ("Apache License (== 2.0)", "Apache-2.0"),
+        ("Apache License 2.0", "Apache-2.0"),
+        ("MIT License", "MIT"),
+        ("CC0", "CC0-1.0"),
+        ("CC BY 4.0", "CC-BY-4.0"),
+        ("CC BY-NC 4.0", "CC-BY-NC-4.0"),
+        ("CC BY-SA 4.0", "CC-BY-SA-4.0"),
+        ("AGPL-3", "AGPL-3.0-only"),
+        ("AGPL (>= 3)", "AGPL-3.0-or-later"),
+        ("EPL", "EPL-1.0"),
+        ("EUPL", "EUPL-1.1"),
+        ("Mozilla Public License 1.0", "MPL-1.0"),
+        ("Mozilla Public License 2.0", "MPL-2.0"),
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
-    let mut res = license.to_string();
-    for (from, to) in license_replacements.iter() {
-        res = res.replace(from, to);
+    // Split the license string at '|' to separate licenses
+    let parts: Vec<&str> = license.split(&['|', '+']).map(str::trim).collect();
+
+    let mut final_licenses = Vec::new();
+    let mut license_file = None;
+
+    for part in parts {
+        if part.to_lowercase().contains("file") {
+            // This part contains the file specification
+            license_file = part.split_whitespace().last().map(|s| s.to_string());
+        } else {
+            // This part is a license
+            println!("Part: {} - looking for replacement", part);
+            let mapped = license_replacements.get(part).map_or(part, |&s| s);
+            final_licenses.push(mapped.to_string());
+        }
     }
 
-    if file.trim().starts_with("file") {
-        let file = file.split_whitespace().last().unwrap();
-        (Some(res.trim().to_string()), Some(file.to_string()))
+    let final_license = if final_licenses.is_empty() {
+        None
     } else {
-        (Some(res), None)
-    }
+        Some(final_licenses.join(" OR "))
+    };
+
+    (final_license, license_file)
 }
 
 fn format_r_package(package: &str, version: Option<&String>) -> String {
@@ -321,4 +351,72 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_license_mapping() {
+        let test_cases = vec![
+            // Simple cases
+            ("GPL-3", "GPL-3.0-only", None),
+            ("MIT", "MIT", None),
+            ("Apache License 2.0", "Apache-2.0", None),
+            // Cases with file LICENSE
+            ("GPL-3 + file LICENSE", "GPL-3.0-only", Some("LICENSE")),
+            ("MIT + file LICENCE", "MIT", Some("LICENCE")),
+            // Compound licenses
+            ("GPL-2 | MIT", "GPL-2.0-only OR MIT", None),
+            (
+                "Apache License 2.0 | file LICENSE",
+                "Apache-2.0",
+                Some("LICENSE"),
+            ),
+            // Version ranges
+            ("GPL (>= 2)", "GPL-2.0-or-later", None),
+            ("LGPL (>= 3)", "LGPL-3.0-or-later", None),
+            // More complex cases
+            (
+                "GPL (>= 2) | BSD_3_clause + file LICENSE",
+                "GPL-2.0-or-later OR BSD-3-Clause",
+                Some("LICENSE"),
+            ),
+            ("LGPL-2.1 | file LICENSE", "LGPL-2.1-only", Some("LICENSE")),
+            (
+                "GPL (>= 2.0) | file LICENCE",
+                "GPL-2.0-or-later",
+                Some("LICENCE"),
+            ),
+            // Cases that should remain unchanged
+            ("Unlimited", "Unlimited", None),
+            ("GPL (>= 2.15.1)", "GPL (>= 2.15.1)", None),
+            // Creative Commons licenses
+            ("CC BY-SA 4.0", "CC-BY-SA-4.0", None),
+            ("CC BY-NC-ND 3.0 US", "CC BY-NC-ND 3.0 US", None), // This one doesn't have a direct SPDX mapping
+            // Multiple licenses with file
+            (
+                "GPL-2 | GPL-3 | MIT + file LICENSE",
+                "GPL-2.0-only OR GPL-3.0-only OR MIT",
+                Some("LICENSE"),
+            ),
+        ];
+
+        for (input, expected_license, expected_file) in test_cases {
+            let (mapped_license, license_file) = map_license(input);
+            assert_eq!(
+                mapped_license.as_deref(),
+                Some(expected_license),
+                "Failed for input: {}",
+                input
+            );
+            assert_eq!(
+                license_file.as_deref(),
+                expected_file,
+                "Failed for input: {}",
+                input
+            );
+        }
+    }
 }
