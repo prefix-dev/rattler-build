@@ -574,24 +574,74 @@ Generate shell completion script
 
 Generate a recipe from PyPI or CRAN
 
-**Usage:** `rattler-build generate-recipe <SOURCE> <PACKAGE>`
+**Usage:** `rattler-build generate-recipe <COMMAND>`
+
+##### **Subcommands:**
+
+* `pypi` — Generate a recipe for a Python package from PyPI
+* `cran` — Generate a recipe for an R package from CRAN
+
+
+
+#### `pypi`
+
+Generate a recipe for a Python package from PyPI
+
+**Usage:** `rattler-build generate-recipe pypi [OPTIONS] <PACKAGE>`
 
 ##### **Arguments:**
-
-- `<SOURCE>`
-
-	Type of package to generate a recipe for
-
-	- Possible values:
-		- `pypi`:
-			Generate a recipe for a Python package from PyPI
-		- `cran`:
-			Generate a recipe for an R package from CRAN
-
 
 - `<PACKAGE>`
 
 	Name of the package to generate
+
+
+
+##### **Options:**
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a folder
+
+	- Possible values: `true`, `false`
+
+
+
+
+
+#### `cran`
+
+Generate a recipe for an R package from CRAN
+
+**Usage:** `rattler-build generate-recipe cran [OPTIONS] <PACKAGE>`
+
+##### **Arguments:**
+
+- `<PACKAGE>`
+
+	Name of the package to generate
+
+
+
+##### **Options:**
+
+- `-u`, `--universe <UNIVERSE>`
+
+	The R Universe to fetch the package from (defaults to `cran`)
+
+
+- `-t`, `--tree`
+
+	Wether to create recipes for the whole dependency tree or not
+
+	- Possible values: `true`, `false`
+
+
+- `-w`, `--write`
+
+	Whether to write the recipe to a folder
+
+	- Possible values: `true`, `false`
 
 
 
