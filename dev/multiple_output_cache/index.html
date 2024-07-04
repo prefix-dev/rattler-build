@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/selectors/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/multiple_output_cache/">
       
       
-        <link rel="prev" href="../build_options/">
+        <link rel="prev" href="../experimental_features/">
       
       
-        <link rel="next" href="../build_script/">
+        <link rel="next" href="../recipe_generation/">
       
       
       <link rel="icon" href="../assets/favicon.png">
@@ -22,7 +22,7 @@
     
     
       
-        <title>Selector syntax (if/then) - rattler-build</title>
+        <title>Multiple output cache - rattler-build</title>
       
     
     
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Selector syntax (if/then) - rattler-build" >
+        <meta  property="og:title"  content="Multiple output cache - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/selectors.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/multiple_output_cache.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/selectors/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/multiple_output_cache/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Selector syntax (if/then) - rattler-build" >
+        <meta  name="twitter:title"  content="Multiple output cache - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/selectors.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/multiple_output_cache.png" >
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#selectors-in-recipes" class="md-skip">
+        <a href="#the-cache-for-multiple-outputs" class="md-skip">
           Skip to content
         </a>
       
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Selector syntax (if/then)
+              Multiple output cache
             
           </span>
         </div>
@@ -524,30 +524,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Selector syntax (if/then)
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../selectors/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -556,62 +536,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#available-variables" class="md-nav__link">
-    <span class="md-ellipsis">
-      Available variables
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#variant-selectors" class="md-nav__link">
-    <span class="md-ellipsis">
-      Variant selectors
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-match-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      The match function
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selector-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Selector evaluation
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -705,10 +629,30 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../multiple_output_cache/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Multiple output cache
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -717,6 +661,44 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#run-exports-from-the-cache" class="md-nav__link">
+    <span class="md-ellipsis">
+      Run exports from the cache
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#caching-in-the-src_dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      Caching in the $SRC_DIR
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1217,36 +1199,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#available-variables" class="md-nav__link">
+  <a href="#run-exports-from-the-cache" class="md-nav__link">
     <span class="md-ellipsis">
-      Available variables
+      Run exports from the cache
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#variant-selectors" class="md-nav__link">
+  <a href="#caching-in-the-src_dir" class="md-nav__link">
     <span class="md-ellipsis">
-      Variant selectors
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#the-match-function" class="md-nav__link">
-    <span class="md-ellipsis">
-      The match function
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#selector-evaluation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Selector evaluation
+      Caching in the $SRC_DIR
     </span>
   </a>
   
@@ -1267,7 +1231,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/selectors.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/multiple_output_cache.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -1275,172 +1239,62 @@
   
 
 
-<h1 id="selectors-in-recipes">Selectors in recipes<a class="headerlink" href="#selectors-in-recipes" title="Permanent link">#</a></h1>
-<p>Recipe and variant configuration files can utilize selectors to conditionally
-add, remove, or modify dependencies, configuration options, or even skip recipe
-execution based on specific conditions.</p>
-<p>Selectors are implemented using an <code>if / then / else</code> map, which is a
-valid YAML dictionary. The condition is evaluated using <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> and
-follows
-the same syntax as a Python expression.</p>
-<p>During rendering, several variables are set based on the platform and variant
-being built. For example, the <code>unix</code> variable is true for macOS and Linux, while
-<code>win</code> is true for Windows. Consider the following recipe executed on Linux:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix-tool</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win-tool</span>
-</span></code></pre></div>
-<p>This will be evaluated as:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix-tool</span>
-</span></code></pre></div>
-<p>The line containing the Windows-specific configuration is removed. Multiple
-items can also be selected, such as:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-1</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-2</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-3</span>
-</span></code></pre></div>
-<p>For Linux, this will result in:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-1</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-2</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux-tool-3</span>
-</span></code></pre></div>
-<p>Other examples often found in the wild:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">build_platform != target_platform ...</span><span class="w"> </span><span class="c1"># true if cross-platform build</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">osx and arm64 ...</span><span class="w"> </span><span class="c1"># true for apple silicon (osx-arm64)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linux and (aarch64 or ppc64le)) ...</span><span class="w"> </span><span class="c1"># true for linux ppc64le or linux-aarch64</span>
-</span></code></pre></div>
-<h3 id="available-variables">Available variables<a class="headerlink" href="#available-variables" title="Permanent link">#</a></h3>
-<p>The following variables are available during rendering of the recipe:</p>
-<table>
-<thead>
-<tr>
-<th>Variable</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>target_platform</code></td>
-<td>the configured <code>target_platform</code> for the build</td>
-</tr>
-<tr>
-<td><code>build_platform</code></td>
-<td>the configured <code>build_platform</code> for the build</td>
-</tr>
-<tr>
-<td><code>linux</code></td>
-<td>"true" if <code>target_platform</code> is Linux</td>
-</tr>
-<tr>
-<td><code>osx</code></td>
-<td>"true" if <code>target_platform</code> is OSX / macOS</td>
-</tr>
-<tr>
-<td><code>win</code></td>
-<td>"true" if <code>target_platform</code> is Windows</td>
-</tr>
-<tr>
-<td><code>unix</code></td>
-<td>"true" if <code>target_platform</code> is a Unix (macOS or Linux)</td>
-</tr>
-<tr>
-<td><code>x86</code>, <code>x86_64</code></td>
-<td>x86 32/64-bit Architecture</td>
-</tr>
-<tr>
-<td><code>aarch64</code>, <code>arm64</code></td>
-<td>64-bit Arm (these are the same but are both supported for legacy)</td>
-</tr>
-<tr>
-<td><code>armV6l</code>, <code>armV7l</code></td>
-<td>32-bit Arm</td>
-</tr>
-<tr>
-<td><code>ppc64</code>, <code>s390x</code>,</td>
-<td>Big endian</td>
-</tr>
-<tr>
-<td><code>ppc64le</code></td>
-<td>Little endian</td>
-</tr>
-<tr>
-<td><code>riscv32</code>, <code>riscv64</code></td>
-<td>The <a href="https://wikipedia.org/wiki/RISC-V">RISC-V</a> Architecture</td>
-</tr>
-<tr>
-<td><code>wasm32</code></td>
-<td>The <a href="https://wikipedia.org/wiki/WebAssembly">WebAssembly</a> Architecture</td>
-</tr>
-</tbody>
-</table>
-<h3 id="variant-selectors">Variant selectors<a class="headerlink" href="#variant-selectors" title="Permanent link">#</a></h3>
-<p>To select based on <a href="../variants/">variant configuration</a> you can use the names in the selectors as well.
-For example, if the build uses <code>python: 3.8</code> as a variant, we can use <code>if: python == "3.8"</code> to enable a dependency for
-only
-when the Python version is 3.8.</p>
+<h1 id="the-cache-for-multiple-outputs">The cache for multiple outputs<a class="headerlink" href="#the-cache-for-multiple-outputs" title="Permanent link">#</a></h1>
 <div class="admonition note">
-<p class="admonition-title">String comparison</p>
+<p class="admonition-title">Note</p>
+<p>The "multi-output" cache is a little bit different from a compilation cache. If you look for tips and tricks on how to use <code>sccache</code> or <code>ccache</code> with <code>rattler-build</code>, please refer to the <a href="../tips_and_tricks/#using-sccache-or-ccache">tips and tricks section</a>.</p>
 </div>
-<p>The comparison is a string comparison done by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a>, so it is important to use the correct string
-representation of the variant.
-Use the <code>match</code> function to compare versions.</p>
-<div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">python</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
+<p>Sometimes you build a package and want to split the contents into multiple sub-packages.
+For example, when building a C/C++ package, you might want to create multiple packages for the
+runtime requirements (library), and the development time requirements such as header files.</p>
+<p>The "cache" output makes this easy. It allows you to specify a single top-level cache that can produce arbitrary
+files, that can then be used in other packages.</p>
+<p>Let's take a look at an example:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">recipe</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;0.1.0&#39;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="nt">cache</span><span class="p">:</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;c&#39;) }}</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">script</span><span class="p">:</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdir -p $PREFIX/lib</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mkdir -p $PREFIX/include</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;This is the library&quot; &gt; lib/library.txt</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo &quot;This is the header&quot; &gt; include/header.txt</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nt">outputs</span><span class="p">:</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage-library</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib/*</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mypackage-headers</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">      </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include/*</span>
 </span></code></pre></div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># (1)!</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">else</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">otherdep</span>
-</span></code></pre></div>
-<ol>
-<li>This will only add <code>mydep</code> when the Python version is 3.8. This comparison is a string comparison, so it is important
-   to
-   use the correct string representation of the variant.</li>
-</ol>
-<h3 id="the-match-function">The <code>match</code> function<a class="headerlink" href="#the-match-function" title="Permanent link">#</a></h3>
-<p>!!!  note "Rename from <code>cmp</code> to <code>match</code>"
-    The <code>cmp</code> function has been renamed to <code>match</code> to better reflect its purpose.</p>
-<p>Inside selectors, one can use a special <code>match</code> function to test if the selected variant version has a matching version.
-For example, having the following variants file, we could use the these tests:</p>
-<div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">python</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.8</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.9</span>
-</span></code></pre></div>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;3.8&quot;)</span><span class="w">    </span><span class="c1"># true, false</span>
-</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&gt;=3.8&quot;)</span><span class="w">  </span><span class="c1"># true, true</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">match(python, &quot;&lt;3.8&quot;)</span><span class="w">   </span><span class="c1"># false, false (1)</span>
-</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">then</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydep</span>
-</span></code></pre></div>
-<ol>
-<li><code>else:</code> would also have worked here.</li>
-</ol>
-<p>This function eliminates the need to implement any Python-specific <code>conda-build</code>
-selectors (such as <code>py3k</code>, <code>py38</code>, etc.) or the <code>py</code> and <code>npy</code> integers.</p>
-<p>Please note that during the <em>initial</em> phase of rendering we do not know the
-variant, and thus the <code>match</code> condition always evaluates to <code>true</code>.</p>
-<h3 id="selector-evaluation">Selector evaluation<a class="headerlink" href="#selector-evaluation" title="Permanent link">#</a></h3>
-<p>Except for the rattler-build specific selectors, the selectors are evaluated using the <code>minijinja</code> engine. This means
-that the selectors are evaluated by <a href="https://github.com/mitsuhiko/minijinja"><code>minijinja</code></a> thus Python like expressions.
-Some notable options are:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python == &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># equal</span>
-</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python != &quot;3.8&quot;</span><span class="w"> </span><span class="c1"># not equal</span>
-</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux</span>
-</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and not linux</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is not linux</span>
-</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python and (linux or osx)</span><span class="w"> </span><span class="c1"># true if python variant is set and the target_platform is linux or osx</span>
-</span></code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Since this is an experimental feature, you need to pass the <code>--experimental</code> flag to enable parsing of the <code>cache</code> top-level section.</p>
+</div>
+<p>In this example, we have a single package called <code>mypackage</code> that creates two outputs: <code>mypackage-library</code> and <code>mypackage-headers</code>.
+The cache output will run like a regular output, but after the build is finished, the files will be copied to a "cache" directory (in your output folder, under <code>output/build_cache</code>).</p>
+<p>The files in the cache folder are then copied into the <code>$PREFIX</code> of each output package. Since they are "new" files in the prefix, they will be included in the output package.
+The easiest way to select a subset of the files in the prefix is by using the <code>files</code> field in the output definition.
+You can use a list of globs to select only the files that you want.</p>
+<p>For something more complicated you can also use <code>include</code> and <code>exclude</code> fields in the <code>files</code> selector. Please refer to the <a href="../build_options/#include-only-certain-files-in-the-package">the build options documentation</a>.</p>
+<h2 id="run-exports-from-the-cache">Run exports from the cache<a class="headerlink" href="#run-exports-from-the-cache" title="Permanent link">#</a></h2>
+<p>Since the cache output also has build- and host requirements we need to additionally take care of eventual "run-exports" from the cache output.
+Run exports from the cache-dependencies are handled very similar to the run exports from a given output. We append any run exports to the outputs.</p>
+<p>If the cache has an "ignore run exports" section, than we apply those filters at the cache level. If the output ignores any run exports, then we also ignore the run-exports if they would come from the cache.</p>
+<h2 id="caching-in-the-src_dir">Caching in the $SRC_DIR<a class="headerlink" href="#caching-in-the-src_dir" title="Permanent link">#</a></h2>
+<p>If you used <code>conda-build</code> a lot, you might have noticed that a top-level build is also caching the changes in the <code>$SRC_DIR</code>. This is not the case for <code>rattler-build</code> yet.</p>
+<p>You could try to work around by e.g. copying files into the <code>$PREFIX</code> and restoring them in each output.</p>
 
 
 
@@ -1512,9 +1366,9 @@ Some notable options are:</p>
           
             
             <a
-              href="../build_options/"
+              href="../experimental_features/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Advanced options"
+              aria-label="Previous: Experimental features"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1525,7 +1379,7 @@ Some notable options are:</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Advanced options
+                  Experimental features
                 </div>
               </div>
             </a>
@@ -1535,16 +1389,16 @@ Some notable options are:</p>
           
             
             <a
-              href="../build_script/"
+              href="../recipe_generation/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Build script"
+              aria-label="Next: Generating recipes"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Build script
+                  Generating recipes
                 </div>
               </div>
               <div class="md-footer__button md-icon">

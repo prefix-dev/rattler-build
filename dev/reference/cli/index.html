@@ -525,27 +525,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../experimental_features/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Experimental features
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../selectors/" class="md-nav__link">
         
   
@@ -614,6 +593,90 @@
   
   <span class="md-ellipsis">
     Compilers and cross compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../experimental_features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experimental features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../multiple_output_cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Multiple output cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../recipe_generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Generating recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tips_and_tricks/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tips and tricks
   </span>
   
 
@@ -1812,31 +1875,67 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 </ul>
 <h3 id="generate-recipe"><code>generate-recipe</code><a class="headerlink" href="#generate-recipe" title="Permanent link">#</a></h3>
 <p>Generate a recipe from PyPI or CRAN</p>
-<p><strong>Usage:</strong> <code>rattler-build generate-recipe &lt;SOURCE&gt; &lt;PACKAGE&gt;</code></p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe &lt;COMMAND&gt;</code></p>
+<h5 id="subcommands_2"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_2" title="Permanent link">#</a></h5>
+<ul>
+<li><code>pypi</code> — Generate a recipe for a Python package from PyPI</li>
+<li><code>cran</code> — Generate a recipe for an R package from CRAN</li>
+</ul>
+<h4 id="pypi"><code>pypi</code><a class="headerlink" href="#pypi" title="Permanent link">#</a></h4>
+<p>Generate a recipe for a Python package from PyPI</p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe pypi [OPTIONS] &lt;PACKAGE&gt;</code></p>
 <h5 id="arguments_1"><strong>Arguments:</strong><a class="headerlink" href="#arguments_1" title="Permanent link">#</a></h5>
 <ul>
-<li>
-<p><code>&lt;SOURCE&gt;</code></p>
-<p>Type of package to generate a recipe for</p>
-<ul>
-<li>Possible values:<ul>
-<li><code>pypi</code>:
-    Generate a recipe for a Python package from PyPI</li>
-<li><code>cran</code>:
-    Generate a recipe for an R package from CRAN</li>
-</ul>
-</li>
-</ul>
-</li>
 <li>
 <p><code>&lt;PACKAGE&gt;</code></p>
 <p>Name of the package to generate</p>
 </li>
 </ul>
+<h5 id="options_10"><strong>Options:</strong><a class="headerlink" href="#options_10" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-w</code>, <code>--write</code></p>
+<p>Whether to write the recipe to a folder</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+</ul>
+<h4 id="cran"><code>cran</code><a class="headerlink" href="#cran" title="Permanent link">#</a></h4>
+<p>Generate a recipe for an R package from CRAN</p>
+<p><strong>Usage:</strong> <code>rattler-build generate-recipe cran [OPTIONS] &lt;PACKAGE&gt;</code></p>
+<h5 id="arguments_2"><strong>Arguments:</strong><a class="headerlink" href="#arguments_2" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>&lt;PACKAGE&gt;</code></p>
+<p>Name of the package to generate</p>
+</li>
+</ul>
+<h5 id="options_11"><strong>Options:</strong><a class="headerlink" href="#options_11" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-u</code>, <code>--universe &lt;UNIVERSE&gt;</code></p>
+<p>The R Universe to fetch the package from (defaults to <code>cran</code>)</p>
+</li>
+<li>
+<p><code>-t</code>, <code>--tree</code></p>
+<p>Wether to create recipes for the whole dependency tree or not</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>-w</code>, <code>--write</code></p>
+<p>Whether to write the recipe to a folder</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+</ul>
 <h3 id="auth"><code>auth</code><a class="headerlink" href="#auth" title="Permanent link">#</a></h3>
 <p>Handle authentication to external channels</p>
 <p><strong>Usage:</strong> <code>rattler-build auth &lt;COMMAND&gt;</code></p>
-<h5 id="subcommands_2"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_2" title="Permanent link">#</a></h5>
+<h5 id="subcommands_3"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_3" title="Permanent link">#</a></h5>
 <ul>
 <li><code>login</code> — Store authentication information for a given host</li>
 <li><code>logout</code> — Remove authentication information for a given host</li>
@@ -1844,14 +1943,14 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 <h4 id="login"><code>login</code><a class="headerlink" href="#login" title="Permanent link">#</a></h4>
 <p>Store authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth login [OPTIONS] &lt;HOST&gt;</code></p>
-<h5 id="arguments_2"><strong>Arguments:</strong><a class="headerlink" href="#arguments_2" title="Permanent link">#</a></h5>
+<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
 <p>The host to authenticate with (e.g. repo.prefix.dev)</p>
 </li>
 </ul>
-<h5 id="options_10"><strong>Options:</strong><a class="headerlink" href="#options_10" title="Permanent link">#</a></h5>
+<h5 id="options_12"><strong>Options:</strong><a class="headerlink" href="#options_12" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>--token &lt;TOKEN&gt;</code></p>
@@ -1873,7 +1972,7 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 <h4 id="logout"><code>logout</code><a class="headerlink" href="#logout" title="Permanent link">#</a></h4>
 <p>Remove authentication information for a given host</p>
 <p><strong>Usage:</strong> <code>rattler-build auth logout &lt;HOST&gt;</code></p>
-<h5 id="arguments_3"><strong>Arguments:</strong><a class="headerlink" href="#arguments_3" title="Permanent link">#</a></h5>
+<h5 id="arguments_4"><strong>Arguments:</strong><a class="headerlink" href="#arguments_4" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>&lt;HOST&gt;</code></p>
