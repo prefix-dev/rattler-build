@@ -151,7 +151,6 @@ fn map_license(license: &str) -> (Option<String>, Option<String>) {
             license_file = part.split_whitespace().last().map(|s| s.to_string());
         } else {
             // This part is a license
-            println!("Part: {} - looking for replacement", part);
             let mapped = license_replacements.get(part).map_or(part, |&s| s);
             final_licenses.push(mapped.to_string());
         }
@@ -362,6 +361,7 @@ mod tests {
             // Cases with file LICENSE
             ("GPL-3 + file LICENSE", "GPL-3.0-only", Some("LICENSE")),
             ("MIT + file LICENCE", "MIT", Some("LICENCE")),
+            ("MIT + file LICENSE", "MIT", Some("LICENSE")),
             // Compound licenses
             ("GPL-2 | MIT", "GPL-2.0-only OR MIT", None),
             (

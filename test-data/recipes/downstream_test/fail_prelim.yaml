@@ -12,7 +12,7 @@ outputs:
         - upstream-fail
       run:
         - upstream-fail
-    
+
     tests:
       - script:
           - if: unix
