@@ -3,7 +3,6 @@
     <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
   </a>
 </h1>
-![console_example]()
 
 <h1 align="center">
 
