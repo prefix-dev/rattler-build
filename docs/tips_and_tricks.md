@@ -38,9 +38,9 @@ or proprietary packages, or packages that you have modified in some way.
 Doing so is pretty straightforward with `rattler-build` and a CI provider of
 your choice. We have a number of example repositories for "custom" forges:
 
-- [https://github.com/wolfv/rust-forge](rust-forge): This repository builds a
+- [rust-forge](https://github.com/wolfv/rust-forge): This repository builds a
   number of Rust packages for Windows, macOS and Linux on top of Github Actions.
-- [https://github.com/wolfv/r-forge](r-forge): The same idea, but for `R`
+- [r-forge](https://github.com/wolfv/r-forge): The same idea, but for `R`
   packages
 
 ### Directory structure
@@ -63,7 +63,7 @@ rebuilding should be rebuilt.
 !!!note
 
     You can generate recipes for different ecosystems with the `rattler-build generate-recipe` command.
-    Read more about it in the [Generating recipes](./generating_recipes.md) section.
+    Read more about it in the [Generating recipes](recipe_generation.md) section.
 
 ### CI setup
 
