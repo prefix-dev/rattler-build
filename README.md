@@ -1,8 +1,9 @@
 <h1>
   <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/3bad9a38-939d-4513-8c61-dcc4ddb7fb51">
+    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
   </a>
 </h1>
+![console_example]()
 
 <h1 align="center">
 
@@ -31,7 +32,7 @@ run is a package that can be installed using `mamba`, `rattler` or `conda`.
 `rattler-build` does not have any dependencies on `conda-build` or Python and
 works as a standalone binary.
 
-![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
+![](https://github.com/prefix-dev/rattler-build/assets/885054/98377399-aae4-45a5-a4e9-982a3c7b2d50)
 
 ### Installation
 
