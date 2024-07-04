@@ -106,13 +106,17 @@ nav:
   - Build options:
 
     - Advanced options: build_options.md
-    - Experimental features: experimental_features.md
 
     - Selector syntax (if/then): selectors.md
     - Build script: build_script.md
     - Variants: variants.md
 
     - Compilers and cross compilation: compilers.md
+
+    - Experimental features: experimental_features.md
+    - Multiple output cache: multiple_output_cache.md
+    - Generating recipes: recipe_generation.md
+    - Tips and tricks: tips_and_tricks.md
 
   - Testing:
     - Testing packages: testing.md
