@@ -339,7 +339,11 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
             let r_package = format_r_package(&dep, None);
 
             if !PathBuf::from(r_package).exists() {
-                generate_r_recipe(opts).await?;
+                let opts = CranOpts {
+                    package: dep,
+                    ..opts.clone()
+                };
+                generate_r_recipe(&opts).await?;
             }
         }
     }
