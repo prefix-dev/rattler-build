@@ -1900,6 +1900,21 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 <li>Possible values: <code>true</code>, <code>false</code></li>
 </ul>
 </li>
+<li>
+<p><code>-u</code>, <code>--use-mapping</code></p>
+<p>Whether to use the conda-forge PyPI name mapping</p>
+<ul>
+<li>Default value: <code>true</code></li>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>-t</code>, <code>--tree</code></p>
+<p>Whether to generate recipes for all dependencies</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
 </ul>
 <h4 id="cran"><code>cran</code><a class="headerlink" href="#cran" title="Permanent link">#</a></h4>
 <p>Generate a recipe for an R package from CRAN</p>
@@ -1919,7 +1934,7 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 </li>
 <li>
 <p><code>-t</code>, <code>--tree</code></p>
-<p>Wether to create recipes for the whole dependency tree or not</p>
+<p>Whether to create recipes for the whole dependency tree or not</p>
 <ul>
 <li>Possible values: <code>true</code>, <code>false</code></li>
 </ul>

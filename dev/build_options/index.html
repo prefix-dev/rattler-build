@@ -1387,7 +1387,7 @@ match a single character, and <code>**</code> to match any number of directories
   in any directory</li>
 <li><code>foo/</code> matches all files under the <code>foo</code> directory</li>
 </ul>
-<p>The globs are always evaluted relative to the prefix directory. If you have no
+<p>The globs are always evaluated relative to the prefix directory. If you have no
 <code>include</code> globs, but an <code>exclude</code> glob, then all files are included except those
 that match the <code>exclude</code> glob. This is equivalent to <code>include: ['**']</code>.</p>
 <h2 id="always-include-and-always-copy-files">Always include and always copy files<a class="headerlink" href="#always-include-and-always-copy-files" title="Permanent link">#</a></h2>
@@ -1448,7 +1448,7 @@ string that you might have seen in the build process.</p>
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="w">    </span><span class="c1"># ignore all or specific files for prefix replacement`</span>
 </span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="w">    </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool | [path] (defaults to false)</span>
 </span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">    </span><span class="c1"># wether to detect binary files with prefix or not</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a><span class="w">    </span><span class="c1"># whether to detect binary files with prefix or not</span>
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="w">    </span><span class="c1"># defaults to true on Unix and (always) false on Windows</span>
 </span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="w">    </span><span class="nt">ignore_binary_files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool</span>
 </span></code></pre></div>
@@ -1519,7 +1519,7 @@ but is not actually used by any of the binaries/libraries in the package.</p>
 </span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">    </span><span class="c1"># outside of the environment</span>
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">rpath_allowlist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="c1"># wether to relocate binaries or not. If this is a list of paths, then</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="w">    </span><span class="c1"># whether to relocate binaries or not. If this is a list of paths, then</span>
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="w">    </span><span class="c1"># only the listed paths are relocated</span>
 </span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a><span class="w">    </span><span class="nt">binary_relocation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bool (defaults to true) | list of globs</span>
 </span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
