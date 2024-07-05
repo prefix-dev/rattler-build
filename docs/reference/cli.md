@@ -606,6 +606,21 @@ Generate a recipe for a Python package from PyPI
 	- Possible values: `true`, `false`
 
 
+- `-u`, `--use-mapping`
+
+	Whether to use the conda-forge PyPI name mapping
+
+	- Default value: `true`
+	- Possible values: `true`, `false`
+
+
+- `-t`, `--tree`
+
+	Whether to generate recipes for all dependencies
+
+	- Possible values: `true`, `false`
+
+
 
 
 
@@ -632,7 +647,7 @@ Generate a recipe for an R package from CRAN
 
 - `-t`, `--tree`
 
-	Wether to create recipes for the whole dependency tree or not
+	Whether to create recipes for the whole dependency tree or not
 
 	- Possible values: `true`, `false`
 

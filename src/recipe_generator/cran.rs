@@ -65,7 +65,7 @@ pub struct CranOpts {
     #[arg(short, long)]
     universe: Option<String>,
 
-    /// Wether to create recipes for the whole dependency tree or not
+    /// Whether to create recipes for the whole dependency tree or not
     #[arg(short, long)]
     tree: bool,
 

@@ -74,7 +74,7 @@ impl Output {
                 }
             }
             // always insert the target platform and build platform
-            // we are using the `host_platform` here because for the cache it should not matter wether it's being
+            // we are using the `host_platform` here because for the cache it should not matter whether it's being
             // build for `noarch` or not (one can have mixed outputs, in fact).
             selected_variant.insert("host_platform", self.host_platform().to_string());
             selected_variant.insert(

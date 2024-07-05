@@ -58,7 +58,7 @@ For example:
   in any directory
 - `foo/` matches all files under the `foo` directory
 
-The globs are always evaluted relative to the prefix directory. If you have no
+The globs are always evaluated relative to the prefix directory. If you have no
 `include` globs, but an `exclude` glob, then all files are included except those
 that match the `exclude` glob. This is equivalent to `include: ['**']`.
 
@@ -136,7 +136,7 @@ build:
     # ignore all or specific files for prefix replacement`
     ignore: bool | [path] (defaults to false)
 
-    # wether to detect binary files with prefix or not
+    # whether to detect binary files with prefix or not
     # defaults to true on Unix and (always) false on Windows
     ignore_binary_files: bool
 ```
@@ -228,7 +228,7 @@ build:
     # outside of the environment
     rpath_allowlist: list of globs
 
-    # wether to relocate binaries or not. If this is a list of paths, then
+    # whether to relocate binaries or not. If this is a list of paths, then
     # only the listed paths are relocated
     binary_relocation: bool (defaults to true) | list of globs
 

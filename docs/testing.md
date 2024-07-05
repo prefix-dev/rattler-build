@@ -70,7 +70,7 @@ For a script test:
 For a Python import test:
 
 - A JSON file is created that is called `python_test.json` and stores the
-  imports to be tested and wether to execute `pip check` or not. This file is
+  imports to be tested and whether to execute `pip check` or not. This file is
   placed under `info/tests/{index}/`
 
 For a downstream test:

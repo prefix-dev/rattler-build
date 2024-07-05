@@ -25,7 +25,7 @@ use super::{
 /// This is a reinterpretation of the [`marked_yaml::Node`] type that is specific
 /// for the first stage of the new Conda recipe format parser. This type handles
 /// the `if / then / else` selector (or if-selector for simplicity) as a special
-/// case of the sequence node, i.e., the occurences of if-selector in the recipe
+/// case of the sequence node, i.e., the occurrences of if-selector in the recipe
 /// are syntactically parsed in the conversion of [`marked_yaml::Node`] to this type.
 ///
 /// **CAUTION:** The user of this type that is responsible to handle the if the
@@ -474,7 +474,7 @@ impl fmt::Debug for RenderedSequenceNode {
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
 /// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
-/// Because ther is an example that on the `context` key-value definition, a later
+/// Because there is an example that on the `context` key-value definition, a later
 /// key was defined as a jinja string using previous values, we need to care about
 /// insertion order we use [`IndexMap`] for this.
 ///

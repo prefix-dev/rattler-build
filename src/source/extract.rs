@@ -194,7 +194,7 @@ mod test {
     #[test]
     fn test_extract_zip() {
         // zip contains text.txt with "Hello, World" text
-        const HELLOW_ZIP_FILE: &[u8] = &[
+        const HELLO_WORLD_ZIP_FILE: &[u8] = &[
             80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13,
             0, 0, 0, 8, 0, 28, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85, 84, 9, 0, 3, 4, 130,
             150, 101, 6, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 72,
@@ -212,7 +212,7 @@ mod test {
         let tempdir = tempfile::tempdir().unwrap();
         let file_path = tempdir.path().join("test.zip");
         let mut file = File::create(&file_path).unwrap();
-        _ = file.write_all(HELLOW_ZIP_FILE);
+        _ = file.write_all(HELLO_WORLD_ZIP_FILE);
 
         let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
         let res = extract_zip(file_path, tempdir.path(), &fancy_log);
