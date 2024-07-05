@@ -35,7 +35,7 @@ pub struct PyPIOpts {
     #[arg(short, long)]
     pub write: bool,
 
-    /// Wether to use the conda-forge PyPI name mapping
+    /// Whether to use the conda-forge PyPI name mapping
     #[arg(short, long, default_value = "true")]
     pub use_mapping: bool,
 
