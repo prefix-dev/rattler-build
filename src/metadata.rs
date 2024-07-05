@@ -199,7 +199,7 @@ impl Directories {
     }
 }
 
-/// Default value for store recipe for backwards compatiblity
+/// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
     true
 }
@@ -259,7 +259,7 @@ pub struct BuildConfiguration {
     /// Whether to store the recipe and build instructions in the final package or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
-    /// Wether to set additional environment variables to force colors in the build script or not
+    /// Whether to set additional environment variables to force colors in the build script or not
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 }

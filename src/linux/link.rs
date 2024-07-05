@@ -235,7 +235,7 @@ fn call_patchelf(
     let mut cmd = system_tools.call(Tool::Patchelf)?;
 
     // prefer using RPATH over RUNPATH because RPATH takes precedence when
-    // searching for shared libraries and cannot be overriden with
+    // searching for shared libraries and cannot be overridden with
     // `LD_LIBRARY_PATH`. This ensures that the libraries from the environment
     // are found first, providing better isolation and preventing potential
     // conflicts with system libraries.

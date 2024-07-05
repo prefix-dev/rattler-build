@@ -190,7 +190,7 @@ pub struct PartialParsingError {
     pub kind: ErrorKind,
 }
 
-// Implement Display for ErrorKind manually bacause [`marked_yaml::LoadError`] does not implement
+// Implement Display for ErrorKind manually because [`marked_yaml::LoadError`] does not implement
 // the way we want it.
 // CAUTION: Because of this impl, we cannot use `#[error()]` on the enum.
 impl fmt::Display for ErrorKind {

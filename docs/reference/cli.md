@@ -632,7 +632,7 @@ Generate a recipe for an R package from CRAN
 
 - `-t`, `--tree`
 
-	Wether to create recipes for the whole dependency tree or not
+	Whether to create recipes for the whole dependency tree or not
 
 	- Possible values: `true`, `false`
 

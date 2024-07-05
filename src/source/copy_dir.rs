@@ -86,7 +86,7 @@ pub(crate) fn copy_file(
 ///
 /// # Return
 ///
-/// The returned `Vec<PathBuf>` contains the pathes of the copied files.
+/// The returned `Vec<PathBuf>` contains the paths of the copied files.
 /// The `bool` flag indicates whether any of the _include_ globs matched.
 /// If a directory is created in this function, the path to the directory is _not_ returned.
 pub(crate) struct CopyDir<'a> {
@@ -158,7 +158,7 @@ impl<'a> CopyDir<'a> {
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_pathes = WalkBuilder::new(self.from_path)
+        let copied_paths = WalkBuilder::new(self.from_path)
             // disregard global gitignore
             .git_global(self.use_git_global)
             .git_ignore(self.use_gitignore)
@@ -272,7 +272,7 @@ impl<'a> CopyDir<'a> {
             .filter_map(|res| res.transpose())
             .collect::<Result<Vec<_>, SourceError>>()?;
 
-        result.copied_paths = copied_pathes;
+        result.copied_paths = copied_paths;
         Ok(result)
     }
 }

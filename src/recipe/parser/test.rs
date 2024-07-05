@@ -47,7 +47,7 @@ pub struct CommandsTest {
     /// The (extra) requirements for the test.
     /// Similar to the `requirements` section in the recipe the `build` requirements
     /// are of the build-computer architecture and the `run` requirements are of the
-    /// target_platform architecture. The current package is implictly added to the
+    /// target_platform architecture. The current package is implicitly added to the
     /// `run` requirements.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
     pub requirements: CommandsTestRequirements,
@@ -83,7 +83,7 @@ fn is_true(value: &bool) -> bool {
 pub struct PythonTest {
     /// List of imports to test
     pub imports: Vec<String>,
-    /// Wether to run `pip check` or not (default to true)
+    /// Whether to run `pip check` or not (default to true)
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
 }

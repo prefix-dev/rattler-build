@@ -179,9 +179,9 @@ impl PackageContentsTest {
             if site_package.glob().contains('/') {
                 globset.add(build_glob(format!("{site_packages_base}/{site_package}"))?);
             } else {
-                let mut splitted = site_package.glob().split('.').collect::<Vec<_>>();
-                let last_elem = splitted.pop().unwrap_or_default();
-                let mut site_package_path = splitted.join("/");
+                let mut split = site_package.glob().split('.').collect::<Vec<_>>();
+                let last_elem = split.pop().unwrap_or_default();
+                let mut site_package_path = split.join("/");
                 if !site_package_path.is_empty() {
                     site_package_path.push('/');
                 }

@@ -17,7 +17,7 @@ pub struct Script {
     /// Environment variables to set in the build environment.
     pub env: BTreeMap<String, String>,
     /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information. Use with care because this might make recipes no
+    /// contain sensitive information. Use with care because this might make recipes no
     /// longer reproducible on other machines.
     pub secrets: Vec<String>,
     /// The contents of the script, either a path or a list of commands.
@@ -171,7 +171,7 @@ impl Script {
     /// Get the secrets environment variables.
     ///
     /// Environment variables to leak into the build environment from the host system that
-    /// contain sensitve information.
+    /// contain sensitive information.
     ///
     /// # Warning
     /// Use with care because this might make recipes no longer reproducible on other machines.

@@ -90,10 +90,10 @@ pub struct Build {
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
     pub(super) dynamic_linking: DynamicLinking,
-    /// Setting to control wether to always copy a file
+    /// Setting to control whether to always copy a file
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) always_copy_files: GlobVec,
-    /// Setting to control wether to always include a file (even if it is already present in the host env)
+    /// Setting to control whether to always include a file (even if it is already present in the host env)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub(super) always_include_files: GlobVec,
     /// Merge the build and host envs
@@ -415,7 +415,7 @@ pub struct Python {
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub skip_pyc_compilation: GlobVec,
 
-    /// Wether to use the "app" entry point for Python (which hooks into the macOS GUI)
+    /// Whether to use the "app" entry point for Python (which hooks into the macOS GUI)
     /// This is only relevant for macOS.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,

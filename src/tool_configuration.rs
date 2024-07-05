@@ -50,7 +50,7 @@ pub struct Configuration {
     /// Whether to only render the build output
     pub render_only: bool,
 
-    /// Wether to skip existing packages
+    /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
 
     /// The channel configuration to use when parsing channels.

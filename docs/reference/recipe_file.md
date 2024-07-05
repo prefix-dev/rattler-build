@@ -218,7 +218,7 @@ source:
   tag: "1.1.4"
 ```
 
-Futhermore, if you want to fetch just the current "`HEAD`" (this may result in
+Furthermore, if you want to fetch just the current "`HEAD`" (this may result in
 non-deterministic builds), then you can use `depth`.
 
 ```yaml

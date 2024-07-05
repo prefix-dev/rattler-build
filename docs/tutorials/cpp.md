@@ -101,10 +101,10 @@ But which the package doesn't depend on itself.
 5. The `files` section specifies the files to be tested for existence, using a glob pattern.
 
 !!! note "`CMAKE_ARGS`"
-    It can be tedious to remember all the diffent variables one needs to pass to CMake to create the perfect build.
+    It can be tedious to remember all the different variables one needs to pass to CMake to create the perfect build.
     The `cmake` package on conda-forge introduces the`CMAKE_ARGS` environment variable.
     This variable contains the necessary flags to make the package build correctly, also when cross-compiling from one machine to another.
-    Therefore, it is often not necesary to pass any additional flags to the `cmake` command.
+    Therefore, it is often not necessary to pass any additional flags to the `cmake` command.
     However, because this is a tutorial we will show how to pass the necessary flags to `cmake` manually.
 
     For more information please refer to the [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#how-to-enable-cross-compilation).
