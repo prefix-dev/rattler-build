@@ -50,9 +50,7 @@ async fn main() -> miette::Result<()> {
                     &mut std::io::stdout(),
                 );
             }
-            let shell = shell
-                .or(clap_complete::Shell::from_env())
-                .unwrap_or(clap_complete::Shell::Bash);
+
             print_completions(shell, &mut cmd);
             Ok(())
         }
