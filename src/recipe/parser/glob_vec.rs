@@ -200,7 +200,7 @@ impl GlobVec {
             include,
             exclude,
             include_globset: globset,
-            exclude_globset: exclude_globset,
+            exclude_globset,
         }
     }
 }

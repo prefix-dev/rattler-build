@@ -219,7 +219,7 @@ mod test {
         assert!(term.contents().trim().starts_with(
             "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
         ));
-        assert!(matches!(res.err(), None));
+        assert!(res.err().is_none());
         assert!(tempdir.path().join("text.txt").exists());
         assert!(std::fs::read_to_string(tempdir.path().join("text.txt"))
             .unwrap()

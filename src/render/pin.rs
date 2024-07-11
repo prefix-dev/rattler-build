@@ -232,7 +232,7 @@ mod test {
             let (version, hash) = spec.split_whitespace().collect_tuple().unwrap();
             let version: Version = version.parse().unwrap();
             let spec = test.pin.apply(&version, hash).unwrap();
-            println!("{} -> {}", spec.to_string(), test.expected);
+            println!("{} -> {}", spec, test.expected);
             assert_eq!(spec.to_string(), test.expected);
         }
     }
