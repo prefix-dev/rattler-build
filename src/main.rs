@@ -87,6 +87,10 @@ async fn main() -> miette::Result<()> {
                 }
             }
 
+            if recipe_paths.is_empty() {
+                miette::bail!("Couldn't detect any recipes.")
+            }
+
             if build_args.tui {
                 #[cfg(feature = "tui")]
                 {
