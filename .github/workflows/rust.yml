@@ -55,6 +55,7 @@ jobs:
         with:
           reporter: "github-pr-check"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          args: "--all-targets"
 
   build:
     name: Build ${{ matrix.target }}
