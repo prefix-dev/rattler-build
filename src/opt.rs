@@ -251,7 +251,7 @@ pub struct BuildOpts {
     pub recipe: Vec<PathBuf>,
 
     /// The directory that contains recipes.
-    #[arg(long)]
+    #[arg(long, value_parser = is_dir)]
     pub recipe_dir: Option<PathBuf>,
 
     /// Build recipes up to the specified package.
@@ -330,6 +330,17 @@ pub struct BuildOpts {
     /// If set to `all`, skip packages that already exist in any channel.
     #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result")]
     pub skip_existing: SkipExisting,
+}
+
+fn is_dir(dir: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(dir);
+    if path.is_dir() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "Path '{dir}' needs to exist on disk and be a directory",
+        ))
+    }
 }
 
 /// Test options.
