@@ -365,6 +365,7 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod test {
     use std::fs;
 
@@ -395,12 +396,12 @@ mod test {
 
         // from yaml
         let tests: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
-        let t = tests.get(0);
+        let t = tests.first();
 
         match t {
             Some(TestType::Python { python }) => {
                 assert_eq!(python.imports, vec!["numpy.testing", "numpy.matrix"]);
-                assert_eq!(python.pip_check, true);
+                assert!(python.pip_check);
             }
             _ => panic!("expected python test"),
         }
