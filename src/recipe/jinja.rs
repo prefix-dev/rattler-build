@@ -697,9 +697,9 @@ mod tests {
     fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
         let tempdir = tempfile::tempdir().unwrap();
         let dir = tempdir.path().join(key);
-        _ = std::fs::create_dir_all(&dir).unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
         f(&dir);
-        _ = std::fs::remove_dir_all(dir).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     // git version is too old in cross container for aarch64
@@ -774,7 +774,7 @@ mod tests {
             assert_eq!(jinja.eval(&format!("git.latest_tag({:?})", path)).expect("test 0").as_str().unwrap(), "v0.1.0");
             assert_eq!(jinja.eval(&format!("git.latest_tag_rev({:?})", path)).expect("test 1 left").as_str().unwrap(), jinja.eval(&format!("git.head_rev({:?})", path)).expect("test 1 right").as_str().unwrap());
             assert_eq!(
-                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).err().expect("test 2").to_string(),
+                jinja_wo_experimental.eval(&format!("git.latest_tag({:?})", path)).expect_err("test 2").to_string(),
                 "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
             );
         });

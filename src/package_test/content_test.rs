@@ -336,10 +336,7 @@ mod tests {
         NoMatch,
     }
 
-    fn test_glob_matches(
-        globs: &Vec<(String, GlobSet)>,
-        paths: &[String],
-    ) -> Result<(), MatchError> {
+    fn test_glob_matches(globs: &[(String, GlobSet)], paths: &[String]) -> Result<(), MatchError> {
         let mut matches = Vec::new();
         for path in paths {
             let mut has_match = false;

@@ -977,7 +977,6 @@ mod tests {
                     upper_bound: Some("x.x".parse().unwrap()),
                     lower_bound: Some("x.x.x".parse().unwrap()),
                     exact: true,
-                    ..Default::default()
                 },
             }
             .into(),
@@ -988,7 +987,6 @@ mod tests {
                     upper_bound: Some("x.x".parse().unwrap()),
                     lower_bound: Some("x.x.x".parse().unwrap()),
                     exact: true,
-                    ..Default::default()
                 },
             }
             .into(),

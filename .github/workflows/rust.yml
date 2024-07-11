@@ -3,15 +3,7 @@ on:
     branches: [main]
     tags:
       - "v*.*.*"
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - ".github/workflows/*"
   pull_request:
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - ".github/workflows/*"
 
   workflow_dispatch:
 
@@ -55,6 +47,7 @@ jobs:
         with:
           reporter: "github-pr-check"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: "--all-targets"
 
   build:
     name: Build ${{ matrix.target }}

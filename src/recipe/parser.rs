@@ -384,7 +384,7 @@ mod tests {
             let err = recipe.unwrap_err();
             let err: ParseErrors = err
                 .into_iter()
-                .map(|err| ParsingError::from_partial(&raw_recipe, err))
+                .map(|err| ParsingError::from_partial(raw_recipe, err))
                 .collect::<Vec<_>>()
                 .into();
             assert_miette_snapshot!(err);
