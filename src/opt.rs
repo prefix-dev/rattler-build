@@ -338,7 +338,7 @@ fn is_dir(dir: &str) -> Result<PathBuf, String> {
         Ok(path)
     } else {
         Err(format!(
-            "Path '{dir}' needs to exist on disk and be a directory.",
+            "Path '{dir}' needs to exist on disk and be a directory",
         ))
     }
 }
