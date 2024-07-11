@@ -1862,14 +1862,28 @@ You can also add a compression level to the package format, e.g. <code>tar-bz2:&
 </ul>
 <h3 id="completion"><code>completion</code><a class="headerlink" href="#completion" title="Permanent link">#</a></h3>
 <p>Generate shell completion script</p>
-<p><strong>Usage:</strong> <code>rattler-build completion [OPTIONS]</code></p>
+<p><strong>Usage:</strong> <code>rattler-build completion --shell &lt;SHELL&gt;</code></p>
 <h5 id="options_9"><strong>Options:</strong><a class="headerlink" href="#options_9" title="Permanent link">#</a></h5>
 <ul>
 <li>
 <p><code>-s</code>, <code>--shell &lt;SHELL&gt;</code></p>
-<p>Shell</p>
+<p>Specifies the shell for which the completions should be generated</p>
 <ul>
-<li>Possible values: <code>bash</code>, <code>elvish</code>, <code>fish</code>, <code>powershell</code>, <code>zsh</code></li>
+<li>Possible values:<ul>
+<li><code>bash</code>:
+    Bourne Again SHell (bash)</li>
+<li><code>elvish</code>:
+    Elvish shell</li>
+<li><code>fish</code>:
+    Friendly Interactive SHell (fish)</li>
+<li><code>nushell</code>:
+    Nushell</li>
+<li><code>powershell</code>:
+    PowerShell</li>
+<li><code>zsh</code>:
+    Z SHell (zsh)</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
