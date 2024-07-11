@@ -556,15 +556,27 @@ Options for uploading to a Anaconda.org server
 
 Generate shell completion script
 
-**Usage:** `rattler-build completion [OPTIONS]`
+**Usage:** `rattler-build completion --shell <SHELL>`
 
 ##### **Options:**
 
 - `-s`, `--shell <SHELL>`
 
-	Shell
+	Specifies the shell for which the completions should be generated
 
-	- Possible values: `bash`, `elvish`, `fish`, `powershell`, `zsh`
+	- Possible values:
+		- `bash`:
+			Bourne Again SHell (bash)
+		- `elvish`:
+			Elvish shell
+		- `fish`:
+			Friendly Interactive SHell (fish)
+		- `nushell`:
+			Nushell
+		- `powershell`:
+			PowerShell
+		- `zsh`:
+			Z SHell (zsh)
 
 
 

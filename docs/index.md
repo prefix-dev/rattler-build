@@ -56,16 +56,59 @@ Other options are:
     Releases](https://github.com/prefix-dev/rattler-build/releases/).
 
 ### Completion
-When installing `rattler-build` you might want to enable shell completion.
-Do this by running the `rattler-build completion` command in the activation of your shell.
 
-```sh
-# For bash (add this to ~/.bashrc)
-echo 'eval "$(rattler-build completion --shell=bash)"' >> ~/.bashrc
-# For zsh (add this to ~/.zshrc)
-echo 'eval "$(rattler-build completion --shell=zsh)"' >> ~/.zshrc
-# For fish (add this to ~/.config/fish/config.fish)
-echo 'rattler-build completion --shell=fish | source' >> ~/.config/fish/config.fish
+When installing `rattler-build` you might want to enable shell completion.
+Afterwards, restart the shell or source the shell config file.
+
+### Bash (default on most Linux systems)
+
+```bash
+echo 'eval "$(rattler-build completion --shell bash)"' >> ~/.bashrc
+```
+### Zsh (default on macOS)
+
+```zsh
+echo 'eval "$(rattler-build completion --shell zsh)"' >> ~/.zshrc
+```
+
+### PowerShell (pre-installed on all Windows systems)
+
+```pwsh
+Add-Content -Path $PROFILE -Value '(& rattler-build completion --shell powershell) | Out-String | Invoke-Expression'
+```
+
+!!! tip "Failure because no profile file exists"
+    Make sure your profile file exists, otherwise create it with:
+    ```PowerShell
+    New-Item -Path $PROFILE -ItemType File -Force
+    ```
+
+
+### Fish
+
+```fish
+echo 'rattler-build completion --shell fish | source' >> ~/.config/fish/config.fish
+```
+
+### Nushell
+
+Add the following to the end of your Nushell env file (find it by running `$nu.env-path` in Nushell):
+
+```nushell
+mkdir ~/.cache/rattler-build
+rattler-build completion --shell nushell | save -f ~/.cache/rattler-build/completions.nu
+```
+
+And add the following to the end of your Nushell configuration (find it by running `$nu.config-path`):
+
+```nushell
+use ~/.cache/rattler-build/completions.nu *
+```
+
+### Elvish
+
+```elv
+echo 'eval (rattler-build completion --shell elvish | slurp)' >> ~/.elvish/rc.elv
 ```
 
 ### Dependencies
