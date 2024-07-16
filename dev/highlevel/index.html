@@ -1266,39 +1266,41 @@ the future.</p>
 <code>recipe.yaml</code> file that specifies how the package is to be built and what the
 dependencies are. From the recipe file, <code>rattler-build</code> executes several steps:</p>
 <ol>
-<li><strong>Rendering</strong>:</li>
+<li>
+<p><strong>Rendering</strong>:
+Parse the recipe file and evaluate conditionals, Jinja expressions, and
+variables, and variants.</p>
+</li>
+<li>
+<p><strong>Fetch source</strong>:
+Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths.
+Additionally, this step will apply patches that can be specified alongside the source file.</p>
+</li>
+<li>
+<p><strong>Install build environments</strong>:
+Download and install dependencies into temporary "host" and "build" workspaces.
+Any dependencies that are needed at build time are installed in this step.</p>
+</li>
+<li>
+<p><strong>Build source</strong>:
+Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
+</li>
+<li>
+<p><strong>Prepare package files</strong>:
+Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
+specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
+</li>
+<li>
+<p><strong>Package</strong>:
+Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
+This also creates the test files that are bundled with the package.</p>
+</li>
+<li>
+<p><strong>Test</strong>:
+Run any tests specified in the recipe.
+The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
+</li>
 </ol>
-<p>Parse the recipe file and evaluate conditionals, Jinja expressions, and
-   variables, and variants.</p>
-<ol>
-<li><strong>Fetch source</strong>:</li>
-</ol>
-<p>Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths.
-   Additionally, this step will apply patches that can be specified alongside the source file.</p>
-<ol>
-<li><strong>Install build environments</strong>:</li>
-</ol>
-<p>Download and install dependencies into temporary "host" and "build" workspaces.
-   Any dependencies that are needed at build time are installed in this step.</p>
-<ol>
-<li><strong>Build source</strong>:</li>
-</ol>
-<p>Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
-<ol>
-<li><strong>Prepare package files</strong>:</li>
-</ol>
-<p>Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
-   specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
-<ol>
-<li><strong>Package</strong>:</li>
-</ol>
-<p>Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
-   This also creates the test files that are bundled with the package.</p>
-<ol>
-<li><strong>Test</strong>:</li>
-</ol>
-<p>Run any tests specified in the recipe.
-   The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
 <p>After this process, a package is created. This package can be uploaded to somewhere like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
 <h3 id="how-to-run-rattler-build">How to run <code>rattler-build</code><a class="headerlink" href="#how-to-run-rattler-build" title="Permanent link">#</a></h3>
 <p>Running <code>rattler-build</code> is straightforward. It can be done on the command line:</p>
