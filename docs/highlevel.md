@@ -13,38 +13,31 @@ Building of packages consists of several steps. It all begins with a
 dependencies are. From the recipe file, `rattler-build` executes several steps:
 
 1. **Rendering**:
-
-   Parse the recipe file and evaluate conditionals, Jinja expressions, and
-   variables, and variants.
+Parse the recipe file and evaluate conditionals, Jinja expressions, and
+variables, and variants.
 
 2. **Fetch source**:
-
-   Retrieve specified source files, such as `.tar.gz` files, `git` repositories, local paths.
-   Additionally, this step will apply patches that can be specified alongside the source file.
+Retrieve specified source files, such as `.tar.gz` files, `git` repositories, local paths.
+Additionally, this step will apply patches that can be specified alongside the source file.
 
 3. **Install build environments**:
-
-   Download and install dependencies into temporary "host" and "build" workspaces.
-   Any dependencies that are needed at build time are installed in this step.
+Download and install dependencies into temporary "host" and "build" workspaces.
+Any dependencies that are needed at build time are installed in this step.
 
 4. **Build source**:
-
-   Execute the build script to _build/compile_ the source code and _install_ it into the host environment.
+Execute the build script to _build/compile_ the source code and _install_ it into the host environment.
 
 5. **Prepare package files**:
-
-   Collect _all_ files that are new in the "host" environment and apply some transformations if necessary;
-   specifically, we edit the `rpath` on `Linux` and `macOS` to make binaries relocatable.
+Collect _all_ files that are new in the "host" environment and apply some transformations if necessary;
+specifically, we edit the `rpath` on `Linux` and `macOS` to make binaries relocatable.
 
 6. **Package**:
-
-   Bundle all the files in a package and write out any additional metadata into the `info/index.json`, `info/about.json`, and `info/paths.json` files.
-   This also creates the test files that are bundled with the package.
+Bundle all the files in a package and write out any additional metadata into the `info/index.json`, `info/about.json`, and `info/paths.json` files.
+This also creates the test files that are bundled with the package.
 
 7. **Test**:
-
-   Run any tests specified in the recipe.
-   The package is considered _done_ if it passes all the tests, otherwise its moved to `broken/` in the output directory.
+Run any tests specified in the recipe.
+The package is considered _done_ if it passes all the tests, otherwise its moved to `broken/` in the output directory.
 
 After this process, a package is created. This package can be uploaded to somewhere like a custom [prefix.dev](https://prefix.dev) private or public channel.
 
