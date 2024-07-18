@@ -20,7 +20,7 @@
     
     
       
-        <title>Jinja functions - rattler-build</title>
+        <title>Jinja - rattler-build</title>
       
     
     
@@ -57,7 +57,7 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Jinja functions - rattler-build" >
+        <meta  property="og:title"  content="Jinja - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
@@ -73,7 +73,7 @@
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Jinja functions - rattler-build" >
+        <meta  name="twitter:title"  content="Jinja - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
@@ -100,7 +100,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#jinja-functions-that-can-be-used-in-the-recipe" class="md-skip">
+        <a href="#jinja" class="md-skip">
           Skip to content
         </a>
       
@@ -139,7 +139,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Jinja functions
+              Jinja
             
           </span>
         </div>
@@ -1104,7 +1104,7 @@
           
   
   <span class="md-ellipsis">
-    Jinja functions
+    Jinja
   </span>
   
 
@@ -1115,7 +1115,7 @@
         
   
   <span class="md-ellipsis">
-    Jinja functions
+    Jinja
   </span>
   
 
@@ -1215,11 +1215,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#default-jinja-filters" class="md-nav__link">
+  <a href="#filters" class="md-nav__link">
     <span class="md-ellipsis">
-      Default Jinja filters
+      Filters
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Filters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extra-filters-for-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extra filters for recipes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#various-remarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Various remarks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1344,11 +1368,35 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#default-jinja-filters" class="md-nav__link">
+  <a href="#filters" class="md-nav__link">
     <span class="md-ellipsis">
-      Default Jinja filters
+      Filters
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Filters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extra-filters-for-recipes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Extra filters for recipes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#various-remarks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Various remarks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1375,9 +1423,9 @@
   
 
 
-<h1 id="jinja-functions-that-can-be-used-in-the-recipe">Jinja functions that can be used in the recipe<a class="headerlink" href="#jinja-functions-that-can-be-used-in-the-recipe" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> comes with a couple of useful helpers that can be used in the
-recipe.</p>
+<h1 id="jinja">Jinja<a class="headerlink" href="#jinja" title="Permanent link">#</a></h1>
+<p><code>rattler-build</code> comes with a couple of useful <a href="https://jinja.palletsprojects.com">Jinja</a>
+functions and filters that can be used in the recipe.</p>
 <h2 id="functions">Functions<a class="headerlink" href="#functions" title="Permanent link">#</a></h2>
 <h3 id="the-compiler-function">The compiler function<a class="headerlink" href="#the-compiler-function" title="Permanent link">#</a></h3>
 <p>The compiler function can be used to put together a compiler that works for the
@@ -1530,13 +1578,96 @@ error is thrown).</p>
 <li><code>${{ env.exists("MY_ENV_VAR") }}</code> will return <code>true</code> if the environment
   variable <code>MY_ENV_VAR</code> is set and <code>false</code> otherwise.</li>
 </ul>
-<h2 id="default-jinja-filters">Default Jinja filters<a class="headerlink" href="#default-jinja-filters" title="Permanent link">#</a></h2>
-<p>The following Jinja filters are available: <code>lower</code>, <code>upper</code>, indexing into
-characters (e.g. <code>https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version
-}}.tar.gz</code>).</p>
-<p>Navigate to the <a href="https://docs.rs/minijinja/latest/minijinja/filters/index.html#built-in-filters">Minijinja
-documentation</a>
-for a list of all available built-in filters.</p>
+<h2 id="filters">Filters<a class="headerlink" href="#filters" title="Permanent link">#</a></h2>
+<p>A feature of <code>jinja</code> is called "filters". Filters are functions that can be
+applied to variables in a template expression.</p>
+<p>The syntax for a filter is <code>{{ variable | filter_name }}</code>. A filter can also
+take arguments, such as <code>... | replace('foo', 'bar')</code>.</p>
+<p>The following Jinja filters are available, taken from the upstream <code>minijinja</code>
+library:</p>
+<ul>
+<li><code>replace</code>: replace a string with another string (e.g. <code>"{{ 'foo' | replace('oo', 'aa') }}"</code> will return <code>"faa"</code>)</li>
+<li><code>lower</code>: convert a string to lowercase (e.g. <code>"{{ 'FOO' | lower }}"</code> will return <code>"foo"</code>)</li>
+<li><code>upper</code>: convert a string to uppercase (e.g. <code>"{{ 'foo' | upper }}"</code> will
+return <code>"FOO"</code>) - <code>int</code>: convert a string to an integer (e.g. <code>"{{ '42' | int }}"</code> will return <code>42</code>)</li>
+<li><code>abs</code>: return the absolute value of a number (e.g. <code>"{{ -42 | abs }}"</code> will return <code>42</code>)</li>
+<li><code>bool</code>: convert a value to a boolean (e.g. <code>"{{ 'foo' | bool }}"</code> will return <code>true</code>)</li>
+<li><code>default</code>: return a default value if the value is falsy (e.g. <code>"{{ '' | default('foo') }}"</code> will return <code>"foo"</code>)</li>
+<li><code>first</code>: return the first element of a list (e.g. <code>"{{ [1, 2, 3] | first }}"</code>
+will return <code>1</code>) - <code>last</code>: return the last element of a list (e.g. <code>"{{ [1, 2, 3] | last }}"</code> will return <code>3</code>)</li>
+<li><code>length</code>: return the length of a list (e.g. <code>"{{ [1, 2, 3] | length }}"</code> will return <code>3</code>)</li>
+<li><code>list</code>: convert a string to a list (e.g. <code>"{{ 'foo' | list }}"</code> will return <code>['f', 'o', 'o']</code>)</li>
+<li><code>join</code>: join a list with a separator (e.g. <code>"{{ [1, 2, 3] | join('.') }}"</code> will return <code>"1.2.3"</code>)</li>
+<li><code>min</code>: return the minimum value of a list (e.g. <code>"{{ [1, 2, 3] | min }}"</code> will return <code>1</code>)</li>
+<li><code>max</code>: return the maximum value of a list (e.g. <code>"{{ [1, 2, 3] | max }}"</code> will return <code>3</code>)</li>
+<li><code>reverse</code>: reverse a list (e.g. <code>"{{ [1, 2, 3] | reverse }}"</code> will return <code>[3, 2, 1]</code>)</li>
+<li><code>slice</code>: slice a list (e.g. <code>"{{ [1, 2, 3] | slice(1, 2) }}"</code> will return <code>[2]</code>)</li>
+<li><code>batch</code>: This filter works pretty much like <code>slice</code> just the other way round.
+  It returns a list of lists with the given number of items. If you provide a
+  second parameter this is used to fill up missing items.</li>
+<li><code>sort</code>: sort a list (e.g. <code>"{{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
+<li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"{{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
+<li><code>unique</code>: remove duplicates from a list (e.g. <code>"{{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
+<li><code>split</code>: split a string into a list (e.g. <code>"{{ '1.2.3' | split('.') }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
+</ul>
+<details>
+<summary>Removed filters</summary>
+<p>The following filters are removed from the builtins:</p>
+<ul>
+<li><code>attr</code></li>
+<li><code>indent</code></li>
+<li><code>select</code></li>
+<li><code>selectattr</code></li>
+<li><code>dictsort</code></li>
+<li><code>reject</code></li>
+<li><code>rejectattr</code></li>
+<li><code>round</code></li>
+<li><code>map</code></li>
+<li><code>title</code></li>
+<li><code>capitalize</code></li>
+<li><code>urlencode</code></li>
+<li><code>escape</code></li>
+<li><code>pprint</code></li>
+<li><code>safe</code></li>
+<li><code>items</code></li>
+<li><code>float</code></li>
+<li><code>tojson</code></li>
+</ul>
+</details>
+<h3 id="extra-filters-for-recipes">Extra filters for recipes<a class="headerlink" href="#extra-filters-for-recipes" title="Permanent link">#</a></h3>
+<h4 id="the-version_to_buildstring-filter">The <code>version_to_buildstring</code> filter<a class="headerlink" href="#the-version_to_buildstring-filter" title="Permanent link">#</a></h4>
+<ul>
+<li><code>${{ python | version_to_buildstring }}</code> converts a version from the variant
+  to a build string (it removes the <code>.</code> character and takes only the first two
+  elements of the version).</li>
+</ul>
+<p>For example the following:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">cuda</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;11.2.0&quot;</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span><span class="nt">string</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ hash }}_cuda${{ cuda_version | version_to_buildstring }}</span>
+</span></code></pre></div>
+<p>Would evaluate to a <code>abc123_cuda112</code> (assuming the hash was <code>abc123</code>).</p>
+<h3 id="various-remarks">Various remarks<a class="headerlink" href="#various-remarks" title="Permanent link">#</a></h3>
+<h4 id="inline-conditionals-with-jinja">Inline conditionals with Jinja<a class="headerlink" href="#inline-conditionals-with-jinja" title="Permanent link">#</a></h4>
+<p>The new recipe format allows for inline conditionals with Jinja. If they are
+falsey, and no <code>else</code> branch exists, they will render to an empty string (which
+is, for example in a list or dictionary, equivalent to a YAML <code>null</code>).</p>
+<p>When a recipe is rendered, all values that are <code>null</code> must be filtered from the
+resulting YAML.</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ &quot;numpy&quot; if cuda == &quot;yes&quot; }}</span>
+</span></code></pre></div>
+<p>If <code>cuda</code> is not equal to yes, the first item of the host requirements will be
+empty (null) and thus filtered from the final list.</p>
+<p>This must also work for dictionary values. For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; }}</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="c1"># or an `else` branch can be used, of course</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; else 0 }}</span>
+</span></code></pre></div>
 
 
 
