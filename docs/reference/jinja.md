@@ -1,7 +1,7 @@
-# Jinja functions that can be used in the recipe
+# Jinja
 
-`rattler-build` comes with a couple of useful helpers that can be used in the
-recipe.
+`rattler-build` comes with a couple of useful [Jinja](https://jinja.palletsprojects.com)
+functions and filters that can be used in the recipe.
 
 ## Functions
 
@@ -190,12 +190,109 @@ You can also check for the existence of an environment variable:
 - `${{ env.exists("MY_ENV_VAR") }}` will return `true` if the environment
   variable `MY_ENV_VAR` is set and `false` otherwise.
 
-## Default Jinja filters
+## Filters
 
-The following Jinja filters are available: `lower`, `upper`, indexing into
-characters (e.g. `https://myurl.com/{{ name[0] }}/{{ name | lower }}_${{ version
-}}.tar.gz`).
+A feature of `jinja` is called "filters". Filters are functions that can be
+applied to variables in a template expression.
 
-Navigate to the [Minijinja
-documentation](https://docs.rs/minijinja/latest/minijinja/filters/index.html#built-in-filters)
-for a list of all available built-in filters.
+The syntax for a filter is `{{ variable | filter_name }}`. A filter can also
+take arguments, such as `... | replace('foo', 'bar')`.
+
+The following Jinja filters are available, taken from the upstream `minijinja`
+library:
+
+- `replace`: replace a string with another string (e.g. `"{{ 'foo' | replace('oo', 'aa') }}"` will return `"faa"`)
+- `lower`: convert a string to lowercase (e.g. `"{{ 'FOO' | lower }}"` will return `"foo"`)
+- `upper`: convert a string to uppercase (e.g. `"{{ 'foo' | upper }}"` will
+return `"FOO"`) - `int`: convert a string to an integer (e.g. `"{{ '42' | int }}"` will return `42`)
+- `abs`: return the absolute value of a number (e.g. `"{{ -42 | abs }}"` will return `42`)
+- `bool`: convert a value to a boolean (e.g. `"{{ 'foo' | bool }}"` will return `true`)
+- `default`: return a default value if the value is falsy (e.g. `"{{ '' | default('foo') }}"` will return `"foo"`)
+- `first`: return the first element of a list (e.g. `"{{ [1, 2, 3] | first }}"`
+will return `1`) - `last`: return the last element of a list (e.g. `"{{ [1, 2, 3] | last }}"` will return `3`)
+- `length`: return the length of a list (e.g. `"{{ [1, 2, 3] | length }}"` will return `3`)
+- `list`: convert a string to a list (e.g. `"{{ 'foo' | list }}"` will return `['f', 'o', 'o']`)
+- `join`: join a list with a separator (e.g. `"{{ [1, 2, 3] | join('.') }}"` will return `"1.2.3"`)
+- `min`: return the minimum value of a list (e.g. `"{{ [1, 2, 3] | min }}"` will return `1`)
+- `max`: return the maximum value of a list (e.g. `"{{ [1, 2, 3] | max }}"` will return `3`)
+- `reverse`: reverse a list (e.g. `"{{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
+- `slice`: slice a list (e.g. `"{{ [1, 2, 3] | slice(1, 2) }}"` will return `[2]`)
+- `batch`: This filter works pretty much like `slice` just the other way round.
+  It returns a list of lists with the given number of items. If you provide a
+  second parameter this is used to fill up missing items.
+- `sort`: sort a list (e.g. `"{{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
+- `trim`: remove leading and trailing whitespace from a string (e.g. `"{{ ' foo ' | trim }}"` will return `"foo"`)
+- `unique`: remove duplicates from a list (e.g. `"{{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
+- `split`: split a string into a list (e.g. `"{{ '1.2.3' | split('.') }}"` will return `['1', '2', '3']`). By default, splits on whitespace.
+
+??? "Removed filters"
+
+    The following filters are removed from the builtins:
+
+    - `attr`
+    - `indent`
+    - `select`
+    - `selectattr`
+    - `dictsort`
+    - `reject`
+    - `rejectattr`
+    - `round`
+    - `map`
+    - `title`
+    - `capitalize`
+    - `urlencode`
+    - `escape`
+    - `pprint`
+    - `safe`
+    - `items`
+    - `float`
+    - `tojson`
+
+### Extra filters for recipes
+
+#### The `version_to_buildstring` filter
+
+- `${{ python | version_to_buildstring }}` converts a version from the variant
+  to a build string (it removes the `.` character and takes only the first two
+  elements of the version).
+
+For example the following:
+
+```yaml
+context:
+  cuda: "11.2.0"
+
+build:
+  string: ${{ hash }}_cuda${{ cuda_version | version_to_buildstring }}
+```
+
+Would evaluate to a `abc123_cuda112` (assuming the hash was `abc123`).
+
+### Various remarks
+
+#### Inline conditionals with Jinja
+
+The new recipe format allows for inline conditionals with Jinja. If they are
+falsey, and no `else` branch exists, they will render to an empty string (which
+is, for example in a list or dictionary, equivalent to a YAML `null`).
+
+When a recipe is rendered, all values that are `null` must be filtered from the
+resulting YAML.
+
+```yaml
+requirements:
+  host:
+    - ${{ "numpy" if cuda == "yes" }}
+```
+
+If `cuda` is not equal to yes, the first item of the host requirements will be
+empty (null) and thus filtered from the final list.
+
+This must also work for dictionary values. For example:
+
+```yaml
+build:
+  number: ${{ 100 if cuda == "yes" }}
+  # or an `else` branch can be used, of course
+  number: ${{ 100 if cuda == "yes" else 0 }}
+```

@@ -135,7 +135,7 @@ nav:
   - References:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
-      - Jinja functions: reference/jinja.md
+      - Jinja: reference/jinja.md
 
 plugins:
   - search
