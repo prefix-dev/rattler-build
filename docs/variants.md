@@ -31,13 +31,6 @@ numpy:
 - "1.20"
 ```
 
-We can pass a variant configuration file to `rattler-build` using a command like
-the following:
-
-```sh
-rattler-build build --variant-config ./variants.yaml --recipe myrecipe.yaml
-```
-
 If we have a recipe, that has a `build`, `host` or `run` dependency on `python`
 we will build multiple variants of this package, one for each configured
 `python` version ("3.8", "3.9" and "3.10").
@@ -63,6 +56,16 @@ requirements:
 Note that variants are _only_ applied if the requirement doesn't specify any
 constraints. If the requirement would be `python >3.8,<3.10` then the variant entry
 would be ignored.
+
+## Automatic `variants.yaml` discovery
+`rattler-build` automatically includes the variant configuration from a `variants.yaml` file next to a recipe.
+Use the `--ignore-recipe-variants` option to disable automatic discovery of `variants.yaml` files next to the recipes.
+
+To include a variant config file from another location or include multiple configuration files use the `--variant-config` option:
+
+```sh
+rattler-build build --variant-config ~/user_variants.yaml --variant-config /opt/rattler-build/global_variants.yaml --recipe myrecipe.yaml
+```
 
 ## Package hash from variant
 

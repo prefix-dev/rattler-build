@@ -179,21 +179,26 @@ pub async fn get_build_output(
 
     // Check if there is a `variants.yaml` file next to the recipe that we should
     // potentially use.
-    let mut variant_configs;
-    let variant_configs = if let Some(variant_path) = recipe_path
+    let mut variant_configs = None;
+    if let Some(variant_path) = recipe_path
         .parent()
         .map(|parent| parent.join(consts::VARIANTS_CONFIG_FILE))
     {
         if variant_path.is_file() {
-            variant_configs = args.variant_config.clone();
-            variant_configs.push(variant_path);
-            &variant_configs
-        } else {
-            &args.variant_config
+            if !args.ignore_recipe_variants {
+                tracing::info!("Including variants from {}", variant_path.display());
+                let mut configs = args.variant_config.clone();
+                configs.push(variant_path);
+                variant_configs = Some(configs);
+            } else {
+                tracing::debug!(
+                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
+                    variant_path.display()
+                );
+            }
         }
-    } else {
-        &args.variant_config
     };
+    let variant_configs = variant_configs.as_ref().unwrap_or(&args.variant_config);
 
     let variant_config =
         VariantConfig::from_files(variant_configs, &selector_config).into_diagnostic()?;

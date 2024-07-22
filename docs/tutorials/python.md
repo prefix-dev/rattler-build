@@ -75,13 +75,13 @@ We will build a package for `numpy` – which contains compiled code.
 Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly.
 The best way to do this is with a "variant_config.yaml" file:
 
-```yaml title="variant_config.yaml"
+```yaml title="variants.yaml"
 python:
   - 3.11
   - 3.12
 ```
 
-This will replace any `python` found in the recipe with the versions specified in the `variant_config.yaml` file.
+This will replace any `python` found in the recipe with the versions specified in the `variants.yaml` file.
 
 ```yaml title="recipe.yaml"
 context:
@@ -174,11 +174,10 @@ for /f %%f in ('dir /b /S .\dist') do (
 ```
 
 ### Running the recipe
-Running this recipe with the variant config file will build a a total of 2 `numpy` packages:
+Running this recipe with the variant config file will build a total of 2 `numpy` packages:
 
 ```bash
-rattler-build build --recipe ./numpy \
-  --variant-config ./numpy/variant_config.yaml
+rattler-build build --recipe ./numpy
 ```
 
 At the beginning of the build process, `rattler-build` will print the following message to show you the variants it found:
