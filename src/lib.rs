@@ -45,6 +45,7 @@ use build::{run_build, skip_existing};
 use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
+use futures::FutureExt;
 use hash::HashInfo;
 use metadata::{
     BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
@@ -344,7 +345,7 @@ pub async fn run_build_from_args(
     let mut outputs: Vec<metadata::Output> = Vec::new();
 
     for output in skip_existing(build_output, &tool_config).await? {
-        let output = match run_build(output, &tool_config).await {
+        let output = match run_build(output, &tool_config).boxed_local().await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output

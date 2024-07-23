@@ -1,7 +1,13 @@
-use comfy_table::Table;
+use std::{
+    future::IntoFuture,
+    path::Path,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use indicatif::ProgressStyle;
-use indicatif::{HumanBytes, ProgressBar};
+use comfy_table::Table;
+use futures::FutureExt;
+use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
 use rattler_repodata_gateway::Gateway;
@@ -9,9 +15,6 @@ use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl,
 use url::Url;
 
 use crate::tool_configuration;
-use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 fn print_as_table(packages: &Vec<RepoDataRecord>) {
     let mut table = Table::new();
@@ -57,8 +60,9 @@ pub async fn create_environment(
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
-    // Parse the specs from the command line. We do this explicitly instead of allow clap to deal
-    // with this because we need to parse the `channel_config` when parsing matchspecs.
+    // Parse the specs from the command line. We do this explicitly instead of allow
+    // clap to deal with this because we need to parse the `channel_config` when
+    // parsing matchspecs.
 
     tracing::info!("\nResolving environment for:\n");
     tracing::info!("  Platform: {}", target_platform);
@@ -76,9 +80,9 @@ pub async fn create_environment(
 
     let repo_data = load_repodatas(channels, target_platform, specs, tool_configuration).await?;
 
-    // Determine virtual packages of the system. These packages define the capabilities of the
-    // system. Some packages depend on these virtual packages to indicate compatibility with the
-    // hardware of the system.
+    // Determine virtual packages of the system. These packages define the
+    // capabilities of the system. Some packages depend on these virtual
+    // packages to indicate compatibility with the hardware of the system.
     let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
         "determining virtual packages",
         move || {
@@ -91,9 +95,10 @@ pub async fn create_environment(
         },
     )?;
 
-    // Now that we parsed and downloaded all information, construct the packaging problem that we
-    // need to solve. We do this by constructing a `SolverProblem`. This encapsulates all the
-    // information required to be able to solve the problem.
+    // Now that we parsed and downloaded all information, construct the packaging
+    // problem that we need to solve. We do this by constructing a
+    // `SolverProblem`. This encapsulates all the information required to be
+    // able to solve the problem.
     let solver_task = SolverTask {
         virtual_packages,
         specs: specs.to_vec(),
@@ -102,8 +107,9 @@ pub async fn create_environment(
         ..SolverTask::from_iter(&repo_data)
     };
 
-    // Next, use a solver to solve this specific problem. This provides us with all the operations
-    // we need to apply to our environment to bring it up to date.
+    // Next, use a solver to solve this specific problem. This provides us with all
+    // the operations we need to apply to our environment to bring it up to
+    // date.
     let required_packages = tool_configuration
         .fancy_log_handler
         .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
@@ -211,7 +217,8 @@ impl GatewayReporterBuilder {
     }
 }
 
-/// Load repodata from channels. Only includes necessary records for platform & specs.
+/// Load repodata from channels. Only includes necessary records for platform &
+/// specs.
 pub async fn load_repodatas(
     channels: &[Url],
     target_platform: &Platform,
@@ -221,7 +228,8 @@ pub async fn load_repodatas(
     let cache_dir = rattler::default_cache_dir()?;
     let download_client = tool_configuration.client.clone();
 
-    // Get the package names from the matchspecs so we can only load the package records that we need.
+    // Get the package names from the matchspecs so we can only load the package
+    // records that we need.
     let gateway = Gateway::builder()
         .with_cache_dir(cache_dir.join("repodata"))
         .with_client(download_client.clone())
@@ -264,6 +272,8 @@ pub async fn load_repodatas(
                 .finish(),
         )
         .recursive(true)
+        .into_future()
+        .boxed()
         .await?;
 
     tool_configuration
