@@ -615,6 +615,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#automatic-variantsyaml-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic variants.yaml discovery
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-hash-from-variant" class="md-nav__link">
     <span class="md-ellipsis">
       Package hash from variant
@@ -1247,6 +1256,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#automatic-variantsyaml-discovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      Automatic variants.yaml discovery
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#package-hash-from-variant" class="md-nav__link">
     <span class="md-ellipsis">
       Package hash from variant
@@ -1363,28 +1381,30 @@ For example:</p>
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;1.12&quot;</span>
 </span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;1.20&quot;</span>
 </span></code></pre></div>
-<p>We can pass a variant configuration file to <code>rattler-build</code> using a command like
-the following:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--variant-config<span class="w"> </span>./variants.yaml<span class="w"> </span>--recipe<span class="w"> </span>myrecipe.yaml
-</span></code></pre></div>
 <p>If we have a recipe, that has a <code>build</code>, <code>host</code> or <code>run</code> dependency on <code>python</code>
 we will build multiple variants of this package, one for each configured
 <code>python</code> version ("3.8", "3.9" and "3.10").</p>
 <p>For example:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># ...</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span></code></pre></div>
+<p>... will be rendered as (for the first variant):</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># ...</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
-</span></code></pre></div>
-<p>... will be rendered as (for the first variant):</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># ...</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python 3.8*</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python 3.8*</span>
 </span></code></pre></div>
 <p>Note that variants are <em>only</em> applied if the requirement doesn't specify any
 constraints. If the requirement would be <code>python &gt;3.8,&lt;3.10</code> then the variant entry
 would be ignored.</p>
+<h2 id="automatic-variantsyaml-discovery">Automatic <code>variants.yaml</code> discovery<a class="headerlink" href="#automatic-variantsyaml-discovery" title="Permanent link">#</a></h2>
+<p><code>rattler-build</code> automatically includes the variant configuration from a <code>variants.yaml</code> file next to a recipe.
+Use the <code>--ignore-recipe-variants</code> option to disable automatic discovery of <code>variants.yaml</code> files next to the recipes.</p>
+<p>To include a variant config file from another location or include multiple configuration files use the <code>--variant-config</code> option:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--variant-config<span class="w"> </span>~/user_variants.yaml<span class="w"> </span>--variant-config<span class="w"> </span>/opt/rattler-build/global_variants.yaml<span class="w"> </span>--recipe<span class="w"> </span>myrecipe.yaml
+</span></code></pre></div>
 <h2 id="package-hash-from-variant">Package hash from variant<a class="headerlink" href="#package-hash-from-variant" title="Permanent link">#</a></h2>
 <p>You might have wondered what the role of the build string is. The build string is (if not explicitly set) computed from the variant configuration.
 It serves as a mechanism to discern different build configurations that produce a package with the same name and version.</p>
