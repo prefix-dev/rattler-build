@@ -3,22 +3,6 @@
 We're using `rattler-build` to build a Rust package for the `cargo-edit` utility.
 This utility manages Cargo dependencies from the command line.
 
-To configure the Rust compiler, we add a `variant_config.yaml` file to the package:
-
-```yaml title="variant_config.yaml"
-rust_compiler: rust
-```
-
-This will tell `rattler-build` what to insert for the `${{ compiler('rust') }}` Jinja function.
-
-!!! note
-    The `${{ compiler(...) }}` functions are very useful in the context of cross-compilation.
-    When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the `target_platform`.
-    The "rendered" compiler will look like `rust_linux-64` when you are targeting the `linux-64` platform.
-
-    You can read more about this in the [cross-compilation](../compilers.md) section.
-
-
 ```yaml title="recipe.yaml"
 context:
   version: "0.11.9"
@@ -55,6 +39,13 @@ about:
   summary: "A utility for managing cargo dependencies from the command line."
 ```
 
+!!! note
+    The `${{ compiler(...) }}` functions are very useful in the context of cross-compilation.
+    When the function is evaluated it will insert the correct compiler (as selected with the variant config) as well the `target_platform`.
+    The "rendered" compiler will look like `rust_linux-64` when you are targeting the `linux-64` platform.
+
+    You can read more about this in the [cross-compilation](../compilers.md) section.
+
 1. The `cargo-bundle-licenses` utility is used to bundle all the licenses of the dependencies into a `THIRDPARTY.yml` file.
    This file is then included in the package. You should always include this file in your package when you are redistributing it.
 2. Running scripts in `bash` or `cmd.exe` to test the package build well, expects an exit code of `0` to pass the test.
@@ -64,6 +55,5 @@ To build this recipe, simply run:
 
 ```bash
 rattler-build build \
-    --recipe ./cargo-edit/recipe.yaml \
-    --variant-config ./cargo-edit/variant_config.yaml
+    --recipe ./cargo-edit/recipe.yaml
 ```

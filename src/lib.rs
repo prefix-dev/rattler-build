@@ -22,6 +22,7 @@ pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
 
+mod consts;
 mod env_vars;
 pub mod hash;
 mod linux;
@@ -33,41 +34,36 @@ mod unix;
 pub mod upload;
 mod windows;
 
-use build::skip_existing;
-
-use dunce::canonicalize;
-use fs_err as fs;
-use metadata::Output;
-use miette::{IntoDiagnostic, WrapErr};
-use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
-use rattler_solve::{ChannelPriority, SolveStrategy};
-use recipe::parser::Dependency;
 use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
-use tool_configuration::Configuration;
 
-use {
-    build::run_build,
-    console_utils::LoggingOutputHandler,
-    hash::HashInfo,
-    metadata::{
-        BuildConfiguration, BuildSummary, Directories, PackageIdentifier, PackagingSettings,
-    },
-    opt::*,
-    package_test::TestConfiguration,
-    recipe::{
-        parser::{find_outputs_from_src, Recipe},
-        ParsingError,
-    },
-    selectors::SelectorConfig,
-    system_tools::SystemTools,
-    variant_config::{ParseErrors, VariantConfig},
+use build::{run_build, skip_existing};
+use console_utils::LoggingOutputHandler;
+use dunce::canonicalize;
+use fs_err as fs;
+use futures::FutureExt;
+use hash::HashInfo;
+use metadata::{
+    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
 };
+use miette::{IntoDiagnostic, WrapErr};
+use opt::*;
+use package_test::TestConfiguration;
+use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use rattler_solve::{ChannelPriority, SolveStrategy};
+use recipe::{
+    parser::{find_outputs_from_src, Dependency, Recipe},
+    ParsingError,
+};
+use selectors::SelectorConfig;
+use system_tools::SystemTools;
+use tool_configuration::Configuration;
+use variant_config::{ParseErrors, VariantConfig};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -177,13 +173,36 @@ pub async fn get_build_output(
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
-
     let enter = span.enter();
+
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
 
+    // Check if there is a `variants.yaml` file next to the recipe that we should
+    // potentially use.
+    let mut variant_configs = None;
+    if let Some(variant_path) = recipe_path
+        .parent()
+        .map(|parent| parent.join(consts::VARIANTS_CONFIG_FILE))
+    {
+        if variant_path.is_file() {
+            if !args.ignore_recipe_variants {
+                tracing::info!("Including variants from {}", variant_path.display());
+                let mut configs = args.variant_config.clone();
+                configs.push(variant_path);
+                variant_configs = Some(configs);
+            } else {
+                tracing::debug!(
+                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
+                    variant_path.display()
+                );
+            }
+        }
+    };
+    let variant_configs = variant_configs.as_ref().unwrap_or(&args.variant_config);
+
     let variant_config =
-        VariantConfig::from_files(&args.variant_config, &selector_config).into_diagnostic()?;
+        VariantConfig::from_files(variant_configs, &selector_config).into_diagnostic()?;
 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
@@ -326,7 +345,7 @@ pub async fn run_build_from_args(
     let mut outputs: Vec<metadata::Output> = Vec::new();
 
     for output in skip_existing(build_output, &tool_config).await? {
-        let output = match run_build(output, &tool_config).await {
+        let output = match run_build(output, &tool_config).boxed_local().await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output
@@ -416,7 +435,8 @@ pub async fn rebuild_from_args(
 ) -> miette::Result<()> {
     tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
-    // and then run the rendered recipe with the same arguments as the original build
+    // and then run the rendered recipe with the same arguments as the original
+    // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
     rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
@@ -586,7 +606,8 @@ pub fn sort_build_outputs_topologically(
             miette::miette!("The package '{}' was not found in the outputs", up_to)
         })?;
 
-        // Perform a DFS post-order traversal from the "up-to" node to find all dependencies
+        // Perform a DFS post-order traversal from the "up-to" node to find all
+        // dependencies
         let mut dfs = DfsPostOrder::new(&graph, up_to_index);
         let mut sorted_indices = Vec::new();
         while let Some(nx) = dfs.next(&graph) {

@@ -187,7 +187,7 @@ jobs:
       - name: Run tests
         shell: bash
         if: matrix.target != 'aarch64-apple-darwin'
-        run: ${{ matrix.use-cross && 'cross' || 'cargo' }} test --locked --target=${{ matrix.target }} ${{ steps.options.outputs.cargo-build-options }} ${{ steps.options.outputs.cargo-test-options }}
+        run: ${{ matrix.use-cross && 'cross' || 'cargo' }} test --release --locked --target=${{ matrix.target }} ${{ steps.options.outputs.cargo-build-options }} ${{ steps.options.outputs.cargo-test-options }}
 
       - name: Create tarball
         id: package

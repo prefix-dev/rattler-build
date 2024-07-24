@@ -106,6 +106,13 @@ Build a package from a recipe
 	Variant configuration files for the build
 
 
+- `--ignore-recipe-variants`
+
+	Do not read the `variants.yaml` file next to a recipe
+
+	- Possible values: `true`, `false`
+
+
 - `--render-only`
 
 	Render the recipe files without executing the build

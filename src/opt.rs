@@ -274,6 +274,10 @@ pub struct BuildOpts {
     #[arg(short = 'm', long)]
     pub variant_config: Vec<PathBuf>,
 
+    /// Do not read the `variants.yaml` file next to a recipe.
+    #[arg(long)]
+    pub ignore_recipe_variants: bool,
+
     /// Render the recipe files without executing the build.
     #[arg(long)]
     pub render_only: bool,
