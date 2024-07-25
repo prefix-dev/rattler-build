@@ -8,6 +8,7 @@ use std::{
 use comfy_table::Table;
 use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
 use rattler_repodata_gateway::Gateway;
@@ -16,7 +17,7 @@ use url::Url;
 
 use crate::tool_configuration;
 
-fn print_as_table(packages: &Vec<RepoDataRecord>) {
+fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
     table
         .load_preset(comfy_table::presets::UTF8_FULL_CONDENSED)
@@ -26,7 +27,10 @@ fn print_as_table(packages: &Vec<RepoDataRecord>) {
         // "License",
     ]);
 
-    for package in packages {
+    for package in packages
+        .iter()
+        .sorted_by_key(|p| p.package_record.name.as_normalized())
+    {
         let channel_short = if package.channel.contains('/') {
             package
                 .channel
