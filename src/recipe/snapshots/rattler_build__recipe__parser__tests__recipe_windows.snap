@@ -441,4 +441,9 @@ Recipe {
         ),
         prelink_message: None,
     },
+    extra: {
+        "recipe-maintainers": Sequence [
+            String("some-maintainer"),
+        ],
+    },
 }

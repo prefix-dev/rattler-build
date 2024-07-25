@@ -236,7 +236,7 @@ impl Serialize for RenderedScalarNode {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.value)
+        self.value.serialize(serializer)
     }
 }
 

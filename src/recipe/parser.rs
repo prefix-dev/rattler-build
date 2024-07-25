@@ -2,7 +2,7 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
-use std::{borrow::Cow, collections::BTreeMap};
+use std::borrow::Cow;
 
 use indexmap::IndexMap;
 use minijinja::Value;
