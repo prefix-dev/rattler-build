@@ -4,6 +4,7 @@
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use std::{borrow::Cow, collections::BTreeMap};
 
+use indexmap::IndexMap;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -79,8 +80,8 @@ pub struct Recipe {
     #[serde(default, skip_serializing_if = "About::is_default")]
     pub about: About,
     /// Extra information as a map with string keys and any value
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub extra: BTreeMap<String, serde_yaml::Value>,
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub extra: IndexMap<String, serde_yaml::Value>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -214,7 +215,7 @@ impl Recipe {
         let mut tests = Vec::default();
         let mut about = About::default();
         let mut cache = None;
-        let mut extra = BTreeMap::default();
+        let mut extra = IndexMap::default();
 
         rendered_node
             .iter()
