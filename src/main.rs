@@ -1,8 +1,7 @@
 //! This is the main entry point for the `rattler-build` binary.
 
 use std::{
-    env,
-    fs::{self, File},
+    fs::File,
     io::{self, IsTerminal},
 };
 
@@ -15,8 +14,8 @@ use rattler_build::{
     rebuild_from_args,
     recipe_generator::generate_recipe,
     run_build_from_args, run_test_from_args, sort_build_outputs_topologically, upload_from_args,
-    utils::get_current_timestamp,
 };
+use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
@@ -56,15 +55,12 @@ async fn main() -> miette::Result<()> {
         }
         Some(SubCommands::Build(build_args)) => {
             let mut recipe_paths = Vec::new();
+            let temp_dir = tempdir().into_diagnostic()?;
             if !std::io::stdin().is_terminal()
                 && build_args.recipe.len() == 1
                 && get_recipe_path(&build_args.recipe[0]).is_err()
             {
-                let package_name =
-                    format!("{}-{}", env!("CARGO_PKG_NAME"), get_current_timestamp()?);
-                let temp_dir = env::temp_dir().join(package_name);
-                fs::create_dir(&temp_dir).into_diagnostic()?;
-                let recipe_path = temp_dir.join("recipe.yaml");
+                let recipe_path = temp_dir.path().join("recipe.yaml");
                 io::copy(
                     &mut io::stdin(),
                     &mut File::create(&recipe_path).into_diagnostic()?,
