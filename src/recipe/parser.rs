@@ -2,7 +2,7 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
@@ -78,6 +78,9 @@ pub struct Recipe {
     /// The information about the package
     #[serde(default, skip_serializing_if = "About::is_default")]
     pub about: About,
+    /// Extra information as a map with string keys and any value
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extra: BTreeMap<String, Value>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -211,6 +214,7 @@ impl Recipe {
         let mut tests = Vec::default();
         let mut about = About::default();
         let mut cache = None;
+        let mut extra = BTreeMap::default();
 
         rendered_node
             .iter()
@@ -244,7 +248,14 @@ impl Recipe {
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "context" => {}
-                    "extra" => {}
+                    "extra" => extra = value.as_mapping().ok_or_else(|| {
+                                            vec![_partialerror!(
+                                                *value.span(),
+                                                ErrorKind::ExpectedMapping,
+                                                label = format!("expected a mapping for `{key_str}`")
+                                            )]
+                                        })
+                                        .and_then(|m| m.try_convert(key_str))?,
                     invalid_key => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -287,6 +298,7 @@ impl Recipe {
             requirements,
             tests,
             about,
+            extra,
         };
 
         Ok(recipe)
