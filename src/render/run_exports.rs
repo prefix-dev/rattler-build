@@ -25,6 +25,9 @@ impl IgnoreRunExports {
         from_env: &str,
     ) -> Result<FilteredRunExports, ParseMatchSpecError> {
         let mut run_export_map = run_export_map.clone();
+        println!("Self: {:?}", self);
+        println!("run_export_map: {:?}", run_export_map);
+        println!("Retaining self.from_package(): {:?}", self.from_package());
         run_export_map.retain(|name, _| !self.from_package().contains(name));
 
         let mut filtered_run_exports = FilteredRunExports::default();

@@ -754,7 +754,7 @@ pub(crate) async fn resolve_dependencies(
         build_run_exports.extend(build_env.run_exports(true));
     }
 
-    let ignore_run_exports = output.recipe.requirements.ignore_run_exports();
+    let ignore_run_exports = requirements.ignore_run_exports();
     let build_run_exports = ignore_run_exports.filter(&build_run_exports, "build")?;
     host_env_specs.extend(build_run_exports.strong.iter().cloned());
 
@@ -849,7 +849,7 @@ pub(crate) async fn resolve_dependencies(
         .as_ref()
         .and_then(|cache| cache.host.as_ref().map(|b| b.run_exports(true)))
         .unwrap_or_default();
-
+    println!("Host run exports ...: {:?}", host_run_exports);
     // Add in the host run exports from the current output
     if let Some(host_env) = &host_env {
         host_run_exports.extend(host_env.run_exports(true));
@@ -857,6 +857,7 @@ pub(crate) async fn resolve_dependencies(
 
     // And filter the run exports
     let host_run_exports = ignore_run_exports.filter(&host_run_exports, "host")?;
+    println!("Host run exports after filter ...: {:?}", host_run_exports);
 
     // add the host run exports to the run dependencies
     if output.target_platform() == &Platform::NoArch {
@@ -875,7 +876,7 @@ pub(crate) async fn resolve_dependencies(
     if let Some(cache) = &output.finalized_cache_dependencies {
         // add in the run exports from the cache
         // filter run dependencies that came from run exports
-        let ignore_run_exports = output.recipe.requirements.ignore_run_exports();
+        let ignore_run_exports = requirements.ignore_run_exports();
         // Note: these run exports are already filtered
         let _cache_run_exports = cache.run.depends.iter().filter(|c| match c {
             DependencyInfo::RunExport(run_export) => {
