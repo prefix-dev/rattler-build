@@ -239,7 +239,7 @@ impl Interpreter for NuShellInterpreter {
         .unwrap();
 
         let host_activation_variables = host_prefix_activator
-            .run_activation(activation_vars)
+            .run_activation(activation_vars, None)
             .unwrap();
 
         // Overwrite the current environment variables with the one from the activated host environment.
@@ -261,7 +261,7 @@ impl Interpreter for NuShellInterpreter {
             };
 
             let build_activation = build_prefix_activator
-                .run_activation(activation_vars)
+                .run_activation(activation_vars, None)
                 .unwrap();
 
             activation_variables.extend(build_activation);
