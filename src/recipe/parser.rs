@@ -52,7 +52,7 @@ pub use self::{
     },
 };
 
-use super::custom_yaml::Node;
+use crate::recipe::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,7 +80,7 @@ pub struct Recipe {
     pub about: About,
     /// Extra information as a map with string keys and any value
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub extra: BTreeMap<String, Value>,
+    pub extra: BTreeMap<String, serde_yaml::Value>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {

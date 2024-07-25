@@ -1219,3 +1219,15 @@ where
         Ok(map)
     }
 }
+
+impl TryConvertNode<serde_yaml::Value> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<serde_yaml::Value, Vec<PartialParsingError>> {
+        serde_yaml::to_value(self).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = err.to_string()
+            )]
+        })
+    }
+}
