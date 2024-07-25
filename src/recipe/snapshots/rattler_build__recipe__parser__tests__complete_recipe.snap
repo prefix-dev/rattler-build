@@ -162,3 +162,8 @@ about:
   - LICENSE
   summary: A summary
   description: More description
+extra:
+  recipe-maintainers:
+  - some-maintainer
+  random_keys:
+    with: random_value

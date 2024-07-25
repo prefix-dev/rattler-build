@@ -6,6 +6,7 @@ use std::{fmt, hash::Hash, ops};
 
 use indexmap::IndexMap;
 use marked_yaml::{types::MarkedScalarNode, Span};
+use serde::{Serialize, Serializer};
 
 use crate::{
     _partialerror,
@@ -55,6 +56,20 @@ pub enum RenderedNode {
     /// This is a special case of a scalar node, but is treated as its own
     /// type here for convenience.
     Null(RenderedScalarNode),
+}
+
+impl Serialize for RenderedNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            RenderedNode::Scalar(node) => node.serialize(serializer),
+            RenderedNode::Mapping(node) => node.serialize(serializer),
+            RenderedNode::Sequence(node) => node.serialize(serializer),
+            RenderedNode::Null(node) => node.serialize(serializer),
+        }
+    }
 }
 
 impl RenderedNode {
@@ -214,6 +229,15 @@ impl TryFrom<&marked_yaml::Node> for RenderedNode {
 pub struct RenderedScalarNode {
     span: marked_yaml::Span,
     value: String,
+}
+
+impl Serialize for RenderedScalarNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
 }
 
 impl RenderedScalarNode {
@@ -396,6 +420,15 @@ pub struct RenderedSequenceNode {
     value: Vec<RenderedNode>,
 }
 
+impl Serialize for RenderedSequenceNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
+}
+
 impl RenderedSequenceNode {
     pub fn new(span: marked_yaml::Span, value: Vec<RenderedNode>) -> Self {
         Self { span, value }
@@ -484,6 +517,15 @@ impl fmt::Debug for RenderedSequenceNode {
 pub struct RenderedMappingNode {
     span: marked_yaml::Span,
     value: IndexMap<RenderedScalarNode, RenderedNode>,
+}
+
+impl Serialize for RenderedMappingNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
 }
 
 impl RenderedMappingNode {

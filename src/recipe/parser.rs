@@ -4,6 +4,7 @@
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use std::borrow::Cow;
 
+use indexmap::IndexMap;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -52,7 +53,7 @@ pub use self::{
     },
 };
 
-use super::custom_yaml::Node;
+use crate::recipe::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,6 +79,9 @@ pub struct Recipe {
     /// The information about the package
     #[serde(default, skip_serializing_if = "About::is_default")]
     pub about: About,
+    /// Extra information as a map with string keys and any value
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub extra: IndexMap<String, serde_yaml::Value>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -211,6 +215,7 @@ impl Recipe {
         let mut tests = Vec::default();
         let mut about = About::default();
         let mut cache = None;
+        let mut extra = IndexMap::default();
 
         rendered_node
             .iter()
@@ -244,7 +249,14 @@ impl Recipe {
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "context" => {}
-                    "extra" => {}
+                    "extra" => extra = value.as_mapping().ok_or_else(|| {
+                                            vec![_partialerror!(
+                                                *value.span(),
+                                                ErrorKind::ExpectedMapping,
+                                                label = format!("expected a mapping for `{key_str}`")
+                                            )]
+                                        })
+                                        .and_then(|m| m.try_convert(key_str))?,
                     invalid_key => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -287,6 +299,7 @@ impl Recipe {
             requirements,
             tests,
             about,
+            extra,
         };
 
         Ok(recipe)

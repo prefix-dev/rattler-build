@@ -1219,3 +1219,32 @@ where
         Ok(map)
     }
 }
+
+impl<K, V> TryConvertNode<IndexMap<K, V>> for RenderedMappingNode
+where
+    K: Ord + Display + Hash,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<IndexMap<K, V>, Vec<PartialParsingError>> {
+        let mut map = IndexMap::new();
+        for (key, value) in self.iter() {
+            let key = key.try_convert(name)?;
+            let value = value.try_convert(name)?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+}
+
+impl TryConvertNode<serde_yaml::Value> for RenderedNode {
+    fn try_convert(&self, _name: &str) -> Result<serde_yaml::Value, Vec<PartialParsingError>> {
+        serde_yaml::to_value(self).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                label = err.to_string()
+            )]
+        })
+    }
+}
