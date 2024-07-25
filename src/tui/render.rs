@@ -8,6 +8,7 @@ use crossterm::event::{
 use miette::IntoDiagnostic;
 use ratatui::layout::Position;
 use ratatui::prelude::*;
+use ratatui::style::Stylize;
 use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
     layout::Alignment,

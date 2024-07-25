@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.18.1"
+version = "0.18.2"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -21,40 +21,40 @@ tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input
 generate-cli-docs = ["clap-markdown"]
 
 [dependencies]
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.26.4", default-features = false, features = ["cli-tools", "indicatif"] }
-rattler_conda_types = { version = "0.25.2", default-features = false }
-rattler_digest = { version = "0.19.4", default-features = false }
-rattler_index = { version = "0.19.17", default-features = false }
-rattler_networking = { version = "0.20.8", default-features = false }
-rattler_repodata_gateway = { version = "0.20.5", default-features = false, features = [
+rattler = { version = "0.27.2", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler_conda_types = { version = "0.26.3", default-features = false }
+rattler_digest = { version = "0.19.5", default-features = false }
+rattler_index = { version = "0.19.21", default-features = false }
+rattler_networking = { version = "0.20.10", default-features = false }
+rattler_repodata_gateway = { version = "0.21.3", default-features = false, features = [
     "gateway",
 ] }
-rattler_shell = { version = "0.20.9", default-features = false, features = [
+rattler_shell = { version = "0.21.3", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.24.2", default-features = false, features = [
+rattler_solve = { version = "0.25.3", default-features = false, features = [
     "resolvo",
     "serde"
 ] }
-rattler_virtual_packages = { version = "0.19.15", default-features = false }
-rattler_package_streaming = { version = "0.21.3", default-features = false }
+rattler_virtual_packages = { version = "0.19.20", default-features = false }
+rattler_package_streaming = { version = "0.21.7", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
-serde_json = "1.0.118"
+serde_json = "1.0.120"
 reqwest = { version = "0.12.5", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.38.0", features = ["rt", "macros", "rt-multi-thread"] }
+tokio = { version = "1.39.1", features = ["rt", "macros", "rt-multi-thread"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
-serde_with = "3.8.1"
+serde_with = "3.9.0"
 url = "2.5.2"
 tracing = "0.1.40"
-clap = { version = "4.5.7", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.10", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=1.0.14", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -65,7 +65,7 @@ tracing-subscriber = { version = "0.3.18", features = [
     "ansi",
     "json"
 ] }
-marked-yaml = { version = "0.6.1" }
+marked-yaml = { version = "0.7.1" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
 goblin = "0.8.2"
@@ -75,7 +75,7 @@ comfy-table = "7.1.1"
 futures = "0.3.30"
 indicatif = "0.17.8"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
-thiserror = "1.0.61"
+thiserror = "1.0.63"
 tempfile = "3.10.1"
 chrono = "0.4.38"
 sha1 = "0.10.6"
@@ -89,12 +89,12 @@ indexmap = "2.2.6"
 dunce = "1.0.4"
 fs-err = "2.11.0"
 which = "6.0.1"
-clap_complete = "4.5.6"
+clap_complete = "4.5.9"
 clap_complete_nushell = "4.5.2"
 tokio-util = "0.7.11"
 
 tar = "0.4.41"
-zip = { version = "2.1.3", default-features = false, features = [
+zip = { version = "2.1.5", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
@@ -102,20 +102,20 @@ bzip2 = "0.4.4"
 base64 = "0.22.1"
 flate2 = "1.0.30"
 xz2 = "0.1.7"
-zstd = "0.13.1"
-toml = "0.8.14"
+zstd = "0.13.2"
+toml = "0.8.15"
 memmap2 = "0.9.4"
-reqwest-middleware = "0.3.1"
+reqwest-middleware = "0.3.2"
 rattler_installs_packages = { version = "0.9.0", default-features = false }
 async-once-cell = "0.5.3"
 terminal_size = "0.3.0"
 memchr = "2.7.4"
 ratatui = { version = "0.26.3", optional = true }
 crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
-ansi-to-tui = { version = "4.0.1", optional = true }
-throbber-widgets-tui = { version = "0.5.0", optional = true }
-tui-input = { version = "0.8.0", optional = true }
-reflink-copy = "0.1.18"
+ansi-to-tui = { version = "4.1.0", optional = true }
+throbber-widgets-tui = { version = "0.5", optional = true }
+tui-input = { version = "0.9.0", optional = true }
+reflink-copy = "0.1.19"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.10.5"
