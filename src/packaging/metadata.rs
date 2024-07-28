@@ -352,14 +352,14 @@ impl Output {
             if !p.exists() {
                 if p.is_symlink() {
                     tracing::warn!(
-                        "Symlink target does not exist: {:?} -> {:?}",
+                        "symlink target not part of _this_ package: {:?} -> {:?}",
                         &p,
                         fs::read_link(p)?
                     );
+                } else {
+                    tracing::warn!("file does not exist: {:?}", &p);
                     continue;
                 }
-                tracing::warn!("File does not exist: {:?} (TODO)", &p);
-                continue;
             }
 
             if meta.is_dir() {

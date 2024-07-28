@@ -42,14 +42,14 @@ pub(crate) fn create_symlink(
     let from = from.as_ref();
     let to = to.as_ref();
 
-    if to.exists() {
-        fs_err::remove_file(to)?;
+    if from.exists() {
+        fs_err::remove_file(from)?;
     }
-
+    println!("Creating symlink from {:?} to {:?}", from, to);
     #[cfg(unix)]
-    fs_err::os::unix::fs::symlink(from, to)?;
+    fs_err::os::unix::fs::symlink(to, from)?;
     #[cfg(windows)]
-    std::os::windows::fs::symlink_file(from, to)?;
+    std::os::windows::fs::symlink_file(to, from)?;
 
     Ok(())
 }
@@ -77,7 +77,7 @@ pub(crate) fn copy_file(
         // if file is a symlink, copy it as a symlink
         if path.is_symlink() {
             let link_target = fs_err::read_link(path)?;
-            create_symlink(link_target, dest_path)?;
+            create_symlink(dest_path, link_target)?;
             Ok(())
         } else {
             if dest_path.exists() {

@@ -117,10 +117,16 @@ impl Output {
             // with the new prefix
             if source.is_symlink() {
                 let symlink_target = fs::read_link(&source).into_diagnostic()?;
+                println!("Current symlink target: {:?}", symlink_target);
                 if let Ok(rest) = symlink_target.strip_prefix(&cache_prefix) {
+                    println!("Rest: {:?}", rest);
                     let new_symlink_target = self.prefix().join(rest);
+                    println!("Creating symlink: {:?} -> {:?}", dest, new_symlink_target);
+                    println!("Removing old symlink: {:?}", dest);
                     fs::remove_file(&dest).into_diagnostic()?;
-                    create_symlink(&new_symlink_target, &dest).into_diagnostic()?;
+                    create_symlink(&dest, &new_symlink_target).into_diagnostic()?;
+                } else {
+                    println!("Didn't change symlink target");
                 }
             }
 
