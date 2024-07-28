@@ -34,6 +34,26 @@ impl Default for CopyOptions {
     }
 }
 
+/// Cross platform way of creating a symlink
+pub(crate) fn create_symlink(
+    from: impl AsRef<Path>,
+    to: impl AsRef<Path>,
+) -> Result<(), SourceError> {
+    let from = from.as_ref();
+    let to = to.as_ref();
+
+    if to.exists() {
+        fs_err::remove_file(to)?;
+    }
+
+    #[cfg(unix)]
+    fs_err::os::unix::fs::symlink(from, to)?;
+    #[cfg(windows)]
+    std::os::windows::fs::symlink_file(from, to)?;
+
+    Ok(())
+}
+
 /// Copy a file or directory, or symlink to another location.
 /// Use reflink if possible.
 pub(crate) fn copy_file(
@@ -57,10 +77,7 @@ pub(crate) fn copy_file(
         // if file is a symlink, copy it as a symlink
         if path.is_symlink() {
             let link_target = fs_err::read_link(path)?;
-            #[cfg(unix)]
-            fs_err::os::unix::fs::symlink(link_target, dest_path)?;
-            #[cfg(windows)]
-            std::os::windows::fs::symlink_file(link_target, dest_path)?;
+            create_symlink(link_target, dest_path)?;
             Ok(())
         } else {
             if dest_path.exists() {

@@ -16,7 +16,7 @@ use crate::{
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
     recipe::parser::{Dependency, Requirements},
     render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies},
-    source::copy_dir::{copy_file, CopyOptions},
+    source::copy_dir::{copy_file, create_symlink, CopyOptions},
 };
 
 /// Error type for cache key generation
@@ -112,6 +112,17 @@ impl Output {
             let dest = self.prefix().join(file);
             let source = &cache_dir.join("prefix").join(file);
             copy_file(source, &dest, &mut paths_created, &copy_options).into_diagnostic()?;
+
+            // check if the symlink starts with the old prefix, and if yes, make the symlink absolute
+            // with the new prefix
+            if source.is_symlink() {
+                let symlink_target = fs::read_link(&source).into_diagnostic()?;
+                if let Ok(rest) = symlink_target.strip_prefix(&cache_prefix) {
+                    let new_symlink_target = self.prefix().join(rest);
+                    fs::remove_file(&dest).into_diagnostic()?;
+                    create_symlink(&new_symlink_target, &dest).into_diagnostic()?;
+                }
+            }
 
             if *has_prefix {
                 replace_prefix(&dest, &cache_prefix, self.prefix())?;
