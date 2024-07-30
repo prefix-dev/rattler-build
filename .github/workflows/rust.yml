@@ -97,6 +97,9 @@ jobs:
       # Optimize the binary for size. This reduces the filesize at the cost of a slower binary.
       CARGO_PROFILE_OPT_LEVEL: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 's' || '0' }}
 
+      # Sets the default features which are always used also when `--no-default` is used.
+      REQUIRED_FEATURES: recipe-generation
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -181,13 +184,22 @@ jobs:
           build
           --locked
           --release
+          --features ${{ env.REQUIRED_FEATURES }}
           --target=${{ matrix.target }}
           ${{ steps.options.outputs.cargo-build-options }}
 
       - name: Run tests
         shell: bash
         if: matrix.target != 'aarch64-apple-darwin'
-        run: ${{ matrix.use-cross && 'cross' || 'cargo' }} test --release --locked --target=${{ matrix.target }} ${{ steps.options.outputs.cargo-build-options }} ${{ steps.options.outputs.cargo-test-options }}
+        run: >-
+          ${{ matrix.use-cross && 'cross' || 'cargo' }}
+          test
+          --release
+          --locked
+          --features ${{ env.REQUIRED_FEATURES }}
+          --target=${{ matrix.target }}
+          ${{ steps.options.outputs.cargo-build-options }}
+          ${{ steps.options.outputs.cargo-test-options }}
 
       - name: Create tarball
         id: package

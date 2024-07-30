@@ -2,9 +2,11 @@
 
 use std::{path::PathBuf, str::FromStr};
 
+#[cfg(feature = "recipe-generator")]
+use crate::recipe_generator::GenerateRecipeOpts;
+
 use crate::{
     console_utils::{Color, LogStyle},
-    recipe_generator::GenerateRecipeOpts,
     tool_configuration::SkipExisting,
 };
 use clap::builder::ArgPredicate;
@@ -45,6 +47,7 @@ pub enum SubCommands {
     /// Generate shell completion script
     Completion(ShellCompletion),
 
+    #[cfg(feature = "recipe-generator")]
     /// Generate a recipe from PyPI or CRAN
     GenerateRecipe(GenerateRecipeOpts),
 
