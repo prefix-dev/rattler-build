@@ -18,8 +18,10 @@ use super::FlattenErrors;
 /// A recipe package information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Package {
-    name: PackageName,
-    version: String,
+    /// Name of the package
+    pub name: PackageName,
+    /// Package version
+    pub version: String,
 }
 
 impl Package {
