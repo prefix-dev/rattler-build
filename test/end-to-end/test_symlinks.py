@@ -6,7 +6,9 @@ import pytest
 from helpers import RattlerBuild, get_extracted_package
 
 
-@pytest.skipif(os.name == "nt", reason="recipe does not support execution on windows")
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
 def test_symlink_cache(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
