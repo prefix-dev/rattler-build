@@ -1,0 +1,27 @@
+recipe:
+  name: cache-symlinks
+  version: 1.0.0
+
+cache:
+  build:
+    script: |
+      touch $PREFIX/foo.txt
+      ln -s $PREFIX/foo.txt $PREFIX/foo-symlink.txt
+      ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
+      ln -s $PREFIX/non-existent-file $PREFIX/broken-symlink.txt
+      ln -s ./foo.txt $PREFIX/relative-symlink.txt
+
+outputs:
+  - package:
+      name: cache-symlinks
+    build:
+      files:
+        include:
+          - "**/*"
+        exclude:
+          - "absolute-symlink.txt"
+  - package:
+      name: absolute-cache-symlinks
+    build:
+      files:
+        - "absolute-symlink.txt"
