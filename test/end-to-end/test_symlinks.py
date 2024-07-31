@@ -26,6 +26,10 @@ def test_symlink_cache(
     link_target = link_file.resolve()
     assert link_target == (pkg / "foo.txt")
 
+    link_file = pkg / "bin/absolute-exe-symlink"
+    assert link_file.is_symlink()
+    assert link_file.readlink() == Path("exe")
+
     pkg = get_extracted_package(tmp_path, "cache-symlinks")
 
     paths_json = pkg / "info/paths.json"
@@ -33,9 +37,9 @@ def test_symlink_cache(
     assert snapshot_json == j
 
     paths = j["paths"]
-    assert len(paths) == 3
+    assert len(paths) == 5
     for p in paths:
-        if p["_path"].endswith("symlink.txt"):
+        if "symlink" in p["_path"]:
             assert p["path_type"] == "softlink"
             assert (
                 p["sha256"]
@@ -49,10 +53,11 @@ def test_symlink_cache(
 
     broken_symlink = pkg / "broken-symlink.txt"
     assert not broken_symlink.exists()
-    # assert broken_symlink.is_symlink()
-    # assert broken_symlink.readlink() == Path("non-existent-file")
-    # assert not broken_symlink.resolve().exists()
 
     relative_symlink = pkg / "relative-symlink.txt"
     assert relative_symlink.is_symlink()
     assert relative_symlink.readlink() == Path("foo.txt")
+
+    relative_symlink = pkg / "bin/exe-symlink"
+    assert relative_symlink.is_symlink()
+    assert relative_symlink.readlink() == Path("exe")

@@ -359,7 +359,10 @@ impl Output {
                                 continue;
                             };
 
-                            let resolved_path = temp_files.encoded_prefix.join(relative_path_parent).join(&link_target);
+                            let resolved_path = temp_files
+                                .encoded_prefix
+                                .join(relative_path_parent)
+                                .join(&link_target);
 
                             if !resolved_path.exists() {
                                 tracing::warn!(

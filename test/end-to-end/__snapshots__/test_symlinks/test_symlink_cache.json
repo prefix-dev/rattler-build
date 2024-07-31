@@ -1,6 +1,18 @@
 {
   "paths": [
     {
+      "_path": "bin/exe",
+      "path_type": "hardlink",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_in_bytes": 0
+    },
+    {
+      "_path": "bin/exe-symlink",
+      "path_type": "softlink",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_in_bytes": 3
+    },
+    {
       "_path": "foo-symlink.txt",
       "path_type": "softlink",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

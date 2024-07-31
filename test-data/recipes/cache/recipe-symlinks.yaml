@@ -5,6 +5,10 @@ recipe:
 cache:
   build:
     script: |
+      mkdir -p $PREFIX/bin
+      touch $PREFIX/bin/exe
+      ln -s $PREFIX/bin/exe $PREFIX/bin/exe-symlink
+      ln -s $PREFIX/bin/exe $PREFIX/bin/absolute-exe-symlink
       touch $PREFIX/foo.txt
       ln -s $PREFIX/foo.txt $PREFIX/foo-symlink.txt
       ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
@@ -20,8 +24,10 @@ outputs:
           - "**/*"
         exclude:
           - "absolute-symlink.txt"
+          - "bin/absolute-exe-symlink"
   - package:
       name: absolute-cache-symlinks
     build:
       files:
         - "absolute-symlink.txt"
+        - "bin/absolute-exe-symlink"
