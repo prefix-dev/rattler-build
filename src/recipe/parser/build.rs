@@ -69,48 +69,48 @@ impl VariantKeyUsage {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Build {
     /// The build number is a number that should be incremented every time the recipe is built.
-    pub(super) number: u64,
+    pub number: u64,
     /// The build string is usually set automatically as the hash of the variant configuration.
     /// It's possible to override this by setting it manually, but not recommended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) string: Option<String>,
+    pub string: Option<String>,
     /// List of conditions under which to skip the build of the package.
     #[serde(default, skip)]
-    pub(super) skip: Skip,
+    pub skip: Skip,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     #[serde(default, skip_serializing_if = "Script::is_default")]
-    pub(super) script: Script,
+    pub script: Script,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
     #[serde(default, skip_serializing_if = "NoArchType::is_none")]
-    pub(super) noarch: NoArchType,
+    pub noarch: NoArchType,
     /// Python specific build configuration
     #[serde(default, skip_serializing_if = "Python::is_default")]
-    pub(super) python: Python,
+    pub python: Python,
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
-    pub(super) dynamic_linking: DynamicLinking,
+    pub dynamic_linking: DynamicLinking,
     /// Setting to control whether to always copy a file
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) always_copy_files: GlobVec,
+    pub always_copy_files: GlobVec,
     /// Setting to control whether to always include a file (even if it is already present in the host env)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) always_include_files: GlobVec,
+    pub always_include_files: GlobVec,
     /// Merge the build and host envs
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub(super) merge_build_and_host_envs: bool,
+    pub merge_build_and_host_envs: bool,
     /// Variant ignore and use keys
     #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
-    pub(super) variant: VariantKeyUsage,
+    pub variant: VariantKeyUsage,
     /// Prefix detection settings
     #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
-    pub(super) prefix_detection: PrefixDetection,
+    pub prefix_detection: PrefixDetection,
     /// Post-process operations for regex based replacements
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub(super) post_process: Vec<PostProcess>,
+    pub post_process: Vec<PostProcess>,
     /// Include files in the package
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) files: GlobVec,
+    pub files: GlobVec,
 }
 
 /// Post process operations for regex based replacements
