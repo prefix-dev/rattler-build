@@ -351,11 +351,29 @@ impl Output {
 
             if !p.exists() {
                 if p.is_symlink() {
-                    tracing::warn!(
-                        "symlink target not part of _this_ package: {:?} -> {:?}",
-                        &p,
-                        fs::read_link(p)?
-                    );
+                    // check if the file is in the prefix
+                    if let Ok(link_target) = p.read_link() {
+                        if link_target.is_relative() {
+                            let resolved_path = temp_files.encoded_prefix.join(&link_target);
+                            if !resolved_path.exists() {
+                                tracing::warn!(
+                                    "symlink target not part of _this_ package: {:?} -> {:?}",
+                                    &p,
+                                    &link_target
+                                );
+                                // Think about continuing here or packaging broken symlinks
+                                continue;
+                            }
+                        } else {
+                            tracing::warn!(
+                                "packaging an absolute symlink to outside the prefix {:?} -> {:?}",
+                                &p,
+                                link_target
+                            );
+                        }
+                    } else {
+                        tracing::warn!("could not read symlink {:?}", &p);
+                    }
                 } else {
                     tracing::warn!("file does not exist: {:?}", &p);
                     continue;
