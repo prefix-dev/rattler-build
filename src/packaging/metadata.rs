@@ -354,13 +354,20 @@ impl Output {
                     // check if the file is in the prefix
                     if let Ok(link_target) = p.read_link() {
                         if link_target.is_relative() {
-                            let resolved_path = temp_files.encoded_prefix.join(&link_target);
+                            let Some(relative_path_parent) = relative_path.parent() else {
+                                tracing::warn!("could not get parent of symlink {:?}", &p);
+                                continue;
+                            };
+
+                            let resolved_path = temp_files.encoded_prefix.join(relative_path_parent).join(&link_target);
+
                             if !resolved_path.exists() {
                                 tracing::warn!(
-                                    "symlink target not part of _this_ package: {:?} -> {:?}",
+                                    "symlink target not part of this package: {:?} -> {:?}",
                                     &p,
                                     &link_target
                                 );
+
                                 // Think about continuing here or packaging broken symlinks
                                 continue;
                             }
