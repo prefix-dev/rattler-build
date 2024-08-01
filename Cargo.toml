@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.18.2"
+version = "0.19.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -49,7 +49,7 @@ rattler = { version = "0.27.2", default-features = false, features = [
     "indicatif",
 ] }
 rattler_conda_types = { version = "0.26.3", default-features = false }
-rattler_digest = { version = "0.19.5", default-features = false }
+rattler_digest = { version = "1.0.0", default-features = false, features = ["serde"] }
 rattler_index = { version = "0.19.21", default-features = false }
 rattler_networking = { version = "0.20.10", default-features = false }
 rattler_repodata_gateway = { version = "0.21.3", default-features = false, features = [
@@ -58,27 +58,27 @@ rattler_repodata_gateway = { version = "0.21.3", default-features = false, featu
 rattler_shell = { version = "0.21.3", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "0.25.3", default-features = false, features = [
+rattler_solve = { version = "1.0.0", default-features = false, features = [
     "resolvo",
     "serde",
 ] }
-rattler_virtual_packages = { version = "0.19.20", default-features = false }
+rattler_virtual_packages = { version = "1.0.0", default-features = false }
 rattler_package_streaming = { version = "0.21.7", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
-serde_json = "1.0.120"
+serde_json = "1.0.121"
 reqwest = { version = "0.12.5", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.39.1", features = ["rt", "macros", "rt-multi-thread", "process"] }
+tokio = { version = "1.39.2", features = ["rt", "macros", "rt-multi-thread", "process"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
 serde_with = "3.9.0"
 url = "2.5.2"
 tracing = "0.1.40"
-clap = { version = "4.5.10", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.13", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=1.0.14", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -106,19 +106,19 @@ sha1 = "0.10.6"
 spdx = "0.10.6"
 ignore = "0.4.22"
 globset = "0.4.14"
-clap-verbosity-flag = "2.2.0"
+clap-verbosity-flag = "2.2.1"
 tracing-core = "0.1.32"
 petgraph = "0.6.5"
-indexmap = "2.2.6"
+indexmap = "2.3.0"
 dunce = "1.0.4"
 fs-err = "2.11.0"
-which = "6.0.1"
-clap_complete = "4.5.9"
-clap_complete_nushell = "4.5.2"
+which = "6.0.2"
+clap_complete = "4.5.12"
+clap_complete_nushell = "4.5.3"
 tokio-util = "0.7.11"
 
 tar = "0.4.41"
-zip = { version = "2.1.5", default-features = false, features = [
+zip = { version = "2.1.6", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
@@ -127,7 +127,7 @@ base64 = "0.22.1"
 flate2 = "1.0.30"
 xz2 = "0.1.7"
 zstd = "0.13.2"
-toml = "0.8.15"
+toml = "0.8.19"
 memmap2 = "0.9.4"
 reqwest-middleware = "0.3.2"
 rattler_installs_packages = { version = "0.9.0", default-features = false, optional = true }
