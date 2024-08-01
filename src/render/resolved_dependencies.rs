@@ -15,8 +15,7 @@ use indicatif::HumanBytes;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, PackageName, ParseStrictness, Platform, RepoDataRecord, StringMatcher, Version,
-    VersionSpec,
+    MatchSpec, PackageName, ParseStrictness, Platform, RepoDataRecord, StringMatcher, VersionSpec,
 };
 use rattler_conda_types::{version_spec::ParseVersionSpecError, PackageRecord};
 use serde::{Deserialize, Serialize};
@@ -498,10 +497,9 @@ pub fn apply_variant(
                     let subpackage = subpackages
                         .get(name)
                         .ok_or(ResolveError::SubpackageNotFound(name.to_owned()))?;
-                    let pinned = pin.pin_value().apply(
-                        &Version::from_str(&subpackage.version)?,
-                        &subpackage.build_string,
-                    )?;
+                    let pinned = pin
+                        .pin_value()
+                        .apply(&subpackage.version, &subpackage.build_string)?;
                     Ok(PinSubpackageDependency {
                         spec: pinned,
                         name: name.as_normalized().to_string(),

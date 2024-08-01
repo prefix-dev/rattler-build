@@ -267,7 +267,7 @@ pub async fn get_build_output(
             recipe.package().name().clone(),
             PackageIdentifier {
                 name: recipe.package().name().clone(),
-                version: recipe.package().version().to_owned(),
+                version: recipe.package().version().version().clone(),
                 build_string: recipe
                     .build()
                     .string()
