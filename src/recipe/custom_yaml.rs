@@ -2,11 +2,15 @@
 //! new Conda recipe format parser.
 
 use core::fmt::Display;
-use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf};
+use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf, str::FromStr};
 
 use indexmap::{IndexMap, IndexSet};
-use marked_yaml::loader::{parse_yaml_with_options, LoaderOptions};
-use marked_yaml::{types::MarkedScalarNode, Span};
+use marked_yaml::{
+    loader::{parse_yaml_with_options, LoaderOptions},
+    types::MarkedScalarNode,
+    Span,
+};
+use rattler_conda_types::VersionWithSource;
 use url::Url;
 
 use crate::{
@@ -24,11 +28,12 @@ use super::Render;
 
 /// A marked new Conda Recipe YAML node
 ///
-/// This is a reinterpretation of the [`marked_yaml::Node`] type that is specific
-/// for the first stage of the new Conda recipe format parser. This type handles
-/// the `if / then / else` selector (or if-selector for simplicity) as a special
-/// case of the sequence node, i.e., the occurrences of if-selector in the recipe
-/// are syntactically parsed in the conversion of [`marked_yaml::Node`] to this type.
+/// This is a reinterpretation of the [`marked_yaml::Node`] type that is
+/// specific for the first stage of the new Conda recipe format parser. This
+/// type handles the `if / then / else` selector (or if-selector for simplicity)
+/// as a special case of the sequence node, i.e., the occurrences of if-selector
+/// in the recipe are syntactically parsed in the conversion of
+/// [`marked_yaml::Node`] to this type.
 ///
 /// **CAUTION:** The user of this type that is responsible to handle the if the
 /// if-selector has semantic validity or not.
@@ -546,7 +551,8 @@ impl SequenceNode {
 
     /// Check if this sequence node is only conditional.
     ///
-    /// This is convenient for places that accept if-selectors but don't accept simple sequence.
+    /// This is convenient for places that accept if-selectors but don't accept
+    /// simple sequence.
     pub fn is_only_conditional(&self) -> bool {
         self.value
             .iter()
@@ -626,9 +632,9 @@ impl fmt::Debug for SequenceNode {
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
 /// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
-/// Because there is an example that on the `context` key-value definition, a later
-/// key was defined as a jinja string using previous values, we need to care about
-/// insertion order we use [`IndexMap`] for this.
+/// Because there is an example that on the `context` key-value definition, a
+/// later key was defined as a jinja string using previous values, we need to
+/// care about insertion order we use [`IndexMap`] for this.
 ///
 /// **NOTE**: Nodes are considered equal even if they don't come from the same
 /// place.  *i.e. their spans are ignored for equality and hashing*
@@ -734,7 +740,8 @@ impl SequenceNodeInternal {
         }
     }
 
-    /// Process the sequence node using the given jinja environment, returning the chosen node.
+    /// Process the sequence node using the given jinja environment, returning
+    /// the chosen node.
     pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, Vec<PartialParsingError>> {
         match self {
             Self::Simple(node) => Ok(Some(node.clone())),
@@ -843,7 +850,8 @@ impl IfSelector {
         &self.span
     }
 
-    /// Process the if-selector using the given jinja environment, returning the chosen node.
+    /// Process the if-selector using the given jinja environment, returning the
+    /// chosen node.
     pub fn process(&self, jinja: &Jinja) -> Result<Option<Node>, Vec<PartialParsingError>> {
         let cond = jinja.eval(self.cond.as_str()).map_err(|err| {
             vec![_partialerror!(
@@ -1150,13 +1158,15 @@ where
     RenderedScalarNode: TryConvertNode<T>,
 {
     /// # Caveats
-    /// Converting the node into a vector may result in a empty vector if the node is null.
+    /// Converting the node into a vector may result in a empty vector if the
+    /// node is null.
     ///
-    /// If that is not the desired behavior, and you want to handle the case of a null node
-    /// differently, specify the result to be `Option<Vec<_>>` instead.
+    /// If that is not the desired behavior, and you want to handle the case of
+    /// a null node differently, specify the result to be `Option<Vec<_>>`
+    /// instead.
     ///
-    /// Alternatively, you can also specify the result to be `Vec<Option<_>>` to handle the
-    /// case of a null node in other ways.
+    /// Alternatively, you can also specify the result to be `Vec<Option<_>>` to
+    /// handle the case of a null node in other ways.
     fn try_convert(&self, name: &str) -> Result<Vec<T>, Vec<PartialParsingError>> {
         match self {
             RenderedNode::Scalar(s) => {
@@ -1246,5 +1256,34 @@ impl TryConvertNode<serde_yaml::Value> for RenderedNode {
                 label = err.to_string()
             )]
         })
+    }
+}
+
+impl TryConvertNode<VersionWithSource> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<VersionWithSource, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<VersionWithSource> for RenderedScalarNode {
+    fn try_convert(&self, name: &str) -> Result<VersionWithSource, Vec<PartialParsingError>> {
+        VersionWithSource::from_str(self.as_str())
+            .map_err(|err| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::InvalidValue((name.to_string(), err.to_string().into())),
+                    label = "failed to parse `{name}`",
+                )
+            })
+            .map_err(|e| vec![e])
     }
 }

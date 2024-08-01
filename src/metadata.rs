@@ -15,7 +15,7 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, PackageName, Platform, RepoDataRecord,
+    Channel, PackageName, Platform, RepoDataRecord, Version,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
@@ -277,7 +277,7 @@ pub struct PackageIdentifier {
     /// The name of the package
     pub name: PackageName,
     /// The version of the package
-    pub version: String,
+    pub version: Version,
     /// The build string of the package
     pub build_string: String,
 }
@@ -331,7 +331,7 @@ impl Output {
     }
 
     /// The version of the package
-    pub fn version(&self) -> &str {
+    pub fn version(&self) -> &Version {
         self.recipe.package().version()
     }
 

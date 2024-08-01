@@ -9,7 +9,15 @@ Recipe {
             normalized: None,
             source: "xtensor",
         },
-        version: "0.24.6",
+        version: VersionWithSource {
+            version: Version {
+                version: [[0], [0], [24], [6]],
+                local: [],
+            },
+            source: Some(
+                "0.24.6",
+            ),
+        },
     },
     cache: None,
     source: [

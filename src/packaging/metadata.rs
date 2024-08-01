@@ -1,17 +1,7 @@
 //! Functions to write and create metadata from a given output
 
-use content_inspector::ContentType;
-use fs_err as fs;
-use fs_err::File;
-use itertools::Itertools;
-use rattler_conda_types::{
-    package::{
-        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PathType, PathsEntry, PathsJson,
-        PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
-    },
-    Platform,
-};
-use rattler_digest::{compute_bytes_digest, compute_file_digest};
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::OsStrExt;
 use std::{
     borrow::Cow,
     collections::HashSet,
@@ -19,14 +9,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rattler_conda_types::package::PackageFile;
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::OsStrExt;
-
-use crate::hash::HashInput;
-use crate::{metadata::Output, recipe::parser::PrefixDetection};
+use content_inspector::ContentType;
+use fs_err as fs;
+use fs_err::File;
+use itertools::Itertools;
+use rattler_conda_types::{
+    package::{
+        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
+        PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
+    },
+    Platform,
+};
+use rattler_digest::{compute_bytes_digest, compute_file_digest};
 
 use super::{PackagingError, TempFiles};
+use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
 
 /// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
@@ -58,8 +55,8 @@ pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, P
     }
 }
 
-/// This function requires we know the file content we are matching against is UTF-8
-/// In case the source is non utf-8 it will fail with a read error
+/// This function requires we know the file content we are matching against is
+/// UTF-8 In case the source is non utf-8 it will fail with a read error
 pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
@@ -95,7 +92,8 @@ pub fn contains_prefix_text(
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
-/// This function will also search in the file for the prefix and determine if the file is binary or text.
+/// This function will also search in the file for the prefix and determine if
+/// the file is binary or text.
 pub fn create_prefix_placeholder(
     target_platform: &Platform,
     file_path: &Path,
@@ -141,8 +139,8 @@ pub fn create_prefix_placeholder(
     let detected_is_text = content_type.is_text()
         && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
 
-    // Even if we force the replacement mode to be text we still cannot handle it like a text file
-    // since it likely contains NULL bytes etc.
+    // Even if we force the replacement mode to be text we still cannot handle it
+    // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
             Ok(true) => {
@@ -258,8 +256,8 @@ impl Output {
             .ok_or(PackagingError::DependenciesNotFinalized)?;
 
         // Track features are exclusively used to down-prioritize packages
-        // Each feature contributes "1 point" to the down-priorization. So we add a feature for each
-        // down-priorization level.
+        // Each feature contributes "1 point" to the down-priorization. So we add a
+        // feature for each down-priorization level.
         let track_features = self
             .recipe
             .build()
@@ -276,7 +274,7 @@ impl Output {
 
         Ok(IndexJson {
             name: self.name().clone(),
-            version: self.version().parse()?,
+            version: self.version().clone().into(),
             build: self
                 .build_string()
                 .ok_or(PackagingError::BuildStringNotSet)?
@@ -324,8 +322,9 @@ impl Output {
     }
 
     /// Create a `paths.json` file structure for the given paths.
-    /// Paths should be given as absolute paths under the `path_prefix` directory.
-    /// This function will also determine if the file is binary or text, and if it contains the prefix.
+    /// Paths should be given as absolute paths under the `path_prefix`
+    /// directory. This function will also determine if the file is binary
+    /// or text, and if it contains the prefix.
     pub fn paths_json(&self, temp_files: &TempFiles) -> Result<PathsJson, PackagingError> {
         let always_copy_files = self.recipe.build().always_copy_files();
 
@@ -447,7 +446,8 @@ impl Output {
         Ok(paths_json)
     }
 
-    /// Create the metadata for the given output and place it in the temporary directory
+    /// Create the metadata for the given output and place it in the temporary
+    /// directory
     pub fn write_metadata(
         &self,
         temp_files: &TempFiles,
@@ -493,9 +493,8 @@ mod test {
     use content_inspector::ContentType;
     use rattler_conda_types::Platform;
 
-    use crate::recipe::parser::PrefixDetection;
-
     use super::create_prefix_placeholder;
+    use crate::recipe::parser::PrefixDetection;
 
     #[test]
     fn detect_prefix() {
