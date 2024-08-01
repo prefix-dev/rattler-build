@@ -1,0 +1,12 @@
+cache:
+  requirements:
+    host:
+      - normal-run-exports
+    ignore_run_exports:
+      from_package:
+        - normal-run-exports
+
+outputs:
+  - package:
+      name: cache-ignore-run-exports
+      version: "1.0.0"

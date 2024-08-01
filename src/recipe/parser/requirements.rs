@@ -100,8 +100,15 @@ impl Requirements {
     }
 
     /// Get run exports that are ignored.
-    pub const fn ignore_run_exports(&self) -> &IgnoreRunExports {
-        &self.ignore_run_exports
+    pub fn ignore_run_exports(&self, merge: Option<&IgnoreRunExports>) -> IgnoreRunExports {
+        let mut ignore = self.ignore_run_exports.clone();
+        if let Some(merge) = merge {
+            ignore.by_name.extend(merge.by_name.iter().cloned());
+            ignore
+                .from_package
+                .extend(merge.from_package.iter().cloned());
+        }
+        ignore
     }
 
     /// Get all requirements at build time (combines build and host requirements)

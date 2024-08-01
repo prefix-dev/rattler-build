@@ -18,6 +18,19 @@ pub struct FilteredRunExports {
     pub weak_constraints: Vec<DependencyInfo>,
 }
 
+impl FilteredRunExports {
+    /// Extend the current filtered run exports with another set of filtered run exports
+    pub fn extend(&mut self, other: &FilteredRunExports) {
+        self.noarch.extend(other.noarch.iter().cloned());
+        self.strong.extend(other.strong.iter().cloned());
+        self.strong_constraints
+            .extend(other.strong_constraints.iter().cloned());
+        self.weak.extend(other.weak.iter().cloned());
+        self.weak_constraints
+            .extend(other.weak_constraints.iter().cloned());
+    }
+}
+
 impl IgnoreRunExports {
     pub fn filter(
         &self,
