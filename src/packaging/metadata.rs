@@ -351,15 +351,43 @@ impl Output {
 
             if !p.exists() {
                 if p.is_symlink() {
-                    tracing::warn!(
-                        "Symlink target does not exist: {:?} -> {:?}",
-                        &p,
-                        fs::read_link(p)?
-                    );
+                    // check if the file is in the prefix
+                    if let Ok(link_target) = p.read_link() {
+                        if link_target.is_relative() {
+                            let Some(relative_path_parent) = relative_path.parent() else {
+                                tracing::warn!("could not get parent of symlink {:?}", &p);
+                                continue;
+                            };
+
+                            let resolved_path = temp_files
+                                .encoded_prefix
+                                .join(relative_path_parent)
+                                .join(&link_target);
+
+                            if !resolved_path.exists() {
+                                tracing::warn!(
+                                    "symlink target not part of this package: {:?} -> {:?}",
+                                    &p,
+                                    &link_target
+                                );
+
+                                // Think about continuing here or packaging broken symlinks
+                                continue;
+                            }
+                        } else {
+                            tracing::warn!(
+                                "packaging an absolute symlink to outside the prefix {:?} -> {:?}",
+                                &p,
+                                link_target
+                            );
+                        }
+                    } else {
+                        tracing::warn!("could not read symlink {:?}", &p);
+                    }
+                } else {
+                    tracing::warn!("file does not exist: {:?}", &p);
                     continue;
                 }
-                tracing::warn!("File does not exist: {:?} (TODO)", &p);
-                continue;
             }
 
             if meta.is_dir() {

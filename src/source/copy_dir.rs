@@ -34,6 +34,34 @@ impl Default for CopyOptions {
     }
 }
 
+/// Cross platform way of creating a symlink
+/// Creates a symlink from `link` to `original`
+/// The file that is newly created is the `link` file
+pub(crate) fn create_symlink(
+    original: impl AsRef<Path>,
+    link: impl AsRef<Path>,
+) -> Result<(), SourceError> {
+    let original = original.as_ref();
+    let link = link.as_ref();
+
+    if link.exists() {
+        fs_err::remove_file(link)?;
+    }
+
+    #[cfg(unix)]
+    fs_err::os::unix::fs::symlink(original, link)?;
+    #[cfg(windows)]
+    {
+        if original.is_dir() {
+            std::os::windows::fs::symlink_dir(original, link)?;
+        } else {
+            std::os::windows::fs::symlink_file(original, link)?;
+        }
+    }
+
+    Ok(())
+}
+
 /// Copy a file or directory, or symlink to another location.
 /// Use reflink if possible.
 pub(crate) fn copy_file(
@@ -57,10 +85,7 @@ pub(crate) fn copy_file(
         // if file is a symlink, copy it as a symlink
         if path.is_symlink() {
             let link_target = fs_err::read_link(path)?;
-            #[cfg(unix)]
-            fs_err::os::unix::fs::symlink(link_target, dest_path)?;
-            #[cfg(windows)]
-            std::os::windows::fs::symlink_file(link_target, dest_path)?;
+            create_symlink(link_target, dest_path)?;
             Ok(())
         } else {
             if dest_path.exists() {
@@ -492,7 +517,7 @@ mod test {
             .use_gitignore(false)
             .run()
             .unwrap();
-        println!("{:?}", copy_dir.copied_paths());
+
         assert_eq!(copy_dir.copied_paths().len(), 2);
         let expected = [
             dest_dir_3.join("test_dir/test.md"),

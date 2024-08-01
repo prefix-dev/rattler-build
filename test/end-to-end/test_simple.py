@@ -4,127 +4,17 @@ import os
 import platform
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from typing import Any, Optional
 
 import pytest
 import requests
 import yaml
-from conda_package_handling.api import extract
-from syrupy.extensions.json import JSONSnapshotExtension
-
-
-class RattlerBuild:
-    def __init__(self, path):
-        self.path = path
-
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        try:
-            return check_output([str(self.path), *args], **kwds).decode("utf-8")
-        except CalledProcessError as e:
-            print(e.output)
-            print(e.stderr)
-            raise e
-
-    def build_args(
-        self,
-        recipe_folder: Path,
-        output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: Optional[list[str]] = None,
-        extra_args: list[str] = None,
-    ):
-        if extra_args is None:
-            extra_args = []
-        args = ["build", "--recipe", str(recipe_folder), *extra_args]
-        if variant_config is not None:
-            args += ["--variant-config", str(variant_config)]
-        args += ["--output-dir", str(output_folder)]
-        args += ["--package-format", str("tar.bz2")]
-
-        if custom_channels:
-            for c in custom_channels:
-                args += ["--channel", c]
-
-        return args
-
-    def build(
-        self,
-        recipe_folder: Path,
-        output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: Optional[list[str]] = None,
-        extra_args: list[str] = None,
-    ):
-        args = self.build_args(
-            recipe_folder,
-            output_folder,
-            variant_config=variant_config,
-            custom_channels=custom_channels,
-            extra_args=extra_args,
-        )
-        return self(*args)
-
-    def test(self, package, *args: Any, **kwds: Any) -> Any:
-        return self("test", "--package-file", package, *args, stderr=STDOUT, **kwds)
-
-
-@pytest.fixture
-def rattler_build():
-    if os.environ.get("RATTLER_BUILD_PATH"):
-        return RattlerBuild(os.environ["RATTLER_BUILD_PATH"])
-    else:
-        base_path = Path(__file__).parent.parent.parent
-        executable_name = "rattler-build"
-        if os.name == "nt":
-            executable_name += ".exe"
-
-        release_path = base_path / f"target/release/{executable_name}"
-        debug_path = base_path / f"target/debug/{executable_name}"
-
-        if release_path.exists():
-            return RattlerBuild(release_path)
-        elif debug_path.exists():
-            return RattlerBuild(debug_path)
-
-    raise FileNotFoundError("Could not find rattler-build executable")
-
-
-@pytest.fixture
-def snapshot_json(snapshot):
-    return snapshot.use_extension(JSONSnapshotExtension)
+from helpers import RattlerBuild, get_extracted_package, get_package
 
 
 def test_functionality(rattler_build: RattlerBuild):
     suffix = ".exe" if os.name == "nt" else ""
     text = rattler_build("--help").splitlines()
     assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
-
-
-@pytest.fixture
-def recipes():
-    return Path(__file__).parent.parent.parent / "test-data" / "recipes"
-
-
-def get_package(folder: Path, glob="*.tar.bz2"):
-    if "tar.bz2" not in glob:
-        glob += "*.tar.bz2"
-    if "/" not in glob:
-        glob = "**/" + glob
-    package_path = next(folder.glob(glob))
-    return package_path
-
-
-def get_extracted_package(folder: Path, glob="*.tar.bz2"):
-    package_path = get_package(folder, glob)
-
-    if package_path.name.endswith(".tar.bz2"):
-        package_without_extension = package_path.name[: -len(".tar.bz2")]
-    elif package_path.name.endswith(".conda"):
-        package_without_extension = package_path.name[: -len(".conda")]
-
-    extract_path = folder / "extract" / package_without_extension
-    extract(str(package_path), dest_dir=str(extract_path))
-    return extract_path
 
 
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):

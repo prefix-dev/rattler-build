@@ -16,7 +16,7 @@ use crate::{
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
     recipe::parser::{Dependency, Requirements},
     render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies},
-    source::copy_dir::{copy_file, CopyOptions},
+    source::copy_dir::{copy_file, create_symlink, CopyOptions},
 };
 
 /// Error type for cache key generation
@@ -113,6 +113,17 @@ impl Output {
             let source = &cache_dir.join("prefix").join(file);
             copy_file(source, &dest, &mut paths_created, &copy_options).into_diagnostic()?;
 
+            // check if the symlink starts with the old prefix, and if yes, make the symlink absolute
+            // with the new prefix
+            if source.is_symlink() {
+                let symlink_target = fs::read_link(source).into_diagnostic()?;
+                if let Ok(rest) = symlink_target.strip_prefix(&cache_prefix) {
+                    let new_symlink_target = self.prefix().join(rest);
+                    fs::remove_file(&dest).into_diagnostic()?;
+                    create_symlink(&new_symlink_target, &dest).into_diagnostic()?;
+                }
+            }
+
             if *has_prefix {
                 replace_prefix(&dest, &cache_prefix, self.prefix())?;
             }
@@ -199,15 +210,20 @@ impl Output {
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
 
-                // check if the file contains the prefix
-                let content_type = content_type(file).into_diagnostic()?;
-                let has_prefix = if content_type.map(|c| c.is_text()).unwrap_or(false) {
-                    contains_prefix_text(file, self.prefix(), self.target_platform())
+                // Defend against broken symlinks here!
+                if !file.is_symlink() {
+                    // check if the file contains the prefix
+                    let content_type = content_type(file).into_diagnostic()?;
+                    let has_prefix = if content_type.map(|c| c.is_text()).unwrap_or(false) {
+                        contains_prefix_text(file, self.prefix(), self.target_platform())
+                    } else {
+                        contains_prefix_binary(file, self.prefix())
+                    }
+                    .into_diagnostic()?;
+                    copied_files.push((stripped.to_path_buf(), has_prefix));
                 } else {
-                    contains_prefix_binary(file, self.prefix())
+                    copied_files.push((stripped.to_path_buf(), false));
                 }
-                .into_diagnostic()?;
-                copied_files.push((stripped.to_path_buf(), has_prefix));
             }
 
             // save the cache
