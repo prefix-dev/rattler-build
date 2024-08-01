@@ -350,4 +350,19 @@ mod test {
         assert!(used_vars.contains("linux"));
         assert!(!used_vars.contains("osx"));
     }
+
+    #[test]
+    fn test_used_vars_algebraic() {
+        let recipe = r#"expr:
+            - ${{ name + '-' + variant }}
+            - ${{ other ~ value }}
+        "#;
+
+        let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
+        let used_vars = used_vars_from_expressions(&recipe_node, recipe).unwrap();
+        assert!(used_vars.contains("name"));
+        assert!(used_vars.contains("variant"));
+        assert!(used_vars.contains("other"));
+        assert!(used_vars.contains("value"));
+    }
 }
