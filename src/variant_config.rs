@@ -384,7 +384,7 @@ impl VariantConfig {
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
         let mut outputs_map = HashMap::new();
-
+        println!("outputs: {:?}", outputs);
         // sort the outputs by topological order
         for output in outputs.iter() {
             // for the topological sort we only take into account `pin_subpackage` expressions
@@ -393,8 +393,12 @@ impl VariantConfig {
                 let errs: ParseErrors = e.into();
                 errs
             })?;
+            println!("Selector config: {:?}", selector_config);
+            println!("used_vars: {:?}", used_vars);
+            let first_combination = self.combinations(&used_vars)?.first().cloned().unwrap_or_default();
+            let temp_selector_config = selector_config.new_with_variant(first_combination.clone(), selector_config.target_platform);
             let parsed_recipe =
-                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
+                Recipe::from_node(output, temp_selector_config).map_err(|err| {
                     let errs: ParseErrors = err
                         .into_iter()
                         .map(|err| ParsingError::from_partial(recipe, err))
@@ -402,7 +406,7 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
-
+            println!("Parsed recipe: {:?}", parsed_recipe);
             let noarch_type = parsed_recipe.build().noarch();
             // add in any host and build dependencies
             used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
