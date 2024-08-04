@@ -132,7 +132,7 @@ async fn main() -> miette::Result<()> {
             .await
         }
         Some(SubCommands::Upload(upload_args)) => upload_from_args(upload_args).await,
-        #[cfg(feature = "recipe-generator")]
+        #[cfg(feature = "recipe-generation")]
         Some(SubCommands::GenerateRecipe(args)) => {
             rattler_build::recipe_generator::generate_recipe(args).await
         }

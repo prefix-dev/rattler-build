@@ -2,7 +2,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-#[cfg(feature = "recipe-generator")]
+#[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
 
 use crate::{
@@ -47,7 +47,7 @@ pub enum SubCommands {
     /// Generate shell completion script
     Completion(ShellCompletion),
 
-    #[cfg(feature = "recipe-generator")]
+    #[cfg(feature = "recipe-generation")]
     /// Generate a recipe from PyPI or CRAN
     GenerateRecipe(GenerateRecipeOpts),
 
