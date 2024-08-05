@@ -12,7 +12,7 @@ point to a JSON file with the following structure:
         "BearerToken": "your_token"
     },
     "otherhost.com": {
-        "BasicHttp": {
+        "BasicHTTP": {
             "username": "your_username",
             "password": "your_password"
         }
@@ -32,7 +32,7 @@ The following known authentication methods are supported:
 
 - `BearerToken`: prefix.dev
 - `CondaToken`: anaconda.org, quetz
-- `BasicHttp`: artifactory
+- `BasicHTTP`: artifactory
 
 ## Uploading packages
 
