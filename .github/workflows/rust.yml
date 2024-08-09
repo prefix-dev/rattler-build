@@ -47,7 +47,7 @@ jobs:
         with:
           reporter: "github-pr-check"
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          clippy_flags: "--all-targets"
+          clippy_flags: "--all-targets --workspace"
 
   build:
     name: Build ${{ matrix.target }}

@@ -39,6 +39,6 @@ repos:
       - id: clippy
         name: clippy
         description: Checks a package to catch common mistakes and improve your Rust code.
-        entry: cargo clippy --all-targets --color always
+        entry: cargo clippy --all-targets --workspace --color always
         language: system
         pass_filenames: false
