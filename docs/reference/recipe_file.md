@@ -553,25 +553,49 @@ glibc version is too old.
 ### Run exports
 
 Packages may have runtime requirements such as shared libraries (e.g. `zlib`), which are required for linking at build time, and for resolving the link at run time.
-Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
+With `run_exports` packages runtime requirements can be implicitly added.
+`run_exports` are weak by default, these two requirements for the `zlib` package are therefore equivalent:
 
-Example from `zlib`:
-
-```yaml
+```yaml title="recipe.yaml for zlib"
   requirements:
     run_exports:
       - ${{ pin_subpackage('libzlib', exact=True) }}
 ```
 
-Run exports are weak by default. But you can also define strong `run_exports`.
-
-```yaml
+```yaml title="recipe.yaml for zlib"
   requirements:
     run_exports:
-      strong:
+      weak:
         - ${{ pin_subpackage('libzlib', exact=True) }}
 ```
 
+The alternative to `weak` is `strong`.
+For `gcc` this would look like this:
+
+```yaml title="recipe.yaml for gcc"
+  requirements:
+    run_exports:
+      strong:
+        - ${{ pin_subpackage('libgcc', exact=True) }}
+```
+
+`weak` exports will only be implicitly added as runtime requirement, if the package is a host dependency.
+`strong` exports will be added for both build and host dependencies.
+In the following example you can see the implicitly added runtime dependencies.
+
+```yaml title="recipe.yaml of some package using gcc and zlib"
+  requirements:
+    build:
+      - gcc            # has a strong run export
+    host:
+      - zlib           # has a (weak) run export
+      # - libgcc       <-- implicitly added by gcc
+    run:
+      # - libgcc       <-- implicitly added by gcc
+      # - libzlib      <-- implicitly added by libzlib
+```
+
+  
 ### Ignore run exports
 
 There maybe cases where an upstream package has a problematic `run_exports` constraint.
