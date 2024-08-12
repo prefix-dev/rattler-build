@@ -85,7 +85,8 @@ This will replace any `python` found in the recipe with the versions specified i
 
 ```yaml title="recipe.yaml"
 context:
-  version: 1.26.4
+  version: 2.0.1
+  default_abi_level: 1.21
 
 package:
   name: numpy
@@ -93,23 +94,26 @@ package:
 
 source:
   - url: https://github.com/numpy/numpy/releases/download/v${{ version }}/numpy-${{ version }}.tar.gz
-    sha256: 2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010
+    sha256: 485b87235796410c3519a699cfe1faab097e509e90ebb05dcd098db2ae87e7b3
 
 build:
   python:
     entry_points:
       - f2py = numpy.f2py.f2py2e:main  # [win]
+      - numpy-config = numpy._configtool:main
 
 requirements:
   build:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
+    # note: some `host` dependencies that run at build time (e.g., `cython`, `meson-python`)
+    #       should ideally be in `build` instead, this is because cross compilation of
+    #       Python packages in conda-forge uses `crossenv` rather than regular cross compilation.
   host:
     # note: variant is injected here!
     - python
     - pip
     - meson-python
-    - ninja
     - pkg-config
     - python-build
     - cython
@@ -119,18 +123,20 @@ requirements:
   run:
     - python
   run_exports:
-    - ${{ pin_subpackage("numpy") }}
+    - numpy >=${{ default_abi_level }},<3.0.0a0
 
 tests:
   - python:
       imports:
         - numpy
-        - numpy.array_api
-        - numpy.array_api.linalg
+        - numpy.fft
+        - numpy.linalg
+        - numpy.random
         - numpy.ctypeslib
 
   - script:
-    - f2py -h
+    - f2py -v
+    - numpy-config --cflags
 
 about:
   homepage: http://numpy.org/
