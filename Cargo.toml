@@ -44,26 +44,27 @@ required-features = ["recipe-generation"]
 [dependencies]
 serde = { version = "1.0.204", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.27.2", default-features = false, features = [
+rattler = { version = "0.27.4", default-features = false, features = [
     "cli-tools",
     "indicatif",
 ] }
-rattler_conda_types = { version = "0.26.3", default-features = false }
+rattler_conda_types = { version = "0.27.1", default-features = false }
 rattler_digest = { version = "1.0.0", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.21", default-features = false }
-rattler_networking = { version = "0.20.10", default-features = false }
-rattler_repodata_gateway = { version = "0.21.3", default-features = false, features = [
+rattler_index = { version = "0.19.23", default-features = false }
+rattler_networking = { version = "0.21.0", default-features = false }
+rattler_repodata_gateway = { version = "0.21.5", default-features = false, features = [
     "gateway",
 ] }
-rattler_shell = { version = "0.21.3", default-features = false, features = [
+rattler_redaction = "0.1.0"
+rattler_shell = { version = "0.21.5", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "1.0.0", default-features = false, features = [
+rattler_solve = { version = "1.0.2", default-features = false, features = [
     "resolvo",
     "serde",
 ] }
-rattler_virtual_packages = { version = "1.0.0", default-features = false }
-rattler_package_streaming = { version = "0.21.7", default-features = false }
+rattler_virtual_packages = { version = "1.0.2", default-features = false }
+rattler_package_streaming = { version = "0.22.1", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
