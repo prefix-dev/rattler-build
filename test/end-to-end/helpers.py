@@ -24,6 +24,7 @@ class RattlerBuild:
         variant_config: Optional[Path] = None,
         custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
+        extra_meta: dict[str, Any] = None,
     ):
         if extra_args is None:
             extra_args = []
@@ -32,6 +33,12 @@ class RattlerBuild:
             args += ["--variant-config", str(variant_config)]
         args += ["--output-dir", str(output_folder)]
         args += ["--package-format", str("tar.bz2")]
+        if extra_meta:
+            args += [
+                item
+                for k, v in (extra_meta or {}).items()
+                for item in ["--extra-meta", f"{k}={v}"]
+            ]
 
         if custom_channels:
             for c in custom_channels:
@@ -46,6 +53,7 @@ class RattlerBuild:
         variant_config: Optional[Path] = None,
         custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
+        extra_meta: dict[str, Any] = None,
     ):
         args = self.build_args(
             recipe_folder,
@@ -53,6 +61,7 @@ class RattlerBuild:
             variant_config=variant_config,
             custom_channels=custom_channels,
             extra_args=extra_args,
+            extra_meta=extra_meta,
         )
         return self(*args)
 

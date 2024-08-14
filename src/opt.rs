@@ -1,6 +1,6 @@
 //! Command-line options.
 
-use std::{path::PathBuf, str::FromStr};
+use std::{error::Error, path::PathBuf, str::FromStr};
 
 #[cfg(feature = "recipe-generation")]
 use crate::recipe_generator::GenerateRecipeOpts;
@@ -16,6 +16,7 @@ use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_package_streaming::write::CompressionLevel;
+use serde_json::{json, Value};
 use url::Url;
 
 /// Application subcommands.
@@ -337,6 +338,10 @@ pub struct BuildOpts {
     /// If set to `all`, skip packages that already exist in any channel.
     #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result")]
     pub skip_existing: SkipExisting,
+
+    /// Extra metadata to include in about.json
+    #[arg(long, value_parser = parse_key_val)]
+    pub extra_meta: Option<Vec<(String, Value)>>,
 }
 
 fn is_dir(dir: &str) -> Result<PathBuf, String> {
@@ -348,6 +353,17 @@ fn is_dir(dir: &str) -> Result<PathBuf, String> {
             "Path '{dir}' needs to exist on disk and be a directory",
         ))
     }
+}
+
+/// Parse a single key-value pair
+fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync + 'static>> {
+    let pos = s
+        .find('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    let key = s[..pos].to_string();
+    let value = s[pos + 1..].to_string();
+
+    Ok((key, json!(value)))
 }
 
 /// Test options.

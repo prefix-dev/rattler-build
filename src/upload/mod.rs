@@ -10,7 +10,8 @@ use std::{
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
-use rattler_networking::{Authentication, AuthenticationStorage, Redact};
+use rattler_networking::{Authentication, AuthenticationStorage};
+use rattler_redaction::Redact;
 use reqwest::Method;
 use tracing::info;
 use url::Url;

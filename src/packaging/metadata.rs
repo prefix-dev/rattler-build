@@ -237,6 +237,7 @@ impl Output {
                 .iter()
                 .map(|c| c.to_string())
                 .collect(),
+            extra: self.extra_meta.clone().unwrap_or_default(),
         };
 
         about_json
