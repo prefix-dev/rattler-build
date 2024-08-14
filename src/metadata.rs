@@ -327,7 +327,7 @@ pub struct Output {
     /// Usually it is used during the CI build to record link to the CI job
     /// that created this artifact
     #[serde(skip)]
-    pub extra_meta: Option<HashMap<String, Value>>,
+    pub extra_meta: Option<BTreeMap<String, Value>>,
 }
 
 impl Output {
