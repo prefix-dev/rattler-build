@@ -357,13 +357,10 @@ fn is_dir(dir: &str) -> Result<PathBuf, String> {
 
 /// Parse a single key-value pair
 fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync + 'static>> {
-    let pos = s
-        .find('=')
+    let (key, value) = s
+        .split_once("=")
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
-    let key = s[..pos].to_string();
-    let value = s[pos + 1..].to_string();
-
-    Ok((key, json!(value)))
+    Ok((key.to_string(), json!(value)))
 }
 
 /// Test options.
