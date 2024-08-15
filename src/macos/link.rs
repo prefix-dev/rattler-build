@@ -627,7 +627,7 @@ mod tests {
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let bin_dir = tmp_dir.path().join("bin");
-        fs::create_dir(&bin_dir)?;
+        fs::create_dir(bin_dir)?;
         let binary_path = tmp_dir.path().join("bin/zlink-relink-relative");
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
 

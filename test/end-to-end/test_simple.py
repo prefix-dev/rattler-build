@@ -875,11 +875,16 @@ def test_downstream_test(
         assert "│ Failing test in downstream package" in e.value.output
         assert "│ Downstream test failed" in e.value.output
 
+
 def test_cache_runexports(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
     rattler_build.build(recipes / "cache_run_exports/helper.yaml", tmp_path)
-    rattler_build.build(recipes / "cache_run_exports/recipe_test_1.yaml", tmp_path, extra_args=["--experimental"])
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_1.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
 
     pkg = get_extracted_package(tmp_path, "cache-run-exports")
 
@@ -900,14 +905,37 @@ def test_cache_runexports(
     print(index)
     assert index.get("depends", []) == []
 
-    rattler_build.build(recipes / "cache_run_exports/recipe_test_2.yaml", tmp_path, extra_args=["--experimental"])
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_2.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
     pkg = get_extracted_package(tmp_path, "cache-ignore-run-exports")
     index = json.loads((pkg / "info/index.json").read_text())
     assert index["name"] == "cache-ignore-run-exports"
     assert index.get("depends", []) == []
 
-    rattler_build.build(recipes / "cache_run_exports/recipe_test_3.yaml", tmp_path, extra_args=["--experimental"])
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_3.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
     pkg = get_extracted_package(tmp_path, "cache-ignore-run-exports-by-name")
     index = json.loads((pkg / "info/index.json").read_text())
     assert index["name"] == "cache-ignore-run-exports-by-name"
     assert index.get("depends", []) == []
+
+
+def test_extra_meta_is_recorded_into_about_json(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "toml",
+        tmp_path,
+        extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
+    )
+    pkg = get_extracted_package(tmp_path, "toml")
+
+    about_json = json.loads((pkg / "info/about.json").read_text())
+
+    assert snapshot_json == about_json

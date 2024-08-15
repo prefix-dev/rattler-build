@@ -21,6 +21,7 @@ use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use url::Url;
 
 use crate::{
@@ -322,6 +323,11 @@ pub struct Output {
     pub build_summary: Arc<Mutex<BuildSummary>>,
     /// The system tools that are used to build this output
     pub system_tools: SystemTools,
+    /// Some extra metadata that should be recorded additionally in about.json
+    /// Usually it is used during the CI build to record link to the CI job
+    /// that created this artifact
+    #[serde(skip)]
+    pub extra_meta: Option<BTreeMap<String, Value>>,
 }
 
 impl Output {

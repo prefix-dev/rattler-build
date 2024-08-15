@@ -322,6 +322,13 @@ pub async fn get_build_output(
             finalized_sources: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
+            extra_meta: Some(
+                args.extra_meta
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
+            ),
         };
 
         if args.render_only && args.with_solve {
