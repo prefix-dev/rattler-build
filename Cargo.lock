@@ -725,10 +725,10 @@ dependencies = [
 [[package]]
 name = "clap-markdown"
 version = "0.1.3"
-source = "git+https://github.com/ruben-arts/clap-markdown?branch=main#bc771f47df47b7b3968c8d08c89372fcd91b5be3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "325f50228f76921784b6d9f2d62de6778d834483248eefecd27279174797e579"
 dependencies = [
  "clap",
- "indexmap 2.4.0",
 ]
 
 [[package]]
@@ -1296,21 +1296,9 @@ checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
 
 [[package]]
 name = "file_url"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0d1df57145d7cda57c95c44a2d64c24f579e2d50b8f4f7a779287293ad3adc0"
-dependencies = [
- "itertools 0.13.0",
- "percent-encoding",
- "thiserror",
- "typed-path",
- "url",
-]
-
-[[package]]
-name = "file_url"
-version = "0.1.3"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+checksum = "5c4602b5420b868957e88e55b927d67e273c764ce9fb6def7369248862928230"
 dependencies = [
  "itertools 0.13.0",
  "percent-encoding",
@@ -3526,8 +3514,9 @@ dependencies = [
 
 [[package]]
 name = "rattler"
-version = "0.27.4"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.27.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba3f7c4e9c778e82c86e4a176e116d7f6d4cd5b91f07e299ba7cba403a1f0ed9"
 dependencies = [
  "anyhow",
  "clap",
@@ -3545,10 +3534,10 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rattler_cache",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "rattler_networking 0.21.0",
- "rattler_package_streaming 0.22.1",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "rattler_networking 0.21.1",
+ "rattler_package_streaming 0.22.2",
  "rattler_shell",
  "reflink-copy",
  "regex",
@@ -3607,12 +3596,12 @@ dependencies = [
  "petgraph",
  "ratatui",
  "rattler",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
  "rattler_index",
  "rattler_installs_packages",
- "rattler_networking 0.21.0",
- "rattler_package_streaming 0.22.1",
+ "rattler_networking 0.21.1",
+ "rattler_package_streaming 0.22.2",
  "rattler_redaction",
  "rattler_repodata_gateway",
  "rattler_shell",
@@ -3656,8 +3645,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_cache"
-version = "0.1.6"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6281470abcc12960b6c71a579a264c444238f329551677393f00acf1d554ce3"
 dependencies = [
  "anyhow",
  "digest",
@@ -3665,10 +3655,10 @@ dependencies = [
  "fxhash",
  "itertools 0.13.0",
  "parking_lot",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "rattler_networking 0.21.0",
- "rattler_package_streaming 0.22.1",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "rattler_networking 0.21.1",
+ "rattler_package_streaming 0.22.2",
  "reqwest 0.12.5",
  "reqwest-middleware",
  "thiserror",
@@ -3684,7 +3674,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa8a3f6f355aebb8a7af60bf5d961adce58689892d646616201d1f5daba1c525"
 dependencies = [
  "chrono",
- "file_url 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "file_url",
  "fxhash",
  "glob",
  "hex",
@@ -3713,12 +3703,13 @@ dependencies = [
 
 [[package]]
 name = "rattler_conda_types"
-version = "0.27.1"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.27.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4dc7a58ae237e3f57310095033da58b37d98ce7c167bc928b0f81951279c514"
 dependencies = [
  "chrono",
  "dirs",
- "file_url 0.1.3 (git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json)",
+ "file_url",
  "fxhash",
  "glob",
  "hex",
@@ -3727,8 +3718,8 @@ dependencies = [
  "lazy-regex",
  "nom",
  "purl",
- "rattler_digest 1.0.0",
- "rattler_macros 1.0.0",
+ "rattler_digest 1.0.1",
+ "rattler_macros 1.0.1",
  "rattler_redaction",
  "regex",
  "serde",
@@ -3764,8 +3755,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_digest"
-version = "1.0.0"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d699fe089907cc0ca66966f6b94e0dc04792a1451b2a60ba49c0abb75fba33da"
 dependencies = [
  "blake2",
  "digest",
@@ -3780,13 +3772,14 @@ dependencies = [
 
 [[package]]
 name = "rattler_index"
-version = "0.19.23"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.19.24"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "665dccb14dc21342a87dcb9d095bc1d3b96e76b65e4cfda86d1e65e3b8c06c79"
 dependencies = [
  "fs-err",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "rattler_package_streaming 0.22.1",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "rattler_package_streaming 0.22.2",
  "serde_json",
  "tracing",
  "walkdir",
@@ -3865,8 +3858,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_macros"
-version = "1.0.0"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "18011e84fcc8dba03a4af5b70cbb99362968cdace525139df430b4f268ef58e0"
 dependencies = [
  "quote",
  "syn 2.0.74",
@@ -3901,8 +3895,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_networking"
-version = "0.21.0"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d635bd42b45a0446ba7cfe21ac07e6efc6016e28ef35c40f6b6e3aa22681667f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3952,16 +3947,17 @@ dependencies = [
 
 [[package]]
 name = "rattler_package_streaming"
-version = "0.22.1"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.22.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "753acc6ff608668f88852d2dfa0c334e046253dd9e40dce5fb2f50427eb3b9f4"
 dependencies = [
  "bzip2",
  "chrono",
  "futures-util",
  "num_cpus",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "rattler_networking 0.21.0",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "rattler_networking 0.21.1",
  "rattler_redaction",
  "reqwest 0.12.5",
  "reqwest-middleware",
@@ -3979,8 +3975,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_redaction"
-version = "0.1.0"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14b8739ebf209f017d70f4a27b2726358bade979cc3327b1765163c93a18d46f"
 dependencies = [
  "reqwest 0.12.5",
  "reqwest-middleware",
@@ -3989,8 +3986,9 @@ dependencies = [
 
 [[package]]
 name = "rattler_repodata_gateway"
-version = "0.21.5"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.21.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6be244c76607297d7c27e9c74870f9d2875f1acccaec827fc57f9eaa7144251"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4001,7 +3999,7 @@ dependencies = [
  "chrono",
  "dashmap",
  "dirs",
- "file_url 0.1.3 (git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json)",
+ "file_url",
  "futures",
  "hex",
  "http 1.1.0",
@@ -4017,9 +4015,9 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "rattler_cache",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "rattler_networking 0.21.0",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "rattler_networking 0.21.1",
  "rattler_redaction",
  "reqwest 0.12.5",
  "reqwest-middleware",
@@ -4041,13 +4039,14 @@ dependencies = [
 
 [[package]]
 name = "rattler_shell"
-version = "0.21.5"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "0.21.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "470fb87026522cb8bdf914b7d044644889d62d91e18f57d3e01f90983a4d49b1"
 dependencies = [
  "enum_dispatch",
  "indexmap 2.4.0",
  "itertools 0.13.0",
- "rattler_conda_types 0.27.1",
+ "rattler_conda_types 0.27.2",
  "serde_json",
  "shlex",
  "sysinfo",
@@ -4058,15 +4057,16 @@ dependencies = [
 
 [[package]]
 name = "rattler_solve"
-version = "1.0.2"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a2afc9a5f77abdc151bd99be9339078e1b6f9bfdbad04705bbb50c30ae11f50"
 dependencies = [
  "chrono",
  "futures",
  "itertools 0.13.0",
- "rattler_conda_types 0.27.1",
- "rattler_digest 1.0.0",
- "resolvo 0.6.2",
+ "rattler_conda_types 0.27.2",
+ "rattler_digest 1.0.1",
+ "resolvo 0.7.0",
  "serde",
  "tempfile",
  "thiserror",
@@ -4076,15 +4076,16 @@ dependencies = [
 
 [[package]]
 name = "rattler_virtual_packages"
-version = "1.0.2"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2097076b49e143fa7b70a63fac0dcc917dfade64b9706e50e8335a1eb5b1e184"
 dependencies = [
  "archspec",
  "libloading",
  "nom",
  "once_cell",
  "plist",
- "rattler_conda_types 0.27.1",
+ "rattler_conda_types 0.27.2",
  "regex",
  "serde",
  "thiserror",
@@ -4340,9 +4341,9 @@ dependencies = [
 
 [[package]]
 name = "resolvo"
-version = "0.6.2"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09f13bb82d6362074f2b2d858bb316dfb2a9940c7e33a9ccd0168ba4f6a247b2"
+checksum = "014783b06e2d02bee01fe3c3247454fb34d0fc35765334e825034cdadec422fa"
 dependencies = [
  "ahash",
  "bitvec",
@@ -4944,7 +4945,8 @@ dependencies = [
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.0.0"
-source = "git+https://github.com/nichmor/rattler?branch=feat/add-extra-field-on-about-json#2017abf747c719ad5dd8acd48833cf78366e23b6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b31ed96d1593e129cc76cb7aca364fb5c173558bfda922c15aac4e2f2f5844e"
 dependencies = [
  "tokio",
 ]

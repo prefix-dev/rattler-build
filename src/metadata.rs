@@ -1,6 +1,6 @@
 //! All the metadata that makes up a recipe file
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fmt::{self, Display, Formatter},
     io::Write,
     iter,
