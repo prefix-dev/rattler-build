@@ -12,7 +12,7 @@ fn main() {
     let target_default_platform = format!("Default value: `{}`", Platform::current());
     let help = help.replace(
         target_default_platform.as_str(),
-        format!("Default value: current platform").as_str(),
+        "Default value: current platform",
     );
 
     print!("{}", help);
