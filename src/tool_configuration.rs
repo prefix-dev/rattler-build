@@ -53,9 +53,6 @@ pub struct Configuration {
     /// Whether to skip existing packages
     pub skip_existing: SkipExisting,
 
-    /// Whether to continue building on failure of a package
-    pub cont_on_fail: bool,
-
     /// The channel configuration to use when parsing channels.
     pub channel_config: ChannelConfig,
 
@@ -111,7 +108,6 @@ impl Default for Configuration {
             use_bz2: true,
             render_only: false,
             skip_existing: SkipExisting::None,
-            cont_on_fail: false,
             channel_config: ChannelConfig::default_with_root_dir(
                 std::env::current_dir().unwrap_or_else(|_err| PathBuf::from("/")),
             ),

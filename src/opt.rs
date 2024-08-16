@@ -346,8 +346,8 @@ pub struct BuildOpts {
 
     /// Whether to continue building upon the failure of one recipe
     /// Only relevant when building multiple recipes with `--recipe-dir`
-    #[arg(long, default_value = "false")]
-    pub cont_on_fail: bool,
+    #[arg(long, default_value = "false", requires="recipe_dir")]
+    pub continue_on_fail: bool,
 }
 
 fn is_dir(dir: &str) -> Result<PathBuf, String> {

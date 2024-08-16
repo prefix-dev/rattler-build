@@ -117,7 +117,7 @@ async fn main() -> miette::Result<()> {
                 }
 
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
-                run_build_from_args(outputs, tool_config).await?;
+                run_build_from_args(outputs, tool_config, build_args.continue_on_fail).await?;
             }
             Ok(())
         }

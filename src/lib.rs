@@ -128,7 +128,6 @@ pub fn get_tool_config(
         use_bz2: args.common.use_bz2,
         render_only: args.render_only,
         skip_existing: args.skip_existing,
-        cont_on_fail: args.cont_on_fail,
         ..Configuration::default()
     })
 }
@@ -350,6 +349,7 @@ pub async fn get_build_output(
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
     tool_config: Configuration,
+    continue_on_fail: bool,
 ) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
 
@@ -361,11 +361,10 @@ pub async fn run_build_from_args(
             }
             Err(e) => {
                 tracing::error!("Error building package: {}", e);
-                if tool_config.cont_on_fail {
+                if continue_on_fail {
                     continue;
-                } else {
-                    return Err(e);
                 }
+                return Err(e);
             }
         };
         outputs.push(output);
