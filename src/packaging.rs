@@ -1,13 +1,17 @@
-//! This module contains the functions to package a conda package from a given output.
+//! This module contains the functions to package a conda package from a given
+//! output.
+use std::{
+    collections::HashSet,
+    io::Write,
+    path::{Component, Path, PathBuf},
+};
+
 use fs_err as fs;
 use fs_err::File;
-use rattler_conda_types::Platform;
-use std::collections::HashSet;
-use std::io::Write;
-use std::path::{Component, Path, PathBuf};
-
-use rattler_conda_types::package::PathsJson;
-use rattler_conda_types::package::{ArchiveType, PackageFile};
+use rattler_conda_types::{
+    package::{ArchiveType, PackageFile, PathsJson},
+    Platform,
+};
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
@@ -18,9 +22,7 @@ mod metadata;
 pub use file_finder::{content_type, Files, TempFiles};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 
-use crate::metadata::Output;
-use crate::package_test::write_test_files;
-use crate::{post_process, tool_configuration};
+use crate::{metadata::Output, package_test::write_test_files, post_process, tool_configuration};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -157,7 +159,8 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
-    // Write out the "rendered" recipe as well (the recipe with all the variables replaced with their values)
+    // Write out the "rendered" recipe as well (the recipe with all the variables
+    // replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
     rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
@@ -277,9 +280,7 @@ pub fn package_conda(
         )?;
     }
 
-    let identifier = output
-        .identifier()
-        .ok_or(PackagingError::BuildStringNotSet)?;
+    let identifier = output.identifier();
     let out_path = output_folder.join(format!(
         "{}{}",
         identifier,
@@ -326,10 +327,10 @@ pub fn package_conda(
     Ok((out_path, paths_json))
 }
 
-/// When building package for noarch, we don't create another build-platform folder
-/// together with noarch but conda-build does
-/// because of this we have a failure in conda-smithy CI so we also *mimic* this behaviour
-/// until this behaviour is changed
+/// When building package for noarch, we don't create another build-platform
+/// folder together with noarch but conda-build does
+/// because of this we have a failure in conda-smithy CI so we also *mimic* this
+/// behaviour until this behaviour is changed
 /// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
 fn create_empty_build_folder(
     local_channel_dir: &Path,
@@ -345,8 +346,9 @@ fn create_empty_build_folder(
 }
 
 impl Output {
-    /// Create a conda package from any new files in the host prefix. Note: the previous stages should have been
-    /// completed before calling this function.
+    /// Create a conda package from any new files in the host prefix. Note: the
+    /// previous stages should have been completed before calling this
+    /// function.
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,

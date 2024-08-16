@@ -1,23 +1,20 @@
-use super::event::Event;
-use super::state::TuiState;
 use ansi_to_tui::IntoText;
 use crossterm::event::{
     Event as CrosstermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
     MouseEventKind,
 };
 use miette::IntoDiagnostic;
-use ratatui::layout::Position;
-use ratatui::prelude::*;
-use ratatui::style::Stylize;
-use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
-    layout::Alignment,
-    style::{Color, Style},
-    widgets::{Block, BorderType, Paragraph},
+    layout::{Alignment, Position},
+    prelude::*,
+    style::{Color, Style, Stylize},
+    widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
+
+use super::{event::Event, state::TuiState};
 
 /// Key bindings.
 const KEY_BINDINGS: &[(&str, &str)] = &[
@@ -263,12 +260,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     package.name.clone().into(),
                     "-".fg(Color::Rgb(100, 100, 100)),
                     package.version.clone().into(),
-                    package
-                        .build_string
-                        .clone()
-                        .map(|v| format!("{}{v}", "-".fg(Color::Rgb(100, 100, 100))))
-                        .unwrap_or_default()
-                        .into(),
+                    format!(
+                        "{}{}",
+                        "-".fg(Color::Rgb(100, 100, 100)),
+                        &package.build_string
+                    )
+                    .into(),
                 ]);
                 if item[1].width < line.width() as u16 {
                     line = Line::from(vec![

@@ -14,7 +14,7 @@ use crate::{
 pub struct Package {
     pub name: String,
     pub version: String,
-    pub build_string: Option<String>,
+    pub build_string: String,
     pub subpackages: Vec<String>,
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
@@ -33,7 +33,7 @@ impl Package {
         Package {
             name: name.clone(),
             version: output.version().to_string(),
-            build_string: output.build_string().map(String::from),
+            build_string: output.build_string().into_owned(),
             subpackages: output
                 .build_configuration
                 .subpackages

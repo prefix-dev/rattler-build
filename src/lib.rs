@@ -271,8 +271,8 @@ pub async fn get_build_output(
                 build_string: recipe
                     .build()
                     .string()
-                    .expect("Shouldn't be unset, needs major refactoring, for handling this better")
-                    .to_owned(),
+                    .resolve(&hash, recipe.build().number())
+                    .into_owned(),
             },
         );
 

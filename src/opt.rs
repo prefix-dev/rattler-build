@@ -21,6 +21,7 @@ use url::Url;
 
 /// Application subcommands.
 #[derive(Parser)]
+#[allow(clippy::large_enum_variant)]
 pub enum SubCommands {
     /// Build a package from a recipe
     Build(BuildOpts),
@@ -358,7 +359,7 @@ fn is_dir(dir: &str) -> Result<PathBuf, String> {
 /// Parse a single key-value pair
 fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync + 'static>> {
     let (key, value) = s
-        .split_once("=")
+        .split_once('=')
         .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
     Ok((key.to_string(), json!(value)))
 }
