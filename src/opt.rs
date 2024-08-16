@@ -343,6 +343,11 @@ pub struct BuildOpts {
     /// Extra metadata to include in about.json
     #[arg(long, value_parser = parse_key_val)]
     pub extra_meta: Option<Vec<(String, Value)>>,
+
+    /// Whether to continue building upon the failure of one recipe
+    /// Only relevant when building multiple recipes with `--recipe-dir`
+    #[arg(long, default_value = "false")]
+    pub cont_on_fail: bool,
 }
 
 fn is_dir(dir: &str) -> Result<PathBuf, String> {
