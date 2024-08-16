@@ -715,8 +715,8 @@ impl VariantConfig {
                 let build_string = parsed_recipe
                     .build()
                     .string()
-                    .unwrap_or(&hash.to_string())
-                    .to_string();
+                    .resolve(&hash, parsed_recipe.build().number)
+                    .into_owned();
 
                 other_recipes.insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
@@ -725,8 +725,8 @@ impl VariantConfig {
                         parsed_recipe
                             .build()
                             .string()
-                            .unwrap_or(&hash.to_string())
-                            .to_string(),
+                            .resolve(&hash, parsed_recipe.build().number)
+                            .into_owned(),
                         used_filtered.clone(),
                     ),
                 );

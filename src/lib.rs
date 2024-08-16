@@ -271,8 +271,8 @@ pub async fn get_build_output(
                 build_string: recipe
                     .build()
                     .string()
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| format!("{}_{}", hash, recipe.build().number())),
+                    .resolve(&hash, recipe.build().number())
+                    .into_owned(),
             },
         );
 

@@ -354,15 +354,10 @@ impl Output {
     /// The build string is either the build string from the recipe or computed
     /// from the hash and build number.
     pub fn build_string(&self) -> Cow<'_, str> {
-        if let Some(build) = self.recipe.build().string() {
-            build.into()
-        } else {
-            format!(
-                "{}_{}",
-                &self.build_configuration.hash, self.recipe.build.number
-            )
-            .into()
-        }
+        self.recipe
+            .build()
+            .string
+            .resolve(&self.build_configuration.hash, self.recipe.build().number)
     }
 
     /// The channels to use when resolving dependencies

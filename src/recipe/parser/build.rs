@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::str::FromStr;
 
 use rattler_conda_types::{package::EntryPoint, NoArchType};
@@ -9,6 +10,7 @@ use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
 
+use crate::hash::HashInfo;
 use crate::validate_keys;
 use crate::{
     _partialerror,
@@ -72,8 +74,8 @@ pub struct Build {
     pub number: u64,
     /// The build string is usually set automatically as the hash of the variant configuration.
     /// It's possible to override this by setting it manually, but not recommended.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub string: Option<String>,
+    #[serde(default, skip_serializing_if = "BuildString::is_derived")]
+    pub string: BuildString,
     /// List of conditions under which to skip the build of the package.
     #[serde(default, skip)]
     pub skip: Skip,
@@ -113,6 +115,80 @@ pub struct Build {
     pub files: GlobVec,
 }
 
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "Option<String>", into = "Option<String>")]
+pub enum BuildString {
+    /// The build string is explicitly set by the user.
+    UserSpecified(String),
+
+    /// The build string should be derived from the variants
+    #[default]
+    Derived,
+}
+
+impl From<Option<String>> for BuildString {
+    fn from(value: Option<String>) -> Self {
+        value.map_or_else(|| BuildString::Derived, BuildString::UserSpecified)
+    }
+}
+
+impl From<BuildString> for Option<String> {
+    fn from(value: BuildString) -> Self {
+        match value {
+            BuildString::UserSpecified(s) => Some(s),
+            BuildString::Derived => None,
+        }
+    }
+}
+
+impl From<String> for BuildString {
+    fn from(value: String) -> Self {
+        BuildString::UserSpecified(value)
+    }
+}
+
+impl BuildString {
+    /// Returns true if the build string should be derived from the variants.
+    pub fn is_derived(&self) -> bool {
+        matches!(self, BuildString::Derived)
+    }
+
+    /// Returns the user specified build string.
+    pub fn as_deref(&self) -> Option<&str> {
+        match self {
+            BuildString::UserSpecified(s) => Some(s),
+            BuildString::Derived => None,
+        }
+    }
+
+    /// Returns the final build string, either based on the user defined value or by computing the derived value.
+    pub fn resolve(&self, hash: &HashInfo, build_number: u64) -> Cow<'_, str> {
+        match self {
+            BuildString::UserSpecified(s) => s.as_str().into(),
+            BuildString::Derived => Self::compute(hash, build_number).into(),
+        }
+    }
+
+    /// Compute the build string based on the hash and build number
+    pub fn compute(hash: &HashInfo, build_number: u64) -> String {
+        format!("{}_{}", hash, build_number)
+    }
+}
+
+impl TryConvertNode<BuildString> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BuildString, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<BuildString> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<BuildString, Vec<PartialParsingError>> {
+        Ok(BuildString::UserSpecified(self.as_str().to_owned()))
+    }
+}
+
 /// Post process operations for regex based replacements
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PostProcess {
@@ -138,8 +214,8 @@ impl Build {
     }
 
     /// Get the build string.
-    pub fn string(&self) -> Option<&str> {
-        self.string.as_deref()
+    pub fn string(&self) -> &BuildString {
+        &self.string
     }
 
     /// Get the skip conditions.
