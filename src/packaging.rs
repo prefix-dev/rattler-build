@@ -8,6 +8,7 @@ use std::{
 
 use fs_err as fs;
 use fs_err::File;
+use miette::IntoDiagnostic;
 use rattler_conda_types::{
     package::{ArchiveType, PackageFile, PathsJson},
     Platform,
@@ -295,7 +296,7 @@ pub fn package_conda(
             .with_prefix("Compressing ")
             .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
     );
-
+    
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
@@ -342,6 +343,28 @@ fn create_empty_build_folder(
 
     fs::create_dir_all(&build_output_folder)?;
 
+    Ok(())
+}
+
+/// Removes a package from the archive directory and repodata.json
+pub fn remove_package (result: &PathBuf) -> miette::Result<()> {
+    //let file_path = result.file_name().unwrap().to_str().unwrap();
+    //println!("{}", file_path);
+    let _ = fs::remove_file(result).into_diagnostic();
+    let dir_path = result.parent().unwrap();
+    let mut repodata_path = PathBuf::from(dir_path);
+    repodata_path.push("repodata.json");
+    let repodata_contents = fs::read_to_string(&repodata_path).into_diagnostic()?;
+    let mut repodata_json : serde_json::Value = serde_json::from_str(&repodata_contents).into_diagnostic()?;
+    if let Some(packages) = repodata_json.get_mut("packages") {
+        if let Some (packages_map) = packages.as_object_mut() {
+            let file_name = result.file_name().unwrap().to_str().unwrap();
+            packages_map.remove(file_name);
+        }
+    }
+    let new_repodata = serde_json::to_string_pretty(&repodata_json).into_diagnostic()?;
+    fs::write(&repodata_path, new_repodata).into_diagnostic()?;
+    
     Ok(())
 }
 
