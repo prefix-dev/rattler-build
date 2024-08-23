@@ -3596,6 +3596,7 @@ dependencies = [
  "petgraph",
  "ratatui",
  "rattler",
+ "rattler_cache",
  "rattler_conda_types 0.27.2",
  "rattler_digest 1.0.1",
  "rattler_index",

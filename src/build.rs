@@ -1,19 +1,19 @@
-//! The build module contains the code for running the build process for a given [`Output`]
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
-use std::path::PathBuf;
-use std::vec;
+//! The build module contains the code for running the build process for a given
+//! [`Output`]
+use std::{path::PathBuf, vec};
 
 use miette::IntoDiagnostic;
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
 use rattler_index::index;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
-use crate::metadata::Output;
-use crate::package_test::TestConfiguration;
-use crate::recipe::parser::TestType;
-use crate::render::solver::load_repodatas;
-use crate::{package_test, tool_configuration};
+use crate::{
+    metadata::Output, package_test, package_test::TestConfiguration, recipe::parser::TestType,
+    render::solver::load_repodatas, tool_configuration,
+};
 
-/// Check if the build should be skipped because it already exists in any of the channels
+/// Check if the build should be skipped because it already exists in any of the
+/// channels
 pub async fn skip_existing(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
@@ -93,8 +93,9 @@ pub async fn skip_existing(
     Ok(outputs)
 }
 
-/// Run the build for the given output. This will fetch the sources, resolve the dependencies,
-/// and execute the build script. Returns the path to the resulting package.
+/// Run the build for the given output. This will fetch the sources, resolve the
+/// dependencies, and execute the build script. Returns the path to the
+/// resulting package.
 pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
@@ -133,6 +134,11 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    output
+        .install_environments(tool_configuration)
+        .await
+        .into_diagnostic()?;
+
     output.run_build_script().await.into_diagnostic()?;
 
     // Package all the new files
@@ -148,7 +154,8 @@ pub async fn run_build(
 
     // We run all the package content tests
     for test in output.recipe.tests() {
-        // TODO we could also run each of the (potentially multiple) test scripts and collect the errors
+        // TODO we could also run each of the (potentially multiple) test scripts and
+        // collect the errors
         if let TestType::PackageContents { package_contents } = test {
             package_contents
                 .run_test(&paths_json, &output.build_configuration.target_platform)

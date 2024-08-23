@@ -48,6 +48,7 @@ rattler = { version = "0.27.5", default-features = false, features = [
     "cli-tools",
     "indicatif",
 ] }
+rattler_cache = { version = "0.1.7", default-features = false }
 rattler_conda_types = { version = "0.27.2", default-features = false }
 rattler_digest = { version = "1.0.1", default-features = false, features = ["serde"] }
 rattler_index = { version = "0.19.24", default-features = false }

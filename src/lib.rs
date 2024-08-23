@@ -51,11 +51,11 @@ use hash::HashInfo;
 use metadata::{
     BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
 };
-use miette::{IntoDiagnostic, WrapErr};
+use miette::IntoDiagnostic;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, ChannelConfig, Platform};
+use rattler_conda_types::{package::ArchiveType, Channel, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use recipe::{
     parser::{find_outputs_from_src, Dependency, Recipe},
@@ -119,17 +119,16 @@ pub fn get_tool_config(
         tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone())
             .into_diagnostic()?;
 
-    Ok(Configuration {
-        client,
-        fancy_log_handler: fancy_log_handler.clone(),
-        no_clean: args.keep_build,
-        no_test: args.no_test,
-        use_zstd: args.common.use_zstd,
-        use_bz2: args.common.use_bz2,
-        render_only: args.render_only,
-        skip_existing: args.skip_existing,
-        ..Configuration::default()
-    })
+    Ok(Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler.clone())
+        .with_keep_build(args.keep_build)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(client)
+        .with_testing(!args.no_test)
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .with_skip_existing(args.skip_existing)
+        .finish())
 }
 
 /// Returns the output for the build.
@@ -331,14 +330,6 @@ pub async fn get_build_output(
             ),
         };
 
-        if args.render_only && args.with_solve {
-            let output_with_resolved_dependencies = output
-                .resolve_dependencies(tool_config)
-                .await
-                .into_diagnostic()?;
-            outputs.push(output_with_resolved_dependencies);
-            continue;
-        }
         outputs.push(output);
     }
 
@@ -385,20 +376,24 @@ pub async fn run_test_from_args(
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
-        .into_diagnostic()?;
 
-    let channel_config = ChannelConfig::default_with_root_dir(
-        std::env::current_dir()
-            .into_diagnostic()
-            .context("failed to determine the current directory")?,
-    );
+    let tool_config = Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler)
+        .with_keep_build(true)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(
+            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+                .into_diagnostic()?,
+        )
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .finish();
 
     let channels = args
         .channel
         .unwrap_or_else(|| vec!["conda-forge".to_string()])
         .into_iter()
-        .map(|name| Channel::from_str(name, &channel_config).map(|c| c.base_url))
+        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()?;
 
@@ -411,14 +406,7 @@ pub async fn run_test_from_args(
         channels,
         channel_priority: ChannelPriority::Strict,
         solve_strategy: SolveStrategy::Highest,
-        tool_configuration: Configuration {
-            client,
-            fancy_log_handler,
-            // duplicate from `keep_test_prefix`?
-            no_clean: false,
-            compression_threads: args.compression_threads,
-            ..Configuration::default()
-        },
+        tool_configuration: tool_config,
     };
 
     let package_name = package_file
@@ -471,19 +459,18 @@ pub async fn rebuild_from_args(
     output.build_configuration.directories.output_dir =
         canonicalize(output_dir).into_diagnostic()?;
 
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
-        .into_diagnostic()?;
-
-    let tool_config = tool_configuration::Configuration {
-        client,
-        fancy_log_handler,
-        no_clean: true,
-        no_test: args.no_test,
-        use_zstd: args.common.use_zstd,
-        use_bz2: args.common.use_bz2,
-        compression_threads: args.compression_threads,
-        ..Configuration::default()
-    };
+    let tool_config = Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler)
+        .with_keep_build(true)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(
+            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+                .into_diagnostic()?,
+        )
+        .with_testing(!args.no_test)
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .finish();
 
     output
         .build_configuration
