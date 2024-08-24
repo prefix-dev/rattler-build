@@ -95,7 +95,7 @@ struct ProgressStyleProperties {
     progress_type: ProgressType,
 }
 
-/// Defines the currect status of a progress bar.
+/// Defines the current status of a progress bar.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 enum ProgressStatus {
     /// The progress bar is showing active work.
