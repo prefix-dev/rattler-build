@@ -1,11 +1,13 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::{Display, Formatter},
     str::FromStr,
     sync::Arc,
 };
 
-use indicatif::HumanBytes;
+use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use rattler::install::Placement;
 use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
@@ -25,6 +27,7 @@ use crate::{
     metadata::{BuildConfiguration, Output},
     recipe::parser::{Dependency, Requirements},
     render::{
+        package_cache_reporter::PackageCacheReporter,
         pin::PinArgs,
         solver::{install_packages, solve_environment},
     },
@@ -544,17 +547,28 @@ pub fn apply_variant(
 /// 2. There are special run_exports.json files available for some channels.
 async fn amend_run_exports(
     records: &mut [RepoDataRecord],
-    package_cache: PackageCache,
     client: ClientWithMiddleware,
+    package_cache: PackageCache,
+    multi_progress: MultiProgress,
+    progress_prefix: impl Into<Cow<'static, str>>,
+    top_level_pb: Option<ProgressBar>,
 ) -> Result<(), PackageCacheError> {
     let max_concurrent_requests = Arc::new(Semaphore::new(50));
     let (tx, mut rx) = mpsc::channel(50);
+
+    let mut progress = PackageCacheReporter::new(
+        multi_progress,
+        top_level_pb.map_or(Placement::End, Placement::After),
+    )
+    .with_prefix(progress_prefix);
 
     for (pkg_idx, pkg) in records.iter().enumerate() {
         if pkg.package_record.run_exports.is_some() {
             // If the package already boasts run exports, we don't need to do anything.
             continue;
         }
+
+        let progress_reporter = Arc::new(progress.add(pkg));
 
         let cache_key = CacheKey::from(&pkg.package_record);
         let client = client.clone();
@@ -568,7 +582,7 @@ async fn amend_run_exports(
                 .await
                 .expect("semaphore error");
             let result = match package_cache
-                .get_or_fetch_from_url(cache_key, url, client, None)
+                .get_or_fetch_from_url(cache_key, url, client, Some(progress_reporter))
                 .await
             {
                 Ok(package_dir) => {
@@ -702,14 +716,21 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async(
-                "Collecting run exports",
+            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.package_cache.clone(),
                     tool_configuration.client.clone(),
-                ),
-            )
+                    tool_configuration.package_cache.clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .with_indent_levels("  "),
+                    Some(pb),
+                )
+            })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
 
@@ -789,14 +810,21 @@ pub(crate) async fn resolve_dependencies(
         // Add the run exports to the records that don't have them yet.
         tool_configuration
             .fancy_log_handler
-            .wrap_in_progress_async(
-                "Collecting run exports",
+            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.package_cache.clone(),
                     tool_configuration.client.clone(),
-                ),
-            )
+                    tool_configuration.package_cache.clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .with_indent_levels("  "),
+                    Some(pb),
+                )
+            })
             .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
 

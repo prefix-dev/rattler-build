@@ -421,10 +421,11 @@ impl LoggingOutputHandler {
         func: F,
     ) -> T {
         let pb = self.add_progress_bar(
-            ProgressBar::new_spinner().with_style(self.long_running_progress_style()),
+            ProgressBar::hidden()
+                .with_style(self.long_running_progress_style())
+                .with_message(msg),
         );
         pb.enable_steady_tick(Duration::from_millis(100));
-        pb.set_message(msg);
         let result = func();
         pb.finish_and_clear();
         result
@@ -437,12 +438,28 @@ impl LoggingOutputHandler {
         msg: impl Into<Cow<'static, str>>,
         future: Fut,
     ) -> T {
+        self.wrap_in_progress_async_with_progress(msg, |_pb| future)
+            .await
+    }
+
+    /// Displays a spinner with the given message while running the specified
+    /// function to completion.
+    pub async fn wrap_in_progress_async_with_progress<
+        T,
+        Fut: Future<Output = T>,
+        F: FnOnce(ProgressBar) -> Fut,
+    >(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        f: F,
+    ) -> T {
         let pb = self.add_progress_bar(
-            ProgressBar::new_spinner().with_style(self.long_running_progress_style()),
+            ProgressBar::hidden()
+                .with_style(self.long_running_progress_style())
+                .with_message(msg),
         );
         pb.enable_steady_tick(Duration::from_millis(100));
-        pb.set_message(msg);
-        let result = future.await;
+        let result = f(pb.clone()).await;
         pb.finish_and_clear();
         result
     }
