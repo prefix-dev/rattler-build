@@ -6,10 +6,11 @@ channels = ["conda-forge"]
 platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 
 [tasks]
-build = "cargo build --release"
+build-release = "cargo build --release"
 install = "cargo install --path . --locked"
-end_to_end_test = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details"
+end-to-end-test = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details"
 test = "cargo test"
+test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
 lint = "pre-commit run --all"
 generate-cli-docs = "cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
@@ -22,7 +23,7 @@ deploy-dev = "mike deploy --push dev devel"
 
 [dependencies]
 openssl = "3.*"
-rust = ">=1.76.0,<1.77"
+rust = ">=1.75.0,<1.76"
 pre-commit = "3.3.3.*"
 compilers = "1.6.0.*"
 libssh2 = "1.11.0.*"
@@ -36,6 +37,19 @@ conda-package-handling = "2.2.0.*"
 requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 
+[target.osx-64.dependencies]
+patchelf = ">=0.18.0,<0.19"
+
+[target.osx-arm64.dependencies]
+patchelf = ">=0.18.0,<0.19"
+
+[target.linux-64.dependencies]
+clang = ">=18.1.8,<19.0"
+mold = ">=2.33.0,<3.0"
+
+[target.linux-64.activation]
+scripts = ["scripts/activate_linux.sh"]
+
 [feature.docs.dependencies]
 mkdocs = "1.5.3.*"
 mkdocs-material = ">=9.5.16,<9.7"
@@ -45,5 +59,7 @@ mike = "2.0.0.*"
 
 [environments]
 # Using same solve group to keep the environment consistent in versions used and improving cache hits
-default = {solve-group = "default"}
-docs = {features = ["docs"], no-default-feature = true, solve-group = "default"}
+default = { solve-group = "default" }
+docs = { features = [
+    "docs",
+], no-default-feature = true, solve-group = "default" }

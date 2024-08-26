@@ -592,7 +592,7 @@ pub fn init_logging(
     Ok(log_handler)
 }
 
-/// check if we are on Github CI nad if the user has enabled the integration
+/// check if we are on Github CI and if the user has enabled the integration
 pub fn github_integration_enabled() -> bool {
     std::env::var("GITHUB_ACTIONS").is_ok()
         && std::env::var("RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION") == Ok("true".to_string())
