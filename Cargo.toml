@@ -169,7 +169,7 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-# [patch.crates-io]
+[patch.crates-io]
 # rattler = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
@@ -181,7 +181,7 @@ pre-build = [
 # rattler_solve = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
-# clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
+clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 
 
 # rattler = { path = "../rattler/crates/rattler" }

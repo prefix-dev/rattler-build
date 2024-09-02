@@ -182,6 +182,11 @@ Build a package from a recipe
 	- Possible values: `true`, `false`
 
 
+- `--extra-meta <EXTRA_META>`
+
+	Extra metadata to include in about.json
+
+
 ###### **Modifying result**
 
 - `--package-format <PACKAGE_FORMAT>`
