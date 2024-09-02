@@ -393,8 +393,18 @@ impl VariantConfig {
                 let errs: ParseErrors = e.into();
                 errs
             })?;
+
+            // for the initial render, take the first variant combination based on the used_vars
+            let combination = self.combinations(&used_vars)?;
+            let combination = combination
+                .first()
+                .unwrap();
+            println!("combination: {:?}", combination);
+            let selector_config_with_variant =
+                selector_config.new_with_variant(combination.clone(), selector_config.target_platform);
+
             let parsed_recipe =
-                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
+                Recipe::from_node(output, selector_config_with_variant).map_err(|err| {
                     let errs: ParseErrors = err
                         .into_iter()
                         .map(|err| ParsingError::from_partial(recipe, err))
@@ -402,7 +412,7 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
-
+            println!("parsed_recipe: {:?}", parsed_recipe);
             let noarch_type = parsed_recipe.build().noarch();
             // add in any host and build dependencies
             used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
