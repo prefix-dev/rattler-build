@@ -418,12 +418,21 @@ impl VariantConfig {
                             normalized_name.to_string().into()
                         })
                     }
-                    Dependency::PinSubpackage(pin) => {
-                        Some(pin.pin_value().name.as_normalized().to_string())
-                    }
                     _ => None,
                 }
             }));
+
+            used_vars.extend(
+                parsed_recipe
+                    .requirements()
+                    .all()
+                    .filter_map(|dep| match dep {
+                        Dependency::PinSubpackage(pin) => {
+                            Some(pin.pin_value().name.as_normalized().to_string())
+                        }
+                        _ => None,
+                    }),
+            );
 
             let use_keys = &parsed_recipe.build().variant().use_keys;
             used_vars.extend(use_keys.iter().cloned());
@@ -519,10 +528,8 @@ impl VariantConfig {
                     errs
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
-            let build_time_requirements = parsed_recipe
-                .build_time_requirements()
-                .cloned()
-                .filter_map(|dep| {
+            let build_time_requirements =
+                parsed_recipe.build_time_requirements().filter_map(|dep| {
                     // here we filter python as a variant and don't take it's passed variants
                     // when noarch is python
                     if let Dependency::Spec(spec) = &dep {
@@ -532,7 +539,7 @@ impl VariantConfig {
                             }
                         }
                     }
-                    Some(dep)
+                    Some(dep.clone())
                 });
             all_build_dependencies.extend(build_time_requirements);
         }
@@ -620,15 +627,19 @@ impl VariantConfig {
                     })?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
-                parsed_recipe
-                    .build_time_requirements()
-                    .for_each(|dep| match dep {
-                        Dependency::Spec(spec) => {
-                            if let Some(name) = &spec.name {
-                                let val = name.as_normalized().to_owned();
-                                used_variables.insert(val);
-                            }
+                parsed_recipe.build_time_requirements().for_each(|dep| {
+                    if let Dependency::Spec(spec) = dep {
+                        if let Some(name) = &spec.name {
+                            let val = name.as_normalized().to_owned();
+                            used_variables.insert(val);
                         }
+                    }
+                });
+
+                parsed_recipe
+                    .requirements()
+                    .all()
+                    .for_each(|dep| match dep {
                         Dependency::PinSubpackage(pin_sub) => {
                             let pin = pin_sub.pin_value();
                             let val = pin.name.as_normalized().to_owned();
@@ -643,6 +654,7 @@ impl VariantConfig {
                                 exact_pins.insert(val);
                             }
                         }
+                        _ => {}
                     });
 
                 // actually used vars
