@@ -611,7 +611,7 @@ You can ignore them by package name, or by naming the runtime dependency directl
         - zlib
 ```
 
-Using a runtime depenedency name:
+Using a runtime dependency name:
 
 ```yaml
   requirements:
