@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.20.0"
+version = "0.21.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -44,27 +44,27 @@ required-features = ["recipe-generation"]
 [dependencies]
 serde = { version = "1.0.209", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.27.6", default-features = false, features = [
+rattler = { version = "0.27.7", default-features = false, features = [
     "cli-tools",
     "indicatif",
 ] }
-rattler_conda_types = { version = "0.27.2", default-features = false }
+rattler_conda_types = { version = "0.27.3", default-features = false }
 rattler_digest = { version = "1.0.1", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.24", default-features = false }
+rattler_index = { version = "0.19.25", default-features = false }
 rattler_networking = { version = "0.21.2", default-features = false }
 rattler_redaction = { version = "0.1.1" }
-rattler_repodata_gateway = { version = "0.21.8", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.21.9", default-features = false, features = [
     "gateway",
 ] }
-rattler_shell = { version = "0.21.6", default-features = false, features = [
+rattler_shell = { version = "0.21.7", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "1.0.3", default-features = false, features = [
+rattler_solve = { version = "1.0.4", default-features = false, features = [
     "resolvo",
     "serde",
 ] }
-rattler_virtual_packages = { version = "1.0.4", default-features = false }
-rattler_package_streaming = { version = "0.22.3", default-features = false }
+rattler_virtual_packages = { version = "1.1.0", default-features = false }
+rattler_package_streaming = { version = "0.22.4", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
