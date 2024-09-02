@@ -405,7 +405,7 @@ impl VariantConfig {
 
             let noarch_type = parsed_recipe.build().noarch();
             // add in any host and build dependencies
-            used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
+            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
                 match dep {
                     Dependency::Spec(spec) => {
                         // here we filter python as a variant and don't take it's passed variants
