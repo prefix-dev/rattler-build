@@ -939,3 +939,20 @@ def test_extra_meta_is_recorded_into_about_json(
     about_json = json.loads((pkg / "info/about.json").read_text())
 
     assert snapshot_json == about_json
+
+
+def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "used-vars/recipe_1.yaml",
+        tmp_path,
+    )
+
+    output = rattler_build(
+        *args, "--target-platform=linux-64", "--render-only", stderr=DEVNULL
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 1
+    assert rendered[0]["build_configuration"]["variant"] == {
+        "target_platform": "noarch"
+    }

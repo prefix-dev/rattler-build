@@ -13,6 +13,7 @@ use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
+use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use url::Url;
 
 use crate::tool_configuration;
@@ -90,7 +91,7 @@ pub async fn create_environment(
     let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
         "determining virtual packages",
         move || {
-            rattler_virtual_packages::VirtualPackage::current().map(|vpkgs| {
+            VirtualPackage::detect(&VirtualPackageOverrides::default()).map(|vpkgs| {
                 vpkgs
                     .iter()
                     .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
