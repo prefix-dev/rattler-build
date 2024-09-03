@@ -39,12 +39,6 @@ conda-package-handling = "2.2.0.*"
 requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
 
-[target.osx-64.dependencies]
-patchelf = ">=0.18.0,<0.19"
-
-[target.osx-arm64.dependencies]
-patchelf = ">=0.18.0,<0.19"
-
 [target.linux-64.dependencies]
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
