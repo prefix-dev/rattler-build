@@ -595,7 +595,7 @@ In the following example you can see the implicitly added runtime dependencies.
       # - libzlib      <-- implicitly added by libzlib
 ```
 
-  
+
 ### Ignore run exports
 
 There maybe cases where an upstream package has a problematic `run_exports` constraint.
@@ -611,7 +611,7 @@ You can ignore them by package name, or by naming the runtime dependency directl
         - zlib
 ```
 
-Using a runtime depenedency name:
+Using a runtime dependency name:
 
 ```yaml
   requirements:

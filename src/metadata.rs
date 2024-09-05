@@ -1,5 +1,6 @@
 //! All the metadata that makes up a recipe file
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     io::Write,
@@ -72,7 +73,8 @@ pub struct Directories {
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
     pub host_prefix: PathBuf,
     /// The build prefix is the directory where build dependencies are installed
-    /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build script
+    /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build
+    /// script
     pub build_prefix: PathBuf,
     /// The work directory is the directory where the source code is copied to
     pub work_dir: PathBuf,
@@ -210,7 +212,8 @@ fn default_true() -> bool {
 pub struct PackagingSettings {
     /// The archive type, currently supported are `tar.bz2` and `conda`
     pub archive_type: ArchiveType,
-    /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda` archives
+    /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda`
+    /// archives
     pub compression_level: i32,
 }
 
@@ -235,7 +238,8 @@ impl PackagingSettings {
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
-    /// The host platform (usually target platform, but for `noarch` it's the build platform)
+    /// The host platform (usually target platform, but for `noarch` it's the
+    /// build platform)
     pub host_platform: Platform,
     /// The build platform (the platform that the build is running on)
     pub build_platform: Platform,
@@ -253,14 +257,17 @@ pub struct BuildConfiguration {
     pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
-    /// All subpackages coming from this output or other outputs from the same recipe
+    /// All subpackages coming from this output or other outputs from the same
+    /// recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub packaging_settings: PackagingSettings,
-    /// Whether to store the recipe and build instructions in the final package or not
+    /// Whether to store the recipe and build instructions in the final package
+    /// or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
-    /// Whether to set additional environment variables to force colors in the build script or not
+    /// Whether to set additional environment variables to force colors in the
+    /// build script or not
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 }
@@ -301,21 +308,24 @@ pub struct BuildSummary {
     pub failed: bool,
 }
 
-/// A output. This is the central element that is passed to the `run_build` function
-/// and fully specifies all the options and settings to run the build.
+/// A output. This is the central element that is passed to the `run_build`
+/// function and fully specifies all the options and settings to run the build.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
     pub recipe: Recipe,
-    /// The build configuration for this output (e.g. target_platform, channels, and other settings)
+    /// The build configuration for this output (e.g. target_platform, channels,
+    /// and other settings)
     pub build_configuration: BuildConfiguration,
-    /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
-    /// During the `run_build` functions, the dependencies are resolved and this field is filled.
+    /// The finalized dependencies for this output. If this is `None`, the
+    /// dependencies have not been resolved yet. During the `run_build`
+    /// functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
-    /// The finalized dependencies from the cache (if there is a cache instruction)
+    /// The finalized dependencies from the cache (if there is a cache
+    /// instruction)
     pub finalized_cache_dependencies: Option<FinalizedDependencies>,
-    /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
-    /// to build this output.
+    /// The finalized sources for this output. Contain the exact git hashes for
+    /// the sources that are used to build this output.
     pub finalized_sources: Option<Vec<Source>>,
 
     /// Summary of the build
@@ -341,9 +351,13 @@ impl Output {
         self.recipe.package().version()
     }
 
-    /// The build string is usually set automatically as the hash of the variant configuration.
-    pub fn build_string(&self) -> Option<&str> {
-        self.recipe.build().string()
+    /// The build string is either the build string from the recipe or computed
+    /// from the hash and build number.
+    pub fn build_string(&self) -> Cow<'_, str> {
+        self.recipe
+            .build()
+            .string
+            .resolve(&self.build_configuration.hash, self.recipe.build().number)
     }
 
     /// The channels to use when resolving dependencies
@@ -358,13 +372,13 @@ impl Output {
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
-    pub fn identifier(&self) -> Option<String> {
-        Some(format!(
+    pub fn identifier(&self) -> String {
+        format!(
             "{}-{}-{}",
             self.name().as_normalized(),
             self.version(),
-            self.build_string()?
-        ))
+            &self.build_string()
+        )
     }
 
     /// Record a warning during the build
@@ -420,7 +434,8 @@ impl Output {
     }
 
     /// Search for the resolved package with the given name in the host prefix
-    /// Returns a tuple of the package and a boolean indicating whether the package is directly requested
+    /// Returns a tuple of the package and a boolean indicating whether the
+    /// package is directly requested
     pub fn find_resolved_package(&self, name: &str) -> Option<(&RepoDataRecord, bool)> {
         let host = self.finalized_dependencies.as_ref()?.host.as_ref()?;
         let record = host
@@ -442,7 +457,7 @@ impl Output {
     /// Print a nice summary of the build
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();
-        let identifier = self.identifier().unwrap_or_default();
+        let identifier = self.identifier();
         let span = tracing::info_span!("Build summary for", recipe = identifier);
         let _enter = span.enter();
 
@@ -574,11 +589,7 @@ impl Output {
             table
         };
 
-        writeln!(
-            f,
-            "Variant configuration (hash: {}):",
-            self.build_string().unwrap_or_default()
-        )?;
+        writeln!(f, "Variant configuration (hash: {}):", self.build_string())?;
         let mut table = template();
         if table_format != comfy_table::presets::UTF8_FULL {
             table.set_header(vec!["Key", "Value"]);
@@ -642,7 +653,6 @@ mod tests {
 
 #[cfg(test)]
 mod test {
-    use rstest::*;
     use std::str::FromStr;
 
     use chrono::TimeZone;
@@ -652,11 +662,11 @@ mod test {
         VersionWithSource,
     };
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use rstest::*;
     use url::Url;
 
-    use crate::render::resolved_dependencies::{self, SourceDependency};
-
     use super::{Directories, Output};
+    use crate::render::resolved_dependencies::{self, SourceDependency};
 
     #[test]
     fn test_directories_yaml_rendering() {

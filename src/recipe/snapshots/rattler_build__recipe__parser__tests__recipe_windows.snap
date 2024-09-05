@@ -85,7 +85,7 @@ Recipe {
     ],
     build: Build {
         number: 0,
-        string: None,
+        string: Derived,
         skip: Skip(
             [
                 (

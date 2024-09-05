@@ -79,14 +79,11 @@ pub async fn skip_existing(
             "{}-{}-{}",
             output.name().as_normalized(),
             output.version(),
-            output.build_string().unwrap_or_default()
+            &output.build_string()
         ));
         if exists {
             // The identifier should always be set at this point
-            tracing::info!(
-                "Skipping build for {}",
-                output.identifier().as_deref().unwrap_or("unknown")
-            );
+            tracing::info!("Skipping build for {}", output.identifier());
         }
         !exists
     });
@@ -101,17 +98,13 @@ pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<(Output, PathBuf)> {
-    if output.build_string().is_none() {
-        miette::bail!("Build string is not set for {:?}", output.name());
-    }
-
     output
         .build_configuration
         .directories
         .create_build_dir()
         .into_diagnostic()?;
 
-    let span = tracing::info_span!("Running build for", recipe = output.identifier().unwrap());
+    let span = tracing::info_span!("Running build for", recipe = output.identifier());
     let _enter = span.enter();
     output.record_build_start();
 

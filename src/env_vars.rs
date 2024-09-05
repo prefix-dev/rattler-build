@@ -292,8 +292,8 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
             .recipe
             .build()
             .string()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| hash.to_string())
+            .resolve(&hash, output.recipe.build().number)
+            .into_owned()
     );
     insert!(vars, "PKG_HASH", hash);
 

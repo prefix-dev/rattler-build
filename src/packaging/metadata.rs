@@ -276,10 +276,7 @@ impl Output {
         Ok(IndexJson {
             name: self.name().clone(),
             version: self.version().clone().into(),
-            build: self
-                .build_string()
-                .ok_or(PackagingError::BuildStringNotSet)?
-                .to_string(),
+            build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
             arch,
             platform,

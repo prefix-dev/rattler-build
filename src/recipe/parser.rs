@@ -138,28 +138,11 @@ impl Recipe {
         })
     }
 
-    /// Build a recipe from a YAML string and use a given package hash string as default value.
-    pub fn from_yaml_with_default_hash_str(
-        yaml: &str,
-        default_pkg_hash: &str,
-        jinja_opt: SelectorConfig,
-    ) -> Result<Self, Vec<ParsingError>> {
-        let mut recipe = Self::from_yaml(yaml, jinja_opt)?;
-
-        // Set the build string to the package hash if it is not set
-        if recipe.build.string.is_none() {
-            recipe.build.string = Some(format!("{}_{}", default_pkg_hash, recipe.build.number));
-        }
-
-        Ok(recipe)
-    }
-
     /// Create recipes from a YAML [`Node`] structure.
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
-        let hash = jinja_opt.hash.clone();
         let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
@@ -267,13 +250,6 @@ impl Recipe {
                 Ok(())
             })
             .flatten_errors()?;
-
-        // Add hash to build.string if it is not set
-        if build.string.is_none() {
-            if let Some(hash) = hash {
-                build.string = Some(format!("{}_{}", hash, build.number));
-            }
-        }
 
         // evaluate the skip conditions
         build.skip = build.skip.with_eval(&jinja)?;
