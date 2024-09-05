@@ -22,7 +22,7 @@ deploy-dev = "mike deploy --push dev devel"
 
 [dependencies]
 openssl = "3.*"
-rust = ">=1.76.0,<1.77"
+rust = "~=1.80.0"
 pre-commit = "3.3.3.*"
 compilers = "1.6.0.*"
 libssh2 = "1.11.0.*"

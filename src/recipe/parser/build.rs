@@ -638,7 +638,7 @@ impl ForceFileType {
     }
 }
 
-///
+/// Configuration related to prefix replacement
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixDetection {
     /// Options to force if a file is detected as text or binary

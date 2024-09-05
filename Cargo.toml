@@ -12,6 +12,7 @@ readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
+rust-version = "1.80.0"
 
 [features]
 default = ['native-tls', 'recipe-generation']
@@ -44,28 +45,6 @@ required-features = ["recipe-generation"]
 [dependencies]
 serde = { version = "1.0.209", features = ["derive"] }
 serde_yaml = "0.9.34"
-rattler = { version = "0.27.7", default-features = false, features = [
-    "cli-tools",
-    "indicatif",
-] }
-rattler_cache = { version = "0.1.7", default-features = false }
-rattler_conda_types = { version = "0.27.3", default-features = false }
-rattler_digest = { version = "1.0.1", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.25", default-features = false }
-rattler_networking = { version = "0.21.2", default-features = false }
-rattler_redaction = { version = "0.1.1" }
-rattler_repodata_gateway = { version = "0.21.9", default-features = false, features = [
-    "gateway",
-] }
-rattler_shell = { version = "0.21.7", default-features = false, features = [
-    "sysinfo",
-] }
-rattler_solve = { version = "1.0.4", default-features = false, features = [
-    "resolvo",
-    "serde",
-] }
-rattler_virtual_packages = { version = "1.1.0", default-features = false }
-rattler_package_streaming = { version = "0.22.4", default-features = false }
 anyhow = "1.0.86"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
@@ -149,6 +128,20 @@ regex = "1.10.6"
 clap-markdown = { version = "=0.1.3", optional = true }
 async-recursion = "1.1.1"
 
+# Rattler crates
+rattler = { version = "0.27.10", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler_cache = { version = "0.2.2", default-features = false }
+rattler_conda_types = { version = "0.27.5", default-features = false }
+rattler_digest = { version = "1.0.2", default-features = false, features = ["serde"] }
+rattler_index = { version = "0.19.27", default-features = false }
+rattler_networking = { version = "0.21.4", default-features = false }
+rattler_redaction = { version = "0.1.2" }
+rattler_repodata_gateway = { version = "0.21.12", default-features = false, features = ["gateway"] }
+rattler_shell = { version = "0.22.0", default-features = false, features = ["sysinfo"] }
+rattler_solve = { version = "1.0.6", default-features = false, features = ["resolvo", "serde"] }
+rattler_virtual_packages = { version = "1.1.3", default-features = false }
+rattler_package_streaming = { version = "0.22.6", default-features = false }
+
 [dev-dependencies]
 insta = { version = "1.39.0", features = ["yaml"] }
 rstest = "0.21.0"
@@ -185,14 +178,16 @@ pre-build = [
 clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 
 
-# rattler = { path = "../rattler/crates/rattler" }
-# rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
-# rattler_digest = { path = "../rattler/crates/rattler_digest" }
-# rattler_index = { path = "../rattler/crates/rattler_index" }
-# rattler_networking = { path = "../rattler/crates/rattler_networking" }
-# rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
-# rattler_shell = { path = "../rattler/crates/rattler_shell" }
-# rattler_solve = { path = "../rattler/crates/rattler_solve" }
-# rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-# rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
+#rattler = { path = "../rattler/crates/rattler" }
+#rattler_cache = { path = "../rattler/crates/rattler_cache" }
+#rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
+#rattler_digest = { path = "../rattler/crates/rattler_digest" }
+#rattler_index = { path = "../rattler/crates/rattler_index" }
+#rattler_networking = { path = "../rattler/crates/rattler_networking" }
+#rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
+#rattler_shell = { path = "../rattler/crates/rattler_shell" }
+#rattler_solve = { path = "../rattler/crates/rattler_solve" }
+#rattler_redaction = { path = "../rattler/crates/rattler_redaction" }
+#rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
+#rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
 #clap-markdown = { path = "../clap-markdown" }

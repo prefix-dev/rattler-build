@@ -586,7 +586,8 @@ async fn amend_run_exports(
                 .await
             {
                 Ok(package_dir) => {
-                    let run_exports = RunExportsJson::from_package_directory(package_dir).ok();
+                    let run_exports =
+                        RunExportsJson::from_package_directory(package_dir.path()).ok();
                     Ok((pkg_idx, run_exports))
                 }
                 Err(e) => Err(e),

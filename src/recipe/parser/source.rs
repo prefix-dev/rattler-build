@@ -1,10 +1,10 @@
 //! Parse the source section of a recipe
 
-use std::{fmt, path::PathBuf, str::FromStr};
-
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use std::fmt::Display;
+use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
 use crate::{
@@ -116,13 +116,13 @@ impl GitRev {
     }
 }
 
-impl ToString for GitRev {
-    fn to_string(&self) -> String {
+impl Display for GitRev {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Branch(branch) => format!("refs/heads/{}", branch),
-            Self::Tag(tag) => format!("refs/tags/{}", tag),
-            Self::Head => "HEAD".into(),
-            Self::Commit(commit) => commit.clone(),
+            Self::Branch(branch) => write!(f, "refs/heads/{}", branch),
+            Self::Tag(tag) => write!(f, "refs/tags/{}", tag),
+            Self::Head => write!(f, "HEAD"),
+            Self::Commit(commit) => write!(f, "{}", commit),
         }
     }
 }

@@ -300,7 +300,7 @@ pub async fn load_repodatas(
 
 pub async fn install_packages(
     name: &str,
-    required_packages: &Vec<RepoDataRecord>,
+    required_packages: &[RepoDataRecord],
     target_platform: &Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
@@ -336,7 +336,7 @@ pub async fn install_packages(
                 )
                 .finish(),
         )
-        .install(&target_prefix, required_packages.clone())
+        .install(&target_prefix, required_packages.to_owned())
         .await?;
 
     tracing::info!(
