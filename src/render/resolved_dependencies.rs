@@ -24,7 +24,7 @@ use url::Url;
 
 use super::pin::PinError;
 use crate::{
-    metadata::{BuildConfiguration, Output},
+    metadata::{build_reindexed_channels, BuildConfiguration, Output},
     recipe::parser::{Dependency, Requirements},
     render::{
         package_cache_reporter::PackageCacheReporter,
@@ -983,9 +983,9 @@ impl Output {
             return Ok(self);
         }
 
-        let channels = self
-            .reindex_channels()
+        let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
             .map_err(ResolveError::RefreshChannelError)?;
+
         let finalized_dependencies = resolve_dependencies(
             self.recipe.requirements(),
             &self,

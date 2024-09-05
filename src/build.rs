@@ -2,15 +2,17 @@
 //! [`Output`]
 use std::{path::PathBuf, vec};
 
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
-use rattler_index::index;
-use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
-    metadata::Output, package_test, package_test::TestConfiguration, recipe::parser::TestType,
-    render::solver::load_repodatas, tool_configuration,
+    metadata::{build_reindexed_channels, Output},
+    package_test,
+    package_test::TestConfiguration,
+    recipe::parser::TestType,
+    render::solver::load_repodatas,
+    tool_configuration,
 };
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -33,7 +35,10 @@ pub async fn skip_existing(
         return Ok(outputs);
     };
 
-    let all_channels = first_output.reindex_channels().into_diagnostic()?;
+    let all_channels =
+        build_reindexed_channels(&first_output.build_configuration, tool_configuration)
+            .into_diagnostic()
+            .context("failed to reindex output channel")?;
 
     let match_specs = outputs
         .iter()
@@ -110,12 +115,6 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    index(
-        &directories.output_dir,
-        Some(&output.build_configuration.target_platform.clone()),
-    )
-    .into_diagnostic()?;
-
     let output = output
         .fetch_sources(tool_configuration)
         .await
@@ -140,16 +139,6 @@ pub async fn run_build(
         .create_package(tool_configuration)
         .await
         .into_diagnostic()?;
-
-    // Clear the cache for the output directory in the shared gateway.
-    tool_configuration.repodata_gateway.clear_repodata_cache(
-        &Channel::from_directory(&output.build_configuration.directories.output_dir),
-        SubdirSelection::Some(
-            [output.build_configuration.target_platform.to_string()]
-                .into_iter()
-                .collect(),
-        ),
-    );
 
     output.record_artifact(&result, &paths_json);
 
@@ -180,7 +169,10 @@ pub async fn run_build(
                 test_prefix: directories.work_dir.join("test"),
                 target_platform: Some(output.build_configuration.host_platform),
                 keep_test_prefix: tool_configuration.no_clean,
-                channels: output.reindex_channels().into_diagnostic()?,
+                //channels: output.reindex_channels().into_diagnostic()?,
+                channels: build_reindexed_channels(&output.build_configuration, tool_configuration)
+                    .into_diagnostic()
+                    .context("failed to reindex output channel")?,
                 channel_priority: ChannelPriority::Strict,
                 solve_strategy: SolveStrategy::Highest,
                 tool_configuration: tool_configuration.clone(),
