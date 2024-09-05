@@ -8,8 +8,7 @@ use rattler_index::index;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
-    metadata::Output, package_test, package_test::TestConfiguration, recipe::parser::TestType,
-    render::solver::load_repodatas, tool_configuration,
+    metadata::Output, package_test::{self, TestConfiguration}, packaging::remove_package, recipe::parser::TestType, render::solver::load_repodatas, tool_configuration
 };
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -134,12 +133,11 @@ pub async fn run_build(
         .create_package(tool_configuration)
         .await
         .into_diagnostic()?;
-
     output.record_artifact(&result, &paths_json);
 
     let span = tracing::info_span!("Running package tests");
     let enter = span.enter();
-
+    
     // We run all the package content tests
     for test in output.recipe.tests() {
         // TODO we could also run each of the (potentially multiple) test scripts and
@@ -158,7 +156,7 @@ pub async fn run_build(
     if tool_configuration.no_test {
         tracing::info!("Skipping tests");
     } else {
-        package_test::run_test(
+        let test_result = package_test::run_test(
             &result,
             &TestConfiguration {
                 test_prefix: directories.work_dir.join("test"),
@@ -171,8 +169,13 @@ pub async fn run_build(
             },
             None,
         )
-        .await
-        .into_diagnostic()?;
+        .await;
+        if test_result.is_err() {
+            tracing::info!("Tests failed");
+            tracing::info!("Removing package");
+            remove_package(&result)?;
+        }
+        test_result.into_diagnostic()?;
     }
 
     drop(enter);
