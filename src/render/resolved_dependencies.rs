@@ -614,27 +614,32 @@ pub async fn install_environments(
         .as_ref()
         .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-    if let Some(build_deps) = dependencies.build.as_ref() {
-        install_packages(
-            "build",
-            &build_deps.resolved,
-            &output.build_configuration.build_platform,
-            &output.build_configuration.directories.build_prefix,
-            tool_configuration,
-        )
-        .await?;
-    }
+    const EMPTY_RECORDS: Vec<RepoDataRecord> = Vec::new();
+    install_packages(
+        "build",
+        dependencies
+            .build
+            .as_ref()
+            .map(|deps| &deps.resolved)
+            .unwrap_or(&EMPTY_RECORDS),
+        &output.build_configuration.build_platform,
+        &output.build_configuration.directories.build_prefix,
+        tool_configuration,
+    )
+    .await?;
 
-    if let Some(host_deps) = dependencies.host.as_ref() {
-        install_packages(
-            "host",
-            &host_deps.resolved,
-            &output.build_configuration.host_platform,
-            &output.build_configuration.directories.host_prefix,
-            tool_configuration,
-        )
-        .await?;
-    }
+    install_packages(
+        "host",
+        dependencies
+            .host
+            .as_ref()
+            .map(|deps| &deps.resolved)
+            .unwrap_or(&EMPTY_RECORDS),
+        &output.build_configuration.host_platform,
+        &output.build_configuration.directories.host_prefix,
+        tool_configuration,
+    )
+    .await?;
 
     Ok(())
 }

@@ -5,6 +5,7 @@ use std::{path::PathBuf, vec};
 use miette::IntoDiagnostic;
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
 use rattler_index::index;
+use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
@@ -146,6 +147,16 @@ pub async fn run_build(
         .create_package(tool_configuration)
         .await
         .into_diagnostic()?;
+
+    // Clear the cache for the output directory in the shared gateway.
+    tool_configuration.repodata_gateway.clear_repodata_cache(
+        &Channel::from_directory(&output.build_configuration.directories.output_dir),
+        SubdirSelection::Some(
+            [output.build_configuration.target_platform.to_string()]
+                .into_iter()
+                .collect(),
+        ),
+    );
 
     output.record_artifact(&result, &paths_json);
 

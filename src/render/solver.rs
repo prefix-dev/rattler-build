@@ -4,6 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use anyhow::Context;
 use comfy_table::Table;
 use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
@@ -303,45 +304,44 @@ pub async fn install_packages(
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<()> {
-    let installed_packages = vec![];
+    // Make sure the target prefix exists, regardless of whether we'll actually
+    // install anything in there.
+    tokio::fs::create_dir_all(&target_prefix)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to create target prefix: {}",
+                target_prefix.display()
+            )
+        })?;
 
     tracing::info!("\nInstalling {name} environment\n");
+    Installer::new()
+        .with_download_client(tool_configuration.client.clone())
+        .with_target_platform(*target_platform)
+        .with_execute_link_scripts(true)
+        .with_package_cache(tool_configuration.package_cache.clone())
+        .with_reporter(
+            IndicatifReporter::builder()
+                .with_multi_progress(
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                )
+                .with_formatter(
+                    DefaultProgressFormatter::default()
+                        .with_prefix(tool_configuration.fancy_log_handler.with_indent_levels("")),
+                )
+                .finish(),
+        )
+        .install(&target_prefix, required_packages.clone())
+        .await?;
 
-    if !required_packages.is_empty() {
-        Installer::new()
-            .with_download_client(tool_configuration.client.clone())
-            .with_target_platform(*target_platform)
-            .with_installed_packages(installed_packages)
-            .with_execute_link_scripts(true)
-            .with_package_cache(tool_configuration.package_cache.clone())
-            .with_reporter(
-                IndicatifReporter::builder()
-                    .with_multi_progress(
-                        tool_configuration
-                            .fancy_log_handler
-                            .multi_progress()
-                            .clone(),
-                    )
-                    .with_formatter(
-                        DefaultProgressFormatter::default().with_prefix(
-                            tool_configuration.fancy_log_handler.with_indent_levels(""),
-                        ),
-                    )
-                    .finish(),
-            )
-            .install(&target_prefix, required_packages.clone())
-            .await?;
-
-        tracing::info!(
-            "{} Successfully updated the environment",
-            console::style(console::Emoji("✔", "")).green(),
-        );
-    } else {
-        tracing::info!(
-            "{} Already up to date",
-            console::style(console::Emoji("✔", "")).green(),
-        );
-    }
+    tracing::info!(
+        "{} Successfully updated the {name} environment",
+        console::style(console::Emoji("✔", "")).green(),
+    );
 
     Ok(())
 }
