@@ -14,7 +14,7 @@ documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
 
 [features]
-default = ['native-tls', 'recipe-generation']
+default = ['rustls-tls', 'recipe-generation']
 native-tls = [
     'reqwest/native-tls',
     'rattler/native-tls',
