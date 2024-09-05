@@ -191,8 +191,10 @@ Build a package from a recipe
 
 - `--package-format <PACKAGE_FORMAT>`
 
-	The package format to use for the build. Can be one of `tar-bz2` or `conda`.
-You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
+	The package format to use for the build. Can be one of `tar-bz2` or
+`conda`. You can also add a compression level to the package format,
+e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
+22).
 
 	- Default value: `conda`
 
