@@ -2,16 +2,15 @@ use std::{
     future::IntoFuture,
     path::Path,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
+use anyhow::Context;
 use comfy_table::Table;
 use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
-use rattler_repodata_gateway::Gateway;
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use url::Url;
@@ -56,10 +55,10 @@ fn print_as_table(packages: &[RepoDataRecord]) {
     tracing::info!("\n{table}");
 }
 
-pub async fn create_environment(
+pub async fn solve_environment(
+    name: &str,
     specs: &[MatchSpec],
     target_platform: &Platform,
-    target_prefix: &Path,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
@@ -69,7 +68,7 @@ pub async fn create_environment(
     // clap to deal with this because we need to parse the `channel_config` when
     // parsing matchspecs.
 
-    tracing::info!("\nResolving environment for:\n");
+    tracing::info!("\nResolving {name} environment:\n");
     tracing::info!("  Platform: {}", target_platform);
     tracing::info!("  Channels: ");
     for channel in channels {
@@ -119,17 +118,42 @@ pub async fn create_environment(
         .fancy_log_handler
         .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
-    if !tool_configuration.render_only {
-        install_packages(
-            &required_packages,
-            target_platform,
-            target_prefix,
-            tool_configuration,
-        )
-        .await?;
-    } else {
-        tracing::info!("skipping installation when --render-only is used");
-    }
+    // Print the result as a table
+    print_as_table(&required_packages);
+
+    Ok(required_packages)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn create_environment(
+    name: &str,
+    specs: &[MatchSpec],
+    target_platform: &Platform,
+    target_prefix: &Path,
+    channels: &[Url],
+    tool_configuration: &tool_configuration::Configuration,
+    channel_priority: ChannelPriority,
+    solve_strategy: SolveStrategy,
+) -> anyhow::Result<Vec<RepoDataRecord>> {
+    let required_packages = solve_environment(
+        name,
+        specs,
+        target_platform,
+        channels,
+        tool_configuration,
+        channel_priority,
+        solve_strategy,
+    )
+    .await?;
+
+    install_packages(
+        name,
+        &required_packages,
+        target_platform,
+        target_prefix,
+        tool_configuration,
+    )
+    .await?;
 
     Ok(required_packages)
 }
@@ -159,14 +183,16 @@ impl rattler_repodata_gateway::Reporter for GatewayReporter {
         let progress_bar = self
             .multi_progress
             .add(ProgressBar::new(1))
-            .with_finish(indicatif::ProgressFinish::AndLeave);
-
-        progress_bar.enable_steady_tick(Duration::from_millis(100));
+            .with_finish(indicatif::ProgressFinish::AndLeave)
+            .with_prefix("Downloading");
 
         // use the configured style
         if let Some(template) = &self.progress_template {
             progress_bar.set_style(template.clone());
         }
+
+        // progress_bar.enable_steady_tick(Duration::from_millis(100));
+
         let mut progress_bars = self.progress_bars.lock().unwrap();
         progress_bars.push(progress_bar);
         progress_bars.len() - 1
@@ -230,31 +256,13 @@ pub async fn load_repodatas(
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<rattler_repodata_gateway::RepoData>> {
-    let cache_dir = rattler::default_cache_dir()?;
-    let download_client = tool_configuration.client.clone();
-
-    // Get the package names from the matchspecs so we can only load the package
-    // records that we need.
-    let gateway = Gateway::builder()
-        .with_cache_dir(cache_dir.join("repodata"))
-        .with_client(download_client.clone())
-        .finish();
-
     let channels = channels
         .iter()
         .map(|url| Channel::from_url(url.clone()))
         .collect::<Vec<_>>();
 
-    let pb =
-        ProgressBar::new(50).with_style(tool_configuration.fancy_log_handler.default_bytes_style());
-
-    let test_pb = tool_configuration
-        .fancy_log_handler
-        .multi_progress()
-        .add(pb);
-    test_pb.finish();
-
-    let result = gateway
+    let result = tool_configuration
+        .repodata_gateway
         .query(
             channels,
             [*target_platform, Platform::NoArch],
@@ -284,55 +292,57 @@ pub async fn load_repodatas(
     tool_configuration
         .fancy_log_handler
         .multi_progress()
-        .clear()?;
+        .clear()
+        .unwrap();
 
     Ok(result)
 }
 
 pub async fn install_packages(
-    required_packages: &Vec<RepoDataRecord>,
+    name: &str,
+    required_packages: &[RepoDataRecord],
     target_platform: &Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<()> {
-    let installed_packages = vec![];
-
-    print_as_table(required_packages);
-
-    if !required_packages.is_empty() {
-        Installer::new()
-            .with_download_client(tool_configuration.client.clone())
-            .with_target_platform(*target_platform)
-            .with_installed_packages(installed_packages)
-            .with_execute_link_scripts(true)
-            .with_reporter(
-                IndicatifReporter::builder()
-                    .with_multi_progress(
-                        tool_configuration
-                            .fancy_log_handler
-                            .multi_progress()
-                            .clone(),
-                    )
-                    .with_formatter(
-                        DefaultProgressFormatter::default().with_prefix(
-                            tool_configuration.fancy_log_handler.with_indent_levels(""),
-                        ),
-                    )
-                    .finish(),
+    // Make sure the target prefix exists, regardless of whether we'll actually
+    // install anything in there.
+    tokio::fs::create_dir_all(&target_prefix)
+        .await
+        .with_context(|| {
+            format!(
+                "failed to create target prefix: {}",
+                target_prefix.display()
             )
-            .install(&target_prefix, required_packages.clone())
-            .await?;
+        })?;
 
-        tracing::info!(
-            "{} Successfully updated the environment",
-            console::style(console::Emoji("✔", "")).green(),
-        );
-    } else {
-        tracing::info!(
-            "{} Already up to date",
-            console::style(console::Emoji("✔", "")).green(),
-        );
-    }
+    tracing::info!("\nInstalling {name} environment\n");
+    Installer::new()
+        .with_download_client(tool_configuration.client.clone())
+        .with_target_platform(*target_platform)
+        .with_execute_link_scripts(true)
+        .with_package_cache(tool_configuration.package_cache.clone())
+        .with_reporter(
+            IndicatifReporter::builder()
+                .with_multi_progress(
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                )
+                .with_formatter(
+                    DefaultProgressFormatter::default()
+                        .with_prefix(tool_configuration.fancy_log_handler.with_indent_levels("")),
+                )
+                .finish(),
+        )
+        .install(&target_prefix, required_packages.to_owned())
+        .await?;
+
+    tracing::info!(
+        "{} Successfully updated the {name} environment",
+        console::style(console::Emoji("✔", "")).green(),
+    );
 
     Ok(())
 }

@@ -1,46 +1,55 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::{Display, Formatter},
-    fs,
-    path::Path,
     str::FromStr,
+    sync::Arc,
 };
 
-use crate::{
-    metadata::{BuildConfiguration, Output},
-    recipe::parser::Requirements,
-    tool_configuration,
-};
-use indicatif::HumanBytes;
-use rattler::package_cache::CacheKey;
+use indicatif::{HumanBytes, MultiProgress, ProgressBar};
+use rattler::install::Placement;
+use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
 use rattler_conda_types::{
     package::{PackageFile, RunExportsJson},
-    MatchSpec, PackageName, ParseStrictness, Platform, RepoDataRecord, StringMatcher, VersionSpec,
+    version_spec::ParseVersionSpecError,
+    MatchSpec, PackageName, PackageRecord, ParseStrictness, Platform, RepoDataRecord,
+    StringMatcher, VersionSpec,
 };
-use rattler_conda_types::{version_spec::ParseVersionSpecError, PackageRecord};
+use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
-use super::{pin::PinError, solver::create_environment};
-use crate::recipe::parser::Dependency;
-use crate::render::pin::PinArgs;
-use crate::render::solver::install_packages;
 use serde_with::{serde_as, DisplayFromStr};
+use thiserror::Error;
+use tokio::sync::{mpsc, Semaphore};
 use url::Url;
+
+use super::pin::PinError;
+use crate::{
+    metadata::{build_reindexed_channels, BuildConfiguration, Output},
+    recipe::parser::{Dependency, Requirements},
+    render::{
+        package_cache_reporter::PackageCacheReporter,
+        pin::PinArgs,
+        solver::{install_packages, solve_environment},
+    },
+    tool_configuration,
+    tool_configuration::Configuration,
+};
 
 /// A enum to keep track of where a given Dependency comes from
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum DependencyInfo {
-    /// The dependency is a direct dependency of the package, with a variant applied
-    /// from the variant config
+    /// The dependency is a direct dependency of the package, with a variant
+    /// applied from the variant config
     Variant(VariantDependency),
 
-    /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
+    /// This is a special pin dependency (e.g. `{{ pin_subpackage('foo',
+    /// exact=True) }}`
     PinSubpackage(PinSubpackageDependency),
 
-    /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo') }}`
+    /// This is a special run_exports dependency (e.g. `{{ pin_compatible('foo')
+    /// }}`
     PinCompatible(PinCompatibleDependency),
 
     /// This is a special run_exports dependency from another package
@@ -70,7 +79,8 @@ impl From<VariantDependency> for DependencyInfo {
     }
 }
 
-/// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True) }}`
+/// This is a special pin dependency (e.g. `{{ pin_subpackage('foo', exact=True)
+/// }}`
 #[serde_as]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -318,7 +328,8 @@ impl ResolvedDependencies {
     }
 
     /// Collect run exports from this environment
-    /// If `direct_only` is set to true, only the run exports of the direct dependencies are collected
+    /// If `direct_only` is set to true, only the run exports of the direct
+    /// dependencies are collected
     fn run_exports(&self, direct_only: bool) -> HashMap<PackageName, RunExportsJson> {
         let mut result = HashMap::new();
         for record in &self.resolved {
@@ -409,8 +420,8 @@ pub enum ResolveError {
     #[error("Failed to resolve dependencies: {0}")]
     DependencyResolutionError(#[from] anyhow::Error),
 
-    #[error("Could not collect run exports: {0}")]
-    CouldNotCollectRunExports(std::io::Error),
+    #[error("Could not collect run exports")]
+    CouldNotCollectRunExports(#[from] PackageCacheError),
 
     #[error("Could not parse version spec: {0}")]
     VersionSpecParseError(#[from] ParseVersionSpecError),
@@ -437,8 +448,8 @@ pub enum ResolveError {
     RefreshChannelError(std::io::Error),
 }
 
-/// Apply a variant to a dependency list and resolve all pin_subpackage and compiler
-/// dependencies
+/// Apply a variant to a dependency list and resolve all pin_subpackage and
+/// compiler dependencies
 pub fn apply_variant(
     raw_specs: &[Dependency],
     build_configuration: &BuildConfiguration,
@@ -528,22 +539,68 @@ pub fn apply_variant(
         .collect()
 }
 
-/// Collect run exports from the package cache and add them to the package records.
-fn amend_run_exports(
+/// Collect run exports from the package cache and add them to the package
+/// records.
+/// TODO: There are many ways that would allow us to optimize this function.
+/// 1. This currently downloads an entire package, but we only need the
+///    `run_exports.json`.
+/// 2. There are special run_exports.json files available for some channels.
+async fn amend_run_exports(
     records: &mut [RepoDataRecord],
-    cache_dir: &Path,
-) -> Result<(), std::io::Error> {
-    for pkg in records {
+    client: ClientWithMiddleware,
+    package_cache: PackageCache,
+    multi_progress: MultiProgress,
+    progress_prefix: impl Into<Cow<'static, str>>,
+    top_level_pb: Option<ProgressBar>,
+) -> Result<(), PackageCacheError> {
+    let max_concurrent_requests = Arc::new(Semaphore::new(50));
+    let (tx, mut rx) = mpsc::channel(50);
+
+    let mut progress = PackageCacheReporter::new(
+        multi_progress,
+        top_level_pb.map_or(Placement::End, Placement::After),
+    )
+    .with_prefix(progress_prefix);
+
+    for (pkg_idx, pkg) in records.iter().enumerate() {
         if pkg.package_record.run_exports.is_some() {
             // If the package already boasts run exports, we don't need to do anything.
             continue;
         }
 
-        // TODO: This is a bit fragile, as there is no guarantee how the package cache stores the records.
-        let cache_key: CacheKey = Into::into(&pkg.package_record);
-        let pkc = cache_dir.join(cache_key.to_string());
+        let progress_reporter = Arc::new(progress.add(pkg));
 
-        pkg.package_record.run_exports = RunExportsJson::from_package_directory(pkc).ok();
+        let cache_key = CacheKey::from(&pkg.package_record);
+        let client = client.clone();
+        let url = pkg.url.clone();
+        let max_concurrent_requests = max_concurrent_requests.clone();
+        let tx = tx.clone();
+        let package_cache = package_cache.clone();
+        tokio::spawn(async move {
+            let _permit = max_concurrent_requests
+                .acquire_owned()
+                .await
+                .expect("semaphore error");
+            let result = match package_cache
+                .get_or_fetch_from_url(cache_key, url, client, Some(progress_reporter))
+                .await
+            {
+                Ok(package_dir) => {
+                    let run_exports =
+                        RunExportsJson::from_package_directory(package_dir.path()).ok();
+                    Ok((pkg_idx, run_exports))
+                }
+                Err(e) => Err(e),
+            };
+            let _ = tx.send(result).await;
+        });
+    }
+
+    drop(tx);
+
+    while let Some(result) = rx.recv().await {
+        let (pkg_idx, run_exports) = result?;
+        records[pkg_idx].package_record.run_exports = run_exports;
     }
 
     Ok(())
@@ -558,31 +615,39 @@ pub async fn install_environments(
         .as_ref()
         .ok_or(ResolveError::FinalizedDependencyNotFound)?;
 
-    if let Some(build_deps) = dependencies.build.as_ref() {
-        install_packages(
-            &build_deps.resolved,
-            &output.build_configuration.build_platform,
-            &output.build_configuration.directories.build_prefix,
-            tool_configuration,
-        )
-        .await?;
-    }
+    const EMPTY_RECORDS: Vec<RepoDataRecord> = Vec::new();
+    install_packages(
+        "build",
+        dependencies
+            .build
+            .as_ref()
+            .map(|deps| &deps.resolved)
+            .unwrap_or(&EMPTY_RECORDS),
+        &output.build_configuration.build_platform,
+        &output.build_configuration.directories.build_prefix,
+        tool_configuration,
+    )
+    .await?;
 
-    if let Some(host_deps) = dependencies.host.as_ref() {
-        install_packages(
-            &host_deps.resolved,
-            &output.build_configuration.host_platform,
-            &output.build_configuration.directories.host_prefix,
-            tool_configuration,
-        )
-        .await?;
-    }
+    install_packages(
+        "host",
+        dependencies
+            .host
+            .as_ref()
+            .map(|deps| &deps.resolved)
+            .unwrap_or(&EMPTY_RECORDS),
+        &output.build_configuration.host_platform,
+        &output.build_configuration.directories.host_prefix,
+        tool_configuration,
+    )
+    .await?;
 
     Ok(())
 }
 
 /// This function renders the run exports into `RunExportsJson` format
-/// This function applies any variant information or `pin_subpackage` specifications to the run exports.
+/// This function applies any variant information or `pin_subpackage`
+/// specifications to the run exports.
 fn render_run_exports(
     output: &Output,
     compatibility_specs: &HashMap<PackageName, PackageRecord>,
@@ -613,11 +678,13 @@ fn render_run_exports(
 /// This function resolves the dependencies of a recipe.
 /// To do this, we have to run a couple of steps:
 ///
-/// 1. Apply the variants to the dependencies, and compiler & pin_subpackage specs
+/// 1. Apply the variants to the dependencies, and compiler & pin_subpackage
+///    specs
 /// 2. Extend the dependencies with the run exports of the dependencies "above"
 /// 3. Resolve the dependencies
 /// 4. Download the packages
-/// 5. Extract the run exports from the downloaded packages (for the next environment)
+/// 5. Extract the run exports from the downloaded packages (for the next
+///    environment)
 pub(crate) async fn resolve_dependencies(
     requirements: &Requirements,
     output: &Output,
@@ -625,9 +692,6 @@ pub(crate) async fn resolve_dependencies(
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();
-
-    let cache_dir = rattler::default_cache_dir().expect("Could not get default cache dir");
-    let pkgs_dir = cache_dir.join("pkgs");
 
     let mut compatibility_specs = HashMap::new();
 
@@ -643,10 +707,10 @@ pub(crate) async fn resolve_dependencies(
             .map(|s| s.spec().clone())
             .collect::<Vec<_>>();
 
-        let mut resolved = create_environment(
+        let mut resolved = solve_environment(
+            "build",
             &match_specs,
             &output.build_configuration.build_platform,
-            &output.build_configuration.directories.build_prefix,
             channels,
             tool_configuration,
             output.build_configuration.channel_priority,
@@ -656,7 +720,24 @@ pub(crate) async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         // Add the run exports to the records that don't have them yet.
-        amend_run_exports(&mut resolved, &pkgs_dir)
+        tool_configuration
+            .fancy_log_handler
+            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                amend_run_exports(
+                    &mut resolved,
+                    tool_configuration.client.clone(),
+                    tool_configuration.package_cache.clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .with_indent_levels("  "),
+                    Some(pb),
+                )
+            })
+            .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
 
         resolved.iter().for_each(|r| {
@@ -668,8 +749,6 @@ pub(crate) async fn resolve_dependencies(
             resolved,
         })
     } else {
-        fs::create_dir_all(&output.build_configuration.directories.build_prefix)
-            .expect("Could not create build prefix");
         None
     };
 
@@ -680,7 +759,8 @@ pub(crate) async fn resolve_dependencies(
         &compatibility_specs,
     )?;
 
-    // Apply the strong run exports from the build environment to the host environment
+    // Apply the strong run exports from the build environment to the host
+    // environment
     let mut build_run_exports = HashMap::new();
     if let Some(build_env) = &build_env {
         build_run_exports.extend(build_env.run_exports(true));
@@ -721,10 +801,10 @@ pub(crate) async fn resolve_dependencies(
     }
 
     let host_env = if !match_specs.is_empty() {
-        let mut resolved = create_environment(
+        let mut resolved = solve_environment(
+            "host",
             &match_specs,
             &output.build_configuration.host_platform,
-            &output.build_configuration.directories.host_prefix,
             channels,
             tool_configuration,
             output.build_configuration.channel_priority,
@@ -734,7 +814,24 @@ pub(crate) async fn resolve_dependencies(
         .map_err(ResolveError::from)?;
 
         // Add the run exports to the records that don't have them yet.
-        amend_run_exports(&mut resolved, &pkgs_dir)
+        tool_configuration
+            .fancy_log_handler
+            .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
+                amend_run_exports(
+                    &mut resolved,
+                    tool_configuration.client.clone(),
+                    tool_configuration.package_cache.clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .multi_progress()
+                        .clone(),
+                    tool_configuration
+                        .fancy_log_handler
+                        .with_indent_levels("  "),
+                    Some(pb),
+                )
+            })
+            .await
             .map_err(ResolveError::CouldNotCollectRunExports)?;
 
         resolved.iter().for_each(|r| {
@@ -746,8 +843,6 @@ pub(crate) async fn resolve_dependencies(
             resolved,
         })
     } else {
-        fs::create_dir_all(&output.build_configuration.directories.host_prefix)
-            .expect("Could not create host prefix");
         None
     };
 
@@ -884,31 +979,35 @@ impl Output {
         let span = tracing::info_span!("Resolving environments");
         let _enter = span.enter();
 
-        let output = if self.finalized_dependencies.is_some() {
-            tracing::info!("Using finalized dependencies");
+        if self.finalized_dependencies.is_some() {
+            return Ok(self);
+        }
 
-            // The output already has the finalized dependencies, so we can just use it as-is
-            install_environments(&self, tool_configuration).await?;
-            self.clone()
-        } else {
-            let channels = self
-                .reindex_channels()
-                .map_err(ResolveError::RefreshChannelError)?;
-            let finalized_dependencies = resolve_dependencies(
-                self.recipe.requirements(),
-                &self,
-                &channels,
-                tool_configuration,
-            )
-            .await?;
+        let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
+            .map_err(ResolveError::RefreshChannelError)?;
 
-            // The output with the resolved dependencies
-            Output {
-                finalized_dependencies: Some(finalized_dependencies),
-                ..self.clone()
-            }
-        };
-        Ok(output)
+        let finalized_dependencies = resolve_dependencies(
+            self.recipe.requirements(),
+            &self,
+            &channels,
+            tool_configuration,
+        )
+        .await?;
+
+        // The output with the resolved dependencies
+        Ok(Output {
+            finalized_dependencies: Some(finalized_dependencies),
+            ..self.clone()
+        })
+    }
+
+    /// Install the environments of the outputs. Assumes that the dependencies
+    /// for the environment have already been resolved.
+    pub async fn install_environments(
+        &self,
+        tool_configuration: &Configuration,
+    ) -> Result<(), ResolveError> {
+        install_environments(self, tool_configuration).await
     }
 }
 

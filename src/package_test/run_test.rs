@@ -177,7 +177,7 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
 }
 
 /// The configuration for a test
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
@@ -357,6 +357,7 @@ pub async fn run_test(
         dependencies.push(match_spec);
 
         create_environment(
+            "test",
             &dependencies,
             &platform,
             &prefix,
@@ -446,6 +447,7 @@ impl PythonTest {
         }
 
         create_environment(
+            "test",
             &dependencies,
             &Platform::current(),
             prefix,
@@ -525,6 +527,7 @@ impl CommandsTest {
                 .collect::<Result<Vec<_>, _>>()?;
 
             create_environment(
+                "test",
                 &build_dependencies,
                 &platform,
                 &build_prefix,
@@ -556,6 +559,7 @@ impl CommandsTest {
 
         let run_env = prefix.join("run");
         create_environment(
+            "test",
             &dependencies,
             &platform,
             &run_env,
@@ -615,19 +619,16 @@ impl DownstreamTest {
                 ParseStrictness::Lenient,
             )?,
         ];
-        let render_only_tool_config = tool_configuration::Configuration {
-            render_only: true,
-            ..config.tool_configuration.clone()
-        };
 
         let target_platform = config.target_platform.unwrap_or_else(Platform::current);
 
         let resolved = create_environment(
+            "test",
             &match_specs,
             &target_platform,
             prefix,
             &config.channels,
-            &render_only_tool_config,
+            &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
         )

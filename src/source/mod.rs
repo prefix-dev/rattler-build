@@ -254,7 +254,7 @@ pub async fn fetch_sources(
                             return Err(SourceError::ValidationFailed);
                         }
                     }
-                    fs::copy(&src_path, &dest_dir.join(file_name))?;
+                    fs::copy(&src_path, dest_dir.join(file_name))?;
                 } else {
                     return Err(SourceError::FileNotFound(src_path));
                 }

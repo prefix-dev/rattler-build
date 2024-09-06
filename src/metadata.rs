@@ -20,6 +20,7 @@ use rattler_conda_types::{
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
+use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,6 +32,7 @@ use crate::{
     recipe::parser::{Recipe, Source},
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
+    tool_configuration,
     utils::remove_dir_all_force,
 };
 /// A Git revision
@@ -360,17 +362,6 @@ impl Output {
             .resolve(&self.build_configuration.hash, self.recipe.build().number)
     }
 
-    /// The channels to use when resolving dependencies
-    pub fn reindex_channels(&self) -> Result<Vec<Url>, std::io::Error> {
-        let output_dir = &self.build_configuration.directories.output_dir;
-
-        index(output_dir, Some(&self.build_configuration.target_platform))?;
-
-        Ok(iter::once(Channel::from_directory(output_dir).base_url)
-            .chain(self.build_configuration.channels.iter().cloned())
-            .collect())
-    }
-
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
     pub fn identifier(&self) -> String {
         format!(
@@ -628,6 +619,33 @@ impl Display for Output {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.format_table_with_option(f, comfy_table::presets::UTF8_FULL, false)
     }
+}
+
+/// Builds the channel list and reindexes the output channel.
+pub fn build_reindexed_channels(
+    build_configuration: &BuildConfiguration,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<Vec<Url>, std::io::Error> {
+    let output_dir = &build_configuration.directories.output_dir;
+    let output_channel = Channel::from_directory(output_dir);
+
+    // Clear the repodata gateway of any cached values for the output channel.
+    tool_configuration.repodata_gateway.clear_repodata_cache(
+        &output_channel,
+        SubdirSelection::Some(
+            [build_configuration.target_platform]
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+        ),
+    );
+
+    // Reindex the output channel from the files on disk
+    index(output_dir, Some(&build_configuration.target_platform))?;
+
+    Ok(iter::once(output_channel.base_url)
+        .chain(build_configuration.channels.iter().cloned())
+        .collect())
 }
 
 #[cfg(test)]

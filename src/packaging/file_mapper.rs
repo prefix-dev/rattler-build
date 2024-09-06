@@ -87,7 +87,7 @@ impl Output {
     ///
     /// * For `noarch: python` packages, the "lib/pythonX.X" prefix is stripped so that only
     ///   the "site-packages" part is kept. Additionally, any `__pycache__` directories or
-    ///  `.pyc` files are skipped.
+    ///   `.pyc` files are skipped.
     /// * For `noarch: python` packages, furthermore `bin` is replaced with `python-scripts`, and
     ///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
     ///   as-is.

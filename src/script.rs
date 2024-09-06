@@ -143,6 +143,7 @@ trait Interpreter {
 
     async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
 
+    #[allow(dead_code)]
     async fn find_interpreter(
         &self,
         build_prefix: Option<&PathBuf>,
