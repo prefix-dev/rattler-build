@@ -383,6 +383,17 @@ impl PackageCacheReporterInner {
     }
 }
 
+impl Drop for PackageCacheReporterInner {
+    fn drop(&mut self) {
+        if let Some(pb) = self.validation_pb.take() {
+            pb.finish_and_clear();
+        }
+        if let Some(pb) = self.download_pb.take() {
+            pb.finish_and_clear();
+        }
+    }
+}
+
 fn format_progress_message(remaining: Vec<&ProgressEntry>) -> String {
     let mut msg = String::new();
     let largest_package = remaining.iter().max_by_key(|e| e.size.unwrap_or(0));
