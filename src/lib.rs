@@ -34,6 +34,7 @@ pub mod recipe_generator;
 mod run_exports;
 mod unix;
 pub mod upload;
+mod variant_render;
 mod windows;
 
 mod package_cache_reporter;
