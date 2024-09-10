@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
-use crate::utils::NormalizedKeyBTreeMap;
 use crate::{
     _partialerror,
     recipe::{
@@ -23,6 +22,7 @@ use crate::{
     selectors::SelectorConfig,
     variant_render::stage_0_render,
 };
+use crate::{utils::NormalizedKeyBTreeMap, variant_render::stage_1_render};
 
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -399,7 +399,7 @@ impl VariantConfig {
         find_combinations(&variant_keys, 0, &mut current, &mut combinations);
 
         // zip the combinations
-        let result : Vec<_> = combinations
+        let result: Vec<_> = combinations
             .iter()
             .map(|combination| {
                 combination
@@ -442,8 +442,8 @@ impl VariantConfig {
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
         /// find all jinja variables
-        let stage_0 = stage_0_render(outputs, recipe, selector_config, self);
-
+        let stage_0 = stage_0_render(outputs, recipe, selector_config, self)?;
+        let stage_1 = stage_1_render(stage_0, self);
         Ok(Default::default())
     }
     // pub fn find_variants(
@@ -1107,7 +1107,9 @@ mod tests {
         assert_eq!(combinations.len(), 2 * 2 * 3);
 
         let already_used_vars = BTreeMap::from_iter(vec![("a".to_string(), "1".to_string())]);
-        let c2 = config.combinations(&used_vars, Some(already_used_vars)).unwrap();
+        let c2 = config
+            .combinations(&used_vars, Some(already_used_vars))
+            .unwrap();
         println!("{:?}", c2);
         for c in &c2 {
             assert!(c.get("a").unwrap() == "1");

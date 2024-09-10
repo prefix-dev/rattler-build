@@ -1,7 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::{
-    recipe::{custom_yaml::Node, ParsingError, Recipe},
+    recipe::{
+        custom_yaml::Node,
+        parser::{Dependency, PinCompatible, PinSubpackage},
+        ParsingError, Recipe,
+    },
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
     variant_config::{ParseErrors, VariantConfig, VariantError},
@@ -28,8 +32,8 @@ pub(crate) struct Stage0Render {
 
     /// The raw outputs of the recipe
     raw_outputs: RawOutputVec,
+
     // Pre-rendered recipe nodes
-    // TODO figure out the variable for this
     rendered_outputs: Vec<Recipe>,
 }
 
@@ -96,12 +100,47 @@ pub(crate) fn stage_0_render(
     Ok(stage0_renders)
 }
 
-struct Stage1Render {
+pub struct Stage1Render {
     variables: BTreeMap<String, String>,
     stage_0_render: Stage0Render,
 }
 
 /// Render the stage 1 of the recipe by adding in variants from the dependencies
-fn stage_1_render(_stage0_renders: Vec<Stage0Render>) -> Result<Vec<Stage1Render>, VariantError> {
-    Ok(Vec::new())
+pub(crate) fn stage_1_render(
+    stage0_renders: Vec<Stage0Render>,
+    variant_config: &VariantConfig,
+) -> Result<Vec<Stage1Render>, VariantError> {
+    let mut stage_1_renders = Vec::new();
+
+    for r in stage0_renders {
+        for output in r.rendered_outputs {
+            println!("{:?}", output.build_time_requirements().collect::<Vec<_>>());
+            let mut additional_variables = HashSet::<String>::new();
+            // Add in variants from the dependencies as we find them
+            for dep in output.build_time_requirements() {
+                if let Dependency::Spec(spec) = dep {
+                    let is_simple = spec.version.is_none() && spec.build.is_none();
+                    // add in the variant key for this dependency that has no version specifier
+                    if is_simple {
+                        if let Some(ref name) = spec.name {
+                            additional_variables.insert(name.as_normalized().to_string());
+                        }
+                    }
+                }
+            }
+
+            // We wanna add something to packages that are requiring a subpackage _exactly_ because
+            // that creates additional variants
+            for req in output.requirements.all_requirements() {
+                match req {
+                    Dependency::PinSubpackage(pin) => {}
+                    _ => {}
+                }
+            }
+
+            // println!("{:?}", output.)
+        }
+    }
+
+    Ok(stage_1_renders)
 }
