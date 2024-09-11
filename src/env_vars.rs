@@ -329,5 +329,8 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
         timestamp_epoch_secs.to_string(),
     );
 
+    // Insert all variant variables into the environment
+    vars.extend(output.variant().clone().into_iter());
+
     vars
 }
