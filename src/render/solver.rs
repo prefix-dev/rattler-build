@@ -1,3 +1,4 @@
+use console::style;
 use std::{
     future::IntoFuture,
     path::Path,
@@ -64,26 +65,6 @@ pub async fn solve_environment(
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
-    // Parse the specs from the command line. We do this explicitly instead of allow
-    // clap to deal with this because we need to parse the `channel_config` when
-    // parsing matchspecs.
-
-    tracing::info!("\nResolving {name} environment:\n");
-    tracing::info!("  Platform: {}", target_platform);
-    tracing::info!("  Channels: ");
-    for channel in channels {
-        tracing::info!(
-            "   - {}",
-            tool_configuration.channel_config.canonical_name(channel)
-        );
-    }
-    tracing::info!("  Specs:");
-    for spec in specs {
-        tracing::info!("   - {}", spec);
-    }
-
-    let repo_data = load_repodatas(channels, target_platform, specs, tool_configuration).await?;
-
     // Determine virtual packages of the system. These packages define the
     // capabilities of the system. Some packages depend on these virtual
     // packages to indicate compatibility with the hardware of the system.
@@ -98,6 +79,27 @@ pub async fn solve_environment(
             })
         },
     )?;
+
+    let vp_string = format!(
+        "[{}]",
+        virtual_packages.iter().map(|s| s.to_string()).join(", ")
+    );
+
+    tracing::info!("\nResolving {name} environment:\n");
+    tracing::info!("  Platform: {} {}", target_platform, style(vp_string).dim());
+    tracing::info!("  Channels: ");
+    for channel in channels {
+        tracing::info!(
+            "   - {}",
+            tool_configuration.channel_config.canonical_name(channel)
+        );
+    }
+    tracing::info!("  Specs:");
+    for spec in specs {
+        tracing::info!("   - {}", spec);
+    }
+
+    let repo_data = load_repodatas(channels, target_platform, specs, tool_configuration).await?;
 
     // Now that we parsed and downloaded all information, construct the packaging
     // problem that we need to solve. We do this by constructing a
