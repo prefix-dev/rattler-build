@@ -355,7 +355,7 @@ impl VariantConfig {
     pub fn combinations(
         &self,
         used_vars: &HashSet<String>,
-        already_used_vars: Option<BTreeMap<String, String>>,
+        already_used_vars: Option<&BTreeMap<String, String>>,
     ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
@@ -397,7 +397,7 @@ impl VariantConfig {
         let mut combinations = Vec::new();
         let mut current = Vec::new();
         find_combinations(&variant_keys, 0, &mut current, &mut combinations);
-
+        println!("CCC {:?}", combinations);
         // zip the combinations
         let result: Vec<_> = combinations
             .iter()
@@ -1108,7 +1108,7 @@ mod tests {
 
         let already_used_vars = BTreeMap::from_iter(vec![("a".to_string(), "1".to_string())]);
         let c2 = config
-            .combinations(&used_vars, Some(already_used_vars))
+            .combinations(&used_vars, Some(&already_used_vars))
             .unwrap();
         println!("{:?}", c2);
         for c in &c2 {

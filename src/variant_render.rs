@@ -100,8 +100,13 @@ pub(crate) fn stage_0_render(
     Ok(stage0_renders)
 }
 
+/// Stage 1 render of a single recipe.yaml
+#[derive(Debug)]
 pub struct Stage1Render {
     variables: BTreeMap<String, String>,
+
+    used_variables_from_dependencies: Vec<HashSet<String>>,
+
     stage_0_render: Stage0Render,
 }
 
@@ -112,8 +117,10 @@ pub(crate) fn stage_1_render(
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
 
+    // TODO we need to add variables from the cache here!
     for r in stage0_renders {
-        for output in r.rendered_outputs {
+        let mut extra_vars_per_output: Vec<HashSet<String>> = Vec::new();
+        for output in &r.rendered_outputs {
             println!("{:?}", output.build_time_requirements().collect::<Vec<_>>());
             let mut additional_variables = HashSet::<String>::new();
             // Add in variants from the dependencies as we find them
@@ -133,14 +140,37 @@ pub(crate) fn stage_1_render(
             // that creates additional variants
             for req in output.requirements.all_requirements() {
                 match req {
-                    Dependency::PinSubpackage(pin) => {}
+                    Dependency::PinSubpackage(pin) => {
+                        if pin.pin_value().args.exact {
+                            let name = pin.pin_value().name.clone().as_normalized().to_string();
+                            additional_variables.insert(name);
+                        }
+                    }
                     _ => {}
                 }
             }
+            extra_vars_per_output.push(additional_variables);
+        }
 
-            // println!("{:?}", output.)
+        // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
+
+        let mut all_vars = extra_vars_per_output
+            .iter()
+            .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
+
+        all_vars.extend(r.variables.keys().cloned());
+
+        println!("All extra vars: {:?}, already: {:?}", all_vars, r.variables);
+        let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
+        println!("Combinazions: {:?}", all_combinations);
+        for combination in all_combinations {
+            stage_1_renders.push(Stage1Render {
+                variables: combination,
+                used_variables_from_dependencies: extra_vars_per_output.clone(),
+                stage_0_render: r.clone(),
+            });
         }
     }
-
+    println!("{:?}", stage_1_renders);
     Ok(stage_1_renders)
 }
