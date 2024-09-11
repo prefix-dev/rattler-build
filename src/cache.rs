@@ -274,7 +274,7 @@ fn replace_prefix(file: &Path, old_prefix: &Path, new_prefix: &Path) -> Result<(
         assert_eq!(
             new_prefix_bytes.len(),
             old_prefix_bytes.len(),
-            "Prefixes must have the same length"
+            format!("Prefixes must have the same length: {:?} != {:?}", new_prefix, old_prefix)
         );
 
         let mut output = Vec::with_capacity(mmap.len());
