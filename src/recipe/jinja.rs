@@ -559,7 +559,7 @@ impl Git {
     fn latest_tag_rev(&self, src: &str) -> Result<Value, minijinja::Error> {
         let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
             .lines()
-            .last()
+            .next()
             .and_then(|s| s.split_ascii_whitespace().nth(0))
             .ok_or_else(|| {
                 minijinja::Error::new(
@@ -574,7 +574,7 @@ impl Git {
     fn latest_tag(&self, src: &str) -> Result<Value, minijinja::Error> {
         let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
             .lines()
-            .last()
+            .next()
             .and_then(|s| s.split_ascii_whitespace().nth(1))
             .and_then(|s| s.strip_prefix("refs/tags/"))
             .map(|s| s.trim_end_matches("^{}"))
