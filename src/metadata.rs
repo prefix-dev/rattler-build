@@ -406,6 +406,7 @@ pub struct Output {
     pub finalized_dependencies: Option<FinalizedDependencies>,
     /// The finalized dependencies from the cache (if there is a cache
     /// instruction)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub finalized_cache_dependencies: Option<FinalizedDependencies>,
     /// The finalized sources for this output. Contain the exact git hashes for
     /// the sources that are used to build this output.

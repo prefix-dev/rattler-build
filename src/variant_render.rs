@@ -1,14 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::{
-    recipe::{
+    hash::HashInfo, recipe::{
         custom_yaml::Node,
         parser::{Dependency, PinCompatible, PinSubpackage},
         ParsingError, Recipe,
-    },
-    selectors::SelectorConfig,
-    used_variables::used_vars_from_expressions,
-    variant_config::{ParseErrors, VariantConfig, VariantError},
+    }, selectors::SelectorConfig, used_variables::used_vars_from_expressions, variant_config::{ParseErrors, VariantConfig, VariantError}
 };
 
 /// All the raw outputs of a single recipe.yaml
@@ -100,6 +97,13 @@ pub(crate) fn stage_0_render(
     Ok(stage0_renders)
 }
 
+struct DiscoveredOutput {
+    /// The recipe of this output
+    recipe: Recipe,
+    /// The variant values of this output
+    variant: BTreeMap<String, String>,
+}
+
 /// Stage 1 render of a single recipe.yaml
 #[derive(Debug)]
 pub struct Stage1Render {
@@ -116,6 +120,7 @@ pub(crate) fn stage_1_render(
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
+    let mut discovered_outputs = Vec::new();
 
     // TODO we need to add variables from the cache here!
     for r in stage0_renders {
@@ -149,11 +154,19 @@ pub(crate) fn stage_1_render(
                     _ => {}
                 }
             }
+
+            let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
+
+            let build_string = parsed_recipe
+                .build()
+                .string()
+                .resolve(&hash, parsed_recipe.build().number)
+                .into_owned();
+
             extra_vars_per_output.push(additional_variables);
         }
 
         // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
-
         let mut all_vars = extra_vars_per_output
             .iter()
             .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
@@ -171,6 +184,10 @@ pub(crate) fn stage_1_render(
             });
         }
     }
-    println!("{:?}", stage_1_renders);
+
+    for render in &stage_1_renders {
+        println!("{:?}\n\n=====\n\n", render);
+    }
+
     Ok(stage_1_renders)
 }
