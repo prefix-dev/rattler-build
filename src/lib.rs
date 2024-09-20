@@ -137,6 +137,7 @@ pub async fn get_build_output(
     recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
+    println!("Building recipe: {:?}", args.virtual_package_for_host);
     let output_dir = args
         .common
         .output_dir
@@ -314,6 +315,7 @@ pub async fn get_build_output(
                     args.package_format.compression_level,
                 ),
                 store_recipe: !args.no_include_recipe,
+                virtual_packages_for_host: args.virtual_package_for_host.clone(),
                 force_colors: args.color_build_log && console::colors_enabled(),
             },
             finalized_dependencies: None,

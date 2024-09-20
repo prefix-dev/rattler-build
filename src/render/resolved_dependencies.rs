@@ -715,6 +715,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            None,
         )
         .await
         .map_err(ResolveError::from)?;
@@ -809,6 +810,7 @@ pub(crate) async fn resolve_dependencies(
             tool_configuration,
             output.build_configuration.channel_priority,
             output.build_configuration.solve_strategy,
+            Some(&output.build_configuration.virtual_packages_for_host),
         )
         .await
         .map_err(ResolveError::from)?;
