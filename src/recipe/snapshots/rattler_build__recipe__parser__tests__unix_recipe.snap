@@ -115,7 +115,7 @@ Recipe {
             env: {},
             secrets: [],
             content: CommandOrPath(
-                "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install\n",
+                "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
             ),
             cwd: None,
         },

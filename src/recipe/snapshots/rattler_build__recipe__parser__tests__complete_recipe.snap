@@ -121,8 +121,7 @@ requirements:
     from_package:
     - python
 tests:
-- script: |
-    echo FOO
+- script: echo FOO
   requirements:
     run:
     - bash

@@ -217,7 +217,7 @@ impl TryConvertNode<Script> for RenderedNode {
 
 impl TryConvertNode<Script> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<Script, Vec<PartialParsingError>> {
-        Ok(ScriptContent::CommandOrPath(self.source().to_owned()).into())
+        Ok(ScriptContent::CommandOrPath(self.source().trim().to_owned()).into())
     }
 }
 
@@ -227,7 +227,7 @@ impl TryConvertNode<Script> for RenderedSequenceNode {
 
         for string in self.iter() {
             if let RenderedNode::Scalar(s) = string {
-                strings.push(s.source().to_owned());
+                strings.push(s.source().trim().to_owned());
             }
         }
 
