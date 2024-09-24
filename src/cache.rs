@@ -187,6 +187,7 @@ impl Output {
                     &self.build_configuration.directories.recipe_dir,
                     &self.build_configuration.directories.host_prefix,
                     Some(&self.build_configuration.directories.build_prefix),
+                    None, // TODO fix this to be proper Jinja context
                 )
                 .await
                 .into_diagnostic()?;

@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 use indexmap::IndexMap;
 use itertools::Itertools;
+use minijinja::Value;
 use rattler_conda_types::Platform;
 use rattler_shell::activation::{prefix_path_entries, PathModificationBehavior};
 use rattler_shell::shell::{NuShell, ShellEnum};
@@ -20,7 +21,10 @@ use tokio::io::AsyncBufReadExt as _;
 use crate::{
     env_vars::{self},
     metadata::Output,
-    recipe::parser::{Script, ScriptContent},
+    recipe::{
+        parser::{Script, ScriptContent},
+        Jinja,
+    },
 };
 
 const BASH_PREAMBLE: &str = r#"
@@ -482,9 +486,10 @@ impl Script {
     fn get_contents(
         &self,
         recipe_dir: &Path,
+        jinja_context: Option<Jinja>,
         extensions: &[&str],
     ) -> Result<ResolvedScriptContents, std::io::Error> {
-        match self.contents() {
+        let script_content = match self.contents() {
             // No script was specified, so we try to read the default script. If the file cannot be
             // found we return an empty string.
             ScriptContent::Default => {
@@ -537,6 +542,24 @@ impl Script {
             ScriptContent::Command(command) => {
                 Ok(ResolvedScriptContents::Inline(command.to_owned()))
             }
+        };
+
+        // render jinja if it is an inline script
+        if let Some(jinja_context) = jinja_context {
+            match script_content? {
+                ResolvedScriptContents::Inline(script) => {
+                    let rendered = jinja_context.render_str(&script).map_err(|e| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            format!("Failed to render jinja template in build `script`: {}", e),
+                        )
+                    })?;
+                    Ok(ResolvedScriptContents::Inline(rendered))
+                }
+                other => Ok(other),
+            }
+        } else {
+            script_content
         }
     }
 
@@ -547,6 +570,7 @@ impl Script {
         recipe_dir: &Path,
         run_prefix: &Path,
         build_prefix: Option<&PathBuf>,
+        mut jinja_config: Option<Jinja<'_>>,
     ) -> Result<(), std::io::Error> {
         // TODO: This is a bit of an out and about way to determine whether or
         //  not nushell is available. It would be best to run the activation
@@ -579,8 +603,21 @@ impl Script {
             valid_script_extensions.push("nu");
         }
 
+        let env_vars = env_vars
+            .into_iter()
+            .chain(self.env().clone().into_iter())
+            .collect::<IndexMap<String, String>>();
+
         // Get the contents of the script.
-        let contents = self.get_contents(recipe_dir, &valid_script_extensions)?;
+        for (k, v) in &env_vars {
+            jinja_config.as_mut().map(|jinja| {
+                jinja
+                    .context_mut()
+                    .insert(k.clone(), Value::from_safe_string(v.clone()))
+            });
+        }
+
+        let contents = self.get_contents(recipe_dir, jinja_config, &valid_script_extensions)?;
 
         // Select a different interpreter if the script is a nushell script.
         if contents
@@ -607,11 +644,6 @@ impl Script {
                     None
                 }
             })
-            .collect::<IndexMap<String, String>>();
-
-        let env_vars = env_vars
-            .into_iter()
-            .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 
         let work_dir = if let Some(cwd) = self.cwd.as_ref() {
@@ -667,6 +699,14 @@ impl Output {
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
 
+        let selector_config = self.build_configuration.selector_config();
+        let mut jinja = Jinja::new(selector_config.clone());
+        for (k, v) in self.recipe.context.iter() {
+            jinja
+                .context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
+
         self.recipe
             .build()
             .script()
@@ -676,6 +716,7 @@ impl Output {
                 &self.build_configuration.directories.recipe_dir,
                 &self.build_configuration.directories.host_prefix,
                 Some(&self.build_configuration.directories.build_prefix),
+                Some(jinja),
             )
             .await?;
 

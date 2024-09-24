@@ -4,6 +4,7 @@ expression: output
 ---
 recipe:
   schema_version: 1
+  context: {}
   package:
     name: curl
     version: 8.0.1

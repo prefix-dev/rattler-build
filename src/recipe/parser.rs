@@ -60,6 +60,8 @@ use crate::recipe::custom_yaml::Node;
 pub struct Recipe {
     /// The schema version of this recipe YAML file
     pub schema_version: u64,
+    /// The context values of this recipe
+    pub context: IndexMap<String, String>,
     /// The package information
     pub package: Package,
     /// The cache build that should be used for this package
@@ -155,37 +157,38 @@ impl Recipe {
         })?;
 
         // add context values
-        if let Some(context) = root_node.get("context") {
-            let context = context.as_mapping().ok_or_else(|| {
+        let mut context = IndexMap::new();
+
+        if let Some(context_map) = root_node.get("context") {
+            let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
-                    *context.span(),
+                    *context_map.span(),
                     ErrorKind::ExpectedMapping,
                     help = "`context` must always be a mapping"
                 )]
             })?;
 
-            context
-                .iter()
-                .map(|(k, v)| {
-                    let val = v.as_scalar().ok_or_else(|| {
-                        vec![_partialerror!(
-                            *v.span(),
-                            ErrorKind::ExpectedScalar,
-                            help = "`context` values must always be scalars (strings)"
-                        )]
-                    })?;
-                    let rendered: Option<ScalarNode> =
-                        val.render(&jinja, &format!("context.{}", k.as_str()))?;
+            for (k, v) in context_map.iter() {
+                let val = v.as_scalar().ok_or_else(|| {
+                    vec![_partialerror!(
+                        *v.span(),
+                        ErrorKind::ExpectedScalar,
+                        help = "`context` values must always be scalars (strings)"
+                    )]
+                })?;
+                let rendered: Option<ScalarNode> =
+                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
 
-                    if let Some(rendered) = rendered {
-                        jinja.context_mut().insert(
-                            k.as_str().to_owned(),
-                            Value::from_safe_string(rendered.as_str().to_string()),
-                        );
-                    }
-                    Ok(())
-                })
-                .flatten_errors()?;
+                if let Some(rendered) = rendered {
+                    context.insert(k.as_str().to_string(), rendered.as_str().to_string());
+                    // also immediately insert into jinja context so that the value can be used
+                    // in later jinja expressions
+                    jinja.context_mut().insert(
+                        k.as_str().to_string(),
+                        Value::from_safe_string(rendered.as_str().to_string()),
+                    );
+                }
+            }
         }
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
@@ -261,6 +264,7 @@ impl Recipe {
 
         let recipe = Recipe {
             schema_version,
+            context,
             package: package.ok_or_else(|| {
                 vec![_partialerror!(
                     *root_node.span(),

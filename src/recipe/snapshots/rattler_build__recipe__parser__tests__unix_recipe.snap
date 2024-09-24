@@ -4,6 +4,10 @@ expression: unix_recipe.unwrap()
 ---
 Recipe {
     schema_version: 1,
+    context: {
+        "name": "xtensor",
+        "version": "0.24.6",
+    },
     package: Package {
         name: PackageName {
             normalized: None,
@@ -111,7 +115,7 @@ Recipe {
             env: {},
             secrets: [],
             content: CommandOrPath(
-                "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install",
+                "cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib\nmake install\n",
             ),
             cwd: None,
         },
