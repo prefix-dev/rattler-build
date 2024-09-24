@@ -4,6 +4,7 @@ expression: git_source_output
 ---
 recipe:
   schema_version: 1
+  context: {}
   package:
     name: git_source
     version: "1"

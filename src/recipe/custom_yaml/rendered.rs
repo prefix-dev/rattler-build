@@ -228,6 +228,7 @@ impl TryFrom<&marked_yaml::Node> for RenderedNode {
 #[derive(Clone)]
 pub struct RenderedScalarNode {
     span: marked_yaml::Span,
+    source: String,
     value: String,
 }
 
@@ -241,12 +242,16 @@ impl Serialize for RenderedScalarNode {
 }
 
 impl RenderedScalarNode {
-    pub fn new(span: marked_yaml::Span, value: String) -> Self {
-        Self { span, value }
+    pub fn new(span: marked_yaml::Span, source: String, value: String) -> Self {
+        Self {
+            span,
+            source,
+            value,
+        }
     }
 
     pub fn new_blank() -> Self {
-        Self::new(marked_yaml::Span::new_blank(), String::new())
+        Self::new(marked_yaml::Span::new_blank(), String::new(), String::new())
     }
 
     /// Treat the scalar node as a string
@@ -254,6 +259,11 @@ impl RenderedScalarNode {
     /// Since scalars are always stringish, this is always safe.
     pub fn as_str(&self) -> &str {
         &self.value
+    }
+
+    /// Return the source with the original Jinja template
+    pub fn source(&self) -> &str {
+        &self.source
     }
 
     /// Treat the scalar node as a boolean
@@ -320,14 +330,18 @@ impl fmt::Debug for RenderedScalarNode {
 impl<'a> From<&'a str> for RenderedScalarNode {
     /// Convert from any borrowed string into a node
     fn from(value: &'a str) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.to_owned())
+        Self::new(
+            marked_yaml::Span::new_blank(),
+            value.to_owned(),
+            value.to_owned(),
+        )
     }
 }
 
 impl From<String> for RenderedScalarNode {
     /// Convert from any owned string into a node
     fn from(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value)
+        Self::new(marked_yaml::Span::new_blank(), value.clone(), value)
     }
 }
 
@@ -353,7 +367,11 @@ impl From<MarkedScalarNode> for RenderedScalarNode {
 
 impl From<&MarkedScalarNode> for RenderedScalarNode {
     fn from(value: &MarkedScalarNode) -> Self {
-        Self::new(*value.span(), value.as_str().to_owned())
+        Self::new(
+            *value.span(),
+            value.as_str().to_owned(),
+            value.as_str().to_owned(),
+        )
     }
 }
 
@@ -614,6 +632,7 @@ impl Render<RenderedNode> for Node {
             Node::Null(n) => Ok(RenderedNode::Null(RenderedScalarNode::new(
                 *n.span(),
                 n.as_str().to_owned(),
+                n.as_str().to_owned(),
             ))),
         }
     }
@@ -628,7 +647,7 @@ impl Render<RenderedNode> for ScalarNode {
                 label = jinja_error_to_label(&err),
             )]
         })?;
-        let rendered = RenderedScalarNode::new(*self.span(), rendered);
+        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
 
         if rendered.is_empty() {
             Ok(RenderedNode::Null(rendered))
@@ -652,7 +671,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
             )]
         })?;
 
-        let rendered = RenderedScalarNode::new(*self.span(), rendered);
+        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
 
         if rendered.is_empty() {
             Ok(None)
@@ -679,7 +698,11 @@ impl Render<RenderedMappingNode> for MappingNode {
         let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
-            let key = RenderedScalarNode::new(*key.span(), key.as_str().to_owned());
+            let key = RenderedScalarNode::new(
+                *key.span(),
+                key.as_str().to_owned(),
+                key.as_str().to_owned(),
+            );
             let value: RenderedNode = value.render(jinja, &format!("{name}.{}", key.as_str()))?;
             if value.is_null() {
                 continue;
@@ -699,6 +722,7 @@ impl Render<RenderedNode> for SequenceNode {
         if rendered.is_empty() {
             return Ok(RenderedNode::Null(RenderedScalarNode::new(
                 *self.span(),
+                String::new(),
                 String::new(),
             )));
         }
