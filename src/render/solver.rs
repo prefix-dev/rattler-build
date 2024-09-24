@@ -64,11 +64,12 @@ pub async fn solve_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
+    virtual_package_override: Option<&[GenericVirtualPackage]>,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     // Determine virtual packages of the system. These packages define the
     // capabilities of the system. Some packages depend on these virtual
     // packages to indicate compatibility with the hardware of the system.
-    let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
+    let mut virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
         "determining virtual packages",
         move || {
             VirtualPackage::detect(&VirtualPackageOverrides::default()).map(|vpkgs| {
@@ -79,6 +80,22 @@ pub async fn solve_environment(
             })
         },
     )?;
+
+    // Override the virtual packages with the provided virtual package overrides
+    if let Some(virtual_package_override) = virtual_package_override {
+        tracing::info!("Overriding virtual packages with: ");
+        for vpkg in virtual_package_override {
+            tracing::info!("  - {}", vpkg);
+        }
+
+        for vp in virtual_package_override.iter() {
+            if let Some(virtual_package) = virtual_packages.iter_mut().find(|vp| vp.name == vp.name) {
+                *virtual_package = vp.clone();
+            } else {
+                virtual_packages.push(vp.clone());
+            }
+        }
+    }
 
     let vp_string = format!(
         "[{}]",
@@ -136,6 +153,7 @@ pub async fn create_environment(
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
+    virtual_package_override: Option<&[GenericVirtualPackage]>
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
     let required_packages = solve_environment(
         name,
@@ -145,6 +163,7 @@ pub async fn create_environment(
         tool_configuration,
         channel_priority,
         solve_strategy,
+        virtual_package_override,
     )
     .await?;
 

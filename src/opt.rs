@@ -6,7 +6,7 @@ use clap::{arg, builder::ArgPredicate, crate_version, Parser, ValueEnum};
 use clap_complete::{shells, Generator};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::{package::ArchiveType, Platform};
+use rattler_conda_types::{package::ArchiveType, GenericVirtualPackage, Platform, Version};
 use rattler_package_streaming::write::CompressionLevel;
 use serde_json::{json, Value};
 use url::Url;
@@ -244,6 +244,36 @@ impl FromStr for PackageFormatAndCompression {
     }
 }
 
+/// A virtual package parser for the CLI
+#[derive(Clone, Debug, PartialEq)]
+pub struct ClapVirtualPackage(pub GenericVirtualPackage);
+
+fn virtual_package_from_string(s: &str) -> Result<GenericVirtualPackage, String> {
+    if s.is_empty() {
+        return Err("No virtual package provided".to_string());
+    }
+
+    let mut split = s.split('=');
+    // return error if no name is provided
+    let name = split
+        .next()
+        .ok_or_else(|| "No name provided for virtual package".to_string())?
+        .parse()
+        .map_err(|e| format!("Invalid name for virtual package ({s}): {:?}", e))?;
+
+    let version: Version = split
+        .next()
+        .unwrap_or("0")
+        .parse()
+        .map_err(|e| format!("Invalid version for virtual package ({s}): {}", e))?;
+    let build = split.next();
+
+    return Ok(GenericVirtualPackage {
+        name,
+        version,
+        build_string: build.map(|s| s.to_string()).unwrap_or_default(),
+    });
+}
 /// Build options.
 #[derive(Parser, Clone)]
 pub struct BuildOpts {
@@ -281,6 +311,10 @@ pub struct BuildOpts {
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     pub variant_config: Vec<PathBuf>,
+
+    /// Override virtual packages for host platform.
+    #[arg(long, value_parser = virtual_package_from_string)]
+    pub virtual_package_for_host: Vec<GenericVirtualPackage>,
 
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]

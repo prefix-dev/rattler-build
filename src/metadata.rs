@@ -15,8 +15,7 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
-    package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, PackageName, Platform, RepoDataRecord, Version,
+    package::{ArchiveType, PathType, PathsEntry, PathsJson}, Channel, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
@@ -264,6 +263,9 @@ pub struct BuildConfiguration {
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub packaging_settings: PackagingSettings,
+    /// Override virtual packages for the host platform
+    #[serde(skip_serializing, default)]
+    pub virtual_packages_for_host: Vec<GenericVirtualPackage>,
     /// Whether to store the recipe and build instructions in the final package
     /// or not
     #[serde(skip_serializing, default = "default_true")]

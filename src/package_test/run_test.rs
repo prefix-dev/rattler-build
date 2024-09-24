@@ -365,6 +365,7 @@ pub async fn run_test(
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            None,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -455,6 +456,7 @@ impl PythonTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            None,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -535,6 +537,7 @@ impl CommandsTest {
                 &config.tool_configuration,
                 config.channel_priority,
                 config.solve_strategy,
+                None,
             )
             .await
             .map_err(TestError::TestEnvironmentSetup)?;
@@ -567,6 +570,7 @@ impl CommandsTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            None,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -631,6 +635,7 @@ impl DownstreamTest {
             &config.tool_configuration,
             config.channel_priority,
             config.solve_strategy,
+            None,
         )
         .await;
 
