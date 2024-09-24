@@ -157,11 +157,11 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         Block::new()
             .title_top(Line::from("rattler-build-tui").style(Style::default().bold()))
             .title_alignment(Alignment::Center),
-        frame.size(),
+        frame.area(),
     );
     let rects = Layout::vertical([Constraint::Percentage(100), Constraint::Min(3)])
         .margin(1)
-        .split(frame.size());
+        .split(frame.area());
     frame.render_widget(
         Paragraph::new(
             Line::default()
@@ -307,10 +307,10 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             ),
             rects[1],
         );
-        frame.set_cursor(
+        frame.set_cursor_position(Position::new(
             rects[1].x + state.input.visual_cursor() as u16 + 3,
             rects[1].y + 1,
-        );
+        ));
         rects[0]
     } else {
         rects[1]
@@ -347,7 +347,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
 
     frame.render_stateful_widget(
         scrollbar,
-        logs_rect.inner(&Margin {
+        logs_rect.inner(Margin {
             vertical: 1,
             horizontal: 0,
         }),
@@ -374,7 +374,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
 
     frame.render_stateful_widget(
         scrollbar,
-        logs_rect.inner(&Margin {
+        logs_rect.inner(Margin {
             vertical: 0,
             horizontal: 1,
         }),
