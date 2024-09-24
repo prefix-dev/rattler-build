@@ -2,7 +2,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::ops::Deref;
 use std::path::Path;
 
-use globset::{Glob, GlobSet};
+use globset::{Glob, GlobBuilder, GlobSet};
 
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize};
@@ -14,12 +14,24 @@ use crate::recipe::custom_yaml::{
 };
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GlobWithSource {
+    glob: Glob,
+    source: String,
+}
+
+impl GlobWithSource {
+    pub fn glob(&self) -> &str {
+        &self.glob.glob()
+    }
+}
+
 /// Wrapper type to simplify serialization of Vec<Glob>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct InnerGlobVec(Vec<Glob>);
+struct InnerGlobVec(Vec<GlobWithSource>);
 
 impl Deref for InnerGlobVec {
-    type Target = Vec<Glob>;
+    type Target = Vec<GlobWithSource>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -30,7 +42,7 @@ impl InnerGlobVec {
     fn globset(&self) -> Result<GlobSet, globset::Error> {
         let mut globset_builder = globset::GlobSetBuilder::new();
         for glob in self.iter() {
-            globset_builder.add(glob.clone());
+            globset_builder.add(glob.glob.clone());
         }
         globset_builder.build()
     }
@@ -46,18 +58,29 @@ impl From<Vec<String>> for InnerGlobVec {
     }
 }
 
-impl From<Vec<Glob>> for InnerGlobVec {
-    fn from(vec: Vec<Glob>) -> Self {
+impl From<Vec<GlobWithSource>> for InnerGlobVec {
+    fn from(vec: Vec<GlobWithSource>) -> Self {
         Self(vec)
     }
 }
 
-fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
-    if glob.ends_with('/') && !glob.contains('*') {
+fn to_glob(glob: &str) -> Result<GlobWithSource, globset::Error> {
+    // first, try to parse as a normal glob so that we get a descriptive error
+    let _ = Glob::new(glob)?;
+    if glob.ends_with('/') {
         // we treat folders as globs that match everything in the folder
-        Glob::new(&format!("{}**", glob))
+        Ok(GlobWithSource {
+            glob: Glob::new(&format!("{glob}**"))?,
+            source: glob.to_string(),
+        })
     } else {
-        Glob::new(glob)
+        // Match either file, or folder
+        Ok(GlobWithSource {
+            glob: GlobBuilder::new(&format!("{glob}{{,/**}}"))
+                .empty_alternates(true)
+                .build()?,
+            source: glob.to_string(),
+        })
     }
 }
 
@@ -83,7 +106,7 @@ impl Serialize for InnerGlobVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(self.len()))?;
         for glob in self.iter() {
-            seq.serialize_element(glob.glob())?;
+            seq.serialize_element(&glob.source)?;
         }
         seq.end()
     }
@@ -105,7 +128,7 @@ impl Serialize for GlobVec {
 impl Debug for GlobVec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_list()
-            .entries(self.include.iter().map(|glob| glob.glob()))
+            .entries(self.include.iter().map(|glob| glob.glob.glob()))
             .finish()
     }
 }
@@ -155,12 +178,12 @@ impl GlobVec {
     }
 
     /// Returns an iterator over the globs
-    pub fn include_globs(&self) -> &Vec<Glob> {
+    pub fn include_globs(&self) -> &Vec<GlobWithSource> {
         &self.include
     }
 
     /// Returns an iterator over the globs
-    pub fn exclude_globs(&self) -> &Vec<Glob> {
+    pub fn exclude_globs(&self) -> &Vec<GlobWithSource> {
         &self.exclude
     }
 
@@ -180,11 +203,12 @@ impl GlobVec {
 
     /// Only used for testing
     pub fn from_vec(include: Vec<&str>, exclude: Option<Vec<&str>>) -> Self {
-        let include_vec: Vec<Glob> = include
+        let include_vec: Vec<GlobWithSource> = include
             .into_iter()
             .map(|glob| to_glob(glob).unwrap())
             .collect();
-        let exclude_vec: Vec<Glob> = exclude
+
+        let exclude_vec: Vec<GlobWithSource> = exclude
             .unwrap_or_default()
             .into_iter()
             .map(|glob| to_glob(glob).unwrap())
@@ -417,6 +441,13 @@ mod tests {
     #[test]
     fn test_glob_match_folder() {
         let globvec = GlobVec::from_vec(vec!["foo/"], None);
+        assert!(globvec.is_match(Path::new("foo/bar")));
+        assert!(globvec.is_match(Path::new("foo/bla")));
+        assert!(globvec.is_match(Path::new("foo/bla/bar")));
+        assert!(!globvec.is_match(Path::new("bar")));
+        assert!(!globvec.is_match(Path::new("bla")));
+
+        let globvec = GlobVec::from_vec(vec!["foo"], None);
         assert!(globvec.is_match(Path::new("foo/bar")));
         assert!(globvec.is_match(Path::new("foo/bla")));
         assert!(globvec.is_match(Path::new("foo/bla/bar")));
