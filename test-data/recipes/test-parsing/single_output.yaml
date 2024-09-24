@@ -1,6 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
 schema_version: 1
 # a recipe with all possible fields
+context:
+  foo: bar
+  baz: ${{ foo | upper }}bar
+
 package:
   name: single_output
   version: "0.1.0"

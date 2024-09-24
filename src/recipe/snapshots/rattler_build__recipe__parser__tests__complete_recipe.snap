@@ -3,7 +3,9 @@ source: src/recipe/parser.rs
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
-context: {}
+context:
+  foo: bar
+  baz: BARbar
 package:
   name: single_output
   version: 0.1.0
