@@ -1,10 +1,9 @@
-use std::{
-    collections::HashMap,
-    path::{Component::*, Path, Prefix::Disk},
-};
+use std::path::{Component::*, Path, Prefix::Disk};
 
 use rattler_conda_types::Platform;
 use regex::Regex;
+
+use crate::env_vars::EnvVars;
 
 fn get_drive_letter(path: &Path) -> Option<char> {
     path.components().find_map(|component| match component {
@@ -39,7 +38,7 @@ fn to_cygdrive(path: &Path) -> String {
     }
 }
 
-pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<String, String> {
+pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> EnvVars {
     let win_arch = match target_platform {
         Platform::Win32 => "i386",
         Platform::Win64 => "amd64",
@@ -54,25 +53,25 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
     // let (drive, tail) = prefix.split(":");
 
     let library_prefix = prefix.join("Library");
-    let mut vars = HashMap::<String, String>::new();
+    let mut vars = EnvVars::new();
     vars.insert(
-        "SCRIPTS".to_string(),
+        "SCRIPTS".into(),
         prefix.join("Scripts").to_string_lossy().to_string(),
     );
     vars.insert(
-        "LIBRARY_PREFIX".to_string(),
+        "LIBRARY_PREFIX".into(),
         library_prefix.to_string_lossy().to_string(),
     );
     vars.insert(
-        "LIBRARY_BIN".to_string(),
+        "LIBRARY_BIN".into(),
         library_prefix.join("bin").to_string_lossy().to_string(),
     );
     vars.insert(
-        "LIBRARY_INC".to_string(),
+        "LIBRARY_INC".into(),
         library_prefix.join("include").to_string_lossy().to_string(),
     );
     vars.insert(
-        "LIBRARY_LIB".to_string(),
+        "LIBRARY_LIB".into(),
         library_prefix.join("lib").to_string_lossy().to_string(),
     );
 
@@ -113,23 +112,23 @@ pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<St
 
     for var in default_vars {
         if let Ok(val) = std::env::var(var) {
-            vars.insert(var.to_string(), val);
+            vars.insert(var.into(), val);
         }
     }
 
     vars.insert(
-        "BUILD".to_string(),
+        "BUILD".into(),
         std::env::var("BUILD").unwrap_or_else(|_| format!("{}-pc-windows-{}", win_arch, win_msvc)),
     );
 
-    vars.insert("CYGWIN_PREFIX".to_string(), to_cygdrive(prefix));
+    vars.insert("CYGWIN_PREFIX".into(), to_cygdrive(prefix));
 
     let re_vs_comntools = Regex::new(r"^VS[0-9]{2,3}COMNTOOLS$").unwrap();
     let re_vs_installdir = Regex::new(r"^VS[0-9]{4}INSTALLDIR$").unwrap();
 
     for (key, val) in std::env::vars() {
         if re_vs_comntools.is_match(&key) || re_vs_installdir.is_match(&key) {
-            vars.insert(key, val);
+            vars.insert(key.into(), val);
         }
     }
 

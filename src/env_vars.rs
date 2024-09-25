@@ -1,4 +1,6 @@
 //! Functions to collect environment variables that are used during the build process.
+use std::borrow::Borrow;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::{collections::HashMap, env};
 
@@ -9,6 +11,50 @@ use crate::macos;
 use crate::metadata::Output;
 use crate::unix;
 use crate::windows;
+
+// Implement a case-preserving case-insensitive string
+#[derive(Debug, Clone)]
+struct CaseInsensitiveString(String);
+
+impl PartialEq for CaseInsensitiveString {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq_ignore_ascii_case(&other.0)
+    }
+}
+
+impl Eq for CaseInsensitiveString {}
+
+impl Hash for CaseInsensitiveString {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_ascii_lowercase().hash(state);
+    }
+}
+
+impl Borrow<str> for CaseInsensitiveString {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for CaseInsensitiveString {
+    fn from(s: &str) -> Self {
+        CaseInsensitiveString(s.to_string())
+    }
+}
+
+impl From<String> for CaseInsensitiveString {
+    fn from(s: String) -> Self {
+        CaseInsensitiveString(s)
+    }
+}
+
+impl Into<String> for CaseInsensitiveString {
+    fn into(self) -> String {
+        self.0
+    }
+}
+
+pub type EnvVars = HashMap<CaseInsensitiveString, String>;
 
 fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
@@ -33,15 +79,15 @@ fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> Pat
 /// - SP_DIR: Python site-packages directory
 /// - NPY_VER: Numpy version (major.minor), e.g. 1.19
 /// - NPY_DISTUTILS_APPEND_FLAGS: 1 (https://github.com/conda/conda-build/pull/3015)
-pub fn python_vars(output: &Output) -> HashMap<String, String> {
-    let mut result = HashMap::<String, String>::new();
+pub fn python_vars(output: &Output) -> EnvVars {
+    let mut result = EnvVars::new();
 
     if output.host_platform().is_windows() {
         let python = output.prefix().join("python.exe");
-        result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
+        result.insert("PYTHON".into(), python.to_string_lossy().to_string());
     } else {
         let python = output.prefix().join("bin/python");
-        result.insert("PYTHON".to_string(), python.to_string_lossy().to_string());
+        result.insert("PYTHON".into(), python.to_string_lossy().to_string());
     }
 
     // find python in the host dependencies
@@ -61,20 +107,20 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
         let site_packages_dir =
             get_sitepackages_dir(output.prefix(), output.host_platform(), &py_ver_str);
         result.insert(
-            "PY3K".to_string(),
+            "PY3K".into(),
             if py_ver[0] == "3" {
                 "1".to_string()
             } else {
                 "0".to_string()
             },
         );
-        result.insert("PY_VER".to_string(), py_ver_str);
+        result.insert("PY_VER".into(), py_ver_str);
         result.insert(
-            "STDLIB_DIR".to_string(),
+            "STDLIB_DIR".into(),
             stdlib_dir.to_string_lossy().to_string(),
         );
         result.insert(
-            "SP_DIR".to_string(),
+            "SP_DIR".into(),
             site_packages_dir.to_string_lossy().to_string(),
         );
     }
@@ -83,9 +129,9 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
         let np_ver = npy_version.split('.').collect::<Vec<_>>();
         let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
 
-        result.insert("NPY_VER".to_string(), np_ver);
+        result.insert("NPY_VER".into(), np_ver);
     }
-    result.insert("NPY_DISTUTILS_APPEND_FLAGS".to_string(), "1".to_string());
+    result.insert("NPY_DISTUTILS_APPEND_FLAGS".into(), "1".to_string());
 
     result
 }
@@ -97,11 +143,11 @@ pub fn python_vars(output: &Output) -> HashMap<String, String> {
 /// - R: Path to R executable
 /// - R_USER: Path to R user directory
 ///
-pub fn r_vars(output: &Output) -> HashMap<String, String> {
-    let mut result = HashMap::<String, String>::new();
+pub fn r_vars(output: &Output) -> EnvVars {
+    let mut result = EnvVars::new();
 
     if let Some(r_ver) = output.variant().get("r-base") {
-        result.insert("R_VER".to_string(), r_ver.clone());
+        result.insert("R_VER".into(), r_ver.clone());
 
         let r_bin = if output.host_platform().is_windows() {
             output.prefix().join("Scripts/R.exe")
@@ -111,15 +157,15 @@ pub fn r_vars(output: &Output) -> HashMap<String, String> {
 
         let r_user = output.prefix().join("Libs/R");
 
-        result.insert("R".to_string(), r_bin.to_string_lossy().to_string());
-        result.insert("R_USER".to_string(), r_user.to_string_lossy().to_string());
+        result.insert("R".into(), r_bin.to_string_lossy().to_string());
+        result.insert("R_USER".into(), r_user.to_string_lossy().to_string());
     }
 
     result
 }
 
-pub fn language_vars(output: &Output) -> HashMap<String, String> {
-    let mut result = HashMap::<String, String>::new();
+pub fn language_vars(output: &Output) -> EnvVars {
+    let mut result = EnvVars::new();
 
     result.extend(python_vars(output));
     result.extend(r_vars(output));
@@ -139,8 +185,8 @@ pub fn language_vars(output: &Output) -> HashMap<String, String> {
 /// - LANG: Language (e.g. en_US.UTF-8)
 /// - LC_ALL: Language (e.g. en_US.UTF-8)
 /// - MAKEFLAGS: Make flags (e.g. -j4)
-pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
-    let mut vars = HashMap::<String, String>::new();
+pub fn os_vars(prefix: &Path, platform: &Platform) -> EnvVars {
+    let mut vars = EnvVars::new();
 
     let path_var = if platform.is_windows() {
         "Path"
@@ -149,13 +195,13 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
     };
 
     vars.insert(
-        "CPU_COUNT".to_string(),
+        "CPU_COUNT".into(),
         env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string()),
     );
-    vars.insert("LANG".to_string(), env::var("LANG").unwrap_or_default());
-    vars.insert("LC_ALL".to_string(), env::var("LC_ALL").unwrap_or_default());
+    vars.insert("LANG".into(), env::var("LANG").unwrap_or_default());
+    vars.insert("LC_ALL".into(), env::var("LC_ALL").unwrap_or_default());
     vars.insert(
-        "MAKEFLAGS".to_string(),
+        "MAKEFLAGS".into(),
         env::var("MAKEFLAGS").unwrap_or_default(),
     );
 
@@ -169,9 +215,9 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
         ".not_implemented".to_string()
     };
 
-    vars.insert("SHLIB_EXT".to_string(), shlib_ext);
+    vars.insert("SHLIB_EXT".into(), shlib_ext);
     if let Ok(path) = env::var(path_var) {
-        vars.insert(path_var.to_string(), path);
+        vars.insert(path_var.into(), path);
     }
 
     if cfg!(target_family = "windows") {
@@ -191,13 +237,13 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
 
 macro_rules! insert {
     ($map:expr, $key:expr, $value:expr) => {
-        $map.insert($key.to_string(), $value.to_string());
+        $map.insert($key.into(), $value.to_string());
     };
 }
 
 /// Set environment variables that help to force color output.
-fn force_color_vars() -> HashMap<String, String> {
-    let mut vars = HashMap::<String, String>::new();
+fn force_color_vars() -> EnvVars {
+    let mut vars = EnvVars::new();
 
     insert!(vars, "CLICOLOR_FORCE", "1");
     insert!(vars, "FORCE_COLOR", "1");
@@ -216,8 +262,8 @@ fn force_color_vars() -> HashMap<String, String> {
 
 /// Return all variables that should be set during the build process, including
 /// operating system specific environment variables.
-pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
-    let mut vars = HashMap::<String, String>::new();
+pub fn vars(output: &Output, build_state: &str) -> EnvVars {
+    let mut vars = EnvVars::new();
 
     insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
@@ -324,13 +370,10 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     // for reproducibility purposes, set the SOURCE_DATE_EPOCH to the configured timestamp
     // this value will be taken from the previous package for rebuild purposes
     let timestamp_epoch_secs = output.build_configuration.timestamp.timestamp();
-    vars.insert(
-        "SOURCE_DATE_EPOCH".to_string(),
-        timestamp_epoch_secs.to_string(),
-    );
+    vars.insert("SOURCE_DATE_EPOCH".into(), timestamp_epoch_secs.to_string());
 
     // Insert all variant variables into the environment
-    vars.extend(output.variant().clone().into_iter());
+    // vars.extend(output.variant().clone().into_iter());
 
     vars
 }

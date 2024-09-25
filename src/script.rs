@@ -18,6 +18,7 @@ use std::{
 };
 use tokio::io::AsyncBufReadExt as _;
 
+use crate::env_vars::EnvVars;
 use crate::{
     env_vars::{self},
     metadata::Output,
@@ -42,7 +43,7 @@ const DEBUG_HELP : &str  = "To debug the build, run it manually in the work dire
 #[derive(Debug)]
 pub struct ExecutionArgs {
     pub script: ResolvedScriptContents,
-    pub env_vars: IndexMap<String, String>,
+    pub env_vars: EnvVars,
     pub secrets: IndexMap<String, String>,
 
     pub execution_platform: Platform,
@@ -565,7 +566,7 @@ impl Script {
 
     pub async fn run_script(
         &self,
-        env_vars: HashMap<String, String>,
+        env_vars: EnvVars,
         work_dir: &Path,
         recipe_dir: &Path,
         run_prefix: &Path,
@@ -603,17 +604,17 @@ impl Script {
             valid_script_extensions.push("nu");
         }
 
-        let env_vars = env_vars
-            .into_iter()
-            .chain(self.env().clone().into_iter())
-            .collect::<IndexMap<String, String>>();
+        // let env_vars = env_vars
+        //     .into_iter()
+        //     .chain(self.env().clone().into_iter())
+        //     .collect::<IndexMap<String, String>>();
 
         // Get the contents of the script.
         for (k, v) in &env_vars {
             jinja_config.as_mut().map(|jinja| {
                 jinja
                     .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()))
+                    .insert(k.clone().into(), Value::from_safe_string(v.clone()))
             });
         }
 
