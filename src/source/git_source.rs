@@ -41,9 +41,10 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr(
-            "failed to git fetch refs from origin",
-        ));
+        return Err(SourceError::GitError(format!(
+            "failed to git fetch refs from origin: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     // try to suppress detached head warning
@@ -62,7 +63,10 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+        return Err(SourceError::GitError(format!(
+            "failed to checkout FETCH_HEAD: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     let output = git_command(system_tools, "checkout")?
@@ -73,7 +77,10 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Repository checkout for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+        return Err(SourceError::GitError(format!(
+            "failed to checkout FETCH_HEAD: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     // Update submodules
@@ -84,7 +91,10 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Submodule update failed!");
-        return Err(SourceError::GitErrorStr("failed to update submodules"));
+        return Err(SourceError::GitError(format!(
+            "failed to update submodules: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     tracing::debug!("Repository fetched successfully!");
