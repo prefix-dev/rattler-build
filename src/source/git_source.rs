@@ -8,7 +8,7 @@ use std::{
 
 use crate::system_tools::{SystemTools, Tool};
 use crate::{
-    recipe::parser::{GitSource, GitUrl},
+    recipe::parser::{GitRev, GitSource, GitUrl},
     system_tools::ToolError,
 };
 
@@ -19,7 +19,7 @@ pub fn fetch_repo(
     system_tools: &SystemTools,
     repo_path: &Path,
     url: &str,
-    rev: &str,
+    rev: &GitRev,
 ) -> Result<(), SourceError> {
     tracing::info!(
         "Fetching repository from {} at {} into {}",
@@ -33,8 +33,22 @@ pub fn fetch_repo(
     }
 
     let mut command = git_command(system_tools, "fetch")?;
+    let refspec = match rev {
+        GitRev::Branch(_) => format!("{0}:{0}", rev),
+        GitRev::Tag(_) => format!("{0}:{0}", rev),
+        _ => format!("{}", rev),
+    };
     let output = command
-        .args([url, rev])
+        .args([
+            // Allow non-fast-forward fetches.
+            "--force",
+            // Allow update a branch even if we currently have it checked out.
+            // This should be safe, as we do a `git checkout` below to refresh
+            // the working copy.
+            "--update-head-ok",
+            url,
+            refspec.as_str(),
+        ])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -66,7 +80,7 @@ pub fn fetch_repo(
     }
 
     let output = git_command(system_tools, "checkout")?
-        .args([rev])
+        .arg(rev.to_string())
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
@@ -187,7 +201,7 @@ pub fn git_src(
             }
 
             assert!(cache_path.exists());
-            fetch_repo(system_tools, &cache_path, &url.to_string(), &rev)?;
+            fetch_repo(system_tools, &cache_path, &url.to_string(), source.rev())?;
         }
         GitUrl::Path(path) => {
             if cache_path.exists() {
