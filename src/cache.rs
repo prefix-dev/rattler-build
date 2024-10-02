@@ -16,7 +16,9 @@ use crate::{
     metadata::{build_reindexed_channels, Output},
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
     recipe::parser::{Dependency, Requirements},
-    render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies},
+    render::resolved_dependencies::{
+        install_environments, resolve_dependencies, FinalizedDependencies,
+    },
     source::copy_dir::{copy_file, create_symlink, CopyOptions},
 };
 
@@ -177,6 +179,10 @@ impl Output {
                 resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
                     .await
                     .unwrap();
+
+            install_environments(self, &finalized_dependencies, tool_configuration)
+                .await
+                .into_diagnostic()?;
 
             cache
                 .build

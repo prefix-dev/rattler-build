@@ -608,13 +608,9 @@ async fn amend_run_exports(
 
 pub async fn install_environments(
     output: &Output,
+    dependencies: &FinalizedDependencies,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), ResolveError> {
-    let dependencies = output
-        .finalized_dependencies
-        .as_ref()
-        .ok_or(ResolveError::FinalizedDependencyNotFound)?;
-
     const EMPTY_RECORDS: Vec<RepoDataRecord> = Vec::new();
     install_packages(
         "build",
@@ -1007,7 +1003,12 @@ impl Output {
         &self,
         tool_configuration: &Configuration,
     ) -> Result<(), ResolveError> {
-        install_environments(self, tool_configuration).await
+        let dependencies = self
+            .finalized_dependencies
+            .as_ref()
+            .ok_or(ResolveError::FinalizedDependencyNotFound)?;
+
+        install_environments(self, dependencies, tool_configuration).await
     }
 }
 

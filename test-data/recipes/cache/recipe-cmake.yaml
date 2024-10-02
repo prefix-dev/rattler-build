@@ -1,0 +1,25 @@
+context:
+  version: 0.1.0
+  build_num: 0
+
+recipe:
+  name: cache-installation
+  version: ${{ version }}
+
+build:
+  number: ${{ build_num }}
+
+cache:
+  requirements:
+    build:
+      - cmake
+  build:
+    script:
+      - cmake --version
+
+outputs:
+  - package:
+      name: check-1
+
+  - package:
+      name: check-2

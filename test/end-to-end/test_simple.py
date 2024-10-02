@@ -956,3 +956,16 @@ def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert rendered[0]["build_configuration"]["variant"] == {
         "target_platform": "noarch"
     }
+
+
+def test_cache_install(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "cache/recipe-cmake.yaml", tmp_path, extra_args=["--experimental"]
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "check-1")
+    pkg2 = get_extracted_package(tmp_path, "check-2")
+    assert (pkg1 / "info/index.json").exists()
+    assert (pkg2 / "info/index.json").exists()
