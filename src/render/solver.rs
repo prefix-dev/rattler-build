@@ -71,7 +71,7 @@ pub async fn solve_environment(
     let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
         "determining virtual packages",
         move || {
-            VirtualPackage::detect(&VirtualPackageOverrides::default()).map(|vpkgs| {
+            VirtualPackage::detect(&VirtualPackageOverrides::from_env()).map(|vpkgs| {
                 vpkgs
                     .iter()
                     .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
