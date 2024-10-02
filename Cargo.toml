@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.22.0"
+version = "0.23.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -50,16 +50,16 @@ walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
 serde_json = "1.0.128"
-reqwest = { version = "0.12.7", default-features = false, features = [
+reqwest = { version = "0.12.8", default-features = false, features = [
     "multipart",
 ] }
 tokio = { version = "1.40.0", features = ["rt", "macros", "rt-multi-thread", "process"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
-serde_with = "3.9.0"
+serde_with = "3.10.0"
 url = "2.5.2"
 tracing = "0.1.40"
-clap = { version = "4.5.18", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.19", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=1.0.14", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -81,31 +81,31 @@ futures = "0.3.30"
 indicatif = "0.17.8"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
 thiserror = "1.0.64"
-tempfile = "3.12.0"
+tempfile = "3.13.0"
 chrono = "0.4.38"
 sha1 = "0.10.6"
 spdx = "0.10.6"
 ignore = "0.4.23"
 globset = "0.4.15"
-clap-verbosity-flag = "2.2.1"
+clap-verbosity-flag = "2.2.2"
 tracing-core = "0.1.32"
 petgraph = "0.6.5"
-indexmap = "2.5.0"
+indexmap = "2.6.0"
 dunce = "1.0.5"
 fs-err = "2.11.0"
 which = "6.0.3"
-clap_complete = "4.5.29"
+clap_complete = "4.5.32"
 clap_complete_nushell = "4.5.3"
 tokio-util = "0.7.12"
 
-tar = "0.4.41"
+tar = "0.4.42"
 zip = { version = "2.2.0", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
 bzip2 = "0.4.4"
 base64 = "0.22.1"
-flate2 = "1.0.33"
+flate2 = "1.0.34"
 xz2 = "0.1.7"
 zstd = "0.13.2"
 toml = "0.8.19"
@@ -113,7 +113,7 @@ memmap2 = "0.9.5"
 reqwest-middleware = "0.3.3"
 rattler_installs_packages = { version = "0.9.0", default-features = false, optional = true }
 async-once-cell = "0.5.3"
-terminal_size = "0.3.0"
+terminal_size = "0.4.0"
 memchr = "2.7.4"
 ratatui = { version = "0.28.1", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
@@ -123,28 +123,28 @@ tui-input = { version = "0.10.1", optional = true }
 reflink-copy = "0.1.19"
 rayon = "1.10.0"
 patch = "0.7.0"
-regex = "1.10.6"
+regex = "1.11.0"
 # we have a patched version of clap-markdown
 clap-markdown = { version = "=0.1.3", optional = true }
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.27.12", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler = { version = "0.27.13", default-features = false, features = ["cli-tools", "indicatif"] }
 rattler_cache = { version = "0.2.4", default-features = false }
 rattler_conda_types = { version = "0.28.0", default-features = false }
 rattler_digest = { version = "1.0.2", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.29", default-features = false }
+rattler_index = { version = "0.19.30", default-features = false }
 rattler_networking = { version = "0.21.4", default-features = false }
 rattler_redaction = { version = "0.1.2" }
-rattler_repodata_gateway = { version = "0.21.14", default-features = false, features = ["gateway"] }
+rattler_repodata_gateway = { version = "0.21.15", default-features = false, features = ["gateway"] }
 rattler_shell = { version = "0.22.2", default-features = false, features = ["sysinfo"] }
-rattler_solve = { version = "1.0.8", default-features = false, features = ["resolvo", "serde"] }
+rattler_solve = { version = "1.0.9", default-features = false, features = ["resolvo", "serde"] }
 rattler_virtual_packages = { version = "1.1.5", default-features = false }
 rattler_package_streaming = { version = "0.22.8", default-features = false }
 
 [dev-dependencies]
 insta = { version = "1.40.0", features = ["yaml"] }
-rstest = "0.22.0"
+rstest = "0.23.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.6"
 
