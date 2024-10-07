@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    _partialerror,
+    _partialerror, env_vars,
     hash::HashInfo,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
@@ -436,6 +436,10 @@ impl VariantConfig {
 
             let use_keys = &parsed_recipe.build().variant().use_keys;
             used_vars.extend(use_keys.iter().cloned());
+
+            // Environment variables can be overwritten by the variant configuration
+            let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.host_platform);
+            used_vars.extend(env_vars.keys().cloned());
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
