@@ -181,8 +181,11 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
-    /// The target platform
+    /// The target platform. If not set it will be discovered from the index.json metadata.
     pub target_platform: Option<Platform>,
+    /// The host platform for run-time dependencies. If not set it will be
+    /// discovered from the index.json metadata.
+    pub host_platform: Option<Platform>,
     /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
     /// The channels to use for the test – do not forget to add the local build outputs channel
@@ -310,17 +313,20 @@ pub async fn run_test(
 
     tracing::info!("Creating test environment in {:?}", prefix);
 
-    let platform = if target_platform != Platform::NoArch {
-        target_platform
-    } else {
-        Platform::current()
-    };
-
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
 
+    let host_platform = config.host_platform.unwrap_or_else(|| {
+        if target_platform == Platform::NoArch {
+            Platform::current()
+        } else {
+            target_platform
+        }
+    });
+
     let config = TestConfiguration {
         target_platform: Some(target_platform),
+        host_platform: Some(host_platform),
         channels,
         ..config.clone()
     };
@@ -359,7 +365,7 @@ pub async fn run_test(
         create_environment(
             "test",
             &dependencies,
-            &platform,
+            &host_platform,
             &prefix,
             &config.channels,
             &config.tool_configuration,
@@ -555,7 +561,7 @@ impl CommandsTest {
             ParseStrictness::Lenient,
         )?);
 
-        let platform = config.target_platform.unwrap_or_else(Platform::current);
+        let platform = config.host_platform.unwrap_or_else(Platform::current);
 
         let run_env = prefix.join("run");
         create_environment(
