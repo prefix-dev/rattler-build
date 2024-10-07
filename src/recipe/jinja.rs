@@ -7,7 +7,7 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::{from_args, Kwargs, Object};
 use minijinja::{Environment, Value};
-use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
+use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
@@ -364,6 +364,7 @@ fn default_filters(env: &mut Environment) {
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
+        host_platform,
         build_platform,
         variant,
         experimental,
@@ -428,8 +429,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     let variant_clone = variant.clone();
     env.add_function("cdt", move |package_name: String| {
-        use rattler_conda_types::Arch;
-        let arch = build_platform.arch().or_else(|| target_platform.arch());
+        let arch = host_platform.arch().or_else(|| build_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
         let cdt_arch = if let Some(s) = variant_clone.get("cdt_arch") {
