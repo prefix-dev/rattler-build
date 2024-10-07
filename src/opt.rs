@@ -271,8 +271,13 @@ pub struct BuildOpts {
     pub build_platform: Platform,
 
     /// The target platform for the build.
+    #[arg(long)]
+    pub target_platform: Option<Platform>,
+
+    /// The host platform for the build. If set, it will be used to determine
+    /// also the target_platform (as long as it is not noarch).
     #[arg(long, default_value_t = Platform::current())]
-    pub target_platform: Platform,
+    pub host_platform: Platform,
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long, default_value = "conda-forge")]
