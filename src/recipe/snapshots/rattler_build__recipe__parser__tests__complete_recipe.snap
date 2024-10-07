@@ -102,6 +102,14 @@ requirements:
   run:
   - python >=3.11
   - perl
+  - pin_subpackage:
+      name: test
+      exact: true
+  - pin_subpackage:
+      name: test
+      lower_bound: x.x.x.x.x.x
+      upper_bound: x
+      build: foo*
   run_constraints:
   - python * *cpython
   run_exports:
