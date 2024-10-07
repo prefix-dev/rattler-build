@@ -302,11 +302,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     } else {
         insert!(vars, "CONDA_BUILD_CROSS_COMPILATION", "0");
     }
-    insert!(
-        vars,
-        "SUBDIR",
-        output.build_configuration.target_platform.to_string()
-    );
+    insert!(vars, "SUBDIR", output.target_platform().to_string());
     insert!(
         vars,
         "build_platform",
@@ -315,8 +311,9 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, String> {
     insert!(
         vars,
         "target_platform",
-        output.build_configuration.target_platform.to_string()
+        output.target_platform().to_string()
     );
+    insert!(vars, "host_platform", output.host_platform().to_string());
     insert!(vars, "CONDA_BUILD_STATE", build_state);
 
     vars.extend(language_vars(output));

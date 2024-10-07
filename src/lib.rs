@@ -154,16 +154,35 @@ pub async fn get_build_output(
 
     let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
 
-    if args.target_platform == Platform::NoArch || args.build_platform == Platform::NoArch {
+    if args.target_platform == Some(Platform::NoArch) || args.build_platform == Platform::NoArch {
         return Err(miette::miette!(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
         ));
     }
 
+    let mut host_platform = args.host_platform;
+    // If target_platform is not set, we default to the host platform
+    let target_platform = args.target_platform.unwrap_or(host_platform);
+    // If target_platform is set and host_platform is not, then we default host_platform to the target_platform
+    if let Some(target_platform) = args.target_platform {
+        // Check if `host_platform` is set by looking at the args (not ideal)
+        let host_platform_set = std::env::args().any(|arg| arg.starts_with("--host-platform"));
+        if !host_platform_set {
+            host_platform = target_platform
+        }
+    }
+
+    tracing::debug!(
+        "Platforms: build: {}, host: {}, target: {}",
+        args.build_platform,
+        host_platform,
+        target_platform
+    );
+
     let selector_config = SelectorConfig {
         // We ignore noarch here
-        target_platform: args.target_platform,
-        host_platform: args.target_platform,
+        target_platform,
+        host_platform,
         hash: None,
         build_platform: args.build_platform,
         variant: BTreeMap::new(),
@@ -292,7 +311,7 @@ pub async fn get_build_output(
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform: args.target_platform,
+                host_platform,
                 build_platform: args.build_platform,
                 hash,
                 variant: discovered_output.used_vars.clone(),
