@@ -165,12 +165,19 @@ pub async fn get_build_output(
     let target_platform = args.target_platform.unwrap_or(host_platform);
     // If target_platform is set and host_platform is not, then we default host_platform to the target_platform
     if let Some(target_platform) = args.target_platform {
-        // check if `--host-platform` is in the sysv arguments
-        let host_platform_set = std::env::args().any(|arg| arg == "--host-platform");
+        // Check if `host_platform` is set by looking at the args (not ideal)
+        let host_platform_set = std::env::args().any(|arg| arg.starts_with("--host-platform"));
         if !host_platform_set {
             host_platform = target_platform
         }
     }
+
+    tracing::debug!(
+        "Platforms: build: {}, host: {}, target: {}",
+        args.build_platform,
+        host_platform,
+        target_platform
+    );
 
     let selector_config = SelectorConfig {
         // We ignore noarch here
