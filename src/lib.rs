@@ -402,6 +402,7 @@ pub async fn run_test_from_args(
     let test_options = TestConfiguration {
         test_prefix: tempdir.path().to_path_buf(),
         target_platform: None,
+        host_platform: None,
         keep_test_prefix: false,
         channels,
         channel_priority: ChannelPriority::Strict,
