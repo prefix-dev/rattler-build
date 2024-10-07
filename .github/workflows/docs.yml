@@ -45,6 +45,7 @@ jobs:
 
       - name: Build docs for PR
         run: |
+          sed -i '/\[dependencies\]/a clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }' Cargo.toml
           pixi run generate-cli-docs
 
       - name: Check for changes
