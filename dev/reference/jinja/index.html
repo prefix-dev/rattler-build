@@ -1521,6 +1521,14 @@ following input:</p>
 </ul>
 <p>Both <code>lower_bound</code> and <code>upper_bound</code> expect a valid version string (e.g.
 <code>1.2.3</code>).</p>
+<p>To add an build-string matching expression, you can use the <code>build</code> argument:</p>
+<ul>
+<li><code>build</code> (default: <code>None</code>): This will add a build string matching expression to
+  the pin. The build string matching expression is a string that is used to
+  match the build string with the match spec. For example, if the build string is
+  <code>py38_0</code>, the build string matching expression could be <code>py38*</code> or to match
+  exactly <code>py38_0</code>. The <code>build</code> and <code>exact</code> options are mutually exclusive.</li>
+</ul>
 <h4 id="the-pin_subpackage-function">The <code>pin_subpackage</code> function<a class="headerlink" href="#the-pin_subpackage-function" title="Permanent link">#</a></h4>
 <ul>
 <li><code>${{ pin_subpackage("mypkg", lower_bound="x.x", upper_bound="x.x") }}</code> creates a pin
@@ -1532,6 +1540,7 @@ following input:</p>
   }}</code> creates a pin to another output in the recipe with a lower bound of
   <code>1.2.3</code> and an upper bound of <code>1.2.4</code>. This is equivalent to writing
   <code>other_output &gt;=1.2.3,&lt;1.2.4</code>.</li>
+<li><code>${{ pin_subpackage("foo", build="py38*") }}</code> creates a matchspec like <code>foo &gt;=3.1,&lt;3.2.0a0 py38*</code>.</li>
 </ul>
 <h4 id="the-pin_compatible-function">The <code>pin_compatible</code> function<a class="headerlink" href="#the-pin_compatible-function" title="Permanent link">#</a></h4>
 <p>The pin compatible function works exactly as the <code>pin_subpackage</code> function, but
