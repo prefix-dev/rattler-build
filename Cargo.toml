@@ -163,7 +163,7 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-[patch.crates-io]
+# [patch.crates-io]
 # rattler = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
@@ -176,17 +176,15 @@ pre-build = [
 # rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 
-
-#rattler = { path = "../rattler/crates/rattler" }
-#rattler_cache = { path = "../rattler/crates/rattler_cache" }
-#rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
-#rattler_digest = { path = "../rattler/crates/rattler_digest" }
-#rattler_index = { path = "../rattler/crates/rattler_index" }
-#rattler_networking = { path = "../rattler/crates/rattler_networking" }
-#rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
-#rattler_shell = { path = "../rattler/crates/rattler_shell" }
-#rattler_solve = { path = "../rattler/crates/rattler_solve" }
-#rattler_redaction = { path = "../rattler/crates/rattler_redaction" }
-#rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
-#rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
-#clap-markdown = { path = "../clap-markdown" }
+# rattler = { path = "../rattler/crates/rattler" }
+# rattler_cache = { path = "../rattler/crates/rattler_cache" }
+# rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
+# rattler_digest = { path = "../rattler/crates/rattler_digest" }
+# rattler_index = { path = "../rattler/crates/rattler_index" }
+# rattler_networking = { path = "../rattler/crates/rattler_networking" }
+# rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
+# rattler_shell = { path = "../rattler/crates/rattler_shell" }
+# rattler_solve = { path = "../rattler/crates/rattler_solve" }
+# rattler_redaction = { path = "../rattler/crates/rattler_redaction" }
+# rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
+# rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }
