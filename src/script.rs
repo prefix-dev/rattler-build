@@ -9,6 +9,7 @@ use rattler_shell::{
     activation::{ActivationError, ActivationVariables, Activator},
     shell::{self, Shell},
 };
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::io::Error;
 use std::{
@@ -691,6 +692,22 @@ impl Script {
 }
 
 impl Output {
+    /// Add environment variables from the variant to the environment variables.
+    fn env_vars_from_variant(&self) -> HashMap<String, Option<String>> {
+        let languages: HashSet<&str> = HashSet::from(["PERL", "LUA", "R", "NUMPY", "PYTHON"]);
+        self.variant()
+            .iter()
+            .filter_map(|(k, v)| {
+                let key_upper = k.to_uppercase();
+                if !languages.contains(key_upper.as_str()) {
+                    Some((k.clone(), Some(v.to_string())))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
@@ -699,6 +716,7 @@ impl Output {
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+        env_vars.extend(self.env_vars_from_variant());
 
         let selector_config = self.build_configuration.selector_config();
         let mut jinja = Jinja::new(selector_config.clone());
