@@ -5,7 +5,10 @@ use std::{collections::HashMap, path::Path};
 use crate::unix;
 
 /// Get default env vars for macOS
-pub fn default_env_vars(prefix: &Path, target_platform: &Platform) -> HashMap<String, Option<String>> {
+pub fn default_env_vars(
+    prefix: &Path,
+    target_platform: &Platform,
+) -> HashMap<String, Option<String>> {
     let mut vars = unix::env::default_env_vars(prefix);
     let t_string = target_platform.to_string();
     let arch = t_string.split('-').collect::<Vec<&str>>()[1];

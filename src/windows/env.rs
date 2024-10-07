@@ -131,7 +131,7 @@ pub fn default_env_vars(
 
     for (key, val) in std::env::vars() {
         if re_vs_comntools.is_match(&key) || re_vs_installdir.is_match(&key) {
-            vars.insert(key, val);
+            vars.insert(key, Some(val));
         }
     }
 

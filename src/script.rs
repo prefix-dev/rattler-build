@@ -565,7 +565,7 @@ impl Script {
 
     pub async fn run_script(
         &self,
-        env_vars: HashMap<String, String>,
+        env_vars: HashMap<String, Option<String>>,
         work_dir: &Path,
         recipe_dir: &Path,
         run_prefix: &Path,
@@ -605,6 +605,7 @@ impl Script {
 
         let env_vars = env_vars
             .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
             .chain(self.env().clone().into_iter())
             .collect::<IndexMap<String, String>>();
 

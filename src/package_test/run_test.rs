@@ -101,10 +101,10 @@ impl Tests {
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(environment, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
-        env_vars.extend(pkg_vars.clone());
+        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
-            environment.to_string_lossy().to_string(),
+            Some(environment.to_string_lossy().to_string()),
         );
         let tmp_dir = tempfile::tempdir()?;
 
@@ -580,8 +580,8 @@ impl CommandsTest {
         let platform = Platform::current();
         let mut env_vars = env_vars::os_vars(prefix, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
-        env_vars.extend(pkg_vars.clone());
-        env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
+        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+        env_vars.insert("PREFIX".to_string(), Some(run_env.to_string_lossy().to_string()));
 
         // copy all test files to a temporary directory and set it as the working directory
         let tmp_dir = tempfile::tempdir()?;

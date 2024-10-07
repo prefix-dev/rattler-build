@@ -10,7 +10,10 @@ pub fn default_env_vars(prefix: &Path) -> HashMap<String, Option<String>> {
         "PKG_CONFIG_PATH".to_string(),
         Some(prefix.join("lib/pkgconfig").to_string_lossy().to_string()),
     );
-    vars.insert("CMAKE_GENERATOR".to_string(), Some("Unix Makefiles".to_string()));
+    vars.insert(
+        "CMAKE_GENERATOR".to_string(),
+        Some("Unix Makefiles".to_string()),
+    );
     vars.insert(
         "SSL_CERT_FILE".to_string(),
         std::env::var("SSL_CERT_FILE").ok(),
