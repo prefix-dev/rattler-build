@@ -126,6 +126,14 @@ following input:
 Both `lower_bound` and `upper_bound` expect a valid version string (e.g.
 `1.2.3`).
 
+To add an build-string matching expression, you can use the `build` argument:
+
+- `build` (default: `None`): This will add a build string matching expression to
+  the pin. The build string matching expression is a string that is used to
+  match the build string with the match spec. For example, if the build string is
+  `py38_0`, the build string matching expression could be `py38*` or to match
+  exactly `py38_0`. The `build` and `exact` options are mutually exclusive.
+
 #### The `pin_subpackage` function
 
 - `${{ pin_subpackage("mypkg", lower_bound="x.x", upper_bound="x.x") }}` creates a pin
@@ -137,6 +145,7 @@ Both `lower_bound` and `upper_bound` expect a valid version string (e.g.
   }}` creates a pin to another output in the recipe with a lower bound of
   `1.2.3` and an upper bound of `1.2.4`. This is equivalent to writing
   `other_output >=1.2.3,<1.2.4`.
+- `${{ pin_subpackage("foo", build="py38*") }}` creates a matchspec like `foo >=3.1,<3.2.0a0 py38*`.
 
 #### The `pin_compatible` function
 

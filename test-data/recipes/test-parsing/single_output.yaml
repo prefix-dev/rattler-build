@@ -112,6 +112,8 @@ requirements:
   run:
     - python >=3.11
     - perl
+    - ${{ pin_subpackage('test', exact=True) }}
+    - ${{ pin_subpackage('test', build="foo*") }}
   run_constraints:
     - python * *cpython
   run_exports:
