@@ -46,6 +46,8 @@ pub fn fetch_repo(
             // This should be safe, as we do a `git checkout` below to refresh
             // the working copy.
             "--update-head-ok",
+            // Avoid overhead of fetching unused tags.
+            "--no-tags",
             url,
             refspec.as_str(),
         ])
@@ -195,7 +197,13 @@ pub fn git_src(
             if !cache_path.exists() {
                 let mut command = git_command(system_tools, "clone")?;
                 command
-                    .args(["--progress", "-n", source.url().to_string().as_str()])
+                    .args([
+                        // Avoid overhead of fetching unused tags.
+                        "--no-tags",
+                        "--progress",
+                        "-n",
+                        source.url().to_string().as_str(),
+                    ])
                     .arg(cache_path.as_os_str());
 
                 let output = command
