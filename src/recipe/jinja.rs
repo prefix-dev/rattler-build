@@ -182,6 +182,17 @@ fn jinja_pin_function(
         ));
     }
 
+    if let Ok(build) = kwargs.get::<String>("build") {
+        // if exact & build are set this is an error
+        if pin.args.exact {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                "Cannot set `exact` and `build` at the same time.".to_string(),
+            ));
+        }
+        pin.args.build = Some(build);
+    }
+
     kwargs.assert_all_used()?;
 
     Ok(internal_repr.to_json(&pin))
