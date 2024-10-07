@@ -28,6 +28,7 @@ use url::Url;
 
 use crate::env_vars;
 use crate::recipe::parser::{CommandsTest, DownstreamTest, Script, ScriptContent, TestType};
+use crate::selectors::SelectorConfig;
 use crate::source::copy_dir::CopyDir;
 use crate::{recipe::parser::PythonTest, render::solver::create_environment, tool_configuration};
 
@@ -218,6 +219,20 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
     );
 
     res
+}
+
+impl TestConfiguration {
+    pub(crate) fn selector_config(&self, index_json: &IndexJson) -> SelectorConfig {
+        SelectorConfig {
+            target_platform: self.target_platform.unwrap_or(Platform::current()),
+            host_platform: self.host_platform.unwrap_or(Platform::current()),
+            build_platform: Platform::current(),
+            hash: None, 
+            variant: Default::default(),
+            experimental: false,
+            allow_undefined: false,
+        }
+    }
 }
 
 /// Run a test for a single package
@@ -592,6 +607,16 @@ impl CommandsTest {
             ))
         })?;
 
+        // Create a jinja environment to render the script commands
+        let selector_config = config.selector_config();
+        let mut jinja = Jinja::new(selector_config.clone());
+        for (k, v) in self.recipe.context.iter() {
+            jinja
+                .context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
+
+
         tracing::info!("Testing commands:");
         self.script
             .run_script(
@@ -600,7 +625,7 @@ impl CommandsTest {
                 path,
                 &run_env,
                 build_env.as_ref(),
-                None,
+                None, // Add jinja env here! 
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
