@@ -27,7 +27,6 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
 use crate::env_vars;
-use crate::metadata::build_reindexed_channels;
 use crate::recipe::parser::{CommandsTest, DownstreamTest, Script, ScriptContent, TestType};
 use crate::source::copy_dir::CopyDir;
 use crate::{recipe::parser::PythonTest, render::solver::create_environment, tool_configuration};
@@ -313,12 +312,6 @@ pub async fn run_test(
     let prefix = canonicalize(&config.test_prefix)?;
 
     tracing::info!("Creating test environment in {:?}", prefix);
-
-    let host_platform = if target_platform != Platform::NoArch {
-        target_platform
-    } else {
-        Platform::current()
-    };
 
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
