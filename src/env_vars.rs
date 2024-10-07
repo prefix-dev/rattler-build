@@ -174,17 +174,13 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, String> {
         vars.insert(path_var.to_string(), path);
     }
 
-    if cfg!(target_family = "windows") {
-        vars.extend(windows::env::default_env_vars(prefix, platform));
-    } else if cfg!(target_family = "unix") {
-        vars.extend(unix::env::default_env_vars(prefix));
-    }
-
-    if platform.is_osx() {
-        vars.extend(macos::env::default_env_vars(prefix, platform));
-    } else if platform.is_linux() {
-        vars.extend(linux::env::default_env_vars(prefix, platform));
-    }
+    // if platform.is_windows() {
+    //     vars.extend(windows::env::default_env_vars(prefix, platform));
+    // } else if platform.is_osx() {
+    //     vars.extend(macos::env::default_env_vars(prefix, platform));
+    // } else if platform.is_linux() {
+    //     vars.extend(linux::env::default_env_vars(prefix, platform));
+    // }
 
     vars
 }
