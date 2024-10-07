@@ -140,7 +140,11 @@ pub fn os_vars(prefix: &Path, platform: &Platform) -> HashMap<String, Option<Str
         "PATH"
     };
 
-    insert!(vars, "CPU_COUNT", env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string()));
+    insert!(
+        vars,
+        "CPU_COUNT",
+        env::var("CPU_COUNT").unwrap_or_else(|_| num_cpus::get().to_string())
+    );
     vars.insert("LANG".to_string(), env::var("LANG").ok());
     vars.insert("LC_ALL".to_string(), env::var("LC_ALL").ok());
     vars.insert("MAKEFLAGS".to_string(), env::var("MAKEFLAGS").ok());
