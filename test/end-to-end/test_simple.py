@@ -969,3 +969,19 @@ def test_cache_install(
     pkg2 = get_extracted_package(tmp_path, "check-2")
     assert (pkg1 / "info/index.json").exists()
     assert (pkg2 / "info/index.json").exists()
+
+
+def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "env_vars",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "env_var_test")
+
+    # assert (pkg / "info/paths.json").exists()
+    text = (pkg / "makeflags.txt").read_text()
+    assert text.strip() == "OVERRIDDEN_MAKEFLAGS"
+
+    variant_config = json.loads((pkg / "info/hash_input.json").read_text())
+    assert variant_config["MAKEFLAGS"] == "OVERRIDDEN_MAKEFLAGS"
