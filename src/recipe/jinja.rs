@@ -361,6 +361,15 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("unique", minijinja::filters::unique);
 }
 
+fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
+    Platform::from_str(platform).map_err(|e| {
+        minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            format!("Invalid platform: {e}"),
+        )
+    })
+}
+
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
@@ -487,6 +496,20 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     env.add_function("pin_compatible", |name: String, kwargs: Kwargs| {
         jinja_pin_function(name, kwargs, InternalRepr::PinCompatible)
+    });
+
+    // Add the is_... functions
+    env.add_function("is_linux", |platform: &str| {
+        Ok(parse_platform(platform)?.is_linux())
+    });
+    env.add_function("is_osx", |platform: &str| {
+        Ok(parse_platform(platform)?.is_osx())
+    });
+    env.add_function("is_windows", |platform: &str| {
+        Ok(parse_platform(platform)?.is_windows())
+    });
+    env.add_function("is_unix", |platform: &str| {
+        Ok(parse_platform(platform)?.is_unix())
     });
 
     env.add_function("load_from_file", move |path: String| {
