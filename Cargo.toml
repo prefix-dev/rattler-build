@@ -35,7 +35,7 @@ tui = [
     'tui-input',
 ]
 recipe-generation = ['rattler_installs_packages']
-# This feature needs to add a dependency on 
+# This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 # but in order to be able to publish to crates we remove this feature
 generate-cli-docs = []
