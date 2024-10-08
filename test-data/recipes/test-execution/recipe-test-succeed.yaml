@@ -1,6 +1,9 @@
+context:
+  version: "1.2.3"
+
 package:
   name: test-execution
-  version: 0.1.0
+  version: ${{ version }}
 
 build:
   script:
@@ -17,6 +20,8 @@ tests:
         - test -f $PREFIX/test-execution.txt
         - test -f ./testfile.txt
         - test -f ./testfolder/data.txt
+        # check that the version is rendered properly from context into the script
+        - if [[ "${{ version }}" == "1.2.3" ]]; then echo "Version matches 1.2.3"; else exit 123; fi
       else:
         - if not exist %PREFIX%\test-execution.txt (exit 1)
         - if not exist .\testfile.txt (exit 1)
@@ -28,12 +33,12 @@ tests:
   - script:
     - if: unix
       then:
-        - test $PKG_VERSION = "0.1.0"
+        - test $PKG_VERSION = "1.2.3"
         - test $PKG_NAME = "test-execution"
         - test $PKG_BUILDNUM = "0"
         - test -n $PKG_BUILD_STRING
       else:
-        - if not "%PKG_VERSION%" == "0.1.0" (exit 1)
+        - if not "%PKG_VERSION%" == "1.2.3" (exit 1)
         - if not "%PKG_NAME%" == "test-execution" (exit 1)
         - if not "%PKG_BUILDNUM%" == "0" (exit 1)
         # make sure that the build string is not empty

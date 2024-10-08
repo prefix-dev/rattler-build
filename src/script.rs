@@ -487,7 +487,7 @@ impl Script {
         }
     }
 
-    fn get_contents(
+    pub(crate) fn resolve_content(
         &self,
         recipe_dir: &Path,
         jinja_context: Option<Jinja>,
@@ -622,7 +622,7 @@ impl Script {
             });
         }
 
-        let contents = self.get_contents(recipe_dir, jinja_config, &valid_script_extensions)?;
+        let contents = self.resolve_content(recipe_dir, jinja_config, &valid_script_extensions)?;
 
         // Select a different interpreter if the script is a nushell script.
         if contents
