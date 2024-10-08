@@ -7,5 +7,7 @@ build:
     - if: unix
       then:
         - echo $MAKEFLAGS > $PREFIX/makeflags.txt
+        - echo $mkl_version > $PREFIX/mkl_version.txt
       else:
         - echo %MAKEFLAGS% > %PREFIX%\makeflags.txt
+        - echo %mkl_version% > %PREFIX%\mkl_version.txt
