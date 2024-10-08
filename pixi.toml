@@ -11,7 +11,7 @@ install = "cargo install --path . --locked"
 end_to_end_test = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details"
 test = "cargo test"
 lint = "pre-commit run --all"
-generate-cli-docs = "cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md"
+generate-cli-docs = "cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 
 [feature.docs.tasks]

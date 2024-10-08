@@ -93,6 +93,11 @@ Build a package from a recipe
 
 	The target platform for the build
 
+
+- `--host-platform <HOST_PLATFORM>`
+
+	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
+
 	- Default value: current platform
 
 - `-c`, `--channel <CHANNEL>`
