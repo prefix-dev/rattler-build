@@ -3479,6 +3479,7 @@ dependencies = [
  "indicatif",
  "insta",
  "itertools 0.13.0",
+ "lazy_static",
  "marked-yaml",
  "memchr",
  "memmap2 0.9.5",

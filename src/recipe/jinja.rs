@@ -366,6 +366,16 @@ fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
     })
 }
 
+lazy_static::lazy_static! {
+    /// The syntax config for MiniJinja / rattler-build
+    pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
+        .block_delimiters("{%", "%}")
+        .variable_delimiters("${{", "}}")
+        .comment_delimiters("#{{", "}}")
+        .build()
+        .unwrap();
+}
+
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
@@ -382,14 +392,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     default_filters(&mut env);
 
     // Ok to unwrap here because we know that the syntax is valid
-    env.set_syntax(
-        SyntaxConfig::builder()
-            .block_delimiters("{%", "%}")
-            .variable_delimiters("${{", "}}")
-            .comment_delimiters("#{{", "}}")
-            .build()
-            .unwrap(),
-    );
+    env.set_syntax(SYNTAX_CONFIG.clone());
 
     let variant = Arc::new(variant.clone());
 
