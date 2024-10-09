@@ -617,11 +617,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "unix_2233755_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_259ce3c_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler-build-demo": "1 unix_4616a5c_0",
+        "rattler_build_demo": "1 unix_4616a5c_0",
         "target_platform": "noarch",
     }
 
@@ -641,11 +641,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "win_b28fc4d_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "win_c8f1e9f_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler-build-demo": "1 win_4616a5c_0",
+        "rattler_build_demo": "1 win_4616a5c_0",
         "target_platform": "noarch",
     }
 
