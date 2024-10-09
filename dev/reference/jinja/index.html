@@ -1617,7 +1617,7 @@ will return <code>1</code>) - <code>last</code>: return the last element of a li
 <li><code>sort</code>: sort a list (e.g. <code>"{{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
 <li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"{{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
 <li><code>unique</code>: remove duplicates from a list (e.g. <code>"{{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
-<li><code>split</code>: split a string into a list (e.g. <code>"{{ '1.2.3' | split('.') }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
+<li><code>split</code>: split a string into a list (e.g. <code>"{{ '1.2.3' | split('.') | list }}"</code> will return <code>['1', '2', '3']</code>). By default, splits on whitespace.</li>
 </ul>
 <details>
 <summary>Removed filters</summary>
