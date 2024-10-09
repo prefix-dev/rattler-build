@@ -466,7 +466,9 @@ pub fn apply_variant(
                     let m = m.clone();
                     if m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
-                            if let Some(version) = variant.get(&name.as_normalized().replace('-', "_")) {
+                            if let Some(version) =
+                                variant.get(&name.as_normalized().replace('-', "_"))
+                            {
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
                                 let mut spec = version.clone();
