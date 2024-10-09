@@ -1101,7 +1101,10 @@ mod tests {
                 "split".to_string()
             };
 
-            jinja.eval(&format!("var | {func}")).unwrap().to_string()
+            jinja
+                .eval(&format!("var | {func} | list"))
+                .unwrap()
+                .to_string()
         };
 
         assert_eq!(split_test("foo bar", None), "[\"foo\", \"bar\"]");

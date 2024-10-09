@@ -41,7 +41,10 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
     }
 }
 
-fn parse<'source>(expr: &'source str, filename: &str) -> Result<ast::Stmt<'source>, minijinja::Error> {
+fn parse<'source>(
+    expr: &'source str,
+    filename: &str,
+) -> Result<ast::Stmt<'source>, minijinja::Error> {
     let syntax_config = SyntaxConfig::builder()
         .block_delimiters("{%", "%}")
         .variable_delimiters("${{", "}}")
