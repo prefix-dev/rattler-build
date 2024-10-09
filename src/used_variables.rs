@@ -160,12 +160,10 @@ fn find_jinja(
                             match parse_expr(if_sel.cond().as_str()) {
                                 Ok(expr) => {
                                     extract_variable_from_expression(&expr, variables);
-                                    // extract_variables(&ast, variables);
                                     queue.push_back((if_sel.then(), src));
-                                    // find_jinja(if_sel.then(), src, variables)?;
+
                                     if let Some(otherwise) = if_sel.otherwise() {
                                         queue.push_back((otherwise, src));
-                                        // find_jinja(otherwise, src, variables)?;
                                     }
                                 }
                                 Err(err) => {
