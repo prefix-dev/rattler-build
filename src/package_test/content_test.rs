@@ -94,14 +94,14 @@ impl PackageContentsTest {
                     result.push((
                         lib.glob().to_string(),
                         GlobSet::builder()
-                            .add(Glob::new(&format!("bin/{lib}"))?)
+                            .add(Glob::new(&format!("Library/bin/{lib}"))?)
                             .build()?,
                     ));
                 } else if lib.glob().ends_with(".lib") {
                     result.push((
                         lib.glob().to_string(),
                         GlobSet::builder()
-                            .add(Glob::new(&format!("lib/{lib}"))?)
+                            .add(Glob::new(&format!("Library/lib/{lib}"))?)
                             .build()?,
                     ));
                 } else {
