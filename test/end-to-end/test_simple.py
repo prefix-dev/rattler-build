@@ -991,5 +991,10 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     assert variant_config["pybind11_abi"] == "4"
 
     # Check that we used the variant in the rendered recipe
-    rendered_recipe = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
-    assert(rendered_recipe["finalized_dependencies"]["build"]["specs"][0] == {"variant": "pybind11-abi", "spec": "pybind11-abi 4.*"})
+    rendered_recipe = yaml.safe_load(
+        (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    )
+    assert rendered_recipe["finalized_dependencies"]["build"]["specs"][0] == {
+        "variant": "pybind11-abi",
+        "spec": "pybind11-abi 4.*",
+    }
