@@ -334,12 +334,6 @@ fn default_filters(env: &mut Environment) {
         format!("{}{}", major, minor)
     });
 
-    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
-        s.split(sep.as_deref().unwrap_or(" "))
-            .map(|s| s.to_string())
-            .collect()
-    });
-
     env.add_filter("replace", minijinja::filters::replace);
     env.add_filter("lower", minijinja::filters::lower);
     env.add_filter("upper", minijinja::filters::upper);
@@ -360,6 +354,7 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
+    env.add_filter("split", minijinja::filters::split);
 }
 
 fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
