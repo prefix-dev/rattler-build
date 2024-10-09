@@ -62,7 +62,7 @@ serde_with = "3.11.0"
 url = "2.5.2"
 tracing = "0.1.40"
 clap = { version = "4.5.19", features = ["derive", "env", "cargo"] }
-minijinja = { version = "=1.0.14", features = [
+minijinja = { version = "2.3.1", features = [
     "unstable_machinery",
     "custom_syntax",
 ] }

@@ -1,6 +1,7 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use fs_err as fs;
+use minijinja::syntax::SyntaxConfig;
 use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
@@ -386,15 +387,14 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     default_filters(&mut env);
 
     // Ok to unwrap here because we know that the syntax is valid
-    env.set_syntax(minijinja::Syntax {
-        block_start: "{%".into(),
-        block_end: "%}".into(),
-        variable_start: "${{".into(),
-        variable_end: "}}".into(),
-        comment_start: "#{{".into(),
-        comment_end: "}}#".into(),
-    })
-    .expect("is tested to be correct");
+    env.set_syntax(
+        SyntaxConfig::builder()
+            .block_delimiters("{%", "%}")
+            .variable_delimiters("${{", "}}")
+            .comment_delimiters("#{{", "}}")
+            .build()
+            .unwrap(),
+    );
 
     let variant = Arc::new(variant.clone());
 
@@ -624,12 +624,8 @@ impl Git {
 }
 
 impl Object for Git {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -684,12 +680,8 @@ impl Env {
 }
 
 impl Object for Env {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],

@@ -12,9 +12,12 @@
 use std::collections::{HashSet, VecDeque};
 
 use marked_yaml::Span;
-use minijinja::machinery::{
-    ast::{self, Expr, Stmt},
-    parse,
+use minijinja::{
+    machinery::{
+        ast::{self, Expr, Stmt},
+        WhitespaceConfig,
+    },
+    syntax::SyntaxConfig,
 };
 
 use crate::recipe::{
@@ -36,6 +39,19 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
         }
         _ => {}
     }
+}
+
+fn parse<'source>(expr: &'source str, filename: &str) -> Result<ast::Stmt<'source>, minijinja::Error> {
+    let syntax_config = SyntaxConfig::builder()
+        .block_delimiters("{%", "%}")
+        .variable_delimiters("${{", "}}")
+        .comment_delimiters("#{{", "}}")
+        .build()
+        .unwrap();
+
+    let whitespace_config = WhitespaceConfig::default();
+
+    minijinja::machinery::parse(expr, filename, syntax_config, whitespace_config)
 }
 
 /// Extract all variables from a jinja expression (called from [`extract_variables`])
