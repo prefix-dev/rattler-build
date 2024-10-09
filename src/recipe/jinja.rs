@@ -1,6 +1,7 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use fs_err as fs;
+use minijinja::syntax::SyntaxConfig;
 use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
@@ -333,12 +334,6 @@ fn default_filters(env: &mut Environment) {
         format!("{}{}", major, minor)
     });
 
-    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
-        s.split(sep.as_deref().unwrap_or(" "))
-            .map(|s| s.to_string())
-            .collect()
-    });
-
     env.add_filter("replace", minijinja::filters::replace);
     env.add_filter("lower", minijinja::filters::lower);
     env.add_filter("upper", minijinja::filters::upper);
@@ -359,6 +354,7 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
+    env.add_filter("split", minijinja::filters::split);
 }
 
 fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
@@ -368,6 +364,16 @@ fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
             format!("Invalid platform: {e}"),
         )
     })
+}
+
+lazy_static::lazy_static! {
+    /// The syntax config for MiniJinja / rattler-build
+    pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
+        .block_delimiters("{%", "%}")
+        .variable_delimiters("${{", "}}")
+        .comment_delimiters("#{{", "}}")
+        .build()
+        .unwrap();
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
@@ -386,15 +392,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     default_filters(&mut env);
 
     // Ok to unwrap here because we know that the syntax is valid
-    env.set_syntax(minijinja::Syntax {
-        block_start: "{%".into(),
-        block_end: "%}".into(),
-        variable_start: "${{".into(),
-        variable_end: "}}".into(),
-        comment_start: "#{{".into(),
-        comment_end: "}}#".into(),
-    })
-    .expect("is tested to be correct");
+    env.set_syntax(SYNTAX_CONFIG.clone());
 
     let variant = Arc::new(variant.clone());
 
@@ -624,12 +622,8 @@ impl Git {
 }
 
 impl Object for Git {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -684,12 +678,8 @@ impl Env {
 }
 
 impl Object for Env {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -1114,12 +1104,28 @@ mod tests {
                 "split".to_string()
             };
 
-            jinja.eval(&format!("var | {func}")).unwrap().to_string()
+            jinja
+                .eval(&format!("var | {func} | list"))
+                .unwrap()
+                .to_string()
         };
 
         assert_eq!(split_test("foo bar", None), "[\"foo\", \"bar\"]");
         assert_eq!(split_test("foobar", None), "[\"foobar\"]");
         assert_eq!(split_test("1.2.3", Some(".")), "[\"1\", \"2\", \"3\"]");
+
+        jinja.context_mut().insert(
+            "var".to_string(),
+            Value::from_safe_string("1.2.3".to_string()),
+        );
+
+        assert_eq!(
+            jinja
+                .eval(&format!("(var | split('.'))[2]"))
+                .unwrap()
+                .to_string(),
+            "3"
+        );
     }
 
     #[test]

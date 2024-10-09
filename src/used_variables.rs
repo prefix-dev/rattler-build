@@ -14,11 +14,12 @@ use std::collections::{HashSet, VecDeque};
 use marked_yaml::Span;
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
-    parse,
+    parse_expr, WhitespaceConfig,
 };
 
 use crate::recipe::{
     custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
+    jinja::SYNTAX_CONFIG,
     parser::CollectErrors,
     ParsingError,
 };
@@ -36,6 +37,18 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
         }
         _ => {}
     }
+}
+
+fn parse<'source>(
+    expr: &'source str,
+    filename: &str,
+) -> Result<ast::Stmt<'source>, minijinja::Error> {
+    minijinja::machinery::parse(
+        expr,
+        filename,
+        SYNTAX_CONFIG.clone(),
+        WhitespaceConfig::default(),
+    )
 }
 
 /// Extract all variables from a jinja expression (called from [`extract_variables`])
@@ -130,12 +143,12 @@ fn find_jinja(
 ) -> Result<(), Vec<ParsingError>> {
     let mut errs = Vec::<ParsingError>::new();
     let mut queue = VecDeque::from([(node, src)]);
+
     while let Some((node, src)) = queue.pop_front() {
         match node {
             Node::Mapping(map) => {
                 for (_, value) in map.iter() {
                     queue.push_back((value, src));
-                    // find_jinja(value, src, variables)?;
                 }
             }
             Node::Sequence(seq) => {
@@ -143,16 +156,13 @@ fn find_jinja(
                     match item {
                         SequenceNodeInternal::Simple(node) => queue.push_back((node, src)),
                         SequenceNodeInternal::Conditional(if_sel) => {
-                            // we need to convert the if condition to a Jinja expression to parse it
-                            let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
-                            match parse(&as_jinja_expr, "jinja.yaml") {
-                                Ok(ast) => {
-                                    extract_variables(&ast, variables);
+                            match parse_expr(if_sel.cond().as_str()) {
+                                Ok(expr) => {
+                                    extract_variable_from_expression(&expr, variables);
                                     queue.push_back((if_sel.then(), src));
-                                    // find_jinja(if_sel.then(), src, variables)?;
+
                                     if let Some(otherwise) = if_sel.otherwise() {
                                         queue.push_back((otherwise, src));
-                                        // find_jinja(otherwise, src, variables)?;
                                     }
                                 }
                                 Err(err) => {

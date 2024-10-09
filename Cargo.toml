@@ -61,8 +61,8 @@ content_inspector = "0.2.4"
 serde_with = "3.11.0"
 url = "2.5.2"
 tracing = "0.1.40"
-clap = { version = "4.5.19", features = ["derive", "env", "cargo"] }
-minijinja = { version = "=1.0.14", features = [
+clap = { version = "4.5.20", features = ["derive", "env", "cargo"] }
+minijinja = { version = "2.3.1", features = [
     "unstable_machinery",
     "custom_syntax",
 ] }
@@ -96,8 +96,8 @@ indexmap = "2.6.0"
 dunce = "1.0.5"
 fs-err = "2.11.0"
 which = "6.0.3"
-clap_complete = "4.5.32"
-clap_complete_nushell = "4.5.3"
+clap_complete = "4.5.33"
+clap_complete_nushell = "4.5.4"
 tokio-util = "0.7.12"
 
 tar = "0.4.42"
@@ -141,6 +141,7 @@ rattler_shell = { version = "0.22.4", default-features = false, features = ["sys
 rattler_solve = { version = "1.1.0", default-features = false, features = ["resolvo", "serde"] }
 rattler_virtual_packages = { version = "1.1.7", default-features = false }
 rattler_package_streaming = { version = "0.22.10", default-features = false }
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 insta = { version = "1.40.0", features = ["yaml"] }
