@@ -986,6 +986,10 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     variant_config = json.loads((pkg / "info/hash_input.json").read_text())
     assert variant_config["MAKEFLAGS"] == "OVERRIDDEN_MAKEFLAGS"
 
-    text = (pkg / "mkl_version.txt").read_text()
-    assert text.strip() == "2023"
-    assert variant_config["mkl-version"] == "2023"
+    text = (pkg / "pybind_abi.txt").read_text()
+    assert text.strip() == "4"
+    assert variant_config["pybind11_abi"] == "4"
+
+    # Check that we used the variant in the rendered recipe
+    rendered_recipe = yaml.safe_load((pkg / "info/recipe/rendered_recipe.yaml").read_text())
+    assert(rendered_recipe["finalized_dependencies"]["build"]["specs"][0] == {"variant": "pybind11-abi", "spec": "pybind11-abi 4.*"})

@@ -1,4 +1,4 @@
 MAKEFLAGS:
   - OVERRIDDEN_MAKEFLAGS
-mkl-version:
-  - 2023
+pybind11_abi:
+  - 4
