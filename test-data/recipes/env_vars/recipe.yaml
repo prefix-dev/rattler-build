@@ -1,0 +1,11 @@
+package:
+  name: env_var_test
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo $MAKEFLAGS > $PREFIX/makeflags.txt
+      else:
+        - echo %MAKEFLAGS% > %PREFIX%\makeflags.txt

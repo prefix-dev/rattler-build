@@ -1,32 +1,33 @@
 //! Functions to write and create metadata from a given output
 
+#[cfg(target_family = "unix")]
+use std::os::unix::prelude::OsStrExt;
+use std::{
+    borrow::Cow,
+    collections::HashSet,
+    ops::Deref,
+    path::{Path, PathBuf},
+};
+
 use content_inspector::ContentType;
 use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
 use rattler_conda_types::{
     package::{
-        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PathType, PathsEntry, PathsJson,
-        PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
+        AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
+        PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
     },
     Platform,
 };
-use rattler_digest::compute_file_digest;
-use std::{
-    collections::HashSet,
-    io::Write,
-    path::{Path, PathBuf},
-};
-
-#[cfg(target_family = "unix")]
-use std::os::unix::prelude::OsStrExt;
-
-use crate::{metadata::Output, recipe::parser::PrefixDetection};
+use rattler_digest::{compute_bytes_digest, compute_file_digest};
 
 use super::{PackagingError, TempFiles};
+use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
 
+/// Detect if the file contains the prefix in binary mode.
 #[allow(unused_variables)]
-fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
+pub fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, PackagingError> {
     // Convert the prefix to a Vec<u8> for binary comparison
     // TODO on Windows check both ascii and utf-8 / 16?
     #[cfg(target_family = "windows")]
@@ -54,9 +55,9 @@ fn contains_prefix_binary(file_path: &Path, prefix: &Path) -> Result<bool, Packa
     }
 }
 
-/// This function requires we know the file content we are matching against is UTF-8
-/// In case the source is non utf-8 it will fail with a read error
-fn contains_prefix_text(
+/// This function requires we know the file content we are matching against is
+/// UTF-8 In case the source is non utf-8 it will fail with a read error
+pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
     target_platform: &Platform,
@@ -78,8 +79,9 @@ fn contains_prefix_text(
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
-        let forward_slash = to_forward_slash_lossy(prefix);
-        let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.as_ref())
+        let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
+
+        let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
             .next()
             .is_some();
 
@@ -90,7 +92,8 @@ fn contains_prefix_text(
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
-/// This function will also search in the file for the prefix and determine if the file is binary or text.
+/// This function will also search in the file for the prefix and determine if
+/// the file is binary or text.
 pub fn create_prefix_placeholder(
     target_platform: &Platform,
     file_path: &Path,
@@ -136,8 +139,8 @@ pub fn create_prefix_placeholder(
     let detected_is_text = content_type.is_text()
         && matches!(content_type, ContentType::UTF_8 | ContentType::UTF_8_BOM);
 
-    // Even if we force the replacement mode to be text we still cannot handle it like a text file
-    // since it likely contains NULL bytes etc.
+    // Even if we force the replacement mode to be text we still cannot handle it
+    // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
             Ok(true) => {
@@ -185,18 +188,18 @@ pub fn create_prefix_placeholder(
 
 impl Output {
     /// Create the run_exports.json file for the given output.
-    pub fn run_exports_json(&self) -> Result<Option<RunExportsJson>, PackagingError> {
-        if let Some(run_exports) = &self
+    pub fn run_exports_json(&self) -> Result<&RunExportsJson, PackagingError> {
+        Ok(&self
             .finalized_dependencies
             .as_ref()
             .ok_or(PackagingError::DependenciesNotFinalized)?
             .run
-            .run_exports
-        {
-            Ok(Some(run_exports.clone()))
-        } else {
-            Ok(None)
-        }
+            .run_exports)
+    }
+
+    /// Returns the contents of the `hash_input.json` file.
+    pub fn hash_input(&self) -> HashInput {
+        HashInput::from_variant(&self.build_configuration.variant)
     }
 
     /// Create the about.json file for the given output.
@@ -228,7 +231,13 @@ impl Output {
                 .unwrap_or_default(),
             // TODO ?
             source_url: None,
-            channels: self.build_configuration.channels.clone(),
+            channels: self
+                .build_configuration
+                .channels
+                .iter()
+                .map(|c| c.to_string())
+                .collect(),
+            extra: self.extra_meta.clone().unwrap_or_default(),
         };
 
         about_json
@@ -248,8 +257,8 @@ impl Output {
             .ok_or(PackagingError::DependenciesNotFinalized)?;
 
         // Track features are exclusively used to down-prioritize packages
-        // Each feature contributes "1 point" to the down-priorization. So we add a feature for each
-        // down-priorization level.
+        // Each feature contributes "1 point" to the down-priorization. So we add a
+        // feature for each down-priorization level.
         let track_features = self
             .recipe
             .build()
@@ -266,11 +275,8 @@ impl Output {
 
         Ok(IndexJson {
             name: self.name().clone(),
-            version: self.version().parse()?,
-            build: self
-                .build_string()
-                .ok_or(PackagingError::BuildStringNotSet)?
-                .to_string(),
+            version: self.version().clone().into(),
+            build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
             arch,
             platform,
@@ -287,7 +293,7 @@ impl Output {
                 .collect(),
             constrains: finalized_dependencies
                 .run
-                .constrains
+                .constraints
                 .iter()
                 .map(|dep| dep.spec().to_string())
                 .dedup()
@@ -314,8 +320,9 @@ impl Output {
     }
 
     /// Create a `paths.json` file structure for the given paths.
-    /// Paths should be given as absolute paths under the `path_prefix` directory.
-    /// This function will also determine if the file is binary or text, and if it contains the prefix.
+    /// Paths should be given as absolute paths under the `path_prefix`
+    /// directory. This function will also determine if the file is binary
+    /// or text, and if it contains the prefix.
     pub fn paths_json(&self, temp_files: &TempFiles) -> Result<PathsJson, PackagingError> {
         let always_copy_files = self.recipe.build().always_copy_files();
 
@@ -334,17 +341,50 @@ impl Output {
 
             let relative_path = p.strip_prefix(temp_files.temp_dir.path())?.to_path_buf();
 
+            // skip any info files as they are not part of the paths.json
+            if relative_path.starts_with("info") {
+                continue;
+            }
+
             if !p.exists() {
                 if p.is_symlink() {
-                    tracing::warn!(
-                        "Symlink target does not exist: {:?} -> {:?}",
-                        &p,
-                        fs::read_link(p)?
-                    );
+                    // check if the file is in the prefix
+                    if let Ok(link_target) = p.read_link() {
+                        if link_target.is_relative() {
+                            let Some(relative_path_parent) = relative_path.parent() else {
+                                tracing::warn!("could not get parent of symlink {:?}", &p);
+                                continue;
+                            };
+
+                            let resolved_path = temp_files
+                                .encoded_prefix
+                                .join(relative_path_parent)
+                                .join(&link_target);
+
+                            if !resolved_path.exists() {
+                                tracing::warn!(
+                                    "symlink target not part of this package: {:?} -> {:?}",
+                                    &p,
+                                    &link_target
+                                );
+
+                                // Think about continuing here or packaging broken symlinks
+                                continue;
+                            }
+                        } else {
+                            tracing::warn!(
+                                "packaging an absolute symlink to outside the prefix {:?} -> {:?}",
+                                &p,
+                                link_target
+                            );
+                        }
+                    } else {
+                        tracing::warn!("could not read symlink {:?}", &p);
+                    }
+                } else {
+                    tracing::warn!("file does not exist: {:?}", &p);
                     continue;
                 }
-                tracing::warn!("File does not exist: {:?} (TODO)", &p);
-                continue;
             }
 
             if meta.is_dir() {
@@ -374,10 +414,7 @@ impl Output {
                 )?;
 
                 let digest = compute_file_digest::<sha2::Sha256>(p)?;
-                let no_link = always_copy_files
-                    .as_ref()
-                    .map(|g| g.is_match(&relative_path))
-                    .unwrap_or(false);
+                let no_link = always_copy_files.is_match(&relative_path);
                 paths_json.paths.push(PathsEntry {
                     sha256: Some(digest),
                     relative_path,
@@ -387,7 +424,11 @@ impl Output {
                     size_in_bytes: Some(meta.len()),
                 });
             } else if meta.is_symlink() {
-                let digest = compute_file_digest::<sha2::Sha256>(p)?;
+                let digest = if p.is_file() {
+                    compute_file_digest::<sha2::Sha256>(p)?
+                } else {
+                    compute_bytes_digest::<sha2::Sha256>(&[])
+                };
 
                 paths_json.paths.push(PathsEntry {
                     sha256: Some(digest),
@@ -403,42 +444,43 @@ impl Output {
         Ok(paths_json)
     }
 
-    /// Create the metadata for the given output and place it in the temporary directory
+    /// Create the metadata for the given output and place it in the temporary
+    /// directory
     pub fn write_metadata(
         &self,
         temp_files: &TempFiles,
     ) -> Result<HashSet<PathBuf>, PackagingError> {
         let mut new_files = HashSet::new();
+        let root_dir = temp_files.temp_dir.path();
         let info_folder = temp_files.temp_dir.path().join("info");
         fs::create_dir_all(&info_folder)?;
 
-        let paths_json = File::create(info_folder.join("paths.json"))?;
-        let paths_json_struct = self.paths_json(temp_files)?;
-        serde_json::to_writer_pretty(paths_json, &paths_json_struct)?;
-        new_files.insert(info_folder.join("paths.json"));
+        let paths_json_path = root_dir.join(PathsJson::package_path());
+        let paths_json = File::create(&paths_json_path)?;
+        serde_json::to_writer_pretty(paths_json, &self.paths_json(temp_files)?)?;
+        new_files.insert(paths_json_path);
 
-        let index_json = File::create(info_folder.join("index.json"))?;
+        let index_json_path = root_dir.join(IndexJson::package_path());
+        let index_json = File::create(&index_json_path)?;
         serde_json::to_writer_pretty(index_json, &self.index_json()?)?;
-        new_files.insert(info_folder.join("index.json"));
+        new_files.insert(index_json_path);
 
-        let hash_input_json = File::create(info_folder.join("hash_input.json"))?;
-        serde_json::to_writer_pretty(hash_input_json, &self.build_configuration.hash.hash_input)?;
-        new_files.insert(info_folder.join("hash_input.json"));
+        let hash_input_path = info_folder.join("hash_input.json");
+        std::fs::write(&hash_input_path, self.hash_input().as_bytes())?;
+        new_files.insert(hash_input_path);
 
-        let about_json = File::create(info_folder.join("about.json"))?;
+        let about_json_path = root_dir.join(AboutJson::package_path());
+        let about_json = File::create(&about_json_path)?;
         serde_json::to_writer_pretty(about_json, &self.about_json())?;
-        new_files.insert(info_folder.join("about.json"));
+        new_files.insert(about_json_path);
 
-        if let Some(run_exports) = self.run_exports_json()? {
-            let run_exports_json = File::create(info_folder.join("run_exports.json"))?;
+        let run_exports = self.run_exports_json()?;
+        if !run_exports.is_empty() {
+            let run_exports_path = root_dir.join(RunExportsJson::package_path());
+            let run_exports_json = File::create(&run_exports_path)?;
             serde_json::to_writer_pretty(run_exports_json, &run_exports)?;
-            new_files.insert(info_folder.join("run_exports.json"));
+            new_files.insert(run_exports_path);
         }
-
-        let mut variant_config = File::create(info_folder.join("hash_input.json"))?;
-        variant_config.write_all(
-            serde_json::to_string_pretty(&self.build_configuration.variant)?.as_bytes(),
-        )?;
 
         Ok(new_files)
     }
@@ -449,9 +491,8 @@ mod test {
     use content_inspector::ContentType;
     use rattler_conda_types::Platform;
 
-    use crate::recipe::parser::PrefixDetection;
-
     use super::create_prefix_placeholder;
+    use crate::recipe::parser::PrefixDetection;
 
     #[test]
     fn detect_prefix() {

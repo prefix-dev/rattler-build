@@ -1,20 +1,26 @@
 #![allow(dead_code)]
 use std::{
-    collections::HashSet,
-    fs::File,
+    collections::{HashMap, HashSet},
     io::Read,
     path::{Path, PathBuf},
 };
 
+use fs_err::File;
+
 use goblin::pe::{header::DOS_MAGIC, PE};
 use scroll::Pread;
+
+use crate::{
+    post_process::relink::{RelinkError, Relinker},
+    recipe::parser::GlobVec,
+};
 
 #[derive(Debug)]
 struct Dll {
     /// Path to the DLL
     path: PathBuf,
     /// Libraries that this DLL depends on
-    libraries: HashSet<String>,
+    libraries: HashSet<PathBuf>,
 }
 
 /// List of System DLLs that are allowed to be linked against.
@@ -51,9 +57,8 @@ pub enum DllParseError {
     ParseFailed(#[from] goblin::error::Error),
 }
 
-impl Dll {
-    /// Check if the file is a DLL (PE) file.
-    fn test_file(path: &Path) -> Result<bool, std::io::Error> {
+impl Relinker for Dll {
+    fn test_file(path: &Path) -> Result<bool, RelinkError> {
         let mut file = File::open(path)?;
         let mut buf: [u8; 2] = [0; 2];
         file.read_exact(&mut buf)?;
@@ -63,15 +68,45 @@ impl Dll {
         Ok(DOS_MAGIC == signature)
     }
 
-    /// Parse a DLL file and return an object that contains the path to the DLL and the list of
-    /// libraries it depends on.
-    fn new(path: &Path) -> Result<Self, DllParseError> {
-        let file = File::open(path).expect("Failed to open the Mach-O binary");
+    fn new(path: &Path) -> Result<Self, RelinkError> {
+        let file = File::open(path)?;
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
         let pe = PE::parse(&mmap)?;
         Ok(Self {
             path: path.to_path_buf(),
-            libraries: pe.libraries.iter().map(|s| s.to_string()).collect(),
+            libraries: pe.libraries.iter().map(PathBuf::from).collect(),
         })
+    }
+
+    fn libraries(&self) -> HashSet<PathBuf> {
+        self.libraries.clone()
+    }
+
+    fn resolve_libraries(
+        &self,
+        _prefix: &Path,
+        _encoded_prefix: &Path,
+    ) -> HashMap<PathBuf, Option<PathBuf>> {
+        let mut result = HashMap::new();
+        for lib in &self.libraries {
+            result.insert(lib.clone(), Some(lib.clone()));
+        }
+        result
+    }
+
+    fn resolve_rpath(&self, _rpath: &Path, _prefix: &Path, _encoded_prefix: &Path) -> PathBuf {
+        unimplemented!("This function does not make sense on Windows")
+    }
+
+    fn relink(
+        &self,
+        _prefix: &Path,
+        _encoded_prefix: &Path,
+        _custom_rpaths: &[String],
+        _rpath_allowlist: &GlobVec,
+        _system_tools: &crate::system_tools::SystemTools,
+    ) -> Result<(), crate::post_process::relink::RelinkError> {
+        // On Windows, we don't need to relink anything
+        Ok(())
     }
 }

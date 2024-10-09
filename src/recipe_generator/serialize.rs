@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, path::PathBuf};
 
 use indexmap::IndexMap;
 use serde::Serialize;
@@ -15,6 +15,7 @@ pub struct SourceElement {
 #[derive(Default, Debug, Serialize)]
 pub struct Build {
     pub script: String,
+    #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
 }
 
@@ -22,6 +23,12 @@ pub struct Build {
 pub struct Python {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub entry_points: Vec<String>,
+}
+
+impl Python {
+    fn is_default(&self) -> bool {
+        self.entry_points.is_empty()
+    }
 }
 
 #[derive(Default, Debug, Serialize)]
@@ -49,12 +56,24 @@ pub struct Package {
 }
 
 #[derive(Default, Debug, Serialize)]
+pub struct ScriptTest {
+    pub script: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(untagged)]
+pub enum Test {
+    Script(ScriptTest),
+}
+
+#[derive(Default, Debug, Serialize)]
 pub struct Recipe {
     pub context: IndexMap<String, String>,
     pub package: Package,
     pub source: Vec<SourceElement>,
     pub build: Build,
     pub requirements: Requirements,
+    pub tests: Vec<Test>,
     pub about: About,
 }
 
@@ -83,4 +102,20 @@ impl fmt::Display for Recipe {
         }
         Ok(())
     }
+}
+
+/// Write a recipe to "{package_name}/recipe.yaml"
+pub fn write_recipe(package_name: &str, recipe: &str) -> std::io::Result<()> {
+    let path = PathBuf::from(&format!("{}/recipe.yaml", &package_name));
+    fs_err::create_dir_all(path.parent().unwrap())?;
+
+    if path.exists() {
+        // move to backup
+        let backup_path = path.with_extension("yaml.bak");
+        fs_err::rename(&path, backup_path)?;
+    }
+
+    println!("Writing recipe to {}", path.display());
+
+    fs_err::write(path, recipe)
 }

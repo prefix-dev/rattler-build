@@ -5,10 +5,13 @@ package:
   name: async-cairo
   version: dev
 
+build:
+  string: "py_${{ python | version_to_buildstring }}"
+
 requirements:
   host:
     - if: linux
       then: ${{ cdt("cairo") }}
   run:
-    - if: cmp("python", "==3.3")
+    - if: match(python, "3.3")
       then: asyncio

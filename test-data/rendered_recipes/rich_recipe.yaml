@@ -1,5 +1,6 @@
 recipe:
   schema_version: 1
+  context: {}
   package:
     name: rich
     version: 13.4.2
@@ -23,11 +24,10 @@ recipe:
     - python ==3.10
     - typing_extensions >=4.0.0,<5.0.0
   tests:
-  - test_type: python
-    imports:
-    - rich
-  - test_type: command
-    script:
+  - python:
+      imports:
+      - rich
+  - script:
     - pip check
     requirements:
       run:
@@ -54,15 +54,16 @@ build_configuration:
     target_platform: noarch
   hash:
     hash: 4616a5c
-    hash_input: '{"target_platform": "noarch"}'
-    hash_prefix: py
+    prefix: py
   directories:
     host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
     build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/build_env
     work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812/work
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_rich_1702492812
   channels:
-  - conda-forge
+  - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: 2023-12-13T18:40:12.845800Z
   subpackages:
     rich:
@@ -72,17 +73,13 @@ build_configuration:
   packaging_settings:
     archive_type: conda
     compression_level: 21
-    compression_threads: 5
 finalized_dependencies:
   build: null
   host:
     specs:
-    - source: raw
-      spec: pip
-    - source: raw
-      spec: poetry-core >=1.0.0
-    - source: raw
-      spec: python ==3.10
+    - source: pip
+    - source: poetry-core >=1.0.0
+    - source: python ==3.10
     resolved:
     - build: h43b31ca_3_cpython
       build_number: 3
@@ -110,6 +107,11 @@ finalized_dependencies:
       fn: python-3.10.0-h43b31ca_3_cpython.tar.bz2
       url: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.10.0-h43b31ca_3_cpython.tar.bz2
       channel: https://conda.anaconda.org/conda-forge/
+      run_exports:
+        weak:
+          - python_abi 3.10.* *_cp310
+        noarch:
+          - python
     - build: h57fd34a_0
       build_number: 0
       depends: []
@@ -368,27 +370,15 @@ finalized_dependencies:
       fn: setuptools-68.2.2-pyhd8ed1ab_0.conda
       url: https://conda.anaconda.org/conda-forge/noarch/setuptools-68.2.2-pyhd8ed1ab_0.conda
       channel: https://conda.anaconda.org/conda-forge/
-    run_exports:
-      python:
-        weak:
-        - python_abi 3.10.* *_cp310
-        noarch:
-        - python
   run:
     depends:
-    - source: raw
-      spec: markdown-it-py >=2.2.0
-    - source: raw
-      spec: pygments >=2.13.0,<3.0.0
-    - source: raw
-      spec: python ==3.10
-    - source: raw
-      spec: typing_extensions >=4.0.0,<5.0.0
-    - source: run_export
+    - source: markdown-it-py >=2.2.0
+    - source: pygments >=2.13.0,<3.0.0
+    - source: python ==3.10
+    - source: typing_extensions >=4.0.0,<5.0.0
+    - run_export: python
       spec: python
       from: host
-      source_package: python
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
-  rattler_build: 0.12.1
+  rattler-build: 0.12.1

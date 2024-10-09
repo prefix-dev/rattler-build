@@ -4,6 +4,7 @@
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use std::borrow::Cow;
 
+use indexmap::IndexMap;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
 
@@ -20,10 +21,12 @@ use crate::{
 
 mod about;
 mod build;
+mod cache;
 mod glob_vec;
 mod helper;
 mod output;
 mod package;
+mod regex;
 mod requirements;
 mod script;
 mod skip;
@@ -33,11 +36,14 @@ mod test;
 pub use self::{
     about::About,
     build::{Build, DynamicLinking, PrefixDetection},
+    cache::Cache,
     glob_vec::GlobVec,
     output::find_outputs_from_src,
     package::{OutputPackage, Package},
+    regex::SerializableRegex,
     requirements::{
-        Compiler, Dependency, IgnoreRunExports, PinSubpackage, Requirements, RunExports,
+        Dependency, IgnoreRunExports, Language, PinCompatible, PinSubpackage, Requirements,
+        RunExports,
     },
     script::{Script, ScriptContent},
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
@@ -47,15 +53,21 @@ pub use self::{
     },
 };
 
-use super::custom_yaml::Node;
+use crate::recipe::custom_yaml::Node;
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
     /// The schema version of this recipe YAML file
     pub schema_version: u64,
+    /// The context values of this recipe
+    pub context: IndexMap<String, String>,
     /// The package information
     pub package: Package,
+    /// The cache build that should be used for this package
+    /// This is the same for all outputs of a recipe
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache: Option<Cache>,
     /// The information about where to obtain the sources
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub source: Vec<Source>,
@@ -69,6 +81,9 @@ pub struct Recipe {
     /// The information about the package
     #[serde(default, skip_serializing_if = "About::is_default")]
     pub about: About,
+    /// Extra information as a map with string keys and any value
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub extra: IndexMap<String, serde_yaml::Value>,
 }
 
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
@@ -125,69 +140,55 @@ impl Recipe {
         })
     }
 
-    /// Build a recipe from a YAML string and use a given package hash string as default value.
-    pub fn from_yaml_with_default_hash_str(
-        yaml: &str,
-        default_pkg_hash: &str,
-        jinja_opt: SelectorConfig,
-    ) -> Result<Self, Vec<ParsingError>> {
-        let mut recipe = Self::from_yaml(yaml, jinja_opt)?;
-
-        // Set the build string to the package hash if it is not set
-        if recipe.build.string.is_none() {
-            recipe.build.string = Some(format!("{}_{}", default_pkg_hash, recipe.build.number));
-        }
-
-        Ok(recipe)
-    }
-
     /// Create recipes from a YAML [`Node`] structure.
     pub fn from_node(
         root_node: &Node,
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
-        let hash = jinja_opt.hash.clone();
+        let experimental = jinja_opt.experimental;
         let mut jinja = Jinja::new(jinja_opt);
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
             vec![_partialerror!(
                 *root_node.span(),
                 ErrorKind::ExpectedMapping,
+                help = "root node must always be a map with keys like `package`, `source`, `build`, `requirements`, `tests`, `about`, `context` and `extra`"
             )]
         })?;
 
         // add context values
-        if let Some(context) = root_node.get("context") {
-            let context = context.as_mapping().ok_or_else(|| {
+        let mut context = IndexMap::new();
+
+        if let Some(context_map) = root_node.get("context") {
+            let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
-                    *context.span(),
+                    *context_map.span(),
                     ErrorKind::ExpectedMapping,
                     help = "`context` must always be a mapping"
                 )]
             })?;
 
-            context
-                .iter()
-                .map(|(k, v)| {
-                    let val = v.as_scalar().ok_or_else(|| {
-                        vec![_partialerror!(
-                            *v.span(),
-                            ErrorKind::ExpectedScalar,
-                            help = "`context` values must always be scalars"
-                        )]
-                    })?;
-                    let rendered: Option<ScalarNode> =
-                        val.render(&jinja, &format!("context.{}", k.as_str()))?;
+            for (k, v) in context_map.iter() {
+                let val = v.as_scalar().ok_or_else(|| {
+                    vec![_partialerror!(
+                        *v.span(),
+                        ErrorKind::ExpectedScalar,
+                        help = "`context` values must always be scalars (strings)"
+                    )]
+                })?;
+                let rendered: Option<ScalarNode> =
+                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
 
-                    if let Some(rendered) = rendered {
-                        jinja.context_mut().insert(
-                            k.as_str().to_owned(),
-                            Value::from_safe_string(rendered.as_str().to_string()),
-                        );
-                    }
-                    Ok(())
-                })
-                .flatten_errors()?;
+                if let Some(rendered) = rendered {
+                    context.insert(k.as_str().to_string(), rendered.as_str().to_string());
+                    // also immediately insert into jinja context so that the value can be used
+                    // in later jinja expressions
+                    jinja.context_mut().insert(
+                        k.as_str().to_string(),
+                        Value::from_safe_string(rendered.as_str().to_string()),
+                    );
+                }
+            }
         }
 
         let rendered_node: RenderedMappingNode = root_node.render(&jinja, "ROOT")?;
@@ -199,6 +200,8 @@ impl Recipe {
         let mut requirements = Requirements::default();
         let mut tests = Vec::default();
         let mut about = About::default();
+        let mut cache = None;
+        let mut extra = IndexMap::default();
 
         rendered_node
             .iter()
@@ -215,13 +218,31 @@ impl Recipe {
                             "The recipe field is only allowed in conjunction with multiple outputs"
                     )])
                     }
+                    "cache" => {
+                        if experimental {
+                            cache = Some(value.try_convert(key_str)?)
+                        } else {
+                            return Err(vec![_partialerror!(
+                                *key.span(),
+                                ErrorKind::ExperimentalOnly("cache".to_string()),
+                                help = "The `cache` key is only allowed in experimental mode (`--experimental`)"
+                            )])
+                        }
+                    }
                     "source" => source = value.try_convert(key_str)?,
                     "build" => build = value.try_convert(key_str)?,
                     "requirements" => requirements = value.try_convert(key_str)?,
                     "tests" => tests = value.try_convert(key_str)?,
                     "about" => about = value.try_convert(key_str)?,
                     "context" => {}
-                    "extra" => {}
+                    "extra" => extra = value.as_mapping().ok_or_else(|| {
+                                            vec![_partialerror!(
+                                                *value.span(),
+                                                ErrorKind::ExpectedMapping,
+                                                label = format!("expected a mapping for `{key_str}`")
+                                            )]
+                                        })
+                                        .and_then(|m| m.try_convert(key_str))?,
                     invalid_key => {
                         return Err(vec![_partialerror!(
                             *key.span(),
@@ -233,23 +254,17 @@ impl Recipe {
             })
             .flatten_errors()?;
 
-        // Add hash to build.string if it is not set
-        if build.string.is_none() {
-            if let Some(hash) = hash {
-                build.string = Some(format!("{}_{}", hash, build.number));
-            }
-        }
-
         // evaluate the skip conditions
         build.skip = build.skip.with_eval(&jinja)?;
 
         if schema_version != 1 {
-            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.", 
+            tracing::warn!("Unknown schema version: {}. rattler-build {} is only known to parse schema version 1.",
                 schema_version, env!("CARGO_PKG_VERSION"));
         }
 
         let recipe = Recipe {
             schema_version,
+            context,
             package: package.ok_or_else(|| {
                 vec![_partialerror!(
                     *root_node.span(),
@@ -258,11 +273,13 @@ impl Recipe {
                     help = "add the required field `package`"
                 )]
             })?,
+            cache,
             build,
             source,
             requirements,
             tests,
             about,
+            extra,
         };
 
         Ok(recipe)
@@ -314,6 +331,7 @@ mod tests {
 
         let selector_config_unix = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             ..SelectorConfig::default()
         };
 
@@ -328,6 +346,7 @@ mod tests {
 
         let selector_config_win = SelectorConfig {
             target_platform: Platform::Win64,
+            host_platform: Platform::Win64,
             ..SelectorConfig::default()
         };
 
@@ -358,7 +377,7 @@ mod tests {
             let err = recipe.unwrap_err();
             let err: ParseErrors = err
                 .into_iter()
-                .map(|err| ParsingError::from_partial(&raw_recipe, err))
+                .map(|err| ParsingError::from_partial(raw_recipe, err))
                 .collect::<Vec<_>>()
                 .into();
             assert_miette_snapshot!(err);
@@ -448,8 +467,13 @@ mod tests {
 
     #[test]
     fn test_complete_recipe() {
+        let selector_config = SelectorConfig {
+            target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
+            ..SelectorConfig::default()
+        };
         let recipe = include_str!("../../test-data/recipes/test-parsing/single_output.yaml");
-        let recipe = Recipe::from_yaml(recipe, SelectorConfig::default()).unwrap();
+        let recipe = Recipe::from_yaml(recipe, selector_config).unwrap();
         assert_snapshot!(serde_yaml::to_string(&recipe).unwrap());
     }
 }

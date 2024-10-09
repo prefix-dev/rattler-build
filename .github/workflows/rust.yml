@@ -3,13 +3,7 @@ on:
     branches: [main]
     tags:
       - "v*.*.*"
-    paths:
-      - "src/**"
-      - "Cargo.*"
   pull_request:
-    paths:
-      - "src/**"
-      - "Cargo.*"
 
   workflow_dispatch:
 
@@ -38,7 +32,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.75.0"
+          toolchain: "1.80.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check
@@ -46,13 +40,14 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Run tests
-        run: cargo test --all-features --verbose -- --nocapture
+        run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
       - name: Format
         run: cargo fmt --all -- --check
       - uses: giraffate/clippy-action@v1
         with:
           reporter: "github-pr-check"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          clippy_flags: "--all-targets --workspace"
 
   build:
     name: Build ${{ matrix.target }}
@@ -69,6 +64,9 @@ jobs:
           # - target: powerpc64le-unknown-linux-musl
           #   os: ubuntu-22.04
           #   use-cross: true
+          - target: powerpc64le-unknown-linux-gnu
+            os: ubuntu-22.04
+            use-cross: true
           - target: x86_64-apple-darwin
             os: macos-13
           - target: aarch64-apple-darwin
@@ -77,6 +75,31 @@ jobs:
             os: windows-2022
           - target: x86_64-pc-windows-msvc
             os: windows-2022
+    env:
+      #
+      # These are some environment variables that configure the build so that the binary size is reduced.
+      # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
+      # They're only enable it on main and releases.
+      #
+
+      # Enable Link Time Optimization (LTO) for our release builds. This increases link time but drastically reduces
+      # binary size.
+      CARGO_PROFILE_RELEASE_LTO: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'true' || 'false' }}
+
+      # Use a single code gen unit, this effectively disables parallel linking but ensures that everything is linked
+      # together in a single unit which reduces the file-size at the cost of link time.
+      # Default for a release build is 16
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 1 || 16 }}
+
+      # Strip the binaries. This reduces the filesize of the final release.
+      CARGO_PROFILE_RELEASE_STRIP: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'symbols' || 'false' }}
+
+      # Optimize the binary for size. This reduces the filesize at the cost of a slower binary.
+      CARGO_PROFILE_OPT_LEVEL: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 's' || '0' }}
+
+      # Sets the default features which are always used also when `--no-default` is used.
+      REQUIRED_FEATURES: recipe-generation
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -102,12 +125,16 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.75.0"
+          toolchain: "1.80.0"
           targets: ${{ matrix.target }}
 
       - name: Install musl-gcc
         if: matrix.target == 'x86_64-unknown-linux-musl'
         run: sudo apt install musl-tools
+
+      - name: Install gnu-openssl
+        if: matrix.target == 'powerpc64le-unknown-linux-gnu'
+        run: sudo apt install libssl-dev
 
       - uses: Swatinem/rust-cache@v2
 
@@ -157,13 +184,22 @@ jobs:
           build
           --locked
           --release
+          --features ${{ env.REQUIRED_FEATURES }}
           --target=${{ matrix.target }}
           ${{ steps.options.outputs.cargo-build-options }}
 
       - name: Run tests
         shell: bash
         if: matrix.target != 'aarch64-apple-darwin'
-        run: ${{ matrix.use-cross && 'cross' || 'cargo' }} test --locked --target=${{ matrix.target }} ${{ steps.options.outputs.cargo-build-options }} ${{ steps.options.outputs.cargo-test-options }}
+        run: >-
+          ${{ matrix.use-cross && 'cross' || 'cargo' }}
+          test
+          --release
+          --locked
+          --features ${{ env.REQUIRED_FEATURES }}
+          --target=${{ matrix.target }}
+          ${{ steps.options.outputs.cargo-build-options }}
+          ${{ steps.options.outputs.cargo-test-options }}
 
       - name: Create tarball
         id: package

@@ -1,17 +1,21 @@
 //! This module contains utilities for logging and progress bar handling.
-use clap_verbosity_flag::{InfoLevel, Verbosity};
-use console::style;
-use indicatif::{HumanBytes, HumanDuration, MultiProgress, ProgressState, ProgressStyle};
 use std::{
+    borrow::Cow,
     collections::HashMap,
+    future::Future,
     io,
     str::FromStr,
     sync::{Arc, Mutex},
-    time::Instant,
+    time::{Duration, Instant},
+};
+
+use clap_verbosity_flag::{InfoLevel, Verbosity};
+use console::style;
+use indicatif::{
+    HumanBytes, HumanDuration, MultiProgress, ProgressBar, ProgressState, ProgressStyle,
 };
 use tracing::{field, Level};
 use tracing_core::{span::Id, Event, Field, Subscriber};
-use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{
     filter::{Directive, ParseError},
     fmt::{
@@ -21,6 +25,7 @@ use tracing_subscriber::{
     },
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
+    util::SubscriberInitExt,
     EnvFilter, Layer,
 };
 
@@ -90,6 +95,7 @@ impl<'a> field::Visit for CustomVisitor<'a> {
         self.result = match field.name() {
             "message" => write!(self.writer, "{:?}", value),
             "recipe" => write!(self.writer, " recipe: {:?}", value),
+            "package" => write!(self.writer, " package: {:?}", value),
             _ => Ok(()),
         };
     }
@@ -292,13 +298,21 @@ impl LoggingOutputHandler {
         }
     }
 
-    fn with_indent_levels(&self, template: &str) -> String {
+    /// Return a string with the current indentation level (bars added to the
+    /// front of the string).
+    pub fn with_indent_levels(&self, template: &str) -> String {
         let state = self.state.lock().unwrap();
         let indent_str = indent_levels(state.indentation_level);
         format!("{} {}", indent_str, template)
     }
 
-    /// Returns the style to use for a progressbar that is currently in progress.
+    /// Return the multi-progress instance.
+    pub fn multi_progress(&self) -> &MultiProgress {
+        &self.progress_bars
+    }
+
+    /// Returns the style to use for a progressbar that is currently in
+    /// progress.
     pub fn default_bytes_style(&self) -> indicatif::ProgressStyle {
         let template_str = self.with_indent_levels(
             "{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {bytes:>8} @ {smoothed_bytes_per_sec:8}"
@@ -329,7 +343,8 @@ impl LoggingOutputHandler {
             )
     }
 
-    /// Returns the style to use for a progressbar that is currently in progress.
+    /// Returns the style to use for a progressbar that is currently in
+    /// progress.
     pub fn default_progress_style(&self) -> indicatif::ProgressStyle {
         let template_str = self.with_indent_levels(
             "{spinner:.green} {prefix:20!} [{elapsed_precise}] [{bar:40!.bright.yellow/dim.white}] {pos:>7}/{len:7}"
@@ -340,7 +355,8 @@ impl LoggingOutputHandler {
             .progress_chars("━━╾─")
     }
 
-    /// Returns the style to use for a progressbar that is in Deserializing state.
+    /// Returns the style to use for a progressbar that is in Deserializing
+    /// state.
     pub fn deserializing_progress_style(&self) -> indicatif::ProgressStyle {
         let template_str =
             self.with_indent_levels("{spinner:.green} {prefix:20!} [{elapsed_precise}] {wide_msg}");
@@ -353,7 +369,7 @@ impl LoggingOutputHandler {
     /// Returns the style to use for a progressbar that is finished.
     pub fn finished_progress_style(&self) -> indicatif::ProgressStyle {
         let template_str = self.with_indent_levels(&format!(
-            "{} {{spinner:.green}} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.green}}",
+            "{} {{prefix:20!}} [{{elapsed_precise}}] {{msg:.bold.green}}",
             console::style(console::Emoji("✔", " ")).green()
         ));
 
@@ -376,7 +392,8 @@ impl LoggingOutputHandler {
             .progress_chars("━━╾─")
     }
 
-    /// Returns the style to use for a progressbar that is indeterminate and simply shows a spinner.
+    /// Returns the style to use for a progressbar that is indeterminate and
+    /// simply shows a spinner.
     pub fn long_running_progress_style(&self) -> indicatif::ProgressStyle {
         let template_str = self.with_indent_levels("{spinner:.green} {msg}");
         ProgressStyle::with_template(&template_str).unwrap()
@@ -394,6 +411,57 @@ impl LoggingOutputHandler {
         } else {
             indicatif::ProgressDrawTarget::stderr()
         });
+    }
+
+    /// Displays a spinner with the given message while running the specified
+    /// function to completion.
+    pub fn wrap_in_progress<T, F: FnOnce() -> T>(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        func: F,
+    ) -> T {
+        let pb = self.add_progress_bar(
+            ProgressBar::hidden()
+                .with_style(self.long_running_progress_style())
+                .with_message(msg),
+        );
+        pb.enable_steady_tick(Duration::from_millis(100));
+        let result = func();
+        pb.finish_and_clear();
+        result
+    }
+
+    /// Displays a spinner with the given message while running the specified
+    /// function to completion.
+    pub async fn wrap_in_progress_async<T, Fut: Future<Output = T>>(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        future: Fut,
+    ) -> T {
+        self.wrap_in_progress_async_with_progress(msg, |_pb| future)
+            .await
+    }
+
+    /// Displays a spinner with the given message while running the specified
+    /// function to completion.
+    pub async fn wrap_in_progress_async_with_progress<
+        T,
+        Fut: Future<Output = T>,
+        F: FnOnce(ProgressBar) -> Fut,
+    >(
+        &self,
+        msg: impl Into<Cow<'static, str>>,
+        f: F,
+    ) -> T {
+        let pb = self.add_progress_bar(
+            ProgressBar::hidden()
+                .with_style(self.long_running_progress_style())
+                .with_message(msg),
+        );
+        pb.enable_steady_tick(Duration::from_millis(100));
+        let result = f(pb.clone()).await;
+        pb.finish_and_clear();
+        result
     }
 }
 
@@ -429,7 +497,8 @@ pub enum LogStyle {
     Plain,
 }
 
-/// Constructs a default [`EnvFilter`] that is used when the user did not specify a custom RUST_LOG.
+/// Constructs a default [`EnvFilter`] that is used when the user did not
+/// specify a custom RUST_LOG.
 pub fn get_default_env_filter(
     verbose: clap_verbosity_flag::LevelFilter,
 ) -> Result<EnvFilter, ParseError> {
@@ -461,10 +530,15 @@ impl<S: Subscriber> Layer<S> for GitHubActionsLayer {
             return;
         }
         let metadata = event.metadata();
+
+        let mut message = Vec::new();
+        event.record(&mut CustomVisitor::new(&mut message));
+        let message = String::from_utf8_lossy(&message);
+
         match *metadata.level() {
-            Level::WARN => println!("::warning ::{}", format_args!("{:?}", event)),
-            Level::ERROR => println!("::error ::{}", format_args!("{:?}", event)),
-            _ => {} // Ignore other levels
+            Level::ERROR => println!("::error ::{}", message),
+            Level::WARN => println!("::warning ::{}", message),
+            _ => {}
         }
     }
 }
@@ -524,7 +598,13 @@ pub fn init_logging(
                 log_sender: tui_log_sender,
             };
             registry
-                .with(fmt::layer().with_writer(writer).without_time())
+                .with(
+                    fmt::layer()
+                        .with_writer(writer)
+                        .without_time()
+                        .with_level(false)
+                        .with_target(false),
+                )
                 .init();
             return Ok(log_handler);
         }

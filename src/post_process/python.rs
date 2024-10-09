@@ -5,7 +5,6 @@
 //!   - Compiling `.py` files to `.pyc` files
 //!   - Replacing the contents of `.dist-info/INSTALLER` files with "conda"
 use fs_err as fs;
-use globset::GlobSet;
 use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
@@ -15,6 +14,7 @@ use std::process::Command;
 
 use crate::metadata::Output;
 use crate::packaging::{PackagingError, TempFiles};
+use crate::recipe::parser::GlobVec;
 use crate::utils::to_forward_slash_lossy;
 
 pub fn python_bin(prefix: &Path, target_platform: &Platform) -> PathBuf {
@@ -31,7 +31,7 @@ pub fn compile_pyc(
     output: &Output,
     paths: &HashSet<PathBuf>,
     base_path: &Path,
-    skip_paths: Option<&GlobSet>,
+    skip_paths: &GlobVec,
 ) -> Result<HashSet<PathBuf>, PackagingError> {
     let build_config = &output.build_configuration;
     let python_interpreter = if output.build_configuration.cross_compilation() {
@@ -97,7 +97,7 @@ pub fn compile_pyc(
         }
     });
 
-    if let Some(skip_paths) = skip_paths {
+    if !skip_paths.is_empty() {
         py_files.retain(|p| {
             !skip_paths.is_match(
                 p.strip_prefix(base_path)
@@ -153,7 +153,7 @@ pub fn compile_pyc(
 
 /// Find any .dist-info/INSTALLER files and replace the contents with "conda"
 /// This is to prevent pip from trying to uninstall the package when it is installed with conda
-pub fn python(output: &Output, temp_files: &TempFiles) -> Result<HashSet<PathBuf>, PackagingError> {
+pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf>, PackagingError> {
     let name = output.name();
     let version = output.version();
     let mut result = HashSet::new();
@@ -163,12 +163,7 @@ pub fn python(output: &Output, temp_files: &TempFiles) -> Result<HashSet<PathBuf
             output,
             &temp_files.files,
             temp_files.temp_dir.path(),
-            output
-                .recipe
-                .build()
-                .python()
-                .skip_pyc_compilation
-                .globset(),
+            &output.recipe.build().python().skip_pyc_compilation,
         )?);
 
         // create entry points if it is not a noarch package
@@ -316,6 +311,7 @@ pub(crate) fn create_entry_points(
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
             &output.prefix().to_string_lossy(),
+            output.target_platform().is_windows(),
             ep,
             // using target_platform is OK because this should never be noarch
             &PythonInfo::from_version(&python_version, *output.target_platform()).map_err(|e| {

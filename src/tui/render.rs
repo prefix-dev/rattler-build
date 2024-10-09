@@ -1,22 +1,20 @@
-use super::event::Event;
-use super::state::TuiState;
 use ansi_to_tui::IntoText;
 use crossterm::event::{
     Event as CrosstermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
     MouseEventKind,
 };
 use miette::IntoDiagnostic;
-use ratatui::layout::Position;
-use ratatui::prelude::*;
-use ratatui::widgets::{Scrollbar, ScrollbarOrientation, ScrollbarState};
 use ratatui::{
-    layout::Alignment,
-    style::{Color, Style},
-    widgets::{Block, BorderType, Paragraph},
+    layout::{Alignment, Position},
+    prelude::*,
+    style::{Color, Style, Stylize},
+    widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
     Frame,
 };
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;
+
+use super::{event::Event, state::TuiState};
 
 /// Key bindings.
 const KEY_BINDINGS: &[(&str, &str)] = &[
@@ -159,11 +157,11 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         Block::new()
             .title_top(Line::from("rattler-build-tui").style(Style::default().bold()))
             .title_alignment(Alignment::Center),
-        frame.size(),
+        frame.area(),
     );
     let rects = Layout::vertical([Constraint::Percentage(100), Constraint::Min(3)])
         .margin(1)
-        .split(frame.size());
+        .split(frame.area());
     frame.render_widget(
         Paragraph::new(
             Line::default()
@@ -211,11 +209,18 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
         );
 
         if !state.packages.is_empty() {
-            let rects =
-                Layout::vertical([Constraint::Min(2)].repeat(((rects[0].height - 2) / 3) as usize))
-                    .margin(1)
-                    .split(rects[0]);
-            for (i, package) in state.packages.iter_mut().enumerate() {
+            let item_count = ((rects[0].height - 2) / 3) as usize;
+            let start_offset = (state.selected_package + 1).saturating_sub(item_count);
+            let rects = Layout::vertical([Constraint::Min(2)].repeat(item_count))
+                .margin(1)
+                .split(rects[0]);
+            for (i, package) in state
+                .packages
+                .iter_mut()
+                .skip(start_offset)
+                .take(item_count)
+                .enumerate()
+            {
                 package.area = rects[i];
                 frame.render_widget(
                     Block::bordered()
@@ -224,7 +229,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                             let mut style = Style::new().fg(package.build_progress.as_color());
                             if package.is_hovered && !package.build_progress.is_building() {
                                 style = style.yellow()
-                            } else if state.selected_package == i {
+                            } else if state.selected_package == i + start_offset {
                                 if package.build_progress.is_building() {
                                     style = style.green()
                                 } else {
@@ -255,12 +260,12 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
                     package.name.clone().into(),
                     "-".fg(Color::Rgb(100, 100, 100)),
                     package.version.clone().into(),
-                    package
-                        .build_string
-                        .clone()
-                        .map(|v| format!("{}{v}", "-".fg(Color::Rgb(100, 100, 100))))
-                        .unwrap_or_default()
-                        .into(),
+                    format!(
+                        "{}{}",
+                        "-".fg(Color::Rgb(100, 100, 100)),
+                        &package.build_string
+                    )
+                    .into(),
                 ]);
                 if item[1].width < line.width() as u16 {
                     line = Line::from(vec![
@@ -302,10 +307,10 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
             ),
             rects[1],
         );
-        frame.set_cursor(
+        frame.set_cursor_position(Position::new(
             rects[1].x + state.input.visual_cursor() as u16 + 3,
             rects[1].y + 1,
-        );
+        ));
         rects[0]
     } else {
         rects[1]
@@ -342,7 +347,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
 
     frame.render_stateful_widget(
         scrollbar,
-        logs_rect.inner(&Margin {
+        logs_rect.inner(Margin {
             vertical: 1,
             horizontal: 0,
         }),
@@ -369,7 +374,7 @@ pub(crate) fn render_widgets(state: &mut TuiState, frame: &mut Frame) {
 
     frame.render_stateful_widget(
         scrollbar,
-        logs_rect.inner(&Margin {
+        logs_rect.inner(Margin {
             vertical: 0,
             horizontal: 1,
         }),

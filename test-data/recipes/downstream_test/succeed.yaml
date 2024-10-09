@@ -1,0 +1,26 @@
+outputs:
+  - package:
+      name: upstream-good
+      version: 1.0.0
+    build:
+      string: "good"
+
+    tests:
+      - script:
+          - echo "Running test"
+      - downstream: downstream-good
+
+  - package:
+      name: downstream-good
+      version: 1.0.0
+    build:
+      string: "good"
+    requirements:
+      host:
+        - upstream-good
+      run:
+        - upstream-good
+
+    tests:
+      - script:
+          - echo "Running test in downstream package"

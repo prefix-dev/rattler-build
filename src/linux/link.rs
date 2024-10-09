@@ -1,6 +1,5 @@
 //! Relink shared objects to use an relative path prefix
 
-use globset::GlobSet;
 use goblin::elf::{Dyn, Elf};
 use goblin::elf64::header::ELFMAG;
 use goblin::strtab::Strtab;
@@ -14,6 +13,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
+use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
 
@@ -135,7 +135,7 @@ impl Relinker for SharedObject {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: Option<&GlobSet>,
+        rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
     ) -> Result<(), RelinkError> {
         if !self.has_dynamic {
@@ -147,6 +147,7 @@ impl Relinker for SharedObject {
             .rpaths
             .iter()
             .flat_map(|r| r.split(':'))
+            .filter(|r| !r.is_empty())
             .map(PathBuf::from)
             .collect::<Vec<_>>();
         rpaths.extend(
@@ -160,6 +161,7 @@ impl Relinker for SharedObject {
             .runpaths
             .iter()
             .flat_map(|r| r.split(':'))
+            .filter(|r| !r.is_empty())
             .map(PathBuf::from)
             .collect::<Vec<_>>();
 
@@ -170,7 +172,7 @@ impl Relinker for SharedObject {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
-                } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+                } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
                 }
@@ -195,10 +197,7 @@ impl Relinker for SharedObject {
                     "$ORIGIN/{}",
                     relative_path.to_string_lossy()
                 )));
-            } else if rpath_allowlist
-                .map(|glob| glob.is_match(rpath))
-                .unwrap_or(false)
-            {
+            } else if rpath_allowlist.is_match(rpath) {
                 tracing::info!("rpath ({:?}) for {:?} found in allowlist", rpath, self.path);
                 final_rpaths.push(rpath.clone());
             } else {
@@ -236,7 +235,7 @@ fn call_patchelf(
     let mut cmd = system_tools.call(Tool::Patchelf)?;
 
     // prefer using RPATH over RUNPATH because RPATH takes precedence when
-    // searching for shared libraries and cannot be overriden with
+    // searching for shared libraries and cannot be overridden with
     // `LD_LIBRARY_PATH`. This ensures that the libraries from the environment
     // are found first, providing better isolation and preventing potential
     // conflicts with system libraries.
@@ -400,7 +399,6 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
 #[cfg(test)]
 mod test {
     use super::*;
-    use globset::{Glob, GlobSetBuilder};
     use std::{fs, path::Path};
     use tempfile::tempdir_in;
 
@@ -424,10 +422,7 @@ mod test {
         let binary_path = tmp_dir.join("zlink");
         fs::copy(prefix.join("zlink"), &binary_path)?;
 
-        let globset = GlobSetBuilder::new()
-            .add(Glob::new("/usr/lib/custom**").unwrap())
-            .build()
-            .unwrap();
+        let globvec = GlobVec::from_vec(vec!["/usr/lib/custom**"], None);
 
         // default rpaths of the test binary are:
         // - /rattler-build_zlink/host_env_placehold/lib
@@ -439,7 +434,7 @@ mod test {
             &prefix,
             encoded_prefix,
             &[],
-            Some(&globset),
+            &globvec,
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;
@@ -485,7 +480,7 @@ mod test {
             &prefix,
             encoded_prefix,
             &[String::from("lib/")],
-            None,
+            &GlobVec::default(),
             &SystemTools::default(),
         )?;
         let object = SharedObject::new(&binary_path)?;

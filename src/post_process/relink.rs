@@ -5,9 +5,9 @@ use crate::packaging::TempFiles;
 
 use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
+use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, ToolError};
-use globset::GlobSet;
-use rattler_conda_types::Platform;
+use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -76,6 +76,7 @@ pub trait Relinker {
         Self: Sized;
 
     /// Returns the shared libraries.
+    #[allow(dead_code)]
     fn libraries(&self) -> HashSet<PathBuf>;
 
     /// Find libraries in the shared library and resolve them by taking into account the rpaths.
@@ -94,7 +95,7 @@ pub trait Relinker {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: Option<&GlobSet>,
+        rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
     ) -> Result<(), RelinkError>;
 }
@@ -149,6 +150,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
 
     if target_platform == Platform::NoArch
         || target_platform.is_windows()
+        // skip linking checks for wasm
+        || target_platform.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
     {
         return Ok(());
@@ -161,6 +164,8 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     let encoded_prefix = &temp_files.encoded_prefix;
 
     let mut binaries = HashSet::new();
+    // allow to use tools from build prefix such as patchelf, install_name_tool, ...
+    let system_tools = output.system_tools.with_build_prefix(output.build_prefix());
 
     for (p, content_type) in temp_files.content_type_map() {
         let metadata = fs::symlink_metadata(p)?;
@@ -183,12 +188,11 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
                 encoded_prefix,
                 &rpaths,
                 rpath_allowlist,
-                &output.system_tools,
+                &system_tools,
             )?;
             binaries.insert(p.clone());
         }
     }
-
     perform_linking_checks(output, &binaries, tmp_prefix)?;
 
     Ok(())

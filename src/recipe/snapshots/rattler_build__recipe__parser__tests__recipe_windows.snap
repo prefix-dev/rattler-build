@@ -4,31 +4,46 @@ expression: win_recipe.unwrap()
 ---
 Recipe {
     schema_version: 1,
+    context: {
+        "name": "xtensor",
+        "version": "0.24.6",
+    },
     package: Package {
         name: PackageName {
             normalized: None,
             source: "xtensor",
         },
-        version: "0.24.6",
+        version: VersionWithSource {
+            version: Version {
+                version: [[0], [0], [24], [6]],
+                local: [],
+            },
+            source: Some(
+                "0.24.6",
+            ),
+        },
     },
+    cache: None,
     source: [
         Url(
             UrlSource {
-                url: Url {
-                    scheme: "https",
-                    cannot_be_a_base: false,
-                    username: "",
-                    password: None,
-                    host: Some(
-                        Domain(
-                            "github.com",
+                url: [
+                    Url {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "github.com",
+                            ),
                         ),
-                    ),
-                    port: None,
-                    path: "/xtensor-stack/xtensor/archive/0.24.6.tar.gz",
-                    query: None,
-                    fragment: None,
-                },
+                        port: None,
+                        path: "/xtensor-stack/xtensor/archive/0.24.6.tar.gz",
+                        query: None,
+                        fragment: None,
+                    },
+                ],
                 sha256: Some(
                     [
                         248,
@@ -74,7 +89,7 @@ Recipe {
     ],
     build: Build {
         number: 0,
-        string: None,
+        string: Derived,
         skip: Skip(
             [
                 (
@@ -100,8 +115,9 @@ Recipe {
             env: {},
             secrets: [],
             content: CommandOrPath(
-                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install",
+                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
             ),
+            cwd: None,
         },
         noarch: NoArchType(
             None,
@@ -141,12 +157,29 @@ Recipe {
             ),
             ignore_binary_files: false,
         },
+        post_process: [],
+        files: [],
     },
     requirements: Requirements {
         build: [
-            Compiler(
-                Compiler {
-                    language: "cxx",
+            Spec(
+                MatchSpec {
+                    name: Some(
+                        PackageName {
+                            normalized: None,
+                            source: "vs2017_win-64",
+                        },
+                    ),
+                    version: None,
+                    build: None,
+                    build_number: None,
+                    file_name: None,
+                    channel: None,
+                    subdir: None,
+                    namespace: None,
+                    md5: None,
+                    sha256: None,
+                    url: None,
                 },
             ),
             Spec(
@@ -166,6 +199,7 @@ Recipe {
                     namespace: None,
                     md5: None,
                     sha256: None,
+                    url: None,
                 },
             ),
         ],
@@ -207,6 +241,7 @@ Recipe {
                     namespace: None,
                     md5: None,
                     sha256: None,
+                    url: None,
                 },
             ),
         ],
@@ -248,6 +283,7 @@ Recipe {
                     namespace: None,
                     md5: None,
                     sha256: None,
+                    url: None,
                 },
             ),
         ],
@@ -289,6 +325,7 @@ Recipe {
                     namespace: None,
                     md5: None,
                     sha256: None,
+                    url: None,
                 },
             ),
         ],
@@ -305,8 +342,8 @@ Recipe {
         },
     },
     tests: [
-        PackageContents(
-            PackageContentsTest {
+        PackageContents {
+            package_contents: PackageContentsTest {
                 files: [
                     "share/cmake/xtensor/xtensorConfig.cmake",
                     "share/cmake/xtensor/xtensorConfigVersion.cmake",
@@ -318,14 +355,22 @@ Recipe {
                     "xtensor/xarray.hpp",
                 ],
             },
-        ),
+        },
         Command(
             CommandsTest {
-                script: [
-                    "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
-                    "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
-                ],
+                script: Script {
+                    interpreter: None,
+                    env: {},
+                    secrets: [],
+                    content: Commands(
+                        [
+                            "if not exist %LIBRARY_PREFIX%\\include\\xtensor\\xarray.hpp (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfig.cmake (exit 1)",
+                            "if not exist %LIBRARY_PREFIX%\\share\\cmake\\xtensor\\xtensorConfigVersion.cmake (exit 1)",
+                        ],
+                    ),
+                    cwd: None,
+                },
                 requirements: CommandsTestRequirements {
                     run: [],
                     build: [],
@@ -407,5 +452,10 @@ Recipe {
             "Multi dimensional arrays with broadcasting and lazy computing",
         ),
         prelink_message: None,
+    },
+    extra: {
+        "recipe-maintainers": Sequence [
+            String("some-maintainer"),
+        ],
     },
 }

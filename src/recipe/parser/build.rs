@@ -1,14 +1,16 @@
+use std::borrow::Cow;
 use std::str::FromStr;
 
-use globset::GlobSet;
 use rattler_conda_types::{package::EntryPoint, NoArchType};
 use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};
-use super::{Dependency, FlattenErrors};
+use super::{Dependency, FlattenErrors, SerializableRegex};
+use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
 
+use crate::hash::HashInfo;
 use crate::validate_keys;
 use crate::{
     _partialerror,
@@ -69,41 +71,130 @@ impl VariantKeyUsage {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Build {
     /// The build number is a number that should be incremented every time the recipe is built.
-    pub(super) number: u64,
+    pub number: u64,
     /// The build string is usually set automatically as the hash of the variant configuration.
     /// It's possible to override this by setting it manually, but not recommended.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) string: Option<String>,
+    #[serde(default, skip_serializing_if = "BuildString::is_derived")]
+    pub string: BuildString,
     /// List of conditions under which to skip the build of the package.
     #[serde(default, skip)]
-    pub(super) skip: Skip,
+    pub skip: Skip,
     /// The build script can be either a list of commands or a path to a script. By
     /// default, the build script is set to `build.sh` or `build.bat` on Unix and Windows respectively.
     #[serde(default, skip_serializing_if = "Script::is_default")]
-    pub(super) script: Script,
+    pub script: Script,
     /// A noarch package runs on any platform. It can be either a python package or a generic package.
     #[serde(default, skip_serializing_if = "NoArchType::is_none")]
-    pub(super) noarch: NoArchType,
+    pub noarch: NoArchType,
     /// Python specific build configuration
     #[serde(default, skip_serializing_if = "Python::is_default")]
-    pub(super) python: Python,
+    pub python: Python,
     /// Settings for shared libraries and executables
     #[serde(default, skip_serializing_if = "DynamicLinking::is_default")]
-    pub(super) dynamic_linking: DynamicLinking,
-    /// Setting to control wether to always copy a file
+    pub dynamic_linking: DynamicLinking,
+    /// Setting to control whether to always copy a file
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) always_copy_files: GlobVec,
-    /// Setting to control wether to always include a file (even if it is already present in the host env)
+    pub always_copy_files: GlobVec,
+    /// Setting to control whether to always include a file (even if it is already present in the host env)
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
-    pub(super) always_include_files: GlobVec,
+    pub always_include_files: GlobVec,
     /// Merge the build and host envs
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub(super) merge_build_and_host_envs: bool,
+    pub merge_build_and_host_envs: bool,
     /// Variant ignore and use keys
     #[serde(default, skip_serializing_if = "VariantKeyUsage::is_default")]
-    pub(super) variant: VariantKeyUsage,
+    pub variant: VariantKeyUsage,
+    /// Prefix detection settings
     #[serde(default, skip_serializing_if = "PrefixDetection::is_default")]
-    pub(super) prefix_detection: PrefixDetection,
+    pub prefix_detection: PrefixDetection,
+    /// Post-process operations for regex based replacements
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub post_process: Vec<PostProcess>,
+    /// Include files in the package
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub files: GlobVec,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(from = "Option<String>", into = "Option<String>")]
+pub enum BuildString {
+    /// The build string is explicitly set by the user.
+    UserSpecified(String),
+
+    /// The build string should be derived from the variants
+    #[default]
+    Derived,
+}
+
+impl From<Option<String>> for BuildString {
+    fn from(value: Option<String>) -> Self {
+        value.map_or_else(|| BuildString::Derived, BuildString::UserSpecified)
+    }
+}
+
+impl From<BuildString> for Option<String> {
+    fn from(value: BuildString) -> Self {
+        match value {
+            BuildString::UserSpecified(s) => Some(s),
+            BuildString::Derived => None,
+        }
+    }
+}
+
+impl From<String> for BuildString {
+    fn from(value: String) -> Self {
+        BuildString::UserSpecified(value)
+    }
+}
+
+impl BuildString {
+    /// Returns true if the build string should be derived from the variants.
+    pub fn is_derived(&self) -> bool {
+        matches!(self, BuildString::Derived)
+    }
+
+    /// Returns the user specified build string.
+    pub fn as_deref(&self) -> Option<&str> {
+        match self {
+            BuildString::UserSpecified(s) => Some(s),
+            BuildString::Derived => None,
+        }
+    }
+
+    /// Returns the final build string, either based on the user defined value or by computing the derived value.
+    pub fn resolve(&self, hash: &HashInfo, build_number: u64) -> Cow<'_, str> {
+        match self {
+            BuildString::UserSpecified(s) => s.as_str().into(),
+            BuildString::Derived => Self::compute(hash, build_number).into(),
+        }
+    }
+
+    /// Compute the build string based on the hash and build number
+    pub fn compute(hash: &HashInfo, build_number: u64) -> String {
+        format!("{}_{}", hash, build_number)
+    }
+}
+
+impl TryConvertNode<BuildString> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<BuildString, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<BuildString> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<BuildString, Vec<PartialParsingError>> {
+        Ok(BuildString::UserSpecified(self.as_str().to_owned()))
+    }
+}
+
+/// Post process operations for regex based replacements
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PostProcess {
+    pub files: GlobVec,
+    pub regex: SerializableRegex,
+    pub replacement: String,
 }
 
 impl Build {
@@ -123,8 +214,8 @@ impl Build {
     }
 
     /// Get the build string.
-    pub fn string(&self) -> Option<&str> {
-        self.string.as_deref()
+    pub fn string(&self) -> &BuildString {
+        &self.string
     }
 
     /// Get the skip conditions.
@@ -153,18 +244,28 @@ impl Build {
     }
 
     /// Get the always copy files settings.
-    pub fn always_copy_files(&self) -> Option<&GlobSet> {
-        self.always_copy_files.globset()
+    pub fn always_copy_files(&self) -> &GlobVec {
+        &self.always_copy_files
     }
 
     /// Get the always include files settings.
-    pub fn always_include_files(&self) -> Option<&GlobSet> {
-        self.always_include_files.globset()
+    pub fn always_include_files(&self) -> &GlobVec {
+        &self.always_include_files
+    }
+
+    /// Get the include files settings.
+    pub fn files(&self) -> &GlobVec {
+        &self.files
     }
 
     /// Get the prefix detection settings.
     pub const fn prefix_detection(&self) -> &PrefixDetection {
         &self.prefix_detection
+    }
+
+    /// Post-process operations for regex based replacements
+    pub const fn post_process(&self) -> &Vec<PostProcess> {
+        &self.post_process
     }
 }
 
@@ -194,7 +295,9 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             always_include_files,
             merge_build_and_host_envs,
             variant,
-            prefix_detection
+            prefix_detection,
+            post_process,
+            files
         }
 
         Ok(build)
@@ -245,13 +348,13 @@ impl DynamicLinking {
     }
 
     /// Get the missing DSO allowlist.
-    pub fn missing_dso_allowlist(&self) -> Option<&GlobSet> {
-        self.missing_dso_allowlist.globset()
+    pub fn missing_dso_allowlist(&self) -> &GlobVec {
+        &self.missing_dso_allowlist
     }
 
     /// Get the rpath allow list.
-    pub fn rpath_allowlist(&self) -> Option<&GlobSet> {
-        self.rpath_allowlist.globset()
+    pub fn rpath_allowlist(&self) -> &GlobVec {
+        &self.rpath_allowlist
     }
 
     /// Get the overdepending behavior.
@@ -331,6 +434,49 @@ impl TryConvertNode<DynamicLinking> for RenderedMappingNode {
     }
 }
 
+impl TryConvertNode<Vec<PostProcess>> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<Vec<PostProcess>, Vec<PartialParsingError>> {
+        self.as_sequence()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedSequence)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<Vec<PostProcess>> for RenderedSequenceNode {
+    fn try_convert(&self, _name: &str) -> Result<Vec<PostProcess>, Vec<PartialParsingError>> {
+        let mut post_process = Vec::new();
+
+        for (idx, node) in self.iter().enumerate() {
+            let pp = node.try_convert(&format!("post_process[{}]", idx))?;
+            post_process.push(pp);
+        }
+
+        Ok(post_process)
+    }
+}
+
+impl TryConvertNode<PostProcess> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PostProcess, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PostProcess> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PostProcess, Vec<PartialParsingError>> {
+        let mut post_process = PostProcess {
+            files: GlobVec::default(),
+            regex: SerializableRegex::default(),
+            replacement: String::new(),
+        };
+
+        validate_keys!(post_process, self.iter(), files, regex, replacement);
+
+        Ok(post_process)
+    }
+}
+
 /// Python specific build configuration
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Python {
@@ -345,7 +491,7 @@ pub struct Python {
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub skip_pyc_compilation: GlobVec,
 
-    /// Wether to use the "app" entry point for Python (which hooks into the macOS GUI)
+    /// Whether to use the "app" entry point for Python (which hooks into the macOS GUI)
     /// This is only relevant for macOS.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,
@@ -467,6 +613,7 @@ impl TryConvertNode<EntryPoint> for RenderedScalarNode {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::EntryPointParsing(err),
+                help = format!("expected a string in the format of `command = module:function`")
             )]
         })
     }
@@ -491,7 +638,7 @@ impl ForceFileType {
     }
 }
 
-///
+/// Configuration related to prefix replacement
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrefixDetection {
     /// Options to force if a file is detected as text or binary

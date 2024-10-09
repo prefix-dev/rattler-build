@@ -79,7 +79,7 @@ The schema (and `pydantic` source file) can be found in this repository:
     Read more about this [here](https://github.com/redhat-developer/yaml-language-server).
 
 
-See more in the [automatic linting](./automatic_linting.md) chapter.
+See more in the [automatic linting](../automatic_linting.md) chapter.
 
 <!--
 Quick start (from conda-build)
@@ -218,7 +218,7 @@ source:
   tag: "1.1.4"
 ```
 
-Futhermore, if you want to fetch just the current "`HEAD`" (this may result in
+Furthermore, if you want to fetch just the current "`HEAD`" (this may result in
 non-deterministic builds), then you can use `depth`.
 
 ```yaml
@@ -425,13 +425,13 @@ build:
 ### Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
-the `package\_metadata` by default. You can disable this by passing
+the `package_metadata` by default. You can disable this by passing
 `--no-include-recipe` on the command line.
 
 !!! note
     There are many more options in the build section. These additional options control
     how variants are computed, prefix replacements, and more.
-    See the [full build options](./build_options.md) for more information.
+    See the [full build options](../build_options.md) for more information.
 
 
 ## Requirements section
@@ -520,7 +520,7 @@ version is part of the package dependencies, list `numpy` as a requirement in
 `recipe.yaml` and use a `conda_build_config.yaml` file with multiple NumPy
 versions.
 
-### Run constrained
+### Run constraints
 
 Packages that are optional at runtime but must obey the supplied additional
 constraint if they are installed.
@@ -530,47 +530,71 @@ specifications](https://conda.io/projects/conda/en/latest/user-guide/concepts/pk
 
 ```yaml
 requirements:
-  run_constrained:
+  run_constraints:
     - optional-subpackage ==${{ version }}
 ```
 
 For example, let's say we have an environment that has package "a" installed at
-version 1.0. If we install package "b" that has a `run\_constrained` entry of
-"`a\>1.0`", then `mamba` would need to upgrade "a" in the environment in order to
+version 1.0. If we install package "b" that has a `run_constraints` entry of
+"`a >1.0`", then `mamba` would need to upgrade "a" in the environment in order to
 install "b".
 
 This is especially useful in the context of virtual packages, where the
-`run\_constrained` dependency is not a package that `mamba` manages, but rather a
+`run_constraints` dependency is not a package that `mamba` manages, but rather a
 [virtual
 package](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-virtual.html)
 that represents a system property that `mamba` can't change. For example, a
-package on Linux may impose a `run\_constrained` dependency on `\_\_glibc\>=2.12`.
+package on Linux may impose a `run_constraints` dependency on `__glibc >=2.12`.
 This is the version bound consistent with CentOS 6. Software built against glibc
-2.12 will be compatible with CentOS 6. This `run\_constrained` dependency helps
-`mamba` tell the user that a given package can't be installed if their system
+2.12 will be compatible with CentOS 6. This `run_constraints` dependency helps
+`mamba`, `conda` or `pixi` tell the user that a given package can't be installed if their system
 glibc version is too old.
 
 ### Run exports
 
 Packages may have runtime requirements such as shared libraries (e.g. `zlib`), which are required for linking at build time, and for resolving the link at run time.
-Such packages use `run_exports` for defining the runtime requirements to let the dependent packages understand the runtime requirements of the package.
+With `run_exports` packages runtime requirements can be implicitly added.
+`run_exports` are weak by default, these two requirements for the `zlib` package are therefore equivalent:
 
-Example from `zlib`:
-
-```yaml
+```yaml title="recipe.yaml for zlib"
   requirements:
     run_exports:
-      - {{ pin_subpackage('libzlib', exact=True) }}
+      - ${{ pin_subpackage('libzlib', exact=True) }}
 ```
 
-Run exports are weak by default. But you can also define strong `run_exports`.
+```yaml title="recipe.yaml for zlib"
+  requirements:
+    run_exports:
+      weak:
+        - ${{ pin_subpackage('libzlib', exact=True) }}
+```
 
-```yaml
+The alternative to `weak` is `strong`.
+For `gcc` this would look like this:
+
+```yaml title="recipe.yaml for gcc"
   requirements:
     run_exports:
       strong:
-        - {{ pin_subpackage('libzlib', exact=True) }}
+        - ${{ pin_subpackage('libgcc', exact=True) }}
 ```
+
+`weak` exports will only be implicitly added as runtime requirement, if the package is a host dependency.
+`strong` exports will be added for both build and host dependencies.
+In the following example you can see the implicitly added runtime dependencies.
+
+```yaml title="recipe.yaml of some package using gcc and zlib"
+  requirements:
+    build:
+      - gcc            # has a strong run export
+    host:
+      - zlib           # has a (weak) run export
+      # - libgcc       <-- implicitly added by gcc
+    run:
+      # - libgcc       <-- implicitly added by gcc
+      # - libzlib      <-- implicitly added by libzlib
+```
+
 
 ### Ignore run exports
 
@@ -587,12 +611,12 @@ You can ignore them by package name, or by naming the runtime dependency directl
         - zlib
 ```
 
-Using a runtime depenedency name:
+Using a runtime dependency name:
 
 ```yaml
   requirements:
     ignore_run_exports:
-      from_name:
+      by_name:
         - libzlib
 ```
 
@@ -1049,8 +1073,8 @@ Jinja.
 There are three functions:
 
 - `env.get("ENV_VAR")` will insert the value of "ENV_VAR" into the recipe.
-- `env.get_default("ENV_VAR", "undefined")` will insert the value of "ENV_VAR"
-  into the recipe or, if "ENV_VAR" is not defined, the specified default value
+- `env.get("ENV_VAR", default="undefined")` will insert the value of `ENV_VAR`
+  into the recipe or, if `ENV_VAR` is not defined, the specified default value
   (in this case "undefined")
 - `env.exists("ENV_VAR")` returns a boolean true of false if the env var is set
   to any value
@@ -1062,16 +1086,33 @@ build:
   string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
 ```
 
-#### `cmp` function
+#### `match` function
 
-This function matches the first argument (the package's MatchSpec) against the second
-argument (the version spec) and returns the resulting boolean.
+This function matches the first argument (the package version) against the second
+argument (the version spec) and returns the resulting boolean. This only works for packages
+defined in the "variant_config.yaml" file.
 
-```yaml
-cmp(python, '>=3.4')
+```yaml title="recipe.yaml"
+match(python, '>=3.4')
 ```
 
-Example: [`cmp` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+For example, you could require a certain dependency only for builds against python 3.4 and above:
+
+```yaml title="recipe.yaml"
+requirements:
+  build:
+    - if: match(python, '>=3.4')
+      then:
+        - some-dep
+```
+
+With a corresponding variant config that looks like the following:
+
+```yaml title="variant_config.yaml"
+python: ["3.2", "3.4", "3.6"]
+```
+
+Example: [`match` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
 #### `cdt` function
 
@@ -1084,7 +1125,7 @@ cdt('package-name') # outputs: package-name-cos6-x86_64
 cdt('package-name') # outputs: package-name-cos6-aarch64
 ```
 
-Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/cmpcdt/recipe.yaml)
+Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
 
 ## Preprocessing selectors
@@ -1117,7 +1158,7 @@ source:
 ```
 
 A selector is a valid Python statement that is executed. You can read more about
-them in the ["Selectors in recipes" chapter](./selectors.md).
+them in the ["Selectors in recipes" chapter](../selectors.md).
 
 The use of the Python version selectors, `py27`, `py34`, etc. is discouraged in
 favor of the more general comparison operators. Additional selectors in this
@@ -1163,5 +1204,5 @@ tests:
 
 ### Jinja functions
 
-- [`load_from_file`](./experimental_features.md#load-from-files)
-- [`git.*` functions](./experimental_features.md#git-functions)
+- [`load_from_file`](../experimental_features.md#load-from-files)
+- [`git.*` functions](../experimental_features.md#git-functions)

@@ -1,13 +1,17 @@
-//! This module contains the functions to package a conda package from a given output.
+//! This module contains the functions to package a conda package from a given
+//! output.
+use std::{
+    collections::HashSet,
+    io::Write,
+    path::{Component, Path, PathBuf},
+};
+
 use fs_err as fs;
 use fs_err::File;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-
-use itertools::Itertools;
-
-use rattler_conda_types::package::PathsJson;
-use rattler_conda_types::package::{ArchiveType, PackageFile};
+use rattler_conda_types::{
+    package::{ArchiveType, PackageFile, PathsJson},
+    Platform,
+};
 use rattler_package_streaming::write::{
     write_conda_package, write_tar_bz2_package, CompressionLevel,
 };
@@ -15,12 +19,10 @@ use rattler_package_streaming::write::{
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{Files, TempFiles};
-pub use metadata::create_prefix_placeholder;
+pub use file_finder::{content_type, Files, TempFiles};
+pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 
-use crate::metadata::Output;
-use crate::package_test::write_test_files;
-use crate::{post_process, tool_configuration};
+use crate::{metadata::Output, package_test::write_test_files, post_process, tool_configuration};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -69,18 +71,19 @@ pub enum PackagingError {
 
     #[error("Failed to find content type for file: {0:?}")]
     ContentTypeNotFound(PathBuf),
+
+    #[error("No license files were copied")]
+    LicensesNotFound,
 }
 
 /// This function copies the license files to the info/licenses folder.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
-) -> Result<Option<Vec<PathBuf>>, PackagingError> {
+) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
     if output.recipe.about().license_file.is_empty() {
         Ok(None)
     } else {
-        let license_globs = output.recipe.about().license_file.clone();
-
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
@@ -88,7 +91,7 @@ fn copy_license_files(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
-        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .with_globvec(&output.recipe.about().license_file)
         .use_gitignore(false)
         .run()?;
 
@@ -99,7 +102,7 @@ fn copy_license_files(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
-        .with_parse_globs(license_globs.iter().map(AsRef::as_ref))
+        .with_globvec(&output.recipe.about().license_file)
         .use_gitignore(false)
         .run()?;
 
@@ -110,17 +113,19 @@ fn copy_license_files(
             .iter()
             .chain(copied_files_work_dir)
             .map(PathBuf::from)
-            .collect::<Vec<PathBuf>>();
+            .collect::<HashSet<PathBuf>>();
 
         if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            tracing::warn!("No include glob matched for copying license files");
+            let warn_str = "No include glob matched for copying license files";
+            tracing::warn!(warn_str);
+            output.record_warning(warn_str);
         }
 
         if copied_files.is_empty() {
-            tracing::warn!("No license files were copied");
+            Err(PackagingError::LicensesNotFound)
+        } else {
+            Ok(Some(copied_files))
         }
-
-        Ok(Some(copied_files))
     }
 }
 
@@ -130,10 +135,23 @@ fn write_recipe_folder(
 ) -> Result<Vec<PathBuf>, PackagingError> {
     let recipe_folder = tmp_dir_path.join("info/recipe/");
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
+    let recipe_path = &output.build_configuration.directories.recipe_path;
 
     let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());
+
+    // Make sure that the recipe file is "recipe.yaml" in `info/recipe/`
+    if recipe_path.file_name() != Some("recipe.yaml".as_ref()) {
+        if let Some(name) = recipe_path.file_name() {
+            fs::rename(recipe_folder.join(name), recipe_folder.join("recipe.yaml"))?;
+            // Update the existing entry with the new recipe file.
+            if let Some(pos) = files.iter().position(|x| x == &recipe_folder.join(name)) {
+                files[pos] = recipe_folder.join("recipe.yaml");
+            }
+        }
+    }
+
     // write the variant config to the appropriate file
     let variant_config_file = recipe_folder.join("variant_config.yaml");
     let mut variant_config = File::create(&variant_config_file)?;
@@ -141,7 +159,8 @@ fn write_recipe_folder(
         .write_all(serde_yaml::to_string(&output.build_configuration.variant)?.as_bytes())?;
     files.push(variant_config_file);
 
-    // TODO(recipe): define how we want to render it exactly!
+    // Write out the "rendered" recipe as well (the recipe with all the variables
+    // replaced with their values)
     let rendered_recipe_file = recipe_folder.join("rendered_recipe.yaml");
     let mut rendered_recipe = File::create(&rendered_recipe_file)?;
     rendered_recipe.write_all(serde_yaml::to_string(&output)?.as_bytes())?;
@@ -189,29 +208,34 @@ pub fn package_conda(
 
     post_process::relink::relink(&tmp, output)?;
 
-    tmp.add_files(post_process::python::python(output, &tmp)?);
+    tmp.add_files(post_process::python::python(&tmp, output)?);
+
+    post_process::regex_replacements::regex_post_process(&tmp, output)?;
 
     tracing::info!("Post-processing done!");
 
     let info_folder = tmp.temp_dir.path().join("info");
 
-    tracing::info!("Writing metadata for package");
+    tracing::info!("Writing test files");
+    let test_files = write_test_files(output, tmp.temp_dir.path())?;
+    tmp.add_files(test_files);
 
+    tracing::info!("Writing metadata for package");
     tmp.add_files(output.write_metadata(&tmp)?);
 
     // TODO move things below also to metadata.rs
+    tracing::info!("Copying license files");
     if let Some(license_files) = copy_license_files(output, tmp.temp_dir.path())? {
         tmp.add_files(license_files);
     }
 
+    tracing::info!("Copying recipe files");
     if output.build_configuration.store_recipe {
         let recipe_files = write_recipe_folder(output, tmp.temp_dir.path())?;
         tmp.add_files(recipe_files);
     }
 
-    let test_files = write_test_files(output, tmp.temp_dir.path())?;
-    tmp.add_files(test_files);
-
+    tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
     if output.recipe.build().noarch().is_python() {
         let link_json = File::create(info_folder.join("link.json"))?;
@@ -221,13 +245,27 @@ pub fn package_conda(
 
     // print sorted files
     tracing::info!("\nFiles in package:\n");
-    tmp.files
+    let mut files = tmp
+        .files
         .iter()
         .map(|x| x.strip_prefix(tmp.temp_dir.path()))
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .sorted()
-        .for_each(|f| tracing::info!("  - {}", f.to_string_lossy()));
+        .collect::<Result<Vec<_>, _>>()?;
+    files.sort_by(|a, b| {
+        let a_is_info = a.components().next() == Some(Component::Normal("info".as_ref()));
+        let b_is_info = b.components().next() == Some(Component::Normal("info".as_ref()));
+        match (a_is_info, b_is_info) {
+            (true, true) | (false, false) => a.cmp(b),
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
+        }
+    });
+    files.iter().for_each(|f| {
+        if f.components().next() == Some(Component::Normal("info".as_ref())) {
+            tracing::info!("  - {}", console::style(f.to_string_lossy()).dim())
+        } else {
+            tracing::info!("  - {}", f.to_string_lossy())
+        }
+    });
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
@@ -235,9 +273,14 @@ pub fn package_conda(
 
     fs::create_dir_all(&output_folder)?;
 
-    let identifier = output
-        .identifier()
-        .ok_or(PackagingError::BuildStringNotSet)?;
+    if let Platform::NoArch = output.build_configuration.target_platform {
+        create_empty_build_folder(
+            local_channel_dir,
+            &output.build_configuration.build_platform,
+        )?;
+    }
+
+    let identifier = output.identifier();
     let out_path = output_folder.join(format!(
         "{}{}",
         identifier,
@@ -270,7 +313,7 @@ pub fn package_conda(
                 tmp.temp_dir.path(),
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
-                packaging_settings.compression_threads,
+                tool_configuration.compression_threads,
                 &identifier,
                 Some(&output.build_configuration.timestamp),
                 Some(Box::new(ProgressBar { progress_bar })),
@@ -284,9 +327,28 @@ pub fn package_conda(
     Ok((out_path, paths_json))
 }
 
+/// When building package for noarch, we don't create another build-platform
+/// folder together with noarch but conda-build does
+/// because of this we have a failure in conda-smithy CI so we also *mimic* this
+/// behaviour until this behaviour is changed
+/// https://github.com/conda-forge/conda-forge-ci-setup-feedstock/blob/main/recipe/conda_forge_ci_setup/feedstock_outputs.py#L164
+fn create_empty_build_folder(
+    local_channel_dir: &Path,
+    build_platform: &Platform,
+) -> miette::Result<(), PackagingError> {
+    let build_output_folder = local_channel_dir.join(build_platform.to_string());
+
+    tracing::info!("Creating empty build folder {:?}", build_output_folder);
+
+    fs::create_dir_all(&build_output_folder)?;
+
+    Ok(())
+}
+
 impl Output {
-    /// Create a conda package from any new files in the host prefix. Note: the previous stages should have been
-    /// completed before calling this function.
+    /// Create a conda package from any new files in the host prefix. Note: the
+    /// previous stages should have been completed before calling this
+    /// function.
     pub async fn create_package(
         &self,
         tool_configuration: &tool_configuration::Configuration,
@@ -296,6 +358,7 @@ impl Output {
         let files_after = Files::from_prefix(
             &self.build_configuration.directories.host_prefix,
             self.recipe.build().always_include_files(),
+            self.recipe.build().files(),
         )?;
 
         package_conda(self, tool_configuration, &files_after)

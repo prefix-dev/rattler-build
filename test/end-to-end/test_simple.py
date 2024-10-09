@@ -3,118 +3,18 @@ import json
 import os
 import platform
 from pathlib import Path
-from subprocess import STDOUT, CalledProcessError, check_output
-from typing import Any, Optional
+from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
 
 import pytest
 import requests
-from conda_package_handling.api import extract
-
-
-class RattlerBuild:
-    def __init__(self, path):
-        self.path = path
-
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        try:
-            return check_output([str(self.path), *args], **kwds).decode("utf-8")
-        except CalledProcessError as e:
-            print(e.output)
-            print(e.stderr)
-            raise e
-
-    def build_args(
-        self,
-        recipe_folder: Path,
-        output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: list[str] | None = None,
-        extra_args: list[str] = None,
-    ):
-        if extra_args is None:
-            extra_args = []
-        args = ["build", "--recipe", str(recipe_folder), *extra_args]
-        if variant_config is not None:
-            args += ["--variant-config", str(variant_config)]
-        args += ["--output-dir", str(output_folder)]
-        args += ["--package-format", str("tar.bz2")]
-
-        if custom_channels:
-            for c in custom_channels:
-                args += ["--channel", c]
-
-        return args
-
-    def build(
-        self,
-        recipe_folder: Path,
-        output_folder: Path,
-        variant_config: Optional[Path] = None,
-        custom_channels: list[str] | None = None,
-        extra_args: list[str] = None,
-    ):
-        args = self.build_args(
-            recipe_folder,
-            output_folder,
-            variant_config=variant_config,
-            custom_channels=custom_channels,
-            extra_args=extra_args,
-        )
-        return self(*args)
-
-
-@pytest.fixture
-def rattler_build():
-    if os.environ.get("RATTLER_BUILD_PATH"):
-        return RattlerBuild(os.environ["RATTLER_BUILD_PATH"])
-    else:
-        base_path = Path(__file__).parent.parent.parent
-        executable_name = "rattler-build"
-        if os.name == "nt":
-            executable_name += ".exe"
-
-        release_path = base_path / f"target/release/{executable_name}"
-        debug_path = base_path / f"target/debug/{executable_name}"
-
-        if release_path.exists():
-            return RattlerBuild(release_path)
-        elif debug_path.exists():
-            return RattlerBuild(debug_path)
-
-    raise FileNotFoundError("Could not find rattler-build executable")
+import yaml
+from helpers import RattlerBuild, get_extracted_package, get_package
 
 
 def test_functionality(rattler_build: RattlerBuild):
     suffix = ".exe" if os.name == "nt" else ""
     text = rattler_build("--help").splitlines()
     assert text[0] == f"Usage: rattler-build{suffix} [OPTIONS] [COMMAND]"
-
-
-@pytest.fixture
-def recipes():
-    return Path(__file__).parent.parent.parent / "test-data" / "recipes"
-
-
-def get_package(folder: Path, glob="*.tar.bz2"):
-    if "tar.bz2" not in glob:
-        glob += "*.tar.bz2"
-    if "/" not in glob:
-        glob = "**/" + glob
-    package_path = next(folder.glob(glob))
-    return package_path
-
-
-def get_extracted_package(folder: Path, glob="*.tar.bz2"):
-    package_path = get_package(folder, glob)
-
-    if package_path.name.endswith(".tar.bz2"):
-        package_without_extension = package_path.name[: -len(".tar.bz2")]
-    elif package_path.name.endswith(".conda"):
-        package_without_extension = package_path.name[: -len(".conda")]
-
-    extract_path = folder / "extract" / package_without_extension
-    extract(str(package_path), dest_dir=str(extract_path))
-    return extract_path
 
 
 def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -180,6 +80,10 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert len(actual_run_export["weak"]) == 1
     x = actual_run_export["weak"][0]
     assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
+
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json.get("depends") is None
 
 
 def host_subdir():
@@ -321,6 +225,12 @@ def test_cross_testing(
         tmp_path,
         extra_args=["--target-platform", target_platform],
     )
+
+    pkg = get_extracted_package(tmp_path, "test-execution")
+
+    assert (pkg / "info/paths.json").exists()
+    # make sure that the recipe is renamed to `recipe.yaml` in the package
+    assert (pkg / "info/recipe/recipe.yaml").exists()
 
 
 def test_additional_entrypoints(
@@ -570,3 +480,508 @@ def test_console_logging(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert "hahaha" not in output
     assert "I am hahaha" not in output
     assert "I am ********" in output
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_git_submodule(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    path_to_recipe = recipes / "git_source_submodule"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "nanobind")
+
+    assert (pkg / "info/paths.json").exists()
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load recipe as YAML
+
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+
+    # parse the rendered recipe
+    rendered_recipe = yaml.safe_load(text)
+    assert snapshot_json == rendered_recipe["finalized_sources"]
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_git_patch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "git_source_patch"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "ament_package")
+
+    assert (pkg / "info/paths.json").exists()
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load recipe as YAML
+
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+
+    # parse the rendered recipe
+    rendered_recipe = yaml.safe_load(text)
+    sources = rendered_recipe["finalized_sources"]
+
+    assert len(sources) == 1
+    source = sources[0]
+    assert source["git"] == "https://github.com/ros2-gbp/ament_package-release.git"
+    assert source["rev"] == "00da147b17c19bc225408dc693ed8fdc14c314ab"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_patch_strip_level(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "patch_with_strip"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = check_output([str(rattler_build.path), *args], stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path, "patch_with_strip")
+
+    assert (pkg / "info/paths.json").exists()
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+
+    text = (pkg / "somefile").read_text()
+
+    assert text == "123\n"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_symlink_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    path_to_recipe = recipes / "symlink"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "symlink")
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_read_only_removal(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "read_only_build_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    rattler_build(*args)
+    pkg = get_extracted_package(tmp_path, "read-only-build-files")
+
+    assert (pkg / "info/index.json").exists()
+
+
+def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "noarch_variant"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = rattler_build(
+        *args, "--target-platform=linux-64", "--render-only", stderr=DEVNULL
+    )
+
+    # parse as json
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
+    assert rendered[0]["recipe"]["build"]["string"] == "unix_4616a5c_0"
+
+    pin = {
+        "pin_subpackage": {
+            "name": "rattler-build-demo",
+            "exact": True,
+        }
+    }
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_2233755_0"
+    assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
+    assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
+    assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler-build-demo": "1 unix_4616a5c_0",
+        "target_platform": "noarch",
+    }
+
+    output = rattler_build(
+        *args, "--target-platform=win-64", "--render-only", stderr=DEVNULL
+    )
+    rendered = json.loads(output)
+    assert len(rendered) == 2
+
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
+    assert rendered[0]["recipe"]["build"]["string"] == "win_4616a5c_0"
+
+    pin = {
+        "pin_subpackage": {
+            "name": "rattler-build-demo",
+            "exact": True,
+        }
+    }
+    assert rendered[1]["recipe"]["build"]["string"] == "win_b28fc4d_0"
+    assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
+    assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
+    assert rendered[1]["build_configuration"]["variant"] == {
+        "rattler-build-demo": "1 win_4616a5c_0",
+        "target_platform": "noarch",
+    }
+
+
+def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "regex_post_process"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    _ = rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "regex-post-process")
+
+    assert (pkg / "info/paths.json").exists()
+
+    test_text = (pkg / "test.txt").read_text().splitlines()
+    assert test_text[0] == "Building the regex-post-process-replaced package"
+    assert test_text[1] == "Do not replace /some/path/to/sysroot/and/more this"
+
+    text_pc = (pkg / "test.pc").read_text().splitlines()
+    expect_begin = "I am a test file with $(CONDA_BUILD_SYSROOT_S)and/some/more"
+    expect_end = "and: $(CONDA_BUILD_SYSROOT_S)and/some/more"
+    assert text_pc[0] == expect_begin
+    assert text_pc[2] == expect_end
+
+    text_cmake = (pkg / "test.cmake").read_text()
+    assert text_cmake.startswith(
+        'target_compile_definitions(test PRIVATE "some_path;{CONDA_BUILD_SYSROOT}/and/more;some_other_path;{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+    )
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_filter_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    path_to_recipe = recipes / "filter_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    rattler_build(*args)
+    pkg = get_extracted_package(tmp_path, "filter_files")
+
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "double_license"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    # make sure that two license files in $SRC_DIR and $RECIPE_DIR raise an exception
+    with pytest.raises(CalledProcessError):
+        rattler_build(*args)
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_post_link(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    path_to_recipe = recipes / "post-link"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "postlink")
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_include_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    path_to_recipe = recipes / "include_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
+
+    pkg = get_extracted_package(tmp_path, "include_files")
+    assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+def test_nushell_implicit_recipe(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    rattler_build.build(
+        recipes / "nushell-implicit/recipe.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "nushell")
+
+    assert (pkg / "info/paths.json").exists()
+    content = (pkg / "hello.txt").read_text()
+    assert "Hello, world!" == content
+
+
+def test_channel_specific(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "channel_specific/recipe.yaml",
+        tmp_path,
+        extra_args="-c conda-forge -c quantstack".split(),
+    )
+    pkg = get_extracted_package(tmp_path, "channel_specific")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load yaml
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    rendered_recipe = yaml.safe_load(text)
+    print(text)
+    deps = rendered_recipe["finalized_dependencies"]["host"]["resolved"]
+
+    for d in deps:
+        if d["name"] == "sphinx":
+            assert d["channel"] == "https://conda.anaconda.org/quantstack/"
+
+
+def test_run_exports_from(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "run_exports_from",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "run_exports_test")
+
+    assert (pkg / "info/run_exports.json").exists()
+
+    actual_run_export = json.loads((pkg / "info/run_exports.json").read_text())
+    assert set(actual_run_export.keys()) == {"weak"}
+    assert len(actual_run_export["weak"]) == 1
+    x = actual_run_export["weak"][0]
+    assert x.startswith("run_exports_test ==1.0.0 h") and x.endswith("_0")
+
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json.get("depends") is None
+
+
+def test_script_execution(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "script",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "script-test")
+
+    # grab paths.json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "script-executed.txt"
+
+    rattler_build.build(
+        recipes / "script/recipe_with_extensions.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "script-test-ext")
+
+    # grab paths.json
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    assert len(paths["paths"]) == 1
+    assert paths["paths"][0]["_path"] == "script-executed.txt"
+
+
+def test_noarch_flask(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot
+):
+    rattler_build.build(
+        recipes / "flask",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "flask")
+
+    # this is to ensure that the clone happens correctly
+    license_file = pkg / "info/licenses/LICENSE.rst"
+    assert license_file.exists()
+
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # check that the snapshot matches
+    test_yaml = (pkg / "info/tests/tests.yaml").read_text()
+    assert test_yaml == snapshot
+
+    # make sure that the entry point does not exist
+    assert not (pkg / "python-scripts/flask").exists()
+
+    assert (pkg / "info/link.json").exists()
+
+
+def test_downstream_test(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "downstream_test/succeed.yaml",
+        tmp_path,
+    )
+
+    pkg = next(tmp_path.rglob("**/upstream-good-*"))
+    test_result = rattler_build.test(pkg, "-c", str(tmp_path))
+
+    assert "Running downstream test for package: downstream-good" in test_result
+    assert "Downstream test could not run" not in test_result
+    assert "Running test in downstream package" in test_result
+
+    rattler_build.build(
+        recipes / "downstream_test/fail_prelim.yaml",
+        tmp_path,
+    )
+
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.build(
+            recipes / "downstream_test/fail.yaml",
+            tmp_path,
+        )
+
+        assert "│ Failing test in downstream package" in e.value.output
+        assert "│ Downstream test failed" in e.value.output
+
+
+def test_cache_runexports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(recipes / "cache_run_exports/helper.yaml", tmp_path)
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_1.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg = get_extracted_package(tmp_path, "cache-run-exports")
+
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["depends"] == ["normal-run-exports"]
+
+    pkg = get_extracted_package(tmp_path, "no-cache-by-name-run-exports")
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["name"] == "no-cache-by-name-run-exports"
+    assert index.get("depends", []) == []
+
+    pkg = get_extracted_package(tmp_path, "no-cache-from-package-run-exports")
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["name"] == "no-cache-from-package-run-exports"
+    print(index)
+    assert index.get("depends", []) == []
+
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_2.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+    pkg = get_extracted_package(tmp_path, "cache-ignore-run-exports")
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["name"] == "cache-ignore-run-exports"
+    assert index.get("depends", []) == []
+
+    rattler_build.build(
+        recipes / "cache_run_exports/recipe_test_3.yaml",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+    pkg = get_extracted_package(tmp_path, "cache-ignore-run-exports-by-name")
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["name"] == "cache-ignore-run-exports-by-name"
+    assert index.get("depends", []) == []
+
+
+def test_extra_meta_is_recorded_into_about_json(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "toml",
+        tmp_path,
+        extra_meta={"flow_run_id": "some_id", "sha": "24ee3"},
+    )
+    pkg = get_extracted_package(tmp_path, "toml")
+
+    about_json = json.loads((pkg / "info/about.json").read_text())
+
+    assert snapshot_json == about_json
+
+
+def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    args = rattler_build.build_args(
+        recipes / "used-vars/recipe_1.yaml",
+        tmp_path,
+    )
+
+    output = rattler_build(
+        *args, "--target-platform=linux-64", "--render-only", stderr=DEVNULL
+    )
+
+    rendered = json.loads(output)
+    assert len(rendered) == 1
+    assert rendered[0]["build_configuration"]["variant"] == {
+        "target_platform": "noarch"
+    }
+
+
+def test_cache_install(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "cache/recipe-cmake.yaml", tmp_path, extra_args=["--experimental"]
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "check-1")
+    pkg2 = get_extracted_package(tmp_path, "check-2")
+    assert (pkg1 / "info/index.json").exists()
+    assert (pkg2 / "info/index.json").exists()
+
+
+def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "env_vars",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "env_var_test")
+
+    # assert (pkg / "info/paths.json").exists()
+    text = (pkg / "makeflags.txt").read_text()
+    assert text.strip() == "OVERRIDDEN_MAKEFLAGS"
+
+    variant_config = json.loads((pkg / "info/hash_input.json").read_text())
+    assert variant_config["MAKEFLAGS"] == "OVERRIDDEN_MAKEFLAGS"

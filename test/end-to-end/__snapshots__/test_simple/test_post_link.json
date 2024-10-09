@@ -1,0 +1,11 @@
+{
+  "paths": [
+    {
+      "_path": "bin/.postlink-post-link.sh",
+      "path_type": "hardlink",
+      "sha256": "2b5030749a170526d3d4323429b032d9776b17d798c972b46f3076392fbf2117",
+      "size_in_bytes": 34
+    }
+  ],
+  "paths_version": 1
+}

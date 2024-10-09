@@ -1,0 +1,15 @@
+package:
+  name: filter_files
+  version: 0.1.0
+
+build:
+  script:
+    - mkdir -p $PREFIX/
+    - touch $PREFIX/.DS_Store
+    - touch $PREFIX/.gitignore
+    - mkdir -p $PREFIX/share/info
+    - touch $PREFIX/share/info/dir
+    - touch $PREFIX/test.pyo
+    - mkdir -p $PREFIX/lib
+    - touch $PREFIX/lib/libarchive.la
+    - touch $PREFIX/exists.txt

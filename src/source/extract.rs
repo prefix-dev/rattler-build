@@ -19,6 +19,40 @@ enum TarCompression<'a> {
     Lzop,
 }
 
+/// Checks whether file has known tarball extension
+pub fn is_tarball(file_name: &str) -> bool {
+    [
+        // Gzip
+        ".tar.gz",
+        ".tgz",
+        ".taz",
+        // Bzip2
+        ".tar.bz2",
+        ".tbz",
+        ".tbz2",
+        ".tz2",
+        // Xz2
+        ".tar.lzma",
+        ".tlz",
+        ".tar.xz",
+        ".txz",
+        // Zstd
+        ".tar.zst",
+        ".tzst",
+        // Compress
+        ".tar.Z",
+        ".taZ",
+        // Lzip
+        ".tar.lz",
+        // Lzop
+        ".tar.lzo",
+        // PlainTar
+        ".tar",
+    ]
+    .iter()
+    .any(|ext| file_name.ends_with(ext))
+}
+
 fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> TarCompression<'a> {
     match ext
         .and_then(OsStr::to_str)
@@ -83,6 +117,8 @@ pub(crate) fn extract_tar(
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
 
+    fs::create_dir_all(target_directory)?;
+
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
     let progress_bar = log_handler.add_progress_bar(
         indicatif::ProgressBar::new(len)
@@ -121,6 +157,7 @@ pub(crate) fn extract_zip(
 ) -> Result<(), SourceError> {
     let archive = archive.as_ref();
     let target_directory = target_directory.as_ref();
+    fs::create_dir_all(target_directory)?;
 
     let len = archive.metadata().map(|m| m.len()).unwrap_or(1);
     let progress_bar = log_handler.add_progress_bar(
@@ -157,7 +194,7 @@ mod test {
     #[test]
     fn test_extract_zip() {
         // zip contains text.txt with "Hello, World" text
-        const HELLOW_ZIP_FILE: &[u8] = &[
+        const HELLO_WORLD_ZIP_FILE: &[u8] = &[
             80, 75, 3, 4, 10, 0, 0, 0, 0, 0, 244, 123, 36, 88, 144, 58, 246, 64, 13, 0, 0, 0, 13,
             0, 0, 0, 8, 0, 28, 0, 116, 101, 120, 116, 46, 116, 120, 116, 85, 84, 9, 0, 3, 4, 130,
             150, 101, 6, 130, 150, 101, 117, 120, 11, 0, 1, 4, 245, 1, 0, 0, 4, 20, 0, 0, 0, 72,
@@ -175,14 +212,14 @@ mod test {
         let tempdir = tempfile::tempdir().unwrap();
         let file_path = tempdir.path().join("test.zip");
         let mut file = File::create(&file_path).unwrap();
-        _ = file.write_all(HELLOW_ZIP_FILE);
+        _ = file.write_all(HELLO_WORLD_ZIP_FILE);
 
         let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
         let res = extract_zip(file_path, tempdir.path(), &fancy_log);
         assert!(term.contents().trim().starts_with(
             "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
         ));
-        assert!(matches!(res.err(), None));
+        assert!(res.err().is_none());
         assert!(tempdir.path().join("text.txt").exists());
         assert!(std::fs::read_to_string(tempdir.path().join("text.txt"))
             .unwrap()

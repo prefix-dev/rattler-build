@@ -2,15 +2,16 @@
 source: src/render/resolved_dependencies.rs
 expression: yaml_str
 ---
-- source: raw
-  spec: xyz
-- source: variant
+- source: xyz
+- variant: bar
   spec: foo
-  variant: bar
-- source: compiler
-  spec: foo
-- source: pin_subpackage
+- pin_subpackage: baz
+  lower_bound: x.x.x
+  upper_bound: x.x
+  exact: true
   spec: baz
-- source: pin_compatible
+- pin_compatible: bat
+  lower_bound: x.x.x
+  upper_bound: x.x
+  exact: true
   spec: bat
-

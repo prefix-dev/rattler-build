@@ -1,0 +1,10 @@
+package:
+  name: recipe_variant
+  version: 0.1.0
+
+build:
+  script: echo "hello, world!"
+
+requirements:
+  build:
+    - python

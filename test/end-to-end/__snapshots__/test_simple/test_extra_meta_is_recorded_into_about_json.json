@@ -1,0 +1,12 @@
+{
+  "channels": [
+    "https://conda.anaconda.org/conda-forge/"
+  ],
+  "extra": {
+    "flow_run_id": "some_id",
+    "sha": "24ee3"
+  },
+  "home": "https://github.com/uiri/toml",
+  "license": "MIT",
+  "summary": "Python lib for TOML."
+}

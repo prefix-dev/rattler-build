@@ -12,6 +12,8 @@ use rattler_conda_types::Platform;
 pub struct SelectorConfig {
     /// The target platform to render for
     pub target_platform: Platform,
+    /// The host platform (relevant for `noarch`)
+    pub host_platform: Platform,
     /// The build platform to render for
     pub build_platform: Platform,
     /// The hash, if available
@@ -20,6 +22,8 @@ pub struct SelectorConfig {
     pub variant: BTreeMap<String, String>,
     /// Enable experimental features
     pub experimental: bool,
+    /// Allow undefined variables
+    pub allow_undefined: bool,
 }
 
 impl SelectorConfig {
@@ -32,7 +36,12 @@ impl SelectorConfig {
             Value::from_safe_string(self.target_platform.to_string()),
         );
 
-        if let Some(platform) = self.target_platform.only_platform() {
+        context.insert(
+            "host_platform".to_string(),
+            Value::from_safe_string(self.host_platform.to_string()),
+        );
+
+        if let Some(platform) = self.host_platform.only_platform() {
             context.insert(
                 platform.to_string(),
                 Value::from_safe_string(platform.to_string()),
@@ -45,7 +54,7 @@ impl SelectorConfig {
 
         context.insert(
             "unix".to_string(),
-            Value::from(self.target_platform.is_unix()),
+            Value::from(self.host_platform.is_unix()),
         );
 
         context.insert(
@@ -91,10 +100,12 @@ impl Default for SelectorConfig {
     fn default() -> Self {
         Self {
             target_platform: Platform::current(),
+            host_platform: Platform::current(),
             build_platform: Platform::current(),
             hash: None,
             variant: Default::default(),
             experimental: false,
+            allow_undefined: false,
         }
     }
 }

@@ -46,13 +46,48 @@ pub fn filter_pyc(path: &Path, new_files: &HashSet<PathBuf>) -> bool {
     false
 }
 
+/// Filter certain files to prevent them from being packaged:
+///
+/// - .pyo files are considered "harmful" (optimized python files)
+/// - .la files are not needed at runtime and are unnecessary bloat
+/// - .DS_Store files are not needed and macOS specific
+/// - .git* files are not needed in a package and are version control specific (incl. .git folder and .gitignore)
+pub fn filter_file(relative_path: &Path) -> bool {
+    let ext = relative_path.extension().unwrap_or_default();
+
+    // skip the share/info/dir file because multiple packages would write
+    // to the same index file
+    if relative_path.starts_with("share/info/dir") {
+        return true;
+    }
+
+    // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
+    if ext == "pyo" {
+        return true;
+    }
+
+    // we skip `.la` files because conda-build does it - la files are not needed at runtime
+    if ext == "la" {
+        return true;
+    }
+
+    // filter any paths with .DS_Store, .git*, or conda-meta in them
+    if relative_path.components().any(|c| {
+        let s = c.as_os_str().to_string_lossy();
+        s.starts_with(".git") || s == ".DS_Store" || s == "conda-meta"
+    }) {
+        return true;
+    }
+    false
+}
+
 impl Output {
     /// This function copies the given file to the destination folder and
     /// transforms it on the way if needed.
     ///
     /// * For `noarch: python` packages, the "lib/pythonX.X" prefix is stripped so that only
     ///   the "site-packages" part is kept. Additionally, any `__pycache__` directories or
-    ///  `.pyc` files are skipped.
+    ///   `.pyc` files are skipped.
     /// * For `noarch: python` packages, furthermore `bin` is replaced with `python-scripts`, and
     ///   `Scripts` is replaced with `python-scripts` (on Windows only). All other files are included
     ///   as-is.
@@ -68,19 +103,13 @@ impl Output {
         let entry_points = &self.recipe.build().python().entry_points;
 
         let path_rel = path.strip_prefix(prefix)?;
-        let mut dest_path = dest_folder.join(path_rel);
 
-        // skip the share/info/dir file because multiple packages would write
-        // to the same index file
-        if path_rel == Path::new("share/info/dir") {
+        if filter_file(path_rel) {
             return Ok(None);
         }
 
+        let mut dest_path = dest_folder.join(path_rel);
         let ext = path.extension().unwrap_or_default();
-        // pyo considered harmful: https://www.python.org/dev/peps/pep-0488/
-        if ext == "pyo" {
-            return Ok(None); // skip .pyo files
-        }
 
         if ext == "py" || ext == "pyc" {
             // if we have a .so file of the same name, skip this path
@@ -257,6 +286,35 @@ impl Output {
             tracing::trace!("Copying file {:?} to {:?}", path, dest_path);
             fs::copy(path, &dest_path)?;
             Ok(Some(dest_path))
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_filter_file() {
+        let test_cases = vec![
+            ("test.pyo", true),
+            ("test.la", true),
+            (".DS_Store", true),
+            (".gitignore", true),
+            (".git/HEAD", true),
+            ("foo/.DS_Store", true),
+            ("lib/libarchive.la", true),
+            ("bla/.git/config", true),
+            ("share/info/dir", true),
+            ("share/info/dir/foo", true),
+            ("lib/python3.9/site-packages/test/fast.pyo", true),
+            ("lib/python3.9/site-packages/test/fast.py", false),
+            ("lib/python3.9/site-packages/test/fast.pyc", false),
+            ("lib/libarchive.a", false),
+            ("lib/libarchive.so", false),
+        ];
+
+        for (file, expected) in test_cases {
+            let path = std::path::Path::new(file);
+            assert_eq!(super::filter_file(path), expected);
         }
     }
 }

@@ -3,56 +3,66 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.14.0"
-authors = ["Wolf Vollprecht <w.vollprecht@gmail.com>"]
+version = "0.24.0"
+authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
 license = "BSD-3-Clause"
 readme = "README.md"
-description = "Rust crate to build conda packages on Windows, macOS and Linux"
+description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
+default-run = "rattler-build"
+rust-version = "1.80.0"
 
 [features]
-default = ['native-tls']
-native-tls = ['reqwest/native-tls', 'rattler/native-tls', 'rattler_installs_packages/native-tls']
-rustls-tls = ['reqwest/rustls-tls', 'reqwest/rustls-tls-native-roots', 'rattler/rustls-tls', 'rattler_installs_packages/rustls-tls']
-tui = ['ratatui', 'crossterm', 'ansi-to-tui', 'throbber-widgets-tui', 'tui-input']
+default = ['native-tls', 'recipe-generation']
+native-tls = [
+    'reqwest/native-tls',
+    'rattler/native-tls',
+    'rattler_installs_packages/native-tls',
+]
+rustls-tls = [
+    'reqwest/rustls-tls',
+    'reqwest/rustls-tls-native-roots',
+    'rattler/rustls-tls',
+    'rattler_installs_packages/rustls-tls',
+]
+tui = [
+    'ratatui',
+    'crossterm',
+    'ansi-to-tui',
+    'throbber-widgets-tui',
+    'tui-input',
+]
+recipe-generation = ['rattler_installs_packages']
+# This feature needs to add a dependency on
+# clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
+# but in order to be able to publish to crates we remove this feature
+generate-cli-docs = []
+
+[[bin]]
+name = "rattler-build"
+required-features = ["recipe-generation"]
 
 [dependencies]
-serde = { version = "1.0.197", features = ["derive"] }
-serde_yaml = "0.9.33"
-rattler = { version = "0.19.4", default-features = false, features = ["cli-tools"] }
-rattler_conda_types = { version = "0.20.2", default-features = false }
-rattler_digest = { version = "0.19.2", default-features = false }
-rattler_index = { version = "0.19.3", default-features = false }
-rattler_networking = { version = "0.19.2", default-features = false }
-rattler_repodata_gateway = { version = "0.19.3", default-features = false, features = [
-    "sparse",
-] }
-rattler_shell = { version = "0.19.3", default-features = false, features = [
-    "sysinfo",
-] }
-rattler_solve = { version = "0.20.2", default-features = false, features = [
-    "resolvo",
-] }
-rattler_virtual_packages = { version = "0.19.3", default-features = false }
-rattler_package_streaming = { version = "0.20.0", default-features = false }
-anyhow = "1.0.81"
+serde = { version = "1.0.210", features = ["derive"] }
+serde_yaml = "0.9.34"
+anyhow = "1.0.89"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
-serde_json = "1.0.114"
-reqwest = { version = "0.11.27", default-features = false, features = [
+serde_json = "1.0.128"
+reqwest = { version = "0.12.8", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.36.0", features = ["rt", "macros", "rt-multi-thread"] }
-itertools = "0.12.1"
+tokio = { version = "1.40.0", features = ["rt", "macros", "rt-multi-thread", "process"] }
+itertools = "0.13.0"
 content_inspector = "0.2.4"
-serde_with = "3.7.0"
-url = "2.5.0"
+serde_with = "3.11.0"
+url = "2.5.2"
 tracing = "0.1.40"
-clap = { version = "4.5.3", features = ["derive", "env", "cargo"] }
-minijinja = { version = "1.0.14", features = [
+clap = { version = "4.5.19", features = ["derive", "env", "cargo"] }
+minijinja = { version = "=1.0.14", features = [
     "unstable_machinery",
     "custom_syntax",
 ] }
@@ -60,63 +70,82 @@ tracing-subscriber = { version = "0.3.18", features = [
     "env-filter",
     "fmt",
     "ansi",
-    "json"
+    "json",
 ] }
-marked-yaml = { version = "0.3.0" }
+marked-yaml = { version = "0.7.1" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
-goblin = "0.8.0"
+goblin = "0.8.2"
 scroll = "0.12.0"
 pathdiff = "0.2.1"
-comfy-table = "7.1.0"
-futures = "0.3.30"
+comfy-table = "7.1.1"
+futures = "0.3.31"
 indicatif = "0.17.8"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
-thiserror = "1.0.58"
-tempfile = "3.10.1"
-chrono = "0.4.35"
+thiserror = "1.0.64"
+tempfile = "3.13.0"
+chrono = "0.4.38"
 sha1 = "0.10.6"
-spdx = "0.10.4"
-fs_extra = "1.3.0"
-ignore = "0.4.22"
-globset = "0.4.14"
-clap-verbosity-flag = "2.2.0"
+spdx = "0.10.6"
+ignore = "0.4.23"
+globset = "0.4.15"
+clap-verbosity-flag = "2.2.2"
 tracing-core = "0.1.32"
-petgraph = "0.6.4"
-indexmap = "2.2.5"
-dunce = "1.0.4"
+petgraph = "0.6.5"
+indexmap = "2.6.0"
+dunce = "1.0.5"
 fs-err = "2.11.0"
-which = "6.0.0"
-clap_complete = "4.5.1"
-tokio-util = "0.7.10"
+which = "6.0.3"
+clap_complete = "4.5.32"
+clap_complete_nushell = "4.5.3"
+tokio-util = "0.7.12"
 
-tar = "0.4.40"
-zip = { version = "0.6.6", default-features = false, features = [
+tar = "0.4.42"
+zip = { version = "2.2.0", default-features = false, features = [
     "flate2",
     "deflate",
 ] }
 bzip2 = "0.4.4"
-base64 = "0.22.0"
-flate2 = "1.0.28"
+base64 = "0.22.1"
+flate2 = "1.0.34"
 xz2 = "0.1.7"
-zstd = "0.13.0"
-toml = "0.8.12"
-memmap2 = "0.9.4"
-reqwest-middleware = "0.2.5"
-rattler_installs_packages = { version = "0.8.1", default-features = false }
-async-once-cell = "0.5.3"
-terminal_size = "0.3.0"
-memchr = "2.7.1"
-ratatui = { version = "0.26.1", optional = true }
-crossterm = { version = "0.27.0", features = ["event-stream"], optional = true }
-ansi-to-tui = { version = "4.0.1", optional = true }
-throbber-widgets-tui = { version = "0.4.1", optional = true }
-tui-input = { version = "0.8.0", optional = true }
+zstd = "0.13.2"
+toml = "0.8.19"
+memmap2 = "0.9.5"
+reqwest-middleware = "0.3.3"
+rattler_installs_packages = { version = "0.9.0", default-features = false, optional = true }
+async-once-cell = "0.5.4"
+terminal_size = "0.4.0"
+memchr = "2.7.4"
+ratatui = { version = "0.28.1", optional = true }
+crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
+ansi-to-tui = { version = "6.0.0", optional = true }
+throbber-widgets-tui = { version = "0.7", optional = true }
+tui-input = { version = "0.10.1", optional = true }
+reflink-copy = "0.1.19"
+rayon = "1.10.0"
+patch = "0.7.0"
+regex = "1.11.0"
+async-recursion = "1.1.1"
+
+# Rattler crates
+rattler = { version = "0.27.15", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler_cache = { version = "0.2.6", default-features = false }
+rattler_conda_types = { version = "0.28.2", default-features = false }
+rattler_digest = { version = "1.0.2", default-features = false, features = ["serde"] }
+rattler_index = { version = "0.19.32", default-features = false }
+rattler_networking = { version = "0.21.4", default-features = false }
+rattler_redaction = { version = "0.1.2" }
+rattler_repodata_gateway = { version = "0.21.17", default-features = false, features = ["gateway"] }
+rattler_shell = { version = "0.22.4", default-features = false, features = ["sysinfo"] }
+rattler_solve = { version = "1.1.0", default-features = false, features = ["resolvo", "serde"] }
+rattler_virtual_packages = { version = "1.1.7", default-features = false }
+rattler_package_streaming = { version = "0.22.10", default-features = false }
 
 [dev-dependencies]
-insta = { version = "1.36.1", features = ["yaml"] }
-rstest = "0.18.2"
-tracing-test = "0.2.4"
+insta = { version = "1.40.0", features = ["yaml"] }
+rstest = "0.23.0"
+tracing-test = "0.2.5"
 tracing-indicatif = "0.3.6"
 
 [profile.dev.package."*"]
@@ -128,19 +157,27 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
+[package.metadata.cross.target.powerpc64le-unknown-linux-gnu]
+pre-build = [
+    "dpkg --add-architecture $CROSS_DEB_ARCH",
+    "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
+]
+
 # [patch.crates-io]
-# rattler = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/mamba-org/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/mamba-org/rattler", branch = "main" }
+# rattler = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_index = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_networking = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_repodata_gateway = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_redaction = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_shell = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_solve = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
+# rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 
 # rattler = { path = "../rattler/crates/rattler" }
+# rattler_cache = { path = "../rattler/crates/rattler_cache" }
 # rattler_conda_types = { path = "../rattler/crates/rattler_conda_types" }
 # rattler_digest = { path = "../rattler/crates/rattler_digest" }
 # rattler_index = { path = "../rattler/crates/rattler_index" }
@@ -148,5 +185,6 @@ pre-build = [
 # rattler_repodata_gateway = { path = "../rattler/crates/rattler_repodata_gateway" }
 # rattler_shell = { path = "../rattler/crates/rattler_shell" }
 # rattler_solve = { path = "../rattler/crates/rattler_solve" }
+# rattler_redaction = { path = "../rattler/crates/rattler_redaction" }
 # rattler_virtual_packages = { path = "../rattler/crates/rattler_virtual_packages" }
 # rattler_package_streaming = { path = "../rattler/crates/rattler_package_streaming" }

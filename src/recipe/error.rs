@@ -152,10 +152,18 @@ pub enum ErrorKind {
     #[diagnostic(code(error::glob_parsing))]
     GlobParsing(#[from] globset::Error),
 
+    /// Error when parsing a regex.
+    #[diagnostic(code(error::glob_parsing))]
+    RegexParsing(#[from] regex::Error),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
     Other,
+
+    /// Error when parsing a field that is experimental only
+    #[diagnostic(code(error::experimental))]
+    ExperimentalOnly(String),
 }
 
 /// Partial error type, almost the same as the [`ParsingError`] but without the source string.
@@ -182,7 +190,7 @@ pub struct PartialParsingError {
     pub kind: ErrorKind,
 }
 
-// Implement Display for ErrorKind manually bacause [`marked_yaml::LoadError`] does not implement
+// Implement Display for ErrorKind manually because [`marked_yaml::LoadError`] does not implement
 // the way we want it.
 // CAUTION: Because of this impl, we cannot use `#[error()]` on the enum.
 impl fmt::Display for ErrorKind {
@@ -232,7 +240,7 @@ impl fmt::Display for ErrorKind {
             ErrorKind::InvalidValue((key, s)) => write!(f, "invalid value for `{key}`: `{s}`."),
             ErrorKind::MissingField(s) => write!(f, "missing field `{s}`"),
             ErrorKind::JinjaRendering(err) => {
-                write!(f, "failed to render Jinja expression: {}", err.kind())
+                write!(f, "failed to render Jinja expression: {}", err)
             }
             ErrorKind::IfSelectorConditionNotBool(err) => {
                 write!(f, "condition in `if` selector must be a boolean: {}", err)
@@ -240,7 +248,15 @@ impl fmt::Display for ErrorKind {
             ErrorKind::UrlParsing(err) => write!(f, "failed to parse URL: {}", err),
             ErrorKind::IntegerParsing(err) => write!(f, "failed to parse integer: {}", err),
             ErrorKind::SpdxParsing(err) => {
-                write!(f, "failed to parse SPDX license: {}", err.reason)
+                writeln!(f, "failed to parse SPDX license: {}", err.reason)?;
+                writeln!(
+                    f,
+                    "See <https://spdx.org/licenses> for the list of valid licenses."
+                )?;
+                write!(
+                    f,
+                    "Use 'LicenseRef-<MyLicense>' if you are using a custom license."
+                )
             }
             ErrorKind::MatchSpecParsing(err) => {
                 write!(f, "failed to parse match spec: {}", err)
@@ -252,7 +268,9 @@ impl fmt::Display for ErrorKind {
                 write!(f, "failed to parse entry point: {}", err)
             }
             ErrorKind::GlobParsing(err) => write!(f, "failed to parse glob: {}", err),
+            ErrorKind::RegexParsing(err) => write!(f, "failed to parse regex: {}", err),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
+            ErrorKind::ExperimentalOnly(s) => write!(f, "experimental only: `{}`.", s),
         }
     }
 }

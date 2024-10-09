@@ -367,7 +367,7 @@ mod tests {
                     }
                 }
             } else if actual.ne(&cmp) {
-                panic!("Expected {f} to be {cmp:?} but was {actual:?}");
+                panic!("Mismatch in {f}:\nExpected:\n  {cmp:?}{f}\nActual:\n  {actual:?}");
             }
         }
     }
@@ -461,31 +461,6 @@ mod tests {
         );
 
         assert!(rattler_build.status.code().unwrap() == 1);
-    }
-
-    #[test]
-    fn test_noarch_flask() {
-        let tmp = tmp("test_noarch_flask");
-        let rattler_build = rattler().build(recipes().join("flask"), tmp.as_dir(), None, None);
-
-        assert!(rattler_build.status.success());
-
-        let pkg = get_extracted_package(tmp.as_dir(), "flask");
-        // this is to ensure that the clone happens correctly
-        let license = pkg.join("info/licenses/LICENSE.rst");
-        assert!(license.exists());
-
-        assert!(pkg.join("info/tests/1/run_test.sh").exists());
-        assert!(pkg.join("info/tests/1/run_test.bat").exists());
-        assert!(pkg
-            .join("info/tests/1/test_time_dependencies.json")
-            .exists());
-
-        assert!(pkg.join("info/tests/0/python_test.json").exists());
-        // make sure that the entry point does not exist
-        assert!(!pkg.join("python-scripts/flask").exists());
-
-        assert!(pkg.join("info/link.json").exists())
     }
 
     #[test]

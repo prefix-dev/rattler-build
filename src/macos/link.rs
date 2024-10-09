@@ -1,5 +1,4 @@
 //! Relink a dylib to use relative paths for rpaths
-use globset::GlobSet;
 use goblin::mach::Mach;
 use memmap2::MmapMut;
 use scroll::Pread;
@@ -10,6 +9,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::post_process::relink::{RelinkError, Relinker};
+use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
 use crate::utils::to_lexical_absolute;
 
@@ -149,7 +149,7 @@ impl Relinker for Dylib {
         prefix: &Path,
         encoded_prefix: &Path,
         custom_rpaths: &[String],
-        rpath_allowlist: Option<&GlobSet>,
+        rpath_allowlist: &GlobVec,
         system_tools: &SystemTools,
     ) -> Result<(), RelinkError> {
         let mut changes = DylibChanges::default();
@@ -177,7 +177,7 @@ impl Relinker for Dylib {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
-                } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+                } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
                 }
@@ -203,7 +203,7 @@ impl Relinker for Dylib {
                 final_rpaths.push(new_rpath.clone());
                 // changes.change_rpath.insert(rpath.clone(), new_rpath);
                 // modified = true;
-            } else if rpath_allowlist.map(|g| g.is_match(rpath)).unwrap_or(false) {
+            } else if rpath_allowlist.is_match(rpath) {
                 tracing::info!("Allowlisted rpath: {}", rpath.display());
                 final_rpaths.push(rpath.clone());
             } else {
@@ -533,11 +533,11 @@ mod tests {
     use tempfile::tempdir_in;
 
     use super::{install_name_tool, RelinkError};
-    use crate::post_process::relink::Relinker;
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,
     };
+    use crate::{post_process::relink::Relinker, recipe::parser::GlobVec};
 
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
@@ -627,7 +627,7 @@ mod tests {
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
         let tmp_dir = tempdir_in(&prefix)?;
         let bin_dir = tmp_dir.path().join("bin");
-        fs::create_dir(&bin_dir)?;
+        fs::create_dir(bin_dir)?;
         let binary_path = tmp_dir.path().join("bin/zlink-relink-relative");
         fs::copy(prefix.join("zlink-macos"), &binary_path)?;
 
@@ -663,7 +663,7 @@ mod tests {
                 tmp_prefix,
                 &encoded_prefix,
                 &[],
-                None,
+                &GlobVec::default(),
                 &SystemTools::default(),
             )
             .unwrap();

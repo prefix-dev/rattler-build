@@ -1,6 +1,6 @@
 <h1>
   <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg">
+    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/43a2e357-6ab3-40f9-8e3f-45d59658ce94">
   </a>
 </h1>
 
@@ -16,7 +16,7 @@
 [build]: https://github.com/prefix-dev/rattler-build/actions/
 [chat-badge]: https://img.shields.io/discord/1082332781146800168.svg?label=&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2&style=flat-square
 [chat-url]: https://discord.gg/kKV8ZxyzY4
-[pixi-badge]:https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json
+[pixi-badge]:https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/prefix-dev/pixi/main/assets/badge/v0.json&style=flat-square
 [pixi-url]: https://pixi.sh
 
 </h1>
@@ -31,7 +31,7 @@ run is a package that can be installed using `mamba`, `rattler` or `conda`.
 `rattler-build` does not have any dependencies on `conda-build` or Python and
 works as a standalone binary.
 
-![](https://user-images.githubusercontent.com/885054/244683824-fd1b3896-84c7-498c-b406-40ab2a9e450c.svg)
+![](https://github.com/prefix-dev/rattler-build/assets/885054/98377399-aae4-45a5-a4e9-982a3c7b2d50)
 
 ### Installation
 

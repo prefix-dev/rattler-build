@@ -37,6 +37,16 @@ build:
     - false
   noarch: generic
   merge_build_and_host_envs: true
+  files:
+    include:
+      - include/*
+      - "**/foo.txt"
+      - x.txt
+      - out/**
+    exclude:
+      - foo/*
+      - bar.txt
+      - baz/
   script:
     env:
       TEST: MYENV_VAR
@@ -86,6 +96,12 @@ build:
         - bla/*.so
     ignore: true
     ignore_binary_files: true
+  post_process:
+    - regex: "complicated(.*)regex"
+      replacement: "simple_string"
+      files:
+        - "*.cmake"
+        - "bla/"
 
 requirements:
   build:
@@ -96,6 +112,8 @@ requirements:
   run:
     - python >=3.11
     - perl
+    - ${{ pin_subpackage('test', exact=True) }}
+    - ${{ pin_subpackage('test', build="foo*") }}
   run_constraints:
     - python * *cpython
   run_exports:
@@ -115,6 +133,41 @@ requirements:
     by_name:
       - python
 
+tests:
+  - script: |
+      echo FOO
+    requirements:
+      run:
+        - bash
+      build:
+        - bash
+    files:
+      source:
+        - include/
+        - src/*.c
+        - src_file.txt
+  - package_contents:
+      lib:
+        - test
+        - test.so.*
+      include:
+        - test.h
+        - test.h*
+      bin:
+        - test
+        - test.exe
+        - foo*
+      site_packages: 
+        - numpy
+        - numpy/foo/__init__.py
+      files:
+        - test.txt
+        - license.txt
+  - python:
+      imports:
+        - numpy
+        - pypy
+      pip_check: false
 
 about:
   homepage: https://cool-website.com

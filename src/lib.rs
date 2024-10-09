@@ -3,6 +3,7 @@
 //! rattler-build library.
 
 pub mod build;
+pub mod cache;
 pub mod console_utils;
 pub mod metadata;
 pub mod opt;
@@ -21,49 +22,49 @@ pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
 
+mod consts;
 mod env_vars;
 pub mod hash;
 mod linux;
 mod macos;
 mod post_process;
 pub mod rebuild;
+#[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
 mod unix;
 pub mod upload;
 mod windows;
 
-use dunce::canonicalize;
-use fs_err as fs;
-use metadata::Output;
-use miette::IntoDiagnostic;
-use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Platform};
 use std::{
     collections::{BTreeMap, HashMap},
     env::current_dir,
     path::{Path, PathBuf},
-    str::FromStr,
     sync::{Arc, Mutex},
 };
-use tool_configuration::Configuration;
 
-use {
-    build::run_build,
-    console_utils::LoggingOutputHandler,
-    hash::HashInfo,
-    metadata::{
-        BuildConfiguration, BuildSummary, Directories, PackageIdentifier, PackagingSettings,
-    },
-    opt::*,
-    package_test::TestConfiguration,
-    recipe::{
-        parser::{find_outputs_from_src, Recipe},
-        ParsingError,
-    },
-    selectors::SelectorConfig,
-    system_tools::SystemTools,
-    variant_config::{ParseErrors, VariantConfig},
+use build::{run_build, skip_existing};
+use console_utils::LoggingOutputHandler;
+use dunce::canonicalize;
+use fs_err as fs;
+use futures::FutureExt;
+use hash::HashInfo;
+use metadata::{
+    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
 };
+use miette::IntoDiagnostic;
+use opt::*;
+use package_test::TestConfiguration;
+use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use rattler_conda_types::{package::ArchiveType, Channel, Platform};
+use rattler_solve::{ChannelPriority, SolveStrategy};
+use recipe::{
+    parser::{find_outputs_from_src, Dependency, Recipe},
+    ParsingError,
+};
+use selectors::SelectorConfig;
+use system_tools::SystemTools;
+use tool_configuration::Configuration;
+use variant_config::{ParseErrors, VariantConfig};
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -113,24 +114,27 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
 pub fn get_tool_config(
     args: &BuildOpts,
     fancy_log_handler: &LoggingOutputHandler,
-) -> Configuration {
+) -> miette::Result<Configuration> {
     let client =
-        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone());
-    Configuration {
-        client,
-        fancy_log_handler: fancy_log_handler.clone(),
-        no_clean: args.keep_build,
-        no_test: args.no_test,
-        use_zstd: args.common.use_zstd,
-        use_bz2: args.common.use_bz2,
-        render_only: args.render_only,
-    }
+        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone())
+            .into_diagnostic()?;
+
+    Ok(Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler.clone())
+        .with_keep_build(args.keep_build)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(client)
+        .with_testing(!args.no_test)
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .with_skip_existing(args.skip_existing)
+        .finish())
 }
 
 /// Returns the output for the build.
 pub async fn get_build_output(
     args: &BuildOpts,
-    recipe_path: PathBuf,
+    recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
     let mut output_dir = args
@@ -151,31 +155,76 @@ pub async fn get_build_output(
         , output_dir.to_string_lossy()));
     }
 
-    let recipe_text = fs::read_to_string(&recipe_path).into_diagnostic()?;
+    let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
 
-    let host_platform = if let Some(target_platform) = &args.target_platform {
-        Platform::from_str(target_platform).into_diagnostic()?
-    } else {
-        Platform::current()
-    };
+    if args.target_platform == Some(Platform::NoArch) || args.build_platform == Platform::NoArch {
+        return Err(miette::miette!(
+            "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
+        ));
+    }
+
+    let mut host_platform = args.host_platform;
+    // If target_platform is not set, we default to the host platform
+    let target_platform = args.target_platform.unwrap_or(host_platform);
+    // If target_platform is set and host_platform is not, then we default host_platform to the target_platform
+    if let Some(target_platform) = args.target_platform {
+        // Check if `host_platform` is set by looking at the args (not ideal)
+        let host_platform_set = std::env::args().any(|arg| arg.starts_with("--host-platform"));
+        if !host_platform_set {
+            host_platform = target_platform
+        }
+    }
+
+    tracing::debug!(
+        "Platforms: build: {}, host: {}, target: {}",
+        args.build_platform,
+        host_platform,
+        target_platform
+    );
 
     let selector_config = SelectorConfig {
         // We ignore noarch here
-        target_platform: host_platform,
+        target_platform,
+        host_platform,
         hash: None,
-        build_platform: Platform::current(),
+        build_platform: args.build_platform,
         variant: BTreeMap::new(),
         experimental: args.common.experimental,
+        // allow undefined while finding the variants
+        allow_undefined: true,
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
-    tracing::info!("Target platform: {}", host_platform);
     let enter = span.enter();
+
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
 
+    // Check if there is a `variants.yaml` file next to the recipe that we should
+    // potentially use.
+    let mut variant_configs = None;
+    if let Some(variant_path) = recipe_path
+        .parent()
+        .map(|parent| parent.join(consts::VARIANTS_CONFIG_FILE))
+    {
+        if variant_path.is_file() {
+            if !args.ignore_recipe_variants {
+                tracing::info!("Including variants from {}", variant_path.display());
+                let mut configs = args.variant_config.clone();
+                configs.push(variant_path);
+                variant_configs = Some(configs);
+            } else {
+                tracing::debug!(
+                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
+                    variant_path.display()
+                );
+            }
+        }
+    };
+    let variant_configs = variant_configs.as_ref().unwrap_or(&args.variant_config);
+
     let variant_config =
-        VariantConfig::from_files(&args.variant_config, &selector_config).into_diagnostic()?;
+        VariantConfig::from_files(variant_configs, &selector_config).into_diagnostic()?;
 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
@@ -211,8 +260,10 @@ pub async fn get_build_output(
             variant: discovered_output.used_vars.clone(),
             hash: Some(hash.clone()),
             target_platform: selector_config.target_platform,
+            host_platform: selector_config.host_platform,
             build_platform: selector_config.build_platform,
             experimental: args.common.experimental,
+            allow_undefined: false,
         };
 
         let recipe =
@@ -237,21 +288,25 @@ pub async fn get_build_output(
             recipe.package().name().clone(),
             PackageIdentifier {
                 name: recipe.package().name().clone(),
-                version: recipe.package().version().to_owned(),
+                version: recipe.package().version().version().clone(),
                 build_string: recipe
                     .build()
                     .string()
-                    .expect("Shouldn't be unset, needs major refactoring, for handling this better")
-                    .to_owned(),
+                    .resolve(&hash, recipe.build().number())
+                    .into_owned(),
             },
         );
 
         let name = recipe.package().name().clone();
         // Add the channels from the args and by default always conda-forge
+
         let channels = args
             .channel
             .clone()
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]);
+            .into_iter()
+            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .collect::<Result<Vec<_>, _>>()
+            .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
 
@@ -260,42 +315,43 @@ pub async fn get_build_output(
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform,
-                build_platform: Platform::current(),
+                build_platform: args.build_platform,
                 hash,
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
                     name.as_normalized(),
-                    &recipe_path,
+                    recipe_path,
                     &output_dir,
                     args.no_build_id,
                     &timestamp,
                 )
                 .into_diagnostic()?,
                 channels,
+                channel_priority: ChannelPriority::Strict,
+                solve_strategy: SolveStrategy::Highest,
                 timestamp,
                 subpackages: subpackages.clone(),
                 packaging_settings: PackagingSettings::from_args(
                     args.package_format.archive_type,
                     args.package_format.compression_level,
-                    args.compression_threads,
                 ),
                 store_recipe: !args.no_include_recipe,
                 force_colors: args.color_build_log && console::colors_enabled(),
             },
             finalized_dependencies: None,
+            finalized_cache_dependencies: None,
             finalized_sources: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
+            extra_meta: Some(
+                args.extra_meta
+                    .clone()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
+            ),
         };
 
-        if args.render_only {
-            let output_with_resolved_dependencies = output
-                .resolve_dependencies(tool_config)
-                .await
-                .into_diagnostic()?;
-            outputs.push(output_with_resolved_dependencies);
-            continue;
-        }
         outputs.push(output);
     }
 
@@ -308,8 +364,9 @@ pub async fn run_build_from_args(
     tool_config: Configuration,
 ) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
-    for output in build_output {
-        let output = match run_build(output, &tool_config).await {
+
+    for output in skip_existing(build_output, &tool_config).await? {
+        let output = match run_build(output, &tool_config).boxed_local().await {
             Ok((output, _archive)) => {
                 output.record_build_end();
                 output
@@ -341,24 +398,38 @@ pub async fn run_test_from_args(
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
+
+    let tool_config = Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler)
+        .with_keep_build(true)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(
+            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+                .into_diagnostic()?,
+        )
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .finish();
+
+    let channels = args
+        .channel
+        .unwrap_or_else(|| vec!["conda-forge".to_string()])
+        .into_iter()
+        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
+        .collect::<Result<Vec<_>, _>>()
+        .into_diagnostic()?;
 
     let tempdir = tempfile::tempdir().into_diagnostic()?;
 
     let test_options = TestConfiguration {
         test_prefix: tempdir.path().to_path_buf(),
         target_platform: None,
+        host_platform: None,
         keep_test_prefix: false,
-        channels: args
-            .channel
-            .unwrap_or_else(|| vec!["conda-forge".to_string()]),
-        tool_configuration: Configuration {
-            client,
-            fancy_log_handler,
-            // duplicate from `keep_test_prefix`?
-            no_clean: false,
-            ..Default::default()
-        },
+        channels,
+        channel_priority: ChannelPriority::Strict,
+        solve_strategy: SolveStrategy::Highest,
+        tool_configuration: tool_config,
     };
 
     let package_name = package_file
@@ -367,9 +438,9 @@ pub async fn run_test_from_args(
         .to_string_lossy()
         .to_string();
 
-    let span = tracing::info_span!("Running tests for ", recipe = %package_name);
+    let span = tracing::info_span!("Running tests for", package = %package_name);
     let _enter = span.enter();
-    package_test::run_test(&package_file, &test_options)
+    package_test::run_test(&package_file, &test_options, None)
         .await
         .into_diagnostic()?;
 
@@ -383,7 +454,8 @@ pub async fn rebuild_from_args(
 ) -> miette::Result<()> {
     tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
-    // and then run the rendered recipe with the same arguments as the original build
+    // and then run the rendered recipe with the same arguments as the original
+    // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
     rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
@@ -410,17 +482,18 @@ pub async fn rebuild_from_args(
     output.build_configuration.directories.output_dir =
         canonicalize(output_dir).into_diagnostic()?;
 
-    let client = tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file);
-
-    let tool_config = tool_configuration::Configuration {
-        client,
-        fancy_log_handler,
-        no_clean: true,
-        no_test: args.no_test,
-        use_zstd: args.common.use_zstd,
-        use_bz2: args.common.use_bz2,
-        render_only: false,
-    };
+    let tool_config = Configuration::builder()
+        .with_logging_output_handler(fancy_log_handler)
+        .with_keep_build(true)
+        .with_compression_threads(args.compression_threads)
+        .with_reqwest_client(
+            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+                .into_diagnostic()?,
+        )
+        .with_testing(!args.no_test)
+        .with_zstd_repodata_enabled(args.common.use_zstd)
+        .with_bz2_repodata_enabled(args.common.use_zstd)
+        .finish();
 
     output
         .build_configuration
@@ -448,7 +521,7 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
         }
     }
 
-    let store = tool_configuration::get_auth_store(args.common.auth_file);
+    let store = tool_configuration::get_auth_store(args.common.auth_file).into_diagnostic()?;
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {
@@ -527,12 +600,12 @@ pub fn sort_build_outputs_topologically(
             .expect("We just inserted it");
         for dep in output.recipe.requirements().all() {
             let dep_name = match dep {
-                recipe::parser::Dependency::Spec(spec) => {
-                    spec.name.clone().expect("We should always have a name")
-                }
-                recipe::parser::Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
-                recipe::parser::Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
-                recipe::parser::Dependency::Compiler(_) => continue,
+                Dependency::Spec(spec) => spec
+                    .name
+                    .clone()
+                    .expect("MatchSpec should always have a name"),
+                Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
+                Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
             };
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 // do not point to self (circular dependency) - this can happen with
@@ -547,12 +620,12 @@ pub fn sort_build_outputs_topologically(
 
     let sorted_indices = if let Some(up_to) = up_to {
         // Find the node index for the "up-to" package
-        let up_to_index = name_to_index
-            .get(up_to)
-            .copied()
-            .expect("Up-to package not found");
+        let up_to_index = name_to_index.get(up_to).copied().ok_or_else(|| {
+            miette::miette!("The package '{}' was not found in the outputs", up_to)
+        })?;
 
-        // Perform a DFS post-order traversal from the "up-to" node to find all dependencies
+        // Perform a DFS post-order traversal from the "up-to" node to find all
+        // dependencies
         let mut dfs = DfsPostOrder::new(&graph, up_to_index);
         let mut sorted_indices = Vec::new();
         while let Some(nx) = dfs.next(&graph) {
@@ -562,7 +635,11 @@ pub fn sort_build_outputs_topologically(
         sorted_indices
     } else {
         // Perform topological sort
-        let mut sorted_indices = toposort(&graph, None).unwrap();
+        let mut sorted_indices = toposort(&graph, None).map_err(|cycle| {
+            let node = cycle.node_id();
+            let name = outputs[node.index()].name();
+            miette::miette!("Cycle detected in dependencies: {}", name.as_source())
+        })?;
         sorted_indices.reverse();
         sorted_indices
     };
@@ -571,7 +648,7 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|idx| &outputs[idx.index()])
         .for_each(|output| {
-            tracing::info!("Ordered output: {:?}", output.name().as_normalized());
+            tracing::debug!("Ordered output: {:?}", output.name().as_normalized());
         });
 
     // Reorder outputs based on the sorted indices

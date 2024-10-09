@@ -1,6 +1,6 @@
 <h1>
   <a href="https://github.com/prefix-dev/rattler-build/">
-    <img alt="banner" src="https://user-images.githubusercontent.com/885054/244679299-f7dbf3a4-fcfd-46cd-b619-720848790c9e.svg">
+    <img alt="banner" src="https://github.com/prefix-dev/rattler-build/assets/885054/3bad9a38-939d-4513-8c61-dcc4ddb7fb51">
   </a>
 </h1>
 
@@ -18,30 +18,100 @@ works as a standalone binary.
 
 ### Installation
 
-You can grab a prerelease version of `rattler-build` from the [Github
-Releases](https://github.com/prefix-dev/rattler-build/releases/).
+The recommended way of installing `rattler-build`, being a conda-package builder, is through a conda package manager.
+Next to `rattler-build` we are also building [`pixi`](https://pixi.sh).
 
-It is (of course) also available from conda-forge:
+With `pixi` you can install `rattler-build` globally:
 
 ```bash
 pixi global install rattler-build
-# or with micromamba
-micromamba install rattler-build -c conda-forge
 ```
 
-Alternatively, you can install `rattler-build` via Homebrew:
+Other options are:
+=== "Conda"
+    ```shell
+    conda install rattler-build -c conda-forge
 
+    mamba install rattler-build -c conda-forge
+    micromamba install rattler-build -c conda-forge
+
+    pixi global install rattler-build
+    pixi add rattler-build # To a pixi project
+    ```
+
+=== "Homebrew"
+    ```shell
+    brew install rattler-build
+    ```
+=== "Arch Linux"
+    ```shell
+    pacman -S rattler-build
+    ```
+=== "Binary"
+    ```shell
+    # Download the latest release from the GitHub releases page, for example the linux x86 version with curl:
+    curl -SL --progress-bar https://github.com/prefix-dev/rattler-build/releases/latest/download/rattler-build-x86_64-unknown-linux-musl
+    ```
+    You can grab version of `rattler-build` from the [Github
+    Releases](https://github.com/prefix-dev/rattler-build/releases/).
+
+### Completion
+
+When installing `rattler-build` you might want to enable shell completion.
+Afterwards, restart the shell or source the shell config file.
+
+### Bash (default on most Linux systems)
+
+```bash
+echo 'eval "$(rattler-build completion --shell bash)"' >> ~/.bashrc
 ```
-brew install rattler-build
+### Zsh (default on macOS)
+
+```zsh
+echo 'eval "$(rattler-build completion --shell zsh)"' >> ~/.zshrc
 ```
 
-`rattler-build` is also available on Arch Linux in the [extra repository](https://archlinux.org/packages/extra/x86_64/rattler-build/):
+### PowerShell (pre-installed on all Windows systems)
 
-```
-pacman -S rattler-build
+```pwsh
+Add-Content -Path $PROFILE -Value '(& rattler-build completion --shell powershell) | Out-String | Invoke-Expression'
 ```
 
-#### Dependencies
+!!! tip "Failure because no profile file exists"
+    Make sure your profile file exists, otherwise create it with:
+    ```PowerShell
+    New-Item -Path $PROFILE -ItemType File -Force
+    ```
+
+
+### Fish
+
+```fish
+echo 'rattler-build completion --shell fish | source' >> ~/.config/fish/config.fish
+```
+
+### Nushell
+
+Add the following to the end of your Nushell env file (find it by running `$nu.env-path` in Nushell):
+
+```nushell
+mkdir ~/.cache/rattler-build
+rattler-build completion --shell nushell | save -f ~/.cache/rattler-build/completions.nu
+```
+
+And add the following to the end of your Nushell configuration (find it by running `$nu.config-path`):
+
+```nushell
+use ~/.cache/rattler-build/completions.nu *
+```
+
+### Elvish
+
+```elv
+echo 'eval (rattler-build completion --shell elvish | slurp)' >> ~/.elvish/rc.elv
+```
+
+### Dependencies
 
 Currently `rattler-build` needs some dependencies on the host system which are
 executed as subprocess. We plan to reduce the number of external dependencies
@@ -64,22 +134,10 @@ self-contained.
 On Windows, to obtain these dependencies from conda-forge, one can install
 `m2-patch`, `m2-bzip2`, `m2-gzip`, `m2-tar`.
 
-### Documentation
-
-We have extensive documentation for `rattler-build`. You can find the [book
-here](https://prefix-dev.github.io/rattler-build).
 
 ### GitHub Action
 
 There is a GitHub Action for `rattler-build`. It can be used to install `rattler-build` in CI/CD workflows and run a build command. Please check out the [GitHub Action documentation](https://github.com/prefix-dev/rattler-build-action) for more information.
-
-### Usage
-
-`rattler-build` comes with two commands: `build` and `test`.
-
-The `build` command takes a `--recipe recipe.yaml` as input and produces a
-package as output. The `test` subcommand can be used to test existing packages
-(tests are shipped with the package).
 
 ### The recipe format
 

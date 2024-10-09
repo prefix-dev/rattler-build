@@ -1,16 +1,20 @@
 //! This is the main entry point for the `rattler-build` binary.
 
+use std::{
+    fs::File,
+    io::{self, IsTerminal},
+};
+
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
     get_build_output, get_recipe_path, get_tool_config,
     opt::{App, ShellCompletion, SubCommands},
-    rebuild_from_args,
-    recipe_generator::generate_recipe,
-    render::resolved_dependencies::FinalizedDependencies,
-    run_build_from_args, run_test_from_args, sort_build_outputs_topologically, upload_from_args,
+    rebuild_from_args, run_build_from_args, run_test_from_args, sort_build_outputs_topologically,
+    upload_from_args,
 };
+use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
@@ -32,6 +36,7 @@ async fn main() -> miette::Result<()> {
         #[cfg(feature = "tui")]
         None
     };
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
@@ -43,27 +48,44 @@ async fn main() -> miette::Result<()> {
                     &mut std::io::stdout(),
                 );
             }
-            let shell = shell
-                .or(clap_complete::Shell::from_env())
-                .unwrap_or(clap_complete::Shell::Bash);
+
             print_completions(shell, &mut cmd);
             Ok(())
         }
         Some(SubCommands::Build(build_args)) => {
             let mut recipe_paths = Vec::new();
-            for recipe_path in &build_args.recipe {
-                recipe_paths.push(get_recipe_path(recipe_path)?);
-            }
-            if let Some(recipe_dir) = &build_args.recipe_dir {
-                for entry in ignore::Walk::new(recipe_dir) {
-                    let entry = entry.into_diagnostic()?;
-                    if entry.path().is_dir() {
-                        if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                            recipe_paths.push(recipe_path);
+            let temp_dir = tempdir().into_diagnostic()?;
+            if !std::io::stdin().is_terminal()
+                && build_args.recipe.len() == 1
+                && get_recipe_path(&build_args.recipe[0]).is_err()
+            {
+                let recipe_path = temp_dir.path().join("recipe.yaml");
+                io::copy(
+                    &mut io::stdin(),
+                    &mut File::create(&recipe_path).into_diagnostic()?,
+                )
+                .into_diagnostic()?;
+                recipe_paths.push(get_recipe_path(&recipe_path)?);
+            } else {
+                for recipe_path in &build_args.recipe {
+                    recipe_paths.push(get_recipe_path(recipe_path)?);
+                }
+                if let Some(recipe_dir) = &build_args.recipe_dir {
+                    for entry in ignore::Walk::new(recipe_dir) {
+                        let entry = entry.into_diagnostic()?;
+                        if entry.path().is_dir() {
+                            if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                                recipe_paths.push(recipe_path);
+                            }
                         }
                     }
                 }
             }
+
+            if recipe_paths.is_empty() {
+                miette::bail!("Couldn't detect any recipes.")
+            }
+
             if build_args.tui {
                 #[cfg(feature = "tui")]
                 {
@@ -79,22 +101,32 @@ async fn main() -> miette::Result<()> {
                 }
             } else {
                 let log_handler = log_handler.expect("logger is not initialized");
-                let tool_config = get_tool_config(&build_args, &log_handler);
+                let tool_config = get_tool_config(&build_args, &log_handler)?;
                 let mut outputs = Vec::new();
                 for recipe_path in &recipe_paths {
-                    let output =
-                        get_build_output(&build_args, recipe_path.clone(), &tool_config).await?;
+                    let output = get_build_output(&build_args, recipe_path, &tool_config).await?;
                     outputs.extend(output);
                 }
 
                 if build_args.render_only {
-                    let render_output: Vec<FinalizedDependencies> = outputs
-                        .into_iter()
-                        .flat_map(|output| output.finalized_dependencies)
-                        .collect();
+                    let outputs = if build_args.with_solve {
+                        let mut updated_outputs = Vec::new();
+                        for output in outputs {
+                            updated_outputs.push(
+                                output
+                                    .resolve_dependencies(&tool_config)
+                                    .await
+                                    .into_diagnostic()?,
+                            );
+                        }
+                        updated_outputs
+                    } else {
+                        outputs
+                    };
+
                     println!(
                         "{}",
-                        serde_json::to_string_pretty(&render_output).into_diagnostic()?
+                        serde_json::to_string_pretty(&outputs).into_diagnostic()?
                     );
                     return Ok(());
                 }
@@ -115,7 +147,10 @@ async fn main() -> miette::Result<()> {
             .await
         }
         Some(SubCommands::Upload(upload_args)) => upload_from_args(upload_args).await,
-        Some(SubCommands::GenerateRecipe(args)) => generate_recipe(args).await,
+        #[cfg(feature = "recipe-generation")]
+        Some(SubCommands::GenerateRecipe(args)) => {
+            rattler_build::recipe_generator::generate_recipe(args).await
+        }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         None => {
             _ = App::command().print_long_help();

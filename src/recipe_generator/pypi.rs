@@ -1,22 +1,47 @@
 use async_once_cell::OnceCell;
+use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
+use rattler_installs_packages::python_env::Pep508EnvMakers;
+use rattler_installs_packages::resolve::solve_options::ResolveOptions;
 use rattler_installs_packages::types::{ArtifactFromSource, Requirement, VersionOrUrl};
+use rattler_installs_packages::wheel_builder::WheelBuilder;
 use rattler_installs_packages::{
     artifacts::SDist,
     index::{ArtifactRequest, PackageDb, PackageSources},
     types::{ArtifactName, NormalizedPackageName},
 };
 use serde::Deserialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{collections::HashMap, str::FromStr};
 use tokio::io::AsyncWriteExt;
 
 use crate::recipe_generator::serialize;
 
+use super::write_recipe;
+
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
     conda_name: String,
     pypi_name: String,
+}
+
+#[derive(Debug, Clone, Parser)]
+pub struct PyPIOpts {
+    /// Name of the package to generate
+    pub package: String,
+
+    /// Whether to write the recipe to a folder
+    #[arg(short, long)]
+    pub write: bool,
+
+    /// Whether to use the conda-forge PyPI name mapping
+    #[arg(short, long, default_value = "true")]
+    pub use_mapping: bool,
+
+    /// Whether to generate recipes for all dependencies
+    #[arg(short, long)]
+    pub tree: bool,
 }
 
 /// Downloads and caches the conda-forge conda-to-pypi name mapping.
@@ -50,15 +75,19 @@ async fn download_sdist(url: &url::Url, dest: &Path) -> miette::Result<()> {
     Ok(())
 }
 
-async fn pypi_requirement(req: &Requirement) -> miette::Result<String> {
+async fn pypi_requirement(req: &Requirement, use_mapping: bool) -> miette::Result<String> {
     let mut res = req.name.clone().to_lowercase();
 
     // check if the name is in the conda-forge pypi name mapping
-    let mapping = conda_pypi_name_mapping()
-        .await
-        .wrap_err("failed to get conda-pypi name mapping")?;
-    if let Some(conda_name) = mapping.get(&req.name) {
-        res = conda_name.clone();
+    if use_mapping {
+        let mapping = conda_pypi_name_mapping()
+            .await
+            .wrap_err("failed to get conda-pypi name mapping")?;
+
+        if let Some(conda_name) = mapping.get(&req.name) {
+            // reinit the result with the mapped conda name
+            res = conda_name.clone();
+        }
     }
 
     if let Some(VersionOrUrl::VersionSpecifier(version)) = &req.version_or_url {
@@ -71,15 +100,27 @@ async fn pypi_requirement(req: &Requirement) -> miette::Result<String> {
     Ok(res)
 }
 
-pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
+#[async_recursion::async_recursion]
+pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
+    eprintln!("Generating recipe for {}", opts.package);
+
+    let package = &opts.package;
     let client = reqwest::Client::new();
     let client_with_middlewares = reqwest_middleware::ClientBuilder::new(client).build();
     let package_sources =
         PackageSources::from(url::Url::parse("https://pypi.org/simple/").unwrap());
     let tempdir = tempfile::tempdir().into_diagnostic()?;
     let artifact_request = ArtifactRequest::FromIndex(NormalizedPackageName::from_str(package)?);
-    let package_db = PackageDb::new(package_sources, client_with_middlewares, tempdir.path())?;
+
+    // keep tempdir
+    let tempdir_path = tempdir.into_path();
+    let package_db = Arc::new(PackageDb::new(
+        package_sources,
+        client_with_middlewares,
+        &tempdir_path.join("pkg-db"),
+    )?);
     let artifacts = package_db.available_artifacts(artifact_request).await?;
+
     // find first artifact or bail out
     let first_artifact = artifacts
         .into_iter()
@@ -92,8 +133,17 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         .find(|artifact| matches!(artifact.filename, ArtifactName::SDist(_)))
         .ok_or_else(|| miette::miette!("No source distribution found for {}", package))?;
 
+    let env_markers = Arc::new(Pep508EnvMakers::from_env().await.unwrap().0);
+    let wheel_builder = WheelBuilder::new(
+        package_db.clone(),
+        env_markers,
+        None,
+        ResolveOptions::default(),
+    )
+    .unwrap();
+
     let metadata = package_db
-        .get_metadata(first_artifact.1, None)
+        .get_metadata(first_artifact.1, Some(&wheel_builder))
         .await?
         .ok_or_else(|| miette::miette!("No metadata found for {}", package))?;
 
@@ -116,10 +166,7 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         md5: None,
     });
 
-    // find package build time deps...
-    let tempdir = tempfile::tempdir().into_diagnostic()?;
-
-    // downlaod the sdist
+    // Download the sdist
     let filename = source_dist.url.to_string();
     let filename = filename.split('/').last().unwrap();
     // split off everything after the #
@@ -128,37 +175,48 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         .map(|(fname, _)| fname)
         .unwrap_or(filename);
 
-    let sdist_path = tempdir.path().join(filename);
+    let sdist_path = tempdir_path.join(filename);
     download_sdist(&source_dist.url, &sdist_path)
         .await
         .wrap_err("failed to download sdist")?;
 
-    let sdist =
-        SDist::from_path(&sdist_path, &NormalizedPackageName::from(metadata.1.name)).unwrap();
+    // get the metadata
+    let wheel_metadata = metadata.1;
+    let sdist = SDist::from_path(
+        &sdist_path,
+        &NormalizedPackageName::from(wheel_metadata.name),
+    )
+    .unwrap();
 
-    let pyproject_toml = sdist.read_pyproject_toml().into_diagnostic()?;
+    let pyproject_toml = sdist.read_pyproject_toml().ok();
     let (_, mut pkg_info) = sdist.read_package_info().into_diagnostic()?;
 
-    println!("{:?}", pyproject_toml);
-
-    for req in pyproject_toml.build_system.unwrap().requires {
-        recipe.requirements.host.push(pypi_requirement(&req).await?);
-    }
-    if let Some(project) = pyproject_toml.project {
-        if let Some(scripts) = project.scripts {
-            recipe.build.python.entry_points = scripts
-                .iter()
-                .map(|(k, v)| format!("{} = {}", k, v))
-                .collect();
+    if let Some(pyproject_toml) = pyproject_toml {
+        if let Some(build_system) = pyproject_toml.build_system {
+            for req in build_system.requires {
+                recipe
+                    .requirements
+                    .host
+                    .push(pypi_requirement(&req, opts.use_mapping).await?);
+            }
         }
-        // recipe.about.license_file = project.license_files.map(|p| p.join(", "));
-        if let Some(urls) = project.urls {
-            recipe.about.repository = urls.get("Source Code").map(|s| s.to_string());
-            recipe.about.documentation = urls.get("Documentation").map(|s| s.to_string());
+
+        if let Some(project) = pyproject_toml.project {
+            if let Some(scripts) = project.scripts {
+                recipe.build.python.entry_points = scripts
+                    .iter()
+                    .map(|(k, v)| format!("{} = {}", k, v))
+                    .collect();
+            }
+            // recipe.about.license_file = project.license_files.map(|p| p.join(", "));
+            if let Some(urls) = project.urls {
+                recipe.about.repository = urls.get("Source Code").map(|s| s.to_string());
+                recipe.about.documentation = urls.get("Documentation").map(|s| s.to_string());
+            }
         }
     }
 
-    if let Some(python_req) = metadata.1.requires_python.as_ref() {
+    if let Some(python_req) = wheel_metadata.requires_python.as_ref() {
         recipe
             .requirements
             .host
@@ -172,8 +230,11 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
     }
     recipe.requirements.host.push("pip".to_string());
 
-    for pkg in metadata.1.requires_dist {
-        recipe.requirements.run.push(pypi_requirement(&pkg).await?);
+    let mut requirements = Vec::new();
+    for pkg in wheel_metadata.requires_dist {
+        let conda_name = pypi_requirement(&pkg, opts.use_mapping).await?;
+        recipe.requirements.run.push(conda_name.clone());
+        requirements.push(conda_name);
     }
 
     recipe.build.script = "python -m pip install .".to_string();
@@ -197,7 +258,24 @@ pub async fn generate_pypi_recipe(package: &str) -> miette::Result<()> {
         res.push('\n');
     }
 
-    print!("{}", res);
+    if opts.write {
+        write_recipe(package, &res).into_diagnostic()?;
+    } else {
+        print!("{}", res);
+    }
+
+    if opts.tree {
+        for dep in requirements {
+            let dep = dep.split_whitespace().next().unwrap();
+            if !PathBuf::from(dep).exists() {
+                let opts = PyPIOpts {
+                    package: dep.to_string(),
+                    ..opts.clone()
+                };
+                generate_pypi_recipe(&opts).await?;
+            }
+        }
+    }
 
     Ok(())
 }

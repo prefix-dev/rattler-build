@@ -1,6 +1,5 @@
 use content_inspector::ContentType;
 use fs_err as fs;
-use globset::GlobSet;
 use rattler_conda_types::PrefixRecord;
 use std::{
     collections::{HashMap, HashSet},
@@ -10,7 +9,7 @@ use std::{
 use tempfile::TempDir;
 use walkdir::WalkDir;
 
-use crate::metadata::Output;
+use crate::{metadata::Output, recipe::parser::GlobVec};
 
 use super::{file_mapper, PackagingError};
 
@@ -38,6 +37,8 @@ pub struct TempFiles {
     content_type_map: HashMap<PathBuf, Option<ContentType>>,
 }
 
+/// Determine the content type of a path by reading the first 1024 bytes of the file
+/// and checking for a BOM or NULL-byte.
 pub fn content_type(path: &Path) -> Result<Option<ContentType>, io::Error> {
     if path.is_dir() || path.is_symlink() {
         return Ok(None);
@@ -65,7 +66,11 @@ impl Files {
     /// Find all files in the given (host) prefix and remove all previously installed files (based on the PrefixRecord
     /// of the conda environment). If always_include is Some, then all files matching the glob pattern will be included
     /// in the new_files set.
-    pub fn from_prefix(prefix: &Path, always_include: Option<&GlobSet>) -> Result<Self, io::Error> {
+    pub fn from_prefix(
+        prefix: &Path,
+        always_include: &GlobVec,
+        files: &GlobVec,
+    ) -> Result<Self, io::Error> {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),
@@ -91,18 +96,22 @@ impl Files {
         };
 
         let current_files = record_files(prefix)?;
-
         let mut difference = current_files
             .difference(&previous_files)
+            // If we have an files glob, we only include files that match the glob
+            .filter(|f| {
+                files.is_empty()
+                    || files.is_match(f.strip_prefix(prefix).expect("File should be in prefix"))
+            })
             .cloned()
             .collect::<HashSet<_>>();
 
-        if let Some(always_include) = always_include {
+        if !always_include.is_empty() {
             for file in current_files {
                 let file_without_prefix =
                     file.strip_prefix(prefix).expect("File should be in prefix");
                 if always_include.is_match(file_without_prefix) {
-                    tracing::info!("Forcing inclusion of file: {:?}", file);
+                    tracing::info!("Forcing inclusion of file: {:?}", file_without_prefix);
                     difference.insert(file);
                 }
             }

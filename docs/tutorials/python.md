@@ -1,15 +1,14 @@
 # Writing a Python package
 
-Writing a Python package is fairly straightforward, especially for "Python-only"
-packages. But it becomes really interesting when compiled extensions are
-involved (we will look at this in the second example).
+Writing a Python package is fairly straightforward, especially for "Python-only" packages.
+In the second example we will build a package for `numpy` which contains compiled code.
 
-The following recipe uses the `noarch: python` setting to build a `noarch`
-package that can be installed on any platform without modification. This is very
-handy for packages that are pure Python and do not contain any compiled
-extensions. Additionally, `noarch: python` packages work with a range of Python
-versions (contrary to packages with compiled extensions that are tied to a
-specific Python version).
+## A Python-only package
+The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification.
+This is very handy for packages that are pure Python and do not contain any compiled extensions.
+
+Additionally, `noarch: python` packages work with a range of Python versions (contrary to packages with compiled extensions that are tied to a specific Python version).
+
 
 ```yaml title="recipe.yaml"
 context:
@@ -63,25 +62,31 @@ about:
 2. The `imports` section in the tests is used to check that the package is
    installed correctly and can be imported.
 
+### Running the recipe
+To build this recipe, simply run:
+
+```bash
+rattler-build build --recipe ./ipywidgets
+```
 
 ## A Python package with compiled extensions
 
-We will build a package for `numpy` – which most definitely contains compiled code.
-Since compiled code is `python` version-specific, we will need to specify the
-`python` version explictly. This is most easily done with a "variant config" file:
+We will build a package for `numpy` – which contains compiled code.
+Since compiled code is `python` version-specific, we will need to specify the `python` version explicitly.
+The best way to do this is with a "variant_config.yaml" file:
 
-```yaml title="variant_config.yaml"
+```yaml title="variants.yaml"
 python:
   - 3.11
   - 3.12
 ```
 
-This will replace any `python` found in the recipe with the versions specified in the
-`variant_config.yaml` file.
+This will replace any `python` found in the recipe with the versions specified in the `variants.yaml` file.
 
 ```yaml title="recipe.yaml"
 context:
-  version: 1.26.4
+  version: 2.0.1
+  default_abi_level: 1.21
 
 package:
   name: numpy
@@ -89,23 +94,26 @@ package:
 
 source:
   - url: https://github.com/numpy/numpy/releases/download/v${{ version }}/numpy-${{ version }}.tar.gz
-    sha256: 2a02aba9ed12e4ac4eb3ea9421c420301a0c6460d9830d74a9df87efa4912010
+    sha256: 485b87235796410c3519a699cfe1faab097e509e90ebb05dcd098db2ae87e7b3
 
 build:
   python:
     entry_points:
       - f2py = numpy.f2py.f2py2e:main  # [win]
+      - numpy-config = numpy._configtool:main
 
 requirements:
   build:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
+    # note: some `host` dependencies that run at build time (e.g., `cython`, `meson-python`)
+    #       should ideally be in `build` instead, this is because cross compilation of
+    #       Python packages in conda-forge uses `crossenv` rather than regular cross compilation.
   host:
     # note: variant is injected here!
     - python
     - pip
     - meson-python
-    - ninja
     - pkg-config
     - python-build
     - cython
@@ -115,18 +123,20 @@ requirements:
   run:
     - python
   run_exports:
-    - ${{ pin_subpackage("numpy") }}
+    - numpy >=${{ default_abi_level }},<3.0.0a0
 
 tests:
   - python:
       imports:
         - numpy
-        - numpy.array_api
-        - numpy.array_api.linalg
+        - numpy.fft
+        - numpy.linalg
+        - numpy.random
         - numpy.ctypeslib
 
   - script:
-    - f2py -h
+    - f2py -v
+    - numpy-config --cflags
 
 about:
   homepage: http://numpy.org/
@@ -170,11 +180,10 @@ for /f %%f in ('dir /b /S .\dist') do (
 ```
 
 ### Running the recipe
-Running this recipe with the variant config file will build a a total of 2 `numpy` packages:
+Running this recipe with the variant config file will build a total of 2 `numpy` packages:
 
 ```bash
-rattler-build build --recipe ./numpy \
-  --variant-config ./numpy/variant_config.yaml
+rattler-build build --recipe ./numpy
 ```
 
 At the beginning of the build process, `rattler-build` will print the following message to show you the variants it found:

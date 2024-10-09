@@ -1,10 +1,10 @@
 //! Parse the source section of a recipe
 
-use std::{fmt, path::PathBuf, str::FromStr};
-
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use std::fmt::Display;
+use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
 
 use crate::{
@@ -41,7 +41,7 @@ impl Source {
         }
     }
 
-    /// Get the folder.
+    /// Get the directory.
     pub fn target_directory(&self) -> Option<&PathBuf> {
         match self {
             Self::Git(git) => git.target_directory(),
@@ -71,7 +71,8 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
                     return Err(vec![_partialerror!(
                         *self.span(),
                         ErrorKind::Other,
-                        label = "unknown source type"
+                        label = "unknown source type (no `url`, `path` or `git` found)",
+                        help = "are you missing `url`, `path` or `git`?"
                     )]);
                 }
             }
@@ -115,13 +116,13 @@ impl GitRev {
     }
 }
 
-impl ToString for GitRev {
-    fn to_string(&self) -> String {
+impl Display for GitRev {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Branch(branch) => format!("refs/heads/{}", branch),
-            Self::Tag(tag) => format!("refs/tags/{}", tag),
-            Self::Head => "HEAD".into(),
-            Self::Commit(commit) => commit.clone(),
+            Self::Branch(branch) => write!(f, "refs/heads/{}", branch),
+            Self::Tag(tag) => write!(f, "refs/tags/{}", tag),
+            Self::Head => write!(f, "HEAD"),
+            Self::Commit(commit) => write!(f, "{}", commit),
         }
     }
 }
@@ -384,7 +385,8 @@ impl fmt::Display for GitUrl {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
-    url: Url,
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
+    url: Vec<Url>,
 
     /// Optionally a sha256 checksum to verify the downloaded file
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -409,8 +411,8 @@ pub struct UrlSource {
 
 impl UrlSource {
     /// Get the url.
-    pub const fn url(&self) -> &Url {
-        &self.url
+    pub fn urls(&self) -> &[Url] {
+        self.url.as_slice()
     }
 
     /// Get the SHA256 checksum of the URL source.
@@ -441,7 +443,7 @@ impl UrlSource {
 
 impl TryConvertNode<UrlSource> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<UrlSource, Vec<PartialParsingError>> {
-        let mut url = None;
+        let mut urls = None;
         let mut sha256 = None;
         let mut md5 = None;
         let mut patches = Vec::new();
@@ -450,7 +452,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 
         self.iter().map(|(key, value)| {
             match key.as_str() {
-                "url" => url = value.try_convert(key)?,
+                "url" => urls = value.try_convert(key)?,
                 "sha256" => {
                     let sha256_str: RenderedScalarNode = value.try_convert(key)?;
                     let sha256_out = rattler_digest::parse_digest_from_hex::<Sha256>(sha256_str.as_str()).ok_or_else(|| vec![_partialerror!(*sha256_str.span(), ErrorKind::InvalidSha256)])?;
@@ -475,7 +477,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
             Ok(())
         }).flatten_errors()?;
 
-        let url = url.ok_or_else(|| {
+        let url = urls.ok_or_else(|| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("url".into()),

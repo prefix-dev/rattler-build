@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use rattler_conda_types::PackageName;
+use rattler_conda_types::{PackageName, VersionWithSource};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,8 +18,10 @@ use super::FlattenErrors;
 /// A recipe package information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Package {
-    name: PackageName,
-    version: String,
+    /// Name of the package
+    pub name: PackageName,
+    /// Package version
+    pub version: VersionWithSource,
 }
 
 impl Package {
@@ -29,7 +31,7 @@ impl Package {
     }
 
     /// Get the package version.
-    pub fn version(&self) -> &str {
+    pub fn version(&self) -> &VersionWithSource {
         &self.version
     }
 }

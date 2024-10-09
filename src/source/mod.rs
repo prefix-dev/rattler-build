@@ -10,8 +10,9 @@ use crate::{
     recipe::parser::{GitRev, GitSource, Source},
     source::{
         checksum::Checksum,
-        extract::{extract_tar, extract_zip},
+        extract::{extract_tar, extract_zip, is_tarball},
     },
+    system_tools::ToolError,
     tool_configuration,
 };
 
@@ -41,7 +42,7 @@ pub enum SourceError {
     WalkDir(#[from] walkdir::Error),
 
     #[error("FileSystem error: '{0}'")]
-    FileSystemError(fs_extra::error::Error),
+    FileSystemError(std::io::Error),
 
     #[error("StripPrefixError Error: {0}")]
     StripPrefixError(#[from] StripPrefixError),
@@ -53,7 +54,10 @@ pub enum SourceError {
     FileNotFound(PathBuf),
 
     #[error("Could not find `patch` executable")]
-    PatchNotFound,
+    PatchExeNotFound,
+
+    #[error("Patch file not found: {0}")]
+    PatchNotFound(PathBuf),
 
     #[error("Failed to apply patch: {0}")]
     PatchFailed(String),
@@ -87,6 +91,9 @@ pub enum SourceError {
 
     #[error("No checksum found for url: {0}")]
     NoChecksum(String),
+
+    #[error("Failed to find git executable: {0}")]
+    GitNotFound(#[from] ToolError),
 }
 
 /// Fetches all sources in a list of sources and applies specified patches
@@ -125,24 +132,33 @@ pub async fn fetch_sources(
                     ..src.clone()
                 }));
 
-                crate::source::copy_dir::CopyDir::new(&result.0, &dest_dir)
-                    .use_gitignore(false)
-                    .run()?;
+                let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
+                    "copying source into isolated environment",
+                    || {
+                        copy_dir::CopyDir::new(&result.0, &dest_dir)
+                            .use_gitignore(false)
+                            .run()
+                    },
+                )?;
+                tracing::info!(
+                    "Copied {} files into isolated environment",
+                    copy_result.copied_paths().len()
+                );
+
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
             }
             Source::Url(src) => {
-                tracing::info!("Fetching source from URL: {}", src.url());
-
-                let file_name_from_url = src
-                    .url()
+                let first_url = src.urls().first().expect("we should have at least one URL");
+                let file_name_from_url = first_url
                     .path_segments()
                     .and_then(|segments| segments.last().map(|last| last.to_string()))
-                    .ok_or_else(|| SourceError::UrlNotFile(src.url().clone()))?;
+                    .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
                 let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
-                let mut dest_dir = if let Some(target_directory) = src.target_directory() {
+
+                let dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
                 } else {
                     work_dir.to_path_buf()
@@ -153,29 +169,27 @@ pub async fn fetch_sources(
                     fs::create_dir_all(&dest_dir)?;
                 }
 
-                if res
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_string_lossy()
-                    .contains(".tar")
-                {
-                    extract_tar(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted to {:?}", dest_dir);
-                } else if res.extension() == Some(OsStr::new("zip")) {
-                    extract_zip(&res, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted zip to {:?}", dest_dir);
+                // Copy source code to work dir
+                if res.is_dir() {
+                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+                    tool_configuration.fancy_log_handler.wrap_in_progress(
+                        "copying source into isolated environment",
+                        || {
+                            copy_dir::CopyDir::new(&res, &dest_dir)
+                                .use_gitignore(false)
+                                .run()
+                        },
+                    )?;
                 } else {
-                    if let Some(file_name) = src.file_name() {
-                        dest_dir = dest_dir.join(file_name);
-                    } else {
-                        dest_dir = dest_dir.join(file_name_from_url);
-                    }
-                    fs::copy(&res, &dest_dir)?;
-                    tracing::info!("Downloaded to {:?}", dest_dir);
+                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+
+                    let file_name = src.file_name().unwrap_or(&file_name_from_url);
+                    let target = dest_dir.join(file_name);
+                    fs::copy(&res, &target)?;
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Url(src.clone()));
@@ -201,9 +215,30 @@ pub async fn fetch_sources(
 
                 // check if the source path is a directory
                 if src_path.is_dir() {
-                    copy_dir::CopyDir::new(&src_path, &dest_dir)
-                        .use_gitignore(src.use_gitignore())
-                        .run()?;
+                    let copy_result = tool_configuration.fancy_log_handler.wrap_in_progress(
+                        "copying source into isolated environment",
+                        || {
+                            copy_dir::CopyDir::new(&src_path, &dest_dir)
+                                .use_gitignore(src.use_gitignore())
+                                .run()
+                        },
+                    )?;
+                    tracing::info!(
+                        "Copied {} files into isolated environment",
+                        copy_result.copied_paths().len()
+                    );
+                } else if is_tarball(
+                    src_path
+                        .file_name()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .as_ref(),
+                ) {
+                    extract_tar(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
+                    tracing::info!("Extracted to {:?}", dest_dir);
+                } else if src_path.extension() == Some(OsStr::new("zip")) {
+                    extract_zip(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
+                    tracing::info!("Extracted zip to {:?}", dest_dir);
                 } else if let Some(file_name) = src
                     .file_name()
                     .cloned()
@@ -219,13 +254,13 @@ pub async fn fetch_sources(
                             return Err(SourceError::ValidationFailed);
                         }
                     }
-                    fs::copy(&src_path, &dest_dir.join(file_name))?;
+                    fs::copy(&src_path, dest_dir.join(file_name))?;
                 } else {
                     return Err(SourceError::FileNotFound(src_path));
                 }
 
                 if !src.patches().is_empty() {
-                    patch::apply_patches(system_tools, src.patches(), work_dir, recipe_dir)?;
+                    patch::apply_patches(system_tools, src.patches(), &dest_dir, recipe_dir)?;
                 }
 
                 rendered_sources.push(Source::Path(src.clone()));

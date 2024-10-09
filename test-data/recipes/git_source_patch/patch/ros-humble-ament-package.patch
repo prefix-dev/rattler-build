@@ -1,0 +1,87 @@
+diff --git a/ament_package/template/environment_hook/library_path.sh b/ament_package/template/environment_hook/library_path.sh
+deleted file mode 100644
+index 292e518..0000000
+--- a/ament_package/template/environment_hook/library_path.sh
++++ /dev/null
+@@ -1,16 +0,0 @@
+-# copied from ament_package/template/environment_hook/library_path.sh
+-
+-# detect if running on Darwin platform
+-_UNAME=`uname -s`
+-_IS_DARWIN=0
+-if [ "$_UNAME" = "Darwin" ]; then
+-  _IS_DARWIN=1
+-fi
+-unset _UNAME
+-
+-if [ $_IS_DARWIN -eq 0 ]; then
+-  ament_prepend_unique_value LD_LIBRARY_PATH "$AMENT_CURRENT_PREFIX/lib"
+-else
+-  ament_prepend_unique_value DYLD_LIBRARY_PATH "$AMENT_CURRENT_PREFIX/lib"
+-fi
+-unset _IS_DARWIN
+diff --git a/ament_package/templates.py b/ament_package/templates.py
+index 885b972..463453c 100644
+--- a/ament_package/templates.py
++++ b/ament_package/templates.py
+@@ -17,15 +17,21 @@ import re
+ 
+ try:
+     import importlib.resources as importlib_resources
+-except ModuleNotFoundError:
++    assert importlib_resources.files, "importlib reousrces too old to support files, please install importlib_resources"
++except (ModuleNotFoundError, AttributeError):
+     import importlib_resources
+ 
+ IS_WINDOWS = os.name == 'nt'
+ 
++# importlib
++# DeprecationWarning: path is deprecated. Use files() instead.
++# Refer to https://importlib-resources.readthedocs.io/en/latest/using.html#migrating-from-legacy 
++# for migration advice.
+ 
+ def get_environment_hook_template_path(name):
+-    with importlib_resources.path('ament_package.template.environment_hook', name) as path:
+-        return str(path)
++    # with importlib_resources.path('ament_package.template.environment_hook', name) as path:
++    path =  importlib_resources.files('ament_package.template.environment_hook').joinpath(name)
++    return str(path)
+ 
+ 
+ def get_package_level_template_names(all_platforms=False):
+@@ -41,8 +47,9 @@ def get_package_level_template_names(all_platforms=False):
+ 
+ 
+ def get_package_level_template_path(name):
+-    with importlib_resources.path('ament_package.template.package_level', name) as path:
+-        return str(path)
++    # with importlib_resources.path('ament_package.template.package_level', name) as path:
++    path = importlib_resources.files('ament_package.template.package_level').joinpath(name)
++    return str(path)
+ 
+ 
+ def get_prefix_level_template_names(*, all_platforms=False):
+@@ -61,8 +68,9 @@ def get_prefix_level_template_names(*, all_platforms=False):
+ 
+ 
+ def get_prefix_level_template_path(name):
+-    with importlib_resources.path('ament_package.template.prefix_level', name) as path:
+-        return str(path)
++    # with importlib_resources.path('ament_package.template.prefix_level', name) as path:
++    path = importlib_resources.files('ament_package.template.prefix_level').joinpath(name)
++    return str(path)
+ 
+ 
+ def get_isolated_prefix_level_template_names(*, all_platforms=False):
+@@ -81,8 +89,9 @@ def get_isolated_prefix_level_template_names(*, all_platforms=False):
+ 
+ 
+ def get_isolated_prefix_level_template_path(name):
+-    with importlib_resources.path('ament_package.template.isolated_prefix_level', name) as path:
+-        return str(path)
++    #with importlib_resources.path('ament_package.template.isolated_prefix_level', name) as path:
++    path = importlib_resources.files('ament_package.template.isolated_prefix_level').joinpath(name)
++    return str(path)
+ 
+ 
+ def configure_file(template_file, environment):

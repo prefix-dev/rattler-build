@@ -12,29 +12,34 @@ Building of packages consists of several steps. It all begins with a
 `recipe.yaml` file that specifies how the package is to be built and what the
 dependencies are. From the recipe file, `rattler-build` executes several steps:
 
-1. Parse the recipe file and evaluate conditional parts (we will see that later,
-   but parts of the recipe can be conditional, e.g. on Windows vs. macOS)
-2. Retrieve all source files specified in the recipe, such as `.tar.gz` files,
-   `git` repositories or even local paths. Additionally, this step will apply
-   patches that can be specified alongside the source file.
-3. Download and install dependencies into temporary "host" and "build"
-   workspaces. Any dependencies that are needed at build time are installed in
-   this step.
-4. Execute the build script to build/compile the source code and "install" it
-   into the host environment.
-5. Collect _all_ files that are new in the "host" environment (because the build
-   script just created them) and apply some transformations if necessary;
-   specifically, we edit the `rpath` on Linux and macOS to help make binaries
-   relocatable.
-6. Bundle all the files in a package and write out any additional metadata into
-   the `info/index.json`, `info/about.json`, and `info/paths.json` files. This
-   also creates the test files that are bundled with the package.
-7. If any tests are specified in the recipe, then those tests are run. The package
-   is considered "done" if it passes all of the tests, otherwise we move it to a
-   "broken" place.
+1. **Rendering**:
+Parse the recipe file and evaluate conditionals, Jinja expressions, and
+variables, and variants.
 
-After this process, a package is created. This package can be uploaded to somewhere
-like a custom [prefix.dev](https://prefix.dev) private or public channel.
+2. **Fetch source**:
+Retrieve specified source files, such as `.tar.gz` files, `git` repositories, local paths.
+Additionally, this step will apply patches that can be specified alongside the source file.
+
+3. **Install build environments**:
+Download and install dependencies into temporary "host" and "build" workspaces.
+Any dependencies that are needed at build time are installed in this step.
+
+4. **Build source**:
+Execute the build script to _build/compile_ the source code and _install_ it into the host environment.
+
+5. **Prepare package files**:
+Collect _all_ files that are new in the "host" environment and apply some transformations if necessary;
+specifically, we edit the `rpath` on `Linux` and `macOS` to make binaries relocatable.
+
+6. **Package**:
+Bundle all the files in a package and write out any additional metadata into the `info/index.json`, `info/about.json`, and `info/paths.json` files.
+This also creates the test files that are bundled with the package.
+
+7. **Test**:
+Run any tests specified in the recipe.
+The package is considered _done_ if it passes all the tests, otherwise its moved to `broken/` in the output directory.
+
+After this process, a package is created. This package can be uploaded to somewhere like a custom [prefix.dev](https://prefix.dev) private or public channel.
 
 ### How to run `rattler-build`
 
@@ -109,10 +114,10 @@ requirements:
 
 The sections of a recipe are:
 
-| sections       | description                                                                                                                                                     |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| sections       | description                                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------------------|
 | `context`      | Defines variables that can be used in the Jinja context later in the recipe (e.g. name and version are commonly interpolated in strings) |
-| `package`      | This section defines the name and version of the package you are currently building and will be the name of the final output                                    |
-| `source`       | Defines where the source code is going to be downloaded from and checksums                                                                                 |
-| `build`        | Settings for the build and the build script                                                                                                                 |
-| `requirements` | Allows the definition of build, host, run and run-constrained dependencies                                                                                      |
+| `package`      | This section defines the name and version of the package you are currently building and will be the name of the final output             |
+| `source`       | Defines where the source code is going to be downloaded from and checksums                                                               |
+| `build`        | Settings for the build and the build script                                                                                              |
+| `requirements` | Allows the definition of build, host, run and run-constrained dependencies                                                               |

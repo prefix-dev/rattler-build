@@ -1,0 +1,28 @@
+outputs:
+  - package:
+      name: upstream-fail
+      version: 1.0.0
+
+  - package:
+      name: downstream-fail
+      version: 1.0.0
+
+    requirements:
+      host:
+        - upstream-fail
+      run:
+        - upstream-fail
+
+    tests:
+      - script:
+          - if: unix
+            then:
+            - if [ -f "$PREFIX/fail.txt" ]; then
+                echo "Failing test in downstream package";
+                exit 1;
+              fi
+          - if: win
+            then:
+            - if exist "%PREFIX%\\fail.txt" (
+                echo "Failing test in downstream package" && exit /b 1
+              )

@@ -1,8 +1,10 @@
 //! All the metadata that makes up a recipe file
 use std::{
+    borrow::Cow,
     collections::BTreeMap,
     fmt::{self, Display, Formatter},
     io::Write,
+    iter,
     path::{Path, PathBuf},
     str::FromStr,
     sync::{Arc, Mutex},
@@ -14,18 +16,27 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    PackageName, Platform, RepoDataRecord,
+    Channel, PackageName, Platform, RepoDataRecord, Version,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
+use rattler_repodata_gateway::SubdirSelection;
+use rattler_solve::{ChannelPriority, SolveStrategy};
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use url::Url;
 
 use crate::{
     console_utils::github_integration_enabled,
     hash::HashInfo,
-    recipe::parser::{Recipe, Source},
+    recipe::{
+        jinja::SelectorConfig,
+        parser::{Recipe, Source},
+    },
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
+    tool_configuration,
+    utils::remove_dir_all_force,
 };
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -57,11 +68,18 @@ pub struct Directories {
     /// The directory where the recipe is located
     #[serde(skip)]
     pub recipe_dir: PathBuf,
+    /// The path where the recipe is located
+    #[serde(skip)]
+    pub recipe_path: PathBuf,
+    /// The folder where the cache is located
+    #[serde(skip)]
+    pub cache_dir: PathBuf,
     /// The host prefix is the directory where host dependencies are installed
     /// Exposed as `$PREFIX` (or `%PREFIX%` on Windows) in the build script
     pub host_prefix: PathBuf,
     /// The build prefix is the directory where build dependencies are installed
-    /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build script
+    /// Exposed as `$BUILD_PREFIX` (or `%BUILD_PREFIX%` on Windows) in the build
+    /// script
     pub build_prefix: PathBuf,
     /// The work directory is the directory where the source code is copied to
     pub work_dir: PathBuf,
@@ -104,6 +122,8 @@ impl Directories {
 
         let build_dir = get_build_dir(&output_dir, name, no_build_id, timestamp)
             .expect("Could not create build directory");
+        // TODO move this into build_dir, and keep build_dir consistent.
+        let cache_dir = output_dir.join("build_cache");
         let recipe_dir = recipe_path
             .parent()
             .ok_or_else(|| {
@@ -132,13 +152,34 @@ impl Directories {
         let directories = Directories {
             build_dir: build_dir.clone(),
             build_prefix: build_dir.join("build_env"),
+            cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
             recipe_dir,
+            recipe_path: recipe_path.to_path_buf(),
             output_dir,
         };
 
         Ok(directories)
+    }
+
+    /// Remove all directories except for the cache directory
+    pub fn clean(&self) -> Result<(), std::io::Error> {
+        if self.build_dir.exists() {
+            let folders = self.build_dir.read_dir()?;
+            for folder in folders {
+                let folder = folder?;
+
+                if folder.path() == self.cache_dir {
+                    continue;
+                }
+
+                if folder.file_type()?.is_dir() {
+                    remove_dir_all_force(&folder.path())?;
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Creates the build directory.
@@ -166,7 +207,7 @@ impl Directories {
     }
 }
 
-/// Default value for store recipe for backwards compatiblity
+/// Default value for store recipe for backwards compatibility
 fn default_true() -> bool {
     true
 }
@@ -176,43 +217,23 @@ fn default_true() -> bool {
 pub struct PackagingSettings {
     /// The archive type, currently supported are `tar.bz2` and `conda`
     pub archive_type: ArchiveType,
-    /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda` archives
+    /// The compression level from 1-9 or -7-22 for `tar.bz2` and `conda`
+    /// archives
     pub compression_level: i32,
-    /// How many threads to use for compression (only relevant for `.conda` archives)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub compression_threads: Option<u32>,
 }
 
 impl PackagingSettings {
     /// Create a new `PackagingSettings` from the command line arguments
     /// and the selected archive type.
-    pub fn from_args(
-        archive_type: ArchiveType,
-        compression_level: CompressionLevel,
-        compression_threads: Option<u32>,
-    ) -> Self {
+    pub fn from_args(archive_type: ArchiveType, compression_level: CompressionLevel) -> Self {
         let compression_level: i32 = match archive_type {
             ArchiveType::TarBz2 => compression_level.to_bzip2_level().unwrap().level() as i32,
             ArchiveType::Conda => compression_level.to_zstd_level().unwrap(),
         };
 
-        if compression_threads.is_some()
-            && compression_threads.unwrap() > 1
-            && archive_type != ArchiveType::Conda
-        {
-            tracing::warn!("Multi-threaded compression is only supported for conda archives");
-        }
-
-        let compression_threads = if archive_type == ArchiveType::Conda {
-            Some(compression_threads.unwrap_or(1))
-        } else {
-            None
-        };
-
         Self {
             archive_type,
             compression_level,
-            compression_threads,
         }
     }
 }
@@ -222,7 +243,8 @@ impl PackagingSettings {
 pub struct BuildConfiguration {
     /// The target platform for the build
     pub target_platform: Platform,
-    /// The host platform (usually target platform, but for `noarch` it's the build platform)
+    /// The host platform (usually target platform, but for `noarch` it's the
+    /// build platform)
     pub host_platform: Platform,
     /// The build platform (the platform that the build is running on)
     pub build_platform: Platform,
@@ -233,17 +255,24 @@ pub struct BuildConfiguration {
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments
-    pub channels: Vec<String>,
+    pub channels: Vec<Url>,
+    /// The channel priority that is used to resolve dependencies
+    pub channel_priority: ChannelPriority,
+    /// The solve strategy to use when resolving dependencies
+    pub solve_strategy: SolveStrategy,
     /// The timestamp to use for the build
     pub timestamp: chrono::DateTime<chrono::Utc>,
-    /// All subpackages coming from this output or other outputs from the same recipe
+    /// All subpackages coming from this output or other outputs from the same
+    /// recipe
     pub subpackages: BTreeMap<PackageName, PackageIdentifier>,
     /// Package format (.tar.bz2 or .conda)
     pub packaging_settings: PackagingSettings,
-    /// Whether to store the recipe and build instructions in the final package or not
+    /// Whether to store the recipe and build instructions in the final package
+    /// or not
     #[serde(skip_serializing, default = "default_true")]
     pub store_recipe: bool,
-    /// Wether to set additional environment variables to force colors in the build script or not
+    /// Whether to set additional environment variables to force colors in the
+    /// build script or not
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
 }
@@ -253,6 +282,19 @@ impl BuildConfiguration {
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform
     }
+
+    /// Construct a `SelectorConfig` from the given `BuildConfiguration`
+    pub fn selector_config(&self) -> SelectorConfig {
+        SelectorConfig {
+            target_platform: self.target_platform,
+            host_platform: self.host_platform,
+            build_platform: self.build_platform,
+            variant: self.variant.clone(),
+            hash: Some(self.hash.clone()),
+            experimental: false,
+            allow_undefined: false,
+        }
+    }
 }
 
 /// A package identifier
@@ -261,7 +303,7 @@ pub struct PackageIdentifier {
     /// The name of the package
     pub name: PackageName,
     /// The version of the package
-    pub version: String,
+    pub version: Version,
     /// The build string of the package
     pub build_string: String,
 }
@@ -284,19 +326,24 @@ pub struct BuildSummary {
     pub failed: bool,
 }
 
-/// A output. This is the central element that is passed to the `run_build` function
-/// and fully specifies all the options and settings to run the build.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// A output. This is the central element that is passed to the `run_build`
+/// function and fully specifies all the options and settings to run the build.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Output {
     /// The rendered recipe that is used to build this output
     pub recipe: Recipe,
-    /// The build configuration for this output (e.g. target_platform, channels, and other settings)
+    /// The build configuration for this output (e.g. target_platform, channels,
+    /// and other settings)
     pub build_configuration: BuildConfiguration,
-    /// The finalized dependencies for this output. If this is `None`, the dependencies have not been resolved yet.
-    /// During the `run_build` functions, the dependencies are resolved and this field is filled.
+    /// The finalized dependencies for this output. If this is `None`, the
+    /// dependencies have not been resolved yet. During the `run_build`
+    /// functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
-    /// The finalized sources for this output. Contain the exact git hashes for the sources that are used
-    /// to build this output.
+    /// The finalized dependencies from the cache (if there is a cache
+    /// instruction)
+    pub finalized_cache_dependencies: Option<FinalizedDependencies>,
+    /// The finalized sources for this output. Contain the exact git hashes for
+    /// the sources that are used to build this output.
     pub finalized_sources: Option<Vec<Source>>,
 
     /// Summary of the build
@@ -304,6 +351,11 @@ pub struct Output {
     pub build_summary: Arc<Mutex<BuildSummary>>,
     /// The system tools that are used to build this output
     pub system_tools: SystemTools,
+    /// Some extra metadata that should be recorded additionally in about.json
+    /// Usually it is used during the CI build to record link to the CI job
+    /// that created this artifact
+    #[serde(skip)]
+    pub extra_meta: Option<BTreeMap<String, Value>>,
 }
 
 impl Output {
@@ -313,34 +365,27 @@ impl Output {
     }
 
     /// The version of the package
-    pub fn version(&self) -> &str {
+    pub fn version(&self) -> &Version {
         self.recipe.package().version()
     }
 
-    /// The build string is usually set automatically as the hash of the variant configuration.
-    pub fn build_string(&self) -> Option<&str> {
-        self.recipe.build().string()
-    }
-
-    /// The channels to use when resolving dependencies
-    pub fn reindex_channels(&self) -> Result<Vec<String>, std::io::Error> {
-        let output_dir = &self.build_configuration.directories.output_dir;
-
-        index(output_dir, Some(&self.build_configuration.target_platform))?;
-
-        let mut channels = vec![output_dir.to_string_lossy().to_string()];
-        channels.extend(self.build_configuration.channels.clone());
-        Ok(channels)
+    /// The build string is either the build string from the recipe or computed
+    /// from the hash and build number.
+    pub fn build_string(&self) -> Cow<'_, str> {
+        self.recipe
+            .build()
+            .string
+            .resolve(&self.build_configuration.hash, self.recipe.build().number)
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})
-    pub fn identifier(&self) -> Option<String> {
-        Some(format!(
+    pub fn identifier(&self) -> String {
+        format!(
             "{}-{}-{}",
             self.name().as_normalized(),
             self.version(),
-            self.build_string()?
-        ))
+            &self.build_string()
+        )
     }
 
     /// Record a warning during the build
@@ -396,7 +441,8 @@ impl Output {
     }
 
     /// Search for the resolved package with the given name in the host prefix
-    /// Returns a tuple of the package and a boolean indicating whether the package is directly requested
+    /// Returns a tuple of the package and a boolean indicating whether the
+    /// package is directly requested
     pub fn find_resolved_package(&self, name: &str) -> Option<(&RepoDataRecord, bool)> {
         let host = self.finalized_dependencies.as_ref()?.host.as_ref()?;
         let record = host
@@ -418,7 +464,7 @@ impl Output {
     /// Print a nice summary of the build
     pub fn log_build_summary(&self) -> Result<(), std::io::Error> {
         let summary = self.build_summary.lock().unwrap();
-        let identifier = self.identifier().unwrap_or_default();
+        let identifier = self.identifier();
         let span = tracing::info_span!("Build summary for", recipe = identifier);
         let _enter = span.enter();
 
@@ -550,11 +596,7 @@ impl Output {
             table
         };
 
-        writeln!(
-            f,
-            "Variant configuration (hash: {}):",
-            self.build_string().unwrap_or_default()
-        )?;
+        writeln!(f, "Variant configuration (hash: {}):", self.build_string())?;
         let mut table = template();
         if table_format != comfy_table::presets::UTF8_FULL {
             table.set_header(vec!["Key", "Value"]);
@@ -595,6 +637,33 @@ impl Display for Output {
     }
 }
 
+/// Builds the channel list and reindexes the output channel.
+pub fn build_reindexed_channels(
+    build_configuration: &BuildConfiguration,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<Vec<Url>, std::io::Error> {
+    let output_dir = &build_configuration.directories.output_dir;
+    let output_channel = Channel::from_directory(output_dir);
+
+    // Clear the repodata gateway of any cached values for the output channel.
+    tool_configuration.repodata_gateway.clear_repodata_cache(
+        &output_channel,
+        SubdirSelection::Some(
+            [build_configuration.target_platform]
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
+        ),
+    );
+
+    // Reindex the output channel from the files on disk
+    index(output_dir, Some(&build_configuration.target_platform))?;
+
+    Ok(iter::once(output_channel.base_url)
+        .chain(build_configuration.channels.iter().cloned())
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,11 +696,11 @@ mod test {
         VersionWithSource,
     };
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use rstest::*;
     use url::Url;
 
-    use crate::render::resolved_dependencies::{self, DependencyInfo};
-
     use super::{Directories, Output};
+    use crate::render::resolved_dependencies::{self, SourceDependency};
 
     #[test]
     fn test_directories_yaml_rendering() {
@@ -658,9 +727,10 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![DependencyInfo::Raw {
+            specs: vec![SourceDependency {
                 spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }],
+            }
+            .into()],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),
@@ -685,14 +755,14 @@ mod test {
                     timestamp: Some(chrono::Utc.timestamp_opt(123123, 0).unwrap()),
                     track_features: vec![],
                     version: VersionWithSource::from_str("1.2.3").unwrap(),
-                    purls: Default::default(),
+                    purls: None,
+                    run_exports: None,
                 },
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
                     .unwrap(),
                 channel: "test".into(),
             }],
-            run_exports: Default::default(),
         };
 
         // test yaml roundtrip
@@ -712,21 +782,16 @@ mod test {
         assert_eq!("pip", parsed_yaml3.specs[0].render(false));
     }
 
-    #[test]
-    fn read_full_recipe() {
+    #[rstest]
+    #[case::rich("rich_recipe.yaml")]
+    #[case::curl("curl_recipe.yaml")]
+    fn read_full_recipe(#[case] recipe_path: String) {
         let test_data_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
-        let recipe_1 = test_data_dir.join("rich_recipe.yaml");
 
-        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
-
-        let output_rich: Output = serde_yaml::from_str(&recipe_1).unwrap();
-        assert_yaml_snapshot!(output_rich);
-
-        let recipe_2 = test_data_dir.join("curl_recipe.yaml");
-        let recipe_2 = std::fs::read_to_string(recipe_2).unwrap();
-        let output_curl: Output = serde_yaml::from_str(&recipe_2).unwrap();
-        assert_yaml_snapshot!(output_curl);
+        let recipe = std::fs::read_to_string(test_data_dir.join(&recipe_path)).unwrap();
+        let output: Output = serde_yaml::from_str(&recipe).unwrap();
+        assert_yaml_snapshot!(recipe_path, output);
     }
 
     #[test]

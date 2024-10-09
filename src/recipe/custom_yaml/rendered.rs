@@ -6,6 +6,7 @@ use std::{fmt, hash::Hash, ops};
 
 use indexmap::IndexMap;
 use marked_yaml::{types::MarkedScalarNode, Span};
+use serde::{Serialize, Serializer};
 
 use crate::{
     _partialerror,
@@ -25,7 +26,7 @@ use super::{
 /// This is a reinterpretation of the [`marked_yaml::Node`] type that is specific
 /// for the first stage of the new Conda recipe format parser. This type handles
 /// the `if / then / else` selector (or if-selector for simplicity) as a special
-/// case of the sequence node, i.e., the occurences of if-selector in the recipe
+/// case of the sequence node, i.e., the occurrences of if-selector in the recipe
 /// are syntactically parsed in the conversion of [`marked_yaml::Node`] to this type.
 ///
 /// **CAUTION:** The user of this type that is responsible to handle the if the
@@ -55,6 +56,20 @@ pub enum RenderedNode {
     /// This is a special case of a scalar node, but is treated as its own
     /// type here for convenience.
     Null(RenderedScalarNode),
+}
+
+impl Serialize for RenderedNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            RenderedNode::Scalar(node) => node.serialize(serializer),
+            RenderedNode::Mapping(node) => node.serialize(serializer),
+            RenderedNode::Sequence(node) => node.serialize(serializer),
+            RenderedNode::Null(node) => node.serialize(serializer),
+        }
+    }
 }
 
 impl RenderedNode {
@@ -213,16 +228,30 @@ impl TryFrom<&marked_yaml::Node> for RenderedNode {
 #[derive(Clone)]
 pub struct RenderedScalarNode {
     span: marked_yaml::Span,
+    source: String,
     value: String,
 }
 
+impl Serialize for RenderedScalarNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
+}
+
 impl RenderedScalarNode {
-    pub fn new(span: marked_yaml::Span, value: String) -> Self {
-        Self { span, value }
+    pub fn new(span: marked_yaml::Span, source: String, value: String) -> Self {
+        Self {
+            span,
+            source,
+            value,
+        }
     }
 
     pub fn new_blank() -> Self {
-        Self::new(marked_yaml::Span::new_blank(), String::new())
+        Self::new(marked_yaml::Span::new_blank(), String::new(), String::new())
     }
 
     /// Treat the scalar node as a string
@@ -230,6 +259,11 @@ impl RenderedScalarNode {
     /// Since scalars are always stringish, this is always safe.
     pub fn as_str(&self) -> &str {
         &self.value
+    }
+
+    /// Return the source with the original Jinja template
+    pub fn source(&self) -> &str {
+        &self.source
     }
 
     /// Treat the scalar node as a boolean
@@ -296,14 +330,18 @@ impl fmt::Debug for RenderedScalarNode {
 impl<'a> From<&'a str> for RenderedScalarNode {
     /// Convert from any borrowed string into a node
     fn from(value: &'a str) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.to_owned())
+        Self::new(
+            marked_yaml::Span::new_blank(),
+            value.to_owned(),
+            value.to_owned(),
+        )
     }
 }
 
 impl From<String> for RenderedScalarNode {
     /// Convert from any owned string into a node
     fn from(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value)
+        Self::new(marked_yaml::Span::new_blank(), value.clone(), value)
     }
 }
 
@@ -329,7 +367,11 @@ impl From<MarkedScalarNode> for RenderedScalarNode {
 
 impl From<&MarkedScalarNode> for RenderedScalarNode {
     fn from(value: &MarkedScalarNode) -> Self {
-        Self::new(*value.span(), value.as_str().to_owned())
+        Self::new(
+            *value.span(),
+            value.as_str().to_owned(),
+            value.as_str().to_owned(),
+        )
     }
 }
 
@@ -394,6 +436,15 @@ scalar_from_to_number!(usize, as_usize);
 pub struct RenderedSequenceNode {
     span: marked_yaml::Span,
     value: Vec<RenderedNode>,
+}
+
+impl Serialize for RenderedSequenceNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
 }
 
 impl RenderedSequenceNode {
@@ -474,7 +525,7 @@ impl fmt::Debug for RenderedSequenceNode {
 /// Mapping nodes in YAML are defined as a key/value mapping where the keys are
 /// unique and always scalars, whereas values may be YAML nodes of any kind.
 ///
-/// Because ther is an example that on the `context` key-value definition, a later
+/// Because there is an example that on the `context` key-value definition, a later
 /// key was defined as a jinja string using previous values, we need to care about
 /// insertion order we use [`IndexMap`] for this.
 ///
@@ -484,6 +535,15 @@ impl fmt::Debug for RenderedSequenceNode {
 pub struct RenderedMappingNode {
     span: marked_yaml::Span,
     value: IndexMap<RenderedScalarNode, RenderedNode>,
+}
+
+impl Serialize for RenderedMappingNode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.value.serialize(serializer)
+    }
 }
 
 impl RenderedMappingNode {
@@ -572,6 +632,7 @@ impl Render<RenderedNode> for Node {
             Node::Null(n) => Ok(RenderedNode::Null(RenderedScalarNode::new(
                 *n.span(),
                 n.as_str().to_owned(),
+                n.as_str().to_owned(),
             ))),
         }
     }
@@ -586,7 +647,7 @@ impl Render<RenderedNode> for ScalarNode {
                 label = jinja_error_to_label(&err),
             )]
         })?;
-        let rendered = RenderedScalarNode::new(*self.span(), rendered);
+        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
 
         if rendered.is_empty() {
             Ok(RenderedNode::Null(rendered))
@@ -610,7 +671,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
             )]
         })?;
 
-        let rendered = RenderedScalarNode::new(*self.span(), rendered);
+        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
 
         if rendered.is_empty() {
             Ok(None)
@@ -637,7 +698,11 @@ impl Render<RenderedMappingNode> for MappingNode {
         let mut rendered = IndexMap::new();
 
         for (key, value) in self.iter() {
-            let key = RenderedScalarNode::new(*key.span(), key.as_str().to_owned());
+            let key = RenderedScalarNode::new(
+                *key.span(),
+                key.as_str().to_owned(),
+                key.as_str().to_owned(),
+            );
             let value: RenderedNode = value.render(jinja, &format!("{name}.{}", key.as_str()))?;
             if value.is_null() {
                 continue;
@@ -657,6 +722,7 @@ impl Render<RenderedNode> for SequenceNode {
         if rendered.is_empty() {
             return Ok(RenderedNode::Null(RenderedScalarNode::new(
                 *self.span(),
+                String::new(),
                 String::new(),
             )));
         }

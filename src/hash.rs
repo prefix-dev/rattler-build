@@ -84,16 +84,42 @@ pub struct HashInfo {
     /// The hash (first 7 letters of the sha1sum)
     pub hash: String,
 
-    /// The exact input that was used to compute the hash
-    pub hash_input: String,
-
     /// The hash prefix (e.g. `py38` or `np111`)
-    pub hash_prefix: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub prefix: String,
+}
+
+/// Represents the input to compute the hash
+pub struct HashInput(String);
+
+impl HashInput {
+    /// Create a new hash input from a variant
+    pub fn from_variant(variant: &BTreeMap<String, String>) -> Self {
+        let mut buf = Vec::new();
+        let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
+
+        // BTree has sorted keys, which is important for hashing
+        variant
+            .serialize(&mut ser)
+            .expect("Failed to serialize input");
+
+        Self(String::from_utf8(buf).expect("Failed to convert to string"))
+    }
+
+    /// Get the hash input as a string
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// Returns the hash input as bytes
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
 }
 
 impl std::fmt::Display for HashInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}h{}", self.hash_prefix, self.hash)
+        write!(f, "{}h{}", self.prefix, self.hash)
     }
 }
 
@@ -136,34 +162,22 @@ impl HashInfo {
         result
     }
 
-    fn hash_variant(variant: &BTreeMap<String, String>) -> (String, String) {
-        let mut buf = Vec::new();
-        let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
-
-        // BTree has sorted keys, which is important for hashing
-        variant
-            .serialize(&mut ser)
-            .expect("Failed to serialize input");
-
-        let string = String::from_utf8(buf).expect("Failed to convert to string");
-
+    fn hash_from_input(hash_input: &HashInput) -> String {
         let mut hasher = Sha1::new();
-        hasher.update(string.as_bytes());
+        hasher.update(hash_input.as_bytes());
         let result = hasher.finalize();
 
         const HASH_LENGTH: usize = 7;
 
         let res = format!("{:x}", result);
-        (res[..HASH_LENGTH].to_string(), string)
+        res[..HASH_LENGTH].to_string()
     }
 
     /// Compute the build string for a given variant
     pub fn from_variant(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> Self {
-        let (hash, hash_input) = Self::hash_variant(variant);
         Self {
-            hash,
-            hash_input,
-            hash_prefix: Self::hash_prefix(variant, noarch),
+            hash: Self::hash_from_input(&HashInput::from_variant(variant)),
+            prefix: Self::hash_prefix(variant, noarch),
         }
     }
 }

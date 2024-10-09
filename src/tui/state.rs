@@ -10,11 +10,11 @@ use crate::{
 };
 
 /// Representation of a package.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Package {
     pub name: String,
     pub version: String,
-    pub build_string: Option<String>,
+    pub build_string: String,
     pub subpackages: Vec<String>,
     pub build_progress: BuildProgress,
     pub build_log: Vec<String>,
@@ -33,7 +33,7 @@ impl Package {
         Package {
             name: name.clone(),
             version: output.version().to_string(),
-            build_string: output.build_string().map(String::from),
+            build_string: output.build_string().into_owned(),
             subpackages: output
                 .build_configuration
                 .subpackages
@@ -48,7 +48,7 @@ impl Package {
             is_hovered: false,
             output: output.clone(),
             tool_config: tool_config.clone(),
-            recipe_path: output.build_configuration.directories.recipe_dir.clone(),
+            recipe_path: output.build_configuration.directories.recipe_path.clone(),
         }
     }
 }
@@ -112,7 +112,8 @@ impl TuiState {
     pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
         Self {
             build_opts: build_opts.clone(),
-            tool_config: get_tool_config(&build_opts, &log_handler),
+            tool_config: get_tool_config(&build_opts, &log_handler)
+                .expect("Could not get tool config"),
             running: true,
             packages: Vec::new(),
             selected_package: 0,

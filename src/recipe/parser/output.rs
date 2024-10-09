@@ -14,8 +14,8 @@ use crate::{
 };
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
-static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 7] = [
-    "context", "recipe", "source", "build", "outputs", "about", "extra",
+static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 8] = [
+    "context", "recipe", "source", "build", "outputs", "about", "extra", "cache",
 ];
 
 /// Retrieve all outputs from the recipe source (YAML)
@@ -70,7 +70,7 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
                     _partialerror!(
                         *key.span(),
                         ErrorKind::InvalidField(key.as_str().to_string().into()),
-                        help = format!("invalid key ({}) in root node", key.as_str())
+                        help = format!("invalid key `{}` in root node", key.as_str())
                     ),
                 ));
             }

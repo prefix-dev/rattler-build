@@ -1,28 +1,47 @@
 //! Command-line options.
 
-use std::{path::PathBuf, str::FromStr};
+use std::{error::Error, path::PathBuf, str::FromStr};
 
+use clap::{arg, builder::ArgPredicate, crate_version, Parser, ValueEnum};
+use clap_complete::{shells, Generator};
+use clap_complete_nushell::Nushell;
+use clap_verbosity_flag::{InfoLevel, Verbosity};
+use rattler_conda_types::{package::ArchiveType, Platform};
+use rattler_package_streaming::write::CompressionLevel;
+use serde_json::{json, Value};
+use url::Url;
+
+#[cfg(feature = "recipe-generation")]
+use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
-    recipe_generator::GenerateRecipeOpts,
+    tool_configuration::SkipExisting,
 };
-use clap::builder::ArgPredicate;
-use clap::{arg, crate_version, Parser};
-use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::package::ArchiveType;
-use rattler_package_streaming::write::CompressionLevel;
-use url::Url;
 
 /// Application subcommands.
 #[derive(Parser)]
+#[allow(clippy::large_enum_variant)]
 pub enum SubCommands {
-    /// Build a package
+    /// Build a package from a recipe
     Build(BuildOpts),
 
-    /// Test a package
+    /// Run a test for a single package
+    ///
+    /// This creates a temporary directory, copies the package file into it, and
+    /// then runs the indexing. It then creates a test environment that
+    /// installs the package and any extra dependencies specified in the
+    /// package test dependencies file.
+    ///
+    /// With the activated test environment, the packaged test files are run:
+    ///
+    /// * `info/test/run_test.sh` or `info/test/run_test.bat` on Windows
+    /// * `info/test/run_test.py`
+    ///
+    /// These test files are written at "package creation time" and are part of
+    /// the package.
     Test(TestOpts),
 
-    /// Rebuild a package
+    /// Rebuild a package from a package file instead of a recipe.
     Rebuild(RebuildOpts),
 
     /// Upload a package
@@ -31,19 +50,62 @@ pub enum SubCommands {
     /// Generate shell completion script
     Completion(ShellCompletion),
 
+    #[cfg(feature = "recipe-generation")]
     /// Generate a recipe from PyPI or CRAN
     GenerateRecipe(GenerateRecipeOpts),
 
-    /// Handle authentication to external repositories
+    /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
 }
 
 /// Shell completion options.
 #[derive(Parser)]
 pub struct ShellCompletion {
-    /// Shell.
+    /// Specifies the shell for which the completions should be generated
     #[arg(short, long)]
-    pub shell: Option<clap_complete::Shell>,
+    pub shell: Shell,
+}
+
+/// Defines the shells for which we can provide completions
+#[allow(clippy::enum_variant_names)]
+#[derive(ValueEnum, Clone, Debug, Copy, Eq, Hash, PartialEq)]
+pub enum Shell {
+    /// Bourne Again SHell (bash)
+    Bash,
+    /// Elvish shell
+    Elvish,
+    /// Friendly Interactive SHell (fish)
+    Fish,
+    /// Nushell
+    Nushell,
+    /// PowerShell
+    Powershell,
+    /// Z SHell (zsh)
+    Zsh,
+}
+
+impl Generator for Shell {
+    fn file_name(&self, name: &str) -> String {
+        match self {
+            Shell::Bash => shells::Bash.file_name(name),
+            Shell::Elvish => shells::Elvish.file_name(name),
+            Shell::Fish => shells::Fish.file_name(name),
+            Shell::Nushell => Nushell.file_name(name),
+            Shell::Powershell => shells::PowerShell.file_name(name),
+            Shell::Zsh => shells::Zsh.file_name(name),
+        }
+    }
+
+    fn generate(&self, cmd: &clap::Command, buf: &mut dyn std::io::Write) {
+        match self {
+            Shell::Bash => shells::Bash.generate(cmd, buf),
+            Shell::Elvish => shells::Elvish.generate(cmd, buf),
+            Shell::Fish => shells::Fish.generate(cmd, buf),
+            Shell::Nushell => Nushell.generate(cmd, buf),
+            Shell::Powershell => shells::PowerShell.generate(cmd, buf),
+            Shell::Zsh => shells::Zsh.generate(cmd, buf),
+        }
+    }
 }
 
 #[allow(missing_docs)]
@@ -89,10 +151,16 @@ impl App {
 }
 
 /// Common opts that are shared between [`Rebuild`] and [`Build`]` subcommands
-#[derive(Parser, Clone)]
+#[derive(Parser, Clone, Debug)]
 pub struct CommonOpts {
-    /// Output directory for build artifacts. Defaults to `./output`.
-    #[clap(long, env = "CONDA_BLD_PATH")]
+    /// Output directory for build artifacts.
+    #[clap(
+        long,
+        env = "CONDA_BLD_PATH",
+        default_value = "./output",
+        verbatim_doc_comment,
+        help_heading = "Modifying result"
+    )]
     pub output_dir: Option<PathBuf>,
 
     /// Enable support for repodata.json.zst
@@ -179,7 +247,8 @@ impl FromStr for PackageFormatAndCompression {
 /// Build options.
 #[derive(Parser, Clone)]
 pub struct BuildOpts {
-    /// The recipe file or directory containing `recipe.yaml`. Defaults to the current directory.
+    /// The recipe file or directory containing `recipe.yaml`. Defaults to the
+    /// current directory.
     #[arg(
         short,
         long,
@@ -189,66 +258,123 @@ pub struct BuildOpts {
     pub recipe: Vec<PathBuf>,
 
     /// The directory that contains recipes.
-    #[arg(long)]
+    #[arg(long, value_parser = is_dir)]
     pub recipe_dir: Option<PathBuf>,
 
     /// Build recipes up to the specified package.
     #[arg(long)]
     pub up_to: Option<String>,
 
+    /// The build platform to use for the build (e.g. for building with
+    /// emulation, or rendering).
+    #[arg(long, default_value_t = Platform::current())]
+    pub build_platform: Platform,
+
     /// The target platform for the build.
     #[arg(long)]
-    pub target_platform: Option<String>,
+    pub target_platform: Option<Platform>,
 
-    /// Add the channels needed for the recipe using this option. For more then one channel use it multiple times.
-    /// The default channel is `conda-forge`.
-    #[arg(short = 'c', long)]
-    pub channel: Option<Vec<String>>,
+    /// The host platform for the build. If set, it will be used to determine
+    /// also the target_platform (as long as it is not noarch).
+    #[arg(long, default_value_t = Platform::current())]
+    pub host_platform: Platform,
+
+    /// Add a channel to search for dependencies in.
+    #[arg(short = 'c', long, default_value = "conda-forge")]
+    pub channel: Vec<String>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
     pub variant_config: Vec<PathBuf>,
 
+    /// Do not read the `variants.yaml` file next to a recipe.
+    #[arg(long)]
+    pub ignore_recipe_variants: bool,
+
     /// Render the recipe files without executing the build.
     #[arg(long)]
     pub render_only: bool,
+
+    /// Render the recipe files with solving dependencies.
+    #[arg(long, requires("render_only"))]
+    pub with_solve: bool,
 
     /// Keep intermediate build artifacts after the build.
     #[arg(long)]
     pub keep_build: bool,
 
-    /// Don't use build id(timestamp) when creating build directory name. Defaults to `false`.
+    /// Don't use build id(timestamp) when creating build directory name.
     #[arg(long)]
     pub no_build_id: bool,
 
-    /// The package format to use for the build. Can be one of `tar-bz2` or `conda`.
-    /// You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
-    #[arg(long, default_value = "conda")]
+    /// The package format to use for the build. Can be one of `tar-bz2` or
+    /// `conda`. You can also add a compression level to the package format,
+    /// e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
+    /// 22).
+    #[arg(
+        long,
+        default_value = "conda",
+        help_heading = "Modifying result",
+        verbatim_doc_comment
+    )]
     pub package_format: PackageFormatAndCompression,
 
     #[arg(long)]
-    /// The number of threads to use for compression (only relevant when also using `--package-format conda`)
+    /// The number of threads to use for compression (only relevant when also
+    /// using `--package-format conda`)
     pub compression_threads: Option<u32>,
 
-    /// Do not store the recipe in the final package
-    #[arg(long)]
+    /// Don't store the recipe in the final package
+    #[arg(long, help_heading = "Modifying result")]
     pub no_include_recipe: bool,
 
-    /// Do not run tests after building
-    #[arg(long, default_value = "false")]
+    /// Don't run the tests after building the package
+    #[arg(long, default_value = "false", help_heading = "Modifying result")]
     pub no_test: bool,
 
-    /// Do not force colors in the output of the build script
-    #[arg(long, default_value = "true")]
+    /// Don't force colors in the output of the build script
+    #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,
 
-    /// Common options.
+    #[allow(missing_docs)]
     #[clap(flatten)]
     pub common: CommonOpts,
 
     /// Launch the terminal user interface.
     #[arg(long, default_value = "false", hide = !cfg!(feature = "tui"))]
     pub tui: bool,
+
+    /// Whether to skip packages that already exist in any channel
+    /// If set to `none`, do not skip any packages, default when not specified.
+    /// If set to `local`, only skip packages that already exist locally,
+    /// default when using `--skip-existing. If set to `all`, skip packages
+    /// that already exist in any channel.
+    #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result"
+    )]
+    pub skip_existing: SkipExisting,
+
+    /// Extra metadata to include in about.json
+    #[arg(long, value_parser = parse_key_val)]
+    pub extra_meta: Option<Vec<(String, Value)>>,
+}
+
+fn is_dir(dir: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(dir);
+    if path.is_dir() {
+        Ok(path)
+    } else {
+        Err(format!(
+            "Path '{dir}' needs to exist on disk and be a directory",
+        ))
+    }
+}
+
+/// Parse a single key-value pair
+fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync + 'static>> {
+    let (key, value) = s
+        .split_once('=')
+        .ok_or_else(|| format!("invalid KEY=value: no `=` found in `{}`", s))?;
+    Ok((key.to_string(), json!(value)))
 }
 
 /// Test options.
@@ -261,6 +387,10 @@ pub struct TestOpts {
     /// The package file to test
     #[arg(short, long)]
     pub package_file: PathBuf,
+
+    /// The number of threads to use for compression.
+    #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
+    pub compression_threads: Option<u32>,
 
     /// Common options.
     #[clap(flatten)]
@@ -278,13 +408,17 @@ pub struct RebuildOpts {
     #[arg(long, default_value = "false")]
     pub no_test: bool,
 
+    /// The number of threads to use for compression.
+    #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
+    pub compression_threads: Option<u32>,
+
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
 }
 
 /// Upload options.
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct UploadOpts {
     /// The package file to upload
     #[arg(global = true, required = false)]
@@ -312,7 +446,7 @@ pub enum ServerType {
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Options for uploading to a Quetz server.
+/// Upload to aQuetz server.
 /// Authentication is used from the keychain / auth-file.
 pub struct QuetzOpts {
     /// The URL to your Quetz server
@@ -323,7 +457,8 @@ pub struct QuetzOpts {
     #[arg(short, long, env = "QUETZ_CHANNEL")]
     pub channel: String,
 
-    /// The Quetz API key, if none is provided, the token is read from the keychain / auth-file
+    /// The Quetz API key, if none is provided, the token is read from the
+    /// keychain / auth-file
     #[arg(short, long, env = "QUETZ_API_KEY")]
     pub api_key: Option<String>,
 }
@@ -353,7 +488,8 @@ pub struct ArtifactoryOpts {
 /// Authentication is used from the keychain / auth-file
 #[derive(Clone, Debug, PartialEq, Parser)]
 pub struct PrefixOpts {
-    /// The URL to the prefix.dev server (only necessary for self-hosted instances)
+    /// The URL to the prefix.dev server (only necessary for self-hosted
+    /// instances)
     #[arg(
         short,
         long,
@@ -366,7 +502,8 @@ pub struct PrefixOpts {
     #[arg(short, long, env = "PREFIX_CHANNEL")]
     pub channel: String,
 
-    /// The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
+    /// The prefix.dev API key, if none is provided, the token is read from the
+    /// keychain / auth-file
     #[arg(short, long, env = "PREFIX_API_KEY")]
     pub api_key: Option<String>,
 }
@@ -379,10 +516,11 @@ pub struct AnacondaOpts {
     pub owner: String,
 
     /// The channel / label to upload the package to (e.g. main / rc)
-    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main", num_args = 1..)]
+    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main")]
     pub channel: Vec<String>,
 
-    /// The Anaconda API key, if none is provided, the token is read from the keychain / auth-file
+    /// The Anaconda API key, if none is provided, the token is read from the
+    /// keychain / auth-file
     #[arg(short, long, env = "ANACONDA_API_KEY")]
     pub api_key: Option<String>,
 
@@ -450,10 +588,12 @@ pub struct CondaForgeOpts {
 
 #[cfg(test)]
 mod test {
-    use super::PackageFormatAndCompression;
+    use std::str::FromStr;
+
     use rattler_conda_types::package::ArchiveType;
     use rattler_package_streaming::write::CompressionLevel;
-    use std::str::FromStr;
+
+    use super::PackageFormatAndCompression;
 
     #[test]
     fn test_parse_packaging() {

@@ -1,9 +1,11 @@
 //! System tools are installed on the system (git, patchelf, install_name_tool, etc.)
 
+use rattler_conda_types::Platform;
+use rattler_shell::{activation::Activator, shell};
 use serde::{Deserialize, Serialize, Serializer};
 use std::{
     collections::{BTreeMap, HashMap},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     sync::{Arc, Mutex},
 };
@@ -22,6 +24,7 @@ pub enum ToolError {
 #[serde(rename_all = "snake_case")]
 pub enum Tool {
     /// The rattler build tool itself
+    #[serde(rename = "rattler-build")]
     RattlerBuild,
     /// The patch tool
     Patch,
@@ -41,7 +44,7 @@ impl std::fmt::Display for Tool {
             f,
             "{}",
             match self {
-                Tool::RattlerBuild => "rattler_build".to_string(),
+                Tool::RattlerBuild => "rattler-build".to_string(),
                 Tool::Codesign => "codesign".to_string(),
                 Tool::Patch => "patch".to_string(),
                 Tool::Patchelf => "patchelf".to_string(),
@@ -59,6 +62,7 @@ pub struct SystemTools {
     rattler_build_version: String,
     used_tools: Arc<Mutex<HashMap<Tool, String>>>,
     found_tools: Arc<Mutex<HashMap<Tool, PathBuf>>>,
+    build_prefix: Option<PathBuf>,
 }
 
 impl Default for SystemTools {
@@ -67,6 +71,7 @@ impl Default for SystemTools {
             rattler_build_version: env!("CARGO_PKG_VERSION").to_string(),
             used_tools: Arc::new(Mutex::new(HashMap::new())),
             found_tools: Arc::new(Mutex::new(HashMap::new())),
+            build_prefix: None,
         }
     }
 }
@@ -75,6 +80,15 @@ impl SystemTools {
     /// Create a new system tools object
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a copy of the system tools object and add a build prefix to search for tools.
+    /// Tools that are found in the build prefix are not added to the used tools list.
+    pub fn with_build_prefix(&self, prefix: &Path) -> Self {
+        Self {
+            build_prefix: Some(prefix.to_path_buf()),
+            ..self.clone()
+        }
     }
 
     /// Create a new system tools object from a previous run so that we can warn if the versions
@@ -95,15 +109,32 @@ impl SystemTools {
             rattler_build_version,
             used_tools: Arc::new(Mutex::new(used_tools)),
             found_tools: Arc::new(Mutex::new(HashMap::new())),
+            build_prefix: None,
         }
     }
 
     /// Find the tool in the system and return the path to the tool
     fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
+        let which = |tool: &str| -> Result<PathBuf, which::Error> {
+            if let Some(build_prefix) = &self.build_prefix {
+                let build_prefix_activator =
+                    Activator::from_path(build_prefix, shell::Bash, Platform::current()).unwrap();
+
+                let paths = std::env::join_paths(build_prefix_activator.paths).ok();
+                let mut found_tool = which::which_in_global(&tool, paths)?;
+
+                // if the tool is found in the build prefix, return it
+                if let Some(found_tool) = found_tool.next() {
+                    return Ok(found_tool);
+                }
+            }
+            which::which(tool)
+        };
+
         let (tool_path, found_version) = match tool {
             Tool::Patchelf => {
-                let path = which::which("patchelf")?;
-                // patchelf version
+                let path = which("patchelf")?;
+                // patch elf version
                 let output = std::process::Command::new(&path)
                     .arg("--version")
                     .output()
@@ -113,15 +144,15 @@ impl SystemTools {
                 (path, found_version.to_string())
             }
             Tool::InstallNameTool => {
-                let path = which::which("install_name_tool")?;
+                let path = which("install_name_tool")?;
                 (path, "".to_string())
             }
             Tool::Codesign => {
-                let path = which::which("codesign")?;
+                let path = which("codesign")?;
                 (path, "".to_string())
             }
             Tool::Git => {
-                let path = which::which("git")?;
+                let path = which("git")?;
                 let output = std::process::Command::new(&path)
                     .arg("--version")
                     .output()
@@ -131,7 +162,7 @@ impl SystemTools {
                 (path, found_version.to_string())
             }
             Tool::Patch => {
-                let path = which::which("patch")?;
+                let path = which("patch")?;
                 let version = std::process::Command::new(&path)
                     .arg("--version")
                     .output()
@@ -146,6 +177,13 @@ impl SystemTools {
         };
 
         let found_version = found_version.trim().to_string();
+
+        if let Some(build_prefix) = &self.build_prefix {
+            // Do not cache tools found in the (temporary) build prefix
+            if tool_path.starts_with(build_prefix) {
+                return Ok(tool_path);
+            }
+        }
 
         self.found_tools
             .lock()
@@ -171,14 +209,9 @@ impl SystemTools {
     /// Create a new `std::process::Command` for the given tool. The command is created with the
     /// path to the tool and can be further configured with arguments and environment variables.
     pub fn call(&self, tool: Tool) -> Result<Command, ToolError> {
-        let found_tool = self.found_tools.lock().unwrap().get(&tool).cloned();
-        let tool_path = if let Some(tool) = found_tool {
-            tool
-        } else {
-            self.find_tool(tool)
-                .map_err(|e| ToolError::ToolNotFound(tool, e))?
-        };
-
+        let tool_path = self
+            .find_tool(tool)
+            .map_err(|e| ToolError::ToolNotFound(tool, e))?;
         Ok(std::process::Command::new(tool_path))
     }
 }
@@ -244,6 +277,7 @@ mod tests {
             rattler_build_version: "0.0.0".to_string(),
             used_tools: Arc::new(Mutex::new(used_tools)),
             found_tools: Arc::new(Mutex::new(HashMap::new())),
+            build_prefix: None,
         };
 
         let json = serde_json::to_string_pretty(&system_tool).unwrap();

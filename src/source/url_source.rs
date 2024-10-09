@@ -1,14 +1,19 @@
 //! This module contains the implementation of the fetching for a `UrlSource` struct.
 
 use std::{
+    ffi::OsStr,
     fs,
     path::{Path, PathBuf},
 };
 
-use crate::{recipe::parser::UrlSource, tool_configuration};
+use crate::{
+    recipe::parser::UrlSource,
+    source::extract::{extract_tar, extract_zip},
+    tool_configuration,
+};
 use tokio::io::AsyncWriteExt;
 
-use super::{checksum::Checksum, SourceError};
+use super::{checksum::Checksum, extract::is_tarball, SourceError};
 
 fn split_filename(filename: &str) -> (String, String) {
     let stem = Path::new(filename)
@@ -33,68 +38,45 @@ fn split_filename(filename: &str) -> (String, String) {
         "".to_string()
     };
 
+    // remove any dots from the stem
+    let stem_without_tar = stem_without_tar.replace('.', "_");
+
     (stem_without_tar.to_string(), full_extension)
 }
 
-fn cache_name_from_url(url: &url::Url, checksum: &Checksum) -> Option<String> {
-    let filename = url.path_segments()?.last()?;
+fn cache_name_from_url(
+    url: &url::Url,
+    checksum: &Checksum,
+    with_extension: bool,
+) -> Option<String> {
+    let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
     let (stem, extension) = split_filename(filename);
     let checksum = checksum.to_hex();
-    Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
+    if with_extension {
+        Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
+    } else {
+        Some(format!("{}_{}", stem, &checksum[0..8]))
+    }
 }
 
-pub(crate) async fn url_src(
-    source: &UrlSource,
-    cache_dir: &Path,
+async fn fetch_remote(
+    url: &url::Url,
+    target: &Path,
     tool_configuration: &tool_configuration::Configuration,
-) -> Result<PathBuf, SourceError> {
-    // convert sha256 or md5 to Checksum
-    let checksum = Checksum::from_url_source(source).ok_or_else(|| {
-        SourceError::NoChecksum(format!("No checksum found for url: {}", source.url()))
-    })?;
-
-    if source.url().scheme() == "file" {
-        let local_path = source.url().to_file_path().map_err(|_| {
-            SourceError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Invalid local file path",
-            ))
-        })?;
-
-        if !local_path.is_file() {
-            return Err(SourceError::FileNotFound(local_path));
-        }
-
-        if !checksum.validate(&local_path) {
-            return Err(SourceError::ValidationFailed);
-        }
-
-        tracing::info!("Using local source file.");
-        return Ok(local_path);
-    }
-
-    let cache_name = PathBuf::from(cache_name_from_url(source.url(), &checksum).ok_or(
-        SourceError::UnknownErrorStr("Failed to build cache name from url"),
-    )?);
-    let cache_name = cache_dir.join(cache_name);
-
-    let metadata = fs::metadata(&cache_name);
-    if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
-        tracing::info!("Found valid source cache file.");
-        return Ok(cache_name.clone());
-    }
-
+) -> Result<(), SourceError> {
     let client = reqwest::Client::new();
     let download_size = {
-        let resp = client.head(source.url().as_str()).send().await?;
-        if resp.status().is_success() {
-            resp.headers()
+        let resp = client.head(url.as_str()).send().await?;
+        match resp.error_for_status() {
+            Ok(resp) => resp
+                .headers()
                 .get(reqwest::header::CONTENT_LENGTH)
                 .and_then(|ct_len| ct_len.to_str().ok())
                 .and_then(|ct_len| ct_len.parse().ok())
-                .unwrap_or(0)
-        } else {
-            return Err(SourceError::UrlNotFile(source.url().clone()));
+                .unwrap_or(0),
+            Err(e) => {
+                return Err(SourceError::Url(e));
+            }
         }
     };
 
@@ -104,16 +86,14 @@ pub(crate) async fn url_src(
             .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
     );
     progress_bar.set_message(
-        source
-            .url()
-            .path_segments()
+        url.path_segments()
             .and_then(|segs| segs.last())
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
-    let mut file = tokio::fs::File::create(&cache_name).await?;
+    let mut file = tokio::fs::File::create(&target).await?;
 
-    let request = client.get(source.url().as_str());
+    let request = client.get(url.clone());
     let mut download = request.send().await?;
 
     while let Some(chunk) = download.chunk().await? {
@@ -124,14 +104,113 @@ pub(crate) async fn url_src(
     progress_bar.finish();
 
     file.flush().await?;
+    Ok(())
+}
 
-    if !checksum.validate(&cache_name) {
-        tracing::error!("Checksum validation failed!");
-        fs::remove_file(&cache_name)?;
-        return Err(SourceError::ValidationFailed);
+fn extracted_folder(path: &Path) -> PathBuf {
+    let filename = path.file_name().unwrap_or_default().to_string_lossy();
+    // remove everything after first dot
+    let filename = filename.split('.').next().unwrap_or_default();
+    path.with_file_name(filename)
+}
+
+fn extract_to_cache(
+    path: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<PathBuf, SourceError> {
+    let target = extracted_folder(path);
+
+    if target.is_dir() {
+        tracing::info!("Using extracted directory from cache: {:?}", target);
+        return Ok(target);
     }
 
-    Ok(cache_name)
+    if is_tarball(
+        path.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .as_ref(),
+    ) {
+        tracing::info!("Extracting tar file to cache: {:?}", path);
+        extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    } else if path.extension() == Some(OsStr::new("zip")) {
+        tracing::info!("Extracting zip file to cache: {:?}", path);
+        extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
+        return Ok(target);
+    }
+
+    Ok(path.to_path_buf())
+}
+
+pub(crate) async fn url_src(
+    source: &UrlSource,
+    cache_dir: &Path,
+    tool_configuration: &tool_configuration::Configuration,
+) -> Result<PathBuf, SourceError> {
+    // convert sha256 or md5 to Checksum
+    let checksum = Checksum::from_url_source(source).ok_or_else(|| {
+        SourceError::NoChecksum(format!("No checksum found for url(s): {:?}", source.urls()))
+    })?;
+
+    let mut last_error = None;
+    for url in source.urls() {
+        if url.scheme() == "file" {
+            let local_path = url.to_file_path().map_err(|_| {
+                SourceError::Io(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "Invalid local file path",
+                ))
+            })?;
+
+            if !local_path.is_file() {
+                return Err(SourceError::FileNotFound(local_path));
+            }
+
+            if !checksum.validate(&local_path) {
+                return Err(SourceError::ValidationFailed);
+            }
+
+            tracing::info!("Using local source file.");
+            return Ok(local_path);
+        }
+
+        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum, true).ok_or(
+            SourceError::UnknownErrorStr("Failed to build cache name from url"),
+        )?);
+        let cache_name = cache_dir.join(cache_name);
+
+        let metadata = fs::metadata(&cache_name);
+        if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
+            tracing::info!("Found valid source cache file.");
+            return extract_to_cache(&cache_name, tool_configuration);
+        }
+
+        match fetch_remote(url, &cache_name, tool_configuration).await {
+            Ok(_) => {
+                tracing::info!("Downloaded file from {}", url);
+
+                if !checksum.validate(&cache_name) {
+                    tracing::error!("Checksum validation failed!");
+                    fs::remove_file(&cache_name)?;
+                    return Err(SourceError::ValidationFailed);
+                }
+
+                return extract_to_cache(&cache_name, tool_configuration);
+            }
+            Err(e) => {
+                last_error = Some(e);
+            }
+        }
+    }
+
+    if let Some(last_error) = last_error {
+        Err(last_error)
+    } else {
+        Err(SourceError::UnknownError(
+            "Could not download any file".to_string(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -149,7 +228,7 @@ mod tests {
             ("example.zip", ("example", ".zip")),
             ("example.tar", ("example", ".tar")),
             ("example", ("example", "")),
-            (".hidden.tar.gz", (".hidden", ".tar.gz")),
+            (".hidden.tar.gz", ("_hidden", ".tar.gz")),
         ];
 
         for (filename, expected) in test_cases {
@@ -172,7 +251,7 @@ mod tests {
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
                     "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
                 ).unwrap()),
-                "snowflake-3.13.27_6a15e95e.zip",
+                "snowflake-3_13_27_6a15e95e.zip",
             ),
             (
                 "https://example.com/example.tar.gz",
@@ -186,13 +265,13 @@ mod tests {
                 Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
                     "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
                 ).unwrap()),
-                "micromamba-12.23.12_63fd8a1d.tar.gz",
+                "micromamba-12_23_12_63fd8a1d.tar.gz",
             ),
         ];
 
         for (url, checksum, expected) in cases {
             let url = Url::parse(url).unwrap();
-            let name = cache_name_from_url(&url, &checksum).unwrap();
+            let name = cache_name_from_url(&url, &checksum, true).unwrap();
             assert_eq!(name, expected);
         }
     }

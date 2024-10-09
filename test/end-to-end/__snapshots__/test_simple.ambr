@@ -1,0 +1,16 @@
+# serializer version: 1
+# name: test_noarch_flask
+  '''
+  - python:
+      imports:
+      - flask
+      - flask.json
+  - script:
+    - flask --help
+    - pip check
+    requirements:
+      run:
+      - pip
+  
+  '''
+# ---

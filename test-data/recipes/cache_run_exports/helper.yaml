@@ -1,0 +1,14 @@
+outputs:
+  - package:
+      name: normal-run-exports
+      version: "1.0.0"
+    requirements:
+      run_exports:
+        - normal-run-exports
+  - package:
+      name: strong-run-exports
+      version: "1.0.0"
+    requirements:
+      run_exports:
+        strong:
+          - normal-run-exports

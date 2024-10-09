@@ -1,16 +1,107 @@
 //! Copy a directory to another location using globs to filter the files and directories to copy.
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use fs_err::create_dir_all;
 
-use fs_extra::dir::CopyOptions;
+use globset::Glob;
 use ignore::WalkBuilder;
+use rayon::iter::{ParallelBridge, ParallelIterator};
+
+use crate::recipe::parser::GlobVec;
 
 use super::SourceError;
+
+/// The copy options for the copy_dir function.
+pub struct CopyOptions {
+    /// Overwrite files if they already exist (default: false)
+    pub overwrite: bool,
+    /// Skip files if they already exist (default: false)
+    pub skip_exist: bool,
+    /// Buffer size for copying files (default: 8 MiB)
+    pub buffer_size: usize,
+}
+
+impl Default for CopyOptions {
+    fn default() -> Self {
+        Self {
+            overwrite: false,
+            skip_exist: false,
+            buffer_size: 8 * 1024 * 1024,
+        }
+    }
+}
+
+/// Cross platform way of creating a symlink
+/// Creates a symlink from `link` to `original`
+/// The file that is newly created is the `link` file
+pub(crate) fn create_symlink(
+    original: impl AsRef<Path>,
+    link: impl AsRef<Path>,
+) -> Result<(), SourceError> {
+    let original = original.as_ref();
+    let link = link.as_ref();
+
+    if link.exists() {
+        fs_err::remove_file(link)?;
+    }
+
+    #[cfg(unix)]
+    fs_err::os::unix::fs::symlink(original, link)?;
+    #[cfg(windows)]
+    {
+        if original.is_dir() {
+            std::os::windows::fs::symlink_dir(original, link)?;
+        } else {
+            std::os::windows::fs::symlink_file(original, link)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Copy a file or directory, or symlink to another location.
+/// Use reflink if possible.
+pub(crate) fn copy_file(
+    from: impl AsRef<Path>,
+    to: impl AsRef<Path>,
+    paths_created: &mut HashSet<PathBuf>,
+    options: &CopyOptions,
+) -> Result<(), SourceError> {
+    let path = from.as_ref();
+    let dest_path = to.as_ref();
+
+    if path.is_dir() {
+        create_dir_all_cached(dest_path, paths_created)?;
+        Ok(())
+    } else {
+        // create dir if parent does not exist
+        if let Some(parent) = dest_path.parent() {
+            create_dir_all_cached(parent, paths_created)?;
+        }
+
+        // if file is a symlink, copy it as a symlink
+        if path.is_symlink() {
+            let link_target = fs_err::read_link(path)?;
+            create_symlink(link_target, dest_path)?;
+            Ok(())
+        } else {
+            if dest_path.exists() {
+                if !(options.overwrite || options.skip_exist) {
+                    tracing::error!("File already exists: {:?}", dest_path);
+                } else if options.skip_exist {
+                    tracing::warn!("File already exists! Skipping file: {:?}", dest_path);
+                } else if options.overwrite {
+                    tracing::warn!("File already exists! Overwriting file: {:?}", dest_path);
+                }
+            }
+            reflink_or_copy(path, dest_path, options).map_err(SourceError::FileSystemError)?;
+            Ok(())
+        }
+    }
+}
 
 /// The copy_dir function accepts additionally a list of globs to ignore or include in the copy process.
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
@@ -20,14 +111,13 @@ use super::SourceError;
 ///
 /// # Return
 ///
-/// The returned `Vec<PathBuf>` contains the pathes of the copied files.
+/// The returned `Vec<PathBuf>` contains the paths of the copied files.
 /// The `bool` flag indicates whether any of the _include_ globs matched.
 /// If a directory is created in this function, the path to the directory is _not_ returned.
 pub(crate) struct CopyDir<'a> {
     from_path: &'a Path,
     to_path: &'a Path,
-    include_globs: Vec<&'a str>,
-    exclude_globs: Vec<&'a str>,
+    globvec: GlobVec,
     use_gitignore: bool,
     use_git_global: bool,
     hidden: bool,
@@ -39,63 +129,16 @@ impl<'a> CopyDir<'a> {
         Self {
             from_path,
             to_path,
-            include_globs: Vec::new(),
-            exclude_globs: Vec::new(),
+            globvec: GlobVec::default(),
             use_gitignore: false,
             use_git_global: false,
             hidden: false,
-            copy_options: CopyOptions::new(),
+            copy_options: CopyOptions::default(),
         }
     }
 
-    /// Parse the iterator of &str as globs
-    ///
-    /// This is a conveniance helper for parsing an iterator of &str as include and exclude globs.
-    ///
-    /// # Note
-    ///
-    /// Uses '~' as negation character (exclude globs)
-    pub fn with_parse_globs<I>(mut self, globs: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        let (exclude_globs, include_globs): (Vec<_>, Vec<_>) = globs
-            .into_iter()
-            .partition(|g| g.trim_start().starts_with('~'));
-
-        self.include_globs.extend(include_globs);
-        self.exclude_globs
-            .extend(exclude_globs.into_iter().map(|g| g.trim_start_matches('~')));
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_include_glob(mut self, include: &'a str) -> Self {
-        self.include_globs.push(include);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_include_globs<I>(mut self, includes: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        self.include_globs.extend(includes);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_exclude_glob(mut self, exclude: &'a str) -> Self {
-        self.exclude_globs.push(exclude);
-        self
-    }
-
-    #[allow(unused)]
-    pub fn with_exclude_globs<I>(mut self, excludes: I) -> Self
-    where
-        I: IntoIterator<Item = &'a str>,
-    {
-        self.exclude_globs.extend(excludes);
+    pub fn with_globvec(mut self, globvec: &GlobVec) -> Self {
+        self.globvec = globvec.clone();
         self
     }
 
@@ -130,30 +173,17 @@ impl<'a> CopyDir<'a> {
         self
     }
 
-    #[allow(unused)]
-    pub fn content_only(mut self, b: bool) -> Self {
-        self.copy_options.content_only = b;
-        self
-    }
-
-    pub fn run(self) -> Result<CopyDirResult<'a>, SourceError> {
+    pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
         create_dir_all(self.to_path)?;
 
-        let (folders, globs) = self
-            .include_globs
-            .into_iter()
-            .partition::<Vec<_>, _>(|glob| glob.ends_with('/') && !glob.contains('*'));
-
-        let folders = Arc::new(folders.into_iter().map(PathBuf::from).collect::<Vec<_>>());
-
         let mut result = CopyDirResult {
             copied_paths: Vec::with_capacity(0), // do not allocate as we overwrite this anyways
-            include_globs: make_glob_match_map(globs)?,
-            exclude_globs: make_glob_match_map(self.exclude_globs)?,
+            include_globs: make_glob_match_map(self.globvec.include_globs())?,
+            exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
 
-        let copied_pathes = WalkBuilder::new(self.from_path)
+        let copied_paths = WalkBuilder::new(self.from_path)
             // disregard global gitignore
             .git_global(self.use_git_global)
             .git_ignore(self.use_gitignore)
@@ -165,13 +195,13 @@ impl<'a> CopyDir<'a> {
                     Err(e) => return Some(Err(e)),
                 };
 
-                // if the entry is a directory, ignore it for the final output
-                if entry
+                let is_dir = entry
                     .file_type()
                     .as_ref()
                     .map(|ft| ft.is_dir())
-                    .unwrap_or(false)
-                {
+                    .unwrap_or(false);
+                // if the entry is a directory, ignore it for the final output
+                if is_dir {
                     // if the dir is empty, check if we should create it anyways
                     if entry.path().read_dir().ok()?.next().is_some()
                         || !result.include_globs().is_empty()
@@ -192,6 +222,7 @@ impl<'a> CopyDir<'a> {
                     components.iter().collect()
                 };
 
+                // include everything
                 let include = result.include_globs().is_empty();
 
                 let include = include
@@ -203,9 +234,6 @@ impl<'a> CopyDir<'a> {
                         .count()
                         != 0;
 
-                let include =
-                    include || folders.clone().iter().any(|f| stripped_path.starts_with(f));
-
                 let exclude = result
                     .exclude_globs_mut()
                     .iter_mut()
@@ -216,70 +244,163 @@ impl<'a> CopyDir<'a> {
 
                 (include && !exclude).then_some(Ok(entry))
             })
-            .map(|entry| {
-                let entry = entry?;
-                let path = entry.path();
+            .par_bridge()
+            .map_with(
+                HashSet::from_iter([self.to_path.to_path_buf()]),
+                |paths_created: &mut HashSet<PathBuf>, entry| {
+                    let entry = entry?;
+                    let path = entry.path();
 
-                let stripped_path = path.strip_prefix(self.from_path)?;
-                let dest_path = self.to_path.join(stripped_path);
+                    let stripped_path = path.strip_prefix(self.from_path)?;
+                    let dest_path = self.to_path.join(stripped_path);
 
-                if path.is_dir() {
-                    // create the empty dir
-                    create_dir_all(&dest_path)?;
-                    Ok(Some(dest_path))
-                } else {
-                    // create dir if parent does not exist
-                    if let Some(parent) = dest_path.parent() {
-                        if !parent.exists() {
-                            create_dir_all(parent)?;
-                        }
-                    }
-
-                    let file_options = fs_extra::file::CopyOptions {
-                        overwrite: self.copy_options.overwrite,
-                        skip_exist: self.copy_options.skip_exist,
-                        buffer_size: self.copy_options.buffer_size,
-                    };
-
-                    // if file is a symlink, copy it as a symlink
-                    if path.is_symlink() {
-                        let link_target = std::fs::read_link(path)?;
-                        #[cfg(unix)]
-                        std::os::unix::fs::symlink(link_target, &dest_path)?;
-                        #[cfg(windows)]
-                        std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+                    if path.is_dir() {
+                        create_dir_all_cached(&dest_path, paths_created)?;
+                        Ok(Some(dest_path))
                     } else {
-                        fs_extra::file::copy(path, &dest_path, &file_options)
-                            .map_err(SourceError::FileSystemError)?;
-                    }
+                        // create dir if parent does not exist
+                        if let Some(parent) = dest_path.parent() {
+                            create_dir_all_cached(parent, paths_created)?;
+                        }
 
-                    Ok(Some(dest_path))
-                }
-            })
+                        // if file is a symlink, copy it as a symlink
+                        if path.is_symlink() {
+                            let link_target = fs_err::read_link(path)?;
+                            #[cfg(unix)]
+                            fs_err::os::unix::fs::symlink(link_target, &dest_path)?;
+                            #[cfg(windows)]
+                            std::os::windows::fs::symlink_file(link_target, &dest_path)?;
+                        } else {
+                            if dest_path.exists() {
+                                if !(self.copy_options.overwrite || self.copy_options.skip_exist) {
+                                    tracing::error!("File already exists: {:?}", dest_path);
+                                } else if self.copy_options.skip_exist {
+                                    tracing::warn!(
+                                        "File already exists! Skipping file: {:?}",
+                                        dest_path
+                                    );
+                                } else if self.copy_options.overwrite {
+                                    tracing::warn!(
+                                        "File already exists! Overwriting file: {:?}",
+                                        dest_path
+                                    );
+                                }
+                            }
+                            reflink_or_copy(path, &dest_path, &self.copy_options)
+                                .map_err(SourceError::FileSystemError)?;
+                        }
+
+                        Ok(Some(dest_path))
+                    }
+                },
+            )
             .filter_map(|res| res.transpose())
             .collect::<Result<Vec<_>, SourceError>>()?;
 
-        result.copied_paths = copied_pathes;
+        result.copied_paths = copied_paths;
         Ok(result)
     }
 }
 
-pub(crate) struct CopyDirResult<'a> {
-    copied_paths: Vec<PathBuf>,
-    include_globs: HashMap<Glob<'a>, Match>,
-    exclude_globs: HashMap<Glob<'a>, Match>,
+/// Recursively creates directories and keeps an in-memory cache of the directories that have been
+/// created before. This speeds up creation of large amounts of directories significantly because
+/// there are fewer IO operations.
+fn create_dir_all_cached(path: &Path, paths_created: &mut HashSet<PathBuf>) -> std::io::Result<()> {
+    // Find the first directory that is not already created
+    let mut dirs_to_create = Vec::new();
+    let mut path = path;
+    loop {
+        if paths_created.contains(path) {
+            break;
+        }
+
+        if path.is_dir() {
+            paths_created.insert(path.to_path_buf());
+            break;
+        }
+
+        dirs_to_create.push(path.to_path_buf());
+        path = match path.parent() {
+            Some(path) => path,
+            None => break,
+        }
+    }
+
+    // Actually create the directories
+    for path in dirs_to_create.into_iter().rev() {
+        match fs_err::create_dir(&path) {
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Ok(()) => {}
+            Err(e) => return Err(e),
+        }
+
+        paths_created.insert(path);
+    }
+
+    Ok(())
 }
 
-impl<'a> CopyDirResult<'a> {
+/// Reflinks or copies a file. If reflinking fails the file is copied instead.
+///
+/// The implementation of this function is partially taken from fs_extra.
+pub fn reflink_or_copy<P, Q>(from: P, to: Q, options: &CopyOptions) -> std::io::Result<()>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    let from = from.as_ref();
+    if !from.exists() {
+        let msg = format!(
+            "Path \"{}\" does not exist or you don't have access!",
+            from.to_str().unwrap_or("???")
+        );
+        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, msg));
+    }
+
+    if !from.is_file() {
+        let msg = format!("Path \"{}\" is not a file!", from.to_str().unwrap_or("???"));
+        return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg));
+    }
+
+    if to.as_ref().exists() {
+        if !options.overwrite {
+            if options.skip_exist {
+                return Ok(());
+            }
+
+            let msg = format!(
+                "Path \"{}\" already exists!",
+                to.as_ref().to_str().unwrap_or("???")
+            );
+            return Err(std::io::Error::new(std::io::ErrorKind::AlreadyExists, msg));
+        }
+
+        // Reflinking on windows cannot overwrite files. It will fail with a permission denied error.
+        fs_err::remove_file(&to)?;
+    }
+
+    // Reflink or copy the file
+    reflink_copy::reflink_or_copy(from, to)?;
+
+    Ok(())
+}
+
+pub(crate) struct CopyDirResult {
+    copied_paths: Vec<PathBuf>,
+    include_globs: HashMap<Glob, Match>,
+    exclude_globs: HashMap<Glob, Match>,
+}
+
+impl CopyDirResult {
     pub fn copied_paths(&self) -> &[PathBuf] {
         &self.copied_paths
     }
 
-    pub fn include_globs(&self) -> &HashMap<Glob<'a>, Match> {
+    pub fn include_globs(&self) -> &HashMap<Glob, Match> {
         &self.include_globs
     }
 
-    fn include_globs_mut(&mut self) -> &mut HashMap<Glob<'a>, Match> {
+    fn include_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
         &mut self.include_globs
     }
 
@@ -288,11 +409,11 @@ impl<'a> CopyDirResult<'a> {
     }
 
     #[allow(unused)]
-    pub fn exclude_globs(&self) -> &HashMap<Glob<'a>, Match> {
+    pub fn exclude_globs(&self) -> &HashMap<Glob, Match> {
         &self.exclude_globs
     }
 
-    fn exclude_globs_mut(&mut self) -> &mut HashMap<Glob<'a>, Match> {
+    fn exclude_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
         &mut self.exclude_globs
     }
 
@@ -302,30 +423,14 @@ impl<'a> CopyDirResult<'a> {
     }
 }
 
-fn make_glob_match_map(globs: Vec<&str>) -> Result<HashMap<Glob, Match>, SourceError> {
+fn make_glob_match_map(globs: &[Glob]) -> Result<HashMap<Glob, Match>, SourceError> {
     globs
-        .into_iter()
-        .map(|gl| {
-            let glob = Glob::new(gl)?;
-            let match_ = Match::new(&glob);
-            Ok((glob, match_))
+        .iter()
+        .map(|glob| {
+            let matcher = Match::new(glob);
+            Ok(((*glob).clone(), matcher))
         })
         .collect()
-}
-
-#[derive(Hash, Eq, PartialEq)]
-pub(crate) struct Glob<'a> {
-    s: &'a str,
-    g: globset::Glob,
-}
-
-impl<'a> Glob<'a> {
-    fn new(s: &'a str) -> Result<Self, SourceError> {
-        Ok(Self {
-            s,
-            g: globset::Glob::new(s)?,
-        })
-    }
 }
 
 pub(crate) struct Match {
@@ -336,7 +441,7 @@ pub(crate) struct Match {
 impl Match {
     fn new(glob: &Glob) -> Self {
         Self {
-            matcher: glob.g.compile_matcher(),
+            matcher: glob.compile_matcher(),
             matched: false,
         }
     }
@@ -361,13 +466,15 @@ impl Match {
 mod test {
     use std::{collections::HashSet, fs, fs::File};
 
+    use crate::recipe::parser::GlobVec;
+
     #[test]
     fn test_copy_dir() {
         let tmp_dir = tempfile::TempDir::new().unwrap();
         let tmp_dir_path = tmp_dir.into_path();
         let dir = tmp_dir_path.as_path().join("test_copy_dir");
 
-        fs_extra::dir::create_all(&dir, true).unwrap();
+        fs_err::create_dir_all(&dir).unwrap();
 
         // test.txt
         // test_dir/test.md
@@ -394,7 +501,7 @@ mod test {
         let dest_dir_2 = tmp_dir_path.as_path().join("test_copy_dir_dest_2");
         // ignore all txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_2)
-            .with_include_glob("*.txt")
+            .with_globvec(&GlobVec::from_vec(vec!["*.txt"], None))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -403,9 +510,10 @@ mod test {
         assert_eq!(copy_dir.copied_paths()[0], dest_dir_2.join("test.txt"));
 
         let dest_dir_3 = tmp_dir_path.as_path().join("test_copy_dir_dest_3");
+
         // ignore all txt files
         let copy_dir = super::CopyDir::new(&dir, &dest_dir_3)
-            .with_exclude_glob("*.txt")
+            .with_globvec(&GlobVec::from_vec(vec![], Some(vec!["*.txt"])))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -432,16 +540,19 @@ mod test {
         let dest_dir = tempfile::TempDir::new().unwrap();
 
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/")
+            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/"], None))
             .use_gitignore(false)
             .run()
             .unwrap();
         assert_eq!(copy_dir.copied_paths().len(), 2);
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/")
-            .with_exclude_glob("*.rst")
+            .with_globvec(&GlobVec::from_vec(
+                vec!["test_copy_dir/test_1.txt"],
+                Some(vec!["*.rst"]),
+            ))
             .use_gitignore(false)
             .run()
             .unwrap();
@@ -451,9 +562,10 @@ mod test {
             dest_dir.path().join("test_copy_dir/test_1.txt")
         );
 
-        fs_extra::dir::create_all(&dest_dir, true).unwrap();
+        fs_err::remove_dir_all(&dest_dir).unwrap();
+        fs_err::create_dir_all(&dest_dir).unwrap();
         let copy_dir = super::CopyDir::new(tmp_dir.path(), dest_dir.path())
-            .with_include_glob("test_copy_dir/test_1.txt")
+            .with_globvec(&GlobVec::from_vec(vec!["test_copy_dir/test_1.txt"], None))
             .use_gitignore(false)
             .run()
             .unwrap();

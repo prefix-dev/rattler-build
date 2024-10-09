@@ -43,7 +43,7 @@ package is available for `linux-64` (your build platform), the compilation
 should succeed.
 
 The distinction between the `build` and `host` sections begins to make sense when
-thinking about cross-compilation. The `build` enviromemnt is resolved to
+thinking about cross-compilation. The `build` environment is resolved to
 packages that need to _run_ at compilation time. For example, `cmake`, `gcc`,
 and `autotools` are all tools that need to be executed. Therefore, the `build`
 environment resolves to packages for the `linux-64` architecture (in our

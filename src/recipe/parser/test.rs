@@ -13,7 +13,7 @@ use crate::{
     validate_keys,
 };
 
-use super::{glob_vec::GlobVec, FlattenErrors};
+use super::{glob_vec::GlobVec, FlattenErrors, Script};
 
 /// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -30,25 +30,24 @@ pub struct CommandsTestRequirements {
 /// The files that should be copied to the test directory (they are stored in the package)
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
-    // TODO parse as globs
     /// Files to be copied from the source directory to the test directory.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub source: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub source: GlobVec,
 
     /// Files to be copied from the recipe directory to the test directory.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub recipe: Vec<String>,
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub recipe: GlobVec,
 }
 
 /// A test that executes a script in a freshly created environment
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommandsTest {
     /// The script to run
-    pub script: Vec<String>,
+    pub script: Script,
     /// The (extra) requirements for the test.
     /// Similar to the `requirements` section in the recipe the `build` requirements
     /// are of the build-computer architecture and the `run` requirements are of the
-    /// target_platform architecture. The current package is implictly added to the
+    /// target_platform architecture. The current package is implicitly added to the
     /// `run` requirements.
     #[serde(default, skip_serializing_if = "CommandsTestRequirements::is_empty")]
     pub requirements: CommandsTestRequirements,
@@ -84,7 +83,7 @@ fn is_true(value: &bool) -> bool {
 pub struct PythonTest {
     /// List of imports to test
     pub imports: Vec<String>,
-    /// Wether to run `pip check` or not (default to true)
+    /// Whether to run `pip check` or not (default to true)
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
 }
@@ -105,22 +104,29 @@ pub struct DownstreamTest {
     pub downstream: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 /// The test type enum
-#[serde(rename_all = "snake_case", tag = "test_type")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum TestType {
-    /// A Python test.
-    Python(PythonTest),
+    /// A Python test that will test if the imports are available and run `pip check`
+    Python {
+        /// The imports to test and the `pip check` flag
+        python: PythonTest,
+    },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
     /// A test that runs the tests of a downstream package
     Downstream(DownstreamTest),
     /// A test that checks the contents of the package
-    PackageContents(PackageContentsTest),
+    PackageContents {
+        /// The package contents to test against
+        // Note we use a struct for better serialization
+        package_contents: PackageContentsTest,
+    },
 }
 
+/// Package content test that compares the contents of the package with the expected contents.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-/// PackageContent
 pub struct PackageContentsTest {
     /// file paths, direct and/or globs
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -172,7 +178,9 @@ impl TryConvertNode<TestType> for RenderedNode {
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(TestType::PackageContents(PackageContentsTest::default())),
+            RenderedNode::Null(_) => Ok(TestType::PackageContents {
+                package_contents: PackageContentsTest::default(),
+            }),
         }
     }
 }
@@ -192,15 +200,17 @@ pub fn as_mapping(
 
 impl TryConvertNode<TestType> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<TestType, Vec<PartialParsingError>> {
-        let mut test = TestType::PackageContents(PackageContentsTest::default());
+        let mut test = TestType::PackageContents {
+            package_contents: PackageContentsTest::default(),
+        };
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
 
             match key_str {
                 "python" => {
-                    let imports = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::Python(imports);
+                    let python = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Python{ python };
                 }
                 "script" | "requirements" | "files"  => {
                     let commands = self.try_convert(key_str)?;
@@ -212,12 +222,12 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                 }
                 "package_contents" => {
                     let package_contents = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::PackageContents(package_contents);
+                    test = TestType::PackageContents { package_contents };
                 }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `command`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -309,7 +319,7 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
 
         validate_keys!(commands_test, self.iter(), script, requirements, files);
 
-        if commands_test.script.is_empty() {
+        if commands_test.script.is_default() {
             Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::MissingField("script".into()),
@@ -355,7 +365,10 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
 }
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod test {
+    use std::fs;
+
     use super::TestType;
     use insta::assert_snapshot;
 
@@ -383,14 +396,32 @@ mod test {
 
         // from yaml
         let tests: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
-        let t = tests.get(0);
+        let t = tests.first();
 
         match t {
-            Some(TestType::Python(python_test)) => {
-                assert_eq!(python_test.imports, vec!["numpy.testing", "numpy.matrix"]);
-                assert_eq!(python_test.pip_check, true);
+            Some(TestType::Python { python }) => {
+                assert_eq!(python.imports, vec!["numpy.testing", "numpy.matrix"]);
+                assert!(python.pip_check);
             }
             _ => panic!("expected python test"),
         }
+    }
+
+    #[test]
+    fn test_script_parsing() {
+        let test_data_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test-data");
+        let text = fs::read_to_string(test_data_dir.join("recipes/test-section/script-test.yaml"))
+            .unwrap();
+
+        // parse the YAML
+        let yaml_root = RenderedNode::parse_yaml(0, &text)
+            .map_err(|err| vec![err])
+            .unwrap();
+
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
     }
 }

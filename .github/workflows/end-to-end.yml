@@ -1,15 +1,7 @@
 on:
   push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - "rust-tests/**"
+    branches: [ main ]
   pull_request:
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - "rust-tests/**"
 
 name: End-to-End testing
 
@@ -28,7 +20,7 @@ jobs:
   run_tests:
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
       fail-fast: false
 
     name: Run tests
@@ -40,15 +32,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.75.0"
-      - uses: prefix-dev/setup-pixi@v0.5.1
-        with:
-          pixi-version: v0.13.0
+      - uses: prefix-dev/setup-pixi@v0.8.1
       - if: runner.os == 'macOS'
         run: pixi global install patchelf
       # build in release mode so that it's reasonably fast to run the tests
       - run: cargo build --release
       - run: cargo test --release -p rust-tests -- --test-threads 1
-      - run: pixi run end_to_end_test
+      - run: pixi run end_to_end_test -s -v
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}

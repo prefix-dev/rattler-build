@@ -8,9 +8,11 @@
 //! * `files` - check if a list of files exist
 
 use fs_err as fs;
-use rattler_conda_types::package::IndexJson;
-use rattler_conda_types::ParseStrictness;
+use rattler_conda_types::package::{IndexJson, PackageFile};
+use rattler_conda_types::{Channel, ParseStrictness};
+use std::collections::HashMap;
 use std::fmt::Write as fmt_write;
+use std::io::Write;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
@@ -20,15 +22,14 @@ use dunce::canonicalize;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
 use rattler_index::index;
-use rattler_shell::activation::ActivationError;
+use rattler_shell::{activation::ActivationError, shell::Shell, shell::ShellEnum};
+use rattler_solve::{ChannelPriority, SolveStrategy};
+use url::Url;
 
 use crate::env_vars;
-use crate::recipe::parser::{Script, ScriptContent};
-use crate::{
-    recipe::parser::{CommandsTestRequirements, PythonTest},
-    render::solver::create_environment,
-    tool_configuration,
-};
+use crate::recipe::parser::{CommandsTest, DownstreamTest, Script, ScriptContent, TestType};
+use crate::source::copy_dir::CopyDir;
+use crate::{recipe::parser::PythonTest, render::solver::create_environment, tool_configuration};
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -45,8 +46,8 @@ pub enum TestError {
     #[error("failed to build glob from pattern")]
     GlobError(#[from] globset::Error),
 
-    #[error("failed to run test")]
-    TestFailed,
+    #[error("failed to run test: {0}")]
+    TestFailed(String),
 
     #[error(transparent)]
     IoError(#[from] std::io::Error),
@@ -62,6 +63,9 @@ pub enum TestError {
 
     #[error("failed to setup test environment: {0}")]
     TestEnvironmentActivation(#[from] ActivationError),
+
+    #[error("failed to parse tests from `info/tests/tests.yaml`: {0}")]
+    TestYamlParseError(#[from] serde_yaml::Error),
 
     #[error("failed to parse JSON from test files: {0}")]
     TestJSONParseError(#[from] serde_json::Error),
@@ -86,14 +90,21 @@ enum Tests {
 }
 
 impl Tests {
-    async fn run(&self, environment: &Path, cwd: &Path) -> Result<(), TestError> {
+    async fn run(
+        &self,
+        environment: &Path,
+        cwd: &Path,
+        pkg_vars: &HashMap<String, String>,
+    ) -> Result<(), TestError> {
         tracing::info!("Testing commands:");
 
-        let mut env_vars = env_vars::os_vars(environment, &Platform::current());
-        env_vars.retain(|key, _| key != "PATH");
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(environment, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
-            environment.to_string_lossy().to_string(),
+            Some(environment.to_string_lossy().to_string()),
         );
         let tmp_dir = tempfile::tempdir()?;
 
@@ -105,8 +116,7 @@ impl Tests {
                 };
 
                 // copy all test files to a temporary directory and set it as the working directory
-                let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-                fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
+                CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
                     TestError::IoError(std::io::Error::new(
                         std::io::ErrorKind::Other,
                         format!("Failed to copy test files: {}", e),
@@ -114,9 +124,9 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
                     .await
-                    .map_err(|_| TestError::TestFailed)?;
+                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
             Tests::Python(path) => {
                 let script = Script {
@@ -126,9 +136,9 @@ impl Tests {
                 };
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
                     .await
-                    .map_err(|_| TestError::TestFailed)?;
+                    .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
         }
         Ok(())
@@ -167,19 +177,47 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
 }
 
 /// The configuration for a test
-#[derive(Default, Clone, Debug)]
+#[derive(Clone)]
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
-    /// The target platform
+    /// The target platform. If not set it will be discovered from the index.json metadata.
     pub target_platform: Option<Platform>,
+    /// The host platform for run-time dependencies. If not set it will be
+    /// discovered from the index.json metadata.
+    pub host_platform: Option<Platform>,
     /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
     /// The channels to use for the test – do not forget to add the local build outputs channel
     /// if desired
-    pub channels: Vec<String>,
+    pub channels: Vec<Url>,
+    /// The channel priority that is used to resolve dependencies
+    pub channel_priority: ChannelPriority,
+    /// The solve strategy to use when resolving dependencies
+    pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+}
+
+fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
+    let mut res = HashMap::new();
+
+    res.insert(
+        "PKG_NAME".to_string(),
+        index_json.name.as_normalized().to_string(),
+    );
+    res.insert("PKG_VERSION".to_string(), index_json.version.to_string());
+    res.insert("PKG_BUILD_STRING".to_string(), index_json.build.clone());
+    res.insert(
+        "PKG_BUILDNUM".to_string(),
+        index_json.build_number.to_string(),
+    );
+    res.insert(
+        "PKG_BUILD_NUMBER".to_string(),
+        index_json.build_number.to_string(),
+    );
+
+    res
 }
 
 /// Run a test for a single package
@@ -204,7 +242,12 @@ pub struct TestConfiguration {
 ///
 /// * `Ok(())` if the test was successful
 /// * `Err(TestError::TestFailed)` if the test failed
-pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result<(), TestError> {
+#[async_recursion::async_recursion]
+pub async fn run_test(
+    package_file: &Path,
+    config: &TestConfiguration,
+    downstream_package: Option<PathBuf>,
+) -> Result<(), TestError> {
     let tmp_repo = tempfile::tempdir()?;
 
     // create the test prefix
@@ -234,12 +277,28 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         ),
     )?;
 
+    // Also copy the downstream package if it exists
+    if let Some(ref downstream_package) = downstream_package {
+        std::fs::copy(
+            downstream_package,
+            subdir.join(
+                downstream_package
+                    .file_name()
+                    .ok_or(TestError::MissingPackageFileName)?,
+            ),
+        )?;
+    }
+
+    // if there is a downstream package, that's the one we actually want to test
+    let package_file = downstream_package.as_deref().unwrap_or(package_file);
+
     // index the temporary channel
     index(tmp_repo.path(), Some(&target_platform))?;
 
     let cache_dir = rattler::default_cache_dir()?;
 
-    let pkg = ArchiveIdentifier::try_from_path(package_file).ok_or(TestError::TestFailed)?;
+    let pkg = ArchiveIdentifier::try_from_path(package_file)
+        .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
     // if the package is already in the cache, remove it. TODO make this based on SHA256 instead!
     let cache_key = CacheKey::from(pkg.clone());
@@ -254,17 +313,20 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     tracing::info!("Creating test environment in {:?}", prefix);
 
-    let platform = if target_platform != Platform::NoArch {
-        target_platform
-    } else {
-        Platform::current()
-    };
-
     let mut channels = config.channels.clone();
-    channels.insert(0, tmp_repo.path().to_string_lossy().to_string());
+    channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
+
+    let host_platform = config.host_platform.unwrap_or_else(|| {
+        if target_platform == Platform::NoArch {
+            Platform::current()
+        } else {
+            target_platform
+        }
+    });
 
     let config = TestConfiguration {
         target_platform: Some(target_platform),
+        host_platform: Some(host_platform),
         channels,
         ..config.clone()
     };
@@ -273,16 +335,16 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
 
     rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
         tracing::error!("Failed to extract package: {:?}", e);
-        TestError::TestFailed
+        TestError::TestFailed(format!("failed to extract package: {:?}", e))
     })?;
 
+    let index_json = IndexJson::from_package_directory(&package_folder)?;
+    let env = env_vars_from_package(&index_json);
     // extract package in place
     if package_folder.join("info/test").exists() {
         let test_dep_json = PathBuf::from("info/test/test_time_dependencies.json");
         let test_dependencies: Vec<String> = if package_folder.join(&test_dep_json).exists() {
-            serde_json::from_str(&std::fs::read_to_string(
-                package_folder.join(&test_dep_json),
-            )?)?
+            serde_json::from_str(&fs::read_to_string(package_folder.join(&test_dep_json))?)?
         } else {
             Vec::new()
         };
@@ -301,11 +363,14 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         dependencies.push(match_spec);
 
         create_environment(
+            "test",
             &dependencies,
-            &platform,
+            &host_platform,
             &prefix,
             &config.channels,
             &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
@@ -314,7 +379,7 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         let (test_folder, tests) = legacy_tests_from_folder(&package_folder).await?;
 
         for test in tests {
-            test.run(&prefix, &test_folder).await?;
+            test.run(&prefix, &test_folder, &env).await?;
         }
 
         tracing::info!(
@@ -323,15 +388,34 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         );
     }
 
-    if package_folder.join("info/tests").exists() {
-        // These are the new style tests
-        let test_folder = package_folder.join("info/tests");
-        let mut read_dir = tokio::fs::read_dir(&test_folder).await?;
+    if package_folder.join("info/tests/tests.yaml").exists() {
+        let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
+        let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
-        // for each enumerated test, we load and run it
-        while let Some(entry) = read_dir.next_entry().await? {
-            tracing::info!("test {:?}", entry.path());
-            run_individual_test(&pkg, &entry.path(), &prefix, &config).await?;
+        for test in tests {
+            match test {
+                TestType::Command(c) => {
+                    c.run_test(&pkg, &package_folder, &prefix, &config, &env)
+                        .await?
+                }
+                TestType::Python { python } => {
+                    python
+                        .run_test(&pkg, &package_folder, &prefix, &config)
+                        .await?
+                }
+                TestType::Downstream(downstream) if downstream_package.is_none() => {
+                    downstream
+                        .run_test(&pkg, package_file, &prefix, &config)
+                        .await?
+                }
+                TestType::Downstream(_) => {
+                    tracing::info!(
+                        "Skipping downstream test as we are already testing a downstream package"
+                    )
+                }
+                // This test already runs during the build process and we don't need to run it again
+                TestType::PackageContents { .. } => {}
+            }
         }
 
         tracing::info!(
@@ -340,189 +424,279 @@ pub async fn run_test(package_file: &Path, config: &TestConfiguration) -> Result
         );
     }
 
-    fs::remove_dir_all(prefix)?;
+    if prefix.exists() {
+        fs::remove_dir_all(prefix)?;
+    }
 
     Ok(())
 }
 
-async fn run_python_test(
-    pkg: &ArchiveIdentifier,
-    path: &Path,
-    prefix: &Path,
-    config: &TestConfiguration,
-) -> Result<(), TestError> {
-    let test_file = path.join("python_test.json");
-    let test: PythonTest = serde_json::from_reader(fs::File::open(test_file)?)?;
+impl PythonTest {
+    /// Execute the Python test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running python test");
+        let _guard = span.enter();
 
-    let match_spec = MatchSpec::from_str(
-        format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-        ParseStrictness::Lenient,
-    )?;
-    let mut dependencies = vec![match_spec];
-    if test.pip_check {
-        dependencies.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap());
-    }
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+        let mut dependencies = vec![match_spec];
+        if self.pip_check {
+            dependencies.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap());
+        }
 
-    create_environment(
-        &dependencies,
-        &Platform::current(),
-        prefix,
-        &config.channels,
-        &config.tool_configuration,
-    )
-    .await
-    .map_err(TestError::TestEnvironmentSetup)?;
-
-    let mut imports = String::new();
-    for import in test.imports {
-        writeln!(imports, "import {}", import)?;
-    }
-
-    let script = Script {
-        content: ScriptContent::Command(imports),
-        interpreter: Some("python".into()),
-        ..Script::default()
-    };
-
-    let tmp_dir = tempfile::tempdir()?;
-    script
-        .run_script(Default::default(), tmp_dir.path(), path, prefix, None)
+        create_environment(
+            "test",
+            &dependencies,
+            &Platform::current(),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
         .await
-        .map_err(|_| TestError::TestFailed)?;
+        .map_err(TestError::TestEnvironmentSetup)?;
 
-    tracing::info!(
-        "{} python imports test passed!",
-        console::style(console::Emoji("✔", "")).green()
-    );
+        let mut imports = String::new();
+        for import in &self.imports {
+            writeln!(imports, "import {}", import)?;
+        }
 
-    if test.pip_check {
         let script = Script {
-            content: ScriptContent::Command("pip check".into()),
+            content: ScriptContent::Command(imports),
+            interpreter: Some("python".into()),
             ..Script::default()
         };
+
+        let tmp_dir = tempfile::tempdir()?;
         script
-            .run_script(Default::default(), path, path, prefix, None)
+            .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
             .await
-            .map_err(|_| TestError::TestFailed)?;
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
         tracing::info!(
-            "{} pip check passed!",
+            "{} python imports test passed!",
             console::style(console::Emoji("✔", "")).green()
         );
-    }
 
-    Ok(())
+        if self.pip_check {
+            let script = Script {
+                content: ScriptContent::Command("pip check".into()),
+                ..Script::default()
+            };
+            script
+                .run_script(Default::default(), path, path, prefix, None, None)
+                .await
+                .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+            tracing::info!(
+                "{} pip check passed!",
+                console::style(console::Emoji("✔", "")).green()
+            );
+        }
+
+        Ok(())
+    }
 }
 
-async fn run_shell_test(
-    pkg: &ArchiveIdentifier,
-    path: &Path,
-    prefix: &Path,
-    config: &TestConfiguration,
-) -> Result<(), TestError> {
-    let deps = if path.join("test_time_dependencies.json").exists() {
-        let test_dep_json = path.join("test_time_dependencies.json");
-        serde_json::from_str(&fs::read_to_string(test_dep_json)?)?
-    } else {
-        CommandsTestRequirements::default()
-    };
+impl CommandsTest {
+    /// Execute the command test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+        pkg_vars: &HashMap<String, String>,
+    ) -> Result<(), TestError> {
+        let deps = self.requirements.clone();
 
-    let build_env = if !deps.build.is_empty() {
-        tracing::info!("Installing build dependencies");
-        let build_prefix = prefix.join("bld");
-        let platform = Platform::current();
-        let build_dependencies = deps
-            .build
+        let span = tracing::info_span!("Running script test");
+        let _guard = span.enter();
+
+        let build_env = if !deps.build.is_empty() {
+            tracing::info!("Installing build dependencies");
+            let build_prefix = prefix.join("bld");
+            let platform = Platform::current();
+            let build_dependencies = deps
+                .build
+                .iter()
+                .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
+                .collect::<Result<Vec<_>, _>>()?;
+
+            create_environment(
+                "test",
+                &build_dependencies,
+                &platform,
+                &build_prefix,
+                &config.channels,
+                &config.tool_configuration,
+                config.channel_priority,
+                config.solve_strategy,
+            )
+            .await
+            .map_err(TestError::TestEnvironmentSetup)?;
+            Some(build_prefix)
+        } else {
+            None
+        };
+
+        let mut dependencies = deps
+            .run
             .iter()
             .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
             .collect::<Result<Vec<_>, _>>()?;
 
+        // create environment with the test dependencies
+        dependencies.push(MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?);
+
+        let platform = config.host_platform.unwrap_or_else(Platform::current);
+
+        let run_env = prefix.join("run");
         create_environment(
-            &build_dependencies,
+            "test",
+            &dependencies,
             &platform,
-            &build_prefix,
+            &run_env,
             &config.channels,
             &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
         )
         .await
         .map_err(TestError::TestEnvironmentSetup)?;
-        Some(build_prefix)
-    } else {
-        None
-    };
 
-    let mut dependencies = deps
-        .run
-        .iter()
-        .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
-        .collect::<Result<Vec<_>, _>>()?;
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(prefix, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
+        env_vars.insert(
+            "PREFIX".to_string(),
+            Some(run_env.to_string_lossy().to_string()),
+        );
 
-    // create environment with the test dependencies
-    dependencies.push(MatchSpec::from_str(
-        format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
-        ParseStrictness::Lenient,
-    )?);
+        // copy all test files to a temporary directory and set it as the working directory
+        let tmp_dir = tempfile::tempdir()?;
+        CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
+            TestError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to copy test files: {}", e),
+            ))
+        })?;
 
-    let platform = config.target_platform.unwrap_or_else(Platform::current);
+        tracing::info!("Testing commands:");
+        self.script
+            .run_script(
+                env_vars,
+                tmp_dir.path(),
+                path,
+                &run_env,
+                build_env.as_ref(),
+                None,
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
-    let run_env = prefix.join("run");
-    create_environment(
-        &dependencies,
-        &platform,
-        &run_env,
-        &config.channels,
-        &config.tool_configuration,
-    )
-    .await
-    .map_err(TestError::TestEnvironmentSetup)?;
-
-    let mut env_vars = env_vars::os_vars(prefix, &Platform::current());
-    env_vars.retain(|key, _| key != "PATH");
-    env_vars.insert("PREFIX".to_string(), run_env.to_string_lossy().to_string());
-
-    let script = Script {
-        content: ScriptContent::Path(PathBuf::from("run_test")),
-        ..Default::default()
-    };
-
-    // copy all test files to a temporary directory and set it as the working directory
-    let tmp_dir = tempfile::tempdir()?;
-    let copy_options = fs_extra::dir::CopyOptions::new().content_only(true);
-    fs_extra::dir::copy(path, tmp_dir.path(), &copy_options).map_err(|e| {
-        TestError::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("Failed to copy test files: {}", e),
-        ))
-    })?;
-
-    tracing::info!("Testing commands:");
-    script
-        .run_script(env_vars, tmp_dir.path(), path, &run_env, build_env.as_ref())
-        .await
-        .map_err(|_| TestError::TestFailed)?;
-
-    Ok(())
+        Ok(())
+    }
 }
 
-async fn run_individual_test(
-    pkg: &ArchiveIdentifier,
-    path: &Path,
-    prefix: &Path,
-    config: &TestConfiguration,
-) -> Result<(), TestError> {
-    if path.join("python_test.json").exists() {
-        run_python_test(pkg, path, prefix, config).await?;
-    } else if path.join("run_test.sh").exists() || path.join("run_test.bat").exists() {
-        // run shell test
-        run_shell_test(pkg, path, prefix, config).await?;
-    } else {
-        // no test found
+impl DownstreamTest {
+    /// Execute the command test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let downstream_spec = self.downstream.clone();
+
+        let span = tracing::info_span!("Running downstream test for", package = downstream_spec);
+        let _guard = span.enter();
+
+        // first try to resolve an environment with the downstream spec and our
+        // current package
+        let match_specs = [
+            MatchSpec::from_str(&downstream_spec, ParseStrictness::Lenient)?,
+            MatchSpec::from_str(
+                format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+                ParseStrictness::Lenient,
+            )?,
+        ];
+
+        let target_platform = config.target_platform.unwrap_or_else(Platform::current);
+
+        let resolved = create_environment(
+            "test",
+            &match_specs,
+            &target_platform,
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await;
+
+        match resolved {
+            Ok(solution) => {
+                let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
+                // we found a solution, so let's run the downstream test with that particular package!
+                let downstream_package = solution
+                    .iter()
+                    .find(|s| s.package_record.name == spec_name)
+                    .ok_or_else(|| {
+                        TestError::TestFailed(
+                            "Could not find package in the resolved environment".to_string(),
+                        )
+                    })?;
+
+                let temp_dir = tempfile::tempdir()?;
+                let package_file = temp_dir.path().join(&downstream_package.file_name);
+
+                if downstream_package.url.scheme() == "file" {
+                    fs::copy(
+                        downstream_package.url.to_file_path().unwrap(),
+                        &package_file,
+                    )?;
+                } else {
+                    let package_dl = reqwest::get(downstream_package.url.clone()).await.unwrap();
+                    // write out the package to a temporary directory
+                    let mut file = fs::File::create(&package_file)?;
+                    let bytes = package_dl.bytes().await.unwrap();
+                    file.write_all(&bytes)?;
+                }
+
+                // run the test with the downstream package
+                tracing::info!("Running downstream test with {:?}", &package_file);
+                run_test(path, config, Some(package_file.clone()))
+                    .await
+                    .map_err(|e| {
+                        tracing::error!("Downstream test with {:?} failed", &package_file);
+                        e
+                    })?;
+            }
+            Err(e) => {
+                // ignore the error
+                tracing::warn!(
+                    "Downstream test could not run. Environment might be unsolvable: {:?}",
+                    e
+                );
+            }
+        }
+
+        Ok(())
     }
-
-    tracing::info!(
-        "{} test passed!",
-        console::style(console::Emoji("✔", "")).green()
-    );
-
-    Ok(())
 }

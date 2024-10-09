@@ -1,5 +1,6 @@
 recipe:
   schema_version: 1
+  context: {}
   package:
     name: curl
     version: 8.0.1
@@ -11,7 +12,7 @@ recipe:
     string: h60d57d3_0
   requirements:
     build:
-    - compiler: c
+    - clang_osx-arm64
     - make
     - perl
     - pkg-config
@@ -35,15 +36,15 @@ build_configuration:
     target_platform: osx-arm64
   hash:
     hash: 60d57d3
-    hash_input: '{"target_platform": "osx-arm64"}'
-    hash_prefix: ''
   directories:
     host_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold
     build_prefix: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/build_env
     work_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293/work
     build_dir: /Users/wolfv/Programs/rattler-build/output/bld/rattler-build_curl_1700573293
   channels:
-  - conda-forge
+  - https://conda.anaconda.org/conda-forge
+  channel_priority: strict
+  solve_strategy: highest
   timestamp: 2023-11-21T13:28:13.086796Z
   subpackages:
     curl:
@@ -53,20 +54,14 @@ build_configuration:
   packaging_settings:
     archive_type: tar_bz2
     compression_level: 3
-    compression_threads: 1
 finalized_dependencies:
   build:
     specs:
-    - source: compiler
-      spec: clang_osx-arm64
-    - source: raw
-      spec: make
-    - source: raw
-      spec: perl
-    - source: raw
-      spec: pkg-config
-    - source: raw
-      spec: libtool
+    - source: clang_osx-arm64
+    - source: make
+    - source: perl
+    - source: pkg-config
+    - source: libtool
     resolved:
     - build: he57ea6c_1
       build_number: 1
@@ -143,6 +138,11 @@ finalized_dependencies:
       fn: perl-5.32.1-4_hf2054a2_perl5.conda
       url: https://conda.anaconda.org/conda-forge/osx-arm64/perl-5.32.1-4_hf2054a2_perl5.conda
       channel: https://conda.anaconda.org/conda-forge/
+      run_exports:
+        weak:
+          - perl >=5.32.1,<5.33.0a0 *_perl5
+        noarch:
+          - perl >=5.32.1,<6.0a0 *_perl5
     - build: hb438215_1
       build_number: 1
       constrains:
@@ -630,16 +630,9 @@ finalized_dependencies:
       fn: ca-certificates-2023.11.17-hf0a4a13_0.conda
       url: https://conda.anaconda.org/conda-forge/osx-arm64/ca-certificates-2023.11.17-hf0a4a13_0.conda
       channel: https://conda.anaconda.org/conda-forge/
-    run_exports:
-      perl:
-        weak:
-        - perl >=5.32.1,<5.33.0a0 *_perl5
-        noarch:
-        - perl >=5.32.1,<6.0a0 *_perl5
   host: null
   run:
     depends: []
-    constrains: []
-    run_exports: null
+    constraints: []
 system_tools:
-  rattler_build: 0.12.1
+  rattler-build: 0.12.1

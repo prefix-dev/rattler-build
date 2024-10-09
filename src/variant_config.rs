@@ -9,12 +9,11 @@ use indexmap::IndexSet;
 use miette::Diagnostic;
 use rattler_conda_types::{NoArchType, ParseVersionError, Platform};
 use serde::{Deserialize, Serialize};
-use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+
 use thiserror::Error;
 
-use crate::recipe::parser::Dependency;
 use crate::{
-    _partialerror,
+    _partialerror, env_vars,
     hash::HashInfo,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
@@ -25,6 +24,7 @@ use crate::{
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
 };
+use crate::{recipe::parser::Dependency, utils::NormalizedKeyBTreeMap};
 use petgraph::{algo::toposort, graph::DiGraph};
 
 #[allow(missing_docs)]
@@ -84,7 +84,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
     }
 }
 
-#[serde_as]
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// The variant configuration.
 /// This is usually loaded from a YAML file and contains a mapping of package names to a list of
@@ -149,9 +148,8 @@ pub struct VariantConfig {
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
-    #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
     #[serde(flatten)]
-    pub variants: BTreeMap<String, Vec<String>>,
+    pub variants: NormalizedKeyBTreeMap,
 }
 
 #[allow(missing_docs)]
@@ -333,12 +331,16 @@ impl VariantConfig {
             })
             .collect::<Vec<_>>();
 
-        let variant_keys = self
-            .variants
+        let variant_keys = used_vars
             .iter()
-            .filter(|(key, _)| used_vars.contains(*key))
-            .filter(|(key, _)| !zip_keys.iter().any(|zip| zip.contains(*key)))
-            .map(|(key, values)| VariantKey::Key(key.clone(), values.clone()))
+            .filter_map(|key| {
+                if let Some(values) = self.variants.get(key) {
+                    if !zip_keys.iter().any(|zip| zip.contains(key)) {
+                        return Some(VariantKey::Key(key.clone(), values.clone()));
+                    }
+                }
+                None
+            })
             .collect::<Vec<_>>();
 
         let variant_keys = used_zip_keys
@@ -400,9 +402,10 @@ impl VariantConfig {
                         .into();
                     errs
                 })?;
+
             let noarch_type = parsed_recipe.build().noarch();
             // add in any host and build dependencies
-            used_vars.extend(parsed_recipe.requirements().all().filter_map(|dep| {
+            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
                 match dep {
                     Dependency::Spec(spec) => {
                         // here we filter python as a variant and don't take it's passed variants
@@ -415,15 +418,28 @@ impl VariantConfig {
                             normalized_name.to_string().into()
                         })
                     }
-                    Dependency::PinSubpackage(pin) => {
-                        Some(pin.pin_value().name.as_normalized().to_string())
-                    }
                     _ => None,
                 }
             }));
 
+            used_vars.extend(
+                parsed_recipe
+                    .requirements()
+                    .all()
+                    .filter_map(|dep| match dep {
+                        Dependency::PinSubpackage(pin) => {
+                            Some(pin.pin_value().name.as_normalized().to_string())
+                        }
+                        _ => None,
+                    }),
+            );
+
             let use_keys = &parsed_recipe.build().variant().use_keys;
             used_vars.extend(use_keys.iter().cloned());
+
+            // Environment variables can be overwritten by the variant configuration
+            let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.host_platform);
+            used_vars.extend(env_vars.keys().cloned());
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
@@ -516,11 +532,8 @@ impl VariantConfig {
                     errs
                 })?;
             let noarch_type = parsed_recipe.build().noarch();
-            let build_time_requirements = parsed_recipe
-                .requirements()
-                .build_time()
-                .cloned()
-                .filter_map(|dep| {
+            let build_time_requirements =
+                parsed_recipe.build_time_requirements().filter_map(|dep| {
                     // here we filter python as a variant and don't take it's passed variants
                     // when noarch is python
                     if let Dependency::Spec(spec) = &dep {
@@ -530,7 +543,7 @@ impl VariantConfig {
                             }
                         }
                     }
-                    Some(dep)
+                    Some(dep.clone())
                 });
             all_build_dependencies.extend(build_time_requirements);
         }
@@ -618,31 +631,35 @@ impl VariantConfig {
                     })?;
 
                 // find the variables that were actually used in the recipe and that count towards the hash
-                let requirements = parsed_recipe.requirements();
-                requirements.build_time().for_each(|dep| match dep {
-                    Dependency::Spec(spec) => {
+                parsed_recipe.build_time_requirements().for_each(|dep| {
+                    if let Dependency::Spec(spec) = dep {
                         if let Some(name) = &spec.name {
                             let val = name.as_normalized().to_owned();
                             used_variables.insert(val);
                         }
                     }
-                    Dependency::PinSubpackage(pin_sub) => {
-                        let pin = pin_sub.pin_value();
-                        let val = pin.name.as_normalized().to_owned();
-                        if pin.exact {
-                            exact_pins.insert(val);
-                        }
-                    }
-                    Dependency::PinCompatible(pin_compatible) => {
-                        let pin = pin_compatible.pin_value();
-                        let val = pin.name.as_normalized().to_owned();
-                        if pin.exact {
-                            exact_pins.insert(val);
-                        }
-                    }
-                    // Be explicit about the other cases, so we can add them later
-                    Dependency::Compiler(_) => (),
                 });
+
+                parsed_recipe
+                    .requirements()
+                    .all()
+                    .for_each(|dep| match dep {
+                        Dependency::PinSubpackage(pin_sub) => {
+                            let pin = pin_sub.pin_value();
+                            let val = pin.name.as_normalized().to_owned();
+                            if pin.args.exact {
+                                exact_pins.insert(val);
+                            }
+                        }
+                        Dependency::PinCompatible(pin_compatible) => {
+                            let pin = pin_compatible.pin_value();
+                            let val = pin.name.as_normalized().to_owned();
+                            if pin.args.exact {
+                                exact_pins.insert(val);
+                            }
+                        }
+                        _ => {}
+                    });
 
                 // actually used vars
                 let mut used_filtered = combination
@@ -663,15 +680,16 @@ impl VariantConfig {
                     }
                 }
 
-                requirements
+                parsed_recipe
+                    .requirements()
                     .run
                     .iter()
-                    .chain(requirements.run_constraints.iter())
-                    .chain(requirements.run_exports().all())
+                    .chain(parsed_recipe.requirements().run_constraints.iter())
+                    .chain(parsed_recipe.requirements().run_exports().all())
                     .try_for_each(|dep| -> Result<(), VariantError> {
                         if let Dependency::PinSubpackage(pin_sub) = dep {
                             let pin = pin_sub.pin_value();
-                            if pin.exact {
+                            if pin.args.exact {
                                 let val = pin.name.as_normalized();
                                 if val != *name {
                                     // if other_recipes does not contain val, throw an error
@@ -713,8 +731,8 @@ impl VariantConfig {
                 let build_string = parsed_recipe
                     .build()
                     .string()
-                    .unwrap_or(&hash.to_string())
-                    .to_string();
+                    .resolve(&hash, parsed_recipe.build().number)
+                    .into_owned();
 
                 other_recipes.insert(
                     parsed_recipe.package().name().as_normalized().to_string(),
@@ -723,8 +741,8 @@ impl VariantConfig {
                         parsed_recipe
                             .build()
                             .string()
-                            .unwrap_or(&hash.to_string())
-                            .to_string(),
+                            .resolve(&hash, parsed_recipe.build().number)
+                            .into_owned(),
                         used_filtered.clone(),
                     ),
                 );
@@ -772,7 +790,9 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                 _ => {
                     let variants: Option<Vec<_>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config.variants.insert(key_str.to_string(), variants);
+                        config
+                            .variants
+                            .insert(key_str.to_string(), variants.clone());
                     }
                 }
             }
@@ -906,6 +926,7 @@ mod tests {
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             variant: Default::default(),
             hash: None,
@@ -919,6 +940,7 @@ mod tests {
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Win64,
+            host_platform: Platform::Win64,
             build_platform: Platform::Win64,
             ..Default::default()
         };
@@ -935,6 +957,7 @@ mod tests {
         let yaml_file = test_data_dir.join("variant_files/variant_config_1.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -950,6 +973,7 @@ mod tests {
         let yaml_file = test_data_dir.join("recipes/variants/variant_config.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -976,7 +1000,7 @@ mod tests {
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = BTreeMap::new();
+        let mut variants = NormalizedKeyBTreeMap::new();
         variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
         variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
         let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];
@@ -1018,6 +1042,7 @@ mod tests {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };
@@ -1049,6 +1074,7 @@ mod tests {
         let yaml_file = test_data_dir.join("recipes/variants/python_variant.yaml");
         let selector_config = SelectorConfig {
             target_platform: Platform::NoArch,
+            host_platform: Platform::Linux64,
             build_platform: Platform::Linux64,
             ..Default::default()
         };

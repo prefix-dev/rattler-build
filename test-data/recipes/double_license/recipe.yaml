@@ -1,0 +1,13 @@
+package:
+  name: "double-license"
+  version: '0.1.0'
+
+source:
+  # license file twice, in $SRC_DIR and $RECIPE_DIR
+  path: ./license.txt
+
+build:
+  number: 0
+
+about:
+  license_file: license.txt

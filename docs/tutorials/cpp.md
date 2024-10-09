@@ -2,20 +2,36 @@
 
 This tutorial will guide you though making a C++ package with `rattler-build`.
 
-## Header-only library
+## Building a Header-only Library
 
-Here we will build a package for the header-only library `xtensor`. The package
-depends on `cmake` and `ninja` for building.
+To build a package for the header-only library `xtensor`, you need to manage dependencies and ensure proper installation paths.
 
-The main "trick" is to instruct `CMake` to install the headers in the right
-prefix, by using the `CMAKE_INSTALL_PREFIX` setting. On Unix, `conda` packages
-follow the regular "Unix" prefix standard (`$PREFIX/include` and `$PREFIX/lib`
-etc.). On Windows, it also looks like a "Unix" prefix but it's nested in a
-`Library` folder (`$PREFIX/Library/include` and `$PREFIX/Library/lib` etc.). For
-this reason, there are some handy variables (`%LIBRARY_PREFIX%` and
-`%LIBRARY_BIN%`) that can be used in the `CMake` command to install the headers
-and libraries in the right place.
+### Key Steps
 
+1. **Dependencies**:
+   Ensure `cmake`, `ninja`, and a `compiler` are available as dependencies.
+
+2. **CMake Installation Prefix**:
+   Use the `CMAKE_INSTALL_PREFIX` setting to instruct `CMake` to install the headers in the correct location.
+
+   * **Unix Systems**:
+       Follow the standard Unix prefix:
+       ```sh
+       $PREFIX/include
+       $PREFIX/lib
+       ```
+
+   * **Windows Systems**:
+     Use a Unix-like prefix but nested in a `Library` directory:
+     ```sh
+     $PREFIX/Library/include
+     $PREFIX/Library/lib
+     ```
+     Utilize the handy variables `%LIBRARY_PREFIX%` and `%LIBRARY_BIN%` to guide `CMake` to install the headers and libraries correctly.
+
+This approach ensures that the headers and libraries are installed in the correct directories on both Unix and Windows systems.
+
+### Recipe
 ```yaml title="recipe.yaml"
 context:
   version: "0.24.6"
@@ -31,37 +47,37 @@ source:
 build:
   number: 0
   script:
-    - if: win
+    - if: win # (1)!
       then: |
-        cmake -GNinja \
-            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% \
+        cmake -GNinja ^
+            -D BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% ^
             %SRC_DIR%
         ninja install
       else: |
-        cmake ${CMAKE_ARGS} -GNinja -DBUILD_TESTS=OFF \
-              -DCMAKE_INSTALL_PREFIX=$PREFIX \
+        cmake -GNinja \
+              -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX \
               $SRC_DIR
         ninja install
 
 requirements:
   build:
-    - ${{ compiler('cxx') }}
+    - ${{ compiler('cxx') }} # (2)!
     - cmake
     - ninja
   host:
     - xtl >=0.7,<0.8
   run:
     - xtl >=0.7,<0.8
-  run_constraints:
+  run_constraints: # (3)!
     - xsimd >=8.0.3,<10
 
 tests:
   - package_contents:
-      include:
+      include: # (4)!
         - xtensor/xarray.hpp
-      files:
-        - share/cmake/xtensor/xtensorConfig.cmake
-        - share/cmake/xtensor/xtensorConfigVersion.cmake
+      files: # (5)!
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfig.cmake
+        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfigVersion.cmake
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor
@@ -77,11 +93,44 @@ extra:
     - some-maintainer
 ```
 
-## A C++ application
+1. The `if:` condition allows the user to switch behavior of the build based on some checks like, the operating system.
+2. The `compiler` function is used to get the C++ compiler for the build system.
+3. The `run_constraints` section specifies the version range of a package which the package can run "with".
+But which the package doesn't depend on itself.
+4. The `include` section specifies the header file to tested for existence.
+5. The `files` section specifies the files to be tested for existence, using a glob pattern.
 
-In this example we will build `poppler`, a C++ application to manipulate PDF
-files from the command line. The final package will install a few tools into the
-`bin/` folder.
+!!! note "`CMAKE_ARGS`"
+    It can be tedious to remember all the different variables one needs to pass to CMake to create the perfect build.
+    The `cmake` package on conda-forge introduces the`CMAKE_ARGS` environment variable.
+    This variable contains the necessary flags to make the package build correctly, also when cross-compiling from one machine to another.
+    Therefore, it is often not necessary to pass any additional flags to the `cmake` command.
+    However, because this is a tutorial we will show how to pass the necessary flags to `cmake` manually.
+
+    For more information please refer to the [conda-forge documentation](https://conda-forge.org/docs/maintainer/knowledge_base/#how-to-enable-cross-compilation).
+
+## Building A C++ application
+
+In this example, we'll build `poppler`, a C++ application for manipulating PDF files from the command line.
+The final package will install several tools into the `bin/` folder.
+We'll use external build scripts and run actual scripts in the test.
+
+### Key Steps
+
+1. **Dependencies**:
+    - **Build Dependencies**: These are necessary for the building process, including `cmake`, `ninja`, and `pkg-config`.
+    - **Host Dependencies**: These are the libraries `poppler` links against, such as `cairo`, `fontconfig`, `freetype`, `glib`, and others.
+
+2. **Compiler Setup**:
+   We use the `compiler` function to obtain the appropriate C and C++ compilers.
+
+3. **Build Script**:
+   The `build.script` field points to an external script (`poppler-build.sh`) which contains the build commands.
+
+4. **Testing**:
+   Simple tests are included to verify that the installed tools (`pdfinfo`, `pdfunite`, `pdftocairo`) are working correctly by running them, and expecting an exit code `0`.
+
+### Recipe
 
 ```yaml title="recipe.yaml"
 context:
@@ -126,14 +175,15 @@ tests:
       - pdftocairo --help
 ```
 
-1. We use the `compiler` function to get the compiler for C and C++.
-2. These are all the dependencies that we link against
+1. The `compiler` jinja function to get the correct compiler for C and C++ on the build system.
+2. These are all the dependencies that the library links against.
 3. The script test just executes some of the installed tools to check if they
-   are working. You could run some more complex tests if you want.
+   are working. These can be as complex as you want. (`bash` or `cmd.exe`)
 
+### External Build Script
 We've defined an external build script in the recipe. This will be searched next
-to the recipe by the file name given (or by the default name `build.sh` or
-`build.bat`).
+to the recipe by the file name given, or the default name `build.sh` on `unix` or
+`build.bat` on windows are searched for.
 
 ```bash title="poppler-build.sh"
 #! /bin/bash
@@ -164,17 +214,17 @@ ninja
 ninja install
 ```
 
-When you look at the output of the `rattler-build` command you might see some
-interesting information.
 
-Our package will have some `run` dependencies (even though we did not specify
-any). These run-dependencies come from the "`run-exports`" of the packages we
-depend on in the `host` section of the recipe.  This is shown in the output of
-`rattler-build` along with `"RE of [host: package]"`.
+## Parsing the `rattler-build build` Output
 
-Basically, `libcurl` declares "if you depend on me in the host section, then you
-should also depend on me during runtime with the following version ranges". This
-is important to make linking to shared libraries work correctly.
+When running the `rattler-build` command, you might notice some interesting information in the output.
+Our package will have some `run` dependencies, even if we didn't specify any.
+
+These come from the `run-exports` of the packages listed in the `host` section of the recipe.
+This is indicated by `"RE of [host: package]"` in the output.
+
+For example, `libcurl` specifies that if you depend on it in the host section, you should also depend on it during runtime with specific version ranges.
+This ensures proper linking to shared libraries.
 
 ```
 Run dependencies:
@@ -199,8 +249,7 @@ Run dependencies:
 ╰───────────────────────┴──────────────────────────────────────────────╯
 ```
 
-We can also observe some "linking" information in the output, for example on
-macOS:
+You can also see "linking" information in the output, for example on macOS:
 
 ```txt
 [lib/libpoppler-glib.8.26.0.dylib] links against:
@@ -215,10 +264,9 @@ macOS:
  └─ @rpath/libcairo.2.dylib
 ```
 
-`rattler-build` performs these checks to make sure that:
+`rattler-build` ensures that:
 
-1. All shared libraries that are linked against are present in the run
-   dependencies. If you link against a library that is not explicitly mentioned
-   in your recipe, you will get an "overlinking" warning.
-2. You don't require any packages in host that you are _not_ linking against.
-   this is the case, you will get an "overdepending" warning.
+1. All shared libraries linked against are present in the run dependencies.
+Missing libraries trigger an `overlinking` warning.
+2. You don't require any packages in the host that you are not linking against.
+This triggers an `overdepending` warning.

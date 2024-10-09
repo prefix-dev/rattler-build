@@ -10,7 +10,7 @@ package:
 
 source:
   git: https://github.com/ggerganov/llama.cpp.git
-  rev: "${{ version }}"
+  tag: "${{ version }}"
 
 build:
   variant:
@@ -29,6 +29,7 @@ requirements:
     - ${{ compiler('c') }}
     - cmake
     - libcblas
+    - r-base
     - if: win
       then: ninja
 
