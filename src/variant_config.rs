@@ -751,6 +751,13 @@ impl VariantConfig {
                 let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
                 used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
 
+                // We also replace `-` with `_` in the keys for better compatibility
+                // with conda-build and because then we can set them directly as env vars
+                let used_filtered = used_filtered
+                    .into_iter()
+                    .map(|(k, v)| (k.replace("-", "_"), v))
+                    .collect::<BTreeMap<_, _>>();
+
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,

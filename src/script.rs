@@ -700,7 +700,7 @@ impl Output {
             .filter_map(|(k, v)| {
                 let key_upper = k.to_uppercase();
                 if !languages.contains(key_upper.as_str()) {
-                    Some((k.clone(), Some(v.to_string())))
+                    Some((k.replace('-', "_"), Some(v.to_string())))
                 } else {
                     None
                 }
