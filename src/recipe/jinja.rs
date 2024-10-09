@@ -1110,6 +1110,16 @@ mod tests {
         assert_eq!(split_test("foo bar", None), "[\"foo\", \"bar\"]");
         assert_eq!(split_test("foobar", None), "[\"foobar\"]");
         assert_eq!(split_test("1.2.3", Some(".")), "[\"1\", \"2\", \"3\"]");
+
+        jinja
+            .context_mut()
+            .insert("var".to_string(), Value::from_safe_string("1.2.3".to_string()));
+
+        assert_eq!(jinja
+            .eval(&format!("(var | split('.'))[2]"))
+            .unwrap()
+            .to_string(), "3");
+
     }
 
     #[test]
