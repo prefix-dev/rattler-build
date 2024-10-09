@@ -988,4 +988,4 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 
     text = (pkg / "pybind_abi.txt").read_text()
     assert text.strip() == "4"
-    assert variant_config["pybind_abi"] == "4"
+    assert variant_config["pybind11_abi"] == "4"
