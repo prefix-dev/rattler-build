@@ -149,7 +149,6 @@ fn find_jinja(
             Node::Mapping(map) => {
                 for (_, value) in map.iter() {
                     queue.push_back((value, src));
-                    // find_jinja(value, src, variables)?;
                 }
             }
             Node::Sequence(seq) => {
