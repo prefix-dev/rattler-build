@@ -413,7 +413,7 @@ impl VariantConfig {
                             if normalized_name == "python" && noarch_type.is_python() {
                                 return None;
                             }
-                            normalized_name.to_string().into()
+                            Some(normalized_name.into())
                         })
                     }
                     _ => None,
@@ -426,18 +426,25 @@ impl VariantConfig {
                     .all()
                     .filter_map(|dep| match dep {
                         Dependency::PinSubpackage(pin) => {
-                            Some(pin.pin_value().name.as_normalized().to_string())
+                            Some(pin.pin_value().name.as_normalized().into())
                         }
                         _ => None,
                     }),
             );
-            println!("Used vars: {:?}", used_vars);
-            let use_keys = &parsed_recipe.build().variant().use_keys;
+
+            let use_keys: Vec<UnderscoreString> = parsed_recipe
+                .build()
+                .variant()
+                .use_keys
+                .iter()
+                .map(|x| x.into())
+                .collect();
+
             used_vars.extend(use_keys.iter().cloned());
 
             // Environment variables can be overwritten by the variant configuration
             let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.host_platform);
-            used_vars.extend(env_vars.keys().cloned());
+            used_vars.extend(env_vars.keys().into_iter().map(|x| x.into()));
 
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
@@ -600,7 +607,6 @@ impl VariantConfig {
                 HashMap::<String, (String, String, BTreeMap<UnderscoreString, String>)>::new();
 
             for (_, (name, output, used_vars, target_platform)) in outputs_map.iter() {
-                println!("Used vars: {:?}", used_vars);
                 let mut used_variables = used_vars.clone();
                 let mut exact_pins = HashSet::new();
 

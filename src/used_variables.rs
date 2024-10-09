@@ -17,11 +17,14 @@ use minijinja::machinery::{
     parse_expr, WhitespaceConfig,
 };
 
-use crate::recipe::{
-    custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
-    jinja::SYNTAX_CONFIG,
-    parser::CollectErrors,
-    ParsingError,
+use crate::{
+    recipe::{
+        custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
+        jinja::SYNTAX_CONFIG,
+        parser::CollectErrors,
+        ParsingError,
+    },
+    utils::UnderscoreString,
 };
 
 /// Extract all variables from a jinja statement
@@ -274,7 +277,7 @@ fn variables_from_skip(
 pub(crate) fn used_vars_from_expressions(
     yaml_node: &Node,
     src: &str,
-) -> Result<HashSet<String>, Vec<ParsingError>> {
+) -> Result<HashSet<UnderscoreString>, Vec<ParsingError>> {
     let mut selectors = HashSet::new();
 
     find_all_selectors(yaml_node, &mut selectors);
@@ -296,7 +299,7 @@ pub(crate) fn used_vars_from_expressions(
     // parse recipe into AST
     find_jinja(yaml_node, src, &mut variables)?;
 
-    Ok(variables)
+    Ok(variables.into_iter().map(|x| x.into()).collect())
 }
 
 #[cfg(test)]
