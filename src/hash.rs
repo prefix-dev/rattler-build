@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use sha1::{Digest, Sha1};
 
+use crate::utils::NormalizedKeyBTreeMap;
+
 /// A hash will be added if all of these are true for any dependency:
 ///
 /// 1. package is an explicit dependency in build, host, or run deps
@@ -94,7 +96,7 @@ pub struct HashInput(String);
 
 impl HashInput {
     /// Create a new hash input from a variant
-    pub fn from_variant(variant: &BTreeMap<String, String>) -> Self {
+    pub fn from_variant(variant: &NormalizedKeyBTreeMap<String>) -> Self {
         let mut buf = Vec::new();
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
 

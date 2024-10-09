@@ -76,54 +76,60 @@ pub fn to_forward_slash_lossy(path: &Path) -> std::borrow::Cow<'_, str> {
     }
 }
 
+
+
 #[serde_as]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-
-/// Struct where keys upon insertion and retrieval are normalized
-pub struct NormalizedKeyBTreeMap {
+pub struct NormalizedKeyBTreeMap<V>
+where
+    V: Clone,
+{
     #[serde_as(deserialize_as = "BTreeMap<_, OneOrMany<_, PreferOne>>")]
     #[serde(flatten)]
-    /// the inner map
-    pub map: BTreeMap<String, Vec<String>>,
+    pub map: BTreeMap<String, V>,
 }
 
-impl NormalizedKeyBTreeMap {
-    /// Makes a new, empty `BTreeMap`
+impl<V> NormalizedKeyBTreeMap<V>
+where
+    V: Clone,
+{
     pub fn new() -> Self {
         NormalizedKeyBTreeMap {
             map: BTreeMap::new(),
         }
     }
 
-    /// Replaces all matches of a `-` with `_`.
-    pub fn normalize_key(key: &str) -> String {
-        key.replace('-', "_")
+    fn normalize_key<S: AsRef<str>>(key: S) -> String {
+        key.as_ref().replace('-', "_")
     }
 
-    /// Inserts a key-value pair into the map, where key is normalized
-    pub fn insert(&mut self, key: String, value: Vec<String>) {
-        let normalized_key = Self::normalize_key(&key);
-        self.map.insert(normalized_key, value);
+    pub fn insert<S: AsRef<str>>(&mut self, key: S, value: V) -> Option<V> {
+        let normalized_key = Self::normalize_key(key);
+        self.map.insert(normalized_key, value)
     }
 
-    /// Returns a reference to the value corresponding to the key.
-    /// Key is normalized
-    pub fn get(&self, key: &str) -> Option<&Vec<String>> {
-        // Change value type as needed
+    pub fn get<S: AsRef<str>>(&self, key: S) -> Option<&V> {
         let normalized_key = Self::normalize_key(key);
         self.map.get(&normalized_key)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &V)> {
+        self.map.iter()
+    }
 }
 
-impl Extend<(String, Vec<String>)> for NormalizedKeyBTreeMap {
+impl<V> Extend<(String, V)> for NormalizedKeyBTreeMap<V>
+where
+    V: Clone + Extend<V>,
+{
     fn extend<T>(&mut self, iter: T)
     where
-        T: IntoIterator<Item = (String, Vec<String>)>,
+        T: IntoIterator<Item = (String, V)>,
     {
         for (key, value) in iter {
-            match self.map.entry(Self::normalize_key(&key)) {
+            match self.map.entry(Self::normalize_key(key)) {
                 Entry::Occupied(mut entry) => {
-                    entry.get_mut().extend(value);
+                    entry.get_mut().extend(std::iter::once(value));
                 }
                 Entry::Vacant(entry) => {
                     entry.insert(value);
@@ -133,25 +139,24 @@ impl Extend<(String, Vec<String>)> for NormalizedKeyBTreeMap {
     }
 }
 
-impl NormalizedKeyBTreeMap {
-    /// Gets an iterator over the entries of the map, sorted by key.
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Vec<String>)> {
-        self.map.iter()
-    }
-}
-
-impl IntoIterator for NormalizedKeyBTreeMap {
-    type Item = (String, Vec<String>);
-    type IntoIter = IntoIter<String, Vec<String>>;
+impl<V> IntoIterator for NormalizedKeyBTreeMap<V>
+where
+    V: Clone,
+{
+    type Item = (String, V);
+    type IntoIter = IntoIter<String, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.into_iter()
     }
 }
 
-impl<'a> IntoIterator for &'a NormalizedKeyBTreeMap {
-    type Item = (&'a String, &'a Vec<String>);
-    type IntoIter = std::collections::btree_map::Iter<'a, String, Vec<String>>;
+impl<'a, V> IntoIterator for &'a NormalizedKeyBTreeMap<V>
+where
+    V: Clone,
+{
+    type Item = (&'a String, &'a V);
+    type IntoIter = std::collections::btree_map::Iter<'a, String, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.map.iter()

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::{hash::HashInfo, recipe::jinja::Env, recipe::jinja::Git};
+use crate::{hash::HashInfo, recipe::jinja::{Env, Git}, utils::NormalizedKeyBTreeMap};
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
@@ -19,7 +19,7 @@ pub struct SelectorConfig {
     /// The hash, if available
     pub hash: Option<HashInfo>,
     /// The variant config
-    pub variant: BTreeMap<String, String>,
+    pub variant: NormalizedKeyBTreeMap<String>,
     /// Enable experimental features
     pub experimental: bool,
     /// Allow undefined variables
