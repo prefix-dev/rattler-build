@@ -149,7 +149,7 @@ pub struct VariantConfig {
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
     #[serde(flatten)]
-    pub variants: NormalizedKeyBTreeMap,
+    pub variants: NormalizedKeyBTreeMap<Vec<String>>,
 }
 
 #[allow(missing_docs)]
@@ -289,7 +289,7 @@ impl VariantConfig {
             for zip in zip_keys {
                 let mut prev_len = None;
                 for key in zip {
-                    let value = match self.variants.get(key) {
+                    let value = match self.variants.get(&key.into()) {
                         None => return Err(VariantError::InvalidZipKeyLength(key.to_string())),
                         Some(value) => value,
                     };
@@ -323,7 +323,7 @@ impl VariantConfig {
                     if !used_vars.contains(key) {
                         continue;
                     }
-                    if let Some(values) = self.variants.get(key) {
+                    if let Some(values) = self.variants.get(&key.into()) {
                         map.insert(key.clone(), values.clone());
                     }
                 }
@@ -334,7 +334,7 @@ impl VariantConfig {
         let variant_keys = used_vars
             .iter()
             .filter_map(|key| {
-                if let Some(values) = self.variants.get(key) {
+                if let Some(values) = self.variants.get(&key.into()) {
                     if !zip_keys.iter().any(|zip| zip.contains(key)) {
                         return Some(VariantKey::Key(key.clone(), values.clone()));
                     }
@@ -751,6 +751,8 @@ impl VariantConfig {
                 let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
                 used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
 
+                let used_filtered = used_filtered.into_iter().map(|(k, v)| (k.replace('-', "_"), v)).collect();
+                
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,
@@ -792,7 +794,7 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                     if let Some(variants) = variants {
                         config
                             .variants
-                            .insert(key_str.to_string(), variants.clone());
+                            .insert(key_str.into(), variants.clone());
                     }
                 }
             }
