@@ -13,6 +13,7 @@ use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version,
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
+use crate::utils::UnderscoreString;
 
 use super::parser::{Dependency, PinCompatible, PinSubpackage};
 
@@ -241,7 +242,7 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
 fn compiler_stdlib_eval(
     lang: &str,
     platform: Platform,
-    variant: &Arc<BTreeMap<String, String>>,
+    variant: &Arc<BTreeMap<UnderscoreString, String>>,
     prefix: &str,
 ) -> Result<String, minijinja::Error> {
     let variant_key = format!("{lang}_{prefix}");
@@ -254,12 +255,12 @@ fn compiler_stdlib_eval(
     };
 
     let res = if let Some(name) = variant
-        .get(&variant_key)
+        .get(&variant_key.into())
         .cloned()
         .or_else(|| default_fn(platform, lang))
     {
         // check if we also have a compiler version
-        if let Some(version) = variant.get(&variant_key_version) {
+        if let Some(version) = variant.get(&variant_key_version.into()) {
             if version.chars().all(|a| a.is_alphanumeric() || a == '.') {
                 Some(format!("{name}_{platform} ={version}"))
             } else {
@@ -439,7 +440,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         let arch = host_platform.arch().or_else(|| build_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
-        let cdt_arch = if let Some(s) = variant_clone.get("cdt_arch") {
+        let cdt_arch = if let Some(s) = variant_clone.get(&"cdt_arch".into()) {
             s.as_str()
         } else {
             match arch {
@@ -456,7 +457,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
             }
         };
 
-        let cdt_name = variant_clone.get("cdt_name").map_or_else(
+        let cdt_name = variant_clone.get(&"cdt_name".into()).map_or_else(
             || match arch {
                 Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7",
                 _ => "cos6",
@@ -1005,7 +1006,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_match() {
-        let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7".to_string())]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7".to_string())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -1027,7 +1028,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_complicated_match() {
-        let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7.* *_cpython".to_string())]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7.* *_cpython".to_string())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,

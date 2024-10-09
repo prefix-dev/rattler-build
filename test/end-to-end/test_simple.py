@@ -986,6 +986,6 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
     variant_config = json.loads((pkg / "info/hash_input.json").read_text())
     assert variant_config["MAKEFLAGS"] == "OVERRIDDEN_MAKEFLAGS"
 
-    text = (pkg / "mkl_version.txt").read_text()
-    assert text.strip() == "2023"
-    assert variant_config["mkl-version"] == "2023"
+    text = (pkg / "pybind_abi.txt").read_text()
+    assert text.strip() == "4"
+    assert variant_config["pybind_abi"] == "4"

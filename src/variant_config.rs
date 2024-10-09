@@ -12,19 +12,22 @@ use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
+use crate::recipe::parser::Dependency;
 use crate::{
     _partialerror, env_vars,
     hash::HashInfo,
     recipe::{
-        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
+        custom_yaml::{
+            HasSpan, Node, RenderedMappingNode, RenderedNode, RenderedScalarNode, TryConvertNode,
+        },
         error::{ErrorKind, ParsingError, PartialParsingError},
         parser::Recipe,
         Jinja, Render,
     },
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
+    utils::UnderscoreString,
 };
-use crate::{recipe::parser::Dependency, utils::NormalizedKeyBTreeMap};
 use petgraph::{algo::toposort, graph::DiGraph};
 
 #[allow(missing_docs)]
@@ -36,7 +39,7 @@ pub struct DiscoveredOutput {
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
     pub node: Node,
-    pub used_vars: BTreeMap<String, String>,
+    pub used_vars: BTreeMap<UnderscoreString, String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -144,12 +147,12 @@ pub struct VariantConfig {
     pub pin_run_as_build: Option<BTreeMap<String, Pin>>,
 
     /// The zip keys are used to "zip" together variants to create specific combinations.
-    pub zip_keys: Option<Vec<Vec<String>>>,
+    pub zip_keys: Option<Vec<Vec<UnderscoreString>>>,
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
     #[serde(flatten)]
-    pub variants: NormalizedKeyBTreeMap,
+    pub variants: BTreeMap<UnderscoreString, Vec<String>>,
 }
 
 #[allow(missing_docs)]
@@ -310,8 +313,8 @@ impl VariantConfig {
     /// variables.
     pub fn combinations(
         &self,
-        used_vars: &HashSet<String>,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+        used_vars: &HashSet<UnderscoreString>,
+    ) -> Result<Vec<BTreeMap<UnderscoreString, String>>, VariantError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
         let used_zip_keys = zip_keys
@@ -356,12 +359,7 @@ impl VariantConfig {
         // zip the combinations
         let result = combinations
             .iter()
-            .map(|combination| {
-                combination
-                    .iter()
-                    .cloned()
-                    .collect::<BTreeMap<String, String>>()
-            })
+            .map(|combination| combination.iter().cloned().collect())
             .collect();
         Ok(result)
     }
@@ -433,7 +431,7 @@ impl VariantConfig {
                         _ => None,
                     }),
             );
-
+            println!("Used vars: {:?}", used_vars);
             let use_keys = &parsed_recipe.build().variant().use_keys;
             used_vars.extend(use_keys.iter().cloned());
 
@@ -590,16 +588,19 @@ impl VariantConfig {
         all_variables.insert("target_platform".to_string());
         all_variables.insert("channel_targets".to_string());
 
-        let combinations = self.combinations(&all_variables)?;
+        let all_variables_underscore: HashSet<UnderscoreString> =
+            all_variables.iter().map(|x| x.into()).collect();
+        let combinations = self.combinations(&all_variables_underscore)?;
 
         // Then find all used variables from the each output recipe
         // let mut variants = Vec::new();
         let mut recipes = IndexSet::new();
         for combination in combinations {
             let mut other_recipes =
-                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
+                HashMap::<String, (String, String, BTreeMap<UnderscoreString, String>)>::new();
 
             for (_, (name, output, used_vars, target_platform)) in outputs_map.iter() {
+                println!("Used vars: {:?}", used_vars);
                 let mut used_variables = used_vars.clone();
                 let mut exact_pins = HashSet::new();
 
@@ -615,7 +616,7 @@ impl VariantConfig {
 
                 let mut combination = combination.clone();
                 // we need to overwrite the target_platform in case of `noarch`.
-                combination.insert("target_platform".to_string(), target_platform.to_string());
+                combination.insert("target_platform".into(), target_platform.to_string());
 
                 let selector_config_with_variant =
                     selector_config.new_with_variant(combination.clone(), *target_platform);
@@ -665,14 +666,14 @@ impl VariantConfig {
                 let mut used_filtered = combination
                     .clone()
                     .into_iter()
-                    .filter(|(k, _)| used_variables.contains(k))
+                    // .filter(|(k, _)| used_variables.contains(&k.into()))
                     .collect::<BTreeMap<_, _>>();
 
                 // exact pins
                 for p in exact_pins {
                     match other_recipes.get(&p) {
                         Some((version, build, _)) => {
-                            used_filtered.insert(p.clone(), format!("{} {}", version, build));
+                            used_filtered.insert(p.into(), format!("{} {}", version, build));
                         }
                         None => {
                             return Err(VariantError::MissingOutput(p));
@@ -696,7 +697,7 @@ impl VariantConfig {
                                     match other_recipes.get(val) {
                                         Some((version, build, _)) => {
                                             used_filtered.insert(
-                                                val.to_owned(),
+                                                val.into(),
                                                 format!("{} {}", version, build),
                                             );
                                         }
@@ -749,7 +750,9 @@ impl VariantConfig {
                 let version = parsed_recipe.package().version().to_string();
 
                 let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
-                used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
+                // TODO ignore keys should be UnderscoreStrings as well?
+                used_filtered
+                    .retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(&k.to_string()));
 
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
@@ -774,6 +777,21 @@ impl TryConvertNode<VariantConfig> for RenderedNode {
     }
 }
 
+impl TryConvertNode<UnderscoreString> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<UnderscoreString, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedScalar)])
+            .and_then(|scalar| scalar.try_convert(name))
+    }
+}
+
+impl TryConvertNode<UnderscoreString> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<UnderscoreString, Vec<PartialParsingError>> {
+        // TODO return an error here if the string contains `-`
+        Ok(self.as_str().into())
+    }
+}
+
 impl TryConvertNode<VariantConfig> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<VariantConfig, Vec<PartialParsingError>> {
         let mut config = VariantConfig::default();
@@ -788,11 +806,16 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                     config.zip_keys = value.try_convert(key_str)?;
                 }
                 _ => {
-                    let variants: Option<Vec<_>> = value.try_convert(key_str)?;
+                    if key_str.contains('-') {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(key_str.to_string().into()),
+                            help = format!("Variant field names cannot contain `-`")
+                        )]);
+                    }
+                    let variants: Option<Vec<String>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config
-                            .variants
-                            .insert(key_str.to_string(), variants.clone());
+                        config.variants.insert(key_str.into(), variants.clone());
                     }
                 }
             }
@@ -804,8 +827,8 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
 
 #[derive(Debug, Clone)]
 enum VariantKey {
-    Key(String, Vec<String>),
-    ZipKey(HashMap<String, Vec<String>>),
+    Key(UnderscoreString, Vec<String>),
+    ZipKey(HashMap<UnderscoreString, Vec<String>>),
 }
 
 impl VariantKey {
@@ -816,7 +839,7 @@ impl VariantKey {
         }
     }
 
-    pub fn at(&self, index: usize) -> Option<Vec<(String, String)>> {
+    pub fn at(&self, index: usize) -> Option<Vec<(UnderscoreString, String)>> {
         match self {
             VariantKey::Key(key, values) => {
                 values.get(index).map(|v| vec![(key.clone(), v.clone())])
@@ -892,8 +915,8 @@ pub enum VariantError {
 fn find_combinations(
     variant_keys: &[VariantKey],
     index: usize,
-    current: &mut Vec<(String, String)>,
-    result: &mut Vec<Vec<(String, String)>>,
+    current: &mut Vec<(UnderscoreString, String)>,
+    result: &mut Vec<Vec<(UnderscoreString, String)>>,
 ) {
     if index == variant_keys.len() {
         result.push(current.clone());
@@ -987,7 +1010,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<UnderscoreString, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)
@@ -1000,12 +1023,12 @@ mod tests {
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = NormalizedKeyBTreeMap::new();
-        variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
-        variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
-        let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];
+        let mut variants = BTreeMap::<UnderscoreString, Vec<String>>::new();
+        variants.insert("a".into(), vec!["1".to_string(), "2".to_string()]);
+        variants.insert("b".into(), vec!["3".to_string(), "4".to_string()]);
+        let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
 
-        let used_vars = vec!["a".to_string()].into_iter().collect();
+        let used_vars = vec!["a".into()].into_iter().collect();
         let mut config = VariantConfig {
             variants,
             zip_keys: Some(zip_keys),
@@ -1015,21 +1038,21 @@ mod tests {
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2);
 
-        let used_vars = vec!["a".to_string(), "b".to_string()].into_iter().collect();
+        let used_vars = vec!["a".into(), "b".into()].into_iter().collect();
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2);
 
         config.variants.insert(
-            "c".to_string(),
+            "c".into(),
             vec!["5".to_string(), "6".to_string(), "7".to_string()],
         );
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
         let combinations = config.combinations(&used_vars).unwrap();
         assert_eq!(combinations.len(), 2 * 3);
 
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
         config.zip_keys = None;
@@ -1089,7 +1112,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<UnderscoreString, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)

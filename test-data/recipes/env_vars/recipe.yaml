@@ -7,7 +7,12 @@ build:
     - if: unix
       then:
         - echo $MAKEFLAGS > $PREFIX/makeflags.txt
-        - echo $mkl_version > $PREFIX/mkl_version.txt
+        - echo $pybind_abi > $PREFIX/pybind_abi.txt
       else:
         - echo %MAKEFLAGS% > %PREFIX%\makeflags.txt
-        - echo %mkl_version% > %PREFIX%\mkl_version.txt
+        - echo %pybind_abi% > %PREFIX%\pybind_abi.txt
+
+requirements:
+  build:
+    # use to make the variant "used"
+    - pybind11-abi

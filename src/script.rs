@@ -698,9 +698,10 @@ impl Output {
         self.variant()
             .iter()
             .filter_map(|(k, v)| {
-                let key_upper = k.to_uppercase();
+                let key_upper = k.to_string().to_uppercase();
                 if !languages.contains(key_upper.as_str()) {
-                    Some((k.clone(), Some(v.replace('-', "_").to_string())))
+                    // TODO why `replace` in the value here?
+                    Some((k.to_string(), Some(v.replace('-', "_").to_string())))
                 } else {
                     None
                 }

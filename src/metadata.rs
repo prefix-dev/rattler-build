@@ -36,7 +36,7 @@ use crate::{
     render::resolved_dependencies::FinalizedDependencies,
     system_tools::SystemTools,
     tool_configuration,
-    utils::remove_dir_all_force,
+    utils::{remove_dir_all_force, UnderscoreString},
 };
 /// A Git revision
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -249,7 +249,7 @@ pub struct BuildConfiguration {
     /// The build platform (the platform that the build is running on)
     pub build_platform: Platform,
     /// The selected variant for this build
-    pub variant: BTreeMap<String, String>,
+    pub variant: BTreeMap<UnderscoreString, String>,
     /// THe computed hash of the variant
     pub hash: HashInfo,
     /// The directories for the build (work, source, build, host, ...)
@@ -416,7 +416,7 @@ impl Output {
     }
 
     /// Shorthand to retrieve the variant configuration for this output
-    pub fn variant(&self) -> &BTreeMap<String, String> {
+    pub fn variant(&self) -> &BTreeMap<UnderscoreString, String> {
         &self.build_configuration.variant
     }
 
@@ -602,7 +602,7 @@ impl Output {
             table.set_header(vec!["Key", "Value"]);
         }
         self.build_configuration.variant.iter().for_each(|(k, v)| {
-            table.add_row(vec![k, v]);
+            table.add_row(vec![&k.to_string(), v]);
         });
         writeln!(f, "{}\n", table)?;
 
