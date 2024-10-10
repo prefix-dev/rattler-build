@@ -621,7 +621,7 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        &output.build_configuration.build_platform,
+        output.build_configuration.build_platform.platform,
         &output.build_configuration.directories.build_prefix,
         tool_configuration,
     )
@@ -634,7 +634,7 @@ pub async fn install_environments(
             .as_ref()
             .map(|deps| &deps.resolved)
             .unwrap_or(&EMPTY_RECORDS),
-        &output.build_configuration.host_platform,
+        output.build_configuration.host_platform.platform,
         &output.build_configuration.directories.host_prefix,
         tool_configuration,
     )

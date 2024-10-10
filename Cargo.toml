@@ -47,6 +47,7 @@ required-features = ["recipe-generation"]
 [dependencies]
 serde = { version = "1.0.210", features = ["derive"] }
 serde_yaml = "0.9.34"
+serde-untagged = "0.1.6"
 anyhow = "1.0.89"
 walkdir = "2.5.0"
 sha2 = "0.10.8"

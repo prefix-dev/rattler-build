@@ -3511,6 +3511,7 @@ dependencies = [
  "rstest",
  "scroll",
  "serde",
+ "serde-untagged",
  "serde_json",
  "serde_with",
  "serde_yaml",

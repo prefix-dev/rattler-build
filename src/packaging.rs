@@ -276,7 +276,7 @@ pub fn package_conda(
     if let Platform::NoArch = output.build_configuration.target_platform {
         create_empty_build_folder(
             local_channel_dir,
-            &output.build_configuration.build_platform,
+            &output.build_configuration.build_platform.platform,
         )?;
     }
 

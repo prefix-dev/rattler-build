@@ -16,13 +16,16 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, PackageName, Platform, RepoDataRecord, Version,
+    Channel, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
-use serde::{Deserialize, Serialize};
+use rattler_virtual_packages::{
+    DetectVirtualPackageError, VirtualPackage, VirtualPackageOverrides,
+};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use url::Url;
 
@@ -238,6 +241,69 @@ impl PackagingSettings {
     }
 }
 
+/// Defines both a platform and the virtual packages that describe the
+/// capabilities of the platform.
+#[derive(Debug, Clone, Serialize)]
+pub struct PlatformWithVirtualPackages {
+    /// The platform
+    pub platform: Platform,
+
+    /// The virtual packages for the platform
+    pub virtual_packages: Vec<GenericVirtualPackage>,
+}
+
+impl From<Platform> for PlatformWithVirtualPackages {
+    fn from(platform: Platform) -> Self {
+        Self {
+            platform,
+            virtual_packages: vec![],
+        }
+    }
+}
+
+impl PlatformWithVirtualPackages {
+    /// Returns the current platform and the virtual packages available on the
+    /// current system.
+    pub fn detect(overrides: &VirtualPackageOverrides) -> Result<Self, DetectVirtualPackageError> {
+        Ok(Self {
+            platform: Platform::current(),
+            virtual_packages: VirtualPackage::detect(overrides)?
+                .into_iter()
+                .map(GenericVirtualPackage::from)
+                .collect(),
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        pub struct Object {
+            pub platform: Platform,
+            pub virtual_packages: Vec<GenericVirtualPackage>,
+        }
+
+        serde_untagged::UntaggedEnumVisitor::new()
+            .string(|s| {
+                Ok(Self {
+                    platform: Platform::from_str(s).map_err(serde::de::Error::custom)?,
+                    virtual_packages: vec![],
+                })
+            })
+            .map(|m| {
+                let object: Object = m.deserialize()?;
+                Ok(Self {
+                    platform: object.platform,
+                    virtual_packages: object.virtual_packages,
+                })
+            })
+            .deserialize(deserializer)
+    }
+}
+
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
@@ -245,9 +311,9 @@ pub struct BuildConfiguration {
     pub target_platform: Platform,
     /// The host platform (usually target platform, but for `noarch` it's the
     /// build platform)
-    pub host_platform: Platform,
+    pub host_platform: PlatformWithVirtualPackages,
     /// The build platform (the platform that the build is running on)
-    pub build_platform: Platform,
+    pub build_platform: PlatformWithVirtualPackages,
     /// The selected variant for this build
     pub variant: BTreeMap<String, String>,
     /// THe computed hash of the variant
@@ -280,15 +346,15 @@ pub struct BuildConfiguration {
 impl BuildConfiguration {
     /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
-        self.target_platform != self.build_platform
+        self.target_platform != self.build_platform.platform
     }
 
     /// Construct a `SelectorConfig` from the given `BuildConfiguration`
     pub fn selector_config(&self) -> SelectorConfig {
         SelectorConfig {
             target_platform: self.target_platform,
-            host_platform: self.host_platform,
-            build_platform: self.build_platform,
+            host_platform: self.host_platform.platform,
+            build_platform: self.build_platform.platform,
             variant: self.variant.clone(),
             hash: Some(self.hash.clone()),
             experimental: false,
@@ -436,7 +502,7 @@ impl Output {
     }
 
     /// Shorthand to retrieve the target platform for this output
-    pub fn host_platform(&self) -> &Platform {
+    pub fn host_platform(&self) -> &PlatformWithVirtualPackages {
         &self.build_configuration.host_platform
     }
 

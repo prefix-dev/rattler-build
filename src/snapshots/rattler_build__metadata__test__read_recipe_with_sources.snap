@@ -28,8 +28,12 @@ recipe:
   requirements: {}
 build_configuration:
   target_platform: osx-arm64
-  host_platform: osx-arm64
-  build_platform: osx-arm64
+  host_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  build_platform:
+    platform: osx-arm64
+    virtual_packages: []
   variant:
     target_platform: osx-arm64
   hash:

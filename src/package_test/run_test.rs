@@ -7,29 +7,37 @@
 //! * `imports` - import a list of modules and check if they can be imported
 //! * `files` - check if a list of files exist
 
-use fs_err as fs;
-use rattler_conda_types::package::{IndexJson, PackageFile};
-use rattler_conda_types::{Channel, ParseStrictness};
-use std::collections::HashMap;
-use std::fmt::Write as fmt_write;
-use std::io::Write;
 use std::{
+    collections::HashMap,
+    fmt::Write as fmt_write,
+    io::Write,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
 use dunce::canonicalize;
+use fs_err as fs;
 use rattler::package_cache::CacheKey;
-use rattler_conda_types::{package::ArchiveIdentifier, MatchSpec, Platform};
+use rattler_conda_types::{
+    package::{ArchiveIdentifier, IndexJson, PackageFile},
+    Channel, MatchSpec, ParseStrictness, Platform,
+};
 use rattler_index::index;
-use rattler_shell::{activation::ActivationError, shell::Shell, shell::ShellEnum};
+use rattler_shell::{
+    activation::ActivationError,
+    shell::{Shell, ShellEnum},
+};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 use url::Url;
 
-use crate::env_vars;
-use crate::recipe::parser::{CommandsTest, DownstreamTest, Script, ScriptContent, TestType};
-use crate::source::copy_dir::CopyDir;
-use crate::{recipe::parser::PythonTest, render::solver::create_environment, tool_configuration};
+use crate::{
+    env_vars,
+    metadata::PlatformWithVirtualPackages,
+    recipe::parser::{CommandsTest, DownstreamTest, PythonTest, Script, ScriptContent, TestType},
+    render::solver::create_environment,
+    source::copy_dir::CopyDir,
+    tool_configuration,
+};
 
 #[allow(missing_docs)]
 #[derive(thiserror::Error, Debug)]
@@ -115,7 +123,8 @@ impl Tests {
                     ..Script::default()
                 };
 
-                // copy all test files to a temporary directory and set it as the working directory
+                // copy all test files to a temporary directory and set it as the working
+                // directory
                 CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
                     TestError::IoError(std::io::Error::new(
                         std::io::ErrorKind::Other,
@@ -181,15 +190,18 @@ async fn legacy_tests_from_folder(pkg: &Path) -> Result<(PathBuf, Vec<Tests>), s
 pub struct TestConfiguration {
     /// The test prefix directory (will be created)
     pub test_prefix: PathBuf,
-    /// The target platform. If not set it will be discovered from the index.json metadata.
+    /// The target platform. If not set it will be discovered from the
+    /// index.json metadata.
     pub target_platform: Option<Platform>,
     /// The host platform for run-time dependencies. If not set it will be
     /// discovered from the index.json metadata.
-    pub host_platform: Option<Platform>,
+    pub host_platform: Option<PlatformWithVirtualPackages>,
+    /// The platform and virtual packages of the current platform.
+    pub current_platform: PlatformWithVirtualPackages,
     /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
-    /// The channels to use for the test – do not forget to add the local build outputs channel
-    /// if desired
+    /// The channels to use for the test – do not forget to add the local build
+    /// outputs channel if desired
     pub channels: Vec<Url>,
     /// The channel priority that is used to resolve dependencies
     pub channel_priority: ChannelPriority,
@@ -222,16 +234,18 @@ fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
 
 /// Run a test for a single package
 ///
-/// This function creates a temporary directory, copies the package file into it, and then runs the
-/// indexing. It then creates a test environment that installs the package and any extra dependencies
-/// specified in the package test dependencies file.
+/// This function creates a temporary directory, copies the package file into
+/// it, and then runs the indexing. It then creates a test environment that
+/// installs the package and any extra dependencies specified in the package
+/// test dependencies file.
 ///
 /// With the activated test environment, the packaged test files are run:
 ///
 /// * `info/test/run_test.sh` or `info/test/run_test.bat` on Windows
 /// * `info/test/run_test.py`
 ///
-/// These test files are written at "package creation time" and are part of the package.
+/// These test files are written at "package creation time" and are part of the
+/// package.
 ///
 /// # Arguments
 ///
@@ -300,7 +314,8 @@ pub async fn run_test(
     let pkg = ArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
-    // if the package is already in the cache, remove it. TODO make this based on SHA256 instead!
+    // if the package is already in the cache, remove it. TODO make this based on
+    // SHA256 instead!
     let cache_key = CacheKey::from(pkg.clone());
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
 
@@ -316,17 +331,20 @@ pub async fn run_test(
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
 
-    let host_platform = config.host_platform.unwrap_or_else(|| {
+    let host_platform = config.host_platform.clone().unwrap_or_else(|| {
         if target_platform == Platform::NoArch {
-            Platform::current()
+            config.current_platform.clone()
         } else {
-            target_platform
+            PlatformWithVirtualPackages {
+                platform: target_platform,
+                virtual_packages: config.current_platform.virtual_packages.clone(),
+            }
         }
     });
 
     let config = TestConfiguration {
         target_platform: Some(target_platform),
-        host_platform: Some(host_platform),
+        host_platform: Some(host_platform.clone()),
         channels,
         ..config.clone()
     };
@@ -455,7 +473,7 @@ impl PythonTest {
         create_environment(
             "test",
             &dependencies,
-            &Platform::current(),
+            &config.current_platform,
             prefix,
             &config.channels,
             &config.tool_configuration,
@@ -525,7 +543,6 @@ impl CommandsTest {
         let build_env = if !deps.build.is_empty() {
             tracing::info!("Installing build dependencies");
             let build_prefix = prefix.join("bld");
-            let platform = Platform::current();
             let build_dependencies = deps
                 .build
                 .iter()
@@ -535,7 +552,7 @@ impl CommandsTest {
             create_environment(
                 "test",
                 &build_dependencies,
-                &platform,
+                &config.current_platform,
                 &build_prefix,
                 &config.channels,
                 &config.tool_configuration,
@@ -561,13 +578,16 @@ impl CommandsTest {
             ParseStrictness::Lenient,
         )?);
 
-        let platform = config.host_platform.unwrap_or_else(Platform::current);
+        let platform = config
+            .host_platform
+            .as_ref()
+            .unwrap_or(&config.current_platform);
 
         let run_env = prefix.join("run");
         create_environment(
             "test",
             &dependencies,
-            &platform,
+            platform,
             &run_env,
             &config.channels,
             &config.tool_configuration,
@@ -586,7 +606,8 @@ impl CommandsTest {
             Some(run_env.to_string_lossy().to_string()),
         );
 
-        // copy all test files to a temporary directory and set it as the working directory
+        // copy all test files to a temporary directory and set it as the working
+        // directory
         let tmp_dir = tempfile::tempdir()?;
         CopyDir::new(path, tmp_dir.path()).run().map_err(|e| {
             TestError::IoError(std::io::Error::new(
@@ -636,12 +657,10 @@ impl DownstreamTest {
             )?,
         ];
 
-        let target_platform = config.target_platform.unwrap_or_else(Platform::current);
-
         let resolved = create_environment(
             "test",
             &match_specs,
-            &target_platform,
+            &config.current_platform,
             prefix,
             &config.channels,
             &config.tool_configuration,
@@ -653,7 +672,8 @@ impl DownstreamTest {
         match resolved {
             Ok(solution) => {
                 let spec_name = match_specs[0].name.clone().expect("matchspec has a name");
-                // we found a solution, so let's run the downstream test with that particular package!
+                // we found a solution, so let's run the downstream test with that particular
+                // package!
                 let downstream_package = solution
                     .iter()
                     .find(|s| s.package_record.name == spec_name)

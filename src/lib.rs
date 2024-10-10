@@ -55,8 +55,9 @@ use miette::IntoDiagnostic;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, Platform};
+use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::{
     parser::{find_outputs_from_src, Dependency, Recipe},
     ParsingError,
@@ -65,6 +66,8 @@ use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::Configuration;
 use variant_config::{ParseErrors, VariantConfig};
+
+use crate::metadata::PlatformWithVirtualPackages;
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -163,7 +166,8 @@ pub async fn get_build_output(
     let mut host_platform = args.host_platform;
     // If target_platform is not set, we default to the host platform
     let target_platform = args.target_platform.unwrap_or(host_platform);
-    // If target_platform is set and host_platform is not, then we default host_platform to the target_platform
+    // If target_platform is set and host_platform is not, then we default
+    // host_platform to the target_platform
     if let Some(target_platform) = args.target_platform {
         // Check if `host_platform` is set by looking at the args (not ideal)
         let host_platform_set = std::env::args().any(|arg| arg.starts_with("--host-platform"));
@@ -171,6 +175,21 @@ pub async fn get_build_output(
             host_platform = target_platform
         }
     }
+
+    // Determine virtual packages of the system. These packages define the
+    // capabilities of the system. Some packages depend on these virtual
+    // packages to indicate compatibility with the hardware of the system.
+    let virtual_packages = tool_config
+        .fancy_log_handler
+        .wrap_in_progress("determining virtual packages", move || {
+            VirtualPackage::detect(&VirtualPackageOverrides::from_env()).map(|vpkgs| {
+                vpkgs
+                    .iter()
+                    .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
+                    .collect::<Vec<_>>()
+            })
+        })
+        .into_diagnostic()?;
 
     tracing::debug!(
         "Platforms: build: {}, host: {}, target: {}",
@@ -311,8 +330,14 @@ pub async fn get_build_output(
             recipe,
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
-                host_platform,
-                build_platform: args.build_platform,
+                host_platform: PlatformWithVirtualPackages {
+                    platform: host_platform,
+                    virtual_packages: virtual_packages.clone(),
+                },
+                build_platform: PlatformWithVirtualPackages {
+                    platform: args.build_platform,
+                    virtual_packages: virtual_packages.clone(),
+                },
                 hash,
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
@@ -396,6 +421,15 @@ pub async fn run_test_from_args(
 ) -> miette::Result<()> {
     let package_file = canonicalize(args.package_file).into_diagnostic()?;
 
+    // Determine virtual packages of the system. These packages define the
+    // capabilities of the system. Some packages depend on these virtual
+    // packages to indicate compatibility with the hardware of the system.
+    let current_platform = fancy_log_handler
+        .wrap_in_progress("determining virtual packages", move || {
+            PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
+        })
+        .into_diagnostic()?;
+
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
@@ -422,6 +456,7 @@ pub async fn run_test_from_args(
         test_prefix: tempdir.path().to_path_buf(),
         target_platform: None,
         host_platform: None,
+        current_platform,
         keep_test_prefix: false,
         channels,
         channel_priority: ChannelPriority::Strict,
