@@ -15,7 +15,7 @@ macro_rules! insert {
     };
 }
 
-fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+fn get_stdlib_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     if platform.is_windows() {
         prefix.join("Lib")
     } else {
@@ -24,7 +24,7 @@ fn get_stdlib_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
     }
 }
 
-fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> PathBuf {
+fn get_sitepackages_dir(prefix: &Path, platform: Platform, py_ver: &str) -> PathBuf {
     get_stdlib_dir(prefix, platform, py_ver).join("site-packages")
 }
 
@@ -41,7 +41,7 @@ fn get_sitepackages_dir(prefix: &Path, platform: &Platform, py_ver: &str) -> Pat
 pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
-    if output.host_platform().is_windows() {
+    if output.host_platform().platform.is_windows() {
         let python = output.prefix().join("python.exe");
         insert!(result, "PYTHON", python.to_string_lossy());
     } else {
@@ -62,9 +62,16 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     if let Some(py_ver) = python_version {
         let py_ver = py_ver.split('.').collect::<Vec<_>>();
         let py_ver_str = format!("{}.{}", py_ver[0], py_ver[1]);
-        let stdlib_dir = get_stdlib_dir(output.prefix(), output.host_platform(), &py_ver_str);
-        let site_packages_dir =
-            get_sitepackages_dir(output.prefix(), output.host_platform(), &py_ver_str);
+        let stdlib_dir = get_stdlib_dir(
+            output.prefix(),
+            output.host_platform().platform,
+            &py_ver_str,
+        );
+        let site_packages_dir = get_sitepackages_dir(
+            output.prefix(),
+            output.host_platform().platform,
+            &py_ver_str,
+        );
         let py3k = if py_ver[0] == "3" { "1" } else { "0" };
         insert!(result, "PY3K", py3k);
         insert!(result, "PY_VER", py_ver_str);
@@ -95,7 +102,7 @@ pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     if let Some(r_ver) = output.variant().get("r-base") {
         insert!(result, "R_VER", r_ver);
 
-        let r_bin = if output.host_platform().is_windows() {
+        let r_bin = if output.host_platform().platform.is_windows() {
             output.prefix().join("Scripts/R.exe")
         } else {
             output.prefix().join("bin/R")
@@ -200,7 +207,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(vars, "CONDA_BUILD", "1");
     insert!(vars, "PYTHONNOUSERSITE", "1");
 
-    if let Some((_, host_arch)) = output.host_platform().to_string().rsplit_once('-') {
+    if let Some((_, host_arch)) = output.host_platform().platform.to_string().rsplit_once('-') {
         insert!(vars, "ARCH", host_arch);
     }
 
@@ -284,14 +291,22 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(
         vars,
         "build_platform",
-        output.build_configuration.build_platform.to_string()
+        output
+            .build_configuration
+            .build_platform
+            .platform
+            .to_string()
     );
     insert!(
         vars,
         "target_platform",
         output.target_platform().to_string()
     );
-    insert!(vars, "host_platform", output.host_platform().to_string());
+    insert!(
+        vars,
+        "host_platform",
+        output.host_platform().platform.to_string()
+    );
     insert!(vars, "CONDA_BUILD_STATE", build_state);
 
     vars.extend(language_vars(output));

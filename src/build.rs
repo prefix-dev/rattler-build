@@ -58,7 +58,7 @@ pub async fn skip_existing(
 
     let existing = load_repodatas(
         &channels,
-        first_output.host_platform(),
+        first_output.host_platform().platform,
         &match_specs,
         tool_configuration,
     )
@@ -168,7 +168,8 @@ pub async fn run_build(
             &TestConfiguration {
                 test_prefix: directories.work_dir.join("test"),
                 target_platform: Some(output.build_configuration.target_platform),
-                host_platform: Some(output.build_configuration.host_platform),
+                host_platform: Some(output.build_configuration.host_platform.clone()),
+                current_platform: output.build_configuration.build_platform.clone(),
                 keep_test_prefix: tool_configuration.no_clean,
                 //channels: output.reindex_channels().into_diagnostic()?,
                 channels: build_reindexed_channels(&output.build_configuration, tool_configuration)

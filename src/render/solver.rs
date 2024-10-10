@@ -1,4 +1,3 @@
-use console::style;
 use std::{
     future::IntoFuture,
     path::Path,
@@ -7,16 +6,16 @@ use std::{
 
 use anyhow::Context;
 use comfy_table::Table;
+use console::style;
 use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
-use rattler_conda_types::{Channel, GenericVirtualPackage, MatchSpec, Platform, RepoDataRecord};
+use rattler_conda_types::{Channel, MatchSpec, Platform, RepoDataRecord};
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
-use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use url::Url;
 
-use crate::tool_configuration;
+use crate::{metadata::PlatformWithVirtualPackages, tool_configuration};
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
@@ -59,34 +58,20 @@ fn print_as_table(packages: &[RepoDataRecord]) {
 pub async fn solve_environment(
     name: &str,
     specs: &[MatchSpec],
-    target_platform: &Platform,
+    target_platform: &PlatformWithVirtualPackages,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
 ) -> anyhow::Result<Vec<RepoDataRecord>> {
-    // Determine virtual packages of the system. These packages define the
-    // capabilities of the system. Some packages depend on these virtual
-    // packages to indicate compatibility with the hardware of the system.
-    let virtual_packages = tool_configuration.fancy_log_handler.wrap_in_progress(
-        "determining virtual packages",
-        move || {
-            VirtualPackage::detect(&VirtualPackageOverrides::from_env()).map(|vpkgs| {
-                vpkgs
-                    .iter()
-                    .map(|vpkg| GenericVirtualPackage::from(vpkg.clone()))
-                    .collect::<Vec<_>>()
-            })
-        },
-    )?;
-
-    let vp_string = format!(
-        "[{}]",
-        virtual_packages.iter().map(|s| s.to_string()).join(", ")
-    );
+    let vp_string = format!("[{}]", target_platform.virtual_packages.iter().format(", "));
 
     tracing::info!("\nResolving {name} environment:\n");
-    tracing::info!("  Platform: {} {}", target_platform, style(vp_string).dim());
+    tracing::info!(
+        "  Platform: {} {}",
+        target_platform.platform,
+        style(vp_string).dim()
+    );
     tracing::info!("  Channels: ");
     for channel in channels {
         tracing::info!(
@@ -99,14 +84,20 @@ pub async fn solve_environment(
         tracing::info!("   - {}", spec);
     }
 
-    let repo_data = load_repodatas(channels, target_platform, specs, tool_configuration).await?;
+    let repo_data = load_repodatas(
+        channels,
+        target_platform.platform,
+        specs,
+        tool_configuration,
+    )
+    .await?;
 
     // Now that we parsed and downloaded all information, construct the packaging
     // problem that we need to solve. We do this by constructing a
     // `SolverProblem`. This encapsulates all the information required to be
     // able to solve the problem.
     let solver_task = SolverTask {
-        virtual_packages,
+        virtual_packages: target_platform.virtual_packages.clone(),
         specs: specs.to_vec(),
         channel_priority,
         strategy: solve_strategy,
@@ -130,7 +121,7 @@ pub async fn solve_environment(
 pub async fn create_environment(
     name: &str,
     specs: &[MatchSpec],
-    target_platform: &Platform,
+    target_platform: &PlatformWithVirtualPackages,
     target_prefix: &Path,
     channels: &[Url],
     tool_configuration: &tool_configuration::Configuration,
@@ -151,7 +142,7 @@ pub async fn create_environment(
     install_packages(
         name,
         &required_packages,
-        target_platform,
+        target_platform.platform,
         target_prefix,
         tool_configuration,
     )
@@ -254,7 +245,7 @@ impl GatewayReporterBuilder {
 /// specs.
 pub async fn load_repodatas(
     channels: &[Url],
-    target_platform: &Platform,
+    target_platform: Platform,
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<Vec<rattler_repodata_gateway::RepoData>> {
@@ -267,7 +258,7 @@ pub async fn load_repodatas(
         .repodata_gateway
         .query(
             channels,
-            [*target_platform, Platform::NoArch],
+            [target_platform, Platform::NoArch],
             specs.to_vec(),
         )
         .with_reporter(
@@ -303,7 +294,7 @@ pub async fn load_repodatas(
 pub async fn install_packages(
     name: &str,
     required_packages: &[RepoDataRecord],
-    target_platform: &Platform,
+    target_platform: Platform,
     target_prefix: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> anyhow::Result<()> {
@@ -321,7 +312,7 @@ pub async fn install_packages(
     tracing::info!("\nInstalling {name} environment\n");
     Installer::new()
         .with_download_client(tool_configuration.client.clone())
-        .with_target_platform(*target_platform)
+        .with_target_platform(target_platform)
         .with_execute_link_scripts(true)
         .with_package_cache(tool_configuration.package_cache.clone())
         .with_reporter(

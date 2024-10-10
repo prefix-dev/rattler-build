@@ -37,12 +37,12 @@ pub fn compile_pyc(
     let python_interpreter = if output.build_configuration.cross_compilation() {
         python_bin(
             &build_config.directories.build_prefix,
-            &build_config.build_platform,
+            &build_config.build_platform.platform,
         )
     } else {
         python_bin(
             &build_config.directories.host_prefix,
-            &build_config.host_platform,
+            &build_config.host_platform.platform,
         )
     };
 

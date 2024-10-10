@@ -47,8 +47,12 @@ recipe:
     description: "Rich is a Python library for rich text and beautiful formatting in the terminal.\n\nThe Rich API makes it easy to add color and style to terminal output. Rich\ncan also render pretty tables, progress bars, markdown, syntax highlighted\nsource code, tracebacks, and more — out of the box."
 build_configuration:
   target_platform: noarch
-  host_platform: osx-arm64
-  build_platform: osx-arm64
+  host_platform:
+    platform: osx-arm64
+    virtual_packages: []
+  build_platform:
+    platform: osx-arm64
+    virtual_packages: []
   variant:
     target_platform: noarch
   hash:
