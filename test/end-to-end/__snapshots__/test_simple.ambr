@@ -6,8 +6,9 @@
       - flask
       - flask.json
   - script:
-    - flask --help
-    - pip check
+      content: |-
+        flask --help
+        pip check
     requirements:
       run:
       - pip
