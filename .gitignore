@@ -11,3 +11,6 @@ site
 
 # pixi environments
 .pixi
+
+# build python module
+py-rattler-build/**/*.so
