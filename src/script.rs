@@ -342,9 +342,12 @@ impl Interpreter for NuShellInterpreter {
 
 const CMDEXE_PREAMBLE: &str = r#"
 @chcp 65001 > nul
+@echo on
 IF "%CONDA_BUILD%" == "" (
     call ((script_path))
 )
+@rem re-enable echo because the activation scripts might have messed with it
+@echo on
 "#;
 
 struct CmdExeInterpreter;
