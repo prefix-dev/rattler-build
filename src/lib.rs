@@ -387,6 +387,7 @@ pub async fn get_build_output(
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
     tool_config: Configuration,
+    continue_on_fail: bool,
 ) -> miette::Result<()> {
     let mut outputs: Vec<metadata::Output> = Vec::new();
 
@@ -398,6 +399,9 @@ pub async fn run_build_from_args(
             }
             Err(e) => {
                 tracing::error!("Error building package: {}", e);
+                if continue_on_fail {
+                    continue;
+                }
                 return Err(e);
             }
         };
