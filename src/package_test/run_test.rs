@@ -314,8 +314,8 @@ pub async fn run_test(
     let pkg = ArchiveIdentifier::try_from_path(package_file)
         .ok_or_else(|| TestError::TestFailed("could not get archive identifier".to_string()))?;
 
-    // if the package is already in the cache, remove it. TODO make this based on
-    // SHA256 instead!
+    // if the package is already in the cache, remove it.
+    // TODO make this based on SHA256 instead!
     let cache_key = CacheKey::from(pkg.clone());
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
 
@@ -473,7 +473,10 @@ impl PythonTest {
         create_environment(
             "test",
             &dependencies,
-            &config.current_platform,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
             prefix,
             &config.channels,
             &config.tool_configuration,
