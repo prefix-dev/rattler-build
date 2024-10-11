@@ -389,7 +389,7 @@ where
                 let permissions = metadata.permissions();
                 fs_err::set_permissions(to, permissions)?;
             }
-        },
+        }
         Some(_) => {}
     }
 
