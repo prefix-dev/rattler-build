@@ -31,9 +31,12 @@ mod post_process;
 pub mod rebuild;
 #[cfg(feature = "recipe-generation")]
 pub mod recipe_generator;
+mod run_exports;
 mod unix;
 pub mod upload;
 mod windows;
+
+mod package_cache_reporter;
 
 use std::{
     collections::{BTreeMap, HashMap},

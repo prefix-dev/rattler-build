@@ -12,6 +12,7 @@ use rattler_conda_types::RepoDataRecord;
 
 /// A reporter that makes it easy to show the progress of updating the package
 /// cache.
+#[derive(Clone)]
 pub struct PackageCacheReporter {
     inner: Arc<Mutex<PackageCacheReporterInner>>,
 }
