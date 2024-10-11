@@ -82,10 +82,10 @@ impl Output {
             // we are using the `host_platform` here because for the cache it should not
             // matter whether it's being build for `noarch` or not (one can have
             // mixed outputs, in fact).
-            selected_variant.insert("host_platform", self.host_platform().to_string());
+            selected_variant.insert("host_platform", self.host_platform().platform.to_string());
             selected_variant.insert(
                 "build_platform",
-                self.build_configuration.build_platform.to_string(),
+                self.build_configuration.build_platform.platform.to_string(),
             );
 
             let cache_key = (cache, selected_variant);

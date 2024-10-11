@@ -152,6 +152,12 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Set the default cache directory to use for objects that need to be
+    /// cached.
+    pub fn with_opt_cache_dir(self, cache_dir: Option<PathBuf>) -> Self {
+        Self { cache_dir, ..self }
+    }
+
     /// Set the logging output handler to use for logging
     pub fn with_logging_output_handler(self, fancy_log_handler: LoggingOutputHandler) -> Self {
         Self {
