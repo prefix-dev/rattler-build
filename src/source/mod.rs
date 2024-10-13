@@ -171,7 +171,11 @@ pub async fn fetch_sources(
 
                 // Copy source code to work dir
                 if res.is_dir() {
-                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+                    tracing::info!(
+                        "Copying source from url: {} to {}",
+                        res.display(),
+                        dest_dir.display()
+                    );
                     tool_configuration.fancy_log_handler.wrap_in_progress(
                         "copying source into isolated environment",
                         || {
@@ -181,7 +185,11 @@ pub async fn fetch_sources(
                         },
                     )?;
                 } else {
-                    tracing::info!("Copying source from url: {:?} to {:?}", res, dest_dir);
+                    tracing::info!(
+                        "Copying source from url: {} to {}",
+                        res.display(),
+                        dest_dir.display()
+                    );
 
                     let file_name = src.file_name().unwrap_or(&file_name_from_url);
                     let target = dest_dir.join(file_name);
@@ -196,7 +204,7 @@ pub async fn fetch_sources(
             }
             Source::Path(src) => {
                 let src_path = recipe_dir.join(src.path()).canonicalize()?;
-                tracing::info!("Fetching source from path: {:?}", src_path);
+                tracing::info!("Fetching source from path: {}", src_path.display());
 
                 let dest_dir = if let Some(target_directory) = src.target_directory() {
                     work_dir.join(target_directory)
@@ -235,26 +243,27 @@ pub async fn fetch_sources(
                         .as_ref(),
                 ) {
                     extract_tar(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted to {:?}", dest_dir);
+                    tracing::info!("Extracted to {}", dest_dir.display());
                 } else if src_path.extension() == Some(OsStr::new("zip")) {
                     extract_zip(&src_path, &dest_dir, &tool_configuration.fancy_log_handler)?;
-                    tracing::info!("Extracted zip to {:?}", dest_dir);
+                    tracing::info!("Extracted zip to {}", dest_dir.display());
                 } else if let Some(file_name) = src
                     .file_name()
                     .cloned()
                     .or_else(|| src_path.file_name().map(PathBuf::from))
                 {
+                    let dest = dest_dir.join(&file_name);
                     tracing::info!(
-                        "Copying source from path: {:?} to {:?}",
-                        src_path,
-                        dest_dir.join(&file_name)
+                        "Copying source from path: {} to {}",
+                        src_path.display(),
+                        dest.display()
                     );
                     if let Some(checksum) = Checksum::from_path_source(src) {
                         if !checksum.validate(&src_path) {
                             return Err(SourceError::ValidationFailed);
                         }
                     }
-                    fs::copy(&src_path, dest_dir.join(file_name))?;
+                    fs::copy(&src_path, dest)?;
                 } else {
                     return Err(SourceError::FileNotFound(src_path));
                 }

@@ -121,7 +121,7 @@ fn extract_to_cache(
     let target = extracted_folder(path);
 
     if target.is_dir() {
-        tracing::info!("Using extracted directory from cache: {:?}", target);
+        tracing::info!("Using extracted directory from cache: {}", target.display());
         return Ok(target);
     }
 
@@ -131,11 +131,11 @@ fn extract_to_cache(
             .to_string_lossy()
             .as_ref(),
     ) {
-        tracing::info!("Extracting tar file to cache: {:?}", path);
+        tracing::info!("Extracting tar file to cache: {}", path.display());
         extract_tar(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
     } else if path.extension() == Some(OsStr::new("zip")) {
-        tracing::info!("Extracting zip file to cache: {:?}", path);
+        tracing::info!("Extracting zip file to cache: {}", path.display());
         extract_zip(path, &target, &tool_configuration.fancy_log_handler)?;
         return Ok(target);
     }

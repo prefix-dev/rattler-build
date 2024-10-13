@@ -400,7 +400,6 @@ pub async fn run_build_from_args(
                 output
             }
             Err(e) => {
-                tracing::error!("Error building package: {}", e);
                 return Err(e);
             }
         };
