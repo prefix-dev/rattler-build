@@ -194,14 +194,13 @@ impl Interpreter for BashInterpreter {
         .await?;
 
         if !output.status.success() {
+            let status_code = output.status.code().unwrap_or(1);
+            tracing::error!("Script failed with status {}", status_code);
+            tracing::error!("Work directory: '{}'", args.work_dir.display());
+            tracing::error!("{}", DEBUG_HELP);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!(
-                    "Script failed with status {:?}.\nWork directory: {:?}\n{}",
-                    output.status.code(),
-                    args.work_dir,
-                    DEBUG_HELP
-                ),
+                "Script failed".to_string(),
             ));
         }
 
@@ -329,14 +328,13 @@ impl Interpreter for NuShellInterpreter {
         .await?;
 
         if !output.status.success() {
+            let status_code = output.status.code().unwrap_or(1);
+            tracing::error!("Script failed with status {}", status_code);
+            tracing::error!("Work directory: '{}'", args.work_dir.display());
+            tracing::error!("{}", DEBUG_HELP);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!(
-                    "Script failed with status {:?}.\nWork directory: {:?}\n{}",
-                    output.status.code(),
-                    args.work_dir,
-                    DEBUG_HELP
-                ),
+                "Script failed".to_string(),
             ));
         }
 
@@ -395,14 +393,13 @@ impl Interpreter for CmdExeInterpreter {
         .await?;
 
         if !output.status.success() {
+            let status_code = output.status.code().unwrap_or(1);
+            tracing::error!("Script failed with status {}", status_code);
+            tracing::error!("Work directory: '{}'", args.work_dir.display());
+            tracing::error!("{}", DEBUG_HELP);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
-                format!(
-                    "Script failed with status {:?}.\nWork directory: {:?}\n{}",
-                    output.status.code(),
-                    args.work_dir,
-                    DEBUG_HELP
-                ),
+                "Script failed".to_string(),
             ));
         }
 

@@ -320,13 +320,16 @@ pub async fn run_test(
     let package_folder = cache_dir.join("pkgs").join(cache_key.to_string());
 
     if package_folder.exists() {
-        tracing::info!("Removing previously cached package {:?}", &package_folder);
+        tracing::info!(
+            "Removing previously cached package '{}'",
+            package_folder.display()
+        );
         fs::remove_dir_all(&package_folder)?;
     }
 
     let prefix = canonicalize(&config.test_prefix)?;
 
-    tracing::info!("Creating test environment in {:?}", prefix);
+    tracing::info!("Creating test environment in '{}'", prefix.display());
 
     let mut channels = config.channels.clone();
     channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
@@ -349,7 +352,7 @@ pub async fn run_test(
         ..config.clone()
     };
 
-    tracing::info!("Collecting tests from {:?}", package_folder);
+    tracing::info!("Collecting tests from '{}'", package_folder.display());
 
     rattler_package_streaming::fs::extract(package_file, &package_folder).map_err(|e| {
         tracing::error!("Failed to extract package: {:?}", e);
