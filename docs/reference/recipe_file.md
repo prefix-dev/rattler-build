@@ -1022,7 +1022,7 @@ string containing only `x` and `.`, e.g. `max_pin="x.x.x"` would signify to pin
 the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
 
 A pin with `min_pin="x.x",max_pin="x.x"` for a package of version `1.2.2` would
-evaluate to `>=1.2.2,<1.2.3`.
+evaluate to `>=1.2,<1.3.0a0`.
 
 If `exact=true`, then the `hash` is included, and the package is pinned exactly,
 e.g. `==1.2.2 h1234`. This is a unique package variant that cannot exist more
