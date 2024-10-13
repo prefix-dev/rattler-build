@@ -62,14 +62,26 @@ impl ExecutionArgs {
         let mut replacements = HashMap::new();
         if let Some(build_prefix) = &self.build_prefix {
             replacements.insert(
-                build_prefix.to_string_lossy().to_string(),
+                build_prefix.display().to_string(),
                 template.replace("((var))", "BUILD_PREFIX"),
             );
         };
         replacements.insert(
-            self.run_prefix.to_string_lossy().to_string(),
+            self.run_prefix.display().to_string(),
             template.replace("((var))", "PREFIX"),
         );
+
+        replacements.insert(
+            self.work_dir.display().to_string(),
+            template.replace("((var))", "SRC_DIR"),
+        );
+
+        // if the paths contain `\` then also replace the forward slash variants
+        for (k, v) in replacements.clone() {
+            if k.contains('\\') {
+                replacements.insert(k.replace('\\', "/"), v.clone());
+            }
+        }
 
         self.secrets.iter().for_each(|(_, v)| {
             replacements.insert(v.to_string(), "********".to_string());
@@ -772,6 +784,7 @@ async fn run_process_with_replacements(
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
     let mut closed = (false, false);
+
     loop {
         let (line, is_stderr) = tokio::select! {
             line = stdout_lines.next_line() => (line, false),
