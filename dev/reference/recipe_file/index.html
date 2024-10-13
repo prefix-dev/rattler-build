@@ -2659,7 +2659,7 @@ specified rules.</p>
 string containing only <code>x</code> and <code>.</code>, e.g. <code>max_pin="x.x.x"</code> would signify to pin
 the given package to <code>&lt;1.2.3</code> (if the package version is <code>1.2.2</code>, for example).</p>
 <p>A pin with <code>min_pin="x.x",max_pin="x.x"</code> for a package of version <code>1.2.2</code> would
-evaluate to <code>&gt;=1.2.2,&lt;1.2.3</code>.</p>
+evaluate to <code>&gt;=1.2,&lt;1.3.0a0</code>.</p>
 <p>If <code>exact=true</code>, then the <code>hash</code> is included, and the package is pinned exactly,
 e.g. <code>==1.2.2 h1234</code>. This is a unique package variant that cannot exist more
 than once, and thus is "exactly" pinned.</p>
