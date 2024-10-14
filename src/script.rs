@@ -354,6 +354,9 @@ const CMDEXE_PREAMBLE: &str = r#"
 @chcp 65001 > nul
 @echo on
 IF "%CONDA_BUILD%" == "" (
+    @rem special behavior from conda-build for Windows
+    set "INCLUDE=((LIBRARY_INC));%INCLUDE%"
+    set "LIB=((LIBRARY_LIB));%LIB%"
     call ((script_path))
 )
 @rem re-enable echo because the activation scripts might have messed with it
@@ -373,7 +376,16 @@ impl Interpreter for CmdExeInterpreter {
 
         let build_script = format!(
             "{}\n{}",
-            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
+            CMDEXE_PREAMBLE
+                .replace("((script_path))", &build_env_path.to_string_lossy())
+                .replace(
+                    "((LIBRARY_INC))",
+                    &args.env_vars.get("LIBRARY_INC").unwrap_or(&"".to_string())
+                )
+                .replace(
+                    "((LIBRARY_LIB))",
+                    &args.env_vars.get("LIBRARY_LIB").unwrap_or(&"".to_string())
+                ),
             args.script.script()
         );
         tokio::fs::write(
