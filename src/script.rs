@@ -355,8 +355,6 @@ const CMDEXE_PREAMBLE: &str = r#"
 @echo on
 IF "%CONDA_BUILD%" == "" (
     @rem special behavior from conda-build for Windows
-    set "INCLUDE=((LIBRARY_INC));%INCLUDE%"
-    set "LIB=((LIBRARY_LIB));%LIB%"
     call ((script_path))
 )
 @rem re-enable echo because the activation scripts might have messed with it

@@ -47,23 +47,39 @@ pub fn default_env_vars(
     let mut vars = HashMap::<String, Option<String>>::new();
     vars.insert(
         "SCRIPTS".to_string(),
-        Some(prefix.join("Scripts").to_string_lossy().to_string()),
+        Some(prefix.join("Scripts").display().to_string()),
     );
     vars.insert(
         "LIBRARY_PREFIX".to_string(),
-        Some(library_prefix.to_string_lossy().to_string()),
+        Some(library_prefix.display().to_string()),
     );
     vars.insert(
         "LIBRARY_BIN".to_string(),
-        Some(library_prefix.join("bin").to_string_lossy().to_string()),
+        Some(library_prefix.join("bin").display().to_string()),
     );
+    let library_lib = library_prefix.join("lib");
+    let library_inc = library_prefix.join("include");
     vars.insert(
         "LIBRARY_INC".to_string(),
-        Some(library_prefix.join("include").to_string_lossy().to_string()),
+        Some(library_inc.display().to_string()),
     );
     vars.insert(
         "LIBRARY_LIB".to_string(),
-        Some(library_prefix.join("lib").to_string_lossy().to_string()),
+        Some(library_lib.display().to_string()),
+    );
+
+    // This adds the LIB and INCLUDE vars. It would not be entirely correct if someone
+    // overwrites the LIBRARY_LIB or LIBRARY_INCLUDE variables from the variants.yaml
+    // but I think for now this is fine.
+    let lib_var = std::env::var("LIB").ok().unwrap_or_default();
+    let include_var = std::env::var("INCLUDE").ok().unwrap_or_default();
+    vars.insert(
+        "LIB".to_string(),
+        Some(format!("{};{}", library_lib.display(), lib_var)),
+    );
+    vars.insert(
+        "INCLUDE".to_string(),
+        Some(format!("{};{}", library_inc.display(), include_var)),
     );
 
     let default_vars = vec![
