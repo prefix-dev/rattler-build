@@ -84,17 +84,15 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                         variables.insert(format!("{}_stdlib", &constant.value));
                         variables.insert(format!("{}_stdlib_version", &constant.value));
                     }
-                } else if function == "pin_subpackage" {
-                    if let Expr::Const(constant) = &call.args[0] {
-                        variables.insert(format!("{}", &constant.value));
+                } else if function == "pin_subpackage" || function == "pin_compatible" {
+                    if !call.args.is_empty() {
+                        extract_variable_from_expression(&call.args[0], variables);
                     }
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "cmp" {
-                    if let Expr::Var(var) = &call.args[0] {
-                        variables.insert(var.id.to_string());
-                    }
+                    extract_variable_from_expression(&call.args[0], variables);
                 }
             }
         }
@@ -314,7 +312,10 @@ mod test {
               then: osx-clang
             - ${{ compiler('c') }}
             - ${{ stdlib('c') }}
-            - ${{ pin_subpackage('abcdef') }}
+            - ${{ pin_subpackage(abcdef) }}
+            - ${{ pin_subpackage("foobar") }}
+            - ${{ pin_compatible(compatible) }}
+            - ${{ pin_compatible(abc ~ def) }}
         "#;
 
         let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
@@ -327,6 +328,10 @@ mod test {
         assert!(used_vars.contains("c_stdlib"));
         assert!(used_vars.contains("c_stdlib_version"));
         assert!(used_vars.contains("abcdef"));
+        assert!(!used_vars.contains("foobar"));
+        assert!(used_vars.contains("compatible"));
+        assert!(used_vars.contains("abc"));
+        assert!(used_vars.contains("def"));
     }
 
     #[test]

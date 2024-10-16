@@ -753,9 +753,11 @@ impl VariantConfig {
 
                 // We also replace `-` with `_` in the keys for better compatibility
                 // with conda-build and because then we can set them directly as env vars
+                // and the same for `.` because we want to be able to set them as env vars directly
                 let used_filtered = used_filtered
                     .into_iter()
                     .map(|(k, v)| (k.replace("-", "_"), v))
+                    .map(|(k, v)| (k.replace(".", "_"), v))
                     .collect::<BTreeMap<_, _>>();
 
                 recipes.insert(DiscoveredOutput {
@@ -1066,7 +1068,7 @@ mod tests {
                 .unwrap();
 
             // assert output order
-            let order = vec!["some-pkg-a", "some-pkg", "some_pkg"];
+            let order = vec!["some-pkg.foo-a", "some-pkg.foo", "some_pkg.foo"];
             let outputs: Vec<_> = outputs_and_variants
                 .iter()
                 .map(|o| o.name.clone())

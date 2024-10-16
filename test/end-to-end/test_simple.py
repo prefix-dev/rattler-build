@@ -998,3 +998,14 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
         "variant": "pybind11-abi",
         "spec": "pybind11-abi 4.*",
     }
+
+
+def test_pin_subpackage(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "pin_subpackage",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "my.package-a")
+    assert (pkg / "info/index.json").exists()
