@@ -60,8 +60,8 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     if let Some(py_ver) = python_version {
-        let py_ver = py_ver.split('.').collect::<Vec<_>>();
-        let py_ver_str = format!("{}.{}", py_ver[0], py_ver[1]);
+        let py_ver: Vec<_> = py_ver.split('.').take(2).collect();
+        let py_ver_str = py_ver.join(".");
         let stdlib_dir = get_stdlib_dir(
             output.prefix(),
             output.host_platform().platform,
@@ -80,9 +80,9 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     if let Some(npy_version) = output.variant().get("numpy") {
-        let np_ver = npy_version.split('.').collect::<Vec<_>>();
-        let np_ver = format!("{}.{}", np_ver[0], np_ver[1]);
-        insert!(result, "NPY_VER", np_ver);
+        let npy_ver: Vec<_> = npy_version.split('.').take(2).collect();
+        let npy_ver = npy_ver.join(".");
+        insert!(result, "NPY_VER", npy_ver);
         insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");
     }
 
