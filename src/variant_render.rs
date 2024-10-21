@@ -1,11 +1,15 @@
 use std::collections::{BTreeMap, HashSet};
 
 use crate::{
-    hash::HashInfo, recipe::{
+    hash::HashInfo,
+    recipe::{
         custom_yaml::Node,
         parser::{Dependency, PinCompatible, PinSubpackage},
         ParsingError, Recipe,
-    }, selectors::SelectorConfig, used_variables::used_vars_from_expressions, variant_config::{ParseErrors, VariantConfig, VariantError}
+    },
+    selectors::SelectorConfig,
+    used_variables::used_vars_from_expressions,
+    variant_config::{ParseErrors, VariantConfig, VariantError},
 };
 
 /// All the raw outputs of a single recipe.yaml
@@ -120,7 +124,7 @@ pub(crate) fn stage_1_render(
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
-    let mut discovered_outputs = Vec::new();
+    // let mut discovered_outputs = Vec::new();
 
     // TODO we need to add variables from the cache here!
     for r in stage0_renders {
@@ -155,13 +159,14 @@ pub(crate) fn stage_1_render(
                 }
             }
 
-            let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
+            // TODO
+            // let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
 
-            let build_string = parsed_recipe
-                .build()
-                .string()
-                .resolve(&hash, parsed_recipe.build().number)
-                .into_owned();
+            // let build_string = parsed_recipe
+            //     .build()
+            //     .string()
+            //     .resolve(&hash, parsed_recipe.build().number)
+            //     .into_owned();
 
             extra_vars_per_output.push(additional_variables);
         }
