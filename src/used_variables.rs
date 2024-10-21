@@ -316,6 +316,8 @@ mod test {
             - ${{ pin_subpackage("foobar") }}
             - ${{ pin_compatible(compatible) }}
             - ${{ pin_compatible(abc ~ def) }}
+            - if: match(xpython, ">=3.7")
+              then: numpy 100
         "#;
 
         let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
@@ -332,6 +334,7 @@ mod test {
         assert!(used_vars.contains("compatible"));
         assert!(used_vars.contains("abc"));
         assert!(used_vars.contains("def"));
+        assert!(used_vars.contains("xpython"));
     }
 
     #[test]
