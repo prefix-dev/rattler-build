@@ -288,6 +288,11 @@ impl Output {
         let span = tracing::info_span!("Fetching source code");
         let _enter = span.enter();
 
+        // if the work directory already exists, we should remove it
+        if self.build_configuration.directories.work_dir.exists() {
+            fs::remove_dir_all(&self.build_configuration.directories.work_dir)?;
+        }
+
         if let Some(finalized_sources) = &self.finalized_sources {
             fetch_sources(
                 finalized_sources,
