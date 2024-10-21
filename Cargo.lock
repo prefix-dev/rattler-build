@@ -84,7 +84,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "00c4af0bef1b514c9b6a32a773caf604c1390fa7913f4eaa23bfe76f251d6a42"
 dependencies = [
  "nom",
- "ratatui 0.28.1",
+ "ratatui",
  "simdutf8",
  "smallvec",
  "thiserror",
@@ -791,7 +791,7 @@ dependencies = [
  "crossterm 0.27.0",
  "strum",
  "strum_macros",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -832,7 +832,7 @@ dependencies = [
  "encode_unicode",
  "lazy_static",
  "libc",
- "unicode-width 0.1.14",
+ "unicode-width",
  "windows-sys 0.52.0",
 ]
 
@@ -2184,15 +2184,9 @@ dependencies = [
  "instant",
  "number_prefix",
  "portable-atomic",
- "unicode-width 0.1.14",
+ "unicode-width",
  "vt100",
 ]
-
-[[package]]
-name = "indoc"
-version = "2.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b248f5224d1d606005e02c97f5aa4e88eeb230488bcc03bc9ca4d7991399f2b5"
 
 [[package]]
 name = "inout"
@@ -2547,7 +2541,7 @@ dependencies = [
  "miette-derive 5.10.0",
  "once_cell",
  "thiserror",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2567,7 +2561,7 @@ dependencies = [
  "terminal_size 0.3.0",
  "textwrap",
  "thiserror",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3060,7 +3054,7 @@ dependencies = [
  "once_cell",
  "regex",
  "serde",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3075,7 +3069,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tracing",
- "unicode-width 0.1.14",
+ "unicode-width",
  "url",
 ]
 
@@ -3422,28 +3416,7 @@ dependencies = [
  "strum_macros",
  "unicode-segmentation",
  "unicode-truncate",
- "unicode-width 0.1.14",
-]
-
-[[package]]
-name = "ratatui"
-version = "0.29.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eabd94c2f37801c20583fc49dd5cd6b0ba68c716787c2dd6ed18571e1e63117b"
-dependencies = [
- "bitflags 2.6.0",
- "cassowary",
- "compact_str",
- "crossterm 0.28.1",
- "indoc",
- "instability",
- "itertools 0.13.0",
- "lru",
- "paste",
- "strum",
- "unicode-segmentation",
- "unicode-truncate",
- "unicode-width 0.2.0",
+ "unicode-width",
 ]
 
 [[package]]
@@ -3528,7 +3501,7 @@ dependencies = [
  "patch",
  "pathdiff",
  "petgraph",
- "ratatui 0.29.0",
+ "ratatui",
  "rattler",
  "rattler_cache",
  "rattler_conda_types",
@@ -5086,7 +5059,7 @@ checksum = "23d434d3f8967a09480fb04132ebe0a3e088c173e6d0ee7897abbdf4eab0f8b9"
 dependencies = [
  "smawk",
  "unicode-linebreak",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -5126,7 +5099,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46994acd1137e3e5b78d9b9112d91596b20e64fc6ec788dfc0f2430a2e965633"
 dependencies = [
  "rand",
- "ratatui 0.28.1",
+ "ratatui",
 ]
 
 [[package]]
@@ -5427,8 +5400,8 @@ version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd137780d743c103a391e06fe952487f914b299a4fe2c3626677f6a6339a7c6b"
 dependencies = [
- "ratatui 0.28.1",
- "unicode-width 0.1.14",
+ "ratatui",
+ "unicode-width",
 ]
 
 [[package]]
@@ -5507,7 +5480,7 @@ checksum = "b3644627a5af5fa321c95b9b235a72fd24cd29c648c2c379431e6628655627bf"
 dependencies = [
  "itertools 0.13.0",
  "unicode-segmentation",
- "unicode-width 0.1.14",
+ "unicode-width",
 ]
 
 [[package]]
@@ -5515,12 +5488,6 @@ name = "unicode-width"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
-
-[[package]]
-name = "unicode-width"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unsafe-libyaml"
@@ -5612,7 +5579,7 @@ checksum = "84cd863bf0db7e392ba3bd04994be3473491b31e66340672af5d11943c6274de"
 dependencies = [
  "itoa",
  "log",
- "unicode-width 0.1.14",
+ "unicode-width",
  "vte",
 ]
 
