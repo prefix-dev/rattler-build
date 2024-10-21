@@ -25,6 +25,7 @@ async fn main() -> miette::Result<()> {
                 &app.log_style,
                 &app.verbose,
                 &app.color,
+                app.wrap_log_lines,
                 #[cfg(feature = "tui")]
                 None,
             )
