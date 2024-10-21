@@ -91,7 +91,7 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
-                } else if function == "cmp" {
+                } else if function == "match" {
                     extract_variable_from_expression(&call.args[0], variables);
                 }
             }
