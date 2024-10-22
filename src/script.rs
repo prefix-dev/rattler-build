@@ -29,6 +29,7 @@ use crate::{
 };
 
 const BASH_PREAMBLE: &str = r#"
+#!/bin/bash
 ## Start of bash preamble
 if [ -z ${CONDA_BUILD+x} ]; then
     source ((script_path))
