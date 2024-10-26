@@ -1,7 +1,6 @@
 //! This module contains utilities for logging and progress bar handling.
 use std::{
     borrow::Cow,
-    collections::HashMap,
     future::Future,
     io,
     str::FromStr,
@@ -56,11 +55,17 @@ where
     }
 }
 
+#[derive(Debug)]
+struct SpanInfo {
+    id: Id,
+    start_time: Instant,
+    header: String,
+    header_printed: bool,
+}
+
 #[derive(Debug, Default)]
 struct SharedState {
-    indentation_level: usize,
-    timestamps: HashMap<Id, Instant>,
-    formatted_spans: HashMap<Id, String>,
+    span_stack: Vec<SpanInfo>,
     warnings: Vec<String>,
 }
 
@@ -155,104 +160,104 @@ where
     fn on_new_span(
         &self,
         attrs: &tracing_core::span::Attributes<'_>,
-        id: &tracing_core::span::Id,
+        id: &Id,
         ctx: Context<'_, S>,
     ) {
         let mut state = self.state.lock().unwrap();
-        state.timestamps.insert(id.clone(), Instant::now());
-        let span = ctx.span(id);
 
-        if let Some(span) = span {
+        if let Some(span) = ctx.span(id) {
             let mut s = Vec::new();
             let mut w = io::Cursor::new(&mut s);
             attrs.record(&mut CustomVisitor::new(&mut w));
             let s = String::from_utf8_lossy(w.get_ref());
 
-            if !s.is_empty() {
-                state
-                    .formatted_spans
-                    .insert(id.clone(), format!("{}{}", span.name(), s));
+            let name = if s.is_empty() {
+                span.name().to_string()
             } else {
-                state
-                    .formatted_spans
-                    .insert(id.clone(), span.name().to_string());
-            }
-        }
-    }
+                format!("{}{}", span.name(), s)
+            };
 
-    fn on_enter(&self, id: &Id, _ctx: Context<'_, S>) {
-        let mut state = self.state.lock().unwrap();
-        let ind = indent_levels(state.indentation_level);
-        if let Some(txt) = state.formatted_spans.get(id) {
-            eprintln!("{ind}\n{ind} {} {}", style("╭─").cyan(), txt);
-        }
+            let indent = indent_levels(state.span_stack.len());
+            let header = format!("{indent}\n{indent} {} {}", style("╭─").cyan(), name);
 
-        state.indentation_level += 1;
+            state.span_stack.push(SpanInfo {
+                id: id.clone(),
+                start_time: Instant::now(),
+                header,
+                header_printed: false,
+            });
+        }
     }
 
     fn on_exit(&self, id: &Id, _ctx: Context<'_, S>) {
         let mut state = self.state.lock().unwrap();
 
-        let prev_ind = indent_levels(state.indentation_level);
+        if let Some(pos) = state.span_stack.iter().position(|info| &info.id == id) {
+            let elapsed = state.span_stack[pos].start_time.elapsed();
+            let header_printed = state.span_stack[pos].header_printed;
+            state.span_stack.truncate(pos);
 
-        if state.indentation_level > 0 {
-            state.indentation_level -= 1;
+            if !header_printed {
+                return;
+            }
+
+            let indent = indent_levels(pos);
+            let indent_plus_one = indent_levels(pos + 1);
+
+            eprintln!(
+                "{indent_plus_one}\n{indent} {} (took {})",
+                style("╰───────────────────").cyan(),
+                HumanDuration(elapsed)
+            );
         }
-
-        let ind = indent_levels(state.indentation_level);
-
-        let elapsed_time = state
-            .timestamps
-            .remove(id)
-            .map(|t| t.elapsed())
-            .unwrap_or_default();
-
-        let human_duration = HumanDuration(elapsed_time);
-
-        eprintln!(
-            "{prev_ind}\n{ind} {} (took {})",
-            style("╰───────────────────").cyan(),
-            human_duration
-        );
     }
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
         let mut state = self.state.lock().unwrap();
-        let indent_str = indent_levels(state.indentation_level);
+        let indent = indent_levels(state.span_stack.len());
+
+        // Print pending headers
+        for span_info in &mut state.span_stack {
+            if !span_info.header_printed {
+                eprintln!("{}", span_info.header);
+                span_info.header_printed = true;
+            }
+        }
 
         let mut s = Vec::new();
         event.record(&mut CustomVisitor::new(&mut s));
-        let s = String::from_utf8_lossy(&s);
+        let message = String::from_utf8_lossy(&s);
 
-        let (prefix, prefix_len) =
-            if event.metadata().level() <= &tracing_core::metadata::Level::WARN {
-                state.warnings.push(s.to_string());
-                if event.metadata().level() == &tracing_core::metadata::Level::ERROR {
-                    (style("× error ").red().bold(), 7)
-                } else {
-                    (style("⚠ warning ").yellow().bold(), 9)
-                }
+        let (prefix, prefix_len) = if event.metadata().level() <= &Level::WARN {
+            state.warnings.push(message.to_string());
+            if event.metadata().level() == &Level::ERROR {
+                (style("× error ").red().bold(), 7)
             } else {
-                (style(""), 0)
-            };
-
-        let width: usize = terminal_size::terminal_size()
-            .map(|(w, _)| w.0)
-            .unwrap_or(160) as usize;
-
-        let max_width = width - (state.indentation_level * 2) - 1 - prefix_len;
+                (style("⚠ warning ").yellow().bold(), 9)
+            }
+        } else {
+            (style(""), 0)
+        };
 
         self.progress_bars.suspend(|| {
-            for line in s.lines() {
-                // split line into max_width chunks
-                if line.len() <= max_width {
-                    eprintln!("{} {}{}", indent_str, prefix, line);
-                } else {
-                    chunk_string_without_ansi(line, max_width)
-                        .iter()
-                        .for_each(|chunk| {
-                            eprintln!("{} {}{}", indent_str, prefix, chunk);
-                        });
+            if !self.wrap_lines {
+                for line in message.lines() {
+                    eprintln!("{} {}{}", indent, prefix, line);
+                }
+            } else {
+                let width = terminal_size::terminal_size()
+                    .map(|(w, _)| w.0)
+                    .unwrap_or(160) as usize;
+                let max_width = width - (state.span_stack.len() * 2) - 1 - prefix_len;
+
+                for line in message.lines() {
+                    if line.len() <= max_width {
+                        eprintln!("{} {}{}", indent, prefix, line);
+                    } else {
+                        for chunk in chunk_string_without_ansi(line, max_width) {
+                            eprintln!("{} {}{}", indent, prefix, chunk);
+                        }
+                    }
                 }
             }
         });
@@ -263,6 +268,7 @@ where
 #[derive(Debug)]
 pub struct LoggingOutputHandler {
     state: Arc<Mutex<SharedState>>,
+    wrap_lines: bool,
     progress_bars: MultiProgress,
     writer: io::Stderr,
 }
@@ -270,6 +276,7 @@ pub struct LoggingOutputHandler {
 impl Clone for LoggingOutputHandler {
     fn clone(&self) -> Self {
         Self {
+            wrap_lines: self.wrap_lines,
             state: self.state.clone(),
             progress_bars: self.progress_bars.clone(),
             writer: io::stderr(),
@@ -281,6 +288,7 @@ impl Default for LoggingOutputHandler {
     /// Creates a new output handler.
     fn default() -> Self {
         Self {
+            wrap_lines: true,
             state: Arc::new(Mutex::new(SharedState::default())),
             progress_bars: MultiProgress::new(),
             writer: io::stderr(),
@@ -289,26 +297,23 @@ impl Default for LoggingOutputHandler {
 }
 
 impl LoggingOutputHandler {
-    /// Create a new logging handler with the given multi-progress.
-    pub fn from_multi_progress(multi_progress: MultiProgress) -> LoggingOutputHandler {
-        Self {
-            state: Arc::new(Mutex::new(SharedState::default())),
-            progress_bars: multi_progress,
-            writer: io::stderr(),
-        }
-    }
-
     /// Return a string with the current indentation level (bars added to the
     /// front of the string).
     pub fn with_indent_levels(&self, template: &str) -> String {
         let state = self.state.lock().unwrap();
-        let indent_str = indent_levels(state.indentation_level);
+        let indent_str = indent_levels(state.span_stack.len());
         format!("{} {}", indent_str, template)
     }
 
     /// Return the multi-progress instance.
     pub fn multi_progress(&self) -> &MultiProgress {
         &self.progress_bars
+    }
+
+    /// Set the multi-progress instance.
+    pub fn with_multi_progress(mut self, multi_progress: MultiProgress) -> Self {
+        self.progress_bars = multi_progress;
+        self
     }
 
     /// Returns the style to use for a progressbar that is currently in
@@ -482,6 +487,7 @@ impl<'a> MakeWriter<'a> for LoggingOutputHandler {
         self.clone()
     }
 }
+
 ///////////////////////
 // LOGGING CLI utils //
 ///////////////////////
@@ -560,11 +566,19 @@ pub fn init_logging(
     log_style: &LogStyle,
     verbosity: &Verbosity<InfoLevel>,
     color: &Color,
+    wrap_lines: Option<bool>,
     #[cfg(feature = "tui")] tui_log_sender: Option<
         tokio::sync::mpsc::UnboundedSender<crate::tui::event::Event>,
     >,
 ) -> Result<LoggingOutputHandler, ParseError> {
-    let log_handler = LoggingOutputHandler::default();
+    let mut log_handler = LoggingOutputHandler::default();
+
+    // Wrap lines by default, but disable it in CI
+    if let Some(wrap_lines) = wrap_lines {
+        log_handler.wrap_lines = wrap_lines;
+    } else if std::env::var("CI").is_ok() {
+        log_handler.wrap_lines = false;
+    }
 
     let use_colors = match color {
         Color::Always => Some(true),

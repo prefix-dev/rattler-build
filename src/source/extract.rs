@@ -214,7 +214,8 @@ mod test {
         let mut file = File::create(&file_path).unwrap();
         _ = file.write_all(HELLO_WORLD_ZIP_FILE);
 
-        let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
+        let fancy_log = LoggingOutputHandler::default().with_multi_progress(multi_progress.clone());
+
         let res = extract_zip(file_path, tempdir.path(), &fancy_log);
         assert!(term.contents().trim().starts_with(
             "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"

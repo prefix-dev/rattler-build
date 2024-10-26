@@ -129,6 +129,14 @@ pub struct App {
     )]
     pub log_style: LogStyle,
 
+    #[clap(
+        long,
+        env = "RATTLER_BUILD_WRAP_LOG_LINES",
+        default_value = "true",
+        global = true
+    )]
+    pub wrap_log_lines: Option<bool>,
+
     /// Enable or disable colored output from rattler-build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
