@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.28.0"
+version = "0.28.1"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -45,10 +45,10 @@ name = "rattler-build"
 required-features = ["recipe-generation"]
 
 [dependencies]
-serde = { version = "1.0.210", features = ["derive"] }
+serde = { version = "1.0.213", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde-untagged = "0.1.6"
-anyhow = "1.0.90"
+anyhow = "1.0.91"
 walkdir = "2.5.0"
 sha2 = "0.10.8"
 hex = "0.4.3"
@@ -56,14 +56,14 @@ serde_json = "1.0.132"
 reqwest = { version = "0.12.8", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.40.0", features = ["rt", "macros", "rt-multi-thread", "process"] }
+tokio = { version = "1.41.0", features = ["rt", "macros", "rt-multi-thread", "process"] }
 itertools = "0.13.0"
 content_inspector = "0.2.4"
 serde_with = "3.11.0"
 url = "2.5.2"
 tracing = "0.1.40"
 clap = { version = "4.5.20", features = ["derive", "env", "cargo"] }
-minijinja = { version = "2.3.1", features = [
+minijinja = { version = "2.4.0", features = [
     "unstable_machinery",
     "custom_syntax",
 ] }
@@ -76,14 +76,14 @@ tracing-subscriber = { version = "0.3.18", features = [
 marked-yaml = { version = "0.7.1" }
 miette = { version = "7.2.0", features = ["fancy"] }
 num_cpus = "1.16.0"
-goblin = "0.9.0"
+goblin = "0.9.1"
 scroll = "0.12.0"
 pathdiff = "0.2.2"
 comfy-table = "7.1.1"
 futures = "0.3.31"
 indicatif = "0.17.8"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
-thiserror = "1.0.64"
+thiserror = "1.0.65"
 tempfile = "3.13.0"
 chrono = "0.4.38"
 sha1 = "0.10.6"
@@ -95,9 +95,9 @@ tracing-core = "0.1.32"
 petgraph = "0.6.5"
 indexmap = "2.6.0"
 dunce = "1.0.5"
-fs-err = "2.11.0"
+fs-err = "3.0.0"
 which = "6.0.3"
-clap_complete = "4.5.33"
+clap_complete = "4.5.35"
 clap_complete_nushell = "4.5.4"
 tokio-util = "0.7.12"
 
@@ -120,13 +120,13 @@ terminal_size = "0.4.0"
 memchr = "2.7.4"
 ratatui = { version = "0.28.1", optional = true }
 crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
-ansi-to-tui = { version = "6.0.0", optional = true }
+ansi-to-tui = { version = "6.0.1", optional = true }
 throbber-widgets-tui = { version = "0.7", optional = true }
 tui-input = { version = "0.10.1", optional = true }
 reflink-copy = "0.1.19"
 rayon = "1.10.0"
 patch = "0.7.0"
-regex = "1.11.0"
+regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
