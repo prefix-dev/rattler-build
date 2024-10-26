@@ -297,16 +297,6 @@ impl Default for LoggingOutputHandler {
 }
 
 impl LoggingOutputHandler {
-    /// Create a new logging handler with the given multi-progress.
-    pub fn from_multi_progress(multi_progress: MultiProgress) -> LoggingOutputHandler {
-        Self {
-            wrap_lines: true,
-            state: Arc::new(Mutex::new(SharedState::default())),
-            progress_bars: multi_progress,
-            writer: io::stderr(),
-        }
-    }
-
     /// Return a string with the current indentation level (bars added to the
     /// front of the string).
     pub fn with_indent_levels(&self, template: &str) -> String {
@@ -318,6 +308,12 @@ impl LoggingOutputHandler {
     /// Return the multi-progress instance.
     pub fn multi_progress(&self) -> &MultiProgress {
         &self.progress_bars
+    }
+
+    /// Set the multi-progress instance.
+    pub fn with_multi_progress(mut self, multi_progress: MultiProgress) -> Self {
+        self.progress_bars = multi_progress;
+        self
     }
 
     /// Returns the style to use for a progressbar that is currently in
