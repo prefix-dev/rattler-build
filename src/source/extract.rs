@@ -1,6 +1,6 @@
 //! Helpers to extract archives
 use std::{ffi::OsStr, io::BufRead, path::Path};
-
+use tar::EntryType;
 use crate::console_utils::LoggingOutputHandler;
 
 use fs_err as fs;
@@ -136,9 +136,29 @@ pub(crate) fn extract_tar(
     ));
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
-    archive
-        .unpack(&tmp_extraction_dir)
-        .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
+    for entry in archive.entries()? {
+        match entry {
+            Ok(mut file) => {
+                let path = tmp_extraction_dir.path().join(file.path()?);
+
+                // Attempt to unpack symlinks, log errors if they fail on Windows
+                if file.header().entry_type() == EntryType::Symlink && cfg!(target_os = "windows") {
+                    if let Err(e) = file.unpack(&path) {
+                        println!("Warning: failed to extract symlink {:?} due to {:?}", path, e);
+                    }
+                    continue;
+                }
+
+                // Attempt to unpack other files individually, handle errors gracefully
+                if let Err(e) = file.unpack(&path) {
+                    println!("Warning: failed to unpack {:?} due to {:?}", path, e);
+                }
+            }
+            Err(e) => {
+                println!("Warning: failed to read an entry due to {:?}", e);
+            }
+        }
+    }
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
     progress_bar.finish_with_message("Extracted...");
@@ -170,7 +190,7 @@ pub(crate) fn extract_zip(
     let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
         File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
     ))
-    .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
+        .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
