@@ -374,16 +374,7 @@ impl Interpreter for CmdExeInterpreter {
 
         let build_script = format!(
             "{}\n{}",
-            CMDEXE_PREAMBLE
-                .replace("((script_path))", &build_env_path.to_string_lossy())
-                .replace(
-                    "((LIBRARY_INC))",
-                    &args.env_vars.get("LIBRARY_INC").unwrap_or(&"".to_string())
-                )
-                .replace(
-                    "((LIBRARY_LIB))",
-                    &args.env_vars.get("LIBRARY_LIB").unwrap_or(&"".to_string())
-                ),
+            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
             args.script.script()
         );
         tokio::fs::write(
