@@ -230,7 +230,7 @@ pub fn git_src(
                 }
             }
             // git doesn't support UNC paths, hence we can't use std::fs::canonicalize
-            let path = dunce::canonicalize(path).map_err(|e| {
+            let path = dunce::canonicalize(recipe_dir.join(path)).map_err(|e| {
                 tracing::error!("Path not found on system: {}", e);
                 SourceError::GitError(format!("{}: Path not found on system", e))
             })?;
