@@ -129,10 +129,13 @@ pub struct App {
     )]
     pub log_style: LogStyle,
 
+    /// Wrap log lines at the terminal width.
+    /// This is automatically disabled on CI (by detecting the `CI` environment variable).
     #[clap(
         long,
         env = "RATTLER_BUILD_WRAP_LOG_LINES",
-        default_value = "true",
+        default_missing_value = "true",
+        num_args = 0..=1,
         global = true
     )]
     pub wrap_log_lines: Option<bool>,
