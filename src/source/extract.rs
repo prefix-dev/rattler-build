@@ -141,20 +141,23 @@ pub(crate) fn extract_tar(
             Ok(mut file) => {
                 let path = tmp_extraction_dir.path().join(file.path()?);
 
-                // Attempt to unpack symlinks, log errors if they fail on Windows
-                if file.header().entry_type() == EntryType::Symlink && cfg!(target_os = "windows") {
-                    if let Err(e) = file.unpack(&path) {
-                        println!(
-                            "Warning: failed to extract symlink {:?} due to {:?}",
-                            path, e
-                        );
-                    }
-                    continue;
+                // Ensure all intermediate directories exist before unpacking
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
                 }
 
-                // Attempt to unpack other files individually, handle errors gracefully
-                if let Err(e) = file.unpack(&path) {
-                    println!("Warning: failed to unpack {:?} due to {:?}", path, e);
+                // Attempt to unpack symlinks and regular files, logging any issues
+                match file.header().entry_type() {
+                    EntryType::Symlink if cfg!(target_os = "windows") => {
+                        if let Err(e) = file.unpack(&path) {
+                            println!("Warning: failed to extract symlink {:?} due to {:?}", path, e);
+                        }
+                    }
+                    _ => {
+                        if let Err(e) = file.unpack(&path) {
+                            println!("Warning: failed to unpack {:?} due to {:?}", path, e);
+                        }
+                    }
                 }
             }
             Err(e) => {
