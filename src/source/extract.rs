@@ -150,7 +150,10 @@ pub(crate) fn extract_tar(
                 match file.header().entry_type() {
                     EntryType::Symlink if cfg!(target_os = "windows") => {
                         if let Err(e) = file.unpack(&path) {
-                            println!("Warning: failed to extract symlink {:?} due to {:?}", path, e);
+                            println!(
+                                "Warning: failed to extract symlink {:?} due to {:?}",
+                                path, e
+                            );
                         }
                     }
                     _ => {
