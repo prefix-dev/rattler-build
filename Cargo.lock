@@ -372,7 +372,7 @@ dependencies = [
  "http-content-range",
  "itertools 0.12.1",
  "memmap2 0.9.5",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "thiserror",
  "tokio",
@@ -741,9 +741,9 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.35"
+version = "4.5.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07a13ab5b8cb13dbe35e68b83f6c12f9293b2f601797b71bc9f23befdb329feb"
+checksum = "86bc73de94bc81e52f3bebec71bc4463e9748f7a59166663e32044669577b0e2"
 dependencies = [
  "clap",
 ]
@@ -1627,9 +1627,9 @@ dependencies = [
 
 [[package]]
 name = "goblin"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13d7f8e497a18cbaafbf758d49d10ee2e718a3b51c4071cda9b1993da3fd32c7"
+checksum = "53ab3f32d1d77146981dea5d6b1e8fe31eedcb7013e5e00d6ccd1259a4b4d923"
 dependencies = [
  "log",
  "plain",
@@ -1914,7 +1914,7 @@ checksum = "92baf25cf0b8c9246baecf3a444546360a97b569168fdf92563ee6a47829920c"
 dependencies = [
  "http 1.1.0",
  "http-serde",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "serde",
  "time",
 ]
@@ -2030,7 +2030,7 @@ dependencies = [
  "http 1.1.0",
  "hyper 1.5.0",
  "hyper-util",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-native-certs",
  "rustls-pki-types",
  "tokio",
@@ -2070,9 +2070,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.9"
+version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41296eb09f183ac68eec06e03cdbea2e759633d4067b2f6552fc2e009bcad08b"
+checksum = "df2dcfbe0677734ab2f3ffa7fa7bfd4706bfdc1ef393f2ee30184aed67e631b4"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2209,9 +2209,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.40.0"
+version = "1.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6593a41c7a73841868772495db7dc1e8ecab43bb5c0b6da2059246c4b506ab60"
+checksum = "a1f72d3e19488cf7d8ea52d2fc0f8754fc933398b337cd3cbdb28aaeb35159ef"
 dependencies = [
  "console",
  "lazy_static",
@@ -2339,9 +2339,9 @@ dependencies = [
 
 [[package]]
 name = "keyring"
-version = "3.5.0"
+version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11351fce7c6e2b5f1871e3c8ed048d60d909ab6fea6b96bfe41a6409277a2ee5"
+checksum = "2f8fe839464d4e4b37d756d7e910063696af79a7e877282cb1825e4ec5f10833"
 dependencies = [
  "byteorder",
  "dbus-secret-service",
@@ -2409,9 +2409,9 @@ dependencies = [
 
 [[package]]
 name = "libm"
-version = "0.2.8"
+version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ec2a862134d2a7d32d7983ddcdd1c4923530833c9f2ea1a44fc5fa473989058"
+checksum = "8355be11b20d696c8f18f6cc018c4e372165b1fa8126cef092399c9951984ffa"
 
 [[package]]
 name = "libredox"
@@ -3325,7 +3325,7 @@ dependencies = [
  "quinn-proto",
  "quinn-udp",
  "rustc-hash",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "socket2",
  "thiserror",
  "tokio",
@@ -3342,7 +3342,7 @@ dependencies = [
  "rand",
  "ring",
  "rustc-hash",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "slab",
  "thiserror",
  "tinyvec",
@@ -3351,10 +3351,11 @@ dependencies = [
 
 [[package]]
 name = "quinn-udp"
-version = "0.5.5"
+version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fe68c2e9e1a1234e218683dbdf9f9dfcb094113c5ac2b938dfcb9bab4c4140b"
+checksum = "e346e016eacfff12233c243718197ca12f148c84e1e84268a896699b41c71780"
 dependencies = [
+ "cfg_aliases",
  "libc",
  "once_cell",
  "socket2",
@@ -3457,7 +3458,7 @@ dependencies = [
  "rattler_shell",
  "reflink-copy",
  "regex",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "simple_spawn_blocking",
  "smallvec",
@@ -3471,7 +3472,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -3527,7 +3528,7 @@ dependencies = [
  "rayon",
  "reflink-copy",
  "regex",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "rstest",
  "scroll",
@@ -3580,7 +3581,7 @@ dependencies = [
  "rattler_digest 1.0.2",
  "rattler_networking",
  "rattler_package_streaming",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "simple_spawn_blocking",
  "thiserror",
@@ -3715,7 +3716,7 @@ dependencies = [
  "pyproject-toml",
  "rattler_digest 0.19.5",
  "regex",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "resolvo 0.4.1",
  "serde",
@@ -3762,7 +3763,7 @@ dependencies = [
  "itertools 0.13.0",
  "keyring",
  "netrc-rs",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "retry-policies",
  "serde",
@@ -3786,7 +3787,7 @@ dependencies = [
  "rattler_digest 1.0.2",
  "rattler_networking",
  "rattler_redaction",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "serde_json",
  "tar",
@@ -3806,7 +3807,7 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8b3a430398cc4ecd0350204087377bc31d977dfd897d3b6930f195f39c515b"
 dependencies = [
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "url",
 ]
@@ -3848,7 +3849,7 @@ dependencies = [
  "rattler_digest 1.0.2",
  "rattler_networking",
  "rattler_redaction",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "reqwest-middleware",
  "rmp-serde",
  "serde",
@@ -4088,9 +4089,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.12.8"
+version = "0.12.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f713147fbe92361e52392c73b8c9e48c04c6625bce969ef54dc901e58e042a7b"
+checksum = "a77c62af46e79de0a562e1a9849205ffcb7fc1238876e9bd743357570e04046f"
 dependencies = [
  "async-compression",
  "base64 0.22.1",
@@ -4115,7 +4116,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "quinn",
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-native-certs",
  "rustls-pemfile 2.2.0",
  "rustls-pki-types",
@@ -4146,7 +4147,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "http 1.1.0",
- "reqwest 0.12.8",
+ "reqwest 0.12.9",
  "serde",
  "thiserror",
  "tower-service",
@@ -4295,9 +4296,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.37"
+version = "0.38.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8acb788b847c24f28525660c4d7758620a7210875711f79e7f663cc152726811"
+checksum = "aa260229e6538e52293eeb577aabd09945a09d6d9cc0fc550ed7529056c2e32a"
 dependencies = [
  "bitflags 2.6.0",
  "errno",
@@ -4320,9 +4321,9 @@ dependencies = [
 
 [[package]]
 name = "rustls"
-version = "0.23.15"
+version = "0.23.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fbb44d7acc4e873d613422379f69f237a1b141928c02f6bc6ccfddddc2d7993"
+checksum = "eee87ff5d9b36712a58574e12e9f0ea80f915a5b0ac518d322b24a465617925e"
 dependencies = [
  "once_cell",
  "ring",
@@ -4519,9 +4520,9 @@ checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "serde"
-version = "1.0.213"
+version = "1.0.214"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea7893ff5e2466df8d720bb615088341b295f849602c6956047f8f80f0e9bc1"
+checksum = "f55c3193aca71c12ad7890f1785d2b73e1b9f63a0bbc353c08ef26fe03fc56b5"
 dependencies = [
  "serde_derive",
 ]
@@ -4539,9 +4540,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.213"
+version = "1.0.214"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e85ad2009c50b58e87caa8cd6dac16bdf511bbfb7af6c33df902396aa480fa5"
+checksum = "de523f781f095e28fa605cdce0f8307e451cc0fd14e2eb4cd2e98a355b147766"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5218,7 +5219,7 @@ version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c7bc40d0e5a97695bb96e27995cd3a08538541b0a846f65bba7a359f36700d4"
 dependencies = [
- "rustls 0.23.15",
+ "rustls 0.23.16",
  "rustls-pki-types",
  "tokio",
 ]
