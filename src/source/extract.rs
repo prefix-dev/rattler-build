@@ -229,8 +229,11 @@ mod test {
     fn test_extract_fail() {
         let fancy_log = LoggingOutputHandler::default();
         let tempdir = tempfile::tempdir().unwrap();
-        let res = extract_zip("", tempdir.path(), &fancy_log);
-        assert!(matches!(res.err(), Some(SourceError::FileNotFound(_))));
+        let result = extract_zip("", tempdir.path(), &fancy_log);
+        assert!(matches!(
+            result,
+            Err(SourceError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound
+        ));
     }
 
     #[test]
