@@ -128,7 +128,7 @@ pub(crate) fn extract_tar(
 
     let file = File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?;
     let wrapped = progress_bar.wrap_read(file);
-    let buf_reader = std::io::BufReader::new(wrapped);
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, wrapped);
 
     let mut archive = tar::Archive::new(ext_to_compression(
         archive.file_name(),
@@ -167,10 +167,10 @@ pub(crate) fn extract_zip(
             .with_style(log_handler.default_bytes_style()),
     );
 
-    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
-        File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    ))
-    .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, File::open(archive)?);
+
+    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(buf_reader))
+        .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
