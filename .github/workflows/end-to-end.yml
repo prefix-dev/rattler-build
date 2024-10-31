@@ -1,0 +1,44 @@
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+name: End-to-End testing
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_LOG: info
+  RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
+  CARGO_TERM_COLOR: always
+  RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
+
+jobs:
+  run_tests:
+    strategy:
+      matrix:
+        os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
+      fail-fast: false
+
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.75.0"
+      - uses: prefix-dev/setup-pixi@v0.8.1
+      - if: runner.os == 'macOS'
+        run: pixi global install patchelf
+      # build in release mode so that it's reasonably fast to run the tests
+      - run: cargo build --release
+      - run: cargo test --release -p rust-tests -- --test-threads 1
+      - run: pixi run end_to_end_test -s -v
+        env:
+          PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
+          ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
