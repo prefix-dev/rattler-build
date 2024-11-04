@@ -1,5 +1,6 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
+use indexmap::IndexSet;
 use memmap2::MmapMut;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
@@ -201,8 +202,6 @@ impl Relinker for Dylib {
                     PathBuf::from(format!("@loader_path/{}", relative_path.to_string_lossy()));
 
                 final_rpaths.push(new_rpath.clone());
-                // changes.change_rpath.insert(rpath.clone(), new_rpath);
-                // modified = true;
             } else if rpath_allowlist.is_match(rpath) {
                 tracing::info!("Allowlisted rpath: {}", rpath.display());
                 final_rpaths.push(rpath.clone());
@@ -490,20 +489,31 @@ fn install_name_tool(
         cmd.arg("-change").arg(old).arg(new);
     }
 
+    let mut add_set = IndexSet::new();
+    let mut remove_set = IndexSet::new();
+
     for change in &changes.change_rpath {
         match change {
             (Some(old), Some(new)) => {
-                cmd.arg("-delete_rpath").arg(old);
-                cmd.arg("-add_rpath").arg(new);
+                remove_set.insert(old);
+                add_set.insert(new);
             }
             (Some(old), None) => {
-                cmd.arg("-delete_rpath").arg(old);
+                remove_set.insert(old);
             }
             (None, Some(new)) => {
-                cmd.arg("-add_rpath").arg(new);
+                add_set.insert(new);
             }
             (None, None) => {}
         }
+    }
+
+    // ignore any that are added and removed
+    for rpath in add_set.difference(&remove_set) {
+        cmd.arg("-add_rpath").arg(rpath);
+    }
+    for rpath in remove_set.difference(&add_set) {
+        cmd.arg("-delete_rpath").arg(rpath);
     }
 
     cmd.arg(dylib_path);
