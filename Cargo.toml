@@ -165,7 +165,10 @@ pre-build = [
     "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
-# [patch.crates-io]
+[patch.crates-io]
+# this fork contains fixes for slow zip reading and large file writing
+zip = { git = "https://github.com/wolfv/zip2", branch = "patched"}
+
 # rattler = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
 # rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "feat/add-extra-field-on-about-json" }
