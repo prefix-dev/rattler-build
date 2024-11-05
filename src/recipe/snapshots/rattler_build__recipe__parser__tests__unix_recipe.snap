@@ -126,6 +126,7 @@ Recipe {
             entry_points: [],
             skip_pyc_compilation: [],
             use_python_app_entrypoint: false,
+            site_packages_path: None,
         },
         dynamic_linking: DynamicLinking {
             rpaths: [],

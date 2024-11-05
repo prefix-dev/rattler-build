@@ -301,6 +301,7 @@ impl Output {
             noarch: *recipe.build().noarch(),
             track_features,
             features: None,
+            python_site_packages_path: recipe.build().python().site_packages_path.clone(),
         })
     }
 

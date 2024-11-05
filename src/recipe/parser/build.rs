@@ -495,6 +495,14 @@ pub struct Python {
     /// This is only relevant for macOS.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,
+
+    /// The relative site-packages path that a Python build _exports_ for other
+    /// packages to use. This setting only makes sense for the `python` package
+    /// itself. For example, a python 3.13 version could advertise a
+    /// site-packages path of `lib/python3.13/site-packages` for `noarch:
+    /// python` packages to use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site_packages_path: Option<String>,
 }
 
 impl Python {
@@ -520,7 +528,8 @@ impl TryConvertNode<Python> for RenderedMappingNode {
             self.iter(),
             entry_points,
             skip_pyc_compilation,
-            use_python_app_entrypoint
+            use_python_app_entrypoint,
+            site_packages_path
         );
         Ok(python)
     }
