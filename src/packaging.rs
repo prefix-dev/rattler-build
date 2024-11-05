@@ -74,6 +74,9 @@ pub enum PackagingError {
 
     #[error("No license files were copied")]
     LicensesNotFound,
+
+    #[error("Invalid Metadata: {0}")]
+    InvalidMetadata(String),
 }
 
 /// This function copies the license files to the info/licenses folder.

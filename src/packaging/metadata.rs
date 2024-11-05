@@ -273,6 +273,12 @@ impl Output {
             })
             .unwrap_or_default();
 
+        if recipe.build().python().site_packages_path.is_some() {
+            // check that the package name is Python, otherwise fail
+            if self.name().as_normalized() != "python" {
+                return Err(PackagingError::InvalidMetadata("Cannot set python_site_packages_path for a package that is not called `python`".to_string()));
+            }
+        }
         Ok(IndexJson {
             name: self.name().clone(),
             version: self.version().clone().into(),
