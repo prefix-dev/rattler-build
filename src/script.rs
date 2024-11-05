@@ -538,16 +538,17 @@ impl Script {
             // as the contents itself if the file is missing.
             ScriptContent::CommandOrPath(path) => {
                 if path.contains('\n') {
-                    return Ok(ResolvedScriptContents::Inline(path.clone()));
-                }
-                let resolved_path = self.find_file(recipe_dir, extensions, Path::new(path));
-                if let Some(resolved_path) = resolved_path {
-                    match fs_err::read_to_string(&resolved_path) {
-                        Err(e) => Err(e),
-                        Ok(content) => Ok(ResolvedScriptContents::Path(resolved_path, content)),
-                    }
-                } else {
                     Ok(ResolvedScriptContents::Inline(path.clone()))
+                } else {
+                    let resolved_path = self.find_file(recipe_dir, extensions, Path::new(path));
+                    if let Some(resolved_path) = resolved_path {
+                        match fs_err::read_to_string(&resolved_path) {
+                            Err(e) => Err(e),
+                            Ok(content) => Ok(ResolvedScriptContents::Path(resolved_path, content)),
+                        }
+                    } else {
+                        Ok(ResolvedScriptContents::Inline(path.clone()))
+                    }
                 }
             }
             ScriptContent::Commands(commands) => {
