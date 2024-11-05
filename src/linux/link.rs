@@ -175,11 +175,12 @@ impl Relinker for SharedObject {
                 } else if rpath_allowlist.is_match(rpath) {
                     tracing::info!("Rpath in allow list: {}", rpath.display());
                     final_rpaths.push(rpath.clone());
+                } else {
+                    tracing::info!(
+                        "Rpath not in prefix or allow-listed: {} – removing it",
+                        rpath.display()
+                    );
                 }
-                tracing::info!(
-                    "Rpath not in prefix or allow-listed: {} – removing it",
-                    rpath.display()
-                );
             } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
                 let new_rpath = prefix.join(rel);
 
