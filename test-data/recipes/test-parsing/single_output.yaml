@@ -60,6 +60,7 @@ build:
     skip_pyc_compilation:
       - test/bla/**/*.py
     use_python_app_entrypoint: true
+    site_packages_path: foo/bar/lib/python4.5/site-packages
 
   always_copy_files:
     - file1
