@@ -373,9 +373,9 @@ impl Anaconda {
                     );
                     self.remove_file(owner, package).await?;
 
-                    // We cannot just rety the staging request here,
-                    // because anaconda might have garbage collected the release / package
-                    // after the deletion of the file.
+                    // We cannot just retry the staging request here, because
+                    // Anaconda might have garbage collected the release /
+                    // package after the deletion of the file.
                     return Ok(false);
                 } else {
                     return Err(miette!(
