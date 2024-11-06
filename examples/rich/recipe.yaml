@@ -8,12 +8,10 @@ package:
   version: ${{ version }}
 
 source:
-  url: file:///Users/wolfv/Downloads/rich-13.9.4.tar.gz
-  sha256: 439594978a49a09530cff7ebc4b5c7103ef57baf48d5ea3184f21d9a2befa098
-  # - url:
-  #     - https://example.com/rich-${{ version }}.tar.gz  # this will give a 404!
-  #     - https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
-  #   sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
+  - url:
+      - https://example.com/rich-${{ version }}.tar.gz  # this will give a 404!
+      - https://pypi.io/packages/source/r/rich/rich-${{ version }}.tar.gz
+    sha256: d653d6bccede5844304c605d5aac802c7cf9621efd700b46c7ec2b51ea914898
 
 build:
   # Thanks to `noarch: python` this package works on all platforms
