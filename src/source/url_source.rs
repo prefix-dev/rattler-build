@@ -3,10 +3,12 @@
 use std::{
     ffi::OsStr,
     fs,
+    io::{Read as _, Write as _},
     path::{Path, PathBuf},
 };
 
 use crate::{
+    console_utils::LoggingOutputHandler,
     recipe::parser::UrlSource,
     source::extract::{extract_tar, extract_zip},
     tool_configuration,
@@ -15,48 +17,48 @@ use tokio::io::AsyncWriteExt;
 
 use super::{checksum::Checksum, extract::is_tarball, SourceError};
 
-fn split_filename(filename: &str) -> (String, String) {
-    let stem = Path::new(filename)
+/// Splits a path into stem and extension, handling special cases like .tar.gz
+fn split_path(path: &Path) -> std::io::Result<(String, String)> {
+    let stem = path
         .file_stem()
-        .and_then(|os_str| os_str.to_str())
-        .unwrap_or("")
-        .to_string();
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid path stem"))?;
 
-    let stem_without_tar = stem.trim_end_matches(".tar");
+    let (stem_no_tar, is_tar) = if let Some(s) = stem.strip_suffix(".tar") {
+        (s, true)
+    } else {
+        (stem, false)
+    };
 
-    let extension = Path::new(filename)
-        .extension()
-        .and_then(|os_str| os_str.to_str())
-        .unwrap_or("")
-        .to_string();
+    let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-    let full_extension = if stem != stem_without_tar {
+    let full_extension = if is_tar {
         format!(".tar.{}", extension)
     } else if !extension.is_empty() {
         format!(".{}", extension)
     } else {
-        "".to_string()
+        String::new()
     };
 
-    // remove any dots from the stem
-    let stem_without_tar = stem_without_tar.replace('.', "_");
-
-    (stem_without_tar.to_string(), full_extension)
+    Ok((stem_no_tar.replace('.', "_"), full_extension))
 }
 
+/// Generates a cache name from URL and checksum
 fn cache_name_from_url(
     url: &url::Url,
     checksum: &Checksum,
     with_extension: bool,
 ) -> Option<String> {
     let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
-    let (stem, extension) = split_filename(filename);
-    let checksum = checksum.to_hex();
-    if with_extension {
-        Some(format!("{}_{}{}", stem, &checksum[0..8], extension))
+
+    let (stem, extension) = split_path(Path::new(filename)).ok()?;
+    let checksum_hex = checksum.to_hex();
+
+    Some(if with_extension {
+        format!("{}_{}{}", stem, &checksum_hex[..8], extension)
     } else {
-        Some(format!("{}_{}", stem, &checksum[0..8]))
-    }
+        format!("{}_{}", stem, &checksum_hex[..8])
+    })
 }
 
 async fn fetch_remote(
@@ -85,6 +87,7 @@ async fn fetch_remote(
             .with_prefix("Downloading")
             .with_style(tool_configuration.fancy_log_handler.default_bytes_style()),
     );
+
     progress_bar.set_message(
         url.path_segments()
             .and_then(|segs| segs.last())
@@ -143,6 +146,37 @@ fn extract_to_cache(
     Ok(path.to_path_buf())
 }
 
+fn copy_with_progress(
+    source: &Path,
+    dest: &Path,
+    progress_handler: &LoggingOutputHandler,
+) -> std::io::Result<u64> {
+    let file_size = source.metadata()?.len();
+    let progress_bar = progress_handler.add_progress_bar(
+        indicatif::ProgressBar::new(file_size)
+            .with_prefix("Copying")
+            .with_style(progress_handler.default_bytes_style()),
+    );
+
+    let mut reader = std::io::BufReader::new(fs::File::open(source)?);
+    let mut writer = std::io::BufWriter::new(fs::File::create(dest)?);
+    let mut buffer = vec![0; 8192];
+    let mut copied = 0u64;
+
+    while let Ok(n) = reader.read(&mut buffer) {
+        if n == 0 {
+            break;
+        }
+        writer.write_all(&buffer[..n])?;
+        copied += n as u64;
+        progress_bar.set_position(copied);
+    }
+
+    progress_bar.finish();
+    writer.flush()?;
+    Ok(copied)
+}
+
 pub(crate) async fn url_src(
     source: &UrlSource,
     cache_dir: &Path,
@@ -155,6 +189,12 @@ pub(crate) async fn url_src(
 
     let mut last_error = None;
     for url in source.urls() {
+        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum, true).ok_or(
+            SourceError::UnknownErrorStr("Failed to build cache name from url"),
+        )?);
+
+        let cache_name = cache_dir.join(cache_name);
+
         if url.scheme() == "file" {
             let local_path = url.to_file_path().map_err(|_| {
                 SourceError::Io(std::io::Error::new(
@@ -171,36 +211,42 @@ pub(crate) async fn url_src(
                 return Err(SourceError::ValidationFailed);
             }
 
+            // copy file to cache
+            copy_with_progress(
+                &local_path,
+                &cache_name,
+                &tool_configuration.fancy_log_handler,
+            )?;
+
             tracing::info!("Using local source file.");
-            return Ok(local_path);
-        }
+        } else {
+            let metadata = fs::metadata(&cache_name);
+            if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
+                tracing::info!("Found valid source cache file.");
+            } else {
+                match fetch_remote(url, &cache_name, tool_configuration).await {
+                    Ok(_) => {
+                        tracing::info!("Downloaded file from {}", url);
 
-        let cache_name = PathBuf::from(cache_name_from_url(url, &checksum, true).ok_or(
-            SourceError::UnknownErrorStr("Failed to build cache name from url"),
-        )?);
-        let cache_name = cache_dir.join(cache_name);
-
-        let metadata = fs::metadata(&cache_name);
-        if metadata.is_ok() && metadata?.is_file() && checksum.validate(&cache_name) {
-            tracing::info!("Found valid source cache file.");
-            return extract_to_cache(&cache_name, tool_configuration);
-        }
-
-        match fetch_remote(url, &cache_name, tool_configuration).await {
-            Ok(_) => {
-                tracing::info!("Downloaded file from {}", url);
-
-                if !checksum.validate(&cache_name) {
-                    tracing::error!("Checksum validation failed!");
-                    fs::remove_file(&cache_name)?;
-                    return Err(SourceError::ValidationFailed);
+                        if !checksum.validate(&cache_name) {
+                            tracing::error!("Checksum validation failed!");
+                            fs::remove_file(&cache_name)?;
+                            return Err(SourceError::ValidationFailed);
+                        }
+                    }
+                    Err(e) => {
+                        last_error = Some(e);
+                        continue;
+                    }
                 }
+            }
+        }
 
-                return extract_to_cache(&cache_name, tool_configuration);
-            }
-            Err(e) => {
-                last_error = Some(e);
-            }
+        // If the source has a file name, we skip the extraction step
+        if source.file_name().is_some() {
+            return Ok(cache_name);
+        } else {
+            return extract_to_cache(&cache_name, tool_configuration);
         }
     }
 
@@ -232,7 +278,7 @@ mod tests {
         ];
 
         for (filename, expected) in test_cases {
-            let (name, ending) = split_filename(filename);
+            let (name, ending) = split_path(Path::new(filename)).unwrap();
             assert_eq!(
                 (name.as_str(), ending.as_str()),
                 expected,

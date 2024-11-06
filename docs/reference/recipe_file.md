@@ -186,6 +186,17 @@ If an extracted archive contains only 1 folder at its top level, its contents
 will be moved 1 level up, so that the extracted package contents sit in the root
 of the work folder.
 
+##### Specifying a file name
+
+For URL and local paths you can specify a file name. If the source is an archive and a file name is set, automatic extraction is disabled.
+
+```yaml
+source:
+  url: https://pypi.python.org/packages/source/b/bsdiff4/bsdiff4-1.1.4.tar.gz
+  # will put the file in the work directory as `bsdiff4-1.1.4.tar.gz`
+  file_name: bsdiff4-1.1.4.tar.gz
+```
+
 #### Source from `git`
 
 ```yaml

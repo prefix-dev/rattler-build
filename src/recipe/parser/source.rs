@@ -401,9 +401,11 @@ pub struct UrlSource {
     /// Optionally a file name to rename the downloaded file (does not apply to archives)
     #[serde(skip_serializing_if = "Option::is_none")]
     file_name: Option<String>,
+
     /// Patches to apply to the source code
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     patches: Vec<PathBuf>,
+
     /// Optionally a folder name under the `work` directory to place the source code
     #[serde(skip_serializing_if = "Option::is_none")]
     target_directory: Option<PathBuf>,
