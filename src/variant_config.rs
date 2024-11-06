@@ -387,7 +387,7 @@ impl VariantConfig {
                 None
             })
             .collect::<Vec<_>>();
-
+        println!("Variant keys: {:?}", variant_keys);
         let variant_keys = used_zip_keys
             .into_iter()
             .chain(variant_keys)
@@ -397,7 +397,7 @@ impl VariantConfig {
         let mut combinations = Vec::new();
         let mut current = Vec::new();
         find_combinations(&variant_keys, 0, &mut current, &mut combinations);
-        println!("CCC {:?}", combinations);
+        println!("Found combinations: {:?}", combinations);
         // zip the combinations
         let result: Vec<_> = combinations
             .iter()
@@ -413,9 +413,13 @@ impl VariantConfig {
             let result = result
                 .into_iter()
                 .filter(|combination| {
-                    already_used_vars
-                        .iter()
-                        .any(|(key, value)| combination.get(key).map_or(false, |v| v == value))
+                    if already_used_vars.is_empty() {
+                        return true;
+                    } else {
+                        already_used_vars
+                            .iter()
+                            .all(|(key, value)| combination.get(key).map_or(false, |v| v == value))
+                    }
                 })
                 .collect();
             Ok(result)
@@ -448,16 +452,21 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for (node, recipe) in sx.stage_0_render.outputs() {
+            for (idx, (node, recipe)) in sx.stage_0_render.outputs().enumerate() {
+                let target_platform = if recipe.build().noarch().is_none() {
+                    selector_config.target_platform
+                } else {
+                    Platform::NoArch
+                };
+
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),
-                    // TODO!
-                    build_string: "foobar".to_string(),
-                    noarch_type: NoArchType::none(),
-                    target_platform: Platform::current(),
+                    build_string: sx.build_string_for_output(idx),
+                    noarch_type: recipe.build().noarch().clone(),
+                    target_platform,
                     node: node.clone(),
-                    used_vars: sx.variables().clone(),
+                    used_vars: sx.variant_for_output(idx),
                 });
             }
         }

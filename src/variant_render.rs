@@ -1,5 +1,7 @@
 use std::collections::{BTreeMap, HashSet};
 
+use rattler_conda_types::NoArchType;
+
 use crate::{
     hash::HashInfo,
     recipe::{
@@ -40,7 +42,10 @@ pub(crate) struct Stage0Render {
 
 impl Stage0Render {
     pub fn outputs(&self) -> impl Iterator<Item = (&Node, &Recipe)> {
-        self.raw_outputs.vec.iter().zip(self.rendered_outputs.iter())
+        self.raw_outputs
+            .vec
+            .iter()
+            .zip(self.rendered_outputs.iter())
     }
 }
 
@@ -50,6 +55,7 @@ pub(crate) fn stage_0_render(
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage0Render>, VariantError> {
+    println!("Outputs: {:?}", outputs);
     let used_vars = outputs
         .iter()
         .map(|output| used_vars_from_expressions(output, recipe))
@@ -103,15 +109,8 @@ pub(crate) fn stage_0_render(
         });
     }
 
-    println!("{:?}", stage0_renders);
+    println!("Stage 0 renders: {:?}", stage0_renders);
     Ok(stage0_renders)
-}
-
-struct DiscoveredOutput {
-    /// The recipe of this output
-    recipe: Recipe,
-    /// The variant values of this output
-    variant: BTreeMap<String, String>,
 }
 
 /// Stage 1 render of a single recipe.yaml
@@ -119,14 +118,51 @@ struct DiscoveredOutput {
 pub struct Stage1Render {
     pub(crate) variables: BTreeMap<String, String>,
 
+    // Per recipe output a set of extra used variables
     pub(crate) used_variables_from_dependencies: Vec<HashSet<String>>,
 
     pub(crate) stage_0_render: Stage0Render,
 }
 
 impl Stage1Render {
-    pub fn variables(&self) -> &BTreeMap<String, String> {
-        &self.variables
+    pub fn variant_for_output(&self, idx: usize) -> BTreeMap<String, String> {
+        // combine jinja variables and the variables from the dependencies
+        let used_vars_jinja = self
+            .stage_0_render
+            .raw_outputs
+            .used_vars_jinja
+            .get(idx)
+            .unwrap();
+        let mut all_vars = self
+            .used_variables_from_dependencies
+            .get(idx)
+            .unwrap()
+            .clone();
+        all_vars.extend(used_vars_jinja.iter().cloned());
+
+        // extract variant
+        let mut variant = BTreeMap::new();
+        for var in all_vars {
+            if let Some(val) = self.variables.get(&var) {
+                variant.insert(var, val.clone());
+            }
+        }
+
+        variant
+    }
+
+    pub fn build_string_for_output(&self, idx: usize) -> String {
+        let variant = self.variant_for_output(idx);
+        let recipe = &self.stage_0_render.rendered_outputs[idx];
+        let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
+
+        let build_string = recipe
+            .build()
+            .string()
+            .resolve(&hash, recipe.build().number)
+            .into_owned();
+
+        build_string
     }
 }
 
@@ -136,13 +172,11 @@ pub(crate) fn stage_1_render(
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
-    // let mut discovered_outputs = Vec::new();
 
-    // TODO we need to add variables from the cache here!
+    // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<String>> = Vec::new();
-        for output in &r.rendered_outputs {
-            println!("{:?}", output.build_time_requirements().collect::<Vec<_>>());
+        for (idx, output) in r.rendered_outputs.iter().enumerate() {
             let mut additional_variables = HashSet::<String>::new();
             // Add in variants from the dependencies as we find them
             for dep in output.build_time_requirements() {
@@ -157,7 +191,7 @@ pub(crate) fn stage_1_render(
                 }
             }
 
-            // We wanna add something to packages that are requiring a subpackage _exactly_ because
+            // We want to add something to packages that are requiring a subpackage _exactly_ because
             // that creates additional variants
             for req in output.requirements.all_requirements() {
                 match req {
@@ -167,18 +201,36 @@ pub(crate) fn stage_1_render(
                             additional_variables.insert(name);
                         }
                     }
+                    Dependency::Spec(spec) => {
+                        // add in virtual package specs where the name starts with `__`
+                        if let Some(ref name) = spec.name {
+                            if name.as_normalized().starts_with("__") {
+                                additional_variables.insert(name.as_normalized().to_string());
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
 
-            // TODO
-            // let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
+            // Add in extra `use` keys from the output
+            let extra_use_keys = output.build().variant().use_keys.clone();
+            additional_variables.extend(extra_use_keys);
 
-            // let build_string = parsed_recipe
-            //     .build()
-            //     .string()
-            //     .resolve(&hash, parsed_recipe.build().number)
-            //     .into_owned();
+            // If the recipe is `noarch: python` we can remove an empty python key that comes from the dependencies
+            if output.build().noarch().is_python() {
+                additional_variables.remove("python");
+            }
+
+            // special handling of CONDA_BUILD_SYSROOT
+            let jinja_variables = r.raw_outputs.used_vars_jinja.get(idx).unwrap();
+            if jinja_variables.contains("c_compiler") || jinja_variables.contains("cxx_compiler") {
+                additional_variables.insert("CONDA_BUILD_SYSROOT".to_string());
+            }
+
+            // also always add `target_platform` and `channel_targets`
+            additional_variables.insert("target_platform".to_string());
+            additional_variables.insert("channel_targets".to_string());
 
             extra_vars_per_output.push(additional_variables);
         }
@@ -187,12 +239,15 @@ pub(crate) fn stage_1_render(
         let mut all_vars = extra_vars_per_output
             .iter()
             .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
-
+        println!("All vars from deps: {:?}", all_vars);
+        println!(
+            "All variables from recipes: {:?}",
+            r.variables.keys().cloned().collect::<Vec<String>>()
+        );
         all_vars.extend(r.variables.keys().cloned());
 
-        println!("All extra vars: {:?}, already: {:?}", all_vars, r.variables);
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
-        println!("Combinazions: {:?}", all_combinations);
+
         for combination in all_combinations {
             stage_1_renders.push(Stage1Render {
                 variables: combination,
@@ -200,10 +255,6 @@ pub(crate) fn stage_1_render(
                 stage_0_render: r.clone(),
             });
         }
-    }
-
-    for render in &stage_1_renders {
-        println!("{:?}\n\n=====\n\n", render);
     }
 
     Ok(stage_1_renders)
