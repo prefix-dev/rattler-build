@@ -121,6 +121,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://prefix-dev.github.io/rattler-build/dev/tutorials/go/</loc>
+         <lastmod>2024-11-06</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://prefix-dev.github.io/rattler-build/dev/tutorials/javascript/</loc>
          <lastmod>2024-11-06</lastmod>
          <changefreq>daily</changefreq>

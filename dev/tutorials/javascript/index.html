@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/tutorials/javascript/">
       
       
+        <link rel="prev" href="../cpp/">
+      
+      
+        <link rel="next" href="../rust/">
       
       
       <link rel="icon" href="../../assets/favicon.png">
@@ -18,7 +22,7 @@
     
     
       
-        <title>Packaging a Javascript (NPM/NodeJS) package - rattler-build</title>
+        <title>Javascript - rattler-build</title>
       
     
     
@@ -55,7 +59,7 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Packaging a Javascript (NPM/NodeJS) package - rattler-build" >
+        <meta  property="og:title"  content="Javascript - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
@@ -71,7 +75,7 @@
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Packaging a Javascript (NPM/NodeJS) package - rattler-build" >
+        <meta  name="twitter:title"  content="Javascript - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
@@ -137,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Packaging a Javascript (NPM/NodeJS) package
+              Javascript
             
           </span>
         </div>
@@ -326,8 +330,10 @@
       
   
   
+    
   
   
+  
     
     
     
@@ -337,11 +343,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
@@ -355,7 +361,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -408,6 +414,76 @@
                 
   
   
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Javascript
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Javascript
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#building-a-nodejs-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      Building a NodeJS Package
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
   
   
     <li class="md-nav__item">
@@ -416,6 +492,27 @@
   
   <span class="md-ellipsis">
     Rust
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Go
   </span>
   
 
@@ -1167,11 +1264,18 @@
 
 
 <h1 id="packaging-a-javascript-npmnodejs-package">Packaging a Javascript (NPM/NodeJS) package<a class="headerlink" href="#packaging-a-javascript-npmnodejs-package" title="Permanent link">#</a></h1>
-<p>This tutorial will guide you though making a NodeJS package with <code>rattler-build</code>.</p>
+<p>This tutorial will guide you though making a NodeJS package with
+<code>rattler-build</code>. Please note that, while packaging executable applications is
+possible, the conda ecosystem is not ideal for NPM libraries. NPM supports a
+number of features that cannot easily be modeled in the conda ecosystem, such as
+peer dependencies, optional dependencies, and the ability to install multiple
+versions of the same package.</p>
+<p>However, if you need to package a NodeJS application, <code>rattler-build</code> can help!</p>
 <h2 id="building-a-nodejs-package">Building a NodeJS Package<a class="headerlink" href="#building-a-nodejs-package" title="Permanent link">#</a></h2>
 <p>In this example, we will build a package for the NodeJS package <code>bibtex-tidy</code>.
-We use <code>nodejs</code> in build and run requirements, and install the package using <code>npm</code>.
-NPM comes as part of the NodeJS installation, so we do not need to install it separately.</p>
+We use <code>nodejs</code> in build and run requirements, and install the package using
+<code>npm</code>. NPM comes as part of the NodeJS installation, so we do not need to
+install it separately.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">context</span><span class="p">:</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.14.0&quot;</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -1260,6 +1364,60 @@ NPM comes as part of the NodeJS installation, so we do not need to install it se
 <footer class="md-footer">
     <!-- Link to previous and/or next page -->
     
+      
+        
+        <nav
+          class="md-footer__inner md-grid"
+          aria-label="Footer"
+          
+        >
+
+          <!-- Link to previous page -->
+          
+            
+            <a
+              href="../cpp/"
+              class="md-footer__link md-footer__link--prev"
+              aria-label="Previous: C++"
+            >
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"/></svg>
+              </div>
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Previous
+                </span>
+                <div class="md-ellipsis">
+                  C++
+                </div>
+              </div>
+            </a>
+          
+
+          <!-- Link to next page -->
+          
+            
+            <a
+              href="../rust/"
+              class="md-footer__link md-footer__link--next"
+              aria-label="Next: Rust"
+            >
+              <div class="md-footer__title">
+                <span class="md-footer__direction">
+                  Next
+                </span>
+                <div class="md-ellipsis">
+                  Rust
+                </div>
+              </div>
+              <div class="md-footer__button md-icon">
+                
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"/></svg>
+              </div>
+            </a>
+          
+        </nav>
       
     
 
