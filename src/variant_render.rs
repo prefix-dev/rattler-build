@@ -38,6 +38,12 @@ pub(crate) struct Stage0Render {
     pub rendered_outputs: Vec<Recipe>,
 }
 
+impl Stage0Render {
+    pub fn outputs(&self) -> impl Iterator<Item = (&Node, &Recipe)> {
+        self.raw_outputs.vec.iter().zip(self.rendered_outputs.iter())
+    }
+}
+
 pub(crate) fn stage_0_render(
     outputs: &[Node],
     recipe: &str,
@@ -111,11 +117,17 @@ struct DiscoveredOutput {
 /// Stage 1 render of a single recipe.yaml
 #[derive(Debug)]
 pub struct Stage1Render {
-    variables: BTreeMap<String, String>,
+    pub(crate) variables: BTreeMap<String, String>,
 
-    used_variables_from_dependencies: Vec<HashSet<String>>,
+    pub(crate) used_variables_from_dependencies: Vec<HashSet<String>>,
 
     pub(crate) stage_0_render: Stage0Render,
+}
+
+impl Stage1Render {
+    pub fn variables(&self) -> &BTreeMap<String, String> {
+        &self.variables
+    }
 }
 
 /// Render the stage 1 of the recipe by adding in variants from the dependencies

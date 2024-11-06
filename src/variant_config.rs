@@ -448,22 +448,18 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for recipe in sx.stage_0_render.rendered_outputs {
+            for (node, recipe) in sx.stage_0_render.outputs() {
                 recipes.insert(DiscoveredOutput {
-                    name: recipe.package().name.as_normalized(),
-
-                })
+                    name: recipe.package().name.as_normalized().to_string(),
+                    version: recipe.package().version.to_string(),
+                    // TODO!
+                    build_string: "foobar".to_string(),
+                    noarch_type: NoArchType::none(),
+                    target_platform: Platform::current(),
+                    node: node.clone(),
+                    used_vars: sx.variables().clone(),
+                });
             }
-
-            recipes.insert(DiscoveredOutput {
-                name: sx.stage_0_render.output.package().name().as_normalized().to_string(),
-                version,
-                build_string,
-                noarch_type: *parsed_recipe.build().noarch(),
-                target_platform: *target_platform,
-                node: (*output).to_owned(),
-                used_vars: used_filtered,
-            });
         }
 
         Ok(recipes)
