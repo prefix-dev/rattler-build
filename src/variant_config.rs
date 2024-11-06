@@ -441,10 +441,32 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
-        /// find all jinja variables
+        // find all jinja variables
         let stage_0 = stage_0_render(outputs, recipe, selector_config, self)?;
-        let stage_1 = stage_1_render(stage_0, self);
-        Ok(Default::default())
+        let stage_1 = stage_1_render(stage_0, self)?;
+
+        // Now we need to convert the stage 1 renders to DiscoveredOutputs
+        let mut recipes = IndexSet::new();
+        for sx in stage_1 {
+            for recipe in sx.stage_0_render.rendered_outputs {
+                recipes.insert(DiscoveredOutput {
+                    name: recipe.package().name.as_normalized(),
+
+                })
+            }
+
+            recipes.insert(DiscoveredOutput {
+                name: sx.stage_0_render.output.package().name().as_normalized().to_string(),
+                version,
+                build_string,
+                noarch_type: *parsed_recipe.build().noarch(),
+                target_platform: *target_platform,
+                node: (*output).to_owned(),
+                used_vars: used_filtered,
+            });
+        }
+
+        Ok(recipes)
     }
     // pub fn find_variants(
     //     &self,

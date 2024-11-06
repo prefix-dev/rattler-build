@@ -29,13 +29,13 @@ struct RawOutputVec {
 #[derive(Clone, Debug)]
 pub(crate) struct Stage0Render {
     /// The used variables with their values
-    variables: BTreeMap<String, String>,
+    pub variables: BTreeMap<String, String>,
 
     /// The raw outputs of the recipe
-    raw_outputs: RawOutputVec,
+    pub raw_outputs: RawOutputVec,
 
     // Pre-rendered recipe nodes
-    rendered_outputs: Vec<Recipe>,
+    pub rendered_outputs: Vec<Recipe>,
 }
 
 pub(crate) fn stage_0_render(
@@ -115,7 +115,7 @@ pub struct Stage1Render {
 
     used_variables_from_dependencies: Vec<HashSet<String>>,
 
-    stage_0_render: Stage0Render,
+    pub(crate) stage_0_render: Stage0Render,
 }
 
 /// Render the stage 1 of the recipe by adding in variants from the dependencies
