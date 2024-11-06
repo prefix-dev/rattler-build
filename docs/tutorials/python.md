@@ -4,6 +4,7 @@ Writing a Python package is fairly straightforward, especially for "Python-only"
 In the second example we will build a package for `numpy` which contains compiled code.
 
 ## A Python-only package
+
 The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification.
 This is very handy for packages that are pure Python and do not contain any compiled extensions.
 
@@ -63,6 +64,7 @@ about:
    installed correctly and can be imported.
 
 ### Running the recipe
+
 To build this recipe, simply run:
 
 ```bash
@@ -180,6 +182,7 @@ for /f %%f in ('dir /b /S .\dist') do (
 ```
 
 ### Running the recipe
+
 Running this recipe with the variant config file will build a total of 2 `numpy` packages:
 
 ```bash

@@ -42,6 +42,13 @@ This document contains the help content for the `rattler-build` command-line pro
 			Use plain logging output
 
 
+- `--wrap-log-lines <WRAP_LOG_LINES>`
+
+	Wrap log lines at the terminal width. This is automatically disabled on CI (by detecting the `CI` environment variable)
+
+	- Possible values: `true`, `false`
+
+
 - `--color <COLOR>`
 
 	Enable or disable colored output from rattler-build. Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable
