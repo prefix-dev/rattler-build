@@ -265,7 +265,6 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 impl TryConvertNode<PythonTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
         let mut python_test = PythonTest::default();
-        println!("{:?}", python_test);
 
         validate_keys!(python_test, self.iter(), imports, pip_check, requirements);
 
