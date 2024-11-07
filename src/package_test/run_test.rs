@@ -461,6 +461,8 @@ impl PythonTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
+        let deps = self.requirements.clone();
+
         let span = tracing::info_span!("Running python test");
         let _guard = span.enter();
 
@@ -472,6 +474,14 @@ impl PythonTest {
         if self.pip_check {
             dependencies.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap());
         }
+
+        let mut run_dependencies = deps
+            .run
+            .iter()
+            .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        dependencies.append(&mut run_dependencies);
 
         create_environment(
             "test",

@@ -1,0 +1,12 @@
+---
+source: src/recipe/parser/test.rs
+assertion_line: 489
+expression: yaml_serde
+snapshot_kind: text
+---
+- python:
+    imports:
+    - pandas
+    requirements:
+      run:
+      - pandas

@@ -410,7 +410,10 @@ mod test {
     use super::TestType;
     use insta::assert_snapshot;
 
-    use crate::recipe::custom_yaml::{RenderedNode, TryConvertNode};
+    use crate::recipe::{
+        custom_yaml::{RenderedNode, TryConvertNode},
+        parser::test::PythonTestRequirements,
+    };
 
     #[test]
     fn test_parsing() {
@@ -461,5 +464,46 @@ mod test {
 
         let yaml_serde = serde_yaml::to_string(&tests).unwrap();
         assert_snapshot!(yaml_serde);
+    }
+
+    #[test]
+    fn test_python_parsing() {
+        let test_section = r#"
+        tests:
+          - python:
+              imports:
+                - pandas
+              requirements:
+                run:
+                  - pandas
+        "#;
+
+        // parse the YAML
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
+
+        // from yaml
+        let tests: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
+        let t = tests.first();
+
+        match t {
+            Some(TestType::Python { python }) => {
+                assert_eq!(python.imports, vec!["pandas"]);
+                assert!(python.pip_check);
+                assert_eq!(
+                    python.requirements,
+                    PythonTestRequirements {
+                        run: vec!["pandas".to_string()]
+                    }
+                );
+            }
+            _ => panic!("expected python test"),
+        }
     }
 }
