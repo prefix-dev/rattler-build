@@ -78,6 +78,14 @@ fn is_true(value: &bool) -> bool {
     *value
 }
 
+/// The extra requirements for the test
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct PythonTestRequirements {
+    /// Extra run requirements for the test.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run: Vec<String>,
+}
+
 /// A special Python test that checks if the imports are available and runs `pip check`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
@@ -86,6 +94,12 @@ pub struct PythonTest {
     /// Whether to run `pip check` or not (default to true)
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
+    /// The (extra) requirements for the test.
+    /// Similar to the `requirements` section in the recipe the `run` requirements are of the
+    /// target_platform architecture. The current package is implicitly added to the
+    /// `run` requirements.
+    #[serde(default, skip_serializing_if = "PythonTestRequirements::is_empty")]
+    pub requirements: PythonTestRequirements,
 }
 
 impl Default for PythonTest {
@@ -93,7 +107,15 @@ impl Default for PythonTest {
         Self {
             imports: Vec::new(),
             pip_check: true,
+            requirements: PythonTestRequirements::default(),
         }
+    }
+}
+
+impl PythonTestRequirements {
+    /// Check if the requirements are empty
+    pub fn is_empty(&self) -> bool {
+        self.run.is_empty()
     }
 }
 
@@ -206,7 +228,6 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
-
             match key_str {
                 "python" => {
                     let python = as_mapping(value, key_str)?.try_convert(key_str)?;
@@ -244,8 +265,9 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 impl TryConvertNode<PythonTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
         let mut python_test = PythonTest::default();
+        println!("{:?}", python_test);
 
-        validate_keys!(python_test, self.iter(), imports, pip_check);
+        validate_keys!(python_test, self.iter(), imports, pip_check, requirements);
 
         if python_test.imports.is_empty() {
             Err(vec![_partialerror!(
@@ -256,6 +278,22 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
         }
 
         Ok(python_test)
+    }
+}
+
+impl TryConvertNode<PythonTestRequirements> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<PythonTestRequirements, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<PythonTestRequirements> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PythonTestRequirements, Vec<PartialParsingError>> {
+        let mut requirements = PythonTestRequirements::default();
+        validate_keys!(requirements, self.iter(), run);
+        Ok(requirements)
     }
 }
 
