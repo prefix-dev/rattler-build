@@ -2,14 +2,17 @@
 //! [`Output`]
 use std::{path::PathBuf, vec};
 
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
-use rattler_index::index;
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
-    metadata::Output, package_test, package_test::TestConfiguration, recipe::parser::TestType,
-    render::solver::load_repodatas, tool_configuration,
+    metadata::{build_reindexed_channels, Output},
+    package_test,
+    package_test::TestConfiguration,
+    recipe::parser::TestType,
+    render::solver::load_repodatas,
+    tool_configuration,
 };
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -32,7 +35,10 @@ pub async fn skip_existing(
         return Ok(outputs);
     };
 
-    let all_channels = first_output.reindex_channels().into_diagnostic()?;
+    let all_channels =
+        build_reindexed_channels(&first_output.build_configuration, tool_configuration)
+            .into_diagnostic()
+            .context("failed to reindex output channel")?;
 
     let match_specs = outputs
         .iter()
@@ -52,7 +58,7 @@ pub async fn skip_existing(
 
     let existing = load_repodatas(
         &channels,
-        first_output.host_platform(),
+        first_output.host_platform().platform,
         &match_specs,
         tool_configuration,
     )
@@ -109,12 +115,6 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    index(
-        &directories.output_dir,
-        Some(&output.build_configuration.target_platform.clone()),
-    )
-    .into_diagnostic()?;
-
     let output = output
         .fetch_sources(tool_configuration)
         .await
@@ -124,6 +124,11 @@ pub async fn run_build(
 
     let output = output
         .resolve_dependencies(tool_configuration)
+        .await
+        .into_diagnostic()?;
+
+    output
+        .install_environments(tool_configuration)
         .await
         .into_diagnostic()?;
 
@@ -162,9 +167,14 @@ pub async fn run_build(
             &result,
             &TestConfiguration {
                 test_prefix: directories.work_dir.join("test"),
-                target_platform: Some(output.build_configuration.host_platform),
+                target_platform: Some(output.build_configuration.target_platform),
+                host_platform: Some(output.build_configuration.host_platform.clone()),
+                current_platform: output.build_configuration.build_platform.clone(),
                 keep_test_prefix: tool_configuration.no_clean,
-                channels: output.reindex_channels().into_diagnostic()?,
+                //channels: output.reindex_channels().into_diagnostic()?,
+                channels: build_reindexed_channels(&output.build_configuration, tool_configuration)
+                    .into_diagnostic()
+                    .context("failed to reindex output channel")?,
                 channel_priority: ChannelPriority::Strict,
                 solve_strategy: SolveStrategy::Highest,
                 tool_configuration: tool_configuration.clone(),

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    _partialerror,
+    _partialerror, env_vars,
     hash::HashInfo,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
@@ -437,6 +437,10 @@ impl VariantConfig {
             let use_keys = &parsed_recipe.build().variant().use_keys;
             used_vars.extend(use_keys.iter().cloned());
 
+            // Environment variables can be overwritten by the variant configuration
+            let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.host_platform);
+            used_vars.extend(env_vars.keys().cloned());
+
             let target_platform = if noarch_type.is_none() {
                 selector_config.target_platform
             } else {
@@ -747,6 +751,15 @@ impl VariantConfig {
                 let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
                 used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
 
+                // We also replace `-` with `_` in the keys for better compatibility
+                // with conda-build and because then we can set them directly as env vars
+                // and the same for `.` because we want to be able to set them as env vars directly
+                let used_filtered = used_filtered
+                    .into_iter()
+                    .map(|(k, v)| (k.replace("-", "_"), v))
+                    .map(|(k, v)| (k.replace(".", "_"), v))
+                    .collect::<BTreeMap<_, _>>();
+
                 recipes.insert(DiscoveredOutput {
                     name: name.to_string(),
                     version,
@@ -1055,7 +1068,7 @@ mod tests {
                 .unwrap();
 
             // assert output order
-            let order = vec!["some-pkg-a", "some-pkg", "some_pkg"];
+            let order = vec!["some-pkg.foo-a", "some-pkg.foo", "some_pkg.foo"];
             let outputs: Vec<_> = outputs_and_variants
                 .iter()
                 .map(|o| o.name.clone())

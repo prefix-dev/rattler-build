@@ -1,0 +1,20 @@
+package:
+  name: env_var_test
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        - echo "Value of $pybind11_abi"
+        - echo "And jinja style: ${{ pybind11_abi }}"
+        - echo $MAKEFLAGS > $PREFIX/makeflags.txt
+        - echo $pybind11_abi > $PREFIX/pybind_abi.txt
+      else:
+        - echo %MAKEFLAGS% > %PREFIX%\makeflags.txt
+        - echo %pybind11_abi% > %PREFIX%\pybind_abi.txt
+
+requirements:
+  build:
+    # use to make the variant "used"
+    - pybind11-abi

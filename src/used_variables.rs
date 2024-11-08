@@ -14,11 +14,12 @@ use std::collections::{HashSet, VecDeque};
 use marked_yaml::Span;
 use minijinja::machinery::{
     ast::{self, Expr, Stmt},
-    parse,
+    parse_expr, WhitespaceConfig,
 };
 
 use crate::recipe::{
     custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
+    jinja::SYNTAX_CONFIG,
     parser::CollectErrors,
     ParsingError,
 };
@@ -36,6 +37,18 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
         }
         _ => {}
     }
+}
+
+fn parse<'source>(
+    expr: &'source str,
+    filename: &str,
+) -> Result<ast::Stmt<'source>, minijinja::Error> {
+    minijinja::machinery::parse(
+        expr,
+        filename,
+        SYNTAX_CONFIG.clone(),
+        WhitespaceConfig::default(),
+    )
 }
 
 /// Extract all variables from a jinja expression (called from [`extract_variables`])
@@ -71,17 +84,15 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                         variables.insert(format!("{}_stdlib", &constant.value));
                         variables.insert(format!("{}_stdlib_version", &constant.value));
                     }
-                } else if function == "pin_subpackage" {
-                    if let Expr::Const(constant) = &call.args[0] {
-                        variables.insert(format!("{}", &constant.value));
+                } else if function == "pin_subpackage" || function == "pin_compatible" {
+                    if !call.args.is_empty() {
+                        extract_variable_from_expression(&call.args[0], variables);
                     }
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
-                } else if function == "cmp" {
-                    if let Expr::Var(var) = &call.args[0] {
-                        variables.insert(var.id.to_string());
-                    }
+                } else if function == "match" {
+                    extract_variable_from_expression(&call.args[0], variables);
                 }
             }
         }
@@ -130,12 +141,12 @@ fn find_jinja(
 ) -> Result<(), Vec<ParsingError>> {
     let mut errs = Vec::<ParsingError>::new();
     let mut queue = VecDeque::from([(node, src)]);
+
     while let Some((node, src)) = queue.pop_front() {
         match node {
             Node::Mapping(map) => {
                 for (_, value) in map.iter() {
                     queue.push_back((value, src));
-                    // find_jinja(value, src, variables)?;
                 }
             }
             Node::Sequence(seq) => {
@@ -143,16 +154,13 @@ fn find_jinja(
                     match item {
                         SequenceNodeInternal::Simple(node) => queue.push_back((node, src)),
                         SequenceNodeInternal::Conditional(if_sel) => {
-                            // we need to convert the if condition to a Jinja expression to parse it
-                            let as_jinja_expr = format!("${{{{ {} }}}}", if_sel.cond().as_str());
-                            match parse(&as_jinja_expr, "jinja.yaml") {
-                                Ok(ast) => {
-                                    extract_variables(&ast, variables);
+                            match parse_expr(if_sel.cond().as_str()) {
+                                Ok(expr) => {
+                                    extract_variable_from_expression(&expr, variables);
                                     queue.push_back((if_sel.then(), src));
-                                    // find_jinja(if_sel.then(), src, variables)?;
+
                                     if let Some(otherwise) = if_sel.otherwise() {
                                         queue.push_back((otherwise, src));
-                                        // find_jinja(otherwise, src, variables)?;
                                     }
                                 }
                                 Err(err) => {
@@ -304,7 +312,12 @@ mod test {
               then: osx-clang
             - ${{ compiler('c') }}
             - ${{ stdlib('c') }}
-            - ${{ pin_subpackage('abcdef') }}
+            - ${{ pin_subpackage(abcdef) }}
+            - ${{ pin_subpackage("foobar") }}
+            - ${{ pin_compatible(compatible) }}
+            - ${{ pin_compatible(abc ~ def) }}
+            - if: match(xpython, ">=3.7")
+              then: numpy 100
         "#;
 
         let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
@@ -317,6 +330,11 @@ mod test {
         assert!(used_vars.contains("c_stdlib"));
         assert!(used_vars.contains("c_stdlib_version"));
         assert!(used_vars.contains("abcdef"));
+        assert!(!used_vars.contains("foobar"));
+        assert!(used_vars.contains("compatible"));
+        assert!(used_vars.contains("abc"));
+        assert!(used_vars.contains("def"));
+        assert!(used_vars.contains("xpython"));
     }
 
     #[test]

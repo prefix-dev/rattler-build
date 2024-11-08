@@ -37,12 +37,12 @@ pub fn compile_pyc(
     let python_interpreter = if output.build_configuration.cross_compilation() {
         python_bin(
             &build_config.directories.build_prefix,
-            &build_config.build_platform,
+            &build_config.build_platform.platform,
         )
     } else {
         python_bin(
             &build_config.directories.host_prefix,
-            &build_config.host_platform,
+            &build_config.host_platform.platform,
         )
     };
 
@@ -306,20 +306,22 @@ pub(crate) fn create_entry_points(
         )
     })?;
 
-    let python_version = python_record.package_record.version.clone();
+    // using target_platform is OK because this should never be noarch
+    let python_info =
+        PythonInfo::from_python_record(&python_record.package_record, *output.target_platform())
+            .map_err(|e| {
+                PackagingError::CannotCreateEntryPoint(format!(
+                    "Could not create python info: {}",
+                    e
+                ))
+            })?;
 
     for ep in &output.recipe.build().python().entry_points {
         let script = python_entry_point_template(
             &output.prefix().to_string_lossy(),
             output.target_platform().is_windows(),
             ep,
-            // using target_platform is OK because this should never be noarch
-            &PythonInfo::from_version(&python_version, *output.target_platform()).map_err(|e| {
-                PackagingError::CannotCreateEntryPoint(format!(
-                    "Could not create python info: {}",
-                    e
-                ))
-            })?,
+            &python_info,
         );
 
         if output.target_platform().is_windows() {

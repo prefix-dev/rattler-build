@@ -88,6 +88,9 @@ pub struct PinArgs {
     /// If an exact pin is given, we pin the exact version & hash
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub exact: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
 }
 
 impl Default for PinArgs {
@@ -96,6 +99,7 @@ impl Default for PinArgs {
             lower_bound: Some("x.x.x.x.x.x".parse().unwrap()),
             upper_bound: Some("x".parse().unwrap()),
             exact: false,
+            build: None,
         }
     }
 }
@@ -113,6 +117,9 @@ pub enum PinError {
 
     #[error("Could not increment version: {0}")]
     VersionBump(#[from] VersionBumpError),
+
+    #[error("Build specifier and exact=True are not supported together")]
+    BuildSpecifierWithExact,
 }
 
 pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBumpError> {
@@ -136,6 +143,10 @@ impl Pin {
     /// Apply the pin to a version and hash of a resolved package. If a max_pin, min_pin or exact pin
     /// are given, the pin is applied to the version accordingly.
     pub fn apply(&self, version: &Version, build_string: &str) -> Result<MatchSpec, PinError> {
+        if self.args.build.is_some() && self.args.exact {
+            return Err(PinError::BuildSpecifierWithExact);
+        }
+
         if self.args.exact {
             return Ok(MatchSpec::from_str(
                 &format!("{} {} {}", self.name.as_normalized(), version, build_string),
@@ -196,8 +207,14 @@ impl Pin {
         }
 
         let name = self.name.as_normalized().to_string();
+        let build = self
+            .args
+            .build
+            .as_ref()
+            .map(|b| format!(" {}", b))
+            .unwrap_or_default();
         Ok(MatchSpec::from_str(
-            format!("{name} {pin_str}").as_str().trim(),
+            format!("{name} {pin_str}{build}").as_str().trim(),
             ParseStrictness::Strict,
         )
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?)
@@ -244,7 +261,7 @@ mod test {
             args: PinArgs {
                 lower_bound: Some("x.x.x".parse().unwrap()),
                 upper_bound: Some("x.x.x".parse().unwrap()),
-                exact: false,
+                ..Default::default()
             },
         };
 
@@ -262,7 +279,7 @@ mod test {
             args: PinArgs {
                 upper_bound: Some("x.x.x".parse().unwrap()),
                 lower_bound: None,
-                exact: false,
+                ..Default::default()
             },
         };
 
@@ -274,12 +291,23 @@ mod test {
             args: PinArgs {
                 lower_bound: Some("x.x.x".parse().unwrap()),
                 upper_bound: None,
-                exact: false,
+                ..Default::default()
             },
         };
 
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3");
+
+        let pin = Pin {
+            name: "foo".parse().unwrap(),
+            args: PinArgs {
+                build: Some("foo*".to_string()),
+                ..Default::default()
+            },
+        };
+
+        let spec = pin.apply(&version, hash).unwrap();
+        assert_eq!(spec.to_string(), "foo >=1.2.3,<2.0a0 foo*");
     }
 
     #[test]
@@ -290,6 +318,7 @@ mod test {
                 lower_bound: Some("x.x.x".parse().unwrap()),
                 upper_bound: Some("x.x.x".parse().unwrap()),
                 exact: true,
+                ..Default::default()
             },
         };
 
@@ -306,7 +335,7 @@ mod test {
             args: PinArgs {
                 lower_bound: Some("x.x.x".parse().unwrap()),
                 upper_bound: Some("2.4".parse().unwrap()),
-                exact: false,
+                ..Default::default()
             },
         };
 

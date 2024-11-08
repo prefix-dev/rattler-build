@@ -36,6 +36,11 @@ impl SelectorConfig {
             Value::from_safe_string(self.target_platform.to_string()),
         );
 
+        context.insert(
+            "host_platform".to_string(),
+            Value::from_safe_string(self.host_platform.to_string()),
+        );
+
         if let Some(platform) = self.host_platform.only_platform() {
             context.insert(
                 platform.to_string(),

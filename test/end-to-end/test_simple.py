@@ -617,11 +617,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "unix_2233755_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_259ce3c_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler-build-demo": "1 unix_4616a5c_0",
+        "rattler_build_demo": "1 unix_4616a5c_0",
         "target_platform": "noarch",
     }
 
@@ -641,11 +641,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "win_b28fc4d_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "win_c8f1e9f_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler-build-demo": "1 win_4616a5c_0",
+        "rattler_build_demo": "1 win_4616a5c_0",
         "target_platform": "noarch",
     }
 
@@ -956,3 +956,56 @@ def test_used_vars(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert rendered[0]["build_configuration"]["variant"] == {
         "target_platform": "noarch"
     }
+
+
+def test_cache_install(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "cache/recipe-cmake.yaml", tmp_path, extra_args=["--experimental"]
+    )
+
+    pkg1 = get_extracted_package(tmp_path, "check-1")
+    pkg2 = get_extracted_package(tmp_path, "check-2")
+    assert (pkg1 / "info/index.json").exists()
+    assert (pkg2 / "info/index.json").exists()
+
+
+def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "env_vars",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "env_var_test")
+
+    # assert (pkg / "info/paths.json").exists()
+    text = (pkg / "makeflags.txt").read_text()
+    assert text.strip() == "OVERRIDDEN_MAKEFLAGS"
+
+    variant_config = json.loads((pkg / "info/hash_input.json").read_text())
+    assert variant_config["MAKEFLAGS"] == "OVERRIDDEN_MAKEFLAGS"
+
+    text = (pkg / "pybind_abi.txt").read_text()
+    assert text.strip() == "4"
+    assert variant_config["pybind11_abi"] == "4"
+
+    # Check that we used the variant in the rendered recipe
+    rendered_recipe = yaml.safe_load(
+        (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    )
+    assert rendered_recipe["finalized_dependencies"]["build"]["specs"][0] == {
+        "variant": "pybind11-abi",
+        "spec": "pybind11-abi 4.*",
+    }
+
+
+def test_pin_subpackage(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "pin_subpackage",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "my.package-a")
+    assert (pkg / "info/index.json").exists()

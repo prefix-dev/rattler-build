@@ -74,6 +74,9 @@ pub enum PackagingError {
 
     #[error("No license files were copied")]
     LicensesNotFound,
+
+    #[error("Invalid Metadata: {0}")]
+    InvalidMetadata(String),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -259,24 +262,27 @@ pub fn package_conda(
             (false, true) => std::cmp::Ordering::Less,
         }
     });
+
+    let normalize_path = |p: &Path| -> String { p.display().to_string().replace('\\', "/") };
+
     files.iter().for_each(|f| {
         if f.components().next() == Some(Component::Normal("info".as_ref())) {
-            tracing::info!("  - {}", console::style(f.to_string_lossy()).dim())
+            tracing::info!("  - {}", console::style(normalize_path(f)).dim())
         } else {
-            tracing::info!("  - {}", f.to_string_lossy())
+            tracing::info!("  - {}", normalize_path(f))
         }
     });
 
     let output_folder =
         local_channel_dir.join(output.build_configuration.target_platform.to_string());
-    tracing::info!("Creating target folder {:?}", output_folder);
+    tracing::info!("Creating target folder '{}'", output_folder.display());
 
     fs::create_dir_all(&output_folder)?;
 
     if let Platform::NoArch = output.build_configuration.target_platform {
         create_empty_build_folder(
             local_channel_dir,
-            &output.build_configuration.build_platform,
+            &output.build_configuration.build_platform.platform,
         )?;
     }
 
@@ -321,7 +327,7 @@ pub fn package_conda(
         }
     }
 
-    tracing::info!("Archive written to {:?}", out_path);
+    tracing::info!("Archive written to '{}'", out_path.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
     Ok((out_path, paths_json))

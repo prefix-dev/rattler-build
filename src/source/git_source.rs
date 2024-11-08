@@ -8,7 +8,7 @@ use std::{
 
 use crate::system_tools::{SystemTools, Tool};
 use crate::{
-    recipe::parser::{GitSource, GitUrl},
+    recipe::parser::{GitRev, GitSource, GitUrl},
     system_tools::ToolError,
 };
 
@@ -19,7 +19,7 @@ pub fn fetch_repo(
     system_tools: &SystemTools,
     repo_path: &Path,
     url: &str,
-    rev: &str,
+    rev: &GitRev,
 ) -> Result<(), SourceError> {
     tracing::info!(
         "Fetching repository from {} at {} into {}",
@@ -33,17 +33,34 @@ pub fn fetch_repo(
     }
 
     let mut command = git_command(system_tools, "fetch")?;
+    let refspec = match rev {
+        GitRev::Branch(_) => format!("{0}:{0}", rev),
+        GitRev::Tag(_) => format!("{0}:{0}", rev),
+        _ => format!("{}", rev),
+    };
     let output = command
-        .args([url, rev])
+        .args([
+            // Allow non-fast-forward fetches.
+            "--force",
+            // Allow update a branch even if we currently have it checked out.
+            // This should be safe, as we do a `git checkout` below to refresh
+            // the working copy.
+            "--update-head-ok",
+            // Avoid overhead of fetching unused tags.
+            "--no-tags",
+            url,
+            refspec.as_str(),
+        ])
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
 
     if !output.status.success() {
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr(
-            "failed to git fetch refs from origin",
-        ));
+        return Err(SourceError::GitError(format!(
+            "failed to git fetch refs from origin: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     // try to suppress detached head warning
@@ -62,18 +79,24 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Repository fetch for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+        return Err(SourceError::GitError(format!(
+            "failed to checkout FETCH_HEAD: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     let output = git_command(system_tools, "checkout")?
-        .args([rev])
+        .arg(rev.to_string())
         .current_dir(repo_path)
         .output()
         .map_err(|_err| SourceError::ValidationFailed)?;
 
     if !output.status.success() {
         tracing::debug!("Repository checkout for revision {:?} failed!", rev);
-        return Err(SourceError::GitErrorStr("failed to checkout FETCH_HEAD"));
+        return Err(SourceError::GitError(format!(
+            "failed to checkout FETCH_HEAD: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     // Update submodules
@@ -84,7 +107,10 @@ pub fn fetch_repo(
 
     if !output.status.success() {
         tracing::debug!("Submodule update failed!");
-        return Err(SourceError::GitErrorStr("failed to update submodules"));
+        return Err(SourceError::GitError(format!(
+            "failed to update submodules: {}",
+            std::str::from_utf8(&output.stderr).unwrap()
+        )));
     }
 
     tracing::debug!("Repository fetched successfully!");
@@ -171,7 +197,13 @@ pub fn git_src(
             if !cache_path.exists() {
                 let mut command = git_command(system_tools, "clone")?;
                 command
-                    .args(["--progress", "-n", source.url().to_string().as_str()])
+                    .args([
+                        // Avoid overhead of fetching unused tags.
+                        "--no-tags",
+                        "--progress",
+                        "-n",
+                        source.url().to_string().as_str(),
+                    ])
                     .arg(cache_path.as_os_str());
 
                 let output = command
@@ -187,7 +219,7 @@ pub fn git_src(
             }
 
             assert!(cache_path.exists());
-            fetch_repo(system_tools, &cache_path, &url.to_string(), &rev)?;
+            fetch_repo(system_tools, &cache_path, &url.to_string(), source.rev())?;
         }
         GitUrl::Path(path) => {
             if cache_path.exists() {
@@ -198,7 +230,7 @@ pub fn git_src(
                 }
             }
             // git doesn't support UNC paths, hence we can't use std::fs::canonicalize
-            let path = dunce::canonicalize(path).map_err(|e| {
+            let path = dunce::canonicalize(recipe_dir.join(path)).map_err(|e| {
                 tracing::error!("Path not found on system: {}", e);
                 SourceError::GitError(format!("{}: Path not found on system", e))
             })?;

@@ -1,0 +1,4 @@
+MAKEFLAGS:
+  - OVERRIDDEN_MAKEFLAGS
+pybind11_abi:
+  - 4

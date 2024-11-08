@@ -1,5 +1,6 @@
 //! Relink a dylib to use relative paths for rpaths
 use goblin::mach::Mach;
+use indexmap::IndexSet;
 use memmap2::MmapMut;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
@@ -201,8 +202,6 @@ impl Relinker for Dylib {
                     PathBuf::from(format!("@loader_path/{}", relative_path.to_string_lossy()));
 
                 final_rpaths.push(new_rpath.clone());
-                // changes.change_rpath.insert(rpath.clone(), new_rpath);
-                // modified = true;
             } else if rpath_allowlist.is_match(rpath) {
                 tracing::info!("Allowlisted rpath: {}", rpath.display());
                 final_rpaths.push(rpath.clone());
@@ -490,20 +489,31 @@ fn install_name_tool(
         cmd.arg("-change").arg(old).arg(new);
     }
 
+    let mut add_set = IndexSet::new();
+    let mut remove_set = IndexSet::new();
+
     for change in &changes.change_rpath {
         match change {
             (Some(old), Some(new)) => {
-                cmd.arg("-delete_rpath").arg(old);
-                cmd.arg("-add_rpath").arg(new);
+                remove_set.insert(old);
+                add_set.insert(new);
             }
             (Some(old), None) => {
-                cmd.arg("-delete_rpath").arg(old);
+                remove_set.insert(old);
             }
             (None, Some(new)) => {
-                cmd.arg("-add_rpath").arg(new);
+                add_set.insert(new);
             }
             (None, None) => {}
         }
+    }
+
+    // ignore any that are added and removed
+    for rpath in add_set.difference(&remove_set) {
+        cmd.arg("-add_rpath").arg(rpath);
+    }
+    for rpath in remove_set.difference(&add_set) {
+        cmd.arg("-delete_rpath").arg(rpath);
     }
 
     cmd.arg(dylib_path);
@@ -539,6 +549,8 @@ mod tests {
     };
     use crate::{post_process::relink::Relinker, recipe::parser::GlobVec};
 
+    const EXPECTED_PATH: &str = "/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib";
+
     #[test]
     fn test_relink_builtin() -> Result<(), RelinkError> {
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
@@ -548,7 +560,7 @@ mod tests {
 
         let object = Dylib::new(&binary_path).unwrap();
         assert!(Dylib::test_file(&binary_path)?);
-        let expected_rpath = PathBuf::from("/Users/wolfv/Programs/rattler-build/output/bld/rattler-build_zlink_1705569778/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehol/lib");
+        let expected_rpath = PathBuf::from(EXPECTED_PATH);
 
         assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
 
@@ -565,6 +577,57 @@ mod tests {
 
         let object = Dylib::new(&binary_path)?;
         assert_eq!(vec![PathBuf::from("@loader_path/../lib")], object.rpaths);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_relink_install_name_tool() -> Result<(), RelinkError> {
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files");
+        let tmp_dir = tempdir_in(&prefix)?;
+        let binary_path = tmp_dir.path().join("zlink");
+        fs::copy(prefix.join("zlink-macos"), &binary_path)?;
+
+        let object = Dylib::new(&binary_path).unwrap();
+        assert!(Dylib::test_file(&binary_path)?);
+        let expected_rpath = PathBuf::from(EXPECTED_PATH);
+        // first change the rpath to just @loader_path
+        let changes = DylibChanges {
+            change_rpath: vec![(
+                Some(expected_rpath.clone()),
+                Some(PathBuf::from("@loader_path/")),
+            )],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        super::relink(&binary_path, &changes)?;
+
+        assert_eq!(object.rpaths, vec![expected_rpath.clone()]);
+
+        let changes = DylibChanges {
+            change_rpath: vec![
+                (
+                    Some("@loader_path/".into()),
+                    Some("@loader_path/../../../".into()),
+                ),
+                (None, Some("@loader_path/".into())),
+            ],
+            change_id: None,
+            change_dylib: HashMap::default(),
+        };
+
+        let system_tools = SystemTools::default();
+        super::install_name_tool(&binary_path, &changes, &system_tools)?;
+
+        let rpaths = Dylib::new(&binary_path)?.rpaths;
+        assert_eq!(
+            rpaths,
+            vec![
+                PathBuf::from("@loader_path/"),
+                PathBuf::from("@loader_path/../../../")
+            ]
+        );
 
         Ok(())
     }

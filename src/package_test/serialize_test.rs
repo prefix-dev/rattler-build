@@ -1,11 +1,16 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
+use minijinja::Value;
 
 use crate::{
     metadata::Output,
     packaging::PackagingError,
-    recipe::parser::{CommandsTest, TestType},
+    recipe::{
+        parser::{CommandsTest, ScriptContent, TestType},
+        Jinja,
+    },
+    script::ResolvedScriptContents,
 };
 
 impl CommandsTest {
@@ -50,6 +55,18 @@ impl CommandsTest {
     }
 }
 
+fn default_jinja_context(output: &Output) -> Jinja {
+    let selector_config = output.build_configuration.selector_config();
+    let mut jinja = Jinja::new(selector_config);
+    for (k, v) in output.recipe.context.iter() {
+        jinja
+            .context_mut()
+            .insert(k.clone(), Value::from_safe_string(v.clone()));
+    }
+
+    jinja
+}
+
 /// Write out the test files for the final package
 pub(crate) fn write_test_files(
     output: &Output,
@@ -75,6 +92,19 @@ pub(crate) fn write_test_files(
                 test_files.extend(files);
                 // store the cwd in the rendered test
                 command_test.script.cwd = Some(cwd);
+            }
+
+            // Try to render the script contents here
+            // Note: we want to improve this with better rendering in the future
+            let contents = command_test.script.resolve_content(
+                &output.build_configuration.directories.recipe_dir,
+                Some(default_jinja_context(output)),
+                &["sh", "bat"],
+            );
+
+            // Replace with rendered contents
+            if let Ok(ResolvedScriptContents::Inline(contents)) = contents {
+                command_test.script.content = ScriptContent::Command(contents)
             }
         }
     }

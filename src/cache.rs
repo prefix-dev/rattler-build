@@ -1,28 +1,32 @@
 //! Functions to deal with the build cache
-use fs_err as fs;
-use memchr::memmem;
-use memmap2::Mmap;
-use miette::IntoDiagnostic;
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashSet},
     path::{Path, PathBuf},
 };
 
+use fs_err as fs;
+use memchr::memmem;
+use memmap2::Mmap;
+use miette::{Context, IntoDiagnostic};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
 use crate::{
     env_vars,
-    metadata::Output,
+    metadata::{build_reindexed_channels, Output},
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
     recipe::parser::{Dependency, Requirements},
-    render::resolved_dependencies::{resolve_dependencies, FinalizedDependencies},
+    render::resolved_dependencies::{
+        install_environments, resolve_dependencies, FinalizedDependencies,
+    },
     source::copy_dir::{copy_file, create_symlink, CopyOptions},
 };
 
 /// Error type for cache key generation
 #[derive(Debug, thiserror::Error)]
 pub enum CacheKeyError {
-    /// No cache key available (when no `cache` section is present in the recipe)
+    /// No cache key available (when no `cache` section is present in the
+    /// recipe)
     #[error("No cache key available")]
     NoCacheKeyAvailable,
     /// Error serializing cache key with serde_json
@@ -39,16 +43,17 @@ pub struct Cache {
     pub finalized_dependencies: FinalizedDependencies,
     /// The prefix files that are included in the cache
     pub prefix_files: Vec<(PathBuf, bool)>,
-    /// The prefix that was used at build time (needs to be replaced when restoring the files)
+    /// The prefix that was used at build time (needs to be replaced when
+    /// restoring the files)
     pub prefix: PathBuf,
 }
 
 impl Output {
-    /// Compute a cache key that contains all the information that was used to build the cache,
-    /// including the relevant variant information.
+    /// Compute a cache key that contains all the information that was used to
+    /// build the cache, including the relevant variant information.
     pub fn cache_key(&self) -> Result<String, CacheKeyError> {
-        // we have a variant, and we need to find the used variables that are used in the cache to create a
-        // hash for the cache ...
+        // we have a variant, and we need to find the used variables that are used in
+        // the cache to create a hash for the cache ...
         if let Some(cache) = &self.recipe.cache {
             // we need to apply the variant to the cache requirements though
             let requirement_names = cache
@@ -74,12 +79,13 @@ impl Output {
                 }
             }
             // always insert the target platform and build platform
-            // we are using the `host_platform` here because for the cache it should not matter whether it's being
-            // build for `noarch` or not (one can have mixed outputs, in fact).
-            selected_variant.insert("host_platform", self.host_platform().to_string());
+            // we are using the `host_platform` here because for the cache it should not
+            // matter whether it's being build for `noarch` or not (one can have
+            // mixed outputs, in fact).
+            selected_variant.insert("host_platform", self.host_platform().platform.to_string());
             selected_variant.insert(
                 "build_platform",
-                self.build_configuration.build_platform.to_string(),
+                self.build_configuration.build_platform.platform.to_string(),
             );
 
             let cache_key = (cache, selected_variant);
@@ -113,8 +119,8 @@ impl Output {
             let source = &cache_dir.join("prefix").join(file);
             copy_file(source, &dest, &mut paths_created, &copy_options).into_diagnostic()?;
 
-            // check if the symlink starts with the old prefix, and if yes, make the symlink absolute
-            // with the new prefix
+            // check if the symlink starts with the old prefix, and if yes, make the symlink
+            // absolute with the new prefix
             if source.is_symlink() {
                 let symlink_target = fs::read_link(source).into_diagnostic()?;
                 if let Ok(rest) = symlink_target.strip_prefix(&cache_prefix) {
@@ -139,7 +145,8 @@ impl Output {
         &self,
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<Self, miette::Error> {
-        // if we don't have a cache, we need to run the cache build with our current workdir, and then return the cache
+        // if we don't have a cache, we need to run the cache build with our current
+        // workdir, and then return the cache
         let span = tracing::info_span!("Running cache build");
         let _enter = span.enter();
 
@@ -163,12 +170,19 @@ impl Output {
                 return self.restore_cache(cache_dir).await;
             }
 
-            let channels = self.reindex_channels().unwrap();
+            // Reindex the channels
+            let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
+                .into_diagnostic()
+                .context("failed to reindex output channel")?;
 
             let finalized_dependencies =
                 resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
                     .await
                     .unwrap();
+
+            install_environments(self, &finalized_dependencies, tool_configuration)
+                .await
+                .into_diagnostic()?;
 
             cache
                 .build
@@ -179,6 +193,7 @@ impl Output {
                     &self.build_configuration.directories.recipe_dir,
                     &self.build_configuration.directories.host_prefix,
                     Some(&self.build_configuration.directories.build_prefix),
+                    None, // TODO fix this to be proper Jinja context
                 )
                 .await
                 .into_diagnostic()?;
@@ -247,8 +262,9 @@ impl Output {
     }
 }
 
-/// Simple replace prefix function that does a direct replacement without any padding considerations
-/// because we know that the prefix is the same length as the original prefix.
+/// Simple replace prefix function that does a direct replacement without any
+/// padding considerations because we know that the prefix is the same length as
+/// the original prefix.
 fn replace_prefix(file: &Path, old_prefix: &Path, new_prefix: &Path) -> Result<(), miette::Error> {
     // mmap the file, and use the fast string search to find the prefix
     let output = {
@@ -265,7 +281,9 @@ fn replace_prefix(file: &Path, old_prefix: &Path, new_prefix: &Path) -> Result<(
         assert_eq!(
             new_prefix_bytes.len(),
             old_prefix_bytes.len(),
-            "Prefixes must have the same length"
+            "Prefixes must have the same length: {:?} != {:?}",
+            new_prefix,
+            old_prefix
         );
 
         let mut output = Vec::with_capacity(mmap.len());

@@ -42,6 +42,13 @@ This document contains the help content for the `rattler-build` command-line pro
 			Use plain logging output
 
 
+- `--wrap-log-lines <WRAP_LOG_LINES>`
+
+	Wrap log lines at the terminal width. This is automatically disabled on CI (by detecting the `CI` environment variable)
+
+	- Possible values: `true`, `false`
+
+
 - `--color <COLOR>`
 
 	Enable or disable colored output from rattler-build. Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable
@@ -92,6 +99,11 @@ Build a package from a recipe
 - `--target-platform <TARGET_PLATFORM>`
 
 	The target platform for the build
+
+
+- `--host-platform <HOST_PLATFORM>`
+
+	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
 
 	- Default value: current platform
 
@@ -191,8 +203,10 @@ Build a package from a recipe
 
 - `--package-format <PACKAGE_FORMAT>`
 
-	The package format to use for the build. Can be one of `tar-bz2` or `conda`.
-You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
+	The package format to use for the build. Can be one of `tar-bz2` or
+`conda`. You can also add a compression level to the package format,
+e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
+22).
 
 	- Default value: `conda`
 

@@ -3,6 +3,7 @@ source: src/recipe/parser.rs
 expression: "serde_yaml::to_string(&recipe).unwrap()"
 ---
 schema_version: 1
+context: {}
 package:
   name: single_output
   version: 0.1.0
@@ -43,6 +44,7 @@ build:
     skip_pyc_compilation:
     - test/bla/**/*.py
     use_python_app_entrypoint: true
+    site_packages_path: foo/bar/lib/python4.5/site-packages
   dynamic_linking:
     rpaths:
     - lib/
@@ -101,6 +103,14 @@ requirements:
   run:
   - python >=3.11
   - perl
+  - pin_subpackage:
+      name: test
+      exact: true
+  - pin_subpackage:
+      name: test
+      lower_bound: x.x.x.x.x.x
+      upper_bound: x
+      build: foo*
   run_constraints:
   - python * *cpython
   run_exports:
@@ -120,7 +130,8 @@ requirements:
     from_package:
     - python
 tests:
-- script: echo FOO
+- script: |
+    echo FOO
   requirements:
     run:
     - bash

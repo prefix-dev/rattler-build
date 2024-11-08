@@ -1,13 +1,14 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use fs_err as fs;
+use minijinja::syntax::SyntaxConfig;
 use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::{from_args, Kwargs, Object};
 use minijinja::{Environment, Value};
-use rattler_conda_types::{PackageName, ParseStrictness, Platform, Version, VersionSpec};
+use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
@@ -182,6 +183,17 @@ fn jinja_pin_function(
         ));
     }
 
+    if let Ok(build) = kwargs.get::<String>("build") {
+        // if exact & build are set this is an error
+        if pin.args.exact {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::SyntaxError,
+                "Cannot set `exact` and `build` at the same time.".to_string(),
+            ));
+        }
+        pin.args.build = Some(build);
+    }
+
     kwargs.assert_all_used()?;
 
     Ok(internal_repr.to_json(&pin))
@@ -322,12 +334,6 @@ fn default_filters(env: &mut Environment) {
         format!("{}{}", major, minor)
     });
 
-    env.add_filter("split", |s: String, sep: Option<String>| -> Vec<String> {
-        s.split(sep.as_deref().unwrap_or(" "))
-            .map(|s| s.to_string())
-            .collect()
-    });
-
     env.add_filter("replace", minijinja::filters::replace);
     env.add_filter("lower", minijinja::filters::lower);
     env.add_filter("upper", minijinja::filters::upper);
@@ -348,11 +354,32 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
+    env.add_filter("split", minijinja::filters::split);
+}
+
+fn parse_platform(platform: &str) -> Result<Platform, minijinja::Error> {
+    Platform::from_str(platform).map_err(|e| {
+        minijinja::Error::new(
+            minijinja::ErrorKind::InvalidOperation,
+            format!("Invalid platform: {e}"),
+        )
+    })
+}
+
+lazy_static::lazy_static! {
+    /// The syntax config for MiniJinja / rattler-build
+    pub static ref SYNTAX_CONFIG: SyntaxConfig = SyntaxConfig::builder()
+        .block_delimiters("{%", "%}")
+        .variable_delimiters("${{", "}}")
+        .comment_delimiters("#{{", "}}")
+        .build()
+        .unwrap();
 }
 
 fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
+        host_platform,
         build_platform,
         variant,
         experimental,
@@ -365,15 +392,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     default_filters(&mut env);
 
     // Ok to unwrap here because we know that the syntax is valid
-    env.set_syntax(minijinja::Syntax {
-        block_start: "{%".into(),
-        block_end: "%}".into(),
-        variable_start: "${{".into(),
-        variable_end: "}}".into(),
-        comment_start: "#{{".into(),
-        comment_end: "}}#".into(),
-    })
-    .expect("is tested to be correct");
+    env.set_syntax(SYNTAX_CONFIG.clone());
 
     let variant = Arc::new(variant.clone());
 
@@ -417,8 +436,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     let variant_clone = variant.clone();
     env.add_function("cdt", move |package_name: String| {
-        use rattler_conda_types::Arch;
-        let arch = build_platform.arch().or_else(|| target_platform.arch());
+        let arch = host_platform.arch().or_else(|| build_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
         let cdt_arch = if let Some(s) = variant_clone.get("cdt_arch") {
@@ -476,6 +494,20 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
 
     env.add_function("pin_compatible", |name: String, kwargs: Kwargs| {
         jinja_pin_function(name, kwargs, InternalRepr::PinCompatible)
+    });
+
+    // Add the is_... functions
+    env.add_function("is_linux", |platform: &str| {
+        Ok(parse_platform(platform)?.is_linux())
+    });
+    env.add_function("is_osx", |platform: &str| {
+        Ok(parse_platform(platform)?.is_osx())
+    });
+    env.add_function("is_windows", |platform: &str| {
+        Ok(parse_platform(platform)?.is_windows())
+    });
+    env.add_function("is_unix", |platform: &str| {
+        Ok(parse_platform(platform)?.is_unix())
     });
 
     env.add_function("load_from_file", move |path: String| {
@@ -559,7 +591,7 @@ impl Git {
     fn latest_tag_rev(&self, src: &str) -> Result<Value, minijinja::Error> {
         let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
             .lines()
-            .last()
+            .next()
             .and_then(|s| s.split_ascii_whitespace().nth(0))
             .ok_or_else(|| {
                 minijinja::Error::new(
@@ -574,7 +606,7 @@ impl Git {
     fn latest_tag(&self, src: &str) -> Result<Value, minijinja::Error> {
         let result = get_command_output("git", &["ls-remote", "--tags", "--sort=-v:refname", src])?
             .lines()
-            .last()
+            .next()
             .and_then(|s| s.split_ascii_whitespace().nth(1))
             .and_then(|s| s.strip_prefix("refs/tags/"))
             .map(|s| s.trim_end_matches("^{}"))
@@ -590,12 +622,8 @@ impl Git {
 }
 
 impl Object for Git {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -650,12 +678,8 @@ impl Env {
 }
 
 impl Object for Env {
-    fn kind(&self) -> minijinja::value::ObjectKind<'_> {
-        minijinja::value::ObjectKind::Plain
-    }
-
     fn call_method(
-        &self,
+        self: &Arc<Self>,
         _state: &minijinja::State,
         name: &str,
         args: &[Value],
@@ -1080,12 +1104,28 @@ mod tests {
                 "split".to_string()
             };
 
-            jinja.eval(&format!("var | {func}")).unwrap().to_string()
+            jinja
+                .eval(&format!("var | {func} | list"))
+                .unwrap()
+                .to_string()
         };
 
         assert_eq!(split_test("foo bar", None), "[\"foo\", \"bar\"]");
         assert_eq!(split_test("foobar", None), "[\"foobar\"]");
         assert_eq!(split_test("1.2.3", Some(".")), "[\"1\", \"2\", \"3\"]");
+
+        jinja.context_mut().insert(
+            "var".to_string(),
+            Value::from_safe_string("1.2.3".to_string()),
+        );
+
+        assert_eq!(
+            jinja
+                .eval(&format!("(var | split('.'))[2]"))
+                .unwrap()
+                .to_string(),
+            "3"
+        );
     }
 
     #[test]

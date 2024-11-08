@@ -1276,6 +1276,17 @@ impl TryConvertNode<VersionWithSource> for RenderedNode {
 
 impl TryConvertNode<VersionWithSource> for RenderedScalarNode {
     fn try_convert(&self, name: &str) -> Result<VersionWithSource, Vec<PartialParsingError>> {
+        let s = self.as_str();
+        if s.contains('-') {
+            // version is not allowed to contain a `-`
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::InvalidValue((name.to_string(), "version cannot contain `-`".into())),
+                label = format!("version `{s}` cannot contain `-` "),
+                help = "replace the `-` with `_` or remove it"
+            )]);
+        }
+
         VersionWithSource::from_str(self.as_str())
             .map_err(|err| {
                 _partialerror!(

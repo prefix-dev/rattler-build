@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// Representation of a package.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Package {
     pub name: String,
     pub version: String,

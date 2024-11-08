@@ -76,6 +76,7 @@ pub trait Relinker {
         Self: Sized;
 
     /// Returns the shared libraries.
+    #[allow(dead_code)]
     fn libraries(&self) -> HashSet<PathBuf>;
 
     /// Find libraries in the shared library and resolve them by taking into account the rpaths.

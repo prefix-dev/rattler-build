@@ -126,14 +126,11 @@ pub(crate) fn extract_tar(
             .with_style(log_handler.default_bytes_style()),
     );
 
-    let file = File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?;
-    let wrapped = progress_bar.wrap_read(file);
-    let buf_reader = std::io::BufReader::new(wrapped);
+    let file = File::open(archive)?;
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let wrapped = progress_bar.wrap_read(buf_reader);
 
-    let mut archive = tar::Archive::new(ext_to_compression(
-        archive.file_name(),
-        Box::new(buf_reader),
-    ));
+    let mut archive = tar::Archive::new(ext_to_compression(archive.file_name(), Box::new(wrapped)));
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
@@ -167,10 +164,11 @@ pub(crate) fn extract_zip(
             .with_style(log_handler.default_bytes_style()),
     );
 
-    let mut archive = zip::ZipArchive::new(progress_bar.wrap_read(
-        File::open(archive).map_err(|_| SourceError::FileNotFound(archive.to_path_buf()))?,
-    ))
-    .map_err(|e| SourceError::InvalidZip(e.to_string()))?;
+    let file = File::open(archive)?;
+    let buf_reader = std::io::BufReader::with_capacity(1024 * 1024, file);
+    let wrapped = progress_bar.wrap_read(buf_reader);
+    let mut archive =
+        zip::ZipArchive::new(wrapped).map_err(|e| SourceError::InvalidZip(e.to_string()))?;
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
     archive
@@ -214,7 +212,8 @@ mod test {
         let mut file = File::create(&file_path).unwrap();
         _ = file.write_all(HELLO_WORLD_ZIP_FILE);
 
-        let fancy_log = LoggingOutputHandler::from_multi_progress(multi_progress);
+        let fancy_log = LoggingOutputHandler::default().with_multi_progress(multi_progress.clone());
+
         let res = extract_zip(file_path, tempdir.path(), &fancy_log);
         assert!(term.contents().trim().starts_with(
             "Extracting zip       [00:00:00] [━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━]"
@@ -230,8 +229,11 @@ mod test {
     fn test_extract_fail() {
         let fancy_log = LoggingOutputHandler::default();
         let tempdir = tempfile::tempdir().unwrap();
-        let res = extract_zip("", tempdir.path(), &fancy_log);
-        assert!(matches!(res.err(), Some(SourceError::FileNotFound(_))));
+        let result = extract_zip("", tempdir.path(), &fancy_log);
+        assert!(matches!(
+            result,
+            Err(SourceError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound
+        ));
     }
 
     #[test]

@@ -25,6 +25,7 @@ async fn main() -> miette::Result<()> {
                 &app.log_style,
                 &app.verbose,
                 &app.color,
+                app.wrap_log_lines,
                 #[cfg(feature = "tui")]
                 None,
             )
@@ -94,6 +95,7 @@ async fn main() -> miette::Result<()> {
                         &app.log_style,
                         &app.verbose,
                         &app.color,
+                        Some(true),
                         Some(tui.event_handler.sender.clone()),
                     )
                     .into_diagnostic()?;
@@ -109,6 +111,21 @@ async fn main() -> miette::Result<()> {
                 }
 
                 if build_args.render_only {
+                    let outputs = if build_args.with_solve {
+                        let mut updated_outputs = Vec::new();
+                        for output in outputs {
+                            updated_outputs.push(
+                                output
+                                    .resolve_dependencies(&tool_config)
+                                    .await
+                                    .into_diagnostic()?,
+                            );
+                        }
+                        updated_outputs
+                    } else {
+                        outputs
+                    };
+
                     println!(
                         "{}",
                         serde_json::to_string_pretty(&outputs).into_diagnostic()?

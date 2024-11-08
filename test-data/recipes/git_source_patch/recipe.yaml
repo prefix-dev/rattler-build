@@ -4,7 +4,7 @@ package:
 
 source:
   git: https://github.com/ros2-gbp/ament_package-release.git
-  rev: release/humble/ament_package/0.14.0-4
+  tag: release/humble/ament_package/0.14.0-4
   target_directory: ros-humble-ament-package/src/work
   patches:
     - patch/ros-humble-ament-package.patch

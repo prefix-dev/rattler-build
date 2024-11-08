@@ -73,4 +73,4 @@ arrow_cpp:
   - 8.0.1
 assimp:
   - 5.2.5
-aws-sdk-cpp: "4.5"
+aws_sdk_cpp: "4.5"

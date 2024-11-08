@@ -60,6 +60,7 @@ build:
     skip_pyc_compilation:
       - test/bla/**/*.py
     use_python_app_entrypoint: true
+    site_packages_path: foo/bar/lib/python4.5/site-packages
 
   always_copy_files:
     - file1
@@ -112,6 +113,8 @@ requirements:
   run:
     - python >=3.11
     - perl
+    - ${{ pin_subpackage('test', exact=True) }}
+    - ${{ pin_subpackage('test', build="foo*") }}
   run_constraints:
     - python * *cpython
   run_exports:
