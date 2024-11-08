@@ -10,7 +10,7 @@ build-release = "cargo build --release"
 install = "cargo install --path . --locked"
 end-to-end-test = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
     "build-release",
-], env = { RATTLER_BUILD_PATH = "$PIXI_PROJECT_ROOT/pixi-target/release/rattler-build" } }
+], env = { RATTLER_BUILD_PATH = "$PIXI_PROJECT_ROOT/target-pixi/release/rattler-build" } }
 test = "cargo test"
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
 lint = "pre-commit run --all"
@@ -43,11 +43,11 @@ syrupy = "4.6.*"
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
 
-[feature.build.target.linux-64.activation]
+[target.linux-64.activation]
 scripts = ["scripts/activate.sh"]
-[feature.build.target.osx-arm64.activation]
+[target.osx-arm64.activation]
 scripts = ["scripts/activate.sh"]
-[feature.build.target.win-64.activation]
+[target.win-64.activation]
 scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]
