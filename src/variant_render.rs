@@ -1,35 +1,33 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
-use rattler_conda_types::NoArchType;
+use petgraph::graph::DiGraph;
 
 use crate::{
     hash::HashInfo,
-    recipe::{
-        custom_yaml::Node,
-        parser::{Dependency, PinCompatible, PinSubpackage},
-        ParsingError, Recipe,
-    },
+    recipe::{custom_yaml::Node, parser::Dependency, ParsingError, Recipe},
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
     variant_config::{ParseErrors, VariantConfig, VariantError},
 };
 
+// pub struct VariantKey(String);
+
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
-struct RawOutputVec {
+pub struct RawOutputVec {
     /// The raw node (slightly preprocessed by making sure all keys are there)
-    vec: Vec<Node>,
+    pub vec: Vec<Node>,
 
     /// The used variables in each of the nodes
-    used_vars_jinja: Vec<HashSet<String>>,
+    pub used_vars_jinja: Vec<HashSet<String>>,
 
     /// The recipe string
-    recipe: String,
+    pub recipe: String,
 }
 
 /// Stage 0 render of a single recipe.yaml
 #[derive(Clone, Debug)]
-pub(crate) struct Stage0Render {
+pub struct Stage0Render {
     /// The used variables with their values
     pub variables: BTreeMap<String, String>,
 
@@ -133,11 +131,13 @@ impl Stage1Render {
             .used_vars_jinja
             .get(idx)
             .unwrap();
+
         let mut all_vars = self
             .used_variables_from_dependencies
             .get(idx)
             .unwrap()
             .clone();
+
         all_vars.extend(used_vars_jinja.iter().cloned());
 
         // extract variant
@@ -164,6 +164,49 @@ impl Stage1Render {
 
         build_string
     }
+
+    /// sort the outputs topologically
+    pub fn sort_outputs(&mut self) {
+        // Create an empty directed graph
+        let mut graph = DiGraph::<_, ()>::new();
+
+        // Create a map from output names to node indices
+        let mut node_indices = Vec::new();
+
+        let mut name_to_idx = HashMap::new();
+
+        for output in &self.stage_0_render.rendered_outputs {
+            let node_index = graph.add_node(output);
+            name_to_idx.insert(output.package().name(), node_index);
+            node_indices.push(node_index);
+        }
+
+        for (idx, output) in self.stage_0_render.rendered_outputs.iter().enumerate() {
+            // Add edges to the graph based on the used variables
+            let variant = self.variant_for_output(idx);
+
+            // if we find any keys that reference another output, add an edge
+            for req in output.build_time_requirements() {
+                let req_name = match req {
+                    Dependency::Spec(x) => x.name.clone().expect("Dependency should have a name"),
+                    Dependency::PinSubpackage(x) => x.pin_value().name.clone(),
+                    _ => continue,
+                };
+
+                if req_name != *output.package().name() {
+                    if let Some(&req_idx) = name_to_idx.get(&req_name) {
+                        graph.add_edge(node_indices[idx], req_idx, ());
+                    }
+                }
+            }
+        }
+
+        // Sort the outputs topologically
+        let sorted_indices =
+            petgraph::algo::toposort(&graph, None).expect("Could not sort topologically.");
+
+        println!("Sorted indices: {:?}", sorted_indices);
+    }
 }
 
 /// Render the stage 1 of the recipe by adding in variants from the dependencies
@@ -173,6 +216,7 @@ pub(crate) fn stage_1_render(
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
 
+    println!("Stage 0: {:?}", stage0_renders);
     // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<String>> = Vec::new();
@@ -232,13 +276,22 @@ pub(crate) fn stage_1_render(
             additional_variables.insert("target_platform".to_string());
             additional_variables.insert("channel_targets".to_string());
 
+            // filter out any ignore keys
+            let extra_ignore_keys = output.build().variant().ignore_keys.clone();
+            additional_variables = additional_variables
+                .into_iter()
+                .filter(|x| !extra_ignore_keys.contains(x))
+                .collect();
+
             extra_vars_per_output.push(additional_variables);
         }
 
+        println!("All vars: {:?}", extra_vars_per_output);
         // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
         let mut all_vars = extra_vars_per_output
             .iter()
             .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
+
         println!("All vars from deps: {:?}", all_vars);
         println!(
             "All variables from recipes: {:?}",
@@ -246,14 +299,23 @@ pub(crate) fn stage_1_render(
         );
         all_vars.extend(r.variables.keys().cloned());
 
+        all_vars = all_vars
+            .into_iter()
+            .map(|x| x.replace('-', "_").replace('.', "_"))
+            .collect::<HashSet<String>>();
+
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
 
         for combination in all_combinations {
-            stage_1_renders.push(Stage1Render {
+            let mut stage_1 = Stage1Render {
                 variables: combination,
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
-            });
+            };
+
+            stage_1.sort_outputs();
+
+            stage_1_renders.push(stage_1);
         }
     }
 
