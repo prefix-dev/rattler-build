@@ -1120,10 +1120,7 @@ mod tests {
         );
 
         assert_eq!(
-            jinja
-                .eval(&format!("(var | split('.'))[2]"))
-                .unwrap()
-                .to_string(),
+            jinja.eval("(var | split('.'))[2]").unwrap().to_string(),
             "3"
         );
     }
