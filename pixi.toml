@@ -10,7 +10,7 @@ build-release = "cargo build --release"
 install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
     "build-release",
-], env = { RATTLER_BUILD_PATH = "$PIXI_PROJECT_ROOT/target-pixi/release/rattler-build" } }
+] }
 test = "cargo test"
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
 lint = "pre-commit run --all"
