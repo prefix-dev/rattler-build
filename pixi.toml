@@ -8,7 +8,7 @@ platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 [tasks]
 build-release = "cargo build --release"
 install = "cargo install --path . --locked"
-end-to-end-test = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
+test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
     "build-release",
 ], env = { RATTLER_BUILD_PATH = "$PIXI_PROJECT_ROOT/target-pixi/release/rattler-build" } }
 test = "cargo test"
