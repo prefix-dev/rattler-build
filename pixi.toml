@@ -42,6 +42,7 @@ syrupy = "4.6.*"
 [target.linux-64.dependencies]
 clang = ">=18.1.8,<19.0"
 mold = ">=2.33.0,<3.0"
+patchelf = ">=0.17.2,<0.18"
 
 [target.linux-64.activation]
 scripts = ["scripts/activate.sh"]
