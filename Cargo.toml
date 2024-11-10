@@ -15,7 +15,7 @@ default-run = "rattler-build"
 rust-version = "1.80.0"
 
 [features]
-default = ['native-tls', 'recipe-generation']
+default = ['rustls-tls', 'recipe-generation']
 native-tls = [
     'reqwest/native-tls',
     'rattler/native-tls',
