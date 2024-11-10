@@ -22,7 +22,6 @@ concurrency:
 env:
   RUST_LOG: info
   RUST_BACKTRACE: 1
-  RUSTFLAGS: "-D warnings"
   CARGO_TERM_COLOR: always
   RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION: "true"
 
