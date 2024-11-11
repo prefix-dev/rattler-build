@@ -764,7 +764,33 @@ async fn run_process_with_replacements(
     cwd: &Path,
     replacements: &HashMap<String, String>,
 ) -> Result<std::process::Output, std::io::Error> {
-    let mut command = tokio::process::Command::new(args[0]);
+    let temp_folder = std::env::var("TMPDIR").ok();
+
+    let mut sandbox_exceptions = vec![
+        rattler_sandbox::Exception::Read("/".to_string()),
+        rattler_sandbox::Exception::ExecuteAndRead("/bin/".to_string()),
+        rattler_sandbox::Exception::ExecuteAndRead("/usr/bin/".to_string()),
+        rattler_sandbox::Exception::ExecuteAndRead("/Users/wolfv/.pixi/".to_string()),
+        rattler_sandbox::Exception::ExecuteAndRead(
+            cwd.parent().unwrap().to_string_lossy().to_string(),
+        ),
+        rattler_sandbox::Exception::ReadAndWrite(
+            cwd.parent().unwrap().to_string_lossy().to_string(),
+        ),
+        // conda compiler activation writes to this tmp folder
+        rattler_sandbox::Exception::ReadAndWrite("/tmp".to_string()),
+        // configure command for curl seems to want to write to this temp folder
+        rattler_sandbox::Exception::ReadAndWrite("/var/tmp".to_string()),
+    ];
+
+    if let Some(temp_folder) = temp_folder {
+        // the is the temp folder from TMPDIR
+        sandbox_exceptions.push(rattler_sandbox::Exception::ReadAndWrite(
+            temp_folder.to_string(),
+        ))
+    }
+
+    let mut command = rattler_sandbox::tokio::sandboxed_command(args[0], &sandbox_exceptions);
     command
         .current_dir(cwd)
         .args(&args[1..])
