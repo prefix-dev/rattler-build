@@ -238,6 +238,7 @@ impl Output {
                     &self.build_configuration.directories.host_prefix,
                     Some(&self.build_configuration.directories.build_prefix),
                     Some(jinja),
+                    None, // sandbox config
                 )
                 .await
                 .into_diagnostic()?;

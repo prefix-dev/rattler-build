@@ -351,6 +351,7 @@ pub async fn get_build_output(
                 ),
                 store_recipe: !args.no_include_recipe,
                 force_colors: args.color_build_log && console::colors_enabled(),
+                sandbox_config: args.sandbox_arguments.clone().into(),
             },
             finalized_dependencies: None,
             finalized_sources: None,

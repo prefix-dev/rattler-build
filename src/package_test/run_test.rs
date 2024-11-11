@@ -135,7 +135,7 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -147,7 +147,7 @@ impl Tests {
                 };
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None)
+                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -568,7 +568,15 @@ impl PythonTest {
 
         let tmp_dir = tempfile::tempdir()?;
         script
-            .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
+            .run_script(
+                Default::default(),
+                tmp_dir.path(),
+                path,
+                prefix,
+                None,
+                None,
+                None,
+            )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
@@ -583,7 +591,7 @@ impl PythonTest {
                 ..Script::default()
             };
             script
-                .run_script(Default::default(), path, path, prefix, None, None)
+                .run_script(Default::default(), path, path, prefix, None, None, None)
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
@@ -648,7 +656,15 @@ impl PerlTest {
 
         let tmp_dir = tempfile::tempdir()?;
         script
-            .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
+            .run_script(
+                Default::default(),
+                tmp_dir.path(),
+                path,
+                prefix,
+                None,
+                None,
+                None,
+            )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
@@ -755,6 +771,7 @@ impl CommandsTest {
                 path,
                 &run_prefix,
                 build_prefix.as_ref(),
+                None,
                 None,
             )
             .await
