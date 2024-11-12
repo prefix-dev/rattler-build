@@ -28,6 +28,8 @@ use tracing_subscriber::{
     EnvFilter, Layer,
 };
 
+use crate::consts;
+
 /// A custom formatter for tracing events.
 pub struct TracingFormatter;
 
@@ -648,8 +650,13 @@ pub fn init_logging(
     Ok(log_handler)
 }
 
-/// check if we are on Github CI and if the user has enabled the integration
+/// Checks whether we are on GitHub Actions and if the user has enabled the GitHub integration
 pub fn github_integration_enabled() -> bool {
-    std::env::var("GITHUB_ACTIONS").is_ok()
-        && std::env::var("RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION") == Ok("true".to_string())
+    github_action_runner()
+        && std::env::var(consts::RATTLER_BUILD_ENABLE_GITHUB_INTEGRATION) == Ok("true".to_string())
+}
+
+/// Checks whether we are on GitHub Actions
+pub fn github_action_runner() -> bool {
+    std::env::var(consts::GITHUB_ACTIONS) == Ok("true".to_string())
 }
