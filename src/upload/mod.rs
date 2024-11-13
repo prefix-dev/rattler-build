@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio_util::io::ReaderStream;
+use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::{Authentication, AuthenticationStorage};
@@ -21,6 +22,7 @@ use crate::upload::package::{sha256_sum, ExtractedPackage};
 mod anaconda;
 pub mod conda_forge;
 mod package;
+mod trusted_publishing;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -179,23 +181,36 @@ pub async fn upload_package_to_prefix(
     url: Url,
     channel: String,
 ) -> miette::Result<()> {
-    let token = match api_key {
-        Some(api_key) => api_key,
-        None => match storage.get_by_url(url.clone()) {
-            Ok((_, Some(Authentication::BearerToken(token)))) => token,
+    let check_storage = || {
+        match storage.get_by_url(url.clone()) {
+            Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
             Ok((_, Some(_))) => {
-                return Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
-                        Authentication information found in the keychain / auth file, but it was not a Bearer token"));
+                Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
+                        Authentication information found in the keychain / auth file, but it was not a Bearer token"))
             }
             Ok((_, None)) => {
-                return Err(miette::miette!(
+                Err(miette::miette!(
                     "No prefix.dev api key was given and none was found in the keychain / auth file"
-                ));
+                ))
             }
             Err(e) => {
-                return Err(miette::miette!(
-                    "Failed to get authentication information form keychain: {e}"
-                ));
+                Err(miette::miette!(
+                    "Failed to get authentication information from keychain: {e}"
+                ))
+            }
+        }
+    };
+
+    let client = get_default_client().into_diagnostic()?;
+
+    let token = match api_key {
+        Some(api_key) => api_key,
+        None => match check_trusted_publishing(&client, &url).await {
+            TrustedPublishResult::Configured(token) => token.secret().to_string(),
+            TrustedPublishResult::Skipped => check_storage()?,
+            TrustedPublishResult::Ignored(err) => {
+                tracing::warn!("Checked for trusted publishing but failed with {err}");
+                check_storage()?
             }
         },
     };
@@ -212,8 +227,6 @@ pub async fn upload_package_to_prefix(
         let url = url
             .join(&format!("api/v1/upload/{}", channel))
             .into_diagnostic()?;
-
-        let client = get_default_client().into_diagnostic()?;
 
         let hash = sha256_sum(package_file).into_diagnostic()?;
 
