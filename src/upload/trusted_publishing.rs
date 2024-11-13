@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::env::VarError;
 use std::ffi::OsString;
-use std::fmt::Display;
 use thiserror::Error;
 use url::Url;
 
@@ -72,9 +71,9 @@ impl TrustedPublishingError {
 #[serde(transparent)]
 pub struct TrustedPublishingToken(String);
 
-impl Display for TrustedPublishingToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl TrustedPublishingToken {
+    pub fn secret(&self) -> String {
+        self.0.clone()
     }
 }
 
@@ -110,7 +109,7 @@ pub(crate) async fn get_token(
 
     // Tell GitHub Actions to mask the token in any console logs.
     if github_action_runner() {
-        println!("::add-mask::{}", &publish_token);
+        println!("::add-mask::{}", &publish_token.secret());
     }
 
     Ok(publish_token)
