@@ -53,8 +53,6 @@ pub enum TrustedPublishingError {
     Url(#[from] url::ParseError),
     #[error("Failed to fetch: `{0}`")]
     Reqwest(Url, #[source] reqwest::Error),
-    #[error(transparent)]
-    SerdeJson(#[from] serde_json::error::Error),
     #[error(
         "Prefix.dev returned error code {0}, is trusted publishing correctly configured?\nResponse: {1}"
     )]
@@ -92,12 +90,6 @@ struct MintTokenRequest {
     token: String,
 }
 
-/// The response from querying `$ACTIONS_ID_TOKEN_REQUEST_URL&audience=prefix.dev`.
-#[derive(Deserialize)]
-struct PublishToken {
-    token: TrustedPublishingToken,
-}
-
 /// Returns the short-lived token to use for uploading.
 pub(crate) async fn get_token(
     client: &Client,
@@ -132,7 +124,9 @@ async fn get_oidc_token(
         TrustedPublishingError::from_var_err(consts::ACTIONS_ID_TOKEN_REQUEST_URL, err)
     })?;
     let mut oidc_token_url = Url::parse(&oidc_token_url)?;
-    oidc_token_url.query_pairs_mut();
+    oidc_token_url
+        .query_pairs_mut()
+        .append_pair("audience", "prefix.dev");
     tracing::info!("Querying the trusted publishing OIDC token from {oidc_token_url}");
     let authorization = format!("bearer {oidc_token_request_token}");
     let response = client
@@ -159,9 +153,10 @@ async fn get_publish_token(
     let mint_token_payload = MintTokenRequest {
         token: oidc_token.to_string(),
     };
+
     let response = client
         .post(mint_token_url.clone())
-        .body(serde_json::to_vec(&mint_token_payload)?)
+        .json(&mint_token_payload)
         .send()
         .await
         .map_err(|err| TrustedPublishingError::Reqwest(mint_token_url.clone(), err))?;
@@ -174,8 +169,8 @@ async fn get_publish_token(
         .map_err(|err| TrustedPublishingError::Reqwest(mint_token_url.clone(), err))?;
 
     if status.is_success() {
-        let publish_token: PublishToken = serde_json::from_slice(&body)?;
-        Ok(publish_token.token)
+        let token = TrustedPublishingToken(String::from_utf8_lossy(&body).to_string());
+        Ok(token)
     } else {
         // An error here means that something is misconfigured,
         // so we're showing the body for more context
