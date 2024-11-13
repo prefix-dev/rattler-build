@@ -91,6 +91,13 @@ pub enum PythonVersion {
     None,
 }
 
+impl PythonVersion {
+    /// Check if the python version is none
+    pub fn is_none(&self) -> bool {
+        matches!(self, PythonVersion::None)
+    }
+}
+
 /// A special Python test that checks if the imports are available and runs `pip check`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
@@ -100,7 +107,7 @@ pub struct PythonTest {
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
     /// Python version(s) to test against. If not specified, the default python version is used.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "PythonVersion::is_none")]
     pub python_version: PythonVersion,
 }
 
@@ -283,22 +290,20 @@ impl TryConvertNode<PythonVersion> for RenderedNode {
                 ErrorKind::InvalidField("expected string, sequence or null".into()),
             )])?,
             RenderedNode::Scalar(version) => PythonVersion::Single(version.to_string()),
-            RenderedNode::Sequence(versions) => {
-                versions
-                    .iter()
-                    .map(|v| {
-                        v.as_scalar()
-                            .ok_or_else(|| {
-                                vec![_partialerror!(
-                                    *self.span(),
-                                    ErrorKind::InvalidField("invalid value".into()),
-                                )]
-                            })
-                            .map(|s| s.to_string())
-                    })
-                    .collect::<Result<Vec<String>, _>>()
-                    .map(PythonVersion::Multiple)?
-            }
+            RenderedNode::Sequence(versions) => versions
+                .iter()
+                .map(|v| {
+                    v.as_scalar()
+                        .ok_or_else(|| {
+                            vec![_partialerror!(
+                                *self.span(),
+                                ErrorKind::InvalidField("invalid value".into()),
+                            )]
+                        })
+                        .map(|s| s.to_string())
+                })
+                .collect::<Result<Vec<String>, _>>()
+                .map(PythonVersion::Multiple)?,
             RenderedNode::Null(_) => PythonVersion::None,
         };
 
@@ -486,7 +491,7 @@ mod test {
           - python:
               imports:
                 - pandas
-              python_version: 3.10, 3.12
+              python_version: [3.10, 3.12]
         "#;
 
         // parse the YAML
