@@ -205,8 +205,8 @@ pub async fn upload_package_to_prefix(
 
     let token = match api_key {
         Some(api_key) => api_key,
-        None => match check_trusted_publishing(&client).await {
-            TrustedPublishResult::Configured(token) => token.secret(),
+        None => match check_trusted_publishing(&client, &url).await {
+            TrustedPublishResult::Configured(token) => token.secret().to_string(),
             TrustedPublishResult::Skipped => check_storage()?,
             TrustedPublishResult::Ignored(err) => {
                 tracing::warn!("Checked for trusted publishing but failed with {err}");

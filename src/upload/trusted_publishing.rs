@@ -14,7 +14,7 @@ use url::Url;
 use crate::{console_utils::github_action_runner, consts};
 
 /// If applicable, attempt obtaining a token for trusted publishing.
-pub async fn check_trusted_publishing(client: &Client) -> TrustedPublishResult {
+pub async fn check_trusted_publishing(client: &Client, prefix_url: &Url) -> TrustedPublishResult {
     // If we aren't in GitHub Actions, we can't use trusted publishing.
     if !github_action_runner() {
         return TrustedPublishResult::Skipped;
@@ -24,7 +24,7 @@ pub async fn check_trusted_publishing(client: &Client) -> TrustedPublishResult {
     tracing::debug!(
         "Running on GitHub Actions without explicit credentials, checking for trusted publishing"
     );
-    match get_token(client).await {
+    match get_token(client, prefix_url).await {
         Ok(token) => TrustedPublishResult::Configured(token),
         Err(err) => {
             tracing::debug!("Could not obtain trusted publishing credentials, skipping: {err}");
@@ -72,8 +72,8 @@ impl TrustedPublishingError {
 pub struct TrustedPublishingToken(String);
 
 impl TrustedPublishingToken {
-    pub fn secret(&self) -> String {
-        self.0.clone()
+    pub fn secret(&self) -> &str {
+        &self.0
     }
 }
 
@@ -92,6 +92,7 @@ struct MintTokenRequest {
 /// Returns the short-lived token to use for uploading.
 pub(crate) async fn get_token(
     client: &Client,
+    prefix_url: &Url,
 ) -> Result<TrustedPublishingToken, TrustedPublishingError> {
     // If this fails, we can skip the audience request.
     let oidc_token_request_token =
@@ -103,7 +104,7 @@ pub(crate) async fn get_token(
     let oidc_token = get_oidc_token(&oidc_token_request_token, client).await?;
 
     // Request 2: Get the publishing token from prefix.dev.
-    let publish_token = get_publish_token(&oidc_token, client).await?;
+    let publish_token = get_publish_token(&oidc_token, prefix_url, client).await?;
 
     tracing::info!("Received token, using trusted publishing");
 
@@ -145,9 +146,11 @@ async fn get_oidc_token(
 
 async fn get_publish_token(
     oidc_token: &str,
+    prefix_url: &Url,
     client: &Client,
 ) -> Result<TrustedPublishingToken, TrustedPublishingError> {
-    let mint_token_url = Url::parse("https://prefix.dev/api/oidc/mint_token")?;
+    // let mint_token_url = Url::parse("https://prefix.dev/api/oidc/mint_token")?;
+    let mint_token_url = prefix_url.join("/api/oidc/mint_token")?;
     tracing::info!("Querying the trusted publishing upload token from {mint_token_url}");
     let mint_token_payload = MintTokenRequest {
         token: oidc_token.to_string(),
