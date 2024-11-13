@@ -286,7 +286,6 @@ impl TryConvertNode<PythonVersion> for RenderedNode {
             RenderedNode::Sequence(versions) => {
                 versions
                     .iter()
-                    // .map(|v| v.map(|s| s.to_string()))
                     .map(|v| {
                         v.as_scalar()
                             .ok_or_else(|| {
