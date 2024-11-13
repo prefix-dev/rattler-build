@@ -99,7 +99,7 @@ pub struct PythonTest {
     /// Whether to run `pip check` or not (default to true)
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
-    /// Python version(s) to test against. If default no python version is specified.
+    /// Python version(s) to test against. If not specified, the default python version is used.
     #[serde(default)]
     pub python_version: PythonVersion,
 }
