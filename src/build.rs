@@ -96,8 +96,6 @@ pub async fn skip_existing(
     Ok(outputs)
 }
 
-
-
 /// Run the build for the given output. This will fetch the sources, resolve the
 /// dependencies, and execute the build script. Returns the path to the
 /// resulting package.
