@@ -6,6 +6,7 @@ pub mod build;
 pub mod cache;
 pub mod console_utils;
 pub mod metadata;
+mod normalized_key;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
@@ -21,6 +22,7 @@ pub mod tui;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
+mod variant_render;
 
 mod consts;
 mod env_vars;
@@ -34,7 +36,6 @@ pub mod recipe_generator;
 mod run_exports;
 mod unix;
 pub mod upload;
-mod variant_render;
 mod windows;
 
 mod package_cache_reporter;
@@ -261,7 +262,7 @@ pub async fn get_build_output(
             .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
             .set_header(vec!["Variant", "Version"]);
         for (key, value) in discovered_output.used_vars.iter() {
-            table.add_row(vec![key, value]);
+            table.add_row(vec![&key.normalize(), value]);
         }
         tracing::info!("\n{}\n", table);
     }

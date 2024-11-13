@@ -353,9 +353,9 @@ impl Output {
         self.variant()
             .iter()
             .filter_map(|(k, v)| {
-                let key_upper = k.to_uppercase();
+                let key_upper = k.normalize().to_uppercase();
                 if !languages.contains(key_upper.as_str()) {
-                    Some((k.replace('-', "_"), Some(v.to_string())))
+                    Some((k.normalize(), Some(v.to_string())))
                 } else {
                     None
                 }

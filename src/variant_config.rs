@@ -12,8 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
+use crate::variant_render::stage_1_render;
 use crate::{
     _partialerror,
+    normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
@@ -22,7 +24,6 @@ use crate::{
     selectors::SelectorConfig,
     variant_render::stage_0_render,
 };
-use crate::{utils::NormalizedKeyBTreeMap, variant_render::stage_1_render};
 
 #[allow(missing_docs)]
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -33,7 +34,7 @@ pub struct DiscoveredOutput {
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
     pub node: Node,
-    pub used_vars: BTreeMap<String, String>,
+    pub used_vars: BTreeMap<NormalizedKey, String>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -141,12 +142,12 @@ pub struct VariantConfig {
     pub pin_run_as_build: Option<BTreeMap<String, Pin>>,
 
     /// The zip keys are used to "zip" together variants to create specific combinations.
-    pub zip_keys: Option<Vec<Vec<String>>>,
+    pub zip_keys: Option<Vec<Vec<NormalizedKey>>>,
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
     #[serde(flatten)]
-    pub variants: NormalizedKeyBTreeMap,
+    pub variants: BTreeMap<NormalizedKey, Vec<String>>,
 }
 
 #[allow(missing_docs)]
@@ -330,13 +331,13 @@ impl VariantConfig {
                 let mut prev_len = None;
                 for key in zip {
                     let value = match self.variants.get(key) {
-                        None => return Err(VariantError::InvalidZipKeyLength(key.to_string())),
+                        None => return Err(VariantError::InvalidZipKeyLength(key.normalize())),
                         Some(value) => value,
                     };
 
                     if let Some(l) = prev_len {
                         if l != value.len() {
-                            return Err(VariantError::InvalidZipKeyLength(key.to_string()));
+                            return Err(VariantError::InvalidZipKeyLength(key.normalize()));
                         }
                     }
                     prev_len = Some(value.len());
@@ -354,9 +355,9 @@ impl VariantConfig {
     /// that are already in other parts of the "tree".
     pub fn combinations(
         &self,
-        used_vars: &HashSet<String>,
-        already_used_vars: Option<&BTreeMap<String, String>>,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+        used_vars: &HashSet<NormalizedKey>,
+        already_used_vars: Option<&BTreeMap<NormalizedKey, String>>,
+    ) -> Result<Vec<BTreeMap<NormalizedKey, String>>, VariantError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
         let used_zip_keys = zip_keys
@@ -405,7 +406,7 @@ impl VariantConfig {
                 combination
                     .iter()
                     .cloned()
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<BTreeMap<NormalizedKey, String>>()
             })
             .collect();
 
@@ -414,7 +415,7 @@ impl VariantConfig {
                 .into_iter()
                 .filter(|combination| {
                     if already_used_vars.is_empty() {
-                        return true;
+                        true
                     } else {
                         already_used_vars
                             .iter()
@@ -463,7 +464,7 @@ impl VariantConfig {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),
                     build_string: sx.build_string_for_output(idx),
-                    noarch_type: recipe.build().noarch().clone(),
+                    noarch_type: *recipe.build().noarch(),
                     target_platform,
                     node: node.clone(),
                     used_vars: sx.variant_for_output(idx),
@@ -887,9 +888,7 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                 _ => {
                     let variants: Option<Vec<_>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config
-                            .variants
-                            .insert(key_str.to_string(), variants.clone());
+                        config.variants.insert(key_str.into(), variants.clone());
                     }
                 }
             }
@@ -901,8 +900,8 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
 
 #[derive(Debug, Clone)]
 enum VariantKey {
-    Key(String, Vec<String>),
-    ZipKey(HashMap<String, Vec<String>>),
+    Key(NormalizedKey, Vec<String>),
+    ZipKey(HashMap<NormalizedKey, Vec<String>>),
 }
 
 impl VariantKey {
@@ -913,7 +912,7 @@ impl VariantKey {
         }
     }
 
-    pub fn at(&self, index: usize) -> Option<Vec<(String, String)>> {
+    pub fn at(&self, index: usize) -> Option<Vec<(NormalizedKey, String)>> {
         match self {
             VariantKey::Key(key, values) => {
                 values.get(index).map(|v| vec![(key.clone(), v.clone())])
@@ -989,8 +988,8 @@ pub enum VariantError {
 fn find_combinations(
     variant_keys: &[VariantKey],
     index: usize,
-    current: &mut Vec<(String, String)>,
-    result: &mut Vec<Vec<(String, String)>>,
+    current: &mut Vec<(NormalizedKey, String)>,
+    result: &mut Vec<Vec<(NormalizedKey, String)>>,
 ) {
     if index == variant_keys.len() {
         result.push(current.clone());
@@ -1010,7 +1009,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::selectors::SelectorConfig;
+    use crate::{normalized_key::NormalizedKey, selectors::SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
 
@@ -1084,7 +1083,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)
@@ -1097,12 +1096,12 @@ mod tests {
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = NormalizedKeyBTreeMap::new();
-        variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
-        variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
-        let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];
+        let mut variants = BTreeMap::<NormalizedKey, Vec<String>>::new();
+        variants.insert("a".into(), vec!["1".to_string(), "2".to_string()]);
+        variants.insert("b".into(), vec!["3".to_string(), "4".to_string()]);
+        let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
 
-        let used_vars = vec!["a".to_string()].into_iter().collect();
+        let used_vars = vec!["a".into()].into_iter().collect();
         let mut config = VariantConfig {
             variants,
             zip_keys: Some(zip_keys),
@@ -1112,34 +1111,34 @@ mod tests {
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2);
 
-        let used_vars = vec!["a".to_string(), "b".to_string()].into_iter().collect();
+        let used_vars = vec!["a".into(), "b".into()].into_iter().collect();
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2);
 
         config.variants.insert(
-            "c".to_string(),
+            "c".into(),
             vec!["5".to_string(), "6".to_string(), "7".to_string()],
         );
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2 * 3);
 
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
         config.zip_keys = None;
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
 
-        let already_used_vars = BTreeMap::from_iter(vec![("a".to_string(), "1".to_string())]);
+        let already_used_vars = BTreeMap::from_iter(vec![("a".into(), "1".to_string())]);
         let c2 = config
             .combinations(&used_vars, Some(&already_used_vars))
             .unwrap();
         println!("{:?}", c2);
         for c in &c2 {
-            assert!(c.get("a").unwrap() == "1");
+            assert!(c.get(&"a".into()).unwrap() == "1");
         }
         assert!(c2.len() == 2 * 3);
     }
@@ -1196,7 +1195,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)
