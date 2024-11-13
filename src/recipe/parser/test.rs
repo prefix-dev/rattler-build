@@ -487,11 +487,11 @@ mod test {
           - python:
               imports:
                 - pandas
-              python_version: 3.10
+              python_version: "3.10"
           - python:
               imports:
                 - pandas
-              python_version: [3.10, 3.12]
+              python_version: ["3.10", "3.12"]
         "#;
 
         // parse the YAML
