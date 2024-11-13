@@ -11,8 +11,8 @@ use rattler_build::{
     console_utils::init_logging,
     get_build_output, get_recipe_path, get_tool_config,
     opt::{App, ShellCompletion, SubCommands},
-    rebuild_from_args, run_build_from_args, run_test_from_args, sort_build_outputs_topologically,
-    upload_from_args,
+    rebuild_from_args, run_build_from_args, run_test_from_args, skip_noarch,
+    sort_build_outputs_topologically, upload_from_args,
 };
 use tempfile::tempdir;
 
@@ -132,6 +132,9 @@ async fn main() -> miette::Result<()> {
                     );
                     return Ok(());
                 }
+
+                // Skip noarch builds before the topological sort
+                outputs = skip_noarch(outputs, &tool_config).await?;
 
                 sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
                 run_build_from_args(outputs, tool_config).await?;

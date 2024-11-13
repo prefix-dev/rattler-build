@@ -21,31 +21,6 @@ pub async fn skip_existing(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<Vec<Output>> {
-    // Adding the logic here for now but will move it elsewhere later
-    if tool_configuration.noarch_platform != None {
-        let noarch_platform = tool_configuration.noarch_platform.clone().unwrap();
-
-        for output in outputs.iter() {
-            // TODO: skip if target == noarch and build paltform different than noarch_platform
-            let skip = output.build_configuration.target_platform == noarch_platform;
-
-            println!("identifier={}", output.identifier());
-            println!(
-                "target_platform={}",
-                output.build_configuration.target_platform
-            );
-            println!(
-                "host_platform={}",
-                output.build_configuration.host_platform.platform
-            );
-            println!(
-                "build_platform={}",
-                output.build_configuration.build_platform.platform
-            );
-            println!("skip={}", skip);
-        }
-    }
-
     let span = tracing::info_span!("Checking existing builds");
     let _enter = span.enter();
 
@@ -120,6 +95,8 @@ pub async fn skip_existing(
 
     Ok(outputs)
 }
+
+
 
 /// Run the build for the given output. This will fetch the sources, resolve the
 /// dependencies, and execute the build script. Returns the path to the
