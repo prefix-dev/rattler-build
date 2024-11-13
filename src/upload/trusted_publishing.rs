@@ -149,7 +149,6 @@ async fn get_publish_token(
     prefix_url: &Url,
     client: &Client,
 ) -> Result<TrustedPublishingToken, TrustedPublishingError> {
-    // let mint_token_url = Url::parse("https://prefix.dev/api/oidc/mint_token")?;
     let mint_token_url = prefix_url.join("/api/oidc/mint_token")?;
     tracing::info!("Querying the trusted publishing upload token from {mint_token_url}");
     let mint_token_payload = MintTokenRequest {
