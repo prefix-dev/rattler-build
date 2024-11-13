@@ -343,6 +343,11 @@ pub struct BuildOpts {
     #[arg(long, default_value = "false", help_heading = "Modifying result")]
     pub no_test: bool,
 
+    /// Don't run the tests after building the package if the building platform
+    /// is different than the host platform (cross-compilation)
+    #[arg(long, default_value = "false", help_heading = "Modifying result")]
+    pub no_test_if_emulate: bool,
+
     /// Don't force colors in the output of the build script
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
     pub color_build_log: bool,

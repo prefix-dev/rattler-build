@@ -45,6 +45,9 @@ pub struct Configuration {
     /// Whether to skip the test phase
     pub no_test: bool,
 
+    /// Whether to skip the test phase if cross-compiling
+    pub no_test_if_emulate: bool,
+
     /// Whether to use zstd
     pub use_zstd: bool,
 
@@ -112,6 +115,7 @@ pub struct ConfigurationBuilder {
     client: Option<ClientWithMiddleware>,
     no_clean: bool,
     no_test: bool,
+    no_test_if_emulate: bool,
     use_zstd: bool,
     use_bz2: bool,
     skip_existing: SkipExisting,
@@ -135,6 +139,7 @@ impl ConfigurationBuilder {
             client: None,
             no_clean: false,
             no_test: false,
+            no_test_if_emulate: false,
             use_zstd: true,
             use_bz2: false,
             skip_existing: SkipExisting::None,
@@ -216,6 +221,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets whether tests should be executed if cross-compiling.
+    pub fn with_testing_if_emulate(self, testing_enabled_if_emulate: bool) -> Self {
+        Self {
+            no_test_if_emulate: !testing_enabled_if_emulate,
+            ..self
+        }
+    }
+
     /// Whether downloading repodata as `.zst` files is enabled.
     pub fn with_zstd_repodata_enabled(self, zstd_repodata_enabled: bool) -> Self {
         Self {
@@ -266,6 +279,7 @@ impl ConfigurationBuilder {
             client,
             no_clean: self.no_clean,
             no_test: self.no_test,
+            no_test_if_emulate: self.no_test_if_emulate,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,

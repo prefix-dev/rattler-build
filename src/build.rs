@@ -160,8 +160,44 @@ pub async fn run_build(
         directories.clean().into_diagnostic()?;
     }
 
-    if tool_configuration.no_test {
-        tracing::info!("Skipping tests");
+    // Are we cross compiling?
+    // NOTE: cannot use output.build_configuration.cross_compilation() here because it uses target_platform instead of host_platform and it enables cross-compilation when noarch.
+    let is_cross_compiling = output.build_configuration.host_platform.platform
+        != output.build_configuration.build_platform.platform;
+
+    println!(
+        "target_platform={}",
+        output.build_configuration.target_platform
+    );
+    println!(
+        "build_platform={}",
+        output.build_configuration.build_platform.platform
+    );
+    println!(
+        "host_platform={}",
+        output.build_configuration.host_platform.platform
+    );
+    println!(
+        "cross_compilation()={}",
+        output.build_configuration.cross_compilation()
+    );
+
+    println!("is_cross_compiling={}", is_cross_compiling);
+
+    // Decide whether the tests should be skipped or not
+    let (skip_test, skip_test_reason) = if tool_configuration.no_test {
+        (true, "the --no-test flag was set")
+    } else if tool_configuration.no_test_if_emulate {
+        (
+            is_cross_compiling,
+            "the --no-test-if-emulate flag was set and cross-compiling",
+        )
+    } else {
+        (false, "")
+    };
+
+    if skip_test {
+        tracing::info!("Skipping tests because {}", skip_test_reason);
     } else {
         package_test::run_test(
             &result,

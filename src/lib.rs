@@ -131,6 +131,7 @@ pub fn get_tool_config(
         .with_compression_threads(args.compression_threads)
         .with_reqwest_client(client)
         .with_testing(!args.no_test)
+        .with_testing_if_emulate(!args.no_test_if_emulate)
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .with_skip_existing(args.skip_existing)
