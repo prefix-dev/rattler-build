@@ -9,4 +9,3 @@ export CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS="-C link-arg=-Wl,-rpath,$CONDA
 export CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS="-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib"
 
 export RATTLER_BUILD_PATH="$PIXI_PROJECT_ROOT/target-pixi/release/rattler-build"
-

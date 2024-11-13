@@ -49,7 +49,7 @@ pub use self::{
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PythonTest, TestType,
+        PackageContentsTest, PythonTest, PythonVersion, TestType,
     },
 };
 
