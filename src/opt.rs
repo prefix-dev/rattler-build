@@ -364,6 +364,11 @@ pub struct BuildOpts {
     )]
     pub skip_existing: SkipExisting,
 
+    /// Define a "noarch platform" for which the noarch packages will be built
+    /// for. The noarch builds will be skipped on the other platforms.
+    #[arg(long, default_value = None, help_heading = "Modifying result")]
+    pub noarch_platform: Option<Platform>,
+
     /// Extra metadata to include in about.json
     #[arg(long, value_parser = parse_key_val)]
     pub extra_meta: Option<Vec<(String, Value)>>,

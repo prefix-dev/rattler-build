@@ -93,6 +93,30 @@ pub async fn skip_existing(
         !exists
     });
 
+    // Adding the logic here for now but will move it elsewhere later
+    if tool_configuration.noarch_platform != None {
+        let noarch_platform = tool_configuration.noarch_platform.clone().unwrap();
+
+        for output in outputs.iter() {
+            let skip = output.build_configuration.target_platform == noarch_platform;
+
+            println!("identifier={}", output.identifier());
+            println!(
+                "target_platform={}",
+                output.build_configuration.target_platform
+            );
+            println!(
+                "host_platform={}",
+                output.build_configuration.host_platform.platform
+            );
+            println!(
+                "build_platform={}",
+                output.build_configuration.build_platform.platform
+            );
+            println!("skip={}", skip);
+        }
+    }
+
     Ok(outputs)
 }
 

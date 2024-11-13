@@ -134,6 +134,7 @@ pub fn get_tool_config(
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .with_skip_existing(args.skip_existing)
+        .with_noarch_platform(args.noarch_platform)
         .finish())
 }
 
