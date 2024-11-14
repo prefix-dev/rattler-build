@@ -54,14 +54,16 @@ use fs_err as fs;
 use futures::FutureExt;
 use hash::HashInfo;
 use metadata::{
-    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels, BuildConfiguration, BuildSummary, Directories, Output,
+    PackageIdentifier, PackagingSettings,
 };
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform};
+use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform, MatchSpec, PackageName};
 use rattler_solve::SolveStrategy;
+use rattler_solve::ChannelPriority;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::{
     parser::{find_outputs_from_src, Dependency, Recipe},
@@ -382,24 +384,113 @@ pub async fn get_build_output(
     Ok(outputs)
 }
 
+fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
+    let mut can_test = true;
+
+    let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
+        if spec.name.as_ref() != Some(output.name()) {
+            return false;
+        }
+        if let Some(version_spec) = &spec.version {
+            if !version_spec.matches(output.recipe.package().version()) {
+                return false;
+            }
+        }
+        if let Some(build_string_spec) = &spec.build {
+            if !build_string_spec.matches(&output.build_string()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    // Check if any run dependencies are not built yet
+    if let Some(ref deps) = output.finalized_dependencies {
+        for dep in &deps.run.depends {
+            if all_output_names
+                .iter()
+                .any(|o| Some(*o) == dep.spec().name.as_ref())
+            {
+                // this dependency might not be built yet
+                if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
+                    can_test = false;
+                    break;
+                }
+            }
+        }
+    }
+
+    can_test
+}
+
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
     tool_config: Configuration,
 ) -> miette::Result<()> {
-    let mut outputs: Vec<metadata::Output> = Vec::new();
+    let mut outputs = Vec::new();
+    let mut test_queue = Vec::new();
 
-    for output in skip_existing(build_output, &tool_config).await? {
-        let output = match run_build(output, &tool_config).boxed_local().await {
-            Ok((output, _archive)) => {
+    let outputs_to_build = skip_existing(build_output, &tool_config).await?;
+
+    let all_output_names = outputs_to_build
+        .iter()
+        .map(|o| o.name())
+        .collect::<Vec<_>>();
+
+    for output in outputs_to_build.iter() {
+        let (output, archive) = match run_build(output.clone(), &tool_config).boxed_local().await {
+            Ok((output, archive)) => {
                 output.record_build_end();
-                output
+                (output, archive)
             }
             Err(e) => {
                 return Err(e);
             }
         };
-        outputs.push(output);
+
+        outputs.push(output.clone());
+
+        // We can now run the tests for the output. However, we need to check if
+        // all dependencies that are needed for the test are already built.
+        if tool_config.no_test {
+            tracing::info!("Skipping tests");
+        } else {
+            test_queue.push((output, archive));
+
+            let (to_test, new_test_queue) = test_queue
+                .into_iter()
+                .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
+
+            // Update the test queue with the tests that we can't run yet
+            test_queue = new_test_queue;
+
+            // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
+            for (output, archive) in &to_test {
+                package_test::run_test(
+                    archive,
+                    &TestConfiguration {
+                        test_prefix: output.build_configuration.directories.work_dir.join("test"),
+                        target_platform: Some(output.build_configuration.target_platform),
+                        host_platform: Some(output.build_configuration.host_platform.clone()),
+                        current_platform: output.build_configuration.build_platform.clone(),
+                        keep_test_prefix: tool_config.no_clean,
+                        channels: build_reindexed_channels(
+                            &output.build_configuration,
+                            &tool_config,
+                        )
+                        .into_diagnostic()
+                        .context("failed to reindex output channel")?,
+                        channel_priority: ChannelPriority::Strict,
+                        solve_strategy: SolveStrategy::Highest,
+                        tool_configuration: tool_config.clone(),
+                    },
+                    None,
+                )
+                .await
+                .into_diagnostic()?;
+            }
+        }
     }
 
     let span = tracing::info_span!("Build summary");

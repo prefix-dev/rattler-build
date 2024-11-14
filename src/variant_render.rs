@@ -227,15 +227,17 @@ impl Stage1Render {
             .collect::<Vec<usize>>();
 
         // Update the order of the outputs
-        return Stage1Render{
+        return Stage1Render {
             order: sorted_indices,
             ..self
-        }
+        };
     }
 
-    pub fn outputs(&self) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
+    pub fn outputs(
+        &self,
+    ) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
         let outputs = self.stage_0_render.outputs().collect::<Vec<_>>();
-        for o in &outputs  {
+        for o in &outputs {
             println!("Output: {:?}", o.1.package().name());
         }
         println!("Order: {:?}", self.order);
@@ -362,7 +364,8 @@ pub(crate) fn stage_1_render(
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
                 order: (0..r.rendered_outputs.len()).collect(),
-            }.sort_outputs();
+            }
+            .sort_outputs();
 
             stage_1_renders.push(stage_1);
         }

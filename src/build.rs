@@ -159,53 +159,6 @@ pub async fn run_build(
         directories.clean().into_diagnostic()?;
     }
 
-    // Decide whether the tests should be skipped or not
-    let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
-        TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
-        TestStrategy::Native => {
-            // Skip if `host_platform != build_platform` and `target_platform != noarch`
-            if output.build_configuration.target_platform != Platform::NoArch
-                && output.build_configuration.host_platform.platform
-                    != output.build_configuration.build_platform.platform
-            {
-                let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
-
-                (true, reason)
-            } else {
-                (false, "".to_string())
-            }
-        }
-        TestStrategy::NativeAndEmulated => (false, "".to_string()),
-    };
-
-    if skip_test {
-        tracing::info!("Skipping tests because {}", skip_test_reason);
-        build_reindexed_channels(&output.build_configuration, tool_configuration)
-            .into_diagnostic()
-            .context("failed to reindex output channel")?;
-    } else {
-        package_test::run_test(
-            &result,
-            &TestConfiguration {
-                test_prefix: directories.work_dir.join("test"),
-                target_platform: Some(output.build_configuration.target_platform),
-                host_platform: Some(output.build_configuration.host_platform.clone()),
-                current_platform: output.build_configuration.build_platform.clone(),
-                keep_test_prefix: tool_configuration.no_clean,
-                //channels: output.reindex_channels().into_diagnostic()?,
-                channels: build_reindexed_channels(&output.build_configuration, tool_configuration)
-                    .into_diagnostic()
-                    .context("failed to reindex output channel")?,
-                channel_priority: tool_configuration.channel_priority,
-                solve_strategy: SolveStrategy::Highest,
-                tool_configuration: tool_configuration.clone(),
-            },
-            None,
-        )
-        .await
-        .into_diagnostic()?;
-    }
-
     drop(enter);
 
     if !tool_configuration.no_clean {
