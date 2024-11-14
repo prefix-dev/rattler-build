@@ -130,9 +130,12 @@ impl<'a> CopyDir<'a> {
             from_path,
             to_path,
             globvec: GlobVec::default(),
+            // use the gitignore file by default
             use_gitignore: false,
+            // use the global git ignore file by default
             use_git_global: false,
-            hidden: false,
+            // ignore hidden files by default
+            hidden: true,
             copy_options: CopyOptions::default(),
         }
     }
