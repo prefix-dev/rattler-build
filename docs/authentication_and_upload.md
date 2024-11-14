@@ -59,7 +59,7 @@ authenticate with the server.
 #### OpenID Connect (OIDC)
 
 `rattler-build` supports authentication with https://prefix.dev through OIDC with GitHub Actions.
-That way you don't need to manually retrieve and store a token.
+An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
 You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
 
 Here you can find an example GitHub Actions workflow
