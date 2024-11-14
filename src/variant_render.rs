@@ -180,7 +180,7 @@ impl Stage1Render {
     }
 
     /// sort the outputs topologically
-    pub fn sort_outputs(&mut self) {
+    pub fn sort_outputs(self) -> Self {
         // Create an empty directed graph
         let mut graph = DiGraph::<_, ()>::new();
 
@@ -220,6 +220,32 @@ impl Stage1Render {
             petgraph::algo::toposort(&graph, None).expect("Could not sort topologically.");
 
         println!("Sorted indices: {:?}", sorted_indices);
+
+        let sorted_indices = sorted_indices
+            .into_iter()
+            .map(|x| x.index())
+            .collect::<Vec<usize>>();
+
+        // Update the order of the outputs
+        return Stage1Render{
+            order: sorted_indices,
+            ..self
+        }
+    }
+
+    pub fn outputs(&self) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
+        let outputs = self.stage_0_render.outputs().collect::<Vec<_>>();
+        for o in &outputs  {
+            println!("Output: {:?}", o.1.package().name());
+        }
+        println!("Order: {:?}", self.order);
+
+        self.order.iter().map(move |&idx| {
+            let recipe = outputs[idx];
+            // WRONG
+            let variant = self.variant_for_output(idx);
+            (recipe, variant)
+        })
     }
 }
 
@@ -331,14 +357,12 @@ pub(crate) fn stage_1_render(
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
 
         for combination in all_combinations {
-            let mut stage_1 = Stage1Render {
+            let stage_1 = Stage1Render {
                 variables: combination,
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
                 order: (0..r.rendered_outputs.len()).collect(),
-            };
-
-            let stage_1 = stage_1.sort_outputs();
+            }.sort_outputs();
 
             stage_1_renders.push(stage_1);
         }

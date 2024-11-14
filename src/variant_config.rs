@@ -453,7 +453,7 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for (idx, (node, recipe)) in sx.stage_0_render.outputs().enumerate() {
+            for (idx, ((node, recipe), variant)) in sx.outputs().enumerate() {
                 let target_platform = if recipe.build().noarch().is_none() {
                     selector_config.target_platform
                 } else {
@@ -467,7 +467,7 @@ impl VariantConfig {
                     noarch_type: *recipe.build().noarch(),
                     target_platform,
                     node: node.clone(),
-                    used_vars: sx.variant_for_output(idx),
+                    used_vars: variant,
                 });
             }
         }
