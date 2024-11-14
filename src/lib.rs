@@ -425,30 +425,26 @@ pub async fn skip_noarch(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<Vec<Output>> {
-    if tool_configuration.noarch_platform.is_none() {
-        return Ok(outputs);
+    if let Some(noarch_platform) = tool_configuration.noarch_platform {
+        outputs.retain(|output| {
+            // Skip the build if:
+            // - target_platform is "noarch"
+            // and
+            // - build_platform != noarch_platform
+            let should_skip = output.build_configuration.target_platform == Platform::NoArch
+                && output.build_configuration.build_platform.platform != noarch_platform;
+
+            if should_skip {
+                // The identifier should always be set at this point
+                tracing::info!(
+                    "Skipping build because noarch_platform is set to {} for {}",
+                    noarch_platform,
+                    output.identifier()
+                );
+            }
+            !should_skip
+        });
     }
-
-    let noarch_platform = tool_configuration.noarch_platform.clone().unwrap();
-
-    outputs.retain(|output| {
-        // Skip the build if:
-        // - target_platform is "noarch"
-        // and
-        // - build_platform != noarch_platform
-        let should_skip = output.build_configuration.target_platform == Platform::NoArch
-            && output.build_configuration.build_platform.platform != noarch_platform;
-
-        if should_skip {
-            // The identifier should always be set at this point
-            tracing::info!(
-                "Skipping build because noarch_platform is set to {} for {}",
-                noarch_platform,
-                output.identifier()
-            );
-        }
-        !should_skip
-    });
 
     Ok(outputs)
 }

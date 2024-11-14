@@ -240,7 +240,7 @@ impl ConfigurationBuilder {
     /// Define the noarch platform
     pub fn with_noarch_platform(self, noarch_platform: Option<Platform>) -> Self {
         Self {
-            noarch_platform: noarch_platform,
+            noarch_platform,
             ..self
         }
     }
