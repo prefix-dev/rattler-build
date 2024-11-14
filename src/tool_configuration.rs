@@ -4,6 +4,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
+use minijinja::machinery::ast::Test;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::ChannelConfig;
 use rattler_networking::{
@@ -29,6 +30,20 @@ pub enum SkipExisting {
     All,
 }
 
+/// Container for the CLI test strategy
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum TestStrategy {
+    /// Skip the tests
+    Skip,
+    /// Run the tests only if the build platform is the same as the host platform.
+    /// Otherwise, skip the tests. If the target platofrm is noarch,
+    /// the tests are always executed.
+    #[default]
+    Native,
+    /// Always run the tests
+    NativeAndEmulated,
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
@@ -42,11 +57,8 @@ pub struct Configuration {
     /// is done
     pub no_clean: bool,
 
-    /// Whether to skip the test phase
-    pub no_test: bool,
-
-    /// Whether to skip the test phase if cross-compiling
-    pub no_test_if_emulate: bool,
+    /// The strategy to use for running tests
+    pub test_strategy: TestStrategy,
 
     /// Whether to use zstd
     pub use_zstd: bool,
@@ -114,8 +126,7 @@ pub struct ConfigurationBuilder {
     fancy_log_handler: Option<LoggingOutputHandler>,
     client: Option<ClientWithMiddleware>,
     no_clean: bool,
-    no_test: bool,
-    no_test_if_emulate: bool,
+    test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
     skip_existing: SkipExisting,
@@ -138,8 +149,7 @@ impl ConfigurationBuilder {
             fancy_log_handler: None,
             client: None,
             no_clean: false,
-            no_test: false,
-            no_test_if_emulate: false,
+            test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: false,
             skip_existing: SkipExisting::None,
@@ -213,18 +223,10 @@ impl ConfigurationBuilder {
         }
     }
 
-    /// Sets whether tests should be executed.
-    pub fn with_testing(self, testing_enabled: bool) -> Self {
+    /// Sets the test strategy to use for running tests.
+    pub fn with_test_strategy(self, test_strategy: TestStrategy) -> Self {
         Self {
-            no_test: !testing_enabled,
-            ..self
-        }
-    }
-
-    /// Sets whether tests should be executed if cross-compiling.
-    pub fn with_testing_if_emulate(self, testing_enabled_if_emulate: bool) -> Self {
-        Self {
-            no_test_if_emulate: !testing_enabled_if_emulate,
+            test_strategy: test_strategy,
             ..self
         }
     }
@@ -278,8 +280,7 @@ impl ConfigurationBuilder {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             no_clean: self.no_clean,
-            no_test: self.no_test,
-            no_test_if_emulate: self.no_test_if_emulate,
+            test_strategy: self.test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,

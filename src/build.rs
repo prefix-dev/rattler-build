@@ -184,17 +184,19 @@ pub async fn run_build(
 
     println!("is_cross_compiling={}", is_cross_compiling);
 
-    // Decide whether the tests should be skipped or not
-    let (skip_test, skip_test_reason) = if tool_configuration.no_test {
-        (true, "the --no-test flag was set")
-    } else if tool_configuration.no_test_if_emulate {
-        (
-            is_cross_compiling,
-            "the --no-test-if-emulate flag was set and cross-compiling",
-        )
-    } else {
-        (false, "")
-    };
+    // // Decide whether the tests should be skipped or not
+    // let (skip_test, skip_test_reason) = if tool_configuration.no_test {
+    //     (true, "the --no-test flag was set")
+    // } else if tool_configuration.no_test_if_emulate {
+    //     (
+    //         is_cross_compiling,
+    //         "the --no-test-if-emulate flag was set and cross-compiling",
+    //     )
+    // } else {
+    //     (false, "")
+    // };
+
+    let (skip_test, skip_test_reason) = (false, "");
 
     if skip_test {
         tracing::info!("Skipping tests because {}", skip_test_reason);
