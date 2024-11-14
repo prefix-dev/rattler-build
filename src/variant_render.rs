@@ -129,10 +129,13 @@ pub struct Stage1Render {
     pub(crate) used_variables_from_dependencies: Vec<HashSet<NormalizedKey>>,
 
     pub(crate) stage_0_render: Stage0Render,
+
+    order: Vec<usize>,
 }
 
 impl Stage1Render {
     pub fn variant_for_output(&self, idx: usize) -> BTreeMap<NormalizedKey, String> {
+        let idx = self.order[idx];
         // combine jinja variables and the variables from the dependencies
         let used_vars_jinja = self
             .stage_0_render
@@ -161,6 +164,8 @@ impl Stage1Render {
     }
 
     pub fn build_string_for_output(&self, idx: usize) -> String {
+        let idx = self.order[idx];
+
         let variant = self.variant_for_output(idx);
         let recipe = &self.stage_0_render.rendered_outputs[idx];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
@@ -330,9 +335,10 @@ pub(crate) fn stage_1_render(
                 variables: combination,
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
+                order: (0..r.rendered_outputs.len()).collect(),
             };
 
-            stage_1.sort_outputs();
+            let stage_1 = stage_1.sort_outputs();
 
             stage_1_renders.push(stage_1);
         }
