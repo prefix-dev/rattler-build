@@ -3,16 +3,15 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform};
 use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
     metadata::{build_reindexed_channels, Output},
-    package_test,
-    package_test::TestConfiguration,
+    package_test::{self, TestConfiguration},
     recipe::parser::TestType,
     render::solver::load_repodatas,
-    tool_configuration,
+    tool_configuration::{self, TestStrategy},
 };
 
 /// Check if the build should be skipped because it already exists in any of the
@@ -160,43 +159,24 @@ pub async fn run_build(
         directories.clean().into_diagnostic()?;
     }
 
-    // Are we cross compiling?
-    // NOTE: cannot use output.build_configuration.cross_compilation() here because it uses target_platform instead of host_platform and it enables cross-compilation when noarch.
-    let is_cross_compiling = output.build_configuration.host_platform.platform
-        != output.build_configuration.build_platform.platform;
+    // Decide whether the tests should be skipped or not
+    let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
+        TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
+        TestStrategy::Native => {
+            // Skip if `host_platform != build_platform` and `target_platform != noarch`
+            if output.build_configuration.target_platform != Platform::NoArch
+                && output.build_configuration.host_platform.platform
+                    != output.build_configuration.build_platform.platform
+            {
+                let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
 
-    println!(
-        "target_platform={}",
-        output.build_configuration.target_platform
-    );
-    println!(
-        "build_platform={}",
-        output.build_configuration.build_platform.platform
-    );
-    println!(
-        "host_platform={}",
-        output.build_configuration.host_platform.platform
-    );
-    println!(
-        "cross_compilation()={}",
-        output.build_configuration.cross_compilation()
-    );
-
-    println!("is_cross_compiling={}", is_cross_compiling);
-
-    // // Decide whether the tests should be skipped or not
-    // let (skip_test, skip_test_reason) = if tool_configuration.no_test {
-    //     (true, "the --no-test flag was set")
-    // } else if tool_configuration.no_test_if_emulate {
-    //     (
-    //         is_cross_compiling,
-    //         "the --no-test-if-emulate flag was set and cross-compiling",
-    //     )
-    // } else {
-    //     (false, "")
-    // };
-
-    let (skip_test, skip_test_reason) = (false, "");
+                (true, reason)
+            } else {
+                (false, "".to_string())
+            }
+        }
+        TestStrategy::NativeAndEmulated => (false, "".to_string()),
+    };
 
     if skip_test {
         tracing::info!("Skipping tests because {}", skip_test_reason);
