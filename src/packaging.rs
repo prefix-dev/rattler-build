@@ -148,6 +148,7 @@ fn write_recipe_folder(
 
     let copy_result = copy_dir::CopyDir::new(recipe_dir, &recipe_folder)
         .use_gitignore(true)
+        .ignore_hidden_files(true)
         .run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());

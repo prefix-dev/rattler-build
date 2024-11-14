@@ -107,8 +107,6 @@ pub(crate) fn copy_file(
 /// It uses the `ignore` crate to read the `.gitignore` file in the source directory and uses the globs
 /// to filter the files and directories to copy.
 ///
-/// The copy process also ignores hidden files and directories by default.
-///
 /// # Return
 ///
 /// The returned `Vec<PathBuf>` contains the paths of the copied files.
@@ -134,8 +132,8 @@ impl<'a> CopyDir<'a> {
             use_gitignore: false,
             // use the global git ignore file by default
             use_git_global: false,
-            // ignore hidden files by default
-            hidden: true,
+            // include hidden files by default
+            hidden: false,
             copy_options: CopyOptions::default(),
         }
     }
