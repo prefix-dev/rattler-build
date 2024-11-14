@@ -253,6 +253,11 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 			Skip packages that already exist in any channel
 
 
+- `--noarch-platform <NOARCH_PLATFORM>`
+
+	Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
+
+
 
 
 
