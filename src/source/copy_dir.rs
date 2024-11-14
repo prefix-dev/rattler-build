@@ -157,7 +157,7 @@ impl<'a> CopyDir<'a> {
     }
 
     #[allow(unused)]
-    pub fn hidden(mut self, b: bool) -> Self {
+    pub fn ignore_hidden_files(mut self, b: bool) -> Self {
         self.hidden = b;
         self
     }
