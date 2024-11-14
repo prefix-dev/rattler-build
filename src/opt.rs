@@ -340,7 +340,7 @@ pub struct BuildOpts {
     pub no_include_recipe: bool,
 
     /// The strategy to use for running tests
-    #[arg(long, help_heading = "Modifying result")]
+    #[arg(long, default_value = "native", help_heading = "Modifying result")]
     pub test: TestStrategy,
 
     /// Don't force colors in the output of the build script
