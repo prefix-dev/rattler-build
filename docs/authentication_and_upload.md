@@ -62,6 +62,9 @@ authenticate with the server.
 An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
 You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
 
+![Trusted Publisher](assets/trusted_publisher.png)
+
+
 Here you can find an example GitHub Actions workflow
 
 ```yaml
