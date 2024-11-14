@@ -179,7 +179,6 @@ impl GlobVec {
     }
 
     /// Only used for testing
-    #[cfg(test)]
     pub fn from_vec(include: Vec<&str>, exclude: Option<Vec<&str>>) -> Self {
         let include_vec: Vec<Glob> = include
             .into_iter()

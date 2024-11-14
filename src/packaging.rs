@@ -22,7 +22,14 @@ mod metadata;
 pub use file_finder::{content_type, Files, TempFiles};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 
-use crate::{metadata::Output, package_test::write_test_files, post_process, tool_configuration};
+use crate::{
+    metadata::Output,
+    package_test::write_test_files,
+    post_process,
+    recipe::parser::GlobVec,
+    source::{self, copy_dir},
+    tool_configuration,
+};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -58,7 +65,7 @@ pub enum PackagingError {
     RelinkError(#[from] crate::post_process::relink::RelinkError),
 
     #[error(transparent)]
-    SourceError(#[from] crate::source::SourceError),
+    SourceError(#[from] source::SourceError),
 
     #[error("could not create python entry point: {0}")]
     CannotCreateEntryPoint(String),
@@ -90,7 +97,7 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
+        let copy_dir = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
@@ -101,7 +108,7 @@ fn copy_license_files(
         let copied_files_recipe_dir = copy_dir.copied_paths();
         let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
 
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
+        let copy_dir = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -139,8 +146,25 @@ fn write_recipe_folder(
     let recipe_folder = tmp_dir_path.join("info/recipe/");
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
     let recipe_path = &output.build_configuration.directories.recipe_path;
+    let output_dir = &output.build_configuration.directories.output_dir;
 
-    let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
+    let mut copy_builder = copy_dir::CopyDir::new(recipe_dir, &recipe_folder)
+        .use_gitignore(true)
+        .ignore_hidden_files(true);
+
+    // if the output dir is inside the same directory as the recipe, then we
+    // need to ignore the output dir when copying
+    if let Ok(ignore_output) = output_dir.strip_prefix(recipe_dir) {
+        tracing::info!(
+            "Ignoring output dir in recipe folder: {}",
+            output_dir.to_string_lossy()
+        );
+        let output_dir_glob = format!("{}/**", ignore_output.to_string_lossy());
+        let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
+        copy_builder = copy_builder.with_globvec(&glob_vec);
+    }
+
+    let copy_result = copy_builder.run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());
 
