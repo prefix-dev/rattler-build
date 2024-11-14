@@ -401,7 +401,7 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
                 return false;
             }
         }
-        return true;
+        true
     };
 
     // Check if any run dependencies are not built yet

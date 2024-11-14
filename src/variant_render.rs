@@ -23,6 +23,7 @@ pub struct RawOutputVec {
     pub used_vars_jinja: Vec<HashSet<NormalizedKey>>,
 
     /// The recipe string
+    #[allow(unused)]
     pub recipe: String,
 }
 
@@ -224,10 +225,10 @@ impl Stage1Render {
             .collect::<Vec<usize>>();
 
         // Update the order of the outputs
-        return Stage1Render {
+        Stage1Render {
             order: sorted_indices,
             ..self
-        };
+        }
     }
 
     pub fn outputs(

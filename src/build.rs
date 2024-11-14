@@ -3,15 +3,13 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform};
-use rattler_solve::SolveStrategy;
+use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
 
 use crate::{
     metadata::{build_reindexed_channels, Output},
-    package_test::{self, TestConfiguration},
     recipe::parser::TestType,
     render::solver::load_repodatas,
-    tool_configuration::{self, TestStrategy},
+    tool_configuration,
 };
 
 /// Check if the build should be skipped because it already exists in any of the
