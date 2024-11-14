@@ -89,3 +89,19 @@ def get_extracted_package(folder: Path, glob="*.tar.bz2"):
     extract_path = folder / "extract" / package_without_extension
     extract(str(package_path), dest_dir=str(extract_path))
     return extract_path
+
+
+def check_build_output(
+    rattler_build: RattlerBuild,
+    capfd,
+    recipe_path,
+    output_path,
+    extra_args: list,
+    string_to_check: str,
+):
+    """Run a build and check the output for a specific string."""
+
+    rattler_build.build(recipe_path, output_path, extra_args=extra_args)
+    _, err = capfd.readouterr()
+    print(err)  # to debug in case it fails
+    assert string_to_check in err
