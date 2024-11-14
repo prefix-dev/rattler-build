@@ -134,7 +134,7 @@ pub fn get_tool_config(
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .with_skip_existing(args.skip_existing)
-        .with_noarch_platform(args.noarch_platform)
+        .with_noarch_build_platform(args.noarch_build_platform)
         .finish())
 }
 
@@ -425,20 +425,20 @@ pub async fn skip_noarch(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<Vec<Output>> {
-    if let Some(noarch_platform) = tool_configuration.noarch_platform {
+    if let Some(noarch_build_platform) = tool_configuration.noarch_build_platform {
         outputs.retain(|output| {
             // Skip the build if:
             // - target_platform is "noarch"
             // and
-            // - build_platform != noarch_platform
+            // - build_platform != noarch_build_platform
             let should_skip = output.build_configuration.target_platform == Platform::NoArch
-                && output.build_configuration.build_platform.platform != noarch_platform;
+                && output.build_configuration.build_platform.platform != noarch_build_platform;
 
             if should_skip {
                 // The identifier should always be set at this point
                 tracing::info!(
-                    "Skipping build because noarch_platform is set to {} for {}",
-                    noarch_platform,
+                    "Skipping build because noarch_build_platform is set to {} for {}",
+                    noarch_build_platform,
                     output.identifier()
                 );
             }

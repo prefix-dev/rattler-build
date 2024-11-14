@@ -55,7 +55,7 @@ pub struct Configuration {
     pub skip_existing: SkipExisting,
 
     /// The noarch platform to use (noarch builds are skipped on other platforms)
-    pub noarch_platform: Option<Platform>,
+    pub noarch_build_platform: Option<Platform>,
 
     /// The channel configuration to use when parsing channels.
     pub channel_config: ChannelConfig,
@@ -118,7 +118,7 @@ pub struct ConfigurationBuilder {
     use_zstd: bool,
     use_bz2: bool,
     skip_existing: SkipExisting,
-    noarch_platform: Option<Platform>,
+    noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
 }
@@ -142,7 +142,7 @@ impl ConfigurationBuilder {
             use_zstd: true,
             use_bz2: false,
             skip_existing: SkipExisting::None,
-            noarch_platform: None,
+            noarch_build_platform: None,
             channel_config: None,
             compression_threads: None,
         }
@@ -238,9 +238,9 @@ impl ConfigurationBuilder {
     }
 
     /// Define the noarch platform
-    pub fn with_noarch_platform(self, noarch_platform: Option<Platform>) -> Self {
+    pub fn with_noarch_build_platform(self, noarch_build_platform: Option<Platform>) -> Self {
         Self {
-            noarch_platform,
+            noarch_build_platform,
             ..self
         }
     }
@@ -282,7 +282,7 @@ impl ConfigurationBuilder {
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,
-            noarch_platform: self.noarch_platform,
+            noarch_build_platform: self.noarch_build_platform,
             channel_config,
             compression_threads: self.compression_threads,
             package_cache,
