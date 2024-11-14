@@ -225,6 +225,14 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	- Possible values: `true`, `false`
 
 
+- `--no-test-if-emulate`
+
+	Don't run the tests after building the package if the building platform is different than the host platform (cross-compilation)
+
+	- Default value: `false`
+	- Possible values: `true`, `false`
+
+
 - `--color-build-log`
 
 	Don't force colors in the output of the build script
