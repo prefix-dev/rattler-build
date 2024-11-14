@@ -56,8 +56,45 @@ authenticate with the server.
 
 ### prefix.dev
 
-To upload to [prefix.dev](https://prefix.dev), you need to have an account and a
-token. You can create a token in the settings of your account. The token is used
+#### OpenID Connect (OIDC)
+
+`rattler-build` also supports OIDC with GitHub and prefix.dev.
+That way you don't need to manually retrieve and store a token.
+You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
+
+Here you can find an example GitHub Actions workflow
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build conda package
+        uses: prefix-dev/rattler-build-action@v0.2.18
+
+      - name: Upload all packages
+        shell: bash
+        run: |
+          shopt -s nullglob
+          EXIT_CODE=0
+          for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
+            if ! rattler-build upload prefix -c my-channel "$file"; then
+              EXIT_CODE=1
+            fi
+          done
+          exit $EXIT_CODE
+```
+
+
+#### Token
+
+To upload to [prefix.dev](https://prefix.dev), you need to have an account.
+You can then create a token in the settings of your account. The token is used
 to authenticate the upload.
 
 ```bash
