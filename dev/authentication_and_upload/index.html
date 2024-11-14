@@ -1411,11 +1411,42 @@ channels that you have access to.</p>
 <p>Note: you can also use the <code>RATTLER_AUTH_FILE</code> environment variable to
 authenticate with the server.</p>
 <h3 id="prefixdev">prefix.dev<a class="headerlink" href="#prefixdev" title="Permanent link">#</a></h3>
-<p>To upload to <a href="https://prefix.dev">prefix.dev</a>, you need to have an account and a
-token. You can create a token in the settings of your account. The token is used
+<h4 id="trusted-publishing-via-oidc">Trusted publishing via OIDC<a class="headerlink" href="#trusted-publishing-via-oidc" title="Permanent link">#</a></h4>
+<p><code>rattler-build</code> supports authentication with https://prefix.dev through OIDC with GitHub Actions.
+An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
+You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.</p>
+<p><img alt="Trusted Publisher" src="../assets/trusted_publisher.png" /></p>
+<p>Here you can find an example GitHub Actions workflow</p>
+<div class="language-yaml highlight"><span class="filename">.github/workflows/build.yml</span><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">permissions</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">contents</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">read</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">id-token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">write</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="nt">jobs</span><span class="p">:</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">steps</span><span class="p">:</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build conda package</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">        </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix-dev/rattler-build-action@v0.2.19</span>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload all packages</span>
+</span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="w">        </span><span class="nt">shell</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bash</span>
+</span><span id="__span-2-15"><a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="w">        </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+</span><span id="__span-2-16"><a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="w">          </span><span class="no">shopt -s nullglob</span>
+</span><span id="__span-2-17"><a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a><span class="w">          </span><span class="no">EXIT_CODE=0</span>
+</span><span id="__span-2-18"><a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="w">          </span><span class="no">for pkg in $(find output -type f \( -name &quot;*.conda&quot; -o -name &quot;*.tar.bz2&quot; \) ); do</span>
+</span><span id="__span-2-19"><a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="w">            </span><span class="no">if ! rattler-build upload prefix -c my-channel &quot;${pkg}&quot;; then</span>
+</span><span id="__span-2-20"><a id="__codelineno-2-20" name="__codelineno-2-20" href="#__codelineno-2-20"></a><span class="w">              </span><span class="no">EXIT_CODE=1</span>
+</span><span id="__span-2-21"><a id="__codelineno-2-21" name="__codelineno-2-21" href="#__codelineno-2-21"></a><span class="w">            </span><span class="no">fi</span>
+</span><span id="__span-2-22"><a id="__codelineno-2-22" name="__codelineno-2-22" href="#__codelineno-2-22"></a><span class="w">          </span><span class="no">done</span>
+</span><span id="__span-2-23"><a id="__codelineno-2-23" name="__codelineno-2-23" href="#__codelineno-2-23"></a><span class="w">          </span><span class="no">exit $EXIT_CODE</span>
+</span></code></pre></div>
+<h4 id="token">Token<a class="headerlink" href="#token" title="Permanent link">#</a></h4>
+<p>To upload to <a href="https://prefix.dev">prefix.dev</a>, you need to have an account.
+You can then create a token in the settings of your account. The token is used
 to authenticate the upload.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFIX_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>prefix<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">PREFIX_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>prefix<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <p>You can also use the <code>--api-key=$PREFIX_API_KEY</code> option to pass the token
 directly to the command. Note that you need to have created the channel on the
@@ -1423,15 +1454,15 @@ prefix.dev website before you can upload to it.</p>
 <h3 id="quetz">Quetz<a class="headerlink" href="#quetz" title="Permanent link">#</a></h3>
 <p>You need to pass a token and API key to upload to a channel on your own Quetz
 server. The token is used to authenticate the upload.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">QUETZ_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>quetz<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">QUETZ_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>quetz<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <h3 id="artifactory">Artifactory<a class="headerlink" href="#artifactory" title="Permanent link">#</a></h3>
 <p>To upload to an Artifactory server, you need to pass a username and password.
 The username and password are used to authenticate the upload.</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_USERNAME</span><span class="o">=</span>&lt;your_username&gt;
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_PASSWORD</span><span class="o">=</span>&lt;your_password&gt;
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>artifactory<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_USERNAME</span><span class="o">=</span>&lt;your_username&gt;
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ARTIFACTORY_PASSWORD</span><span class="o">=</span>&lt;your_password&gt;
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>artifactory<span class="w"> </span>-u<span class="w"> </span>&lt;url&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;channel&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 <h3 id="anacondaorg">anaconda.org<a class="headerlink" href="#anacondaorg" title="Permanent link">#</a></h3>
 <p>To upload to <a href="https://anaconda.org">anaconda.org</a>, you need to specify the owner
@@ -1442,8 +1473,8 @@ organization.</p>
 <code>-c</code> flag. The default value is <code>main</code>.</p>
 <p>You can also add the <code>--force</code> argument to forcibly upload a new package (and
 overwrite any existing ones).</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-o<span class="w"> </span>&lt;your_username&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;label&gt;<span class="w"> </span>&lt;package_files&gt;
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">ANACONDA_API_KEY</span><span class="o">=</span>&lt;your_token&gt;
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>rattler-build<span class="w"> </span>upload<span class="w"> </span>anaconda<span class="w"> </span>-o<span class="w"> </span>&lt;your_username&gt;<span class="w"> </span>-c<span class="w"> </span>&lt;label&gt;<span class="w"> </span>&lt;package_files&gt;
 </span></code></pre></div>
 
 
