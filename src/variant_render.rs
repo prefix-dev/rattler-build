@@ -12,8 +12,6 @@ use crate::{
     variant_config::{ParseErrors, VariantConfig, VariantError},
 };
 
-// pub struct VariantKey(String);
-
 /// All the raw outputs of a single recipe.yaml
 #[derive(Clone, Debug)]
 pub struct RawOutputVec {
@@ -56,7 +54,6 @@ pub(crate) fn stage_0_render(
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage0Render>, VariantError> {
-    // println!("Outputs: {:?}", outputs);
     let used_vars = outputs
         .iter()
         .map(|output| {
@@ -118,7 +115,6 @@ pub(crate) fn stage_0_render(
         });
     }
 
-    // println!("Stage 0 renders: {:?}", stage0_renders);
     Ok(stage0_renders)
 }
 
