@@ -26,6 +26,7 @@ use crate::{
     metadata::Output,
     package_test::write_test_files,
     post_process,
+    recipe::parser::GlobVec,
     source::{self, copy_dir},
     tool_configuration,
 };
@@ -145,11 +146,25 @@ fn write_recipe_folder(
     let recipe_folder = tmp_dir_path.join("info/recipe/");
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
     let recipe_path = &output.build_configuration.directories.recipe_path;
+    let output_dir = &output.build_configuration.directories.output_dir;
 
-    let copy_result = copy_dir::CopyDir::new(recipe_dir, &recipe_folder)
+    let mut copy_builder = copy_dir::CopyDir::new(recipe_dir, &recipe_folder)
         .use_gitignore(true)
-        .ignore_hidden_files(true)
-        .run()?;
+        .ignore_hidden_files(true);
+
+    // if the output dir is inside the same directory as the recipe, then we
+    // need to ignore the output dir when copying
+    if let Ok(ignore_output) = output_dir.strip_prefix(recipe_dir) {
+        tracing::info!(
+            "Ignoring output dir in recipe folder: {}",
+            output_dir.to_string_lossy()
+        );
+        let output_dir_glob = format!("{}/**", ignore_output.to_string_lossy());
+        let glob_vec = GlobVec::from_vec(vec![], Some(vec![&output_dir_glob]));
+        copy_builder = copy_builder.with_globvec(&glob_vec);
+    }
+
+    let copy_result = copy_builder.run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());
 

@@ -151,15 +151,6 @@ pub async fn get_build_output(
     if output_dir.exists() {
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
     }
-    if output_dir.starts_with(
-        recipe_path
-            .parent()
-            .expect("Could not get parent of recipe"),
-    ) {
-        return Err(miette::miette!(
-            "The output directory cannot be in the recipe directory.\nThe current output directory is: {}\nSelect a different output directory with the --output-dir option or set the CONDA_BLD_PATH environment variable"
-        , output_dir.to_string_lossy()));
-    }
 
     let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
 
