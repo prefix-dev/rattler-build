@@ -217,20 +217,18 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	- Possible values: `true`, `false`
 
 
-- `--no-test`
+- `--test <TEST>`
 
-	Don't run the tests after building the package
+	The strategy to use for running tests
 
-	- Default value: `false`
-	- Possible values: `true`, `false`
-
-
-- `--no-test-if-emulate`
-
-	Don't run the tests after building the package if the building platform is different than the host platform (cross-compilation)
-
-	- Default value: `false`
-	- Possible values: `true`, `false`
+	- Default value: `native`
+	- Possible values:
+		- `skip`:
+			Skip the tests
+		- `native`:
+			Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed
+		- `native-and-emulated`:
+			Always run the tests
 
 
 - `--color-build-log`
@@ -343,21 +341,13 @@ These test files are written at "package creation time" and are part of the pack
 
 Rebuild a package from a package file instead of a recipe
 
-**Usage:** `rattler-build rebuild [OPTIONS] --package-file <PACKAGE_FILE>`
+**Usage:** `rattler-build rebuild [OPTIONS] --package-file <PACKAGE_FILE> --test <TEST>`
 
 ##### **Options:**
 
 - `-p`, `--package-file <PACKAGE_FILE>`
 
 	The package file to rebuild
-
-
-- `--no-test`
-
-	Do not run tests after building
-
-	- Default value: `false`
-	- Possible values: `true`, `false`
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
@@ -394,6 +384,19 @@ Rebuild a package from a package file instead of a recipe
 
 
 ###### **Modifying result**
+
+- `--test <TEST>`
+
+	The strategy to use for running tests
+
+	- Possible values:
+		- `skip`:
+			Skip the tests
+		- `native`:
+			Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed
+		- `native-and-emulated`:
+			Always run the tests
+
 
 - `--output-dir <OUTPUT_DIR>`
 
