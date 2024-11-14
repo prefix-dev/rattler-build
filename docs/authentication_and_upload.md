@@ -75,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build conda package
-        uses: prefix-dev/rattler-build-action@v0.2.18
+        uses: prefix-dev/rattler-build-action@v0.2.19
 
       - name: Upload all packages
         shell: bash
