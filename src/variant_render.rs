@@ -196,10 +196,7 @@ impl Stage1Render {
         }
 
         for (idx, output) in self.stage_0_render.rendered_outputs.iter().enumerate() {
-            // Add edges to the graph based on the used variables
-            let variant = self.variant_for_output(idx);
-
-            // if we find any keys that reference another output, add an edge
+            // If we find any keys that reference another output, add an edge
             for req in output.build_time_requirements() {
                 let req_name = match req {
                     Dependency::Spec(x) => x.name.clone().expect("Dependency should have a name"),
@@ -209,7 +206,7 @@ impl Stage1Render {
 
                 if req_name != *output.package().name() {
                     if let Some(&req_idx) = name_to_idx.get(&req_name) {
-                        graph.add_edge(node_indices[idx], req_idx, ());
+                        graph.add_edge(req_idx, node_indices[idx], ());
                     }
                 }
             }
