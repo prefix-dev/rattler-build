@@ -67,7 +67,7 @@ You only have to set up a specific repository and workflow under "Trusted Publis
 
 Here you can find an example GitHub Actions workflow
 
-```yaml
+```yaml title="build.yml"
 permissions:
   contents: read
   id-token: write
