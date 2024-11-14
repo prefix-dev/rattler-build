@@ -83,7 +83,7 @@ jobs:
           shopt -s nullglob
           EXIT_CODE=0
           for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
-            if ! rattler-build upload prefix -c my-channel "$file"; then
+            if ! rattler-build upload prefix -c my-channel "${pkg}"; then
               EXIT_CODE=1
             fi
           done
