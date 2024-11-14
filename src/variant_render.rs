@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use petgraph::graph::DiGraph;
+use rattler_conda_types::PackageName;
 
 use crate::{
     hash::HashInfo,
@@ -55,7 +56,7 @@ pub(crate) fn stage_0_render(
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage0Render>, VariantError> {
-    println!("Outputs: {:?}", outputs);
+    // println!("Outputs: {:?}", outputs);
     let used_vars = outputs
         .iter()
         .map(|output| {
@@ -117,7 +118,7 @@ pub(crate) fn stage_0_render(
         });
     }
 
-    println!("Stage 0 renders: {:?}", stage0_renders);
+    // println!("Stage 0 renders: {:?}", stage0_renders);
     Ok(stage0_renders)
 }
 
@@ -161,6 +162,15 @@ impl Stage1Render {
             }
         }
 
+        // fix target_platform value here
+        if !self.stage_0_render.rendered_outputs[idx]
+            .build()
+            .noarch()
+            .is_none()
+        {
+            variant.insert("target_platform".into(), "noarch".into());
+        }
+
         variant
     }
 
@@ -184,10 +194,7 @@ impl Stage1Render {
     pub fn sort_outputs(self) -> Self {
         // Create an empty directed graph
         let mut graph = DiGraph::<_, ()>::new();
-
-        // Create a map from output names to node indices
         let mut node_indices = Vec::new();
-
         let mut name_to_idx = HashMap::new();
 
         for output in &self.stage_0_render.rendered_outputs {
@@ -197,27 +204,33 @@ impl Stage1Render {
         }
 
         for (idx, output) in self.stage_0_render.rendered_outputs.iter().enumerate() {
-            // If we find any keys that reference another output, add an edge
-            for req in output.build_time_requirements() {
-                let req_name = match req {
-                    Dependency::Spec(x) => x.name.clone().expect("Dependency should have a name"),
-                    Dependency::PinSubpackage(x) => x.pin_value().name.clone(),
-                    _ => continue,
-                };
+            let output_name = output.package().name();
+            let current_node = node_indices[idx];
 
-                if req_name != *output.package().name() {
-                    if let Some(&req_idx) = name_to_idx.get(&req_name) {
-                        graph.add_edge(req_idx, node_indices[idx], ());
+            // Helper closure to add edges for dependencies
+            let mut add_edge = |req_name: &PackageName| {
+                if req_name != output_name {
+                    if let Some(&req_idx) = name_to_idx.get(req_name) {
+                        graph.add_edge(req_idx, current_node, ());
                     }
                 }
+            };
+
+            // If we find any keys that reference another output, add an edge
+            for req in output.build_time_requirements() {
+                if let Dependency::Spec(spec) = req {
+                    add_edge(spec.name.as_ref().expect("Dependency should have a name"));
+                };
+            }
+
+            for pin in output.requirements().all_pin_subpackage() {
+                add_edge(&pin.name);
             }
         }
 
         // Sort the outputs topologically
         let sorted_indices =
             petgraph::algo::toposort(&graph, None).expect("Could not sort topologically.");
-
-        println!("Sorted indices: {:?}", sorted_indices);
 
         let sorted_indices = sorted_indices
             .into_iter()
@@ -235,14 +248,9 @@ impl Stage1Render {
         &self,
     ) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
         let outputs = self.stage_0_render.outputs().collect::<Vec<_>>();
-        for o in &outputs {
-            println!("Output: {:?}", o.1.package().name());
-        }
-        println!("Order: {:?}", self.order);
 
-        self.order.iter().map(move |&idx| {
-            let recipe = outputs[idx];
-            // WRONG
+        (0..outputs.len()).map(move |idx| {
+            let recipe = outputs[self.order[idx]];
             let variant = self.variant_for_output(idx);
             (recipe, variant)
         })
@@ -256,7 +264,6 @@ pub(crate) fn stage_1_render(
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
 
-    println!("Stage 0: {:?}", stage0_renders);
     // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
@@ -341,17 +348,11 @@ pub(crate) fn stage_1_render(
             extra_vars_per_output.push(additional_variables);
         }
 
-        println!("All vars: {:?}", extra_vars_per_output);
         // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
         let mut all_vars = extra_vars_per_output
             .iter()
             .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
 
-        println!("All vars from deps: {:?}", all_vars);
-        println!(
-            "All variables from recipes: {:?}",
-            r.variables.keys().cloned().collect::<Vec<NormalizedKey>>()
-        );
         all_vars.extend(r.variables.keys().cloned());
 
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;

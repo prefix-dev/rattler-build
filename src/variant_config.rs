@@ -388,7 +388,7 @@ impl VariantConfig {
                 None
             })
             .collect::<Vec<_>>();
-        println!("Variant keys: {:?}", variant_keys);
+        // println!("Variant keys: {:?}", variant_keys);
         let variant_keys = used_zip_keys
             .into_iter()
             .chain(variant_keys)
@@ -398,7 +398,7 @@ impl VariantConfig {
         let mut combinations = Vec::new();
         let mut current = Vec::new();
         find_combinations(&variant_keys, 0, &mut current, &mut combinations);
-        println!("Found combinations: {:?}", combinations);
+        // println!("Found combinations: {:?}", combinations);
         // zip the combinations
         let result: Vec<_> = combinations
             .iter()
