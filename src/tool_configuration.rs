@@ -230,7 +230,7 @@ impl ConfigurationBuilder {
     /// Sets the test strategy to use for running tests.
     pub fn with_test_strategy(self, test_strategy: TestStrategy) -> Self {
         Self {
-            test_strategy: test_strategy,
+            test_strategy,
             ..self
         }
     }
