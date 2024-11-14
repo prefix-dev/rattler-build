@@ -753,7 +753,7 @@ pub fn sort_build_outputs_topologically(
         let output_idx = *name_to_index
             .get(output.name())
             .expect("We just inserted it");
-        for dep in output.recipe.requirements().all() {
+        for dep in output.recipe.requirements().run_build_host() {
             let dep_name = match dep {
                 Dependency::Spec(spec) => spec
                     .name
@@ -762,6 +762,7 @@ pub fn sort_build_outputs_topologically(
                 Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
                 Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
             };
+
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 // do not point to self (circular dependency) - this can happen with
                 // pin_subpackage in run_exports, for example.

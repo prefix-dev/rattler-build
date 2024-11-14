@@ -140,12 +140,11 @@ impl Requirements {
     }
 
     /// Get all requirements in one iterator.
-    pub fn all(&self) -> impl Iterator<Item = &Dependency> {
+    pub fn run_build_host(&self) -> impl Iterator<Item = &Dependency> {
         self.build
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
-        // .chain(self.run_constraints.iter())
     }
 
     /// Check if all requirements are empty.
