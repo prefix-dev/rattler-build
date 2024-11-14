@@ -1077,7 +1077,7 @@ def test_testing_strategy(
         string_to_check="all tests passed!",
     )
 
-    # --test=native and cross-compiling adn noarch
+    # --test=native and cross-compiling and noarch
     check_build_output(
         rattler_build,
         capfd,
