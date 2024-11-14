@@ -22,7 +22,13 @@ mod metadata;
 pub use file_finder::{content_type, Files, TempFiles};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 
-use crate::{metadata::Output, package_test::write_test_files, post_process, tool_configuration};
+use crate::{
+    metadata::Output,
+    package_test::write_test_files,
+    post_process,
+    source::{self, copy_dir},
+    tool_configuration,
+};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
@@ -58,7 +64,7 @@ pub enum PackagingError {
     RelinkError(#[from] crate::post_process::relink::RelinkError),
 
     #[error(transparent)]
-    SourceError(#[from] crate::source::SourceError),
+    SourceError(#[from] source::SourceError),
 
     #[error("could not create python entry point: {0}")]
     CannotCreateEntryPoint(String),
@@ -90,7 +96,7 @@ fn copy_license_files(
         let licenses_folder = tmp_dir_path.join("info/licenses/");
         fs::create_dir_all(&licenses_folder)?;
 
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
+        let copy_dir = copy_dir::CopyDir::new(
             &output.build_configuration.directories.recipe_dir,
             &licenses_folder,
         )
@@ -101,7 +107,7 @@ fn copy_license_files(
         let copied_files_recipe_dir = copy_dir.copied_paths();
         let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
 
-        let copy_dir = crate::source::copy_dir::CopyDir::new(
+        let copy_dir = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -140,7 +146,9 @@ fn write_recipe_folder(
     let recipe_dir = &output.build_configuration.directories.recipe_dir;
     let recipe_path = &output.build_configuration.directories.recipe_path;
 
-    let copy_result = crate::source::copy_dir::CopyDir::new(recipe_dir, &recipe_folder).run()?;
+    let copy_result = copy_dir::CopyDir::new(recipe_dir, &recipe_folder)
+        .use_gitignore(true)
+        .run()?;
 
     let mut files = Vec::from(copy_result.copied_paths());
 
