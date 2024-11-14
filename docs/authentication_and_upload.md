@@ -56,8 +56,48 @@ authenticate with the server.
 
 ### prefix.dev
 
-To upload to [prefix.dev](https://prefix.dev), you need to have an account and a
-token. You can create a token in the settings of your account. The token is used
+#### Trusted publishing via OIDC
+
+`rattler-build` supports authentication with https://prefix.dev through OIDC with GitHub Actions.
+An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
+You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
+
+![Trusted Publisher](assets/trusted_publisher.png)
+
+
+Here you can find an example GitHub Actions workflow
+
+```yaml title=".github/workflows/build.yml"
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build conda package
+        uses: prefix-dev/rattler-build-action@v0.2.19
+
+      - name: Upload all packages
+        shell: bash
+        run: |
+          shopt -s nullglob
+          EXIT_CODE=0
+          for pkg in $(find output -type f \( -name "*.conda" -o -name "*.tar.bz2" \) ); do
+            if ! rattler-build upload prefix -c my-channel "${pkg}"; then
+              EXIT_CODE=1
+            fi
+          done
+          exit $EXIT_CODE
+```
+
+
+#### Token
+
+To upload to [prefix.dev](https://prefix.dev), you need to have an account.
+You can then create a token in the settings of your account. The token is used
 to authenticate the upload.
 
 ```bash
