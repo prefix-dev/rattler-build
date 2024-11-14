@@ -8,7 +8,6 @@ use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_package_streaming::write::CompressionLevel;
-use serde::de;
 use serde_json::{json, Value};
 use url::Url;
 

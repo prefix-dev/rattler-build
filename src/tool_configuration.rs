@@ -4,7 +4,6 @@
 use std::{path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
-use minijinja::machinery::ast::Test;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
