@@ -344,7 +344,11 @@ pub struct BuildOpts {
     pub no_test: bool,
 
     /// The strategy to use for running tests
-    #[arg(long, default_value = "native-and-emulated", help_heading = "Modifying result")]
+    #[arg(
+        long,
+        default_value = "native-and-emulated",
+        help_heading = "Modifying result"
+    )]
     pub test: TestStrategy,
 
     /// Don't force colors in the output of the build script
