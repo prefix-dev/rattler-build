@@ -131,6 +131,7 @@ pub fn get_tool_config(
         .with_compression_threads(args.compression_threads)
         .with_reqwest_client(client)
         .with_testing(!args.no_test)
+        .with_test_strategy(args.test)
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .with_skip_existing(args.skip_existing)
@@ -549,6 +550,7 @@ pub async fn rebuild_from_args(
                 .into_diagnostic()?,
         )
         .with_testing(!args.no_test)
+        .with_test_strategy(args.test)
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .finish();

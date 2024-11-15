@@ -29,6 +29,20 @@ pub enum SkipExisting {
     All,
 }
 
+/// Container for the CLI test strategy
+#[derive(Debug, Clone, Copy, ValueEnum, Default)]
+pub enum TestStrategy {
+    /// Skip the tests
+    Skip,
+    /// Run the tests only if the build platform is the same as the host platform.
+    /// Otherwise, skip the tests. If the target platform is noarch,
+    /// the tests are always executed.
+    Native,
+    /// Always run the tests
+    #[default]
+    NativeAndEmulated,
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
@@ -42,8 +56,8 @@ pub struct Configuration {
     /// is done
     pub no_clean: bool,
 
-    /// Whether to skip the test phase
-    pub no_test: bool,
+    /// The strategy to use for running tests
+    pub test_strategy: TestStrategy,
 
     /// Whether to use zstd
     pub use_zstd: bool,
@@ -115,6 +129,7 @@ pub struct ConfigurationBuilder {
     client: Option<ClientWithMiddleware>,
     no_clean: bool,
     no_test: bool,
+    test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
     skip_existing: SkipExisting,
@@ -139,6 +154,7 @@ impl ConfigurationBuilder {
             client: None,
             no_clean: false,
             no_test: false,
+            test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: false,
             skip_existing: SkipExisting::None,
@@ -221,6 +237,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets the test strategy to use for running tests.
+    pub fn with_test_strategy(self, test_strategy: TestStrategy) -> Self {
+        Self {
+            test_strategy,
+            ..self
+        }
+    }
+
     /// Whether downloading repodata as `.zst` files is enabled.
     pub fn with_zstd_repodata_enabled(self, zstd_repodata_enabled: bool) -> Self {
         Self {
@@ -274,11 +298,16 @@ impl ConfigurationBuilder {
             })
             .finish();
 
+        let test_strategy = match self.no_test {
+            true => TestStrategy::Skip,
+            false => self.test_strategy,
+        };
+
         Configuration {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             no_clean: self.no_clean,
-            no_test: self.no_test,
+            test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,

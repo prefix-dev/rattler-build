@@ -15,7 +15,7 @@ use url::Url;
 use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
-    tool_configuration::SkipExisting,
+    tool_configuration::{SkipExisting, TestStrategy},
 };
 
 /// Application subcommands.
@@ -339,9 +339,17 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result")]
     pub no_include_recipe: bool,
 
-    /// Don't run the tests after building the package
+    /// Do not run tests after building (deprecated, use `--test=skip` instead)
     #[arg(long, default_value = "false", help_heading = "Modifying result")]
     pub no_test: bool,
+
+    /// The strategy to use for running tests
+    #[arg(
+        long,
+        default_value = "native-and-emulated",
+        help_heading = "Modifying result"
+    )]
+    pub test: TestStrategy,
 
     /// Don't force colors in the output of the build script
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
@@ -420,9 +428,13 @@ pub struct RebuildOpts {
     #[arg(short, long)]
     pub package_file: PathBuf,
 
-    /// Do not run tests after building
+    /// Do not run tests after building (deprecated, use `--test=skip` instead)
     #[arg(long, default_value = "false")]
     pub no_test: bool,
+
+    /// The strategy to use for running tests
+    #[arg(long, help_heading = "Modifying result")]
+    pub test: TestStrategy,
 
     /// The number of threads to use for compression.
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]

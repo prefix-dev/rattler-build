@@ -8,7 +8,8 @@ from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
 import pytest
 import requests
 import yaml
-from helpers import RattlerBuild, get_extracted_package, get_package
+from helpers import (RattlerBuild, check_build_output, get_extracted_package,
+                     get_package)
 
 
 def test_functionality(rattler_build: RattlerBuild):
@@ -111,7 +112,7 @@ def variant_hash(variant):
 
 
 def test_pkg_hash(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(recipes / "pkg_hash", tmp_path, extra_args=["--no-test"])
+    rattler_build.build(recipes / "pkg_hash", tmp_path, extra_args=["--test=skip"])
     pkg = get_package(tmp_path, "pkg_hash")
     expected_hash = variant_hash({"target_platform": host_subdir()})
     assert pkg.name.endswith(f"pkg_hash-1.0.0-{expected_hash}_my_pkg.tar.bz2")
@@ -1009,3 +1010,83 @@ def test_pin_subpackage(
     )
     pkg = get_extracted_package(tmp_path, "my.package-a")
     assert (pkg / "info/index.json").exists()
+
+
+def test_testing_strategy(
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    capfd,
+):
+    # --test=skip
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe.yaml",
+        output_path=tmp_path,
+        extra_args=["--test=skip"],
+        string_to_check="Skipping tests because the argument --test=skip was set",
+    )
+
+    # --test=native
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe.yaml",
+        output_path=tmp_path,
+        extra_args=["--test=native"],
+        string_to_check="all tests passed!",
+    )
+
+    # --test=native and cross-compiling
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe.yaml",
+        output_path=tmp_path,
+        extra_args=[
+            "--test=native",
+            "--target-platform=linux-64",
+            "--build-platform=osx-64",
+        ],
+        string_to_check="Skipping tests because the argument "
+        "--test=native was set and the build is a cross-compilation",
+    )
+
+    # --test=native-and-emulated
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe.yaml",
+        output_path=tmp_path,
+        extra_args=["--test=native-and-emulated"],
+        string_to_check="all tests passed!",
+    )
+
+    #  --test=native-and-emulated and cross-compiling
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe.yaml",
+        output_path=tmp_path,
+        extra_args=[
+            "--test=native-and-emulated",
+            "--target-platform=linux-64",
+            "--build-platform=osx-64",
+        ],
+        string_to_check="all tests passed!",
+    )
+
+    # --test=native and cross-compiling and noarch
+    check_build_output(
+        rattler_build,
+        capfd,
+        recipe_path=recipes / "test_strategy" / "recipe-noarch.yaml",
+        output_path=tmp_path,
+        extra_args=[
+            "--test=native",
+            "--target-platform=linux-64",
+            "--build-platform=osx-64",
+        ],
+        string_to_check="all tests passed!",
+    )
