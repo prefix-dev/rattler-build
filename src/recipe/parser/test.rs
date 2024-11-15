@@ -78,6 +78,26 @@ fn is_true(value: &bool) -> bool {
     *value
 }
 
+/// The Python version(s) to test the imports against.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum PythonVersion {
+    /// A single python version
+    Single(String),
+    /// Multiple python versions
+    Multiple(Vec<String>),
+    /// No python version specified
+    #[default]
+    None,
+}
+
+impl PythonVersion {
+    /// Check if the python version is none
+    pub fn is_none(&self) -> bool {
+        matches!(self, PythonVersion::None)
+    }
+}
+
 /// A special Python test that checks if the imports are available and runs `pip check`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PythonTest {
@@ -86,6 +106,9 @@ pub struct PythonTest {
     /// Whether to run `pip check` or not (default to true)
     #[serde(default = "pip_check_true", skip_serializing_if = "is_true")]
     pub pip_check: bool,
+    /// Python version(s) to test against. If not specified, the default python version is used.
+    #[serde(default, skip_serializing_if = "PythonVersion::is_none")]
+    pub python_version: PythonVersion,
 }
 
 impl Default for PythonTest {
@@ -93,6 +116,7 @@ impl Default for PythonTest {
         Self {
             imports: Vec::new(),
             pip_check: true,
+            python_version: PythonVersion::None,
         }
     }
 }
@@ -206,7 +230,6 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 
         self.iter().map(|(key, value)| {
             let key_str = key.as_str();
-
             match key_str {
                 "python" => {
                     let python = as_mapping(value, key_str)?.try_convert(key_str)?;
@@ -245,7 +268,7 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
         let mut python_test = PythonTest::default();
 
-        validate_keys!(python_test, self.iter(), imports, pip_check);
+        validate_keys!(python_test, self.iter(), imports, pip_check, python_version);
 
         if python_test.imports.is_empty() {
             Err(vec![_partialerror!(
@@ -256,6 +279,35 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
         }
 
         Ok(python_test)
+    }
+}
+
+impl TryConvertNode<PythonVersion> for RenderedNode {
+    fn try_convert(&self, _name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
+        let python_version = match self {
+            RenderedNode::Mapping(_) => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::InvalidField("expected string, sequence or null".into()),
+            )])?,
+            RenderedNode::Scalar(version) => PythonVersion::Single(version.to_string()),
+            RenderedNode::Sequence(versions) => versions
+                .iter()
+                .map(|v| {
+                    v.as_scalar()
+                        .ok_or_else(|| {
+                            vec![_partialerror!(
+                                *self.span(),
+                                ErrorKind::InvalidField("invalid value".into()),
+                            )]
+                        })
+                        .map(|s| s.to_string())
+                })
+                .collect::<Result<Vec<String>, _>>()
+                .map(PythonVersion::Multiple)?,
+            RenderedNode::Null(_) => PythonVersion::None,
+        };
+
+        Ok(python_version)
     }
 }
 
@@ -372,7 +424,10 @@ mod test {
     use super::TestType;
     use insta::assert_snapshot;
 
-    use crate::recipe::custom_yaml::{RenderedNode, TryConvertNode};
+    use crate::recipe::{
+        custom_yaml::{RenderedNode, TryConvertNode},
+        parser::test::PythonVersion,
+    };
 
     #[test]
     fn test_parsing() {
@@ -423,5 +478,60 @@ mod test {
 
         let yaml_serde = serde_yaml::to_string(&tests).unwrap();
         assert_snapshot!(yaml_serde);
+    }
+
+    #[test]
+    fn test_python_parsing() {
+        let test_section = r#"
+        tests:
+          - python:
+              imports:
+                - pandas
+              python_version: "3.10"
+          - python:
+              imports:
+                - pandas
+              python_version: ["3.10", "3.12"]
+        "#;
+
+        // parse the YAML
+        let yaml_root = RenderedNode::parse_yaml(0, test_section)
+            .map_err(|err| vec![err])
+            .unwrap();
+        let tests_node = yaml_root.as_mapping().unwrap().get("tests").unwrap();
+        let tests: Vec<TestType> = tests_node.try_convert("tests").unwrap();
+
+        let yaml_serde = serde_yaml::to_string(&tests).unwrap();
+        assert_snapshot!(yaml_serde);
+
+        // from yaml
+        let tests: Vec<TestType> = serde_yaml::from_str(&yaml_serde).unwrap();
+        let t = tests.first();
+
+        match t {
+            Some(TestType::Python { python }) => {
+                assert_eq!(python.imports, vec!["pandas"]);
+                assert!(python.pip_check);
+                assert_eq!(
+                    python.python_version,
+                    PythonVersion::Single("3.10".to_string())
+                );
+            }
+            _ => panic!("expected python test"),
+        }
+
+        let t2 = tests.get(1);
+
+        match t2 {
+            Some(TestType::Python { python }) => {
+                assert_eq!(python.imports, vec!["pandas"]);
+                assert!(python.pip_check);
+                assert_eq!(
+                    python.python_version,
+                    PythonVersion::Multiple(vec!["3.10".to_string(), "3.12".to_string()])
+                );
+            }
+            _ => panic!("expected python test"),
+        }
     }
 }

@@ -33,7 +33,9 @@ use url::Url;
 use crate::{
     env_vars,
     metadata::PlatformWithVirtualPackages,
-    recipe::parser::{CommandsTest, DownstreamTest, PythonTest, Script, ScriptContent, TestType},
+    recipe::parser::{
+        CommandsTest, DownstreamTest, PythonTest, PythonVersion, Script, ScriptContent, TestType,
+    },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
     tool_configuration,
@@ -461,17 +463,77 @@ impl PythonTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running python test");
+        let span = tracing::info_span!("Running python test(s)");
         let _guard = span.enter();
 
+        // The version spec of the package being built
         let match_spec = MatchSpec::from_str(
             format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
             ParseStrictness::Lenient,
         )?;
-        let mut dependencies = vec![match_spec];
+
+        // The dependencies for the test environment
+        // - python_version: null -> { "": ["mypackage=xx=xx"]}
+        // - python_version: 3.12 -> { "3.12": ["python=3.12", "mypackage=xx=xx"]}
+        // - python_version: [3.12, 3.13] -> { "3.12": ["python=3.12", "mypackage=xx=xx"], "3.13": ["python=3.13", "mypackage=xx=xx"]}
+        let mut dependencies_map: HashMap<String, Vec<MatchSpec>> = match &self.python_version {
+            PythonVersion::Multiple(versions) => versions
+                .iter()
+                .map(|version| {
+                    (
+                        version.clone(),
+                        vec![
+                            MatchSpec::from_str(
+                                &format!("python={}", version),
+                                ParseStrictness::Lenient,
+                            )
+                            .unwrap(),
+                            match_spec.clone(),
+                        ],
+                    )
+                })
+                .collect(),
+            PythonVersion::Single(version) => HashMap::from([(
+                version.clone(),
+                vec![
+                    MatchSpec::from_str(&format!("python={}", version), ParseStrictness::Lenient)
+                        .unwrap(),
+                    match_spec,
+                ],
+            )]),
+            PythonVersion::None => HashMap::from([("".to_string(), vec![match_spec])]),
+        };
+
+        // Add `pip` if pip_check is set to true
         if self.pip_check {
-            dependencies.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap());
+            dependencies_map.iter_mut().for_each(|(_, v)| {
+                v.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap())
+            });
         }
+
+        // Run tests for each python version
+        for (python_version, dependencies) in dependencies_map {
+            self.run_test_inner(python_version, dependencies, path, prefix, config)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn run_test_inner(
+        &self,
+        python_version: String,
+        dependencies: Vec<MatchSpec>,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span_message = match python_version.as_str() {
+            "" => "Testing with default python version".to_string(),
+            _ => format!("Testing with python {}", python_version),
+        };
+        let span = tracing::info_span!("", message = %span_message);
+        let _guard = span.enter();
 
         create_environment(
             "test",
@@ -526,7 +588,6 @@ impl PythonTest {
                 console::style(console::Emoji("✔", "")).green()
             );
         }
-
         Ok(())
     }
 }
