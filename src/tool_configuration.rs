@@ -38,9 +38,9 @@ pub enum TestStrategy {
     /// Run the tests only if the build platform is the same as the host platform.
     /// Otherwise, skip the tests. If the target platform is noarch,
     /// the tests are always executed.
-    #[default]
     Native,
     /// Always run the tests
+    #[default]
     NativeAndEmulated,
 }
 
