@@ -130,18 +130,33 @@ regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.28.0", default-features = false, features = ["cli-tools", "indicatif"] }
-rattler_cache = { version = "0.2.8", default-features = false }
-rattler_conda_types = { version = "0.29.0", default-features = false }
-rattler_digest = { version = "1.0.3", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.34", default-features = false }
-rattler_networking = { version = "0.21.5", default-features = false }
-rattler_redaction = { version = "0.1.3" }
-rattler_repodata_gateway = { version = "0.21.20", default-features = false, features = ["gateway"] }
-rattler_shell = { version = "0.22.5", default-features = false, features = ["sysinfo"] }
-rattler_solve = { version = "1.2.1", default-features = false, features = ["resolvo", "serde"] }
-rattler_virtual_packages = { version = "1.1.8", default-features = false }
-rattler_package_streaming = { version = "0.22.11", default-features = false }
+# rattler = { version = "0.28.0", default-features = false, features = ["cli-tools", "indicatif"] }
+# rattler_cache = { version = "0.2.8", default-features = false }
+# rattler_conda_types = { version = "0.29.0", default-features = false }
+# rattler_digest = { version = "1.0.3", default-features = false, features = ["serde"] }
+# rattler_index = { version = "0.19.34", default-features = false }
+# rattler_networking = { version = "0.21.5", default-features = false }
+# rattler_redaction = { version = "0.1.3" }
+# rattler_repodata_gateway = { version = "0.21.20", default-features = false, features = ["gateway"] }
+# rattler_shell = { version = "0.22.5", default-features = false, features = ["sysinfo"] }
+# rattler_solve = { version = "1.2.1", default-features = false, features = ["resolvo", "serde"] }
+# rattler_virtual_packages = { version = "1.1.8", default-features = false }
+# rattler_package_streaming = { version = "0.22.11", default-features = false }
+rattler = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build", default-features = false, features = ["cli-tools", "indicatif"]}
+rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_cache = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_digest = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" , features = ["serde"]}
+rattler_lock = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_networking = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build", features = ["gateway"] }
+rattler_redaction = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_index = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+rattler_shell = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build", features = ["sysinfo"]}
+rattler_solve = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" , features = ["resolvo", "serde"]}
+rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "feat/pixi-build" }
+
+
 lazy_static = "1.5.0"
 
 [dev-dependencies]
