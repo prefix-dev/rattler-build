@@ -307,7 +307,7 @@ impl ConfigurationBuilder {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             no_clean: self.no_clean,
-            test_strategy: test_strategy,
+            test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,
