@@ -12,7 +12,6 @@ use rattler_networking::{
 };
 use rattler_repodata_gateway::Gateway;
 use reqwest_middleware::ClientWithMiddleware;
-use tokio::time::error::Elapsed;
 
 use crate::console_utils::LoggingOutputHandler;
 
