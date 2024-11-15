@@ -130,6 +130,7 @@ pub fn get_tool_config(
         .with_keep_build(args.keep_build)
         .with_compression_threads(args.compression_threads)
         .with_reqwest_client(client)
+        .with_testing(!args.no_test)
         .with_test_strategy(args.test)
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
@@ -548,6 +549,7 @@ pub async fn rebuild_from_args(
             tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
                 .into_diagnostic()?,
         )
+        .with_testing(!args.no_test)
         .with_test_strategy(args.test)
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)

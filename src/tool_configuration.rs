@@ -12,6 +12,7 @@ use rattler_networking::{
 };
 use rattler_repodata_gateway::Gateway;
 use reqwest_middleware::ClientWithMiddleware;
+use tokio::time::error::Elapsed;
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -128,6 +129,7 @@ pub struct ConfigurationBuilder {
     fancy_log_handler: Option<LoggingOutputHandler>,
     client: Option<ClientWithMiddleware>,
     no_clean: bool,
+    no_test: bool,
     test_strategy: TestStrategy,
     use_zstd: bool,
     use_bz2: bool,
@@ -152,6 +154,7 @@ impl ConfigurationBuilder {
             fancy_log_handler: None,
             client: None,
             no_clean: false,
+            no_test: false,
             test_strategy: TestStrategy::default(),
             use_zstd: true,
             use_bz2: false,
@@ -227,6 +230,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets whether tests should be executed.
+    pub fn with_testing(self, testing_enabled: bool) -> Self {
+        Self {
+            no_test: !testing_enabled,
+            ..self
+        }
+    }
+
     /// Sets the test strategy to use for running tests.
     pub fn with_test_strategy(self, test_strategy: TestStrategy) -> Self {
         Self {
@@ -288,11 +299,16 @@ impl ConfigurationBuilder {
             })
             .finish();
 
+        let test_strategy = match self.no_test {
+            true => TestStrategy::Skip,
+            false => self.test_strategy,
+        };
+
         Configuration {
             fancy_log_handler: self.fancy_log_handler.unwrap_or_default(),
             client,
             no_clean: self.no_clean,
-            test_strategy: self.test_strategy,
+            test_strategy: test_strategy,
             use_zstd: self.use_zstd,
             use_bz2: self.use_bz2,
             skip_existing: self.skip_existing,

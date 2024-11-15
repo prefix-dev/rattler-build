@@ -339,6 +339,10 @@ pub struct BuildOpts {
     #[arg(long, help_heading = "Modifying result")]
     pub no_include_recipe: bool,
 
+    /// Do not run tests after building (deprecated, use `--test=skip` instead)
+    #[arg(long, default_value = "false", help_heading = "Modifying result")]
+    pub no_test: bool,
+
     /// The strategy to use for running tests
     #[arg(long, default_value = "native", help_heading = "Modifying result")]
     pub test: TestStrategy,
@@ -419,6 +423,10 @@ pub struct RebuildOpts {
     /// The package file to rebuild
     #[arg(short, long)]
     pub package_file: PathBuf,
+
+    /// Do not run tests after building (deprecated, use `--test=skip` instead)
+    #[arg(long, default_value = "false")]
+    pub no_test: bool,
 
     /// The strategy to use for running tests
     #[arg(long, help_heading = "Modifying result")]
