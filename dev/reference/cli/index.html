@@ -1614,10 +1614,26 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <p><code>--no-test</code></p>
-<p>Don't run the tests after building the package</p>
+<p>Do not run tests after building (deprecated, use <code>--test=skip</code> instead)</p>
 <ul>
 <li>Default value: <code>false</code></li>
 <li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--test &lt;TEST&gt;</code></p>
+<p>The strategy to use for running tests</p>
+<ul>
+<li>Default value: <code>native-and-emulated</code></li>
+<li>Possible values:<ul>
+<li><code>skip</code>:
+    Skip the tests</li>
+<li><code>native</code>:
+    Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed</li>
+<li><code>native-and-emulated</code>:
+    Always run the tests</li>
+</ul>
+</li>
 </ul>
 </li>
 <li>
@@ -1719,7 +1735,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <h3 id="rebuild"><code>rebuild</code><a class="headerlink" href="#rebuild" title="Permanent link">#</a></h3>
 <p>Rebuild a package from a package file instead of a recipe</p>
-<p><strong>Usage:</strong> <code>rattler-build rebuild [OPTIONS] --package-file &lt;PACKAGE_FILE&gt;</code></p>
+<p><strong>Usage:</strong> <code>rattler-build rebuild [OPTIONS] --package-file &lt;PACKAGE_FILE&gt; --test &lt;TEST&gt;</code></p>
 <h5 id="options_3"><strong>Options:</strong><a class="headerlink" href="#options_3" title="Permanent link">#</a></h5>
 <ul>
 <li>
@@ -1728,7 +1744,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 <li>
 <p><code>--no-test</code></p>
-<p>Do not run tests after building</p>
+<p>Do not run tests after building (deprecated, use <code>--test=skip</code> instead)</p>
 <ul>
 <li>Default value: <code>false</code></li>
 <li>Possible values: <code>true</code>, <code>false</code></li>
@@ -1768,6 +1784,21 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <h6 id="modifying-result_2"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_2" title="Permanent link">#</a></h6>
 <ul>
+<li>
+<p><code>--test &lt;TEST&gt;</code></p>
+<p>The strategy to use for running tests</p>
+<ul>
+<li>Possible values:<ul>
+<li><code>skip</code>:
+    Skip the tests</li>
+<li><code>native</code>:
+    Run the tests only if the build platform is the same as the host platform. Otherwise, skip the tests. If the target platform is noarch, the tests are always executed</li>
+<li><code>native-and-emulated</code>:
+    Always run the tests</li>
+</ul>
+</li>
+</ul>
+</li>
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
 <p>Output directory for build artifacts.</p>
