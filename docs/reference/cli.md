@@ -217,11 +217,19 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	- Possible values: `true`, `false`
 
 
+- `--no-test`
+
+	Do not run tests after building (deprecated, use `--test=skip` instead)
+
+	- Default value: `false`
+	- Possible values: `true`, `false`
+
+
 - `--test <TEST>`
 
 	The strategy to use for running tests
 
-	- Default value: `native`
+	- Default value: `native-and-emulated`
 	- Possible values:
 		- `skip`:
 			Skip the tests
@@ -348,6 +356,14 @@ Rebuild a package from a package file instead of a recipe
 - `-p`, `--package-file <PACKAGE_FILE>`
 
 	The package file to rebuild
+
+
+- `--no-test`
+
+	Do not run tests after building (deprecated, use `--test=skip` instead)
+
+	- Default value: `false`
+	- Possible values: `true`, `false`
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
