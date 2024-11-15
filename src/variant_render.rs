@@ -1,9 +1,13 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    path::PathBuf,
+};
 
 use petgraph::graph::DiGraph;
 use rattler_conda_types::PackageName;
 
 use crate::{
+    env_vars,
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{custom_yaml::Node, parser::Dependency, ParsingError, Recipe},
@@ -126,13 +130,23 @@ pub struct Stage1Render {
     // Per recipe output a set of extra used variables
     pub(crate) used_variables_from_dependencies: Vec<HashSet<NormalizedKey>>,
 
+    pub(crate) exact_pins: Vec<HashSet<PackageName>>,
+
     pub(crate) stage_0_render: Stage0Render,
 
     order: Vec<usize>,
 }
 
 impl Stage1Render {
+    pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
+        self.stage_0_render
+            .rendered_outputs
+            .iter()
+            .position(|x| x.package().name() == package_name)
+    }
+
     pub fn variant_for_output(&self, idx: usize) -> BTreeMap<NormalizedKey, String> {
+        tracing::info!("Getting variant for output {}", idx);
         let idx = self.order[idx];
         // combine jinja variables and the variables from the dependencies
         let used_vars_jinja = self
@@ -158,6 +172,20 @@ impl Stage1Render {
             }
         }
 
+        let exact_pins = self.exact_pins.get(idx).unwrap();
+        for pin in exact_pins {
+            // find the referenced output
+            let other_idx = self.index_from_name(pin).unwrap();
+            let build_string = self.build_string_for_output(other_idx);
+            let version = self.stage_0_render.rendered_outputs[other_idx]
+                .package()
+                .version();
+            variant.insert(
+                pin.as_normalized().into(),
+                format!("{} {}", version, build_string),
+            );
+        }
+
         // fix target_platform value here
         if !self.stage_0_render.rendered_outputs[idx]
             .build()
@@ -171,12 +199,9 @@ impl Stage1Render {
     }
 
     pub fn build_string_for_output(&self, idx: usize) -> String {
-        let idx = self.order[idx];
-
         let variant = self.variant_for_output(idx);
-        let recipe = &self.stage_0_render.rendered_outputs[idx];
+        let recipe = &self.stage_0_render.rendered_outputs[self.order[idx]];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
-
         let build_string = recipe
             .build()
             .string()
@@ -256,6 +281,7 @@ impl Stage1Render {
 /// Render the stage 1 of the recipe by adding in variants from the dependencies
 pub(crate) fn stage_1_render(
     stage0_renders: Vec<Stage0Render>,
+    selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
 ) -> Result<Vec<Stage1Render>, VariantError> {
     let mut stage_1_renders = Vec::new();
@@ -263,8 +289,10 @@ pub(crate) fn stage_1_render(
     // TODO we need to add variables from the cache output here!
     for r in stage0_renders {
         let mut extra_vars_per_output: Vec<HashSet<NormalizedKey>> = Vec::new();
+        let mut exact_pins_per_output: Vec<HashSet<PackageName>> = Vec::new();
         for (idx, output) in r.rendered_outputs.iter().enumerate() {
             let mut additional_variables = HashSet::<NormalizedKey>::new();
+            let mut exact_pins = HashSet::<PackageName>::new();
             // Add in variants from the dependencies as we find them
             for dep in output.build_time_requirements() {
                 if let Dependency::Spec(spec) = dep {
@@ -280,23 +308,22 @@ pub(crate) fn stage_1_render(
 
             // We want to add something to packages that are requiring a subpackage _exactly_ because
             // that creates additional variants
-            for req in output.requirements.all_requirements() {
-                match req {
-                    Dependency::PinSubpackage(pin) => {
-                        if pin.pin_value().args.exact {
-                            let name = pin.pin_value().name.clone().as_normalized().to_string();
-                            additional_variables.insert(name.into());
+            for pin in output.requirements.all_pin_subpackage() {
+                if pin.args.exact {
+                    let name = pin.name.clone().as_normalized().to_string();
+                    additional_variables.insert(name.into());
+                    exact_pins.insert(pin.name.clone());
+                }
+            }
+
+            // add in virtual package run specs where the name starts with `__`
+            for run_req in output.requirements().run() {
+                if let Dependency::Spec(spec) = run_req {
+                    if let Some(ref name) = spec.name {
+                        if name.as_normalized().starts_with("__") {
+                            additional_variables.insert(name.as_normalized().into());
                         }
                     }
-                    Dependency::Spec(spec) => {
-                        // add in virtual package specs where the name starts with `__`
-                        if let Some(ref name) = spec.name {
-                            if name.as_normalized().starts_with("__") {
-                                additional_variables.insert(name.as_normalized().into());
-                            }
-                        }
-                    }
-                    _ => {}
                 }
             }
 
@@ -329,6 +356,10 @@ pub(crate) fn stage_1_render(
             additional_variables.insert("target_platform".into());
             additional_variables.insert("channel_targets".into());
 
+            // Environment variables can be overwritten by the variant configuration
+            let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.target_platform);
+            additional_variables.extend(env_vars.keys().cloned().map(Into::into));
+
             // filter out any ignore keys
             let extra_ignore_keys: HashSet<NormalizedKey> = output
                 .build()
@@ -342,6 +373,7 @@ pub(crate) fn stage_1_render(
             additional_variables.retain(|x| !extra_ignore_keys.contains(x));
 
             extra_vars_per_output.push(additional_variables);
+            exact_pins_per_output.push(exact_pins);
         }
 
         // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
@@ -355,6 +387,7 @@ pub(crate) fn stage_1_render(
 
         for combination in all_combinations {
             let stage_1 = Stage1Render {
+                exact_pins: exact_pins_per_output.clone(),
                 variables: combination,
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
