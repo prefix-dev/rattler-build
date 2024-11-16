@@ -2,7 +2,7 @@
 
 if /I "%PKG_NAME%" == "mamba" (
 	cd mamba
-	%PYTHON% -m pip install . --no-deps -vv
+	%PYTHON% -m pip install . -vv
 	exit 0
 )
 
@@ -43,6 +43,6 @@ if errorlevel 1 exit 1
 if /I "%PKG_NAME%" == "libmambapy" (
 	cd ../libmambapy
 	rmdir /Q /S build
-	%PYTHON% -m pip install . --no-deps -vv
+	%PYTHON% -m pip install . -vv
 	del *.pyc /a /s
 )

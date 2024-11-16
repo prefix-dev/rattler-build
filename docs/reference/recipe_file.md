@@ -112,7 +112,7 @@ source:
 # build number (should be incremented if a new build is made, but version is not incrementing)
 build:
   number: 1
-  script: python -m pip install --no-deps --ignore-installed .
+  script: python -m pip install .
 
 # the requirements at build and runtime
 requirements:

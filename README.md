@@ -210,7 +210,7 @@ build:
   # Thanks to `noarch: python` this package works on all platforms
   noarch: python
   script:
-    - python -m pip install . -vv --no-deps --no-build-isolation
+    - python -m pip install . -vv
 
 requirements:
   host:

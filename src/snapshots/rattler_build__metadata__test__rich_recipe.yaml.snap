@@ -15,7 +15,7 @@ recipe:
     number: 0
     string: pyh4616a5c_0
     script:
-      - python -m pip install . -vv --no-deps --no-build-isolation
+      - python -m pip install . -vv
     noarch: python
   requirements:
     host:

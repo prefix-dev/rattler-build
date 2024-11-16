@@ -16,7 +16,7 @@ source:
 build:
   number: 0
   script:
-    - python -m pip install . -vv --no-deps --no-build-isolation
+    - python -m pip install . -vv
     # make sure that PY_VER is set even for noarch packages
     - if: unix
       then:
