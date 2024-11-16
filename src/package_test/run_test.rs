@@ -19,8 +19,7 @@ use dunce::canonicalize;
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, IndexJson, PackageFile},
-    Channel, MatchSpec, ParseStrictness, Platform,
+    package::{ArchiveIdentifier, IndexJson, PackageFile}, Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform
 };
 use rattler_index::index;
 use rattler_shell::{
@@ -28,7 +27,6 @@ use rattler_shell::{
     shell::{Shell, ShellEnum},
 };
 use rattler_solve::{ChannelPriority, SolveStrategy};
-use url::Url;
 
 use crate::{
     env_vars,
@@ -204,7 +202,7 @@ pub struct TestConfiguration {
     pub keep_test_prefix: bool,
     /// The channels to use for the test – do not forget to add the local build
     /// outputs channel if desired
-    pub channels: Vec<Url>,
+    pub channels: Vec<ChannelUrl>,
     /// The channel priority that is used to resolve dependencies
     pub channel_priority: ChannelPriority,
     /// The solve strategy to use when resolving dependencies

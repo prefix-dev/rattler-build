@@ -15,8 +15,7 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
-    package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
+    package::{ArchiveType, PathType, PathsEntry, PathsJson}, Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;
@@ -27,7 +26,6 @@ use rattler_virtual_packages::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use url::Url;
 
 use crate::{
     console_utils::github_integration_enabled,
@@ -321,7 +319,7 @@ pub struct BuildConfiguration {
     /// The directories for the build (work, source, build, host, ...)
     pub directories: Directories,
     /// The channels to use when resolving environments
-    pub channels: Vec<Url>,
+    pub channels: Vec<ChannelUrl>,
     /// The channel priority that is used to resolve dependencies
     pub channel_priority: ChannelPriority,
     /// The solve strategy to use when resolving dependencies
@@ -707,7 +705,7 @@ impl Display for Output {
 pub fn build_reindexed_channels(
     build_configuration: &BuildConfiguration,
     tool_configuration: &tool_configuration::Configuration,
-) -> Result<Vec<Url>, std::io::Error> {
+) -> Result<Vec<ChannelUrl>, std::io::Error> {
     let output_dir = &build_configuration.directories.output_dir;
     let output_channel = Channel::from_directory(output_dir);
 
