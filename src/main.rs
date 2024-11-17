@@ -18,6 +18,8 @@ use tempfile::tempdir;
 
 #[tokio::main]
 async fn main() -> miette::Result<()> {
+    rattler_sandbox::init_sandbox();
+
     let app = App::parse();
     let log_handler = if !app.is_tui() {
         Some(

@@ -451,6 +451,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 
 [[package]]
+name = "birdcage"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "848df95320021558dd6bb4c26de3fe66724cdcbdbbf3fa720150b52b086ae568"
+dependencies = [
+ "bitflags",
+ "libc",
+ "log",
+ "rustix",
+ "seccompiler",
+]
+
+[[package]]
 name = "bisection"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3565,6 +3578,7 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "rattler_repodata_gateway",
+ "rattler_sandbox",
  "rattler_shell",
  "rattler_solve",
  "rattler_virtual_packages",
@@ -3908,6 +3922,16 @@ dependencies = [
  "url",
  "windows-sys 0.59.0",
  "zstd 0.13.2",
+]
+
+[[package]]
+name = "rattler_sandbox"
+version = "0.1.0"
+dependencies = [
+ "birdcage",
+ "clap",
+ "fs-err 3.0.0",
+ "tokio",
 ]
 
 [[package]]
@@ -4417,6 +4441,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "seccompiler"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f6575e3c2b3a0fe2ef3e53855b6a8dead7c29f783da5e123d378c8c6a89017e"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
