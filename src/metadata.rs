@@ -15,7 +15,8 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
-    package::{ArchiveType, PathType, PathsEntry, PathsJson}, Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version
+    package::{ArchiveType, PathType, PathsEntry, PathsJson},
+    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
 };
 use rattler_index::index;
 use rattler_package_streaming::write::CompressionLevel;

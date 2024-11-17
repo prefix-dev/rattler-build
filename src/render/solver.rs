@@ -76,7 +76,9 @@ pub async fn solve_environment(
     for channel in channels {
         tracing::info!(
             "   - {}",
-            tool_configuration.channel_config.canonical_name(channel.url())
+            tool_configuration
+                .channel_config
+                .canonical_name(channel.url())
         );
     }
     tracing::info!("  Specs:");

@@ -10,7 +10,9 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    package::RunExportsJson, version_spec::ParseVersionSpecError, ChannelUrl, MatchSpec, PackageName, PackageRecord, ParseStrictness, Platform, RepoDataRecord, StringMatcher, VersionSpec
+    package::RunExportsJson, version_spec::ParseVersionSpecError, ChannelUrl, MatchSpec,
+    PackageName, PackageRecord, ParseStrictness, Platform, RepoDataRecord, StringMatcher,
+    VersionSpec,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
