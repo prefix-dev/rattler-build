@@ -253,7 +253,7 @@ pub async fn load_repodatas(
 ) -> anyhow::Result<Vec<rattler_repodata_gateway::RepoData>> {
     let channels = channels
         .iter()
-        .map(|url| Channel::from_url(url.url().clone()))
+        .map(|url| Channel::from_url(url.clone()))
         .collect::<Vec<_>>();
 
     let result = tool_configuration
