@@ -725,7 +725,7 @@ pub fn build_reindexed_channels(
     // Reindex the output channel from the files on disk
     index(output_dir, Some(&build_configuration.target_platform))?;
 
-    Ok(iter::once(output_channel.base_url)
+    Ok(iter::once(output_channel.base_url.url().clone())
         .chain(build_configuration.channels.iter().cloned())
         .collect())
 }

@@ -332,7 +332,13 @@ pub async fn run_test(
     tracing::info!("Creating test environment in '{}'", prefix.display());
 
     let mut channels = config.channels.clone();
-    channels.insert(0, Channel::from_directory(tmp_repo.path()).base_url);
+    channels.insert(
+        0,
+        Channel::from_directory(tmp_repo.path())
+            .base_url
+            .url()
+            .clone(),
+    );
 
     let host_platform = config.host_platform.clone().unwrap_or_else(|| {
         if target_platform == Platform::NoArch {

@@ -50,7 +50,9 @@ pub async fn skip_existing(
     let channels = if only_local {
         vec![
             Channel::from_directory(&first_output.build_configuration.directories.output_dir)
-                .base_url,
+                .base_url
+                .url()
+                .clone(),
         ]
     } else {
         all_channels

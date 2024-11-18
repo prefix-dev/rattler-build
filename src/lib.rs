@@ -326,7 +326,9 @@ pub async fn get_build_output(
             .channel
             .clone()
             .into_iter()
-            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .map(|c| {
+                Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url.url().clone())
+            })
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
@@ -451,7 +453,9 @@ pub async fn run_test_from_args(
         .channel
         .unwrap_or_else(|| vec!["conda-forge".to_string()])
         .into_iter()
-        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
+        .map(|name| {
+            Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url.url().clone())
+        })
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()?;
 
