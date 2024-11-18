@@ -11,7 +11,7 @@ use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
-use rattler_conda_types::{Channel, MatchSpec, Platform, RepoDataRecord};
+use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, RepoDataRecord};
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use url::Url;
 
@@ -59,7 +59,7 @@ pub async fn solve_environment(
     name: &str,
     specs: &[MatchSpec],
     target_platform: &PlatformWithVirtualPackages,
-    channels: &[Url],
+    channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
@@ -76,7 +76,9 @@ pub async fn solve_environment(
     for channel in channels {
         tracing::info!(
             "   - {}",
-            tool_configuration.channel_config.canonical_name(channel)
+            tool_configuration
+                .channel_config
+                .canonical_name(channel.url())
         );
     }
     tracing::info!("  Specs:");
@@ -123,7 +125,7 @@ pub async fn create_environment(
     specs: &[MatchSpec],
     target_platform: &PlatformWithVirtualPackages,
     target_prefix: &Path,
-    channels: &[Url],
+    channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
     channel_priority: ChannelPriority,
     solve_strategy: SolveStrategy,
@@ -244,7 +246,7 @@ impl GatewayReporterBuilder {
 /// Load repodata from channels. Only includes necessary records for platform &
 /// specs.
 pub async fn load_repodatas(
-    channels: &[Url],
+    channels: &[ChannelUrl],
     target_platform: Platform,
     specs: &[MatchSpec],
     tool_configuration: &tool_configuration::Configuration,

@@ -10,15 +10,15 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    package::RunExportsJson, version_spec::ParseVersionSpecError, MatchSpec, PackageName,
-    PackageRecord, ParseStrictness, Platform, RepoDataRecord, StringMatcher, VersionSpec,
+    package::RunExportsJson, version_spec::ParseVersionSpecError, ChannelUrl, MatchSpec,
+    PackageName, PackageRecord, ParseStrictness, Platform, RepoDataRecord, StringMatcher,
+    VersionSpec,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use thiserror::Error;
 use tokio::sync::{mpsc, Semaphore};
-use url::Url;
 
 use super::pin::PinError;
 use crate::{
@@ -669,7 +669,7 @@ fn render_run_exports(
 pub(crate) async fn resolve_dependencies(
     requirements: &Requirements,
     output: &Output,
-    channels: &[Url],
+    channels: &[ChannelUrl],
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<FinalizedDependencies, ResolveError> {
     let merge_build_host = output.recipe.build().merge_build_and_host_envs();

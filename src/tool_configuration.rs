@@ -292,6 +292,7 @@ impl ConfigurationBuilder {
                     jlap_enabled: true,
                     zstd_enabled: self.use_zstd,
                     bz2_enabled: self.use_bz2,
+                    sharded_enabled: true,
                     cache_action: Default::default(),
                 },
                 per_channel: Default::default(),

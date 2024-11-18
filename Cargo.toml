@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.30.0"
+version = "0.31.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 homepage = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -62,7 +62,7 @@ content_inspector = "0.2.4"
 serde_with = "3.11.0"
 url = "2.5.3"
 tracing = "0.1.40"
-clap = { version = "4.5.20", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.21", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=2.4.0", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -79,7 +79,7 @@ num_cpus = "1.16.0"
 goblin = "0.9.2"
 scroll = "0.12.0"
 pathdiff = "0.2.2"
-comfy-table = "7.1.2"
+comfy-table = "7.1.3"
 futures = "0.3.31"
 indicatif = "0.17.9"
 console = { version = "0.15.8", features = ["windows-console-colors"] }
@@ -87,17 +87,17 @@ thiserror = "2.0.3"
 tempfile = "3.14.0"
 chrono = "0.4.38"
 sha1 = "0.10.6"
-spdx = "0.10.6"
+spdx = "0.10.7"
 ignore = "0.4.23"
 globset = "0.4.15"
-clap-verbosity-flag = "2.2.2"
+clap-verbosity-flag = "2.2.3"
 tracing-core = "0.1.32"
 petgraph = "0.6.5"
 indexmap = "2.6.0"
 dunce = "1.0.5"
 fs-err = "3.0.0"
 which = "7.0.0"
-clap_complete = "4.5.37"
+clap_complete = "4.5.38"
 clap_complete_nushell = "4.5.4"
 tokio-util = "0.7.12"
 
@@ -108,7 +108,7 @@ zip = { version = "2.2.0", default-features = false, features = [
 ] }
 bzip2 = "0.4.4"
 base64 = "0.22.1"
-flate2 = "1.0.34"
+flate2 = "1.0.35"
 xz2 = "0.1.7"
 zstd = "0.13.2"
 toml = "0.8.19"
@@ -130,18 +130,18 @@ regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.28.0", default-features = false, features = ["cli-tools", "indicatif"] }
-rattler_cache = { version = "0.2.8", default-features = false }
-rattler_conda_types = { version = "0.29.0", default-features = false }
+rattler = { version = "0.28.2", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler_cache = { version = "0.2.10", default-features = false }
+rattler_conda_types = { version = "0.29.2", default-features = false }
 rattler_digest = { version = "1.0.3", default-features = false, features = ["serde"] }
-rattler_index = { version = "0.19.34", default-features = false }
+rattler_index = { version = "0.19.36", default-features = false }
 rattler_networking = { version = "0.21.5", default-features = false }
 rattler_redaction = { version = "0.1.3" }
-rattler_repodata_gateway = { version = "0.21.20", default-features = false, features = ["gateway"] }
-rattler_shell = { version = "0.22.5", default-features = false, features = ["sysinfo"] }
-rattler_solve = { version = "1.2.1", default-features = false, features = ["resolvo", "serde"] }
-rattler_virtual_packages = { version = "1.1.8", default-features = false }
-rattler_package_streaming = { version = "0.22.11", default-features = false }
+rattler_repodata_gateway = { version = "0.21.22", default-features = false, features = ["gateway"] }
+rattler_shell = { version = "0.22.7", default-features = false, features = ["sysinfo"] }
+rattler_solve = { version = "1.2.3", default-features = false, features = ["resolvo", "serde"] }
+rattler_virtual_packages = { version = "1.1.10", default-features = false }
+rattler_package_streaming = { version = "0.22.13", default-features = false }
 lazy_static = "1.5.0"
 
 [dev-dependencies]
