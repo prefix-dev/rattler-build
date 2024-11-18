@@ -97,8 +97,8 @@ pub(crate) fn stage_0_render(
         let mut rendered_outputs = Vec::new();
         // TODO: figure out if we can pre-compute the `noarch` value.
         for output in outputs {
-            let config_with_variant = selector_config
-                .new_with_variant(combination.clone(), selector_config.target_platform);
+            let config_with_variant =
+                selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
             let parsed_recipe = Recipe::from_node(output, config_with_variant).map_err(|err| {
                 let errs: ParseErrors = err
@@ -134,13 +134,14 @@ pub struct Stage1Render {
 
     pub(crate) stage_0_render: Stage0Render,
 
+    pub(crate) final_rendered_outputs: Vec<Recipe>,
+
     order: Vec<usize>,
 }
 
 impl Stage1Render {
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
-        self.stage_0_render
-            .rendered_outputs
+        self.final_rendered_outputs
             .iter()
             .position(|x| x.package().name() == package_name)
     }
@@ -149,6 +150,7 @@ impl Stage1Render {
         tracing::info!("Getting variant for output {}", idx);
         let idx = self.order[idx];
         // combine jinja variables and the variables from the dependencies
+        let self_name = self.stage_0_render.rendered_outputs[idx].package().name();
         let used_vars_jinja = self
             .stage_0_render
             .raw_outputs
@@ -174,12 +176,13 @@ impl Stage1Render {
 
         let exact_pins = self.exact_pins.get(idx).unwrap();
         for pin in exact_pins {
-            // find the referenced output
+            if pin == self_name {
+                continue;
+            }
             let other_idx = self.index_from_name(pin).unwrap();
+            // find the referenced output
             let build_string = self.build_string_for_output(other_idx);
-            let version = self.stage_0_render.rendered_outputs[other_idx]
-                .package()
-                .version();
+            let version = self.final_rendered_outputs[other_idx].package().version();
             variant.insert(
                 pin.as_normalized().into(),
                 format!("{} {}", version, build_string),
@@ -187,11 +190,7 @@ impl Stage1Render {
         }
 
         // fix target_platform value here
-        if !self.stage_0_render.rendered_outputs[idx]
-            .build()
-            .noarch()
-            .is_none()
-        {
+        if !self.final_rendered_outputs[idx].build().noarch().is_none() {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
@@ -268,10 +267,14 @@ impl Stage1Render {
     pub fn outputs(
         &self,
     ) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
-        let outputs = self.stage_0_render.outputs().collect::<Vec<_>>();
+        // zip node from stage0 and final render output
+        let raw_nodes = self.stage_0_render.raw_outputs.vec.iter();
+        let outputs = self.final_rendered_outputs.iter();
 
-        (0..outputs.len()).map(move |idx| {
-            let recipe = outputs[self.order[idx]];
+        let zipped = raw_nodes.zip(outputs).collect::<Vec<_>>();
+
+        (0..zipped.len()).map(move |idx| {
+            let recipe = zipped[self.order[idx]];
             let variant = self.variant_for_output(idx);
             (recipe, variant)
         })
@@ -386,12 +389,25 @@ pub(crate) fn stage_1_render(
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
 
         for combination in all_combinations {
+            let mut rendered_outputs = Vec::new();
+            // TODO: figure out if we can pre-compute the `noarch` value.
+            for output in r.raw_outputs.vec.iter() {
+                let config_with_variant = selector_config
+                    .with_variant(combination.clone(), selector_config.target_platform);
+                // .with_build_number(r.rendered_outputs[idx].build().number);
+
+                let parsed_recipe = Recipe::from_node(output, config_with_variant).unwrap();
+
+                rendered_outputs.push(parsed_recipe);
+            }
+
             let stage_1 = Stage1Render {
                 exact_pins: exact_pins_per_output.clone(),
                 variables: combination,
                 used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
                 order: (0..r.rendered_outputs.len()).collect(),
+                final_rendered_outputs: rendered_outputs,
             }
             .sort_outputs();
 

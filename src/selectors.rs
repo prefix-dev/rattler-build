@@ -87,7 +87,7 @@ impl SelectorConfig {
     }
 
     /// Create a new selector config from an existing one, replacing the variant
-    pub fn new_with_variant(
+    pub fn with_variant(
         &self,
         variant: BTreeMap<NormalizedKey, String>,
         target_platform: Platform,
