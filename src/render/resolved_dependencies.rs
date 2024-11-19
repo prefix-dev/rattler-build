@@ -301,7 +301,7 @@ impl ResolvedDependencies {
                     .render(long),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
-                short_channel(&record.channel),
+                short_channel(&record.channel.clone().unwrap_or_default()),
                 record
                     .package_record
                     .size
@@ -315,7 +315,7 @@ impl ResolvedDependencies {
                 "".to_string(),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
-                short_channel(&record.channel),
+                short_channel(&record.channel.clone().unwrap_or_default()),
                 record
                     .package_record
                     .size

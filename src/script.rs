@@ -195,9 +195,9 @@ impl Interpreter for BashInterpreter {
 
         if !output.status.success() {
             let status_code = output.status.code().unwrap_or(1);
-            tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
+            eprintln!("Script failed with status {}", status_code);
+            eprintln!("Work directory: '{}'", args.work_dir.display());
+            eprintln!("{}", DEBUG_HELP);
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "Script failed".to_string(),

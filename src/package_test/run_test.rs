@@ -337,6 +337,8 @@ pub async fn run_test(
         Channel::from_directory(tmp_repo.path())
             .base_url
             .url()
+            .as_ref()
+            .clone()
             .clone(),
     );
 

@@ -52,6 +52,7 @@ pub async fn skip_existing(
             Channel::from_directory(&first_output.build_configuration.directories.output_dir)
                 .base_url
                 .url()
+                .as_ref()
                 .clone(),
         ]
     } else {
@@ -105,11 +106,14 @@ pub async fn run_build(
     output: Output,
     tool_configuration: &tool_configuration::Configuration,
 ) -> miette::Result<(Output, PathBuf)> {
+    eprintln!("before create build dir");
     output
         .build_configuration
         .directories
         .create_build_dir()
         .into_diagnostic()?;
+
+    eprintln!("after create build dir");
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
     let _enter = span.enter();
@@ -122,19 +126,30 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    eprintln!("before build or fetch cache");
+
     let output = output.build_or_fetch_cache(tool_configuration).await?;
+
+    eprintln!("after build or fetch cache");
 
     let output = output
         .resolve_dependencies(tool_configuration)
         .await
         .into_diagnostic()?;
 
+    eprintln!("before install env");
+
     output
         .install_environments(tool_configuration)
         .await
         .into_diagnostic()?;
 
+    eprintln!("after install env");
+
+    eprintln!("before run build script");
     output.run_build_script().await.into_diagnostic()?;
+
+    eprintln!("after run build script");
 
     // Package all the new files
     let (result, paths_json) = output
@@ -142,7 +157,11 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
+    eprintln!("before record artifact ");
+
     output.record_artifact(&result, &paths_json);
+
+    eprintln!("after record artifact ");
 
     let span = tracing::info_span!("Running package tests");
     let enter = span.enter();

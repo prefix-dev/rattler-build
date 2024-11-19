@@ -212,6 +212,14 @@ pub async fn fetch_sources(
                     work_dir.to_path_buf()
                 };
 
+                eprintln!("src target directory is {:?}", src.target_directory());
+
+                eprintln!("work dir is {:?}", work_dir);
+
+                eprintln!("dest dir is {:?}", dest_dir);
+
+                eprintln!("src path is {:?}", src_path);
+
                 // Create folder if it doesn't exist
                 if !dest_dir.exists() {
                     fs::create_dir_all(&dest_dir)?;
@@ -231,6 +239,7 @@ pub async fn fetch_sources(
                                 .run()
                         },
                     )?;
+                    eprintln!("copied paths are {:?}", copy_result.copied_paths());
                     tracing::info!(
                         "Copied {} files into isolated environment",
                         copy_result.copied_paths().len()

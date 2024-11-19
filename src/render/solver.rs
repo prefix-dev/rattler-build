@@ -31,15 +31,17 @@ fn print_as_table(packages: &[RepoDataRecord]) {
         .iter()
         .sorted_by_key(|p| p.package_record.name.as_normalized())
     {
-        let channel_short = if package.channel.contains('/') {
+        let channel_short = if package.channel.clone().unwrap_or_default().contains('/') {
             package
                 .channel
+                .clone()
+                .unwrap_or_default()
                 .rsplit('/')
                 .find(|s| !s.is_empty())
                 .expect("yep will crash if ")
                 .to_string()
         } else {
-            package.channel.to_string()
+            package.channel.clone().unwrap_or_default()
         };
 
         table.add_row(vec![

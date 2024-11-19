@@ -175,6 +175,7 @@ impl<'a> CopyDir<'a> {
 
     pub fn run(self) -> Result<CopyDirResult, SourceError> {
         // Create the to path because we're going to copy the contents only
+        eprintln!("Creating directory: {:?}", self.to_path);
         create_dir_all(self.to_path)?;
 
         let mut result = CopyDirResult {
@@ -182,6 +183,11 @@ impl<'a> CopyDir<'a> {
             include_globs: make_glob_match_map(self.globvec.include_globs())?,
             exclude_globs: make_glob_match_map(self.globvec.exclude_globs())?,
         };
+
+        eprintln!(
+            "Copying files from {:?} to {:?}",
+            self.from_path, self.to_path
+        );
 
         let copied_paths = WalkBuilder::new(self.from_path)
             // disregard global gitignore

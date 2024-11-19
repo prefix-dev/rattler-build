@@ -725,7 +725,7 @@ pub fn build_reindexed_channels(
     // Reindex the output channel from the files on disk
     index(output_dir, Some(&build_configuration.target_platform))?;
 
-    Ok(iter::once(output_channel.base_url.url().clone())
+    Ok(iter::once(output_channel.base_url.url().as_ref().clone())
         .chain(build_configuration.channels.iter().cloned())
         .collect())
 }
@@ -828,7 +828,7 @@ mod test {
                 file_name: "test-1.2.3-h123.tar.bz2".into(),
                 url: Url::from_str("https://test.com/test/linux-64/test-1.2.3-h123.tar.bz2")
                     .unwrap(),
-                channel: "test".into(),
+                channel: Some("test".to_string()),
             }],
         };
 
