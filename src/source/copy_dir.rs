@@ -187,6 +187,8 @@ impl<'a> CopyDir<'a> {
         let copied_paths = WalkBuilder::new(self.from_path)
             // disregard global gitignore
             .git_global(self.use_git_global)
+            // ignore any .gitignore files from parent directories
+            .parents(false)
             .git_ignore(self.use_gitignore)
             .hidden(self.hidden)
             .build()
