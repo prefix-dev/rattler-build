@@ -32,7 +32,7 @@ impl CommandsTest {
                 folder,
             )
             .with_globvec(globs)
-            .use_gitignore(true)
+            .use_gitignore(false)
             .run()?;
 
             test_files.extend(copy_dir.copied_paths().iter().cloned());
@@ -45,7 +45,7 @@ impl CommandsTest {
                 folder,
             )
             .with_globvec(globs)
-            .use_gitignore(true)
+            .use_gitignore(false)
             .run()?;
 
             test_files.extend(copy_dir.copied_paths().iter().cloned());
