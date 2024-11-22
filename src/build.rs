@@ -55,6 +55,8 @@ pub async fn skip_existing(
         all_channels
     };
 
+    tracing::info!("Looking for existing builds in channels: {:?} / platform {:?}", channels, first_output.host_platform().platform);
+
     let existing = load_repodatas(
         &channels,
         first_output.host_platform().platform,
@@ -76,6 +78,8 @@ pub async fn skip_existing(
             )
         })
         .collect::<std::collections::HashSet<_>>();
+
+    tracing::info!("Found existing builds: {:?}", existing_set);
 
     // Retain only the outputs that do not exist yet
     outputs.retain(|output| {
