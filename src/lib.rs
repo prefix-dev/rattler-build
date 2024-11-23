@@ -59,7 +59,7 @@ use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform};
-use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::{
     parser::{find_outputs_from_src, Dependency, Recipe},
@@ -136,6 +136,7 @@ pub fn get_tool_config(
         .with_bz2_repodata_enabled(args.common.use_zstd)
         .with_skip_existing(args.skip_existing)
         .with_noarch_build_platform(args.noarch_build_platform)
+        .with_channel_priority(args.common.channel_priority.value)
         .finish())
 }
 
@@ -348,7 +349,7 @@ pub async fn get_build_output(
                 )
                 .into_diagnostic()?,
                 channels,
-                channel_priority: ChannelPriority::Strict,
+                channel_priority: tool_config.channel_priority,
                 solve_strategy: SolveStrategy::Highest,
                 timestamp,
                 subpackages: subpackages.clone(),
@@ -467,6 +468,7 @@ pub async fn run_test_from_args(
         )
         .with_zstd_repodata_enabled(args.common.use_zstd)
         .with_bz2_repodata_enabled(args.common.use_zstd)
+        .with_channel_priority(args.common.channel_priority.value)
         .finish();
 
     let channels = args
@@ -486,7 +488,7 @@ pub async fn run_test_from_args(
         current_platform,
         keep_test_prefix: false,
         channels,
-        channel_priority: ChannelPriority::Strict,
+        channel_priority: tool_config.channel_priority,
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
     };

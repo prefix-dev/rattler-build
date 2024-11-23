@@ -4,7 +4,7 @@ use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec, ParseStrictness, Platform};
-use rattler_solve::{ChannelPriority, SolveStrategy};
+use rattler_solve::SolveStrategy;
 
 use crate::{
     metadata::{build_reindexed_channels, Output},
@@ -193,7 +193,7 @@ pub async fn run_build(
                 channels: build_reindexed_channels(&output.build_configuration, tool_configuration)
                     .into_diagnostic()
                     .context("failed to reindex output channel")?,
-                channel_priority: ChannelPriority::Strict,
+                channel_priority: tool_configuration.channel_priority,
                 solve_strategy: SolveStrategy::Highest,
                 tool_configuration: tool_configuration.clone(),
             },

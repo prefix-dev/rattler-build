@@ -7,6 +7,7 @@ use clap_complete::{shells, Generator};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{package::ArchiveType, Platform};
+use rattler_solve::ChannelPriority;
 use rattler_package_streaming::write::CompressionLevel;
 use serde_json::{json, Value};
 use url::Url;
@@ -189,6 +190,29 @@ pub struct CommonOpts {
     /// Path to an auth-file to read authentication information from
     #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
     pub auth_file: Option<PathBuf>,
+
+    /// Channel priority to use when solving
+    #[arg(long, default_value = "strict")]
+    pub channel_priority: ChannelPriorityWrapper,
+}
+
+/// Container for rattler_solver::ChannelPriority so that it can be parsed
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct ChannelPriorityWrapper {
+    /// The ChannelPriority value to be used when building the Configuration
+    pub value: ChannelPriority
+}
+
+impl FromStr for ChannelPriorityWrapper {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "strict" => Ok(ChannelPriorityWrapper { value: ChannelPriority::Strict }),
+            "disabled" => Ok(ChannelPriorityWrapper { value: ChannelPriority::Disabled }),
+            _ => Err("Channel priority must be either 'strict' or 'disabled'".to_string())
+        }
+    }
 }
 
 /// Container for the CLI package format and compression level
