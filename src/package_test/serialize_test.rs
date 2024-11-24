@@ -100,11 +100,19 @@ pub(crate) fn write_test_files(
                 &output.build_configuration.directories.recipe_dir,
                 Some(default_jinja_context(output)),
                 &["sh", "bat"],
-            );
+            )?;
 
             // Replace with rendered contents
-            if let Ok(ResolvedScriptContents::Inline(contents)) = contents {
-                command_test.script.content = ScriptContent::Command(contents)
+            match contents {
+                ResolvedScriptContents::Inline(contents) => {
+                    command_test.script.content = ScriptContent::Command(contents)
+                }
+                ResolvedScriptContents::Path(_path, contents) => {
+                    command_test.script.content = ScriptContent::Command(contents);
+                }
+                ResolvedScriptContents::Missing => {
+                    command_test.script.content = ScriptContent::Command("".to_string());
+                }
             }
         }
     }
