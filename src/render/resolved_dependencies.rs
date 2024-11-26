@@ -249,7 +249,8 @@ pub struct ResolvedDependencies {
     pub resolved: Vec<RepoDataRecord>,
 }
 
-fn short_channel(channel: &str) -> String {
+fn short_channel(channel: Option<&str>) -> String {
+    let channel = channel.unwrap_or_default();
     if channel.contains('/') {
         channel
             .rsplit('/')
@@ -301,7 +302,7 @@ impl ResolvedDependencies {
                     .render(long),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
-                short_channel(&record.channel),
+                short_channel(record.channel.as_deref()),
                 record
                     .package_record
                     .size
@@ -315,7 +316,7 @@ impl ResolvedDependencies {
                 "".to_string(),
                 record.package_record.version.to_string(),
                 record.package_record.build.to_string(),
-                short_channel(&record.channel),
+                short_channel(record.channel.as_deref()),
                 record
                     .package_record
                     .size

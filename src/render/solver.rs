@@ -31,15 +31,16 @@ fn print_as_table(packages: &[RepoDataRecord]) {
         .iter()
         .sorted_by_key(|p| p.package_record.name.as_normalized())
     {
-        let channel_short = if package.channel.contains('/') {
+        let channel_short = if package.channel.as_deref().unwrap_or_default().contains('/') {
             package
                 .channel
-                .rsplit('/')
-                .find(|s| !s.is_empty())
-                .expect("yep will crash if ")
+                .as_ref()
+                .map(|s| s.rsplit('/').find(|s| !s.is_empty()))
+                .flatten()
+                .expect("expected channel to be defined and contain '/'")
                 .to_string()
         } else {
-            package.channel.to_string()
+            package.channel.as_deref().unwrap_or_default().to_string()
         };
 
         table.add_row(vec![

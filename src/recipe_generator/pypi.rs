@@ -1,6 +1,7 @@
 use async_once_cell::OnceCell;
 use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
+use rattler_installs_packages::index::CheckAvailablePackages;
 use rattler_installs_packages::python_env::Pep508EnvMakers;
 use rattler_installs_packages::resolve::solve_options::ResolveOptions;
 use rattler_installs_packages::types::{ArtifactFromSource, Requirement, VersionOrUrl};
@@ -118,6 +119,7 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
         package_sources,
         client_with_middlewares,
         &tempdir_path.join("pkg-db"),
+        CheckAvailablePackages::Always,
     )?);
     let artifacts = package_db.available_artifacts(artifact_request).await?;
 
