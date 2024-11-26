@@ -7,7 +7,7 @@
 Currently only the `build` and `rebuild` commands support the following experimental features.
 
 To enable them, use the `--experimental` flag with the command.
-Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=1`.
+Or, use the environment variable, `RATTLER_BUILD_EXPERIMENTAL=true`.
 
 ## Jinja functions
 
