@@ -180,6 +180,9 @@ pub async fn run_build(
 
     if skip_test {
         tracing::info!("Skipping tests because {}", skip_test_reason);
+        build_reindexed_channels(&output.build_configuration, tool_configuration)
+            .into_diagnostic()
+            .context("failed to reindex output channel")?;
     } else {
         package_test::run_test(
             &result,
