@@ -6,12 +6,12 @@ use std::{path::PathBuf, sync::Arc};
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
-use rattler_solve::ChannelPriority;
 use rattler_networking::{
     authentication_storage::{self, backends::file::FileStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
 };
 use rattler_repodata_gateway::Gateway;
+use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
 
 use crate::console_utils::LoggingOutputHandler;

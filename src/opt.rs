@@ -7,8 +7,8 @@ use clap_complete::{shells, Generator};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use rattler_conda_types::{package::ArchiveType, Platform};
-use rattler_solve::ChannelPriority;
 use rattler_package_streaming::write::CompressionLevel;
+use rattler_solve::ChannelPriority;
 use serde_json::{json, Value};
 use url::Url;
 
@@ -200,7 +200,7 @@ pub struct CommonOpts {
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct ChannelPriorityWrapper {
     /// The ChannelPriority value to be used when building the Configuration
-    pub value: ChannelPriority
+    pub value: ChannelPriority,
 }
 
 impl FromStr for ChannelPriorityWrapper {
@@ -208,9 +208,13 @@ impl FromStr for ChannelPriorityWrapper {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "strict" => Ok(ChannelPriorityWrapper { value: ChannelPriority::Strict }),
-            "disabled" => Ok(ChannelPriorityWrapper { value: ChannelPriority::Disabled }),
-            _ => Err("Channel priority must be either 'strict' or 'disabled'".to_string())
+            "strict" => Ok(ChannelPriorityWrapper {
+                value: ChannelPriority::Strict,
+            }),
+            "disabled" => Ok(ChannelPriorityWrapper {
+                value: ChannelPriority::Disabled,
+            }),
+            _ => Err("Channel priority must be either 'strict' or 'disabled'".to_string()),
         }
     }
 }
