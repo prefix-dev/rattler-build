@@ -180,7 +180,7 @@ The `down_prioritize_variant` option allows you to specify a variant that should
 
 ```yaml title="recipe.yaml" hl_lines="7"
 build:
-  variant_config:
+  variant:
     use_keys:
       # use cuda from the variant config, e.g. to build multiple CUDA variants
       - cuda
