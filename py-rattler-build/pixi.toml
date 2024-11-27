@@ -1,5 +1,5 @@
 [project]
-name = "py-rattler"
+name = "py-rattler-build"
 description = "Add a short description here"
 authors = [
     "Wolf Vollprecht <wolf@prefix.dev>",
@@ -51,7 +51,7 @@ type-check = { cmd = "mypy", depends_on = ["build"] }
 
 # checks for the CI
 fmt-rust-check = "cargo fmt --all --check"
-fmt-python-check = "ruff format rattler examples tests --diff"
+fmt-python-check = "ruff format rattler_build examples tests --diff"
 fmt-check = { depends_on = ["fmt-python-check", "fmt-rust-check"] }
 
 [feature.docs.dependencies]
