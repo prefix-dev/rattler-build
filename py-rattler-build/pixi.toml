@@ -41,7 +41,7 @@ types-networkx = "*"
 
 [feature.test.tasks]
 test = { cmd = "pytest --doctest-modules", depends_on = ["build"] }
-fmt-python = "ruff format rattler examples tests"
+fmt-python = "ruff format rattler_build examples tests"
 fmt-rust = "cargo fmt --all"
 lint-python = "ruff check ."
 lint-rust = "cargo clippy --all"
