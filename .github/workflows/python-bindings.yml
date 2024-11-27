@@ -34,6 +34,7 @@ jobs:
           submodules: recursive
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
+          pixi-version: v0.37.0
           manifest-path: py-rattler-build/pixi.toml
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
