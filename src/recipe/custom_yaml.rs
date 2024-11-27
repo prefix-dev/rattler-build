@@ -668,7 +668,6 @@ impl Eq for MappingNode {}
 impl Hash for MappingNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.value.keys().for_each(|k| k.hash(state));
-        state.finish();
     }
 }
 
