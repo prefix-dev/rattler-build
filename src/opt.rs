@@ -108,6 +108,11 @@ impl Generator for Shell {
     }
 }
 
+/// Get the version of rattler-build.
+pub fn get_rattler_build_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
 #[allow(missing_docs)]
 #[derive(Parser)]
 #[clap(version = crate_version!())]
