@@ -569,7 +569,6 @@ impl Eq for RenderedMappingNode {}
 impl Hash for RenderedMappingNode {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.value.keys().for_each(|k| k.hash(state));
-        state.finish();
     }
 }
 

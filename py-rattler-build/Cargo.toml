@@ -1,0 +1,48 @@
+[package]
+name = "py-rattler-build"
+version = "0.1.0"
+edition = "2021"
+license = "BSD-3-Clause"
+publish = false
+
+[lib]
+name = "rattler_build"
+crate-type = ["cdylib"]
+
+[features]
+default = ["rustls-tls"]
+native-tls = ["rattler-build/native-tls"]
+rustls-tls = ["rattler-build/rustls-tls"]
+
+[dependencies]
+rattler-build = { path = "../" }
+pyo3 = { version = "0.23.2", features = [
+    "abi3-py38",
+    "extension-module",
+    "multiple-pymethods",
+] }
+# pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
+# tokio = { version = "1.41" }
+
+[build-dependencies]
+pyo3-build-config = "0.23.2"
+
+
+[patch.crates-io]
+zip = { git = "https://github.com/wolfv/zip2", branch = "patched"}
+
+rattler = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+
+# Prevent package from thinking it's in the workspace
+[workspace]
