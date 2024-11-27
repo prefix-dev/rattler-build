@@ -11,6 +11,7 @@ use rattler_networking::{
     AuthenticationMiddleware, AuthenticationStorage,
 };
 use rattler_repodata_gateway::Gateway;
+use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
 
 use crate::console_utils::LoggingOutputHandler;
@@ -84,6 +85,9 @@ pub struct Configuration {
 
     /// The repodata gateway to use for querying repodata
     pub repodata_gateway: Gateway,
+
+    /// What channel priority to use in solving
+    pub channel_priority: ChannelPriority,
 }
 
 /// Get the authentication storage from the given file
@@ -136,6 +140,7 @@ pub struct ConfigurationBuilder {
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
+    channel_priority: ChannelPriority,
 }
 
 impl Configuration {
@@ -161,6 +166,7 @@ impl ConfigurationBuilder {
             noarch_build_platform: None,
             channel_config: None,
             compression_threads: None,
+            channel_priority: ChannelPriority::Strict,
         }
     }
 
@@ -269,6 +275,14 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets the channel priority to be used when solving environments
+    pub fn with_channel_priority(self, channel_priority: ChannelPriority) -> Self {
+        Self {
+            channel_priority,
+            ..self
+        }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
@@ -317,6 +331,7 @@ impl ConfigurationBuilder {
             compression_threads: self.compression_threads,
             package_cache,
             repodata_gateway,
+            channel_priority: self.channel_priority,
         }
     }
 }
