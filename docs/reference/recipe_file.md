@@ -843,8 +843,13 @@ outputs:
   - package:
       name: subpackage-name
     build:
-      script: install-subpackage.sh
+      script: install-subpackage
 ```
+
+If `script` lacks a file extension,
+the appropriate extension for the platform will be appended,
+e.g. the above will run `install-subpackage.sh` in `bash` on most platforms
+and `install-subpackage.bat` in `cmd.exe` on Windows.
 
 Each output is built independently. You should take care of not packaging the
 same files twice.
