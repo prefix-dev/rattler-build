@@ -12,6 +12,7 @@ use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, RepoDataRecord};
+use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use url::Url;
 
@@ -260,7 +261,7 @@ pub async fn load_repodatas(
     let result = tool_configuration
         .repodata_gateway
         .query(
-            channels,
+            channels.clone(),
             [target_platform, Platform::NoArch],
             specs.to_vec(),
         )
@@ -290,6 +291,12 @@ pub async fn load_repodatas(
         .multi_progress()
         .clear()
         .unwrap();
+
+    for channel in &channels {
+        tool_configuration
+            .repodata_gateway
+            .clear_repodata_cache(channel, SubdirSelection::All);
+    }
 
     Ok(result)
 }
