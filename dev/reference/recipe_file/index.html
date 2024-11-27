@@ -2566,8 +2566,12 @@ sections.</p>
 </span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">package</span><span class="p">:</span>
 </span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subpackage-name</span>
 </span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a><span class="w">    </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-44-5"><a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">      </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">install-subpackage.sh</span>
+</span><span id="__span-44-5"><a id="__codelineno-44-5" name="__codelineno-44-5" href="#__codelineno-44-5"></a><span class="w">      </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">install-subpackage</span>
 </span></code></pre></div>
+<p>If <code>script</code> lacks a file extension,
+the appropriate extension for the platform will be appended,
+e.g. the above will run <code>install-subpackage.sh</code> in <code>bash</code> on most platforms
+and <code>install-subpackage.bat</code> in <code>cmd.exe</code> on Windows.</p>
 <p>Each output is built independently. You should take care of not packaging the
 same files twice.</p>
 <h3 id="subpackage-requirements">Subpackage requirements<a class="headerlink" href="#subpackage-requirements" title="Permanent link">#</a></h3>
