@@ -19,7 +19,7 @@ use crate::{
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
     },
-    source::copy_dir::{copy_file, create_symlink, CopyOptions},
+    source::copy_dir::{copy_file, create_symlink, CopyDir, CopyOptions},
 };
 
 /// Error type for cache key generation
@@ -39,10 +39,16 @@ pub enum CacheKeyError {
 pub struct Cache {
     /// The requirements that were used to build the cache
     pub requirements: Requirements,
+
     /// The finalized dependencies
     pub finalized_dependencies: FinalizedDependencies,
+
     /// The prefix files that are included in the cache
     pub prefix_files: Vec<(PathBuf, bool)>,
+
+    /// The (dirty) source files that are included in the cache
+    pub work_dir_files: Vec<PathBuf>,
+
     /// The prefix that was used at build time (needs to be replaced when
     /// restoring the files)
     pub prefix: PathBuf,
@@ -135,26 +141,30 @@ impl Output {
             }
         }
 
+        // restore the work dir files
+        let cache_dir_work = cache_dir.join("work_dir");
+        CopyDir::new(&cache_dir_work, &self.build_configuration.directories.work_dir)
+            .run()
+            .into_diagnostic()?;
+
         Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
             ..self.clone()
         })
     }
 
+    /// This will fetch sources and build the cache if it doesn't exist
+    /// Note: this modifies the output in place
     pub(crate) async fn build_or_fetch_cache(
-        &self,
+        mut self,
         tool_configuration: &crate::tool_configuration::Configuration,
     ) -> Result<Self, miette::Error> {
-        // if we don't have a cache, we need to run the cache build with our current
-        // workdir, and then return the cache
-        let span = tracing::info_span!("Running cache build");
-        let _enter = span.enter();
+        if let Some(cache) = self.recipe.cache.clone() {
+            // if we don't have a cache, we need to run the cache build with our current
+            // workdir, and then return the cache
+            let span = tracing::info_span!("Running cache build");
+            let _enter = span.enter();
 
-        let target_platform = self.build_configuration.target_platform;
-        let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
-
-        if let Some(cache) = &self.recipe.cache {
             tracing::info!("Cache key: {:?}", self.cache_key().into_diagnostic()?);
             let cache_key = format!("bld_{}", self.cache_key().into_diagnostic()?);
 
@@ -170,17 +180,26 @@ impl Output {
                 return self.restore_cache(cache_dir).await;
             }
 
+            self = self
+                .fetch_sources(tool_configuration)
+                .await
+                .into_diagnostic()?;
+
+            let target_platform = self.build_configuration.target_platform;
+            let mut env_vars = env_vars::vars(&self, "BUILD");
+            env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
+
             // Reindex the channels
             let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
 
             let finalized_dependencies =
-                resolve_dependencies(&cache.requirements, self, &channels, tool_configuration)
+                resolve_dependencies(&cache.requirements, &self, &channels, tool_configuration)
                     .await
                     .unwrap();
 
-            install_environments(self, &finalized_dependencies, tool_configuration)
+            install_environments(&self, &finalized_dependencies, tool_configuration)
                 .await
                 .into_diagnostic()?;
 
@@ -213,6 +232,7 @@ impl Output {
             let mut creation_cache = HashSet::new();
             let mut copied_files = Vec::new();
             let copy_options = CopyOptions::default();
+
             for file in &new_files.new_files {
                 // skip directories (if they are not a symlink)
                 // directories are implicitly created by the files
@@ -241,11 +261,18 @@ impl Output {
                 }
             }
 
+            // We also need to copy the work dir files to the cache
+            let work_dir_files = CopyDir::new(
+                &self.build_configuration.directories.work_dir.clone(),
+                &cache_dir.join("work_dir"),
+            ).run().into_diagnostic()?;
+
             // save the cache
             let cache = Cache {
                 requirements: cache.requirements.clone(),
                 finalized_dependencies: finalized_dependencies.clone(),
                 prefix_files: copied_files,
+                work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),
             };
 
@@ -254,10 +281,10 @@ impl Output {
 
             Ok(Output {
                 finalized_cache_dependencies: Some(finalized_dependencies),
-                ..self.clone()
+                ..self
             })
         } else {
-            Ok(self.clone())
+            Ok(self)
         }
     }
 }
