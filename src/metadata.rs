@@ -118,7 +118,7 @@ impl Directories {
         timestamp: &DateTime<Utc>,
     ) -> Result<Directories, std::io::Error> {
         if !output_dir.exists() {
-            fs::create_dir(output_dir)?;
+            fs::create_dir_all(output_dir)?;
         }
         let output_dir = canonicalize(output_dir)?;
 
@@ -197,7 +197,7 @@ impl Directories {
         }
 
         if !self.output_dir.exists() {
-            fs::create_dir(&self.output_dir)?;
+            fs::create_dir_all(&self.output_dir)?;
         }
 
         fs::create_dir_all(&self.build_dir)?;
