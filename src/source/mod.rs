@@ -304,8 +304,8 @@ impl Output {
                 self.recipe
                     .sources()
                     .iter()
+                    .filter(|&s| !already_fetched.iter().any(|fetched| fetched == s))
                     .cloned()
-                    .filter(|s| !already_fetched.iter().any(|fetched| fetched == s))
                     .collect()
             } else {
                 self.recipe.sources().to_vec()

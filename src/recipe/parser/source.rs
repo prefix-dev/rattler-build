@@ -531,7 +531,10 @@ pub struct PathSource {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<PathBuf>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
-    #[serde(default = "default_gitignore", skip_serializing_if = "should_not_serialize_use_gitignore")]
+    #[serde(
+        default = "default_gitignore",
+        skip_serializing_if = "should_not_serialize_use_gitignore"
+    )]
     pub use_gitignore: bool,
 }
 
@@ -698,5 +701,4 @@ mod tests {
         let json = serde_json::to_string(&path_source).unwrap();
         serde_json::from_str::<PathSource>(&json).unwrap();
     }
-    
 }
