@@ -61,9 +61,11 @@ use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform, MatchSpec, PackageName};
-use rattler_solve::SolveStrategy;
+use rattler_conda_types::{
+    package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
+};
 use rattler_solve::ChannelPriority;
+use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::{
     parser::{find_outputs_from_src, Dependency, Recipe},
@@ -71,7 +73,7 @@ use recipe::{
 };
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
-use tool_configuration::Configuration;
+use tool_configuration::{Configuration, TestStrategy};
 use variant_config::{ParseErrors, VariantConfig};
 
 use crate::metadata::PlatformWithVirtualPackages;
@@ -426,12 +428,12 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
-    tool_config: Configuration,
+    tool_configuration: Configuration,
 ) -> miette::Result<()> {
     let mut outputs = Vec::new();
     let mut test_queue = Vec::new();
 
-    let outputs_to_build = skip_existing(build_output, &tool_config).await?;
+    let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
 
     let all_output_names = outputs_to_build
         .iter()
@@ -439,7 +441,10 @@ pub async fn run_build_from_args(
         .collect::<Vec<_>>();
 
     for output in outputs_to_build.iter() {
-        let (output, archive) = match run_build(output.clone(), &tool_config).boxed_local().await {
+        let (output, archive) = match run_build(output.clone(), &tool_configuration)
+            .boxed_local()
+            .await
+        {
             Ok((output, archive)) => {
                 output.record_build_end();
                 (output, archive)
@@ -453,8 +458,30 @@ pub async fn run_build_from_args(
 
         // We can now run the tests for the output. However, we need to check if
         // all dependencies that are needed for the test are already built.
-        if tool_config.no_test {
-            tracing::info!("Skipping tests");
+
+        // Decide whether the tests should be skipped or not
+        let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
+            TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
+            TestStrategy::Native => {
+                // Skip if `host_platform != build_platform` and `target_platform != noarch`
+                if output.build_configuration.target_platform != Platform::NoArch
+                    && output.build_configuration.host_platform.platform
+                        != output.build_configuration.build_platform.platform
+                {
+                    let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
+
+                    (true, reason)
+                } else {
+                    (false, "".to_string())
+                }
+            }
+            TestStrategy::NativeAndEmulated => (false, "".to_string()),
+        };
+        if skip_test {
+            tracing::info!("Skipping tests because {}", skip_test_reason);
+            build_reindexed_channels(&output.build_configuration, &tool_configuration)
+                .into_diagnostic()
+                .context("failed to reindex output channel")?;
         } else {
             test_queue.push((output, archive));
 
@@ -474,16 +501,16 @@ pub async fn run_build_from_args(
                         target_platform: Some(output.build_configuration.target_platform),
                         host_platform: Some(output.build_configuration.host_platform.clone()),
                         current_platform: output.build_configuration.build_platform.clone(),
-                        keep_test_prefix: tool_config.no_clean,
+                        keep_test_prefix: tool_configuration.no_clean,
                         channels: build_reindexed_channels(
                             &output.build_configuration,
-                            &tool_config,
+                            &tool_configuration,
                         )
                         .into_diagnostic()
                         .context("failed to reindex output channel")?,
                         channel_priority: ChannelPriority::Strict,
                         solve_strategy: SolveStrategy::Highest,
-                        tool_configuration: tool_config.clone(),
+                        tool_configuration: tool_configuration.clone(),
                     },
                     None,
                 )
