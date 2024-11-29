@@ -143,9 +143,14 @@ impl Output {
 
         // restore the work dir files
         let cache_dir_work = cache_dir.join("work_dir");
-        CopyDir::new(&cache_dir_work, &self.build_configuration.directories.work_dir)
-            .run()
-            .into_diagnostic()?;
+        let result = CopyDir::new(
+            &cache_dir_work,
+            &self.build_configuration.directories.work_dir,
+        )
+        .run()
+        .into_diagnostic()?;
+
+        tracing::info!("Restored source files from cache");
 
         Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
@@ -265,7 +270,9 @@ impl Output {
             let work_dir_files = CopyDir::new(
                 &self.build_configuration.directories.work_dir.clone(),
                 &cache_dir.join("work_dir"),
-            ).run().into_diagnostic()?;
+            )
+            .run()
+            .into_diagnostic()?;
 
             // save the cache
             let cache = Cache {

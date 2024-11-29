@@ -164,8 +164,10 @@ pub async fn get_build_output(
     }
 
     let mut host_platform = args.host_platform;
+
     // If target_platform is not set, we default to the host platform
     let target_platform = args.target_platform.unwrap_or(host_platform);
+
     // If target_platform is set and host_platform is not, then we default
     // host_platform to the target_platform
     if let Some(target_platform) = args.target_platform {
@@ -268,6 +270,12 @@ pub async fn get_build_output(
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
+
+    let global_build_name = outputs_and_variants
+        .first()
+        .map(|o| o.name.clone())
+        .unwrap_or_default();
+
     for discovered_output in outputs_and_variants {
         let hash =
             HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
@@ -313,9 +321,13 @@ pub async fn get_build_output(
             },
         );
 
-        let name = recipe.package().name().clone();
-        // Add the channels from the args and by default always conda-forge
+        let build_name = if recipe.cache.is_some() {
+            global_build_name.clone()
+        } else {
+            recipe.package().name().as_normalized().to_string()
+        };
 
+        // Add the channels from the args and by default always conda-forge
         let channels = args
             .channel
             .clone()
@@ -341,7 +353,7 @@ pub async fn get_build_output(
                 hash,
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
-                    name.as_normalized(),
+                    &build_name,
                     recipe_path,
                     &output_dir,
                     args.no_build_id,
