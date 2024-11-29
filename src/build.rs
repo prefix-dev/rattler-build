@@ -118,7 +118,7 @@ pub async fn run_build(
         output.build_or_fetch_cache(tool_configuration).await?
     } else {
         output
-            .fetch_sources(tool_configuration)
+            .fetch_sources(None, tool_configuration)
             .await
             .into_diagnostic()?
     };

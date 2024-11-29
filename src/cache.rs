@@ -15,7 +15,7 @@ use crate::{
     env_vars,
     metadata::{build_reindexed_channels, Output},
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
-    recipe::parser::{Dependency, Requirements},
+    recipe::parser::{Dependency, Requirements, Source},
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
     },
@@ -52,6 +52,9 @@ pub struct Cache {
     /// The prefix that was used at build time (needs to be replaced when
     /// restoring the files)
     pub prefix: PathBuf,
+
+    /// The sources that were already present in the `work_dir`
+    pub sources: Vec<Source>,
 }
 
 impl Output {
@@ -107,11 +110,11 @@ impl Output {
     }
 
     /// Restore an existing cache from a cache directory
-    async fn restore_cache(&self, cache_dir: PathBuf) -> Result<Output, miette::Error> {
-        let cache: Cache = serde_json::from_str(
-            &fs::read_to_string(cache_dir.join("cache.json")).into_diagnostic()?,
-        )
-        .into_diagnostic()?;
+    async fn restore_cache(
+        &self,
+        cache: Cache,
+        cache_dir: PathBuf,
+    ) -> Result<Output, miette::Error> {
         let copy_options = CopyOptions {
             skip_exist: true,
             ..Default::default()
@@ -143,7 +146,7 @@ impl Output {
 
         // restore the work dir files
         let cache_dir_work = cache_dir.join("work_dir");
-        let result = CopyDir::new(
+        CopyDir::new(
             &cache_dir_work,
             &self.build_configuration.directories.work_dir,
         )
@@ -181,12 +184,27 @@ impl Output {
 
             // restore the cache if it exists by copying the files to the prefix
             if cache_dir.exists() {
-                tracing::info!("Restoring cache from {:?}", cache_dir);
-                return self.restore_cache(cache_dir).await;
+                let text = fs::read_to_string(cache_dir.join("cache.json")).into_diagnostic()?;
+                match serde_json::from_str::<Cache>(&text) {
+                    Ok(cache) => {
+                        tracing::info!("Restoring cache from {:?}", cache_dir);
+                        self = self
+                            .fetch_sources(Some(cache.sources.clone()), tool_configuration)
+                            .await
+                            .into_diagnostic()?;
+                        return self.restore_cache(cache, cache_dir).await;
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to parse cache: {:?} - rebuilding", e);
+                        tracing::info!("JSON: {}", text);
+                        // remove the cache dir and run as normal
+                        fs::remove_dir_all(&cache_dir).into_diagnostic()?;
+                    }
+                }
             }
 
             self = self
-                .fetch_sources(tool_configuration)
+                .fetch_sources(None, tool_configuration)
                 .await
                 .into_diagnostic()?;
 
@@ -281,6 +299,7 @@ impl Output {
                 prefix_files: copied_files,
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),
+                sources: self.recipe.source.clone(),
             };
 
             let cache_file = cache_dir.join("cache.json");
