@@ -52,9 +52,6 @@ pub struct Cache {
     /// The prefix that was used at build time (needs to be replaced when
     /// restoring the files)
     pub prefix: PathBuf,
-
-    /// The sources that were already present in the `work_dir`
-    pub sources: Vec<Source>,
 }
 
 impl Output {
