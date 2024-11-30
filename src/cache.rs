@@ -1,12 +1,10 @@
 //! Functions to deal with the build cache
 use std::{
     collections::{BTreeMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use fs_err as fs;
-use memchr::memmem;
-use memmap2::Mmap;
 use miette::{Context, IntoDiagnostic};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -14,7 +12,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     env_vars,
     metadata::{build_reindexed_channels, Output},
-    packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
+    packaging::Files,
     recipe::parser::{Dependency, Requirements},
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
@@ -47,7 +45,7 @@ pub struct Cache {
     pub finalized_dependencies: FinalizedDependencies,
 
     /// The prefix files that are included in the cache
-    pub prefix_files: Vec<(PathBuf, bool)>,
+    pub prefix_files: Vec<PathBuf>,
 
     /// The (dirty) source files that are included in the cache
     pub work_dir_files: Vec<PathBuf>,
@@ -97,13 +95,11 @@ impl Output {
                 self.build_configuration.build_platform.platform.to_string(),
             );
 
-            let cache_key = (cache, selected_variant);
+            let cache_key = (cache, selected_variant, self.prefix());
             // serialize to json and hash
             let mut hasher = Sha256::new();
-            let serialized = serde_json::to_string(&cache_key)?;
-            hasher.update(serialized.as_bytes());
-            let result = hasher.finalize();
-            Ok(format!("{:x}", result))
+            cache_key.serialize(&mut serde_json::Serializer::new(&mut hasher))?;
+            Ok(format!("{:x}", hasher.finalize()))
         } else {
             Err(CacheKeyError::NoCacheKeyAvailable)
         }
@@ -122,7 +118,7 @@ impl Output {
         let cache_prefix = cache.prefix;
 
         let mut paths_created = HashSet::new();
-        for (file, has_prefix) in &cache.prefix_files {
+        for file in &cache.prefix_files {
             tracing::info!("Restoring from cache: {:?}", file);
             let dest = self.prefix().join(file);
             let source = &cache_dir.join("prefix").join(file);
@@ -137,10 +133,6 @@ impl Output {
                     fs::remove_file(&dest).into_diagnostic()?;
                     create_symlink(&new_symlink_target, &dest).into_diagnostic()?;
                 }
-            }
-
-            if *has_prefix {
-                replace_prefix(&dest, &cache_prefix, self.prefix())?;
             }
         }
 
@@ -274,21 +266,7 @@ impl Output {
                     .expect("File should be in prefix");
                 let dest = &prefix_cache_dir.join(stripped);
                 copy_file(file, dest, &mut creation_cache, &copy_options).into_diagnostic()?;
-
-                // Defend against broken symlinks here!
-                if !file.is_symlink() {
-                    // check if the file contains the prefix
-                    let content_type = content_type(file).into_diagnostic()?;
-                    let has_prefix = if content_type.map(|c| c.is_text()).unwrap_or(false) {
-                        contains_prefix_text(file, self.prefix(), self.target_platform())
-                    } else {
-                        contains_prefix_binary(file, self.prefix())
-                    }
-                    .into_diagnostic()?;
-                    copied_files.push((stripped.to_path_buf(), has_prefix));
-                } else {
-                    copied_files.push((stripped.to_path_buf(), false));
-                }
+                copied_files.push(stripped.to_path_buf());
             }
 
             // We also need to copy the work dir files to the cache
@@ -320,47 +298,4 @@ impl Output {
             Ok(self)
         }
     }
-}
-
-/// Simple replace prefix function that does a direct replacement without any
-/// padding considerations because we know that the prefix is the same length as
-/// the original prefix.
-fn replace_prefix(file: &Path, old_prefix: &Path, new_prefix: &Path) -> Result<(), miette::Error> {
-    // mmap the file, and use the fast string search to find the prefix
-    let output = {
-        let map_file = fs::File::open(file).into_diagnostic()?;
-        let mmap = unsafe { Mmap::map(&map_file).into_diagnostic()? };
-        let new_prefix_bytes = new_prefix.as_os_str().as_encoded_bytes();
-        let old_prefix_bytes = old_prefix.as_os_str().as_encoded_bytes();
-
-        // if the prefix is the same, we don't need to do anything
-        if old_prefix == new_prefix {
-            return Ok(());
-        }
-
-        assert_eq!(
-            new_prefix_bytes.len(),
-            old_prefix_bytes.len(),
-            "Prefixes must have the same length: {:?} != {:?}",
-            new_prefix,
-            old_prefix
-        );
-
-        let mut output = Vec::with_capacity(mmap.len());
-        let mut last_match_end = 0;
-        let finder = memmem::Finder::new(old_prefix_bytes);
-
-        while let Some(index) = finder.find(&mmap[last_match_end..]) {
-            let absolute_index = last_match_end + index;
-            output.extend_from_slice(&mmap[last_match_end..absolute_index]);
-            output.extend_from_slice(new_prefix_bytes);
-            last_match_end = absolute_index + new_prefix_bytes.len();
-        }
-        output.extend_from_slice(&mmap[last_match_end..]);
-        output
-        // close file & mmap at end of scope
-    };
-
-    // overwrite the file
-    fs::write(file, output).into_diagnostic()
 }
