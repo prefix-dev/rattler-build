@@ -283,7 +283,6 @@ impl Output {
     /// Fetches the sources for the given output and returns a new output with the finalized sources attached
     pub async fn fetch_sources(
         self,
-        already_fetched: Option<Vec<Source>>,
         tool_configuration: &tool_configuration::Configuration,
     ) -> Result<Self, SourceError> {
         let span = tracing::info_span!("Fetching source code");
@@ -300,19 +299,8 @@ impl Output {
 
             Ok(self)
         } else {
-            let sources_to_fetch = if let Some(already_fetched) = already_fetched {
-                self.recipe
-                    .sources()
-                    .iter()
-                    .filter(|&s| !already_fetched.iter().any(|fetched| fetched == s))
-                    .cloned()
-                    .collect()
-            } else {
-                self.recipe.sources().to_vec()
-            };
-
             let rendered_sources = fetch_sources(
-                &sources_to_fetch,
+                &self.recipe.sources(),
                 &self.build_configuration.directories,
                 &self.system_tools,
                 tool_configuration,

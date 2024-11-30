@@ -15,11 +15,14 @@ use crate::{
     env_vars,
     metadata::{build_reindexed_channels, Output},
     packaging::{contains_prefix_binary, contains_prefix_text, content_type, Files},
-    recipe::parser::{Dependency, Requirements, Source},
+    recipe::parser::{Dependency, Requirements},
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
     },
-    source::copy_dir::{copy_file, create_symlink, CopyDir, CopyOptions},
+    source::{
+        copy_dir::{copy_file, create_symlink, CopyDir, CopyOptions},
+        fetch_sources,
+    },
 };
 
 /// Error type for cache key generation
@@ -186,7 +189,7 @@ impl Output {
                     Ok(cache) => {
                         tracing::info!("Restoring cache from {:?}", cache_dir);
                         self = self
-                            .fetch_sources(Some(cache.sources.clone()), tool_configuration)
+                            .fetch_sources(tool_configuration)
                             .await
                             .into_diagnostic()?;
                         return self.restore_cache(cache, cache_dir).await;
@@ -200,10 +203,16 @@ impl Output {
                 }
             }
 
-            self = self
-                .fetch_sources(None, tool_configuration)
-                .await
-                .into_diagnostic()?;
+            // fetch the sources for the `cache` section
+            // TODO store them as finalized?!
+            fetch_sources(
+                &cache.source,
+                &self.build_configuration.directories,
+                &self.system_tools,
+                tool_configuration,
+            )
+            .await
+            .into_diagnostic()?;
 
             let target_platform = self.build_configuration.target_platform;
             let mut env_vars = env_vars::vars(&self, "BUILD");
@@ -296,7 +305,6 @@ impl Output {
                 prefix_files: copied_files,
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),
-                sources: self.recipe.source.clone(),
             };
 
             let cache_file = cache_dir.join("cache.json");
