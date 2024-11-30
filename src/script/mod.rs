@@ -1,17 +1,14 @@
-#![allow(missing_docs)]
+//! Module for running scripts in different interpreters.
+mod interpreter;
+
+use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
+use interpreter::{BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PythonInterpreter, PerlInterpreter};
 use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;
-use rattler_shell::activation::{prefix_path_entries, PathModificationBehavior};
-use rattler_shell::shell::{NuShell, ShellEnum};
-use rattler_shell::{
-    activation::{ActivationError, ActivationVariables, Activator},
-    shell::{self, Shell},
-};
 use std::collections::HashSet;
 use std::ffi::OsStr;
-use std::io::Error;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -28,29 +25,25 @@ use crate::{
     },
 };
 
-const BASH_PREAMBLE: &str = r#"#!/bin/bash
-## Start of bash preamble
-if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
-fi
-# enable debug mode for the rest of the script
-set -x
-## End of preamble
-"#;
-
-const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
-
+/// Arguments for executing a script in a given interpreter.
 #[derive(Debug)]
 pub struct ExecutionArgs {
+    /// Contents of the script to execute
     pub script: ResolvedScriptContents,
+    /// Environment variables to set before executing the script
     pub env_vars: IndexMap<String, String>,
+    /// Secrets to set as env vars and replace in the output
     pub secrets: IndexMap<String, String>,
 
+    /// The platform on which the script should be executed
     pub execution_platform: Platform,
 
+    /// The build prefix that should contain the interpreter to use
     pub build_prefix: Option<PathBuf>,
+    /// The prefix to use for the script execution
     pub run_prefix: PathBuf,
 
+    /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
 }
 
@@ -91,376 +84,19 @@ impl ExecutionArgs {
     }
 }
 
-fn find_interpreter(
-    name: &str,
-    build_prefix: Option<&PathBuf>,
-    platform: &Platform,
-) -> Result<Option<PathBuf>, which::Error> {
-    let exe_name = format!("{}{}", name, std::env::consts::EXE_SUFFIX);
-
-    let path = std::env::var("PATH").unwrap_or_default();
-    if let Some(build_prefix) = build_prefix {
-        let mut prepend_path = prefix_path_entries(build_prefix, platform)
-            .into_iter()
-            .collect::<Vec<_>>();
-        prepend_path.extend(std::env::split_paths(&path));
-        return Ok(
-            which::which_in_global(exe_name, std::env::join_paths(prepend_path).ok())?.next(),
-        );
-    }
-
-    Ok(which::which_in_global(exe_name, Some(path))?.next())
-}
-
-trait Interpreter {
-    fn get_script<T: Shell + Copy + 'static>(
-        &self,
-        args: &ExecutionArgs,
-        shell_type: T,
-    ) -> Result<String, ActivationError> {
-        let mut shell_script = shell::ShellScript::new(shell_type, Platform::current());
-        for (k, v) in args.env_vars.iter() {
-            shell_script.set_env_var(k, v)?;
-        }
-        let host_prefix_activator =
-            Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
-
-        let current_path = std::env::var(shell_type.path_var(&args.execution_platform))
-            .ok()
-            .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
-        let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-
-        let activation_vars = ActivationVariables {
-            conda_prefix,
-            path: current_path,
-            path_modification_behavior: Default::default(),
-        };
-
-        let host_activation = host_prefix_activator.activation(activation_vars)?;
-
-        if let Some(build_prefix) = &args.build_prefix {
-            let build_prefix_activator =
-                Activator::from_path(build_prefix, shell_type, args.execution_platform)?;
-
-            let activation_vars = ActivationVariables {
-                conda_prefix: None,
-                path: Some(host_activation.path.clone()),
-                path_modification_behavior: Default::default(),
-            };
-
-            let build_activation = build_prefix_activator.activation(activation_vars)?;
-            shell_script.append_script(&host_activation.script);
-            shell_script.append_script(&build_activation.script);
-        } else {
-            shell_script.append_script(&host_activation.script);
-        }
-
-        Ok(shell_script.contents()?)
-    }
-
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error>;
-
-    #[allow(dead_code)]
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error>;
-}
-
-struct BashInterpreter;
-
-impl Interpreter for BashInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
-        let script = self.get_script(&args, shell::Bash).unwrap();
-
-        let build_env_path = args.work_dir.join("build_env.sh");
-        let build_script_path = args.work_dir.join("conda_build.sh");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
-        let script = format!("{}\n{}", preamble, args.script.script());
-        tokio::fs::write(&build_script_path, script).await?;
-
-        let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["bash", "-e", &build_script_path_str];
-
-        let output = run_process_with_replacements(
-            &cmd_args,
-            &args.work_dir,
-            &args.replacements("$((var))"),
-        )
-        .await?;
-
-        if !output.status.success() {
-            let status_code = output.status.code().unwrap_or(1);
-            tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Script failed".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("bash", build_prefix, platform)
-    }
-}
-
-struct NuShellInterpreter;
-
-const NUSHELL_PREAMBLE: &str = r#"
-## Start of bash preamble
-if not ("CONDA_BUILD" in $env) {
-    source-env ((script_path))
-}
-
-## End of preamble
-"#;
-
-impl Interpreter for NuShellInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), Error> {
-        let host_shell_type = ShellEnum::default();
-        let nushell = ShellEnum::NuShell(Default::default());
-
-        // Create a map of environment variables to pass to the shell script
-        let mut activation_variables: HashMap<_, _> = HashMap::from_iter(args.env_vars.clone());
-
-        // Read some of the current environment variables
-        let current_path = std::env::var(nushell.path_var(&args.execution_platform))
-            .map(|p| std::env::split_paths(&p).collect_vec())
-            .ok();
-        let current_conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
-
-        // Run the activation script for the host environment.
-        let activation_vars = ActivationVariables {
-            conda_prefix: current_conda_prefix,
-            path: current_path,
-            path_modification_behavior: PathModificationBehavior::default(),
-        };
-
-        let host_prefix_activator = Activator::from_path(
-            &args.run_prefix,
-            host_shell_type.clone(),
-            args.execution_platform,
-        )
-        .unwrap();
-
-        let host_activation_variables = host_prefix_activator
-            .run_activation(activation_vars, None)
-            .unwrap();
-
-        // Overwrite the current environment variables with the one from the activated host environment.
-        activation_variables.extend(host_activation_variables);
-
-        // If there is a build environment run the activation script for that environment and extend
-        // the activation variables with the new environment variables.
-        if let Some(build_prefix) = &args.build_prefix {
-            let build_prefix_activator =
-                Activator::from_path(build_prefix, host_shell_type, args.execution_platform)
-                    .unwrap();
-
-            let activation_vars = ActivationVariables {
-                conda_prefix: None,
-                path: activation_variables
-                    .get(nushell.path_var(&args.execution_platform))
-                    .map(|path| std::env::split_paths(&path).collect()),
-                path_modification_behavior: PathModificationBehavior::default(),
-            };
-
-            let build_activation = build_prefix_activator
-                .run_activation(activation_vars, None)
-                .unwrap();
-
-            activation_variables.extend(build_activation);
-        }
-
-        // Construct a shell script with the activation variables.
-        let mut shell_script = shell::ShellScript::new(NuShell, Platform::current());
-        for (k, v) in activation_variables.iter() {
-            shell_script.set_env_var(k, v).unwrap();
-        }
-        let script = shell_script
-            .contents()
-            .expect("failed to construct shell script");
-
-        let build_env_path = args.work_dir.join("build_env.nu");
-        let build_script_path = args.work_dir.join("conda_build.nu");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let preamble =
-            NUSHELL_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
-        let script = format!("{}\n{}", preamble, args.script.script());
-        tokio::fs::write(&build_script_path, script).await?;
-
-        let build_script_path_str = build_script_path.to_string_lossy().to_string();
-
-        let nu_path =
-            match find_interpreter("nu", args.build_prefix.as_ref(), &args.execution_platform) {
-                Ok(Some(path)) => path,
-                _ => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "NuShell executable not found in PATH",
-                    ));
-                }
-            }
-            .to_string_lossy()
-            .to_string();
-
-        let cmd_args = [nu_path.as_str(), build_script_path_str.as_str()];
-
-        let output = run_process_with_replacements(
-            &cmd_args,
-            &args.work_dir,
-            &args.replacements("$((var))"),
-        )
-        .await?;
-
-        if !output.status.success() {
-            let status_code = output.status.code().unwrap_or(1);
-            tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Script failed".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("nu", build_prefix, platform)
-    }
-}
-
-const CMDEXE_PREAMBLE: &str = r#"
-@chcp 65001 > nul
-@echo on
-IF "%CONDA_BUILD%" == "" (
-    @rem special behavior from conda-build for Windows
-    call ((script_path))
-)
-@rem re-enable echo because the activation scripts might have messed with it
-@echo on
-"#;
-
-struct CmdExeInterpreter;
-
-impl Interpreter for CmdExeInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
-        let script = self.get_script(&args, shell::CmdExe).unwrap();
-
-        let build_env_path = args.work_dir.join("build_env.bat");
-        let build_script_path = args.work_dir.join("conda_build.bat");
-
-        tokio::fs::write(&build_env_path, script).await?;
-
-        let build_script = format!(
-            "{}\n{}",
-            CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
-            args.script.script()
-        );
-        tokio::fs::write(
-            &build_script_path,
-            &build_script.replace('\n', "\r\n").as_bytes(),
-        )
-        .await?;
-
-        let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["cmd.exe", "/d", "/c", &build_script_path_str];
-
-        let output = run_process_with_replacements(
-            &cmd_args,
-            &args.work_dir,
-            &args.replacements("%((var))%"),
-        )
-        .await?;
-
-        if !output.status.success() {
-            let status_code = output.status.code().unwrap_or(1);
-            tracing::error!("Script failed with status {}", status_code);
-            tracing::error!("Work directory: '{}'", args.work_dir.display());
-            tracing::error!("{}", DEBUG_HELP);
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Script failed".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
-
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        // check if COMSPEC is set to cmd.exe
-        if let Ok(comspec) = std::env::var("COMSPEC") {
-            if comspec.to_lowercase().contains("cmd.exe") {
-                return Ok(Some(PathBuf::from(comspec)));
-            }
-        }
-
-        // check if cmd.exe is in PATH
-        find_interpreter("cmd", build_prefix, platform)
-    }
-}
-
-struct PythonInterpreter;
-
-// python interpreter calls either bash or cmd.exe interpreter for activation and then runs python script
-impl Interpreter for PythonInterpreter {
-    async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
-        let py_script = args.work_dir.join("conda_build_script.py");
-        tokio::fs::write(&py_script, args.script.script()).await?;
-
-        let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(format!("python {:?}", py_script)),
-            ..args
-        };
-
-        if cfg!(windows) {
-            CmdExeInterpreter.run(args).await
-        } else {
-            BashInterpreter.run(args).await
-        }
-    }
-
-    async fn find_interpreter(
-        &self,
-        build_prefix: Option<&PathBuf>,
-        platform: &Platform,
-    ) -> Result<Option<PathBuf>, which::Error> {
-        find_interpreter("python", build_prefix, platform)
-    }
-}
-
+/// The resolved contents of a script.
 #[derive(Debug)]
 pub enum ResolvedScriptContents {
+    /// The script contents as loaded from a file (path, contents)
     Path(PathBuf, String),
+    /// The script contents from an inline YAML string
     Inline(String),
+    /// There are no script contents
     Missing,
 }
 
 impl ResolvedScriptContents {
+    /// Get the script contents as a string
     pub fn script(&self) -> &str {
         match self {
             ResolvedScriptContents::Path(_, script) => script,
@@ -469,6 +105,7 @@ impl ResolvedScriptContents {
         }
     }
 
+    /// Get the path to the script file (if it was loaded from a file)
     pub fn path(&self) -> Option<&Path> {
         match self {
             ResolvedScriptContents::Path(path, _) => Some(path),
@@ -578,6 +215,7 @@ impl Script {
         }
     }
 
+    /// Run the script with the given parameters
     pub async fn run_script(
         &self,
         env_vars: HashMap<String, Option<String>>,
@@ -693,6 +331,7 @@ impl Script {
             "bash" => BashInterpreter.run(exec_args).await?,
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
             "python" => PythonInterpreter.run(exec_args).await?,
+            "perl" => PerlInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
@@ -722,6 +361,7 @@ impl Output {
             .collect()
     }
 
+    /// Run the build script for the output as defined in the YAML `build.script`.
     pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
         let span = tracing::info_span!("Running build script");
         let _enter = span.enter();
