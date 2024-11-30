@@ -288,29 +288,19 @@ impl Output {
         let span = tracing::info_span!("Fetching source code");
         let _enter = span.enter();
 
-        if let Some(finalized_sources) = &self.finalized_sources {
-            fetch_sources(
-                finalized_sources,
-                &self.build_configuration.directories,
-                &self.system_tools,
-                tool_configuration,
-            )
-            .await?;
+        let rendered_sources = fetch_sources(
+            self.finalized_sources
+                .as_deref()
+                .unwrap_or(self.recipe.sources()),
+            &self.build_configuration.directories,
+            &self.system_tools,
+            tool_configuration,
+        )
+        .await?;
 
-            Ok(self)
-        } else {
-            let rendered_sources = fetch_sources(
-                &self.recipe.sources(),
-                &self.build_configuration.directories,
-                &self.system_tools,
-                tool_configuration,
-            )
-            .await?;
-
-            Ok(Output {
-                finalized_sources: Some(rendered_sources),
-                ..self
-            })
-        }
+        Ok(Output {
+            finalized_sources: Some(rendered_sources),
+            ..self
+        })
     }
 }

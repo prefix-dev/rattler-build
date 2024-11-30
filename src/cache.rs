@@ -204,9 +204,10 @@ impl Output {
             }
 
             // fetch the sources for the `cache` section
-            // TODO store them as finalized?!
-            fetch_sources(
-                &cache.source,
+            let rendered_sources = fetch_sources(
+                self.finalized_cache_sources
+                    .as_ref()
+                    .unwrap_or(&cache.source),
                 &self.build_configuration.directories,
                 &self.system_tools,
                 tool_configuration,
@@ -312,6 +313,7 @@ impl Output {
 
             Ok(Output {
                 finalized_cache_dependencies: Some(finalized_dependencies),
+                finalized_cache_sources: Some(rendered_sources),
                 ..self
             })
         } else {

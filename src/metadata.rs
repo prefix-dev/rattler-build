@@ -404,12 +404,17 @@ pub struct Output {
     /// dependencies have not been resolved yet. During the `run_build`
     /// functions, the dependencies are resolved and this field is filled.
     pub finalized_dependencies: Option<FinalizedDependencies>,
-    /// The finalized dependencies from the cache (if there is a cache
-    /// instruction)
-    pub finalized_cache_dependencies: Option<FinalizedDependencies>,
     /// The finalized sources for this output. Contain the exact git hashes for
     /// the sources that are used to build this output.
     pub finalized_sources: Option<Vec<Source>>,
+
+    /// The finalized dependencies from the cache (if there is a cache
+    /// instruction)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finalized_cache_dependencies: Option<FinalizedDependencies>,
+    /// The finalized sources from the cache (if there is a cache instruction)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finalized_cache_sources: Option<Vec<Source>>,
 
     /// Summary of the build
     #[serde(skip)]
