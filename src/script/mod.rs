@@ -3,7 +3,9 @@ mod interpreter;
 
 use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
-use interpreter::{BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PythonInterpreter, PerlInterpreter};
+use interpreter::{
+    BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
+};
 use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;

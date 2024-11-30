@@ -1,16 +1,16 @@
 mod bash;
 mod cmd_exe;
 mod nushell;
-mod python;
 mod perl;
+mod python;
 
 use std::path::PathBuf;
 
 pub(crate) use bash::BashInterpreter;
 pub(crate) use cmd_exe::CmdExeInterpreter;
 pub(crate) use nushell::NuShellInterpreter;
-pub(crate) use python::PythonInterpreter;
 pub(crate) use perl::PerlInterpreter;
+pub(crate) use python::PythonInterpreter;
 
 use rattler_conda_types::Platform;
 use rattler_shell::{
