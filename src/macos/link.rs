@@ -257,9 +257,21 @@ impl Relinker for Dylib {
         }
 
         if modified {
+            // log the permissions on the file
+            let mut perms = std::fs::metadata(&self.path)?.permissions();
+            if perms.readonly() {
+                tracing::info!("Making file writable: {}", self.path.display());
+                perms.set_readonly(false);
+                std::fs::set_permissions(&self.path, perms)?;
+            }
             // run builtin relink. if it fails, try install_name_tool
-            if relink(&self.path, &changes).is_err() {
-                install_name_tool(&self.path, &changes, system_tools)?;
+            match relink(&self.path, &changes) {
+                Err(e) => {
+                    assert!(self.path.exists());
+                    tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
+                    install_name_tool(&self.path, &changes, system_tools)?;
+                }
+                Ok(_) => {}
             }
             codesign(&self.path, system_tools)?;
         }
@@ -402,7 +414,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         let new_path = new_path.as_bytes();
 
         if new_path.len() > old_path.len() {
-            tracing::debug!(
+            tracing::info!(
                 "new path is longer than old path: {} > {}",
                 new_path.len(),
                 old_path.len()
