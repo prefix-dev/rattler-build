@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from helpers import RattlerBuild, get_extracted_package
+from syrupy.filters import paths as filter_paths
 
 
 @pytest.mark.skipif(
@@ -34,10 +35,11 @@ def test_symlink_cache(
 
     paths_json = pkg / "info/paths.json"
     j = json.loads(paths_json.read_text())
-    assert snapshot_json == j
+    # prefix placeholder always changes, and we test it later
+    assert snapshot_json(exclude=filter_paths("paths.4.prefix_placeholder")) == j
 
     paths = j["paths"]
-    assert len(paths) == 5
+    assert len(paths) == 6
     for p in paths:
         if "symlink" in p["_path"]:
             assert p["path_type"] == "softlink"
@@ -61,3 +63,13 @@ def test_symlink_cache(
     relative_symlink = pkg / "bin/exe-symlink"
     assert relative_symlink.is_symlink()
     assert relative_symlink.readlink() == Path("exe")
+
+    prefix_txt = pkg / "prefix.txt"
+    assert prefix_txt.exists()
+    contents = prefix_txt.read_text()
+    assert contents.len() > 0
+    # find the path in paths.json for the prefix.txt
+    for p in paths:
+        if p["_path"] == "prefix.txt":
+            assert p["path_type"] == "hardlink"
+            assert p["prefix_placeholder"] == contents.strip()

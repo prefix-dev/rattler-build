@@ -14,6 +14,7 @@ cache:
       ln -s $PREFIX/foo.txt $PREFIX/absolute-symlink.txt
       ln -s $PREFIX/non-existent-file $PREFIX/broken-symlink.txt
       ln -s ./foo.txt $PREFIX/relative-symlink.txt
+      echo ${{ PREFIX }} > $PREFIX/prefix.txt
 
 outputs:
   - package:
