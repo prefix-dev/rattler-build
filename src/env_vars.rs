@@ -273,16 +273,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     );
 
     let hash = output.build_configuration.hash.clone();
-    insert!(
-        vars,
-        "PKG_BUILD_STRING",
-        output
-            .recipe
-            .build()
-            .string()
-            .resolve(&hash, output.recipe.build().number)
-            .into_owned()
-    );
+    insert!(vars, "PKG_BUILD_STRING", output.build_string().to_string());
     insert!(vars, "PKG_HASH", hash);
 
     if output.build_configuration.cross_compilation() {

@@ -10,7 +10,7 @@ use crate::{
     env_vars,
     hash::HashInfo,
     normalized_key::NormalizedKey,
-    recipe::{custom_yaml::Node, parser::Dependency, ParsingError, Recipe},
+    recipe::{custom_yaml::Node, parser::Dependency, Jinja, ParsingError, Recipe},
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
     variant_config::{ParseErrors, VariantConfig, VariantError},
@@ -201,11 +201,22 @@ impl Stage1Render {
         let variant = self.variant_for_output(idx);
         let recipe = &self.stage_0_render.rendered_outputs[self.order[idx]];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
+
         let build_string = recipe
             .build()
             .string()
-            .resolve(&hash, recipe.build().number)
+            .resolve(&hash, recipe.build().number, &variant)
             .into_owned();
+
+        // original build string
+        let original_recipe = &self.stage_0_render.raw_outputs.vec[self.order[idx]];
+        let original_build_string = original_recipe
+            .as_mapping()
+            .unwrap()
+            .get("build")
+            .map(|x| x.as_mapping().unwrap().get("string"));
+
+        println!("original build string: {:?}", original_build_string);
 
         build_string
     }

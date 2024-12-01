@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use rattler_conda_types::{package::EntryPoint, NoArchType};
@@ -6,11 +7,13 @@ use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};
 use super::{Dependency, FlattenErrors, SerializableRegex};
+use crate::normalized_key::NormalizedKey;
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
 
 use crate::hash::HashInfo;
+use crate::recipe::Jinja;
 use crate::validate_keys;
 use crate::{
     _partialerror,
@@ -118,8 +121,12 @@ pub struct Build {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(from = "Option<String>", into = "Option<String>")]
 pub enum BuildString {
-    /// The build string is explicitly set by the user.
+    /// The build string is explicitly set by the user. This is the
+    /// source template with unresolved Jinja variables.
     UserSpecified(String),
+
+    /// The build string is resolved and should be used as is.
+    Resolved(String),
 
     /// The build string should be derived from the variants
     #[default]
@@ -128,14 +135,15 @@ pub enum BuildString {
 
 impl From<Option<String>> for BuildString {
     fn from(value: Option<String>) -> Self {
-        value.map_or_else(|| BuildString::Derived, BuildString::UserSpecified)
+        value.map_or_else(|| BuildString::Derived, BuildString::Resolved)
     }
 }
 
 impl From<BuildString> for Option<String> {
     fn from(value: BuildString) -> Self {
         match value {
-            BuildString::UserSpecified(s) => Some(s),
+            BuildString::UserSpecified(_) => None,
+            BuildString::Resolved(s) => Some(s),
             BuildString::Derived => None,
         }
     }
@@ -143,7 +151,7 @@ impl From<BuildString> for Option<String> {
 
 impl From<String> for BuildString {
     fn from(value: String) -> Self {
-        BuildString::UserSpecified(value)
+        BuildString::Resolved(value)
     }
 }
 
@@ -153,18 +161,21 @@ impl BuildString {
         matches!(self, BuildString::Derived)
     }
 
-    /// Returns the user specified build string.
-    pub fn as_deref(&self) -> Option<&str> {
-        match self {
-            BuildString::UserSpecified(s) => Some(s),
-            BuildString::Derived => None,
-        }
-    }
-
     /// Returns the final build string, either based on the user defined value or by computing the derived value.
-    pub fn resolve(&self, hash: &HashInfo, build_number: u64) -> Cow<'_, str> {
+    pub fn resolve(
+        &self,
+        hash: &HashInfo,
+        build_number: u64,
+        variant: BTreeMap<NormalizedKey, String>,
+    ) -> Cow<'_, str> {
         match self {
-            BuildString::UserSpecified(s) => s.as_str().into(),
+            // TODO
+            BuildString::UserSpecified(template) => {
+                let jinja = Jinja::new();
+                let context = jinja.create_context(variant);
+                Cow::Owned(jinja.render(template, &context).unwrap())
+            }
+            BuildString::Resolved(s) => s.as_str().into(),
             BuildString::Derived => Self::compute(hash, build_number).into(),
         }
     }
@@ -185,7 +196,7 @@ impl TryConvertNode<BuildString> for RenderedNode {
 
 impl TryConvertNode<BuildString> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<BuildString, Vec<PartialParsingError>> {
-        Ok(BuildString::UserSpecified(self.as_str().to_owned()))
+        Ok(BuildString::UserSpecified(self.source().to_string()))
     }
 }
 
