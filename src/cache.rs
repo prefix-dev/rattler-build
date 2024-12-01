@@ -6,6 +6,7 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
+use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -13,7 +14,10 @@ use crate::{
     env_vars,
     metadata::{build_reindexed_channels, Output},
     packaging::Files,
-    recipe::parser::{Dependency, Requirements, Source},
+    recipe::{
+        parser::{Dependency, Requirements, Source},
+        Jinja,
+    },
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
     },
@@ -175,8 +179,11 @@ impl Output {
                         return self.restore_cache(cache, cache_dir).await;
                     }
                     Err(e) => {
-                        tracing::error!("Failed to parse cache: {:?} - rebuilding", e);
-                        tracing::info!("JSON: {}", text);
+                        tracing::error!(
+                            "Failed to parse cache at {}: {:?} - rebuilding",
+                            cache_dir.join("cache.json").display(),
+                            e
+                        );
                         // remove the cache dir and run as normal
                         fs::remove_dir_all(&cache_dir).into_diagnostic()?;
                     }
@@ -213,6 +220,14 @@ impl Output {
                 .await
                 .into_diagnostic()?;
 
+            let selector_config = self.build_configuration.selector_config();
+            let mut jinja = Jinja::new(selector_config.clone());
+            for (k, v) in self.recipe.context.iter() {
+                jinja
+                    .context_mut()
+                    .insert(k.clone(), Value::from_safe_string(v.clone()));
+            }
+
             cache
                 .build
                 .script()
@@ -222,7 +237,7 @@ impl Output {
                     &self.build_configuration.directories.recipe_dir,
                     &self.build_configuration.directories.host_prefix,
                     Some(&self.build_configuration.directories.build_prefix),
-                    None, // TODO fix this to be proper Jinja context
+                    Some(jinja),
                 )
                 .await
                 .into_diagnostic()?;
