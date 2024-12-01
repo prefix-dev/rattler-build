@@ -36,7 +36,12 @@ def test_symlink_cache(
     paths_json = pkg / "info/paths.json"
     j = json.loads(paths_json.read_text())
     # prefix placeholder always changes, and we test it later
-    assert snapshot_json(exclude=filter_paths("paths.4.prefix_placeholder", "paths.4.sha256")) == j
+    assert (
+        snapshot_json(
+            exclude=filter_paths("paths.4.prefix_placeholder", "paths.4.sha256")
+        )
+        == j
+    )
 
     paths = j["paths"]
     assert len(paths) == 6
