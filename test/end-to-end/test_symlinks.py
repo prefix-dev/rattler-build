@@ -36,7 +36,7 @@ def test_symlink_cache(
     paths_json = pkg / "info/paths.json"
     j = json.loads(paths_json.read_text())
     # prefix placeholder always changes, and we test it later
-    assert snapshot_json(exclude=filter_paths("paths.4.prefix_placeholder")) == j
+    assert snapshot_json(exclude=filter_paths("paths.4.prefix_placeholder", "paths.4.sha256")) == j
 
     paths = j["paths"]
     assert len(paths) == 6
@@ -67,7 +67,7 @@ def test_symlink_cache(
     prefix_txt = pkg / "prefix.txt"
     assert prefix_txt.exists()
     contents = prefix_txt.read_text()
-    assert contents.len() > 0
+    assert len(contents) > 0
     # find the path in paths.json for the prefix.txt
     for p in paths:
         if p["_path"] == "prefix.txt":
