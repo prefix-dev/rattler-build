@@ -259,10 +259,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let package_contents = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::PackageContents { package_contents };
                 }
+                "perl" => {
+                    let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Perl { perl };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
