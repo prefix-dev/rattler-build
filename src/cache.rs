@@ -13,12 +13,12 @@ use crate::{
     env_vars,
     metadata::{build_reindexed_channels, Output},
     packaging::Files,
-    recipe::parser::{Dependency, Requirements},
+    recipe::parser::{Dependency, Requirements, Source},
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
     },
     source::{
-        copy_dir::{copy_file, create_symlink, CopyDir, CopyOptions},
+        copy_dir::{copy_file, CopyDir, CopyOptions},
         fetch_sources,
     },
 };
@@ -43,6 +43,9 @@ pub struct Cache {
 
     /// The finalized dependencies
     pub finalized_dependencies: FinalizedDependencies,
+
+    /// The finalized sources
+    pub finalized_sources: Vec<Source>,
 
     /// The prefix files that are included in the cache
     pub prefix_files: Vec<PathBuf>,
@@ -111,44 +114,29 @@ impl Output {
         cache: Cache,
         cache_dir: PathBuf,
     ) -> Result<Output, miette::Error> {
-        let copy_options = CopyOptions {
-            skip_exist: true,
-            ..Default::default()
-        };
-        let cache_prefix = cache.prefix;
-
-        let mut paths_created = HashSet::new();
-        for file in &cache.prefix_files {
-            tracing::info!("Restoring from cache: {:?}", file);
-            let dest = self.prefix().join(file);
-            let source = &cache_dir.join("prefix").join(file);
-            copy_file(source, &dest, &mut paths_created, &copy_options).into_diagnostic()?;
-
-            // check if the symlink starts with the old prefix, and if yes, make the symlink
-            // absolute with the new prefix
-            if source.is_symlink() {
-                let symlink_target = fs::read_link(source).into_diagnostic()?;
-                if let Ok(rest) = symlink_target.strip_prefix(&cache_prefix) {
-                    let new_symlink_target = self.prefix().join(rest);
-                    fs::remove_file(&dest).into_diagnostic()?;
-                    create_symlink(&new_symlink_target, &dest).into_diagnostic()?;
-                }
-            }
-        }
+        let cache_prefix_dir = cache_dir.join("prefix");
+        let copied_prefix = CopyDir::new(&cache_prefix_dir, self.prefix())
+            .run()
+            .into_diagnostic()?;
 
         // restore the work dir files
         let cache_dir_work = cache_dir.join("work_dir");
-        CopyDir::new(
+        let copied_cache = CopyDir::new(
             &cache_dir_work,
             &self.build_configuration.directories.work_dir,
         )
         .run()
         .into_diagnostic()?;
 
-        tracing::info!("Restored source files from cache");
+        let combined_files = copied_prefix.copied_paths().len() + copied_cache.copied_paths().len();
+        tracing::info!(
+            "Restored {} source and prefix files from cache",
+            combined_files
+        );
 
         Ok(Output {
             finalized_cache_dependencies: Some(cache.finalized_dependencies.clone()),
+            finalized_cache_sources: Some(cache.finalized_sources.clone()),
             ..self.clone()
         })
     }
@@ -165,7 +153,7 @@ impl Output {
             let span = tracing::info_span!("Running cache build");
             let _enter = span.enter();
 
-            tracing::info!("Cache key: {:?}", self.cache_key().into_diagnostic()?);
+            tracing::info!("using cache key: {:?}", self.cache_key().into_diagnostic()?);
             let cache_key = format!("bld_{}", self.cache_key().into_diagnostic()?);
 
             let cache_dir = self
@@ -281,6 +269,7 @@ impl Output {
             let cache = Cache {
                 requirements: cache.requirements.clone(),
                 finalized_dependencies: finalized_dependencies.clone(),
+                finalized_sources: rendered_sources.clone(),
                 prefix_files: copied_files,
                 work_dir_files: work_dir_files.copied_paths().to_vec(),
                 prefix: self.prefix().to_path_buf(),

@@ -114,7 +114,7 @@ pub fn get_rattler_build_version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
-#[allow(missing_docs)]
+/// The main application.
 #[derive(Parser)]
 #[clap(version = crate_version!())]
 pub struct App {
@@ -494,20 +494,24 @@ pub struct UploadOpts {
     pub common: CommonOpts,
 }
 
-/// Server type.
+/// The server type to upload to.
 #[derive(Clone, Debug, PartialEq, Parser)]
-#[allow(missing_docs)]
 pub enum ServerType {
+    /// A Quetz server
     Quetz(QuetzOpts),
+    /// An Artifactory server
     Artifactory(ArtifactoryOpts),
+    /// A prefix.dev server
     Prefix(PrefixOpts),
+    /// An anaconda.org server
     Anaconda(AnacondaOpts),
+    /// A conda-forge server
     #[clap(hide = true)]
     CondaForge(CondaForgeOpts),
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
-/// Upload to aQuetz server.
+/// Upload to a Quetz server.
 /// Authentication is used from the keychain / auth-file.
 pub struct QuetzOpts {
     /// The URL to your Quetz server
