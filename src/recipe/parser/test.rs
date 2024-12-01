@@ -145,9 +145,9 @@ pub enum TestType {
         python: PythonTest,
     },
     /// A Perl test that will test if the modules are available
-    Perl { 
+    Perl {
         /// The modules to test
-        perl: PerlTest
+        perl: PerlTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
