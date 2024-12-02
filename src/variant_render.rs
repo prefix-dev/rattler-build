@@ -127,42 +127,37 @@ pub(crate) fn stage_0_render(
 pub struct Stage1Render {
     pub(crate) variables: BTreeMap<NormalizedKey, String>,
 
-    // Per recipe output a set of extra used variables
-    pub(crate) used_variables_from_dependencies: Vec<HashSet<NormalizedKey>>,
-
-    pub(crate) exact_pins: Vec<HashSet<PackageName>>,
+    pub(crate) inner: Vec<Stage1Inner>,
 
     pub(crate) stage_0_render: Stage0Render,
-
-    pub(crate) final_rendered_outputs: Vec<Recipe>,
 
     order: Vec<usize>,
 }
 
+#[derive(Debug, Clone)]
+pub struct Stage1Inner {
+    pub(crate) used_vars_from_dependencies: HashSet<NormalizedKey>,
+    pub(crate) exact_pins: HashSet<PackageName>,
+    pub(crate) recipe: Recipe,
+    pub(crate) selector_config: SelectorConfig,
+}
+
 impl Stage1Render {
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
-        self.final_rendered_outputs
+        self.inner
             .iter()
-            .position(|x| x.package().name() == package_name)
+            .position(|x| x.recipe.package().name() == package_name)
     }
 
     pub fn variant_for_output(&self, idx: usize) -> BTreeMap<NormalizedKey, String> {
         tracing::info!("Getting variant for output {}", idx);
         let idx = self.order[idx];
+        let inner = &self.inner[idx];
         // combine jinja variables and the variables from the dependencies
         let self_name = self.stage_0_render.rendered_outputs[idx].package().name();
-        let used_vars_jinja = self
-            .stage_0_render
-            .raw_outputs
-            .used_vars_jinja
-            .get(idx)
-            .unwrap();
+        let used_vars_jinja = &self.stage_0_render.raw_outputs.used_vars_jinja[idx];
 
-        let mut all_vars = self
-            .used_variables_from_dependencies
-            .get(idx)
-            .unwrap()
-            .clone();
+        let mut all_vars = inner.used_vars_from_dependencies.clone();
 
         all_vars.extend(used_vars_jinja.iter().cloned());
 
@@ -174,15 +169,14 @@ impl Stage1Render {
             }
         }
 
-        let exact_pins = self.exact_pins.get(idx).unwrap();
-        for pin in exact_pins {
+        for pin in &inner.exact_pins {
             if pin == self_name {
                 continue;
             }
             let other_idx = self.index_from_name(pin).unwrap();
             // find the referenced output
             let build_string = self.build_string_for_output(other_idx);
-            let version = self.final_rendered_outputs[other_idx].package().version();
+            let version = self.inner[other_idx].recipe.package().version();
             variant.insert(
                 pin.as_normalized().into(),
                 format!("{} {}", version, build_string),
@@ -190,7 +184,7 @@ impl Stage1Render {
         }
 
         // fix target_platform value here
-        if !self.final_rendered_outputs[idx].build().noarch().is_none() {
+        if !self.inner[idx].recipe.build().noarch().is_none() {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
@@ -202,11 +196,11 @@ impl Stage1Render {
         let recipe = &self.stage_0_render.rendered_outputs[self.order[idx]];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
 
-        let build_string = recipe
-            .build()
-            .string()
-            .resolve(&hash, recipe.build().number, &variant)
-            .into_owned();
+        // let build_string = recipe
+        //     .build()
+        //     .string()
+        //     .resolve(&hash, recipe.build().number, &variant)
+        //     .into_owned();
 
         // original build string
         let original_recipe = &self.stage_0_render.raw_outputs.vec[self.order[idx]];
@@ -218,7 +212,8 @@ impl Stage1Render {
 
         println!("original build string: {:?}", original_build_string);
 
-        build_string
+        // build_string
+        "foo".to_string()
     }
 
     /// sort the outputs topologically
@@ -280,7 +275,7 @@ impl Stage1Render {
     ) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
         // zip node from stage0 and final render output
         let raw_nodes = self.stage_0_render.raw_outputs.vec.iter();
-        let outputs = self.final_rendered_outputs.iter();
+        let outputs: Vec<&Recipe> = self.inner.iter().map(|i| &i.recipe).collect();
 
         let zipped = raw_nodes.zip(outputs).collect::<Vec<_>>();
 
@@ -400,25 +395,29 @@ pub(crate) fn stage_1_render(
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
 
         for combination in all_combinations {
-            let mut rendered_outputs = Vec::new();
+            let mut inner = Vec::new();
+
             // TODO: figure out if we can pre-compute the `noarch` value.
-            for output in r.raw_outputs.vec.iter() {
+            for (idx, output) in r.raw_outputs.vec.iter().enumerate() {
+                // use the correct target_platform here?
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
-                // .with_build_number(r.rendered_outputs[idx].build().number);
 
-                let parsed_recipe = Recipe::from_node(output, config_with_variant).unwrap();
+                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone()).unwrap();
 
-                rendered_outputs.push(parsed_recipe);
+                inner.push(Stage1Inner {
+                    used_vars_from_dependencies: extra_vars_per_output[idx].clone(),
+                    exact_pins: exact_pins_per_output[idx].clone(),
+                    recipe: parsed_recipe,
+                    selector_config: config_with_variant,
+                })
             }
 
             let stage_1 = Stage1Render {
-                exact_pins: exact_pins_per_output.clone(),
+                inner,
                 variables: combination,
-                used_variables_from_dependencies: extra_vars_per_output.clone(),
                 stage_0_render: r.clone(),
                 order: (0..r.rendered_outputs.len()).collect(),
-                final_rendered_outputs: rendered_outputs,
             }
             .sort_outputs();
 
