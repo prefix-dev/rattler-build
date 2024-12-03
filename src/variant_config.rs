@@ -12,21 +12,22 @@ use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
-use crate::variant_render::stage_1_render;
 use crate::{
     _partialerror,
     normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
+        parser::BuildString,
         Jinja, Render,
     },
     selectors::SelectorConfig,
     variant_render::stage_0_render,
 };
+use crate::{hash::HashInfo, recipe::Recipe, variant_render::stage_1_render};
 
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct DiscoveredOutput {
     pub name: String,
     pub version: String,
@@ -35,6 +36,36 @@ pub struct DiscoveredOutput {
     pub target_platform: Platform,
     pub node: Node,
     pub used_vars: BTreeMap<NormalizedKey, String>,
+    pub recipe: Recipe,
+    pub hash: HashInfo,
+}
+
+impl Eq for DiscoveredOutput {}
+
+impl PartialEq for DiscoveredOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.build_string == other.build_string
+            && self.noarch_type == other.noarch_type
+            && self.target_platform == other.target_platform
+            && self.node == other.node
+            && self.used_vars == other.used_vars
+            && self.hash == other.hash
+    }
+}
+
+impl std::hash::Hash for DiscoveredOutput {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.version.hash(state);
+        self.build_string.hash(state);
+        self.noarch_type.hash(state);
+        self.target_platform.hash(state);
+        self.node.hash(state);
+        self.used_vars.hash(state);
+        self.hash.hash(state);
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -417,14 +448,20 @@ impl VariantConfig {
                     Platform::NoArch
                 };
 
+                let mut recipe = recipe.clone();
+                let build_string = sx.build_string_for_output(idx);
+                recipe.build.string = BuildString::Resolved(build_string.clone());
+
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),
-                    build_string: sx.build_string_for_output(idx),
+                    build_string,
                     noarch_type: *recipe.build().noarch(),
                     target_platform,
                     node: node.clone(),
-                    used_vars: variant,
+                    used_vars: variant.clone(),
+                    recipe: recipe.clone(),
+                    hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
                 });
             }
         }

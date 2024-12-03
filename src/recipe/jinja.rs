@@ -1,6 +1,7 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use fs_err as fs;
+use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
 use std::process::Command;
 use std::sync::Arc;
@@ -57,6 +58,15 @@ impl<'a> Jinja<'a> {
         let env = set_jinja(&config);
         let context = config.into_context();
         Self { env, context }
+    }
+
+    /// Add in the variables from the given context.
+    pub fn with_context(mut self, context: &IndexMap<String, String>) -> Self {
+        for (k, v) in context {
+            self.context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
+        self
     }
 
     /// Get a reference to the miniJinja environment.

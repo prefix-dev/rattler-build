@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::str::FromStr;
 
 use rattler_conda_types::{package::EntryPoint, NoArchType};
@@ -7,7 +6,6 @@ use serde::{Deserialize, Serialize};
 
 use super::glob_vec::{AllOrGlobVec, GlobVec};
 use super::{Dependency, FlattenErrors, SerializableRegex};
-use crate::normalized_key::NormalizedKey;
 use crate::recipe::custom_yaml::RenderedSequenceNode;
 use crate::recipe::parser::script::Script;
 use crate::recipe::parser::skip::Skip;
@@ -118,6 +116,7 @@ pub struct Build {
     pub files: GlobVec,
 }
 
+/// The build string can be either a user specified string, a resolved string or derived from the variant.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[serde(from = "Option<String>", into = "Option<String>")]
 pub enum BuildString {
@@ -142,7 +141,7 @@ impl From<Option<String>> for BuildString {
 impl From<BuildString> for Option<String> {
     fn from(value: BuildString) -> Self {
         match value {
-            BuildString::UserSpecified(_) => None,
+            BuildString::UserSpecified(s) => Some(s),
             BuildString::Resolved(s) => Some(s),
             BuildString::Derived => None,
         }
@@ -161,20 +160,19 @@ impl BuildString {
         matches!(self, BuildString::Derived)
     }
 
+    /// Returns the resolved build string if it exists.
+    pub fn as_resolved(&self) -> Option<&str> {
+        match self {
+            BuildString::Resolved(s) => Some(s),
+            _ => None,
+        }
+    }
+
     /// Returns the final build string, either based on the user defined value or by computing the derived value.
-    pub fn resolve(
-        &self,
-        hash: &HashInfo,
-        build_number: u64,
-        variant: BTreeMap<NormalizedKey, String>,
-    ) -> Cow<'_, str> {
+    pub fn resolve(&self, hash: &HashInfo, build_number: u64, jinja: &Jinja) -> Cow<'_, str> {
         match self {
             // TODO
-            BuildString::UserSpecified(template) => {
-                let jinja = Jinja::new();
-                let context = jinja.create_context(variant);
-                Cow::Owned(jinja.render(template, &context).unwrap())
-            }
+            BuildString::UserSpecified(template) => jinja.render_str(template).unwrap().into(),
             BuildString::Resolved(s) => s.as_str().into(),
             BuildString::Derived => Self::compute(hash, build_number).into(),
         }

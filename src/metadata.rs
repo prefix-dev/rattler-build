@@ -442,7 +442,9 @@ impl Output {
         self.recipe
             .build()
             .string
-            .resolve(&self.build_configuration.hash, self.recipe.build().number)
+            .as_resolved()
+            .expect("Build string is not resolved")
+            .into()
     }
 
     /// retrieve an identifier for this output ({name}-{version}-{build_string})

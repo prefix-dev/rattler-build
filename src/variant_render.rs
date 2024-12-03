@@ -195,25 +195,17 @@ impl Stage1Render {
         let variant = self.variant_for_output(idx);
         let recipe = &self.stage_0_render.rendered_outputs[self.order[idx]];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
+        let inner = &self.inner[self.order[idx]];
 
-        // let build_string = recipe
-        //     .build()
-        //     .string()
-        //     .resolve(&hash, recipe.build().number, &variant)
-        //     .into_owned();
+        let mut selector_config = inner.selector_config.clone();
+        selector_config.hash = Some(hash.clone());
+        let jinja = Jinja::new(selector_config.clone()).with_context(&recipe.context);
 
-        // original build string
-        let original_recipe = &self.stage_0_render.raw_outputs.vec[self.order[idx]];
-        let original_build_string = original_recipe
-            .as_mapping()
-            .unwrap()
-            .get("build")
-            .map(|x| x.as_mapping().unwrap().get("string"));
-
-        println!("original build string: {:?}", original_build_string);
-
-        // build_string
-        "foo".to_string()
+        recipe
+            .build()
+            .string()
+            .resolve(&hash, recipe.build().number, &jinja)
+            .into_owned()
     }
 
     /// sort the outputs topologically

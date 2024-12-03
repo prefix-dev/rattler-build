@@ -52,7 +52,6 @@ use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
-use hash::HashInfo;
 use metadata::{
     build_reindexed_channels, BuildConfiguration, BuildSummary, Directories, Output,
     PackageIdentifier, PackagingSettings,
@@ -67,14 +66,11 @@ use rattler_conda_types::{
 use rattler_solve::ChannelPriority;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::{
-    parser::{find_outputs_from_src, Dependency, Recipe},
-    ParsingError,
-};
+use recipe::parser::{find_outputs_from_src, Dependency};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
-use variant_config::{ParseErrors, VariantConfig};
+use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
 
@@ -275,28 +271,7 @@ pub async fn get_build_output(
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
     for discovered_output in outputs_and_variants {
-        let hash =
-            HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
-
-        let selector_config = SelectorConfig {
-            variant: discovered_output.used_vars.clone(),
-            hash: Some(hash.clone()),
-            target_platform: selector_config.target_platform,
-            host_platform: selector_config.host_platform,
-            build_platform: selector_config.build_platform,
-            experimental: args.common.experimental,
-            allow_undefined: false,
-        };
-
-        let recipe =
-            Recipe::from_node(&discovered_output.node, selector_config).map_err(|err| {
-                let errs: ParseErrors = err
-                    .into_iter()
-                    .map(|err| ParsingError::from_partial(&recipe_text, err))
-                    .collect::<Vec<ParsingError>>()
-                    .into();
-                errs
-            })?;
+        let recipe = &discovered_output.recipe;
 
         if recipe.build().skip() {
             tracing::info!(
@@ -311,17 +286,13 @@ pub async fn get_build_output(
             PackageIdentifier {
                 name: recipe.package().name().clone(),
                 version: recipe.package().version().version().clone(),
-                build_string: recipe
-                    .build()
-                    .string()
-                    .resolve(&hash, recipe.build().number())
-                    .into_owned(),
+                build_string: discovered_output.build_string.clone(),
             },
         );
 
         let name = recipe.package().name().clone();
-        // Add the channels from the args and by default always conda-forge
 
+        // Add the channels from the args and by default always conda-forge
         let channels = args
             .channel
             .clone()
@@ -333,7 +304,7 @@ pub async fn get_build_output(
         let timestamp = chrono::Utc::now();
 
         let output = metadata::Output {
-            recipe,
+            recipe: recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages {
@@ -344,7 +315,7 @@ pub async fn get_build_output(
                     platform: args.build_platform,
                     virtual_packages: virtual_packages.clone(),
                 },
-                hash,
+                hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
                     name.as_normalized(),
