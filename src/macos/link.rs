@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use crate::post_process::relink::{RelinkError, Relinker};
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
-use crate::unix::permission_guard::PermissionGuard;
+use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
 
 /// A macOS dylib (Mach-O)
@@ -258,7 +258,7 @@ impl Relinker for Dylib {
         }
 
         if modified {
-            let _permission_guard = PermissionGuard::new(&self.path, 0o200)?;
+            let _permission_guard = PermissionGuard::new(&self.path, READ_WRITE)?;
             // run builtin relink. if it fails, try install_name_tool
             match relink(&self.path, &changes) {
                 Err(e) => {
