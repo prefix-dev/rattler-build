@@ -103,6 +103,7 @@ nav:
     - "Javascript": tutorials/javascript.md
     - "Rust": tutorials/rust.md
     - "Go": tutorials/go.md
+    - "Perl": tutorials/perl.md
     - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:
