@@ -11,11 +11,11 @@ use futures::FutureExt;
 use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
-use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, RepoDataRecord};
+use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
 use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
 use url::Url;
 
-use crate::{metadata::PlatformWithVirtualPackages, tool_configuration};
+use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};
 
 fn print_as_table(packages: &[RepoDataRecord]) {
     let mut table = Table::new();
@@ -311,12 +311,32 @@ pub async fn install_packages(
             )
         })?;
 
+    let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
+
+    if !installed_packages.is_empty() && name.starts_with("host") {
+        // we have to clean up extra files in the prefix
+        let extra_files =
+            Files::from_prefix(target_prefix, &Default::default(), &Default::default())?;
+
+        tracing::info!(
+            "Cleaning up {} files in the prefix from a previous build.",
+            extra_files.new_files.len()
+        );
+
+        for f in extra_files.new_files {
+            if !f.is_dir() {
+                fs_err::remove_file(target_prefix.join(f))?;
+            }
+        }
+    }
+
     tracing::info!("\nInstalling {name} environment\n");
     Installer::new()
         .with_download_client(tool_configuration.client.clone())
         .with_target_platform(target_platform)
         .with_execute_link_scripts(true)
         .with_package_cache(tool_configuration.package_cache.clone())
+        .with_installed_packages(installed_packages)
         .with_reporter(
             IndicatifReporter::builder()
                 .with_multi_progress(

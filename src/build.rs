@@ -114,6 +114,11 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
+    // if the work directory already exists, we should remove it
+    if directories.work_dir.exists() {
+        fs_err::remove_dir_all(&directories.work_dir).into_diagnostic()?;
+    }
+
     let output = if output.recipe.cache.is_some() {
         output.build_or_fetch_cache(tool_configuration).await?
     } else {
