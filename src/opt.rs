@@ -506,9 +506,9 @@ pub enum ServerType {
     CondaForge(CondaForgeOpts),
 }
 
-#[derive(Clone, Debug, PartialEq, Parser)]
-/// Upload to aQuetz server.
+/// Upload to a Quetz server.
 /// Authentication is used from the keychain / auth-file.
+#[derive(Clone, Debug, PartialEq, Parser)]
 pub struct QuetzOpts {
     /// The URL to your Quetz server
     #[arg(short, long, env = "QUETZ_SERVER_URL")]

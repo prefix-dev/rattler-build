@@ -20,7 +20,7 @@ use crate::{
 use super::FlattenErrors;
 
 /// Source information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Source {
     /// Git source pointing to a Git repository to retrieve the source from
@@ -167,7 +167,7 @@ where
 }
 
 /// Git source information.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GitSource {
     /// Url to the git repository
     #[serde(rename = "git")]
@@ -358,7 +358,7 @@ impl TryConvertNode<GitSource> for RenderedMappingNode {
 }
 
 /// A Git repository URL or a local path to a Git repository
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GitUrl {
     /// A remote Git repository URL
@@ -382,7 +382,7 @@ impl fmt::Display for GitUrl {
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     #[serde_as(as = "OneOrMany<_, PreferOne>")]
@@ -509,7 +509,7 @@ impl TryConvertNode<UrlSource> for RenderedMappingNode {
 /// A local path source. The source code will be copied to the `work`
 /// (or `work/<folder>` directory).
 #[serde_as]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PathSource {
     /// Path to the local source code
     pub path: PathBuf,
@@ -531,8 +531,15 @@ pub struct PathSource {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_name: Option<PathBuf>,
     /// Whether to use the `.gitignore` file in the source directory. Defaults to `true`.
-    #[serde(skip_serializing_if = "should_not_serialize_use_gitignore")]
+    #[serde(
+        default = "default_gitignore",
+        skip_serializing_if = "should_not_serialize_use_gitignore"
+    )]
     pub use_gitignore: bool,
+}
+
+fn default_gitignore() -> bool {
+    true
 }
 
 /// Helper method to skip serializing the use_gitignore flag if it is true.
@@ -676,5 +683,22 @@ mod tests {
         let parsed_git: GitSource = serde_yaml::from_str(&yaml).unwrap();
 
         assert_eq!(parsed_git.url, git.url);
+    }
+
+    // test serde json round trip for path source "../"
+    #[test]
+    fn test_path_source_round_trip() {
+        let path_source = PathSource {
+            path: "../".into(),
+            sha256: None,
+            md5: None,
+            patches: Vec::new(),
+            target_directory: None,
+            file_name: None,
+            use_gitignore: true,
+        };
+
+        let json = serde_json::to_string(&path_source).unwrap();
+        serde_json::from_str::<PathSource>(&json).unwrap();
     }
 }

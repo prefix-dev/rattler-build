@@ -25,6 +25,12 @@
       "size_in_bytes": 0
     },
     {
+      "_path": "prefix.txt",
+      "file_mode": "text",
+      "path_type": "hardlink",
+      "size_in_bytes": 256
+    },
+    {
       "_path": "relative-symlink.txt",
       "path_type": "softlink",
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

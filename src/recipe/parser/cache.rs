@@ -9,11 +9,14 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::{Build, Requirements};
+use super::{Build, Requirements, Source};
 
 /// A cache build that can be used to split up a build into multiple outputs
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Cache {
+    /// Sources that are used in the cache build and subsequent output builds
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub source: Vec<Source>,
     /// The build configuration for the cache
     pub build: Build,
     /// The requirements for building the cache
@@ -35,6 +38,7 @@ impl TryConvertNode<Cache> for RenderedMappingNode {
         validate_keys! {
             cache,
             self.iter(),
+            source,
             build,
             requirements
         };
