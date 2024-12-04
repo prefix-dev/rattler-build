@@ -112,12 +112,14 @@ pub async fn run_build(
 
     let directories = output.build_configuration.directories.clone();
 
-    let output = output
-        .fetch_sources(tool_configuration)
-        .await
-        .into_diagnostic()?;
-
-    let output = output.build_or_fetch_cache(tool_configuration).await?;
+    let output = if output.recipe.cache.is_some() {
+        output.build_or_fetch_cache(tool_configuration).await?
+    } else {
+        output
+            .fetch_sources(tool_configuration)
+            .await
+            .into_diagnostic()?
+    };
 
     let output = output
         .resolve_dependencies(tool_configuration)

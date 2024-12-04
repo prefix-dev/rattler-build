@@ -186,6 +186,12 @@ Build a package from a recipe
 	Path to an auth-file to read authentication information from
 
 
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+	- Default value: `strict`
+
 - `--tui`
 
 	Launch the terminal user interface
@@ -334,6 +340,12 @@ These test files are written at "package creation time" and are part of the pack
 	Path to an auth-file to read authentication information from
 
 
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+	- Default value: `strict`
+
 ###### **Modifying result**
 
 - `--output-dir <OUTPUT_DIR>`
@@ -399,6 +411,12 @@ Rebuild a package from a package file instead of a recipe
 	Path to an auth-file to read authentication information from
 
 
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+	- Default value: `strict`
+
 ###### **Modifying result**
 
 - `--test <TEST>`
@@ -431,7 +449,7 @@ Upload a package
 
 ##### **Subcommands:**
 
-* `quetz` — Upload to aQuetz server. Authentication is used from the keychain / auth-file
+* `quetz` — Upload to a Quetz server. Authentication is used from the keychain / auth-file
 * `artifactory` — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
 * `prefix` — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file
 * `anaconda` — Options for uploading to a Anaconda.org server
@@ -474,6 +492,12 @@ Upload a package
 	Path to an auth-file to read authentication information from
 
 
+- `--channel-priority <CHANNEL_PRIORITY>`
+
+	Channel priority to use when solving
+
+	- Default value: `strict`
+
 ###### **Modifying result**
 
 - `--output-dir <OUTPUT_DIR>`
@@ -487,7 +511,7 @@ Upload a package
 
 #### `quetz`
 
-Upload to aQuetz server. Authentication is used from the keychain / auth-file
+Upload to a Quetz server. Authentication is used from the keychain / auth-file
 
 **Usage:** `rattler-build upload quetz [OPTIONS] --url <URL> --channel <CHANNEL>`
 

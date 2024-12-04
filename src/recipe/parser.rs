@@ -35,7 +35,7 @@ mod test;
 
 pub use self::{
     about::About,
-    build::{Build, BuildString, DynamicLinking, PrefixDetection},
+    build::{Build, BuildString, DynamicLinking, PrefixDetection, Python},
     cache::Cache,
     glob_vec::GlobVec,
     output::find_outputs_from_src,
@@ -49,7 +49,7 @@ pub use self::{
     source::{GitRev, GitSource, GitUrl, PathSource, Source, UrlSource},
     test::{
         CommandsTest, CommandsTestFiles, CommandsTestRequirements, DownstreamTest,
-        PackageContentsTest, PythonTest, PythonVersion, TestType,
+        PackageContentsTest, PerlTest, PythonTest, PythonVersion, TestType,
     },
 };
 

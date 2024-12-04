@@ -166,8 +166,10 @@ pub async fn get_build_output(
     }
 
     let mut host_platform = args.host_platform;
+
     // If target_platform is not set, we default to the host platform
     let target_platform = args.target_platform.unwrap_or(host_platform);
+
     // If target_platform is set and host_platform is not, then we default
     // host_platform to the target_platform
     if let Some(target_platform) = args.target_platform {
@@ -270,6 +272,12 @@ pub async fn get_build_output(
 
     let mut subpackages = BTreeMap::new();
     let mut outputs = Vec::new();
+
+    let global_build_name = outputs_and_variants
+        .first()
+        .map(|o| o.name.clone())
+        .unwrap_or_default();
+
     for discovered_output in outputs_and_variants {
         let recipe = &discovered_output.recipe;
 
@@ -290,7 +298,11 @@ pub async fn get_build_output(
             },
         );
 
-        let name = recipe.package().name().clone();
+        let build_name = if recipe.cache.is_some() {
+            global_build_name.clone()
+        } else {
+            recipe.package().name().as_normalized().to_string()
+        };
 
         // Add the channels from the args and by default always conda-forge
         let channels = args
@@ -318,7 +330,7 @@ pub async fn get_build_output(
                 hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
-                    name.as_normalized(),
+                    &build_name,
                     recipe_path,
                     &output_dir,
                     args.no_build_id,
@@ -338,8 +350,9 @@ pub async fn get_build_output(
                 force_colors: args.color_build_log && console::colors_enabled(),
             },
             finalized_dependencies: None,
-            finalized_cache_dependencies: None,
             finalized_sources: None,
+            finalized_cache_dependencies: None,
+            finalized_cache_sources: None,
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(

@@ -8,8 +8,7 @@ from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
 import pytest
 import requests
 import yaml
-from helpers import (RattlerBuild, check_build_output, get_extracted_package,
-                     get_package)
+from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
 def test_functionality(rattler_build: RattlerBuild):

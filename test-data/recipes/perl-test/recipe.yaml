@@ -1,0 +1,40 @@
+context:
+  version: 0.03
+
+package:
+  name: perl-call-context
+  version: ${{ version }}
+
+source:
+  url: https://cpan.metacpan.org/authors/id/F/FE/FELIPE/Call-Context-${{ version }}.tar.gz
+  sha256: 0ee6bf46bc72755adb7a6b08e79d12e207de5f7809707b3c353b58cb2f0b5a26
+
+build:
+  number: 0
+  noarch: generic
+  script:
+    - perl Makefile.PL INSTALLDIRS=site NO_PERLLOCAL=1 NO_PACKLIST=1
+    - make
+    - make test
+    - make install
+    - echo "LICENSE-ARTISTIC" > LICENSE-ARTISTIC
+    - echo "LICENSE-GPL" > LICENSE-GPL
+
+requirements:
+  build:
+    - make
+  host:
+    - perl
+
+tests:
+  - perl:
+      uses:
+        - Call::Context
+
+about:
+  license: GPL-1.0-or-later OR Artistic-1.0-Perl
+  license_file:
+    - LICENSE-ARTISTIC
+    - LICENSE-GPL
+  summary: Sanity-check calling context
+  homepage: http://metacpan.org/pod/Call-Context

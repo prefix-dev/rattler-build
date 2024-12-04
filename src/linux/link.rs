@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use crate::post_process::relink::{RelinkError, Relinker};
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
+use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
 
 /// A linux shared object (ELF)
@@ -213,6 +214,8 @@ impl Relinker for SharedObject {
 
         // keep only first unique item
         final_rpaths = final_rpaths.into_iter().unique().collect();
+
+        let _permission_guard = PermissionGuard::new(&self.path, READ_WRITE)?;
 
         // run builtin relink. if it fails, try patchelf
         if builtin_relink(&self.path, &final_rpaths).is_err() {

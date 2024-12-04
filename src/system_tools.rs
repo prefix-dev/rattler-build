@@ -11,9 +11,10 @@ use std::{
 };
 use thiserror::Error;
 
+/// Errors that can occur when working with system tools
 #[derive(Error, Debug)]
-#[allow(missing_docs)]
 pub enum ToolError {
+    /// The tool was not found on the system
     #[error("failed to find `{0}` ({1})")]
     ToolNotFound(Tool, which::Error),
 }

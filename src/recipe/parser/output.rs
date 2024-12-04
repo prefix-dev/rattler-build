@@ -4,6 +4,8 @@
 //! each mapping can have its own `package`, `source`, `build`, `requirements`,
 //! `test`, and `about` fields.
 
+use marked_yaml::types::MarkedMappingNode;
+
 use crate::{
     _partialerror,
     recipe::{
@@ -18,6 +20,30 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 8] = [
     "context", "recipe", "source", "build", "outputs", "about", "extra", "cache",
 ];
 
+// Check if the `cache` top-level key is present. If it does not contain a source, but there is a
+// top-level `source` key, then we should warn the user because this key was moved to the `cache`
+fn check_src_cache(root: &MarkedMappingNode) -> Result<(), ParsingError> {
+    if let Some(cache) = root.get("cache") {
+        let has_top_level_source = root.contains_key("source");
+        let cache_map = cache.as_mapping().ok_or_else(|| {
+            ParsingError::from_partial(
+                "",
+                _partialerror!(
+                    *cache.span(),
+                    ErrorKind::ExpectedMapping,
+                    help = "`cache` must always be a mapping"
+                ),
+            )
+        })?;
+
+        if !cache_map.contains_key("source") && has_top_level_source {
+            tracing::warn!("The cache has its own `source` key now. You probably want to move the top-level `source` key into the `cache` key.");
+        }
+    }
+
+    Ok(())
+}
+
 /// Retrieve all outputs from the recipe source (YAML)
 pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
     let root_node = parse_yaml(0, src)?;
@@ -31,6 +57,8 @@ pub fn find_outputs_from_src(src: &str) -> Result<Vec<Node>, ParsingError> {
             ),
         )
     })?;
+
+    check_src_cache(root_map)?;
 
     if root_map.contains_key("outputs") {
         if root_map.contains_key("package") {
