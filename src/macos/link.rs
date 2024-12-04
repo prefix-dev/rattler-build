@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use crate::post_process::relink::{RelinkError, Relinker};
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
+use crate::unix::permission_guard::{PermissionGuard, READ_WRITE};
 use crate::utils::to_lexical_absolute;
 
 /// A macOS dylib (Mach-O)
@@ -257,8 +258,11 @@ impl Relinker for Dylib {
         }
 
         if modified {
-            // run builtin relink. if it fails, try install_name_tool
-            if relink(&self.path, &changes).is_err() {
+            let _permission_guard = PermissionGuard::new(&self.path, READ_WRITE)?;
+            // run builtin relink. If it fails, try install_name_tool
+            if let Err(e) = relink(&self.path, &changes) {
+                assert!(self.path.exists());
+                tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
                 install_name_tool(&self.path, &changes, system_tools)?;
             }
             codesign(&self.path, system_tools)?;
@@ -402,7 +406,7 @@ fn relink(dylib_path: &Path, changes: &DylibChanges) -> Result<(), RelinkError> 
         let new_path = new_path.as_bytes();
 
         if new_path.len() > old_path.len() {
-            tracing::debug!(
+            tracing::info!(
                 "new path is longer than old path: {} > {}",
                 new_path.len(),
                 old_path.len()
