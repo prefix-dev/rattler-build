@@ -478,6 +478,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../tutorials/perl/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Perl
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../converting_from_conda_build/" class="md-nav__link">
         
   
@@ -1581,6 +1602,13 @@
 <p>Path to an auth-file to read authentication information from</p>
 </li>
 <li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+<ul>
+<li>Default value: <code>strict</code></li>
+</ul>
+</li>
+<li>
 <p><code>--tui</code></p>
 <p>Launch the terminal user interface</p>
 <ul>
@@ -1722,6 +1750,13 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
 <p>Path to an auth-file to read authentication information from</p>
 </li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+<ul>
+<li>Default value: <code>strict</code></li>
+</ul>
+</li>
 </ul>
 <h6 id="modifying-result_1"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_1" title="Permanent link">#</a></h6>
 <ul>
@@ -1781,6 +1816,13 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
 <p>Path to an auth-file to read authentication information from</p>
 </li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+<ul>
+<li>Default value: <code>strict</code></li>
+</ul>
+</li>
 </ul>
 <h6 id="modifying-result_2"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_2" title="Permanent link">#</a></h6>
 <ul>
@@ -1812,7 +1854,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><strong>Usage:</strong> <code>rattler-build upload [OPTIONS] [PACKAGE_FILES]... &lt;COMMAND&gt;</code></p>
 <h5 id="subcommands_1"><strong>Subcommands:</strong><a class="headerlink" href="#subcommands_1" title="Permanent link">#</a></h5>
 <ul>
-<li><code>quetz</code> — Upload to aQuetz server. Authentication is used from the keychain / auth-file</li>
+<li><code>quetz</code> — Upload to a Quetz server. Authentication is used from the keychain / auth-file</li>
 <li><code>artifactory</code> — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file</li>
 <li><code>prefix</code> — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file</li>
 <li><code>anaconda</code> — Options for uploading to a Anaconda.org server</li>
@@ -1853,6 +1895,13 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
 <p>Path to an auth-file to read authentication information from</p>
 </li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+<ul>
+<li>Default value: <code>strict</code></li>
+</ul>
+</li>
 </ul>
 <h6 id="modifying-result_3"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_3" title="Permanent link">#</a></h6>
 <ul>
@@ -1865,7 +1914,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </li>
 </ul>
 <h4 id="quetz"><code>quetz</code><a class="headerlink" href="#quetz" title="Permanent link">#</a></h4>
-<p>Upload to aQuetz server. Authentication is used from the keychain / auth-file</p>
+<p>Upload to a Quetz server. Authentication is used from the keychain / auth-file</p>
 <p><strong>Usage:</strong> <code>rattler-build upload quetz [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNEL&gt;</code></p>
 <h5 id="options_5"><strong>Options:</strong><a class="headerlink" href="#options_5" title="Permanent link">#</a></h5>
 <ul>
