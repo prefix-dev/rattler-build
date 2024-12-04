@@ -259,14 +259,11 @@ impl Relinker for Dylib {
 
         if modified {
             let _permission_guard = PermissionGuard::new(&self.path, READ_WRITE)?;
-            // run builtin relink. if it fails, try install_name_tool
-            match relink(&self.path, &changes) {
-                Err(e) => {
-                    assert!(self.path.exists());
-                    tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
-                    install_name_tool(&self.path, &changes, system_tools)?;
-                }
-                Ok(_) => {}
+            // run builtin relink. If it fails, try install_name_tool
+            if let Err(e) = relink(&self.path, &changes) {
+                assert!(self.path.exists());
+                tracing::warn!("Builtin relink failed {:?}, trying install_name_tool", e);
+                install_name_tool(&self.path, &changes, system_tools)?;
             }
             codesign(&self.path, system_tools)?;
         }
