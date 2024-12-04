@@ -105,7 +105,7 @@ pub async fn run_build(
     output
         .build_configuration
         .directories
-        .create_build_dir()
+        .create_build_dir(true)
         .into_diagnostic()?;
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
@@ -113,11 +113,6 @@ pub async fn run_build(
     output.record_build_start();
 
     let directories = output.build_configuration.directories.clone();
-
-    // if the work directory already exists, we should remove it
-    if directories.work_dir.exists() {
-        fs_err::remove_dir_all(&directories.work_dir).into_diagnostic()?;
-    }
 
     let output = if output.recipe.cache.is_some() {
         output.build_or_fetch_cache(tool_configuration).await?
