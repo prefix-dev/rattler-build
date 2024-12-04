@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use crate::post_process::relink::{RelinkError, Relinker};
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, Tool};
+use crate::unix::permission_guard::PermissionGuard;
 use crate::utils::to_lexical_absolute;
 
 /// A macOS dylib (Mach-O)
@@ -257,13 +258,7 @@ impl Relinker for Dylib {
         }
 
         if modified {
-            // log the permissions on the file
-            let mut perms = std::fs::metadata(&self.path)?.permissions();
-            if perms.readonly() {
-                tracing::info!("Making file writable: {}", self.path.display());
-                perms.set_readonly(false);
-                std::fs::set_permissions(&self.path, perms)?;
-            }
+            let _permission_guard = PermissionGuard::new(&self.path, 0o200)?;
             // run builtin relink. if it fails, try install_name_tool
             match relink(&self.path, &changes) {
                 Err(e) => {
