@@ -35,8 +35,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
             package
                 .channel
                 .as_ref()
-                .map(|s| s.rsplit('/').find(|s| !s.is_empty()))
-                .flatten()
+                .and_then(|s| s.rsplit('/').find(|s| !s.is_empty()))
                 .expect("expected channel to be defined and contain '/'")
                 .to_string()
         } else {
