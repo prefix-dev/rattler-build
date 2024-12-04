@@ -33,7 +33,8 @@ use crate::{
     env_vars,
     metadata::PlatformWithVirtualPackages,
     recipe::parser::{
-        CommandsTest, DownstreamTest, PythonTest, PythonVersion, Script, ScriptContent, TestType,
+        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
+        TestType,
     },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
@@ -425,6 +426,10 @@ pub async fn run_test(
                         .run_test(&pkg, &package_folder, &prefix, &config)
                         .await?
                 }
+                TestType::Perl { perl } => {
+                    perl.run_test(&pkg, &package_folder, &prefix, &config)
+                        .await?
+                }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
                         .run_test(&pkg, package_file, &prefix, &config)
@@ -587,6 +592,69 @@ impl PythonTest {
                 console::style(console::Emoji("✔", "")).green()
             );
         }
+        Ok(())
+    }
+}
+
+impl PerlTest {
+    /// Execute the Perl test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running perl test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec![
+            MatchSpec::from_str("perl", ParseStrictness::Strict).unwrap(),
+            match_spec,
+        ];
+
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut imports = String::new();
+        tracing::info!("Testing perl imports:\n");
+
+        for module in &self.uses {
+            writeln!(imports, "use {};", module)?;
+            tracing::info!("  use {};", module);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(imports.clone()),
+            interpreter: Some("perl".into()),
+            ..Script::default()
+        };
+
+        let tmp_dir = tempfile::tempdir()?;
+        script
+            .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
         Ok(())
     }
 }

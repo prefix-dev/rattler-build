@@ -121,6 +121,13 @@ impl Default for PythonTest {
     }
 }
 
+/// A special Perl test that checks if the imports are available and runs `cpanm check`.
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PerlTest {
+    /// List of perl `uses` to test
+    pub uses: Vec<String>,
+}
+
 /// A test that runs the tests of a downstream package.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
@@ -136,6 +143,11 @@ pub enum TestType {
     Python {
         /// The imports to test and the `pip check` flag
         python: PythonTest,
+    },
+    /// A Perl test that will test if the modules are available
+    Perl {
+        /// The modules to test
+        perl: PerlTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
@@ -247,10 +259,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let package_contents = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::PackageContents { package_contents };
                 }
+                "perl" => {
+                    let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::Perl { perl };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -380,6 +396,18 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
         }
 
         Ok(commands_test)
+    }
+}
+
+///////////////////////////
+/// Perl Test           ///
+///////////////////////////
+
+impl TryConvertNode<PerlTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PerlTest, Vec<PartialParsingError>> {
+        let mut perl_test = PerlTest::default();
+        validate_keys!(perl_test, self.iter(), uses);
+        Ok(perl_test)
     }
 }
 

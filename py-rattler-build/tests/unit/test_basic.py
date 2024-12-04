@@ -1,5 +1,6 @@
-import rattler_build
 from pathlib import Path
+
+import rattler_build
 
 
 def test_basic() -> None:
