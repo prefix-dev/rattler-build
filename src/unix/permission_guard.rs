@@ -92,6 +92,9 @@ mod unix {
 
 #[cfg(windows)]
 mod windows {
+    use std::io;
+    use std::path::Path;
+
     pub struct PermissionGuard;
 
     impl PermissionGuard {
