@@ -17,8 +17,8 @@ build:
     - make
     - make test
     - make install
-    - pod2text ${PREFIX}/lib/perl5/core_perl/pods/perlartistic.pod > LICENSE-ARTISTIC
-    - pod2text ${PREFIX}/lib/perl5/core_perl/pods/perlgpl.pod > LICENSE-GPL
+    - echo "LICENSE-ARTISTIC" > LICENSE-ARTISTIC
+    - echo "LICENSE-GPL" > LICENSE-GPL
 
 requirements:
   build:
