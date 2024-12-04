@@ -19,9 +19,14 @@ recipe:
   version: '0.1.0'
 
 cache:
+  source:
+    - url: https://example.com/library.tar.gz
+      sha256: 1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
   requirements:
     build:
       - ${{ compiler('c') }}
+
   build:
     script:
       - mkdir -p $PREFIX/lib
@@ -63,8 +68,7 @@ Run exports from the cache-dependencies are handled very similar to the run expo
 
 If the cache has an "ignore run exports" section, than we apply those filters at the cache level. If the output ignores any run exports, then we also ignore the run-exports if they would come from the cache.
 
-## Caching in the $SRC_DIR
+## Source code in the cache
 
-If you used `conda-build` a lot, you might have noticed that a top-level build is also caching the changes in the `$SRC_DIR`. This is not the case for `rattler-build` yet.
-
-You could try to work around by e.g. copying files into the `$PREFIX` and restoring them in each output.
+The cache output has its own `source` section. For every output, the (dirty) source is restored from the cache directory. Outputs can layer additional files on top of the cache source.
+However, if you already ran `cmake` in the cache output, you can continue from where the build left off. This is useful when you want to e.g. build additional components (such as Python bindings) on top of the already-built library.
