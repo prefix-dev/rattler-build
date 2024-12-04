@@ -635,9 +635,13 @@ impl PerlTest {
         .map_err(TestError::TestEnvironmentSetup)?;
 
         let mut imports = String::new();
+        tracing::info!("Testing perl imports:\n");
+
         for module in &self.uses {
-            writeln!(imports, "use {}", module)?;
+            writeln!(imports, "use {};", module)?;
+            tracing::info!("  use {};", module);
         }
+        tracing::info!("\n");
 
         let script = Script {
             content: ScriptContent::Command(imports.clone()),
