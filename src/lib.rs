@@ -66,7 +66,7 @@ use rattler_conda_types::{
 use rattler_solve::ChannelPriority;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::parser::{find_outputs_from_src, Dependency};
+use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
@@ -371,8 +371,6 @@ pub async fn get_build_output(
 }
 
 fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
-    let mut can_test = true;
-
     let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
         if spec.name.as_ref() != Some(output.name()) {
             return false;
@@ -399,14 +397,36 @@ fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[
             {
                 // this dependency might not be built yet
                 if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
-                    can_test = false;
-                    break;
+                    return false;
                 }
             }
         }
     }
 
-    can_test
+    // Also check that for all script tests
+    for test in output.recipe.tests() {
+        if let TestType::Command(command) = test {
+            for dep in command
+                .requirements
+                .build
+                .iter()
+                .chain(command.requirements.run.iter())
+            {
+                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
+                if all_output_names
+                    .iter()
+                    .any(|o| Some(*o) == dep_spec.name.as_ref())
+                {
+                    // this dependency might not be built yet
+                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    true
 }
 
 /// Runs build.
