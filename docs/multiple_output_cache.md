@@ -61,14 +61,85 @@ You can use a list of globs to select only the files that you want.
 
 For something more complicated you can also use `include` and `exclude` fields in the `files` selector. Please refer to the [the build options documentation](build_options.md#include-only-certain-files-in-the-package).
 
-## Run exports from the cache
+### Run exports from the cache
 
 Since the cache output also has build- and host requirements we need to additionally take care of eventual "run-exports" from the cache output.
 Run exports from the cache-dependencies are handled very similar to the run exports from a given output. We append any run exports to the outputs.
 
 If the cache has an "ignore run exports" section, than we apply those filters at the cache level. If the output ignores any run exports, then we also ignore the run-exports if they would come from the cache.
 
-## Source code in the cache
+### Source code in the cache
 
 The cache output has its own `source` section. For every output, the (dirty) source is restored from the cache directory. Outputs can layer additional files on top of the cache source.
 However, if you already ran `cmake` in the cache output, you can continue from where the build left off. This is useful when you want to e.g. build additional components (such as Python bindings) on top of the already-built library.
+
+
+## C++ Example that builds Python bindings on top of a library
+
+You can find an example (with source code) here: [Link](https://github.com/wolfv/rattler-build-cache-test/).
+
+```yaml title="variants.yaml"
+python:
+  - "3.12.*"
+  - "3.11.*"
+```
+
+And the corresponding recipe:
+
+```yaml title="recipe.yaml"
+recipe:
+name: calculator
+version: 1.0.0
+
+cache:
+source:
+  path: ../
+
+requirements:
+  build:
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+build:
+  script:
+    # make sure that `alternative_name.md` is not present
+    - test ! -f ./alternative_name.md
+    - mkdir build
+    - cd build
+    - cmake $SRC_DIR -GNinja ${CMAKE_ARGS}
+    - ninja install
+
+outputs:
+# this first output will include all files installed during the cache build
+- package:
+    name: libcalculator
+
+  requirements:
+    run_exports:
+      - ${{ pin_subpackage('libcalculator') }}
+# This output will build the Python bindings using CMake and then create new
+# packages with the Python bindings
+- package:
+    name: py-calculator
+  source:
+    - path: ../README.md
+      file_name: alternative_name.md
+
+  requirements:
+    build:
+      - ${{ compiler('cxx') }}
+      - cmake
+      - ninja
+    host:
+      - pybind11
+      - python
+      - libcalculator
+
+  build:
+    script:
+      # assert that the README.md file is present
+      - test -f ./alternative_name.md
+      - cd build
+      - cmake $SRC_DIR -GNinja ${CMAKE_ARGS} -DBUILD_PYTHON_BINDINGS=ON
+      - ninja install
+```
