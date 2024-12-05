@@ -213,7 +213,7 @@ package:
 
 build:
   string: ${{ blas_variant }}${{ hash }}_${{ build_number }}
-  variant_config:
+  variant:
     # make sure that `openblas` is preferred over `mkl`
     down_prioritize_variant: ${{ 1 if blas_variant == "mkl" else 0 }}
 ```
