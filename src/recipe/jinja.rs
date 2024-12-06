@@ -1,6 +1,7 @@
 //! Module for types and functions related to miniJinja setup for recipes.
 
 use fs_err as fs;
+use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
 use std::process::Command;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use minijinja::value::{from_args, Kwargs, Object};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
+use crate::normalized_key::NormalizedKey;
 use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
@@ -56,6 +58,15 @@ impl<'a> Jinja<'a> {
         let env = set_jinja(&config);
         let context = config.into_context();
         Self { env, context }
+    }
+
+    /// Add in the variables from the given context.
+    pub fn with_context(mut self, context: &IndexMap<String, String>) -> Self {
+        for (k, v) in context {
+            self.context_mut()
+                .insert(k.clone(), Value::from_safe_string(v.clone()));
+        }
+        self
     }
 
     /// Get a reference to the miniJinja environment.
@@ -241,7 +252,7 @@ fn default_compiler(platform: Platform, language: &str) -> Option<String> {
 fn compiler_stdlib_eval(
     lang: &str,
     platform: Platform,
-    variant: &Arc<BTreeMap<String, String>>,
+    variant: &Arc<BTreeMap<NormalizedKey, String>>,
     prefix: &str,
 ) -> Result<String, minijinja::Error> {
     let variant_key = format!("{lang}_{prefix}");
@@ -254,12 +265,12 @@ fn compiler_stdlib_eval(
     };
 
     let res = if let Some(name) = variant
-        .get(&variant_key)
+        .get(&variant_key.into())
         .cloned()
         .or_else(|| default_fn(platform, lang))
     {
         // check if we also have a compiler version
-        if let Some(version) = variant.get(&variant_key_version) {
+        if let Some(version) = variant.get(&variant_key_version.into()) {
             if version.chars().all(|a| a.is_alphanumeric() || a == '.') {
                 Some(format!("{name}_{platform} ={version}"))
             } else {
@@ -439,7 +450,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         let arch = host_platform.arch().or_else(|| build_platform.arch());
         let arch_str = arch.map(|arch| format!("{arch}"));
 
-        let cdt_arch = if let Some(s) = variant_clone.get("cdt_arch") {
+        let cdt_arch = if let Some(s) = variant_clone.get(&"cdt_arch".into()) {
             s.as_str()
         } else {
             match arch {
@@ -456,7 +467,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
             }
         };
 
-        let cdt_name = variant_clone.get("cdt_name").map_or_else(
+        let cdt_name = variant_clone.get(&"cdt_name".into()).map_or_else(
             || match arch {
                 Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7",
                 _ => "cos6",
@@ -1005,7 +1016,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_match() {
-        let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7".to_string())]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7".to_string())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -1027,7 +1038,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_complicated_match() {
-        let variant = BTreeMap::from_iter(vec![("python".to_string(), "3.7.* *_cpython".to_string())]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7.* *_cpython".to_string())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,

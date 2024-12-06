@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
 use fs_err as fs;
-use minijinja::Value;
 
 use crate::{
     metadata::Output,
@@ -32,7 +31,7 @@ impl CommandsTest {
                 folder,
             )
             .with_globvec(globs)
-            .use_gitignore(true)
+            .use_gitignore(false)
             .run()?;
 
             test_files.extend(copy_dir.copied_paths().iter().cloned());
@@ -45,7 +44,7 @@ impl CommandsTest {
                 folder,
             )
             .with_globvec(globs)
-            .use_gitignore(true)
+            .use_gitignore(false)
             .run()?;
 
             test_files.extend(copy_dir.copied_paths().iter().cloned());
@@ -57,13 +56,7 @@ impl CommandsTest {
 
 fn default_jinja_context(output: &Output) -> Jinja {
     let selector_config = output.build_configuration.selector_config();
-    let mut jinja = Jinja::new(selector_config);
-    for (k, v) in output.recipe.context.iter() {
-        jinja
-            .context_mut()
-            .insert(k.clone(), Value::from_safe_string(v.clone()));
-    }
-
+    let jinja = Jinja::new(selector_config).with_context(&output.recipe.context);
     jinja
 }
 

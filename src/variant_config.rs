@@ -13,22 +13,21 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    _partialerror, env_vars,
-    hash::HashInfo,
+    _partialerror,
+    normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
-        parser::Recipe,
+        parser::BuildString,
         Jinja, Render,
     },
     selectors::SelectorConfig,
-    used_variables::used_vars_from_expressions,
+    variant_render::stage_0_render,
 };
-use crate::{recipe::parser::Dependency, utils::NormalizedKeyBTreeMap};
-use petgraph::{algo::toposort, graph::DiGraph};
+use crate::{hash::HashInfo, recipe::Recipe, variant_render::stage_1_render};
 
 #[allow(missing_docs)]
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct DiscoveredOutput {
     pub name: String,
     pub version: String,
@@ -36,7 +35,37 @@ pub struct DiscoveredOutput {
     pub noarch_type: NoArchType,
     pub target_platform: Platform,
     pub node: Node,
-    pub used_vars: BTreeMap<String, String>,
+    pub used_vars: BTreeMap<NormalizedKey, String>,
+    pub recipe: Recipe,
+    pub hash: HashInfo,
+}
+
+impl Eq for DiscoveredOutput {}
+
+impl PartialEq for DiscoveredOutput {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.build_string == other.build_string
+            && self.noarch_type == other.noarch_type
+            && self.target_platform == other.target_platform
+            && self.node == other.node
+            && self.used_vars == other.used_vars
+            && self.hash == other.hash
+    }
+}
+
+impl std::hash::Hash for DiscoveredOutput {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.version.hash(state);
+        self.build_string.hash(state);
+        self.noarch_type.hash(state);
+        self.target_platform.hash(state);
+        self.node.hash(state);
+        self.used_vars.hash(state);
+        self.hash.hash(state);
+    }
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -144,12 +173,12 @@ pub struct VariantConfig {
     pub pin_run_as_build: Option<BTreeMap<String, Pin>>,
 
     /// The zip keys are used to "zip" together variants to create specific combinations.
-    pub zip_keys: Option<Vec<Vec<String>>>,
+    pub zip_keys: Option<Vec<Vec<NormalizedKey>>>,
 
     /// The variants are a mapping of package names to a list of versions. Each version represents
     /// a variant for the build matrix.
     #[serde(flatten)]
-    pub variants: NormalizedKeyBTreeMap,
+    pub variants: BTreeMap<NormalizedKey, Vec<String>>,
 }
 
 #[allow(missing_docs)]
@@ -290,13 +319,13 @@ impl VariantConfig {
                 let mut prev_len = None;
                 for key in zip {
                     let value = match self.variants.get(key) {
-                        None => return Err(VariantError::InvalidZipKeyLength(key.to_string())),
+                        None => return Err(VariantError::InvalidZipKeyLength(key.normalize())),
                         Some(value) => value,
                     };
 
                     if let Some(l) = prev_len {
                         if l != value.len() {
-                            return Err(VariantError::InvalidZipKeyLength(key.to_string()));
+                            return Err(VariantError::InvalidZipKeyLength(key.normalize()));
                         }
                     }
                     prev_len = Some(value.len());
@@ -308,10 +337,15 @@ impl VariantConfig {
 
     /// This function returns all possible combinations of variants for the given set of used
     /// variables.
+    ///
+    /// The `used_vars` argument is a set of variables that are used in the recipe. The `already_used_vars`
+    /// argument is a mapping of variables that are already used in the recipe. This is used to remove variants
+    /// that are already in other parts of the "tree".
     pub fn combinations(
         &self,
-        used_vars: &HashSet<String>,
-    ) -> Result<Vec<BTreeMap<String, String>>, VariantError> {
+        used_vars: &HashSet<NormalizedKey>,
+        already_used_vars: Option<&BTreeMap<NormalizedKey, String>>,
+    ) -> Result<Vec<BTreeMap<NormalizedKey, String>>, VariantError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
         let used_zip_keys = zip_keys
@@ -354,16 +388,33 @@ impl VariantConfig {
         find_combinations(&variant_keys, 0, &mut current, &mut combinations);
 
         // zip the combinations
-        let result = combinations
+        let result: Vec<_> = combinations
             .iter()
             .map(|combination| {
                 combination
                     .iter()
                     .cloned()
-                    .collect::<BTreeMap<String, String>>()
+                    .collect::<BTreeMap<NormalizedKey, String>>()
             })
             .collect();
-        Ok(result)
+
+        if let Some(already_used_vars) = already_used_vars {
+            let result = result
+                .into_iter()
+                .filter(|combination| {
+                    if already_used_vars.is_empty() {
+                        true
+                    } else {
+                        already_used_vars
+                            .iter()
+                            .all(|(key, value)| combination.get(key).map_or(false, |v| v == value))
+                    }
+                })
+                .collect();
+            Ok(result)
+        } else {
+            Ok(result)
+        }
     }
 
     /// This function finds all used variables in a recipe and expands the recipe to the full
@@ -383,394 +434,38 @@ impl VariantConfig {
         recipe: &str,
         selector_config: &SelectorConfig,
     ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
-        let mut outputs_map = HashMap::new();
+        // find all jinja variables
+        let stage_0 = stage_0_render(outputs, recipe, selector_config, self)?;
+        let stage_1 = stage_1_render(stage_0, selector_config, self)?;
 
-        // sort the outputs by topological order
-        for output in outputs.iter() {
-            // for the topological sort we only take into account `pin_subpackage` expressions
-            // in the recipe which are captured by the `used vars`
-            let mut used_vars = used_vars_from_expressions(output, recipe).map_err(|e| {
-                let errs: ParseErrors = e.into();
-                errs
-            })?;
-            let parsed_recipe =
-                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
-                    let errs: ParseErrors = err
-                        .into_iter()
-                        .map(|err| ParsingError::from_partial(recipe, err))
-                        .collect::<Vec<ParsingError>>()
-                        .into();
-                    errs
-                })?;
-
-            let noarch_type = parsed_recipe.build().noarch();
-            // add in any host and build dependencies
-            used_vars.extend(parsed_recipe.requirements().build_time().filter_map(|dep| {
-                match dep {
-                    Dependency::Spec(spec) => {
-                        // here we filter python as a variant and don't take it's passed variants
-                        // when noarch is python
-                        spec.name.as_ref().and_then(|name| {
-                            let normalized_name = name.as_normalized();
-                            if normalized_name == "python" && noarch_type.is_python() {
-                                return None;
-                            }
-                            normalized_name.to_string().into()
-                        })
-                    }
-                    _ => None,
-                }
-            }));
-
-            used_vars.extend(
-                parsed_recipe
-                    .requirements()
-                    .all()
-                    .filter_map(|dep| match dep {
-                        Dependency::PinSubpackage(pin) => {
-                            Some(pin.pin_value().name.as_normalized().to_string())
-                        }
-                        _ => None,
-                    }),
-            );
-
-            let use_keys = &parsed_recipe.build().variant().use_keys;
-            used_vars.extend(use_keys.iter().cloned());
-
-            // Environment variables can be overwritten by the variant configuration
-            let env_vars = env_vars::os_vars(&PathBuf::new(), &selector_config.host_platform);
-            used_vars.extend(env_vars.keys().cloned());
-
-            let target_platform = if noarch_type.is_none() {
-                selector_config.target_platform
-            } else {
-                Platform::NoArch
-            };
-            if outputs_map
-                .insert(
-                    parsed_recipe.package().name().as_normalized().to_string(),
-                    (output, used_vars, target_platform),
-                )
-                .is_some()
-            {
-                return Err(VariantError::DuplicateOutputs(
-                    parsed_recipe.package().name().as_normalized().to_string(),
-                ));
-            }
-        }
-
-        // now topologically sort the outputs and find cycles
-
-        // Create an empty directed graph
-        let mut graph = DiGraph::<_, ()>::new();
-
-        // Create a map from output names to node indices
-        let mut node_indices = HashMap::new();
-
-        // TODO: this code can be improved in general
-        // Add a node for each output
-        for output in outputs_map.keys() {
-            let node_index = graph.add_node(output.clone());
-            node_indices.insert(output.clone(), node_index);
-        }
-
-        // Add an edge for each pair of outputs where one uses a variable defined by the other
-        for (output, (_, used_vars, _)) in &outputs_map {
-            let output_node_index = *node_indices
-                .get(output)
-                .expect("unreachable, we insert keys in the loop above");
-            for used_var in used_vars {
-                if outputs_map.contains_key(used_var) {
-                    let defining_output_node_index = *node_indices
-                        .get(used_var)
-                        .expect("unreachable, we insert keys in the loop above");
-                    // self referencing is possible, but not a cycle
-                    if defining_output_node_index == output_node_index {
-                        continue;
-                    }
-                    graph.add_edge(defining_output_node_index, output_node_index, ());
-                }
-            }
-        }
-
-        // Perform a topological sort
-        let outputs: Vec<_> = match toposort(&graph, None) {
-            Ok(sorted_node_indices) => {
-                // Replace the original list of outputs with the sorted list
-                sorted_node_indices
-                    .into_iter()
-                    .map(|node_index| graph[node_index].clone())
-                    .collect()
-            }
-            Err(err) => {
-                // There is a cycle in the graph
-                return Err(VariantError::CycleInRecipeOutputs(
-                    graph[err.node_id()].clone(),
-                ));
-            }
-        };
-
-        // sort the outputs map by the topological order
-        let outputs_map = outputs
-            .iter()
-            .enumerate()
-            .map(|(idx, name)| {
-                let (node, used_vars, target_platform) = outputs_map[name].clone();
-                (idx, (name, node, used_vars, target_platform))
-            })
-            .collect::<BTreeMap<_, _>>();
-
-        let mut all_build_dependencies = Vec::new();
-        for (_, (_, output, _, _)) in outputs_map.iter() {
-            let parsed_recipe =
-                Recipe::from_node(output, selector_config.clone()).map_err(|err| {
-                    let errs: ParseErrors = err
-                        .into_iter()
-                        .map(|err| ParsingError::from_partial(recipe, err))
-                        .collect::<Vec<ParsingError>>()
-                        .into();
-                    errs
-                })?;
-            let noarch_type = parsed_recipe.build().noarch();
-            let build_time_requirements =
-                parsed_recipe.build_time_requirements().filter_map(|dep| {
-                    // here we filter python as a variant and don't take it's passed variants
-                    // when noarch is python
-                    if let Dependency::Spec(spec) = &dep {
-                        if let Some(name) = &spec.name {
-                            if name.as_normalized() == "python" && noarch_type.is_python() {
-                                return None;
-                            }
-                        }
-                    }
-                    Some(dep.clone())
-                });
-            all_build_dependencies.extend(build_time_requirements);
-        }
-
-        let mut all_variables = all_build_dependencies
-            .iter()
-            .filter_map(|dep| match dep {
-                Dependency::Spec(spec) => {
-                    // filter all matchspecs that override the version or build
-                    let is_simple = spec.version.is_none() && spec.build.is_none();
-                    if is_simple && spec.name.is_some() {
-                        spec.name
-                            .as_ref()
-                            .and_then(|name| name.as_normalized().to_string().into())
-                    } else {
-                        None
-                    }
-                }
-                Dependency::PinSubpackage(pin_sub) => {
-                    Some(pin_sub.pin_value().name.as_normalized().to_string())
-                }
-                _ => None,
-            })
-            .collect::<HashSet<_>>();
-
-        // also add all used variables from the outputs
-        for (_, (_, _, used_vars, _)) in outputs_map.iter() {
-            all_variables.extend(used_vars.clone());
-        }
-
-        // remove all existing outputs from all_variables
-        let output_names = outputs.iter().cloned().collect::<HashSet<_>>();
-        let mut all_variables = all_variables
-            .difference(&output_names)
-            .cloned()
-            .collect::<HashSet<_>>();
-
-        // special handling of CONDA_BUILD_SYSROOT
-        if all_variables.contains("c_compiler") || all_variables.contains("cxx_compiler") {
-            all_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-        }
-
-        // also always add `target_platform` and `channel_targets`
-        all_variables.insert("target_platform".to_string());
-        all_variables.insert("channel_targets".to_string());
-
-        let combinations = self.combinations(&all_variables)?;
-
-        // Then find all used variables from the each output recipe
-        // let mut variants = Vec::new();
+        // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
-        for combination in combinations {
-            let mut other_recipes =
-                HashMap::<String, (String, String, BTreeMap<String, String>)>::new();
-
-            for (_, (name, output, used_vars, target_platform)) in outputs_map.iter() {
-                let mut used_variables = used_vars.clone();
-                let mut exact_pins = HashSet::new();
-
-                // special handling of CONDA_BUILD_SYSROOT
-                if used_variables.contains("c_compiler") || used_variables.contains("cxx_compiler")
-                {
-                    used_variables.insert("CONDA_BUILD_SYSROOT".to_string());
-                }
-
-                // also always add `target_platform` and `channel_targets`
-                used_variables.insert("target_platform".to_string());
-                used_variables.insert("channel_targets".to_string());
-
-                let mut combination = combination.clone();
-                // we need to overwrite the target_platform in case of `noarch`.
-                combination.insert("target_platform".to_string(), target_platform.to_string());
-
-                let selector_config_with_variant =
-                    selector_config.new_with_variant(combination.clone(), *target_platform);
-
-                let parsed_recipe = Recipe::from_node(output, selector_config_with_variant.clone())
-                    .map_err(|err| {
-                        let errs: ParseErrors = err
-                            .into_iter()
-                            .map(|err| ParsingError::from_partial(recipe, err))
-                            .collect::<Vec<ParsingError>>()
-                            .into();
-                        errs
-                    })?;
-
-                // find the variables that were actually used in the recipe and that count towards the hash
-                parsed_recipe.build_time_requirements().for_each(|dep| {
-                    if let Dependency::Spec(spec) = dep {
-                        if let Some(name) = &spec.name {
-                            let val = name.as_normalized().to_owned();
-                            used_variables.insert(val);
-                        }
-                    }
-                });
-
-                parsed_recipe
-                    .requirements()
-                    .all()
-                    .for_each(|dep| match dep {
-                        Dependency::PinSubpackage(pin_sub) => {
-                            let pin = pin_sub.pin_value();
-                            let val = pin.name.as_normalized().to_owned();
-                            if pin.args.exact {
-                                exact_pins.insert(val);
-                            }
-                        }
-                        Dependency::PinCompatible(pin_compatible) => {
-                            let pin = pin_compatible.pin_value();
-                            let val = pin.name.as_normalized().to_owned();
-                            if pin.args.exact {
-                                exact_pins.insert(val);
-                            }
-                        }
-                        _ => {}
-                    });
-
-                // actually used vars
-                let mut used_filtered = combination
-                    .clone()
-                    .into_iter()
-                    .filter(|(k, _)| used_variables.contains(k))
-                    .collect::<BTreeMap<_, _>>();
-
-                // exact pins
-                for p in exact_pins {
-                    match other_recipes.get(&p) {
-                        Some((version, build, _)) => {
-                            used_filtered.insert(p.clone(), format!("{} {}", version, build));
-                        }
-                        None => {
-                            return Err(VariantError::MissingOutput(p));
-                        }
-                    }
-                }
-
-                parsed_recipe
-                    .requirements()
-                    .run
-                    .iter()
-                    .chain(parsed_recipe.requirements().run_constraints.iter())
-                    .chain(parsed_recipe.requirements().run_exports().all())
-                    .try_for_each(|dep| -> Result<(), VariantError> {
-                        if let Dependency::PinSubpackage(pin_sub) = dep {
-                            let pin = pin_sub.pin_value();
-                            if pin.args.exact {
-                                let val = pin.name.as_normalized();
-                                if val != *name {
-                                    // if other_recipes does not contain val, throw an error
-                                    match other_recipes.get(val) {
-                                        Some((version, build, _)) => {
-                                            used_filtered.insert(
-                                                val.to_owned(),
-                                                format!("{} {}", version, build),
-                                            );
-                                        }
-                                        None => {
-                                            return Err(VariantError::MissingOutput(val.into()));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Ok(())
-                    })?;
-
-                // compute hash for the recipe
-                let hash = HashInfo::from_variant(&used_filtered, parsed_recipe.build().noarch());
-                // TODO(wolf) can we make this computation better by having some nice API on Output?
-                // get the real build string from the recipe
-                let selector_config_with_hash = SelectorConfig {
-                    hash: Some(hash.clone()),
-                    ..selector_config_with_variant
+        for sx in stage_1 {
+            for (idx, ((node, recipe), variant)) in sx.outputs().enumerate() {
+                let target_platform = if recipe.build().noarch().is_none() {
+                    selector_config.target_platform
+                } else {
+                    Platform::NoArch
                 };
-                let parsed_recipe =
-                    Recipe::from_node(output, selector_config_with_hash).map_err(|err| {
-                        let errs: ParseErrors = err
-                            .into_iter()
-                            .map(|err| ParsingError::from_partial(recipe, err))
-                            .collect::<Vec<ParsingError>>()
-                            .into();
-                        errs
-                    })?;
 
-                let build_string = parsed_recipe
-                    .build()
-                    .string()
-                    .resolve(&hash, parsed_recipe.build().number)
-                    .into_owned();
-
-                other_recipes.insert(
-                    parsed_recipe.package().name().as_normalized().to_string(),
-                    (
-                        parsed_recipe.package().version().to_string(),
-                        parsed_recipe
-                            .build()
-                            .string()
-                            .resolve(&hash, parsed_recipe.build().number)
-                            .into_owned(),
-                        used_filtered.clone(),
-                    ),
-                );
-                let version = parsed_recipe.package().version().to_string();
-
-                let ignore_keys = &parsed_recipe.build().variant().ignore_keys;
-                used_filtered.retain(|k, _| ignore_keys.is_empty() || !ignore_keys.contains(k));
-
-                // We also replace `-` with `_` in the keys for better compatibility
-                // with conda-build and because then we can set them directly as env vars
-                // and the same for `.` because we want to be able to set them as env vars directly
-                let used_filtered = used_filtered
-                    .into_iter()
-                    .map(|(k, v)| (k.replace("-", "_"), v))
-                    .map(|(k, v)| (k.replace(".", "_"), v))
-                    .collect::<BTreeMap<_, _>>();
+                let mut recipe = recipe.clone();
+                let build_string = sx.build_string_for_output(idx);
+                recipe.build.string = BuildString::Resolved(build_string.clone());
 
                 recipes.insert(DiscoveredOutput {
-                    name: name.to_string(),
-                    version,
+                    name: recipe.package().name.as_normalized().to_string(),
+                    version: recipe.package().version.to_string(),
                     build_string,
-                    noarch_type: *parsed_recipe.build().noarch(),
-                    target_platform: *target_platform,
-                    node: (*output).to_owned(),
-                    used_vars: used_filtered,
+                    noarch_type: *recipe.build().noarch(),
+                    target_platform,
+                    node: node.clone(),
+                    used_vars: variant.clone(),
+                    recipe: recipe.clone(),
+                    hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
                 });
             }
         }
+
         Ok(recipes)
     }
 }
@@ -799,9 +494,7 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                 _ => {
                     let variants: Option<Vec<_>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config
-                            .variants
-                            .insert(key_str.to_string(), variants.clone());
+                        config.variants.insert(key_str.into(), variants.clone());
                     }
                 }
             }
@@ -813,8 +506,8 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
 
 #[derive(Debug, Clone)]
 enum VariantKey {
-    Key(String, Vec<String>),
-    ZipKey(HashMap<String, Vec<String>>),
+    Key(NormalizedKey, Vec<String>),
+    ZipKey(HashMap<NormalizedKey, Vec<String>>),
 }
 
 impl VariantKey {
@@ -825,7 +518,7 @@ impl VariantKey {
         }
     }
 
-    pub fn at(&self, index: usize) -> Option<Vec<(String, String)>> {
+    pub fn at(&self, index: usize) -> Option<Vec<(NormalizedKey, String)>> {
         match self {
             VariantKey::Key(key, values) => {
                 values.get(index).map(|v| vec![(key.clone(), v.clone())])
@@ -901,8 +594,8 @@ pub enum VariantError {
 fn find_combinations(
     variant_keys: &[VariantKey],
     index: usize,
-    current: &mut Vec<(String, String)>,
-    result: &mut Vec<Vec<(String, String)>>,
+    current: &mut Vec<(NormalizedKey, String)>,
+    result: &mut Vec<Vec<(NormalizedKey, String)>>,
 ) {
     if index == variant_keys.len() {
         result.push(current.clone());
@@ -922,7 +615,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::selectors::SelectorConfig;
+    use crate::{normalized_key::NormalizedKey, selectors::SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
 
@@ -996,7 +689,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)
@@ -1009,41 +702,51 @@ mod tests {
 
     #[test]
     fn test_variant_combinations() {
-        let mut variants = NormalizedKeyBTreeMap::new();
-        variants.insert("a".to_string(), vec!["1".to_string(), "2".to_string()]);
-        variants.insert("b".to_string(), vec!["3".to_string(), "4".to_string()]);
-        let zip_keys = vec![vec!["a".to_string(), "b".to_string()].into_iter().collect()];
+        let mut variants = BTreeMap::<NormalizedKey, Vec<String>>::new();
+        variants.insert("a".into(), vec!["1".to_string(), "2".to_string()]);
+        variants.insert("b".into(), vec!["3".to_string(), "4".to_string()]);
+        let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
 
-        let used_vars = vec!["a".to_string()].into_iter().collect();
+        let used_vars = vec!["a".into()].into_iter().collect();
         let mut config = VariantConfig {
             variants,
             zip_keys: Some(zip_keys),
             pin_run_as_build: None,
         };
 
-        let combinations = config.combinations(&used_vars).unwrap();
+        let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2);
 
-        let used_vars = vec!["a".to_string(), "b".to_string()].into_iter().collect();
-        let combinations = config.combinations(&used_vars).unwrap();
+        let used_vars = vec!["a".into(), "b".into()].into_iter().collect();
+        let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2);
 
         config.variants.insert(
-            "c".to_string(),
+            "c".into(),
             vec!["5".to_string(), "6".to_string(), "7".to_string()],
         );
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
-        let combinations = config.combinations(&used_vars).unwrap();
+        let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2 * 3);
 
-        let used_vars = vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
         config.zip_keys = None;
-        let combinations = config.combinations(&used_vars).unwrap();
+        let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
+
+        let already_used_vars = BTreeMap::from_iter(vec![("a".into(), "1".to_string())]);
+        let c2 = config
+            .combinations(&used_vars, Some(&already_used_vars))
+            .unwrap();
+        println!("{:?}", c2);
+        for c in &c2 {
+            assert!(c.get(&"a".into()).unwrap() == "1");
+        }
+        assert!(c2.len() == 2 * 3);
     }
 
     #[test]
@@ -1098,7 +801,7 @@ mod tests {
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
 
-        let used_variables_all: Vec<&BTreeMap<String, String>> = outputs_and_variants
+        let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants
             .as_slice()
             .into_iter()
             .map(|s| &s.used_vars)

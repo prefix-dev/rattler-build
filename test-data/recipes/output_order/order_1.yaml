@@ -11,6 +11,10 @@ recipe:
 source:
   path: ../
 
+# expected order of outputs:
+# 1. some-pkg.foo-a
+# 2. some-pkg.foo
+# 3. some_pkg.foo
 outputs:
   - package:
       name: ${{ name }}
@@ -22,8 +26,8 @@ outputs:
       host:
         - python >=3.10
         - pip
-      run:
         - ${{ pin_subpackage(name_a, lower_bound="x.x.x") }}
+      run:
         - python >=3.10
   - package:
       name: ${{ name_a }}
@@ -43,5 +47,5 @@ outputs:
     build:
       noarch: generic
     requirements:
-      run:
+      host:
         - ${{ pin_subpackage(name, exact=true) }}

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::ser::Formatter;
 use sha1::{Digest, Sha1};
 
+use crate::normalized_key::NormalizedKey;
+
 /// A hash will be added if all of these are true for any dependency:
 ///
 /// 1. package is an explicit dependency in build, host, or run deps
@@ -94,7 +96,7 @@ pub struct HashInput(String);
 
 impl HashInput {
     /// Create a new hash input from a variant
-    pub fn from_variant(variant: &BTreeMap<String, String>) -> Self {
+    pub fn from_variant(variant: &BTreeMap<NormalizedKey, String>) -> Self {
         let mut buf = Vec::new();
         let mut ser = serde_json::Serializer::with_formatter(&mut buf, PythonFormatter {});
 
@@ -124,7 +126,7 @@ impl std::fmt::Display for HashInfo {
 }
 
 impl HashInfo {
-    fn hash_prefix(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> String {
+    fn hash_prefix(variant: &BTreeMap<NormalizedKey, String>, noarch: &NoArchType) -> String {
         if noarch.is_python() {
             return "py".to_string();
         }
@@ -132,7 +134,7 @@ impl HashInfo {
         let mut map: HashMap<String, String> = HashMap::new();
 
         for (variant_key, version_spec) in variant.iter() {
-            let prefix = match variant_key.as_str() {
+            let prefix = match variant_key.normalize().as_str() {
                 "numpy" => "np",
                 "python" => "py",
                 "perl" => "pl",
@@ -174,7 +176,7 @@ impl HashInfo {
     }
 
     /// Compute the build string for a given variant
-    pub fn from_variant(variant: &BTreeMap<String, String>, noarch: &NoArchType) -> Self {
+    pub fn from_variant(variant: &BTreeMap<NormalizedKey, String>, noarch: &NoArchType) -> Self {
         Self {
             hash: Self::hash_from_input(&HashInput::from_variant(variant)),
             prefix: Self::hash_prefix(variant, noarch),
@@ -190,21 +192,18 @@ mod tests {
     #[test]
     fn test_hash() {
         let mut input = BTreeMap::new();
-        input.insert("rust_compiler".to_string(), "rust".to_string());
-        input.insert("build_platform".to_string(), "osx-64".to_string());
-        input.insert("c_compiler".to_string(), "clang".to_string());
-        input.insert("target_platform".to_string(), "osx-arm64".to_string());
-        input.insert("openssl".to_string(), "3".to_string());
+        input.insert("rust_compiler".into(), "rust".to_string());
+        input.insert("build_platform".into(), "osx-64".to_string());
+        input.insert("c_compiler".into(), "clang".to_string());
+        input.insert("target_platform".into(), "osx-arm64".to_string());
+        input.insert("openssl".into(), "3".to_string());
         input.insert(
-            "CONDA_BUILD_SYSROOT".to_string(),
+            "CONDA_BUILD_SYSROOT".into(),
             "/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk".to_string(),
         );
-        input.insert(
-            "channel_targets".to_string(),
-            "conda-forge main".to_string(),
-        );
-        input.insert("python".to_string(), "3.11.* *_cpython".to_string());
-        input.insert("c_compiler_version".to_string(), "14".to_string());
+        input.insert("channel_targets".into(), "conda-forge main".to_string());
+        input.insert("python".into(), "3.11.* *_cpython".to_string());
+        input.insert("c_compiler_version".into(), "14".to_string());
 
         let build_string_from_output = HashInfo::from_variant(&input, &NoArchType::none());
         assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");

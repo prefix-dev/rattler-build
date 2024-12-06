@@ -353,9 +353,9 @@ impl Output {
         self.variant()
             .iter()
             .filter_map(|(k, v)| {
-                let key_upper = k.to_uppercase();
+                let key_upper = k.normalize().to_uppercase();
                 if !languages.contains(key_upper.as_str()) {
-                    Some((k.replace('-', "_"), Some(v.to_string())))
+                    Some((k.normalize(), Some(v.to_string())))
                 } else {
                     None
                 }
@@ -375,12 +375,7 @@ impl Output {
         env_vars.extend(self.env_vars_from_variant());
 
         let selector_config = self.build_configuration.selector_config();
-        let mut jinja = Jinja::new(selector_config.clone());
-        for (k, v) in self.recipe.context.iter() {
-            jinja
-                .context_mut()
-                .insert(k.clone(), Value::from_safe_string(v.clone()));
-        }
+        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
 
         self.recipe
             .build()

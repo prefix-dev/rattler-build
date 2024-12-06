@@ -88,7 +88,7 @@ impl Output {
             // intersect variant with requirements
             let mut selected_variant = BTreeMap::new();
             for key in requirement_names.iter() {
-                if let Some(value) = self.variant().get(key) {
+                if let Some(value) = self.variant().get(&key.as_str().into()) {
                     selected_variant.insert(key.as_ref(), value.clone());
                 }
             }
