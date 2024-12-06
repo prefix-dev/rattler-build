@@ -118,7 +118,7 @@ pub fn reqwest_client_from_auth_storage(
             .no_gzip()
             .pool_max_idle_per_host(20)
             .user_agent(APP_USER_AGENT)
-            .timeout(std::time::Duration::from_secs(timeout))
+            .read_timeout(std::time::Duration::from_secs(timeout))
             .build()
             .expect("failed to create client"),
     )
