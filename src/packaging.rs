@@ -87,6 +87,8 @@ pub enum PackagingError {
 }
 
 /// This function copies the license files to the info/licenses folder.
+/// License files are selected from the recipe directory and the source (work) folder.
+/// If the same file is found in both locations, the file from the recipe directory is used.
 fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
@@ -98,17 +100,6 @@ fn copy_license_files(
         fs::create_dir_all(&licenses_folder)?;
 
         let copy_dir = copy_dir::CopyDir::new(
-            &output.build_configuration.directories.recipe_dir,
-            &licenses_folder,
-        )
-        .with_globvec(&output.recipe.about().license_file)
-        .use_gitignore(false)
-        .run()?;
-
-        let copied_files_recipe_dir = copy_dir.copied_paths();
-        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
-
-        let copy_dir = copy_dir::CopyDir::new(
             &output.build_configuration.directories.work_dir,
             &licenses_folder,
         )
@@ -117,7 +108,29 @@ fn copy_license_files(
         .run()?;
 
         let copied_files_work_dir = copy_dir.copied_paths();
+        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
+
+        let copy_dir = copy_dir::CopyDir::new(
+            &output.build_configuration.directories.recipe_dir,
+            &licenses_folder,
+        )
+        .with_globvec(&output.recipe.about().license_file)
+        .use_gitignore(false)
+        .overwrite(true)
+        .run()?;
+
+        let copied_files_recipe_dir = copy_dir.copied_paths();
         let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
+
+        // if a file was copied from the recipe dir, and the work dir, we should
+        // issue a warning
+        for file in copied_files_recipe_dir {
+            if copied_files_work_dir.contains(&file) {
+                let warn_str = format!("License file from source directory was overwritten by license file from recipe folder ({})", file.display());
+                tracing::warn!(warn_str);
+                output.record_warning(&warn_str);
+            }
+        }
 
         let copied_files = copied_files_recipe_dir
             .iter()
