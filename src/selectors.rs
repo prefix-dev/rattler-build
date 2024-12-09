@@ -10,6 +10,7 @@ use crate::{
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
+use strum::IntoEnumIterator;
 
 /// The selector config is used to render the recipe.
 #[derive(Clone, Debug)]
@@ -45,15 +46,20 @@ impl SelectorConfig {
             Value::from_safe_string(self.host_platform.to_string()),
         );
 
-        if let Some(platform) = self.host_platform.only_platform() {
-            context.insert(
-                platform.to_string(),
-                Value::from_safe_string(platform.to_string()),
-            );
-        }
+        for platform in Platform::iter() {
+            if let Some(only_platform) = platform.only_platform() {
+                context.insert(
+                    only_platform.to_string(),
+                    Value::from(self.host_platform == platform),
+                );
+            }
 
-        if let Some(arch) = self.target_platform.arch() {
-            context.insert(arch.to_string(), Value::from(true));
+            if let Some(arch) = platform.arch() {
+                context.insert(
+                    arch.to_string(),
+                    Value::from(self.host_platform.arch() == Some(arch)),
+                );
+            }
         }
 
         context.insert(
@@ -88,14 +94,22 @@ impl SelectorConfig {
 
     /// Create a new selector config from an existing one, replacing the variant
     pub fn with_variant(
-        &self,
+        self,
         variant: BTreeMap<NormalizedKey, String>,
         target_platform: Platform,
     ) -> Self {
         Self {
             variant,
             target_platform,
-            ..self.clone()
+            ..self
+        }
+    }
+
+    /// Set allow_undefined for this Jinja context / selector config
+    pub fn with_allow_undefined(self, allow_undefined: bool) -> Self {
+        Self {
+            allow_undefined,
+            ..self
         }
     }
 }
