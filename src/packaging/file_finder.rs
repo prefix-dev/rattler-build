@@ -19,6 +19,8 @@ use super::{file_mapper, PackagingError};
 pub struct Files {
     /// The files that are new in the prefix
     pub new_files: HashSet<PathBuf>,
+    /// The files that were present in the original conda environment
+    pub old_files: HashSet<PathBuf>,
     /// The prefix that we are dealing with
     pub prefix: PathBuf,
 }
@@ -74,6 +76,7 @@ impl Files {
         if !prefix.exists() {
             return Ok(Files {
                 new_files: HashSet::new(),
+                old_files: HashSet::new(),
                 prefix: prefix.to_owned(),
             });
         }
@@ -119,6 +122,7 @@ impl Files {
 
         Ok(Files {
             new_files: difference,
+            old_files: previous_files,
             prefix: prefix.to_owned(),
         })
     }
@@ -130,7 +134,7 @@ impl Files {
         let mut content_type_map = HashMap::new();
         for f in &self.new_files {
             // temporary measure to remove pyc files that are not supposed to be there
-            if file_mapper::filter_pyc(f, &self.new_files) {
+            if file_mapper::filter_pyc(f, &self.old_files) {
                 continue;
             }
 
