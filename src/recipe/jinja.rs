@@ -399,6 +399,9 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     } = config.clone();
 
     let mut env = Environment::empty();
+    if !allow_undefined {
+        env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    }
     default_tests(&mut env);
     default_filters(&mut env);
 
