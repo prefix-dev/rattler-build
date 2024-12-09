@@ -19,3 +19,6 @@ py_file.write_text(py_content)
 
 py_broken = prefix / "broken.py"
 py_broken.write_text("print('Hello, world!'")
+
+adding_pyc_file = prefix / "just_a_.cpython-311.pyc"
+adding_pyc_file.write_text("")

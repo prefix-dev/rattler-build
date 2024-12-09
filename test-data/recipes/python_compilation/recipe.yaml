@@ -5,12 +5,8 @@ package:
 build:
   number: 0
   script:
-    - if: unix
-      then:
-        - python $RECIPE_DIR/recipe.py
-    - if: win
-      then:
-        - python %RECIPE_DIR%\recipe.py
+    interpreter: python
+    file: recipe.py
 
   python:
     skip_pyc_compilation:
