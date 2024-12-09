@@ -1,7 +1,7 @@
 //! Helpers to extract archives
-use std::{ffi::OsStr, io::BufRead, path::Path};
-
 use crate::console_utils::LoggingOutputHandler;
+use std::{ffi::OsStr, io::BufRead, path::Path};
+use tar::EntryType;
 
 use fs_err as fs;
 use fs_err::File;
@@ -133,9 +133,38 @@ pub(crate) fn extract_tar(
     let mut archive = tar::Archive::new(ext_to_compression(archive.file_name(), Box::new(wrapped)));
 
     let tmp_extraction_dir = tempfile::Builder::new().tempdir_in(target_directory)?;
-    archive
-        .unpack(&tmp_extraction_dir)
-        .map_err(|e| SourceError::TarExtractionError(e.to_string()))?;
+    for entry in archive.entries()? {
+        match entry {
+            Ok(mut file) => {
+                let path = tmp_extraction_dir.path().join(file.path()?);
+
+                // Ensure all intermediate directories exist before unpacking
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+
+                // Attempt to unpack symlinks and regular files, logging any issues
+                match file.header().entry_type() {
+                    EntryType::Symlink if cfg!(target_os = "windows") => {
+                        if let Err(e) = file.unpack(&path) {
+                            println!(
+                                "Warning: failed to extract symlink {:?} due to {:?}",
+                                path, e
+                            );
+                        }
+                    }
+                    _ => {
+                        if let Err(e) = file.unpack(&path) {
+                            println!("Warning: failed to unpack {:?} due to {:?}", path, e);
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!("Warning: failed to read an entry due to {:?}", e);
+            }
+        }
+    }
 
     move_extracted_dir(tmp_extraction_dir.path(), target_directory)?;
     progress_bar.finish_with_message("Extracted...");
