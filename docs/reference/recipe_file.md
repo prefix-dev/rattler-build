@@ -943,6 +943,9 @@ to directories with license information. Directory entries must end with a `/`
 suffix (this is to lessen unintentional inclusion of non-license files; all the
 directory's contents will be unconditionally and recursively added).
 
+If a license file is found in both the source and recipe directories, the file from
+the recipe directory is used (you should see a warning about this in the build log).
+
 ```yaml
 about:
   license_file:
