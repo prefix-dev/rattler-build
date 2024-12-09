@@ -88,8 +88,9 @@ pub(crate) fn stage_0_render(
         let mut rendered_outputs = Vec::new();
         // TODO: figure out if we can pre-compute the `noarch` value.
         for output in outputs {
-            let config_with_variant =
-                selector_config.with_variant(combination.clone(), selector_config.target_platform);
+            let config_with_variant = selector_config
+                .clone()
+                .with_variant(combination.clone(), selector_config.target_platform);
 
             let parsed_recipe = Recipe::from_node(output, config_with_variant).map_err(|err| {
                 let errs: ParseErrors = err
@@ -381,7 +382,9 @@ pub(crate) fn stage_1_render(
             for (idx, output) in r.raw_outputs.vec.iter().enumerate() {
                 // use the correct target_platform here?
                 let config_with_variant = selector_config
-                    .with_variant(combination.clone(), selector_config.target_platform);
+                    .clone()
+                    .with_variant(combination.clone(), selector_config.target_platform)
+                    .with_allow_undefined(false);
 
                 let parsed_recipe = Recipe::from_node(output, config_with_variant.clone()).unwrap();
 

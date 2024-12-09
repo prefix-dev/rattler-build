@@ -3567,6 +3567,7 @@ dependencies = [
  "sha1",
  "sha2",
  "spdx",
+ "strum",
  "tar",
  "tempfile",
  "terminal_size 0.4.0",
