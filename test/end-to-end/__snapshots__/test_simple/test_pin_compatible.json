@@ -1,0 +1,13 @@
+{
+  "host": [
+    "python"
+  ],
+  "run": [
+    {
+      "pin_compatible": {
+        "exact": true,
+        "name": "python"
+      }
+    }
+  ]
+}

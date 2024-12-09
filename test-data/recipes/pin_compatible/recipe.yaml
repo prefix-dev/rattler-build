@@ -1,0 +1,9 @@
+package:
+  name: test
+  version: v1
+
+requirements:
+  host:
+    - python
+  run:
+    - ${{ pin_compatible('python', exact=True) }}

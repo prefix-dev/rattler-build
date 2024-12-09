@@ -1097,3 +1097,11 @@ def test_testing_strategy(
         ],
         string_to_check="all tests passed!",
     )
+
+
+def test_pin_compatible(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rendered = rattler_build.render(recipes / "pin_compatible", tmp_path)
+
+    assert snapshot_json == rendered[0]["recipe"]["requirements"]
