@@ -2666,6 +2666,8 @@ single filename or a YAML list for multiple license files. Values can also point
 to directories with license information. Directory entries must end with a <code>/</code>
 suffix (this is to lessen unintentional inclusion of non-license files; all the
 directory's contents will be unconditionally and recursively added).</p>
+<p>If a license file is found in both the source and recipe directories, the file from
+the recipe directory is used (you should see a warning about this in the build log).</p>
 <div class="language-yaml highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="nt">about</span><span class="p">:</span>
 </span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span>
 </span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
