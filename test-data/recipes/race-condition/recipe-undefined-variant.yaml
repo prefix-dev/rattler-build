@@ -1,0 +1,10 @@
+context:
+  name: my-package
+
+recipe:
+  name: ${{ name }}
+  version: '1.0.0'
+
+outputs:
+  - package:
+      name: ${{ name + '-' + variant }}
