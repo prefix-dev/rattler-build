@@ -15,7 +15,7 @@ outputs:
     requirements:
       run:
         - ${{ "__unix" if unix }}
-        - ${{ "__win" if win }}
+        - ${{ "__win >=11.0.123 foobar" if win }}
 
   - package:
       name: ${{ name }}-subpackage

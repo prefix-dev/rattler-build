@@ -50,7 +50,10 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     // find python in the host dependencies
-    let mut python_version = output.variant().get("python").map(|s| s.to_string());
+    let mut python_version = output
+        .variant()
+        .get(&"python".into())
+        .map(|s| s.to_string());
     if python_version.is_none() {
         if let Some((record, requested)) = output.find_resolved_package("python") {
             if requested {
@@ -79,7 +82,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
         insert!(result, "SP_DIR", site_packages_dir.to_string_lossy());
     }
 
-    if let Some(npy_version) = output.variant().get("numpy") {
+    if let Some(npy_version) = output.variant().get(&"numpy".into()) {
         let npy_ver: Vec<_> = npy_version.split('.').take(2).collect();
         let npy_ver = npy_ver.join(".");
         insert!(result, "NPY_VER", npy_ver);
@@ -99,7 +102,7 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
 pub fn r_vars(output: &Output) -> HashMap<String, Option<String>> {
     let mut result = HashMap::new();
 
-    if let Some(r_ver) = output.variant().get("r-base") {
+    if let Some(r_ver) = output.variant().get(&"r-base".into()) {
         insert!(result, "R_VER", r_ver);
 
         let r_bin = if output.host_platform().platform.is_windows() {
@@ -270,16 +273,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     );
 
     let hash = output.build_configuration.hash.clone();
-    insert!(
-        vars,
-        "PKG_BUILD_STRING",
-        output
-            .recipe
-            .build()
-            .string()
-            .resolve(&hash, output.recipe.build().number)
-            .into_owned()
-    );
+    insert!(vars, "PKG_BUILD_STRING", output.build_string().to_string());
     insert!(vars, "PKG_HASH", hash);
 
     if output.build_configuration.cross_compilation() {

@@ -1,0 +1,23 @@
+context:
+  name: my-package
+
+recipe:
+  name: ${{ name }}
+  version: '1.0.0'
+
+outputs:
+  - package:
+      name: ${{ name }}-${{ variant }}
+
+    tests:
+      - script:
+          - echo "Hello, world!"
+        requirements:
+          run:
+            - ${{ name }}
+
+  - package:
+      name: ${{ name }}
+    requirements:
+      run:
+        - ${{ pin_subpackage('my-package-a', exact=true) if variant == 'a' else pin_subpackage('my-package-b', exact=true) }}

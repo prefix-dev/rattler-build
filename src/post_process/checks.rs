@@ -156,7 +156,7 @@ fn find_system_libs(output: &Output) -> Result<GlobSet, globset::Error> {
         if let Some(sysroot) = output
             .build_configuration
             .variant
-            .get("CONDA_BUILD_SYSROOT")
+            .get(&"CONDA_BUILD_SYSROOT".into())
         {
             system_libs.add(Glob::new(&format!("{}/**/*", sysroot))?);
         } else {

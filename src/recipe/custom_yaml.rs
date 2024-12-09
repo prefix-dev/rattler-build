@@ -15,6 +15,7 @@ use url::Url;
 
 use crate::{
     _partialerror,
+    normalized_key::NormalizedKey,
     recipe::{
         error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
@@ -1052,6 +1053,27 @@ impl TryConvertNode<String> for RenderedNode {
 impl TryConvertNode<String> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<String, Vec<PartialParsingError>> {
         Ok(self.as_str().to_owned())
+    }
+}
+
+impl TryConvertNode<NormalizedKey> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<NormalizedKey, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
+            .and_then(|s| s.try_convert(name))
+    }
+}
+
+impl TryConvertNode<NormalizedKey> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<NormalizedKey, Vec<PartialParsingError>> {
+        Ok(self.as_str().into())
     }
 }
 

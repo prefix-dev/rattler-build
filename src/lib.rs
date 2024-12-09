@@ -6,6 +6,7 @@ pub mod build;
 pub mod cache;
 pub mod console_utils;
 pub mod metadata;
+mod normalized_key;
 pub mod opt;
 pub mod package_test;
 pub mod packaging;
@@ -21,6 +22,7 @@ pub mod tui;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
+mod variant_render;
 
 mod consts;
 mod env_vars;
@@ -50,25 +52,25 @@ use console_utils::LoggingOutputHandler;
 use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
-use hash::HashInfo;
 use metadata::{
-    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels, BuildConfiguration, BuildSummary, Directories, Output,
+    PackageIdentifier, PackagingSettings,
 };
-use miette::IntoDiagnostic;
+use miette::{Context, IntoDiagnostic};
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
-use rattler_conda_types::{package::ArchiveType, Channel, GenericVirtualPackage, Platform};
+use rattler_conda_types::{
+    package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
+};
+use rattler_solve::ChannelPriority;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::{
-    parser::{find_outputs_from_src, Dependency, Recipe},
-    ParsingError,
-};
+use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
-use tool_configuration::Configuration;
-use variant_config::{ParseErrors, VariantConfig};
+use tool_configuration::{Configuration, TestStrategy};
+use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
 
@@ -262,7 +264,7 @@ pub async fn get_build_output(
             .apply_modifier(comfy_table::modifiers::UTF8_ROUND_CORNERS)
             .set_header(vec!["Variant", "Version"]);
         for (key, value) in discovered_output.used_vars.iter() {
-            table.add_row(vec![key, value]);
+            table.add_row(vec![&key.normalize(), value]);
         }
         tracing::info!("\n{}\n", table);
     }
@@ -277,28 +279,7 @@ pub async fn get_build_output(
         .unwrap_or_default();
 
     for discovered_output in outputs_and_variants {
-        let hash =
-            HashInfo::from_variant(&discovered_output.used_vars, &discovered_output.noarch_type);
-
-        let selector_config = SelectorConfig {
-            variant: discovered_output.used_vars.clone(),
-            hash: Some(hash.clone()),
-            target_platform: selector_config.target_platform,
-            host_platform: selector_config.host_platform,
-            build_platform: selector_config.build_platform,
-            experimental: args.common.experimental,
-            allow_undefined: false,
-        };
-
-        let recipe =
-            Recipe::from_node(&discovered_output.node, selector_config).map_err(|err| {
-                let errs: ParseErrors = err
-                    .into_iter()
-                    .map(|err| ParsingError::from_partial(&recipe_text, err))
-                    .collect::<Vec<ParsingError>>()
-                    .into();
-                errs
-            })?;
+        let recipe = &discovered_output.recipe;
 
         if recipe.build().skip() {
             tracing::info!(
@@ -313,11 +294,7 @@ pub async fn get_build_output(
             PackageIdentifier {
                 name: recipe.package().name().clone(),
                 version: recipe.package().version().version().clone(),
-                build_string: recipe
-                    .build()
-                    .string()
-                    .resolve(&hash, recipe.build().number())
-                    .into_owned(),
+                build_string: discovered_output.build_string.clone(),
             },
         );
 
@@ -339,7 +316,7 @@ pub async fn get_build_output(
         let timestamp = chrono::Utc::now();
 
         let output = metadata::Output {
-            recipe,
+            recipe: recipe.clone(),
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages {
@@ -350,7 +327,7 @@ pub async fn get_build_output(
                     platform: args.build_platform,
                     virtual_packages: virtual_packages.clone(),
                 },
-                hash,
+                hash: discovered_output.hash.clone(),
                 variant: discovered_output.used_vars.clone(),
                 directories: Directories::setup(
                     &build_name,
@@ -393,24 +370,164 @@ pub async fn get_build_output(
     Ok(outputs)
 }
 
+fn can_test(output: &Output, all_output_names: &[&PackageName], done_outputs: &[Output]) -> bool {
+    let check_if_matches = |spec: &MatchSpec, output: &Output| -> bool {
+        if spec.name.as_ref() != Some(output.name()) {
+            return false;
+        }
+        if let Some(version_spec) = &spec.version {
+            if !version_spec.matches(output.recipe.package().version()) {
+                return false;
+            }
+        }
+        if let Some(build_string_spec) = &spec.build {
+            if !build_string_spec.matches(&output.build_string()) {
+                return false;
+            }
+        }
+        true
+    };
+
+    // Check if any run dependencies are not built yet
+    if let Some(ref deps) = output.finalized_dependencies {
+        for dep in &deps.run.depends {
+            if all_output_names
+                .iter()
+                .any(|o| Some(*o) == dep.spec().name.as_ref())
+            {
+                // this dependency might not be built yet
+                if !done_outputs.iter().any(|o| check_if_matches(dep.spec(), o)) {
+                    return false;
+                }
+            }
+        }
+    }
+
+    // Also check that for all script tests
+    for test in output.recipe.tests() {
+        if let TestType::Command(command) = test {
+            for dep in command
+                .requirements
+                .build
+                .iter()
+                .chain(command.requirements.run.iter())
+            {
+                let dep_spec: MatchSpec = dep.parse().expect("Could not parse MatchSpec");
+                if all_output_names
+                    .iter()
+                    .any(|o| Some(*o) == dep_spec.name.as_ref())
+                {
+                    // this dependency might not be built yet
+                    if !done_outputs.iter().any(|o| check_if_matches(&dep_spec, o)) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    true
+}
+
 /// Runs build.
 pub async fn run_build_from_args(
     build_output: Vec<Output>,
-    tool_config: Configuration,
+    tool_configuration: Configuration,
 ) -> miette::Result<()> {
-    let mut outputs: Vec<metadata::Output> = Vec::new();
+    let mut outputs = Vec::new();
+    let mut test_queue = Vec::new();
 
-    for output in skip_existing(build_output, &tool_config).await? {
-        let output = match run_build(output, &tool_config).boxed_local().await {
-            Ok((output, _archive)) => {
+    let outputs_to_build = skip_existing(build_output, &tool_configuration).await?;
+
+    let all_output_names = outputs_to_build
+        .iter()
+        .map(|o| o.name())
+        .collect::<Vec<_>>();
+
+    for (index, output) in outputs_to_build.iter().enumerate() {
+        let (output, archive) = match run_build(output.clone(), &tool_configuration)
+            .boxed_local()
+            .await
+        {
+            Ok((output, archive)) => {
                 output.record_build_end();
-                output
+                (output, archive)
             }
             Err(e) => {
                 return Err(e);
             }
         };
-        outputs.push(output);
+
+        outputs.push(output.clone());
+
+        // We can now run the tests for the output. However, we need to check if
+        // all dependencies that are needed for the test are already built.
+
+        // Decide whether the tests should be skipped or not
+        let (skip_test, skip_test_reason) = match tool_configuration.test_strategy {
+            TestStrategy::Skip => (true, "the argument --test=skip was set".to_string()),
+            TestStrategy::Native => {
+                // Skip if `host_platform != build_platform` and `target_platform != noarch`
+                if output.build_configuration.target_platform != Platform::NoArch
+                    && output.build_configuration.host_platform.platform
+                        != output.build_configuration.build_platform.platform
+                {
+                    let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
+
+                    (true, reason)
+                } else {
+                    (false, "".to_string())
+                }
+            }
+            TestStrategy::NativeAndEmulated => (false, "".to_string()),
+        };
+        if skip_test {
+            tracing::info!("Skipping tests because {}", skip_test_reason);
+            build_reindexed_channels(&output.build_configuration, &tool_configuration)
+                .into_diagnostic()
+                .context("failed to reindex output channel")?;
+        } else {
+            test_queue.push((output, archive));
+
+            let is_last_iteration = index == outputs_to_build.len() - 1;
+            let to_test = if is_last_iteration {
+                // On last iteration, test everything in the queue
+                std::mem::take(&mut test_queue)
+            } else {
+                // Update the test queue with the tests that we can't run yet
+                let (to_test, new_test_queue) = test_queue
+                    .into_iter()
+                    .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
+                test_queue = new_test_queue;
+                to_test
+            };
+
+            // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
+            for (output, archive) in &to_test {
+                package_test::run_test(
+                    archive,
+                    &TestConfiguration {
+                        test_prefix: output.build_configuration.directories.work_dir.join("test"),
+                        target_platform: Some(output.build_configuration.target_platform),
+                        host_platform: Some(output.build_configuration.host_platform.clone()),
+                        current_platform: output.build_configuration.build_platform.clone(),
+                        keep_test_prefix: tool_configuration.no_clean,
+                        channels: build_reindexed_channels(
+                            &output.build_configuration,
+                            &tool_configuration,
+                        )
+                        .into_diagnostic()
+                        .context("failed to reindex output channel")?,
+                        channel_priority: ChannelPriority::Strict,
+                        solve_strategy: SolveStrategy::Highest,
+                        tool_configuration: tool_configuration.clone(),
+                    },
+                    None,
+                )
+                .await
+                .into_diagnostic()?;
+            }
+        }
     }
 
     let span = tracing::info_span!("Build summary");
@@ -673,7 +790,7 @@ pub fn sort_build_outputs_topologically(
         let output_idx = *name_to_index
             .get(output.name())
             .expect("We just inserted it");
-        for dep in output.recipe.requirements().all() {
+        for dep in output.recipe.requirements().run_build_host() {
             let dep_name = match dep {
                 Dependency::Spec(spec) => spec
                     .name
@@ -682,6 +799,7 @@ pub fn sort_build_outputs_topologically(
                 Dependency::PinSubpackage(pin) => pin.pin_value().name.clone(),
                 Dependency::PinCompatible(pin) => pin.pin_value().name.clone(),
             };
+
             if let Some(&dep_idx) = name_to_index.get(&dep_name) {
                 // do not point to self (circular dependency) - this can happen with
                 // pin_subpackage in run_exports, for example.

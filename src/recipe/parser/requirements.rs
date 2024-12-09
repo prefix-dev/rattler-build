@@ -116,13 +116,35 @@ impl Requirements {
         self.build.iter().chain(self.host.iter())
     }
 
-    /// Get all requirements in one iterator.
-    pub fn all(&self) -> impl Iterator<Item = &Dependency> {
+    /// Get all pin_subpackage expressions from requirements, constraints and run exports
+    pub fn all_pin_subpackage(&self) -> impl Iterator<Item = &Pin> {
+        self.all_requirements().filter_map(|dep| match dep {
+            Dependency::PinSubpackage(pin) => Some(&pin.pin_subpackage),
+            _ => None,
+        })
+    }
+
+    /// Return all dependencies including any constraints, run exports
+    /// This is mainly used to find any pin expressions that need to be resolved or added as requirements
+    pub fn all_requirements(&self) -> impl Iterator<Item = &Dependency> {
         self.build
             .iter()
             .chain(self.host.iter())
             .chain(self.run.iter())
-        // .chain(self.run_constraints.iter())
+            .chain(self.run_constraints.iter())
+            .chain(self.run_exports.weak.iter())
+            .chain(self.run_exports.weak_constraints.iter())
+            .chain(self.run_exports.strong.iter())
+            .chain(self.run_exports.strong_constraints.iter())
+            .chain(self.run_exports.noarch.iter())
+    }
+
+    /// Get all requirements in one iterator.
+    pub fn run_build_host(&self) -> impl Iterator<Item = &Dependency> {
+        self.build
+            .iter()
+            .chain(self.host.iter())
+            .chain(self.run.iter())
     }
 
     /// Check if all requirements are empty.

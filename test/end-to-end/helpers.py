@@ -1,7 +1,7 @@
+import json
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
-
 from conda_package_handling.api import extract
 
 
@@ -67,6 +67,30 @@ class RattlerBuild:
 
     def test(self, package, *args: Any, **kwds: Any) -> Any:
         return self("test", "--package-file", package, *args, stderr=STDOUT, **kwds)
+
+    def render(
+        self,
+        recipe_folder: Path,
+        output_folder: Path,
+        with_solve: bool = False,
+        variant_config: Optional[Path] = None,
+        custom_channels: Optional[list[str]] = None,
+        extra_args: list[str] = None,
+        extra_meta: dict[str, Any] = None,
+    ) -> Any:
+        args = self.build_args(
+            recipe_folder,
+            output_folder,
+            variant_config=variant_config,
+            custom_channels=custom_channels,
+            extra_args=extra_args,
+            extra_meta=extra_meta,
+        )
+        if with_solve:
+            args += ["--with-solve"]
+        output = self(*args, "--render-only")
+
+        return json.loads(output)
 
 
 def get_package(folder: Path, glob="*.tar.bz2"):

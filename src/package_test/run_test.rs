@@ -671,7 +671,7 @@ impl CommandsTest {
     ) -> Result<(), TestError> {
         let deps = self.requirements.clone();
 
-        let span = tracing::info_span!("Running script test");
+        let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
         let _guard = span.enter();
 
         let build_env = if !deps.build.is_empty() {
