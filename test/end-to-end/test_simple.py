@@ -608,8 +608,12 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     assert len(rendered) == 2
 
     assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
-    assert rendered[0]["recipe"]["requirements"]["run"] == ["__unix"]
-    assert rendered[0]["recipe"]["build"]["string"] == "unix_4616a5c_0"
+    assert rendered[0]["recipe"]["build"]["string"] == "unix_5600cae_0"
+
+    assert rendered[0]["build_configuration"]["variant"] == {
+        "__unix": "__unix",
+        "target_platform": "noarch",
+    }
 
     pin = {
         "pin_subpackage": {
@@ -617,11 +621,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "unix_259ce3c_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "unix_63d9094_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler_build_demo": "1 unix_4616a5c_0",
+        "rattler_build_demo": "1 unix_5600cae_0",
         "target_platform": "noarch",
     }
 
@@ -631,9 +635,13 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
     rendered = json.loads(output)
     assert len(rendered) == 2
 
-    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
-    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win"]
-    assert rendered[0]["recipe"]["build"]["string"] == "win_4616a5c_0"
+    assert rendered[0]["recipe"]["requirements"]["run"] == ["__win >=11.0.123 foobar"]
+    assert rendered[0]["recipe"]["build"]["string"] == "win_19aa286_0"
+
+    assert rendered[0]["build_configuration"]["variant"] == {
+        "__win": "__win >=11.0.123 foobar",
+        "target_platform": "noarch",
+    }
 
     pin = {
         "pin_subpackage": {
@@ -641,11 +649,11 @@ def test_noarch_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             "exact": True,
         }
     }
-    assert rendered[1]["recipe"]["build"]["string"] == "win_c8f1e9f_0"
+    assert rendered[1]["recipe"]["build"]["string"] == "win_95d38b2_0"
     assert rendered[1]["recipe"]["build"]["noarch"] == "generic"
     assert rendered[1]["recipe"]["requirements"]["run"] == [pin]
     assert rendered[1]["build_configuration"]["variant"] == {
-        "rattler_build_demo": "1 win_4616a5c_0",
+        "rattler_build_demo": "1 win_19aa286_0",
         "target_platform": "noarch",
     }
 

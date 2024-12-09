@@ -43,15 +43,6 @@ pub struct Stage0Render {
     pub rendered_outputs: Vec<Recipe>,
 }
 
-impl Stage0Render {
-    pub fn outputs(&self) -> impl Iterator<Item = (&Node, &Recipe)> {
-        self.raw_outputs
-            .vec
-            .iter()
-            .zip(self.rendered_outputs.iter())
-    }
-}
-
 pub(crate) fn stage_0_render(
     outputs: &[Node],
     recipe: &str,
@@ -122,6 +113,14 @@ pub(crate) fn stage_0_render(
     Ok(stage0_renders)
 }
 
+#[derive(Debug, Clone)]
+pub struct Stage1Inner {
+    pub(crate) used_vars_from_dependencies: HashSet<NormalizedKey>,
+    pub(crate) exact_pins: HashSet<PackageName>,
+    pub(crate) recipe: Recipe,
+    pub(crate) selector_config: SelectorConfig,
+}
+
 /// Stage 1 render of a single recipe.yaml
 #[derive(Debug)]
 pub struct Stage1Render {
@@ -134,14 +133,6 @@ pub struct Stage1Render {
     order: Vec<usize>,
 }
 
-#[derive(Debug, Clone)]
-pub struct Stage1Inner {
-    pub(crate) used_vars_from_dependencies: HashSet<NormalizedKey>,
-    pub(crate) exact_pins: HashSet<PackageName>,
-    pub(crate) recipe: Recipe,
-    pub(crate) selector_config: SelectorConfig,
-}
-
 impl Stage1Render {
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
         self.inner
@@ -150,7 +141,6 @@ impl Stage1Render {
     }
 
     pub fn variant_for_output(&self, idx: usize) -> BTreeMap<NormalizedKey, String> {
-        tracing::info!("Getting variant for output {}", idx);
         let idx = self.order[idx];
         let inner = &self.inner[idx];
         // combine jinja variables and the variables from the dependencies
@@ -169,6 +159,18 @@ impl Stage1Render {
             }
         }
 
+        // Add in virtual packages
+        let recipe = &self.inner[idx].recipe;
+        for run_requirement in recipe.requirements().run() {
+            if let Dependency::Spec(spec) = run_requirement {
+                if let Some(ref name) = spec.name {
+                    if name.as_normalized().starts_with("__") {
+                        variant.insert(name.as_normalized().into(), spec.to_string());
+                    }
+                }
+            }
+        }
+
         for pin in &inner.exact_pins {
             if pin == self_name {
                 continue;
@@ -184,7 +186,7 @@ impl Stage1Render {
         }
 
         // fix target_platform value here
-        if !self.inner[idx].recipe.build().noarch().is_none() {
+        if !recipe.build().noarch().is_none() {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
@@ -317,17 +319,6 @@ pub(crate) fn stage_1_render(
                 }
             }
 
-            // add in virtual package run specs where the name starts with `__`
-            for run_req in output.requirements().run() {
-                if let Dependency::Spec(spec) = run_req {
-                    if let Some(ref name) = spec.name {
-                        if name.as_normalized().starts_with("__") {
-                            additional_variables.insert(name.as_normalized().into());
-                        }
-                    }
-                }
-            }
-
             // Add in extra `use` keys from the output
             let extra_use_keys = output
                 .build()
@@ -372,7 +363,6 @@ pub(crate) fn stage_1_render(
                 .collect();
 
             additional_variables.retain(|x| !extra_ignore_keys.contains(x));
-
             extra_vars_per_output.push(additional_variables);
             exact_pins_per_output.push(exact_pins);
         }
@@ -385,10 +375,8 @@ pub(crate) fn stage_1_render(
         all_vars.extend(r.variables.keys().cloned());
 
         let all_combinations = variant_config.combinations(&all_vars, Some(&r.variables))?;
-
         for combination in all_combinations {
             let mut inner = Vec::new();
-
             // TODO: figure out if we can pre-compute the `noarch` value.
             for (idx, output) in r.raw_outputs.vec.iter().enumerate() {
                 // use the correct target_platform here?
