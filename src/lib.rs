@@ -444,7 +444,7 @@ pub async fn run_build_from_args(
         .map(|o| o.name())
         .collect::<Vec<_>>();
 
-    for output in outputs_to_build.iter() {
+    for (index, output) in outputs_to_build.iter().enumerate() {
         let (output, archive) = match run_build(output.clone(), &tool_configuration)
             .boxed_local()
             .await
@@ -489,12 +489,18 @@ pub async fn run_build_from_args(
         } else {
             test_queue.push((output, archive));
 
-            let (to_test, new_test_queue) = test_queue
-                .into_iter()
-                .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
-
-            // Update the test queue with the tests that we can't run yet
-            test_queue = new_test_queue;
+            let is_last_iteration = index == outputs_to_build.len() - 1;
+            let to_test = if is_last_iteration {
+                // On last iteration, test everything in the queue
+                std::mem::take(&mut test_queue)
+            } else {
+                // Update the test queue with the tests that we can't run yet
+                let (to_test, new_test_queue) = test_queue
+                    .into_iter()
+                    .partition(|(output, _)| can_test(output, &all_output_names, &outputs));
+                test_queue = new_test_queue;
+                to_test
+            };
 
             // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
             for (output, archive) in &to_test {

@@ -1105,3 +1105,15 @@ def test_pin_compatible(
     rendered = rattler_build.render(recipes / "pin_compatible", tmp_path)
 
     assert snapshot_json == rendered[0]["recipe"]["requirements"]
+
+def test_render_variants(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rendered = rattler_build.render(recipes / "race-condition/recipe-undefined-variant.yaml", tmp_path)
+    assert [rx["recipe"]["package"]["name"] for rx in rendered] == ["my-package-a", "my-package-b"]
+
+def test_race_condition(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    # make sure that tests are ran in the right order and that the packages are built correctly
+    rattler_build.build(recipes / "race-condition", tmp_path)
