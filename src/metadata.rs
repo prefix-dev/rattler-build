@@ -186,8 +186,13 @@ impl Directories {
     }
 
     /// Creates the build directory.
-    pub fn create_build_dir(&self) -> Result<(), std::io::Error> {
-        fs::create_dir_all(self.build_dir.join("work"))?;
+    pub fn create_build_dir(&self, remove_existing_work_dir: bool) -> Result<(), std::io::Error> {
+        if remove_existing_work_dir && self.work_dir.exists() {
+            fs::remove_dir_all(&self.work_dir)?;
+        }
+
+        fs::create_dir_all(&self.work_dir)?;
+
         Ok(())
     }
 
@@ -787,7 +792,7 @@ mod test {
             &chrono::Utc::now(),
         )
         .unwrap();
-        directories.create_build_dir().unwrap();
+        directories.create_build_dir(false).unwrap();
 
         // test yaml roundtrip
         let yaml = serde_yaml::to_string(&directories).unwrap();

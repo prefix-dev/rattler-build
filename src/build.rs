@@ -103,7 +103,7 @@ pub async fn run_build(
     output
         .build_configuration
         .directories
-        .create_build_dir()
+        .create_build_dir(true)
         .into_diagnostic()?;
 
     let span = tracing::info_span!("Running build for", recipe = output.identifier());
