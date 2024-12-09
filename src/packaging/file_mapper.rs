@@ -38,12 +38,12 @@ pub fn filter_pyc(path: &Path, old_files: &HashSet<PathBuf>) -> bool {
                 path.with_extension("py")
             };
 
-            if !old_files.contains(&pyfile) {
-                return false;
+            if old_files.contains(&pyfile) {
+                return true;
             }
         }
     }
-    true
+    false
 }
 
 /// Filter certain files to prevent them from being packaged:
@@ -343,9 +343,9 @@ mod test {
             ("pkg/nested/__pycache__/deep.cpython-311.pyc", true),
             ("pkg/nested/deep.pyc", true),
             // Edge cases
-            ("pkg/not_python.txt", true), // non-python files pass through
-            ("pkg/__pycache__/invalid", true), // no extension
-            ("", true),                   // empty path
+            ("pkg/not_python.txt", false), // non-python files pass through
+            ("pkg/__pycache__/invalid", false), // no extension
+            ("", false),                   // empty path
         ];
 
         for (file, expected) in test_cases {

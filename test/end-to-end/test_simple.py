@@ -367,9 +367,9 @@ def test_compile_python(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pa
 
     assert (pkg / "info/paths.json").exists()
     paths = json.loads((pkg / "info/paths.json").read_text())
-    assert (
-        len([p for p in paths["paths"] if p["_path"].endswith(".cpython-311.pyc")]) == 2
-    )
+    pyc_paths = [p["_path"] for p in paths["paths"] if p["_path"].endswith(".pyc")]
+    assert len(pyc_paths) == 3
+    assert "just_a_.cpython-311.pyc" in pyc_paths
     assert len([p for p in paths["paths"] if p["_path"].endswith(".py")]) == 4
 
     # make sure that we include the `info/recipe/recipe.py` file
@@ -1106,11 +1106,18 @@ def test_pin_compatible(
 
     assert snapshot_json == rendered[0]["recipe"]["requirements"]
 
+
 def test_render_variants(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
-    rendered = rattler_build.render(recipes / "race-condition/recipe-undefined-variant.yaml", tmp_path)
-    assert [rx["recipe"]["package"]["name"] for rx in rendered] == ["my-package-a", "my-package-b"]
+    rendered = rattler_build.render(
+        recipes / "race-condition/recipe-undefined-variant.yaml", tmp_path
+    )
+    assert [rx["recipe"]["package"]["name"] for rx in rendered] == [
+        "my-package-a",
+        "my-package-b",
+    ]
+
 
 def test_race_condition(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
