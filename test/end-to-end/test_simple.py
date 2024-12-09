@@ -699,13 +699,9 @@ def test_filter_files(
 
 def test_double_license(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     path_to_recipe = recipes / "double_license"
-    args = rattler_build.build_args(
-        path_to_recipe,
-        tmp_path,
-    )
-    # make sure that two license files in $SRC_DIR and $RECIPE_DIR raise an exception
-    with pytest.raises(CalledProcessError):
-        rattler_build(*args)
+    args = rattler_build.build_args(path_to_recipe, tmp_path)
+    output = rattler_build(*args, stderr=STDOUT)
+    assert "warning License file from source directory was overwritten" in output
 
 
 @pytest.mark.skipif(
