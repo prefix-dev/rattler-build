@@ -4,10 +4,10 @@ expression: err
 ---
   × Failed to parse recipe
 
-Error:   × Parsing: missing field `version`
+Error: 
+  × Parsing: missing field `version`
    ╭─[6:11]
  5 │       - package:
  6 │ ╭─▶       name: bla
    ╰────
   help: the field `version` is required for `package`
-
