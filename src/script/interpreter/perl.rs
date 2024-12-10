@@ -8,7 +8,7 @@ use super::{find_interpreter, BashInterpreter, CmdExeInterpreter, Interpreter};
 
 pub(crate) struct PerlInterpreter;
 
-// python interpreter calls either bash or cmd.exe interpreter for activation and then runs python script
+// Perl interpreter calls either bash or cmd.exe interpreter for activation and then runs Perl script
 impl Interpreter for PerlInterpreter {
     async fn run(&self, args: ExecutionArgs) -> Result<(), std::io::Error> {
         let perl_script = args.work_dir.join("conda_build_script.pl");
