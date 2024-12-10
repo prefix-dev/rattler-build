@@ -508,11 +508,11 @@ pub enum LogStyle {
 /// Constructs a default [`EnvFilter`] that is used when the user did not
 /// specify a custom RUST_LOG.
 pub fn get_default_env_filter(
-    verbose: clap_verbosity_flag::LevelFilter,
+    verbose: clap_verbosity_flag::log::LevelFilter,
 ) -> Result<EnvFilter, ParseError> {
     let mut result = EnvFilter::new(format!("rattler_build={verbose}"));
 
-    if verbose >= clap_verbosity_flag::LevelFilter::Trace {
+    if verbose >= clap_verbosity_flag::log::LevelFilter::Trace {
         result = result.add_directive(Directive::from_str("resolvo=info")?);
         result = result.add_directive(Directive::from_str("rattler=info")?);
         result = result.add_directive(Directive::from_str(
@@ -598,7 +598,7 @@ pub fn init_logging(
     let registry =
         tracing_subscriber::registry().with(get_default_env_filter(verbosity.log_level_filter())?);
 
-    let log_style = if verbosity.log_level_filter() >= clap_verbosity_flag::LevelFilter::Debug {
+    let log_style = if verbosity.log_level_filter() >= clap_verbosity_flag::log::LevelFilter::Debug {
         LogStyle::Plain
     } else {
         *log_style
