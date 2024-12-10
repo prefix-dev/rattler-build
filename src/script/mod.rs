@@ -374,7 +374,7 @@ impl Output {
         env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
         env_vars.extend(self.env_vars_from_variant());
 
-        let selector_config = self.build_configuration.selector_config();
+        let selector_config = self.build_configuration.selector_config(self.recipe.build().number());
         let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
 
         self.recipe

@@ -384,7 +384,8 @@ pub(crate) fn stage_1_render(
                 let config_with_variant = selector_config
                     .clone()
                     .with_variant(combination.clone(), selector_config.target_platform)
-                    .with_allow_undefined(false);
+                    // TODO finish with the real hash
+                    .finish(HashInfo::from_variant(&Default::default(), &rattler_conda_types::NoArchType::none()), 123);
 
                 let parsed_recipe = Recipe::from_node(output, config_with_variant.clone()).unwrap();
 

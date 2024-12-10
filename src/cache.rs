@@ -220,7 +220,7 @@ impl Output {
                 .await
                 .into_diagnostic()?;
 
-            let selector_config = self.build_configuration.selector_config();
+            let selector_config = self.build_configuration.selector_config(self.recipe.build().number());
             let mut jinja = Jinja::new(selector_config.clone());
             for (k, v) in self.recipe.context.iter() {
                 jinja

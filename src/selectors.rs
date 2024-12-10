@@ -23,6 +23,8 @@ pub struct SelectorConfig {
     pub build_platform: Platform,
     /// The hash, if available
     pub hash: Option<HashInfo>,
+    /// The build number if available
+    pub build_number: Option<u64>,
     /// The variant config
     pub variant: BTreeMap<NormalizedKey, String>,
     /// Enable experimental features
@@ -105,10 +107,13 @@ impl SelectorConfig {
         }
     }
 
-    /// Set allow_undefined for this Jinja context / selector config
-    pub fn with_allow_undefined(self, allow_undefined: bool) -> Self {
+    /// Finish the selector config by adding the hash and build number. 
+    /// After this, all variables are defined and `allow_undefined` is set to false.
+    pub fn finish(self, hash: HashInfo, build_number: u64) -> Self {
         Self {
-            allow_undefined,
+            hash: Some(hash),
+            build_number: Some(build_number),
+            allow_undefined: false,
             ..self
         }
     }
@@ -121,6 +126,7 @@ impl Default for SelectorConfig {
             host_platform: Platform::current(),
             build_platform: Platform::current(),
             hash: None,
+            build_number: None,
             variant: Default::default(),
             experimental: false,
             allow_undefined: false,
