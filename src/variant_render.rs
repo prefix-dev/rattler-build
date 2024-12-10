@@ -10,7 +10,11 @@ use crate::{
     env_vars,
     hash::HashInfo,
     normalized_key::NormalizedKey,
-    recipe::{custom_yaml::Node, parser::Dependency, Jinja, ParsingError, Recipe},
+    recipe::{
+        custom_yaml::Node,
+        parser::{BuildString, Dependency},
+        Jinja, ParsingError, Recipe,
+    },
     selectors::SelectorConfig,
     used_variables::used_vars_from_expressions,
     variant_config::{ParseErrors, VariantConfig, VariantError},
@@ -55,17 +59,15 @@ pub(crate) fn stage_0_render(
             used_vars_from_expressions(output, recipe)
                 .map(|x| x.into_iter().map(Into::into).collect())
         })
-        .collect::<Result<Vec<HashSet<NormalizedKey>>, Vec<ParsingError>>>();
-
-    // If there are any parsing errors, return them
-    if let Err(errors) = used_vars {
-        let err: ParseErrors = errors.into();
-        return Err(VariantError::RecipeParseErrors(err));
-    }
+        .collect::<Result<Vec<HashSet<NormalizedKey>>, Vec<ParsingError>>>()
+        .map_err(|errs| {
+            let errs: ParseErrors = errs.into();
+            VariantError::RecipeParseErrors(errs)
+        })?;
 
     let raw_output_vec = RawOutputVec {
         vec: outputs.to_vec(),
-        used_vars_jinja: used_vars.unwrap(),
+        used_vars_jinja: used_vars,
         recipe: recipe.to_string(),
     };
 
@@ -74,7 +76,10 @@ pub(crate) fn stage_0_render(
     for output in outputs {
         used_vars.extend(
             used_vars_from_expressions(output, recipe)
-                .unwrap()
+                .map_err(|errs| {
+                    let errs: ParseErrors = errs.into();
+                    VariantError::RecipeParseErrors(errs)
+                })?
                 .into_iter()
                 .map(Into::into),
         );
@@ -129,8 +134,6 @@ pub struct Stage1Render {
     pub(crate) inner: Vec<Stage1Inner>,
 
     pub(crate) stage_0_render: Stage0Render,
-
-    order: Vec<usize>,
 }
 
 impl Stage1Render {
@@ -140,8 +143,10 @@ impl Stage1Render {
             .position(|x| x.recipe.package().name() == package_name)
     }
 
-    pub fn variant_for_output(&self, idx: usize) -> BTreeMap<NormalizedKey, String> {
-        let idx = self.order[idx];
+    pub fn variant_for_output(
+        &self,
+        idx: usize,
+    ) -> Result<BTreeMap<NormalizedKey, String>, VariantError> {
         let inner = &self.inner[idx];
         // combine jinja variables and the variables from the dependencies
         let self_name = self.stage_0_render.rendered_outputs[idx].package().name();
@@ -175,9 +180,11 @@ impl Stage1Render {
             if pin == self_name {
                 continue;
             }
-            let other_idx = self.index_from_name(pin).unwrap();
+            let Some(other_idx) = self.index_from_name(pin) else {
+                return Err(VariantError::MissingOutput(pin.as_source().to_string()));
+            };
             // find the referenced output
-            let build_string = self.build_string_for_output(other_idx);
+            let build_string = self.build_string_for_output(other_idx)?;
             let version = self.inner[other_idx].recipe.package().version();
             variant.insert(
                 pin.as_normalized().into(),
@@ -190,28 +197,28 @@ impl Stage1Render {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
-        variant
+        Ok(variant)
     }
 
-    pub fn build_string_for_output(&self, idx: usize) -> String {
-        let variant = self.variant_for_output(idx);
-        let recipe = &self.stage_0_render.rendered_outputs[self.order[idx]];
+    pub fn build_string_for_output(&self, idx: usize) -> Result<String, VariantError> {
+        let variant = self.variant_for_output(idx)?;
+        let recipe = &self.stage_0_render.rendered_outputs[idx];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
-        let inner = &self.inner[self.order[idx]];
+        let inner = &self.inner[idx];
 
         let mut selector_config = inner.selector_config.clone();
         selector_config.hash = Some(hash.clone());
         let jinja = Jinja::new(selector_config.clone()).with_context(&recipe.context);
 
-        recipe
+        Ok(recipe
             .build()
             .string()
             .resolve(&hash, recipe.build().number, &jinja)
-            .into_owned()
+            .into_owned())
     }
 
     /// sort the outputs topologically
-    pub fn sort_outputs(self) -> Self {
+    pub fn sorted_indices(&self) -> Result<Vec<usize>, VariantError> {
         // Create an empty directed graph
         let mut graph = DiGraph::<_, ()>::new();
         let mut node_indices = Vec::new();
@@ -249,8 +256,16 @@ impl Stage1Render {
         }
 
         // Sort the outputs topologically
-        let sorted_indices =
-            petgraph::algo::toposort(&graph, None).expect("Could not sort topologically.");
+        let sorted_indices = match petgraph::algo::toposort(&graph, None) {
+            Ok(sorted_indices) => sorted_indices,
+            Err(cycle) => {
+                let cycle = cycle.node_id();
+                let cycle_name = graph[cycle].package().name();
+                return Err(VariantError::CycleInRecipeOutputs(
+                    cycle_name.as_source().to_string(),
+                ));
+            }
+        };
 
         let sorted_indices = sorted_indices
             .into_iter()
@@ -258,26 +273,30 @@ impl Stage1Render {
             .collect::<Vec<usize>>();
 
         // Update the order of the outputs
-        Stage1Render {
-            order: sorted_indices,
-            ..self
-        }
+        Ok(sorted_indices)
     }
 
-    pub fn outputs(
-        &self,
-    ) -> impl Iterator<Item = ((&Node, &Recipe), BTreeMap<NormalizedKey, String>)> {
+    pub fn into_sorted_outputs(
+        self,
+    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, String>)>, VariantError> {
         // zip node from stage0 and final render output
-        let raw_nodes = self.stage_0_render.raw_outputs.vec.iter();
-        let outputs: Vec<&Recipe> = self.inner.iter().map(|i| &i.recipe).collect();
+        let sorted_indices = self.sorted_indices()?;
+
+        let raw_nodes = self.stage_0_render.raw_outputs.vec.clone().into_iter();
+        let outputs = self.inner.clone().into_iter().map(|i| i.recipe);
 
         let zipped = raw_nodes.zip(outputs).collect::<Vec<_>>();
+        let mut result = Vec::new();
+        for idx in sorted_indices {
+            let mut recipe = zipped[idx].clone();
+            let build_string = self.build_string_for_output(idx)?;
+            // Resolve the build string and store the resolved one in the recipe
+            recipe.1.build.string = BuildString::Resolved(build_string);
+            let variant = self.variant_for_output(idx)?;
+            result.push((recipe, variant));
+        }
 
-        (0..zipped.len()).map(move |idx| {
-            let recipe = zipped[self.order[idx]];
-            let variant = self.variant_for_output(idx);
-            (recipe, variant)
-        })
+        Ok(result)
     }
 }
 
@@ -337,7 +356,7 @@ pub(crate) fn stage_1_render(
             }
 
             // special handling of CONDA_BUILD_SYSROOT
-            let jinja_variables = r.raw_outputs.used_vars_jinja.get(idx).unwrap();
+            let jinja_variables = &r.raw_outputs.used_vars_jinja[idx];
             if jinja_variables.contains(&"c_compiler".into())
                 || jinja_variables.contains(&"cxx_compiler".into())
             {
@@ -383,7 +402,15 @@ pub(crate) fn stage_1_render(
                 let config_with_variant = selector_config
                     .with_variant(combination.clone(), selector_config.target_platform);
 
-                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone()).unwrap();
+                let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
+                    .map_err(|err| {
+                        let errs: ParseErrors = err
+                            .into_iter()
+                            .map(|err| ParsingError::from_partial(&r.raw_outputs.recipe, err))
+                            .collect::<Vec<ParsingError>>()
+                            .into();
+                        errs
+                    })?;
 
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),
@@ -397,9 +424,7 @@ pub(crate) fn stage_1_render(
                 inner,
                 variables: combination,
                 stage_0_render: r.clone(),
-                order: (0..r.rendered_outputs.len()).collect(),
-            }
-            .sort_outputs();
+            };
 
             stage_1_renders.push(stage_1);
         }

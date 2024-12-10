@@ -1,0 +1,19 @@
+recipe:
+  name: test-split
+  version: v1
+
+build:
+  number: 0
+  noarch: python
+
+source:
+  path: ./
+
+outputs:
+  - package:
+      name: test.a
+  - package:
+      name: test.b
+    requirements:
+      run:
+        - ${{ pin_subpackage('test1', exact=True) }} # this package does not exist!

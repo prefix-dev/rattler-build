@@ -1,3 +1,6 @@
 variant:
   - a
   - b
+
+python_min:
+  - "3.8.0"

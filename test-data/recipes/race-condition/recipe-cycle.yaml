@@ -1,0 +1,14 @@
+recipe:
+  version: "1.2.3"
+
+outputs:
+  - package:
+      name: foobar
+    requirements:
+      host:
+        - bazbus
+  - package:
+      name: bazbus
+    requirements:
+      host:
+        - foobar

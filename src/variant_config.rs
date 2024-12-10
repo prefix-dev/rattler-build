@@ -18,7 +18,6 @@ use crate::{
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
-        parser::BuildString,
         Jinja, Render,
     },
     selectors::SelectorConfig,
@@ -441,16 +440,19 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for (idx, ((node, recipe), variant)) in sx.outputs().enumerate() {
+            for ((node, recipe), variant) in sx.into_sorted_outputs()? {
                 let target_platform = if recipe.build().noarch().is_none() {
                     selector_config.target_platform
                 } else {
                     Platform::NoArch
                 };
 
-                let mut recipe = recipe.clone();
-                let build_string = sx.build_string_for_output(idx);
-                recipe.build.string = BuildString::Resolved(build_string.clone());
+                let build_string = recipe
+                    .build()
+                    .string()
+                    .as_resolved()
+                    .expect("Build string has to be resolved")
+                    .to_string();
 
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
@@ -458,7 +460,7 @@ impl VariantConfig {
                     build_string,
                     noarch_type: *recipe.build().noarch(),
                     target_platform,
-                    node: node.clone(),
+                    node,
                     used_vars: variant.clone(),
                     recipe: recipe.clone(),
                     hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
