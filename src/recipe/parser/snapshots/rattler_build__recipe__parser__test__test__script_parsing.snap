@@ -15,8 +15,8 @@ expression: yaml_serde
 - script:
     interpreter: bash
     env:
-      BAZ: QUX
       FOO: BAR
+      BAZ: QUX
     secrets:
     - ABC
     - DEF
