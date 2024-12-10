@@ -4,7 +4,8 @@ expression: err
 ---
   × Failed to parse recipe
 
-Error:   × Parsing: expected a mapping.
+Error: 
+  × Parsing: expected a mapping.
    ╭─[3:17]
  2 │                 context:
  3 │ ╭─▶                 - a
@@ -13,4 +14,3 @@ Error:   × Parsing: expected a mapping.
  5 │                 package:
    ╰────
   help: `context` must always be a mapping
-

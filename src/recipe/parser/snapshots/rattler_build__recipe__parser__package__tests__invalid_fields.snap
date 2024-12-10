@@ -4,7 +4,8 @@ expression: err
 ---
   × Failed to parse recipe
 
-Error:   × Parsing: invalid field `invalid`.
+Error: 
+  × Parsing: invalid field `invalid`.
    ╭─[5:13]
  4 │             version: 0.1.0
  5 │             invalid: "field"
@@ -13,4 +14,3 @@ Error:   × Parsing: invalid field `invalid`.
  6 │         
    ╰────
   help: valid fields for `package` are `name` and `version`
-
