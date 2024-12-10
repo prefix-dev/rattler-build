@@ -13,8 +13,9 @@ class RattlerBuild:
         try:
             return check_output([str(self.path), *args], **kwds).decode("utf-8")
         except CalledProcessError as e:
-            print(e.output)
-            print(e.stderr)
+            if kwds.get("stderr") is None:
+                print(e.output)
+                print(e.stderr)
             raise e
 
     def build_args(
@@ -77,6 +78,7 @@ class RattlerBuild:
         custom_channels: Optional[list[str]] = None,
         extra_args: list[str] = None,
         extra_meta: dict[str, Any] = None,
+        **kwargs: Any,
     ) -> Any:
         args = self.build_args(
             recipe_folder,
@@ -88,7 +90,7 @@ class RattlerBuild:
         )
         if with_solve:
             args += ["--with-solve"]
-        output = self(*args, "--render-only")
+        output = self(*args, "--render-only", **kwargs)
 
         return json.loads(output)
 

@@ -1103,9 +1103,7 @@ def test_pin_compatible(
     assert snapshot_json == rendered[0]["recipe"]["requirements"]
 
 
-def test_render_variants(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
-):
+def test_render_variants(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rendered = rattler_build.render(
         recipes / "race-condition/recipe-undefined-variant.yaml", tmp_path
     )
@@ -1115,8 +1113,50 @@ def test_render_variants(
     ]
 
 
-def test_race_condition(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
-):
+def test_race_condition(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     # make sure that tests are ran in the right order and that the packages are built correctly
     rattler_build.build(recipes / "race-condition", tmp_path)
+
+
+def test_variant_sorting(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # make sure that tests are ran in the right order and that the packages are built correctly
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-pin-subpackage.yaml", tmp_path
+    )
+    assert [rx["recipe"]["package"]["name"] for rx in rendered] == ["test1", "test2"]
+
+
+def test_missing_pin_subpackage(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # make sure that tests are ran in the right order and that the packages are built correctly
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.render(
+            recipes / "race-condition" / "recipe-pin-invalid.yaml",
+            tmp_path,
+            stderr=STDOUT,
+        )
+    stdout = e.value.output.decode("utf-8")
+    assert "Missing output: test1 (used in pin_subpackage)" in stdout
+
+
+def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    # make sure that tests are ran in the right order and that the packages are built correctly
+    with pytest.raises(CalledProcessError) as e:
+        rattler_build.render(
+            recipes / "race-condition" / "recipe-cycle.yaml",
+            tmp_path,
+            stderr=STDOUT,
+        )
+    stdout = e.value.output.decode("utf-8")
+    assert "Found a cycle in the recipe outputs: bazbus" in stdout
+
+
+def test_python_min_render(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rendered = rattler_build.render(
+        recipes / "race-condition" / "recipe-python-min.yaml", tmp_path
+    )
+
+    assert snapshot_json == rendered[0]["recipe"]["requirements"]

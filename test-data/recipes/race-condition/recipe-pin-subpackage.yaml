@@ -1,0 +1,19 @@
+recipe:
+  name: test-split
+  version: v1
+
+build:
+  number: 0
+  noarch: python
+
+source:
+  path: ./
+
+outputs:
+  - package:
+      name: test2
+    requirements:
+      run:
+        - ${{ pin_subpackage('test1', exact=True) }}
+  - package:
+      name: test1
