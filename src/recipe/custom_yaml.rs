@@ -1251,6 +1251,26 @@ where
     }
 }
 
+impl<K, V> TryConvertNode<IndexMap<K, V>> for RenderedNode
+where
+    K: Ord + Display + Hash,
+    RenderedScalarNode: TryConvertNode<K>,
+    RenderedNode: TryConvertNode<V>,
+{
+    fn try_convert(&self, name: &str) -> Result<IndexMap<K, V>, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| {
+                _partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedMapping,
+                    help = format!("expected a mapping for `{name}`")
+                )
+            })
+            .map_err(|e| vec![e])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
 impl<K, V> TryConvertNode<IndexMap<K, V>> for RenderedMappingNode
 where
     K: Ord + Display + Hash,

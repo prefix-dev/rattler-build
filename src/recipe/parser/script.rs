@@ -6,8 +6,9 @@ use crate::{
     },
     recipe::error::{ErrorKind, PartialParsingError},
 };
+use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::{borrow::Cow, collections::BTreeMap, path::PathBuf};
+use std::{borrow::Cow, path::PathBuf};
 
 /// Defines the script to run to build the package.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -15,7 +16,7 @@ pub struct Script {
     /// The interpreter to use for the script.
     pub interpreter: Option<String>,
     /// Environment variables to set in the build environment.
-    pub env: BTreeMap<String, String>,
+    pub env: IndexMap<String, String>,
     /// Environment variables to leak into the build environment from the host system that
     /// contain sensitive information. Use with care because this might make recipes no
     /// longer reproducible on other machines.
@@ -48,8 +49,8 @@ impl Serialize for Script {
             Object {
                 #[serde(skip_serializing_if = "Option::is_none")]
                 interpreter: Option<&'a String>,
-                #[serde(skip_serializing_if = "BTreeMap::is_empty")]
-                env: &'a BTreeMap<String, String>,
+                #[serde(skip_serializing_if = "IndexMap::is_empty")]
+                env: &'a IndexMap<String, String>,
                 #[serde(skip_serializing_if = "Vec::is_empty")]
                 secrets: &'a Vec<String>,
                 #[serde(skip_serializing_if = "Option::is_none", flatten)]
@@ -114,7 +115,7 @@ impl<'de> Deserialize<'de> for Script {
                 #[serde(default)]
                 interpreter: Option<String>,
                 #[serde(default)]
-                env: BTreeMap<String, String>,
+                env: IndexMap<String, String>,
                 #[serde(default)]
                 secrets: Vec<String>,
                 #[serde(default, flatten)]
@@ -164,7 +165,7 @@ impl Script {
     }
 
     /// Get the environment variables to set in the build environment.
-    pub fn env(&self) -> &BTreeMap<String, String> {
+    pub fn env(&self) -> &IndexMap<String, String> {
         &self.env
     }
 
