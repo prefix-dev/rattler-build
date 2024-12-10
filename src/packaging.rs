@@ -125,7 +125,7 @@ fn copy_license_files(
         // if a file was copied from the recipe dir, and the work dir, we should
         // issue a warning
         for file in copied_files_recipe_dir {
-            if copied_files_work_dir.contains(&file) {
+            if copied_files_work_dir.contains(file) {
                 let warn_str = format!("License file from source directory was overwritten by license file from recipe folder ({})", file.display());
                 tracing::warn!(warn_str);
                 output.record_warning(&warn_str);

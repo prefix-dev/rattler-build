@@ -276,6 +276,7 @@ impl Stage1Render {
         Ok(sorted_indices)
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn into_sorted_outputs(
         self,
     ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, String>)>, VariantError> {
