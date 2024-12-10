@@ -598,7 +598,8 @@ pub fn init_logging(
     let registry =
         tracing_subscriber::registry().with(get_default_env_filter(verbosity.log_level_filter())?);
 
-    let log_style = if verbosity.log_level_filter() >= clap_verbosity_flag::log::LevelFilter::Debug {
+    let log_style = if verbosity.log_level_filter() >= clap_verbosity_flag::log::LevelFilter::Debug
+    {
         LogStyle::Plain
     } else {
         *log_style
