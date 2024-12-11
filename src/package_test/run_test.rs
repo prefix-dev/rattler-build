@@ -33,7 +33,7 @@ use crate::{
     env_vars,
     metadata::PlatformWithVirtualPackages,
     recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
+        CommandsTest, DownstreamTest, PerlTest, RTest, PythonTest, PythonVersion, Script, ScriptContent,
         TestType,
     },
     render::solver::create_environment,
