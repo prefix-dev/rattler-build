@@ -149,6 +149,11 @@ pub enum TestType {
         /// The modules to test
         perl: PerlTest,
     },
+    /// A R test that will test if the modules are available
+    R {
+        /// The modules to test
+        r: RTest,
+    },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
     /// A test that runs the tests of a downstream package
