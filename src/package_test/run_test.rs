@@ -663,6 +663,69 @@ impl PerlTest {
     }
 }
 
+impl RTest {
+    /// Execute the R test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running r test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec![
+            MatchSpec::from_str("r", ParseStrictness::Strict).unwrap(),
+            match_spec,
+        ];
+
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let mut imports = String::new();
+        tracing::info!("Testing r imports:\n");
+
+        for module in &self.libraries {
+            writeln!(imports, "use {};", module)?;
+            tracing::info!("  use {};", module);
+        }
+        tracing::info!("\n");
+
+        let script = Script {
+            content: ScriptContent::Command(imports.clone()),
+            interpreter: Some("r".into()),
+            ..Script::default()
+        };
+
+        let tmp_dir = tempfile::tempdir()?;
+        script
+            .run_script(Default::default(), tmp_dir.path(), path, prefix, None, None)
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
 impl CommandsTest {
     /// Execute the command test
     pub async fn run_test(
