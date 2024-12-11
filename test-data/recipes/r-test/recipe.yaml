@@ -1,9 +1,8 @@
 context:
-  version: 0.01
+  version: 2.0.3
 
 package:
   name: r-magrittr
-  # 2.0.3 is the latest version of magrittr as of 2022-02-22
   version: ${{ version }}
 
 source:
@@ -14,9 +13,9 @@ build:
   number: 0
   noarch: generic
   script:
-    - print("Hello World!", quote = FALSE)
+    # - print("Hello World!", quote = FALSE)
     - R CMD INSTALL --build .
-    - write("MIT", file = "MIT")
+    # - write("MIT", file = "MIT")
 
 requirements:
   build:
@@ -24,15 +23,15 @@ requirements:
   host:
     - r
 
-tests:
-  # - Rscript -e "library(magrittr)"
-  - R:
-      libraries:
-        - magrittr
+# tests:
+#   # - Rscript -e "library(magrittr)"
+#   - R:
+#       libraries:
+#         - magrittr
 
 about:
   license: MIT
   license_file:
-    - MIT
+    # - MIT
   summary: A Forward-Pipe Operator for R
   homepage: https://magrittr.tidyverse.org/
