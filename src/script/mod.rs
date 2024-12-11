@@ -4,7 +4,7 @@ mod interpreter;
 use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
 use interpreter::{
-    BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
+    BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter, RInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;

@@ -430,6 +430,10 @@ pub async fn run_test(
                     perl.run_test(&pkg, &package_folder, &prefix, &config)
                         .await?
                 }
+                TestType::R { r } => {
+                    r.run_test(&pkg, &package_folder, &prefix, &config)
+                        .await?
+                }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
                         .run_test(&pkg, package_file, &prefix, &config)
