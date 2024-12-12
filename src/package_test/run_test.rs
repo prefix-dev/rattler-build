@@ -665,7 +665,7 @@ impl CommandsTest {
         &self,
         pkg: &ArchiveIdentifier,
         path: &Path,
-        prefix: &Path,
+        test_directory: &Path,
         config: &TestConfiguration,
         pkg_vars: &HashMap<String, String>,
     ) -> Result<(), TestError> {
@@ -674,9 +674,9 @@ impl CommandsTest {
         let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
         let _guard = span.enter();
 
-        let build_env = if !deps.build.is_empty() {
+        let build_prefix = if !deps.build.is_empty() {
             tracing::info!("Installing build dependencies");
-            let build_prefix = prefix.join("bld");
+            let build_prefix = test_directory.join("bld");
             let build_dependencies = deps
                 .build
                 .iter()
@@ -717,12 +717,12 @@ impl CommandsTest {
             .as_ref()
             .unwrap_or(&config.current_platform);
 
-        let run_env = prefix.join("run");
+        let run_prefix = test_directory.join("run");
         create_environment(
             "test",
             &dependencies,
             platform,
-            &run_env,
+            &run_prefix,
             &config.channels,
             &config.tool_configuration,
             config.channel_priority,
@@ -732,12 +732,12 @@ impl CommandsTest {
         .map_err(TestError::TestEnvironmentSetup)?;
 
         let platform = Platform::current();
-        let mut env_vars = env_vars::os_vars(prefix, &platform);
+        let mut env_vars = env_vars::os_vars(&run_prefix, &platform);
         env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
         env_vars.extend(pkg_vars.iter().map(|(k, v)| (k.clone(), Some(v.clone()))));
         env_vars.insert(
             "PREFIX".to_string(),
-            Some(run_env.to_string_lossy().to_string()),
+            Some(run_prefix.to_string_lossy().to_string()),
         );
 
         // copy all test files to a temporary directory and set it as the working
@@ -756,8 +756,8 @@ impl CommandsTest {
                 env_vars,
                 tmp_dir.path(),
                 path,
-                &run_env,
-                build_env.as_ref(),
+                &run_prefix,
+                build_prefix.as_ref(),
                 None,
             )
             .await
