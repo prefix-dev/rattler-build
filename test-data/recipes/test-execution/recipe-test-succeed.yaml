@@ -12,6 +12,10 @@ build:
         - echo "Hello World" > $PREFIX/test-execution.txt
       else:
         - echo "Hello World" > %PREFIX%\test-execution.txt
+        - mkdir %LIBRARY_BIN%
+        - mkdir %LIBRARY_LIB%
+        - echo "Hello World" > %LIBRARY_BIN%\test.lib
+        - echo "Hello World" > %LIBRARY_LIB%\test.dll
 
 tests:
   - script:
@@ -26,6 +30,8 @@ tests:
         - if not exist %PREFIX%\test-execution.txt (exit 1)
         - if not exist .\testfile.txt (exit 1)
         - if not exist .\testfolder\data.txt (exit 1)
+        - if not exist %LIBRARY_BIN%\test.lib (exit 1)
+        - if not exist %LIBRARY_LIB%\test.dll (exit 1)
     files:
       recipe:
         - testfile.txt
