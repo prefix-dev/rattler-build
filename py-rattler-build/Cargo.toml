@@ -31,18 +31,5 @@ pyo3-build-config = "0.23.2"
 [patch.crates-io]
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched"}
 
-rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
-
 # Prevent package from thinking it's in the workspace
 [workspace]
