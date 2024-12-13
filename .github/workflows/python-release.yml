@@ -31,7 +31,7 @@ env:
 
 jobs:
   sdist:
-    name: Build sdist
+    name: Python Build sdist
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    name: Build ${{ matrix.platform.target }}
+    name: Python Build ${{ matrix.platform.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -101,7 +101,7 @@ jobs:
 
   linux:
     runs-on: ubuntu-latest
-    name: Build ${{ matrix.target }}
+    name: Python Build ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -136,7 +136,7 @@ jobs:
 
   linux-cross:
     runs-on: ubuntu-latest
-    name: Build ${{ matrix.platform.target }}
+    name: Python Build ${{ matrix.platform.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -183,7 +183,7 @@ jobs:
 
 #   linux-cross-native-tls:
 #     runs-on: ubuntu-latest
-#     name: Build ${{ matrix.platform.target }}
+#     name: Python Build ${{ matrix.platform.target }}
 #     strategy:
 #       fail-fast: false
 #       matrix:
@@ -232,7 +232,7 @@ jobs:
 
   musllinux:
     runs-on: ubuntu-latest
-    name: Build ${{ matrix.target }}
+    name: Python Build ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -281,7 +281,7 @@ jobs:
 
   musllinux-cross:
     runs-on: ubuntu-latest
-    name: Build ${{ matrix.platform.target }}
+    name: Python Build ${{ matrix.platform.target }}
     strategy:
       fail-fast: false
       matrix:
@@ -325,7 +325,7 @@ jobs:
 
   macos-x86_64:
     runs-on: macos-13   # x86_64 runner
-    name: Build x86_64-macos
+    name: Python Build x86_64-macos
     steps:
       - uses: actions/checkout@v4
         with:
@@ -352,7 +352,7 @@ jobs:
 
   macos-universal:
     runs-on: macos-latest
-    name: Build universal2-apple-macos
+    name: Python Build universal2-apple-macos
     steps:
       - uses: actions/checkout@v4
         with:
