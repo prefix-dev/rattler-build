@@ -49,7 +49,8 @@ jobs:
       - name: "Test sdist"
         run: |
           rustup default $(cat rust-toolchain)
-          pip install py-rattler-build/dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
+          cd py-rattler-build
+          pip install dist/${{ env.PACKAGE_NAME }}-*.tar.gz --force-reinstall
           python -c "import rattler_build; print(rattler_build.rattler_build_version())"
       - name: "Upload sdist"
         uses: actions/upload-artifact@v4
