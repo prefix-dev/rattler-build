@@ -15,7 +15,7 @@ impl Interpreter for RInterpreter {
         tokio::fs::write(&r_script, args.script.script()).await?;
 
         let args = ExecutionArgs {
-            script: ResolvedScriptContents::Inline(format!("r {:?}", r_script)),
+            script: ResolvedScriptContents::Inline(format!("r {:?} --vanilla", r_script)),
             ..args
         };
 
