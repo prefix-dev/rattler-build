@@ -418,7 +418,7 @@ jobs:
       - windows
       - linux
       - linux-cross
-      - linux-cross-native-tls
+    #   - linux-cross-native-tls
       - musllinux
       - musllinux-cross
       - validate-tag
