@@ -131,8 +131,8 @@ pub struct PerlTest {
 /// A special R test that checks if the imports are available and runs `R CMD check`.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RTest {
-    /// List of r `uses` to test
-    pub uses: Vec<String>,
+    /// List of r `libraries/uses` to test
+    pub libraries: Vec<String>,
 }
 
 /// A test that runs the tests of a downstream package.
@@ -434,7 +434,7 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
 impl TryConvertNode<RTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<RTest, Vec<PartialParsingError>> {
         let mut r_test = RTest::default();
-        validate_keys!(r_test, self.iter(), uses);
+        validate_keys!(r_test, self.iter(), libraries);
         Ok(r_test)
     }
 }

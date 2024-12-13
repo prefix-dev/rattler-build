@@ -704,7 +704,7 @@ impl RTest {
         let mut imports = String::new();
         tracing::info!("Testing r imports:\n");
 
-        for module in &self.uses {
+        for module in &self.libraries {
             writeln!(imports, "use {};", module)?;
             tracing::info!("  use {};", module);
         }
