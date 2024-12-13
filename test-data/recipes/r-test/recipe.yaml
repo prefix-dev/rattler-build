@@ -23,11 +23,10 @@ requirements:
   host:
     - r
 
-# tests:
-#   # - Rscript -e "library(magrittr)"
-#   - R:
-#       libraries:
-#         - magrittr
+tests:
+  - r:
+      uses:
+        - magrittr
 
 about:
   license: MIT
