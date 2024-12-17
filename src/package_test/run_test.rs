@@ -511,7 +511,7 @@ impl PythonTest {
         // Add `pip` if pip_check is set to true
         if self.pip_check {
             dependencies_map.iter_mut().for_each(|(_, v)| {
-                v.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap())
+                v.push("pip".parse().unwrap())
             });
         }
 
@@ -614,7 +614,7 @@ impl PerlTest {
         )?;
 
         let dependencies = vec![
-            MatchSpec::from_str("perl", ParseStrictness::Strict).unwrap(),
+            "perl".parse().unwrap(),
             match_spec,
         ];
 
