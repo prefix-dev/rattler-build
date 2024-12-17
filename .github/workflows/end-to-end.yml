@@ -1,17 +1,18 @@
-on:
-  push:
-    branches: [ main ]
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - "rust-tests/**"
-      - "test/end-to-end/**"
-  pull_request:
-    paths:
-      - "src/**"
-      - "Cargo.*"
-      - "rust-tests/**"
-      - "test/end-to-end/**"
+aksldjkasdjkalsjd
+# on:
+#   push:
+#     branches: [ main ]
+#     paths:
+#       - "src/**"
+#       - "Cargo.*"
+#       - "rust-tests/**"
+#       - "test/end-to-end/**"
+#   pull_request:
+#     paths:
+#       - "src/**"
+#       - "Cargo.*"
+#       - "rust-tests/**"
+#       - "test/end-to-end/**"
 
 name: End-to-End testing
 
