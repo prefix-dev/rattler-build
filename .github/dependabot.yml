@@ -20,3 +20,6 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(ci)"
+    ignore:
+      - dependency-name: "crate-ci/typos"
+        update-types: ["version-update:semver-patch"]
