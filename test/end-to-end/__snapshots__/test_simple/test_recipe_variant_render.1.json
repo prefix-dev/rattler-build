@@ -1,0 +1,40 @@
+[
+  [
+    [
+      {
+        "spec": "python 3.8.*",
+        "variant": "python"
+      }
+    ],
+    {
+      "constraints": [],
+      "depends": [
+        {
+          "source": "python"
+        },
+        {
+          "source": "__unix"
+        }
+      ]
+    }
+  ],
+  [
+    [
+      {
+        "spec": "python 3.9.*",
+        "variant": "python"
+      }
+    ],
+    {
+      "constraints": [],
+      "depends": [
+        {
+          "source": "python"
+        },
+        {
+          "source": "__unix"
+        }
+      ]
+    }
+  ]
+]

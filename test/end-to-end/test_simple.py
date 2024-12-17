@@ -1160,3 +1160,20 @@ def test_python_min_render(
     )
 
     assert snapshot_json == rendered[0]["recipe"]["requirements"]
+
+
+def test_recipe_variant_render(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rendered = rattler_build.render(
+        recipes / "recipe_variant" / "recipe.yaml", tmp_path, "--with-solve"
+    )
+
+    assert snapshot_json == [output["recipe"]["requirements"] for output in rendered]
+    assert snapshot_json == [
+        (
+            output["finalized_dependencies"]["build"]["specs"],
+            output["finalized_dependencies"]["run"],
+        )
+        for output in rendered
+    ]
