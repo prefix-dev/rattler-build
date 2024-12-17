@@ -510,9 +510,9 @@ impl PythonTest {
 
         // Add `pip` if pip_check is set to true
         if self.pip_check {
-            dependencies_map.iter_mut().for_each(|(_, v)| {
-                v.push(MatchSpec::from_str("pip", ParseStrictness::Strict).unwrap())
-            });
+            dependencies_map
+                .iter_mut()
+                .for_each(|(_, v)| v.push("pip".parse().unwrap()));
         }
 
         // Run tests for each python version
@@ -613,10 +613,7 @@ impl PerlTest {
             ParseStrictness::Lenient,
         )?;
 
-        let dependencies = vec![
-            MatchSpec::from_str("perl", ParseStrictness::Strict).unwrap(),
-            match_spec,
-        ];
+        let dependencies = vec!["perl".parse().unwrap(), match_spec];
 
         create_environment(
             "test",

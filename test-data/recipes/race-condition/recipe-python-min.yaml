@@ -4,12 +4,10 @@ package:
 
 requirements:
   host:
-    - python ${{ python_min }}
     - python >=${{ python_min }}
     - python ${{ python_min }}.*
     - python ${{ python_min ~ ".*,<4.0a0" }}
   run:
-    - python ${{ python_min }}
     - python >=${{ python_min }}
     - python ${{ python_min }}.*
     - python ${{ python_min ~ ".*,<4.0a0" }}

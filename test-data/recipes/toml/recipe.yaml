@@ -18,9 +18,9 @@ build:
 
 requirements:
   host:
-    - python 3.12.1
-    - pip 23.3.2
-    - setuptools 68
+    - python 3.12.1.*
+    - pip 23.3.2.*
+    - setuptools 68.*
   run:
     - python
 

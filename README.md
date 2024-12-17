@@ -216,12 +216,12 @@ requirements:
   host:
     - pip
     - poetry-core >=1.0.0
-    - python 3.10
+    - python 3.10.*
   run:
     # sync with normalized deps from poetry-generated setup.py
     - markdown-it-py >=2.2.0
     - pygments >=2.13.0,<3.0.0
-    - python 3.10
+    - python 3.10.*
     - typing_extensions >=4.0.0,<5.0.0
 
 tests:

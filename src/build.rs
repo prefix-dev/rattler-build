@@ -3,7 +3,7 @@
 use std::{path::PathBuf, vec};
 
 use miette::{Context, IntoDiagnostic};
-use rattler_conda_types::{Channel, MatchSpec, ParseStrictness};
+use rattler_conda_types::{Channel, MatchSpec};
 
 use crate::{
     metadata::{build_reindexed_channels, Output},
@@ -39,10 +39,8 @@ pub async fn skip_existing(
 
     let match_specs = outputs
         .iter()
-        .map(|o| {
-            MatchSpec::from_str(o.name().as_normalized(), ParseStrictness::Strict).into_diagnostic()
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|o| o.name().clone().into())
+        .collect::<Vec<MatchSpec>>();
 
     let channels = if only_local {
         vec![

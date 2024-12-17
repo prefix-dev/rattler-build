@@ -45,7 +45,8 @@ impl IgnoreRunExports {
         let to_specs = |strings: &Vec<String>| -> Result<Vec<MatchSpec>, ParseMatchSpecError> {
             strings
                 .iter()
-                .map(|s| MatchSpec::from_str(s, ParseStrictness::Strict))
+                // We have to parse these as lenient as they come from packages
+                .map(|s| MatchSpec::from_str(s, ParseStrictness::Lenient))
                 .filter_map(|result| match result {
                     Ok(spec) => {
                         if spec
