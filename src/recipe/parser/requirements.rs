@@ -392,7 +392,6 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
             }
         }
 
-
         MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
             let str = self.as_str();
             vec![_partialerror!(
