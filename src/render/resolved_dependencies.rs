@@ -467,11 +467,23 @@ pub fn apply_variant(
                     if m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
                             if let Some(version) = variant.get(&name.into()) {
+                                // if the variant starts with an alphanumeric character,
+                                // we have to add a '=' to the version spec
+                                let mut spec = version.clone();
+
+                                // check if all characters are alphanumeric or ., in that case add
+                                // a '=' to get "startswith" behavior
+                                if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
+                                    spec = format!("={}", version);
+                                } else {
+                                    spec = version.clone();
+                                }
+
                                 // we split at whitespace to separate into version and build
-                                let mut splitter = version.split_whitespace();
+                                let mut splitter = spec.split_whitespace();
                                 let version_spec = splitter
                                     .next()
-                                    .map(|v| VersionSpec::from_str(v, ParseStrictness::Lenient))
+                                    .map(|v| VersionSpec::from_str(v, ParseStrictness::Strict))
                                     .transpose()?;
                                 let build_spec =
                                     splitter.next().map(StringMatcher::from_str).transpose()?;
