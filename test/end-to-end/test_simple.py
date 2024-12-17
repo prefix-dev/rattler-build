@@ -1170,4 +1170,10 @@ def test_recipe_variant_render(
     )
 
     assert snapshot_json == [output["recipe"]["requirements"] for output in rendered]
-    assert snapshot_json == [output["finalized_dependencies"]["build"]["specs"] for output in rendered]
+    assert snapshot_json == [
+        (
+            output["finalized_dependencies"]["build"]["specs"],
+            output["finalized_dependencies"]["run"],
+        )
+        for output in rendered
+    ]
