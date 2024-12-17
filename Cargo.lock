@@ -1392,7 +1392,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88a41f105fe1d5b6b34b2055e3dc59bb79b46b48b2040b9e6c7b4b5de097aa41"
 dependencies = [
  "autocfg",
- "tokio",
 ]
 
 [[package]]
@@ -1411,17 +1410,6 @@ version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7e180ac76c23b45e767bd7ae9579bc0bb458618c4bc71835926e098e61d15f8"
 dependencies = [
- "rustix",
- "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "fs4"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e871a4cfa68bb224863b53149d973df1ac8d1ed2fa1d1bfc37ac1bb65dd37207"
-dependencies = [
- "fs-err 2.11.0",
  "rustix",
  "windows-sys 0.52.0",
 ]
@@ -3492,7 +3480,7 @@ dependencies = [
  "memmap2 0.9.5",
  "once_cell",
  "parking_lot",
- "rattler_cache 0.3.0",
+ "rattler_cache",
  "rattler_conda_types",
  "rattler_digest 1.0.4",
  "rattler_networking",
@@ -3556,7 +3544,7 @@ dependencies = [
  "petgraph",
  "ratatui",
  "rattler",
- "rattler_cache 0.2.15",
+ "rattler_cache",
  "rattler_conda_types",
  "rattler_digest 1.0.4",
  "rattler_index",
@@ -3603,35 +3591,6 @@ dependencies = [
  "xz2",
  "zip 2.2.2",
  "zstd 0.13.2",
-]
-
-[[package]]
-name = "rattler_cache"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2523385739abca920f8b9ac5c292b0835f003ee4fa3d5da89b44fa2e4be68961"
-dependencies = [
- "anyhow",
- "dashmap",
- "digest",
- "dirs",
- "fs-err 3.0.0",
- "fs4 0.11.1",
- "futures",
- "fxhash",
- "itertools 0.13.0",
- "parking_lot",
- "rattler_conda_types",
- "rattler_digest 1.0.4",
- "rattler_networking",
- "rattler_package_streaming",
- "reqwest",
- "reqwest-middleware",
- "simple_spawn_blocking",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "url",
 ]
 
 [[package]]
@@ -3920,7 +3879,7 @@ dependencies = [
  "ouroboros",
  "parking_lot",
  "pin-project-lite",
- "rattler_cache 0.3.0",
+ "rattler_cache",
  "rattler_conda_types",
  "rattler_digest 1.0.4",
  "rattler_networking",
