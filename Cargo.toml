@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.32.1"
+version = "0.33.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -97,7 +97,7 @@ indexmap = "2.7.0"
 dunce = "1.0.5"
 fs-err = "3.0.0"
 which = "7.0.0"
-clap_complete = "4.5.39"
+clap_complete = "4.5.40"
 clap_complete_nushell = "4.5.4"
 tokio-util = "0.7.13"
 
