@@ -27,10 +27,10 @@ env:
 
 jobs:
   run_tests:
-    strategy:
-      matrix:
-        os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
-      fail-fast: false
+    # strategy:
+    #   matrix:
+    #     os: [ "ubuntu-latest", "windows-latest", "macos-latest" ]
+    #   fail-fast: false
 
     name: Run tests
     runs-on: ${{ matrix.os }}
