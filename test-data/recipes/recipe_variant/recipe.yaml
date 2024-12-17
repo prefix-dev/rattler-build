@@ -8,3 +8,6 @@ build:
 requirements:
   build:
     - python
+  run:
+    - python
+    - __unix

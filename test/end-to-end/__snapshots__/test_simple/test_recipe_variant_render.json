@@ -1,0 +1,20 @@
+[
+  {
+    "build": [
+      "python"
+    ],
+    "run": [
+      "python",
+      "__unix"
+    ]
+  },
+  {
+    "build": [
+      "python"
+    ],
+    "run": [
+      "python",
+      "__unix"
+    ]
+  }
+]

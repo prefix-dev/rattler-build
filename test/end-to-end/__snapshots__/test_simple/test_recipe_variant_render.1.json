@@ -1,0 +1,14 @@
+[
+  [
+    {
+      "spec": "python 3.8.*",
+      "variant": "python"
+    }
+  ],
+  [
+    {
+      "spec": "python 3.9.*",
+      "variant": "python"
+    }
+  ]
+]

@@ -454,6 +454,7 @@ pub fn apply_variant(
     raw_specs: &[Dependency],
     build_configuration: &BuildConfiguration,
     compatibility_specs: &HashMap<PackageName, PackageRecord>,
+    build_time: bool,
 ) -> Result<Vec<DependencyInfo>, ResolveError> {
     let variant = &build_configuration.variant;
     let subpackages = &build_configuration.subpackages;
@@ -464,7 +465,7 @@ pub fn apply_variant(
             match s {
                 Dependency::Spec(m) => {
                     let m = m.clone();
-                    if m.version.is_none() && m.build.is_none() {
+                    if build_time && m.version.is_none() && m.build.is_none() {
                         if let Some(name) = &m.name {
                             if let Some(version) = variant.get(&name.into()) {
                                 // if the variant starts with an alphanumeric character,
@@ -633,7 +634,12 @@ fn render_run_exports(
     compatibility_specs: &HashMap<PackageName, PackageRecord>,
 ) -> Result<RunExportsJson, ResolveError> {
     let render_run_exports = |run_export: &[Dependency]| -> Result<Vec<String>, ResolveError> {
-        let rendered = apply_variant(run_export, &output.build_configuration, compatibility_specs)?;
+        let rendered = apply_variant(
+            run_export,
+            &output.build_configuration,
+            compatibility_specs,
+            false,
+        )?;
         Ok(rendered
             .iter()
             .map(|dep| dep.spec().to_string())
@@ -680,6 +686,7 @@ pub(crate) async fn resolve_dependencies(
             requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
+            true,
         )?;
 
         let match_specs = build_env_specs
@@ -737,6 +744,7 @@ pub(crate) async fn resolve_dependencies(
         requirements.host(),
         &output.build_configuration,
         &compatibility_specs,
+        true,
     )?;
 
     // Apply the strong run exports from the build environment to the host
@@ -776,6 +784,7 @@ pub(crate) async fn resolve_dependencies(
             requirements.build(),
             &output.build_configuration,
             &compatibility_specs,
+            true,
         )?;
         match_specs.extend(specs.iter().map(|s| s.spec().clone()));
     }
@@ -830,12 +839,14 @@ pub(crate) async fn resolve_dependencies(
         &requirements.run,
         &output.build_configuration,
         &compatibility_specs,
+        false,
     )?;
 
     let mut constraints = apply_variant(
         &requirements.run_constraints,
         &output.build_configuration,
         &compatibility_specs,
+        false,
     )?;
 
     // add in dependencies from the finalized cache
