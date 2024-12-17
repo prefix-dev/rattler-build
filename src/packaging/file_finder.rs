@@ -82,7 +82,7 @@ impl Files {
         }
 
         let previous_files = if prefix.join("conda-meta").exists() {
-            let prefix_records = PrefixRecord::collect_from_prefix(prefix)?;
+            let prefix_records: Vec<PrefixRecord> = PrefixRecord::collect_from_prefix(prefix)?;
             let mut previous_files =
                 prefix_records
                     .into_iter()
