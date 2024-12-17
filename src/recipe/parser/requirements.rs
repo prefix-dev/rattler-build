@@ -370,12 +370,12 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
 
         // if we have a matchspec that is only numbers, and ., we complain and ask the user to add a
         // `.*` or `==` in front of it.
-        let splitted = string.split_whitespace().collect::<Vec<_>>();
-        if splitted.len() >= 2 {
-            if splitted[1].chars().all(|c| c.is_numeric() || c == '.') {
-                let name = splitted[0];
-                let version = splitted[1];
-                let rest = splitted[2..].join(" ");
+        let split_string = string.split_whitespace().collect::<Vec<_>>();
+        if split_string.len() >= 2 {
+            if split_string[1].chars().all(|c| c.is_numeric() || c == '.') {
+                let name = split_string[0];
+                let version = split_string[1];
+                let rest = split_string[2..].join(" ");
                 let rest = if rest.is_empty() {
                     "".to_string()
                 } else {
