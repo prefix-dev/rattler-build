@@ -366,7 +366,7 @@ impl TryConvertNode<MatchSpec> for RenderedNode {
 
 impl TryConvertNode<MatchSpec> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<MatchSpec, Vec<PartialParsingError>> {
-        MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
+        MatchSpec::from_str(self.as_str(), ParseStrictness::Lenient).map_err(|err| {
             let str = self.as_str();
             vec![_partialerror!(
                 *self.span(),
