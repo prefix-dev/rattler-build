@@ -1307,7 +1307,7 @@ checksum = "95ad84121770c9766a67e4dd0a96b0467c6a5a2c43e873bf853aeaa6632b687c"
 dependencies = [
  "itertools 0.13.0",
  "percent-encoding",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "typed-path",
  "url",
 ]
@@ -3354,7 +3354,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tracing",
 ]
@@ -3373,7 +3373,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tinyvec",
  "tracing",
  "web-time",
@@ -3494,7 +3494,7 @@ dependencies = [
  "simple_spawn_blocking",
  "smallvec",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tracing",
  "url",
@@ -3574,7 +3574,7 @@ dependencies = [
  "tar",
  "tempfile",
  "terminal_size",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "throbber-widgets-tui",
  "tokio",
  "tokio-util",
@@ -3617,7 +3617,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "simple_spawn_blocking",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tracing",
  "url",
@@ -3644,6 +3644,7 @@ dependencies = [
  "rattler_digest 1.0.4",
  "rattler_macros",
  "rattler_redaction",
+ "rayon",
  "regex",
  "serde",
  "serde-untagged",
@@ -3654,7 +3655,7 @@ dependencies = [
  "simd-json",
  "smallvec",
  "strum",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tracing",
  "typed-path",
  "url",
@@ -3802,7 +3803,7 @@ dependencies = [
  "retry-policies",
  "serde",
  "serde_json",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tracing",
  "url",
 ]
@@ -3827,7 +3828,7 @@ dependencies = [
  "serde_json",
  "tar",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tokio-util",
  "tracing",
@@ -3893,7 +3894,7 @@ dependencies = [
  "simple_spawn_blocking",
  "superslice",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tokio",
  "tokio-util",
  "tracing",
@@ -3917,7 +3918,7 @@ dependencies = [
  "shlex",
  "sysinfo",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tracing",
 ]
 
@@ -3935,7 +3936,7 @@ dependencies = [
  "resolvo 0.8.4",
  "serde",
  "tempfile",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tracing",
  "url",
 ]
@@ -3954,7 +3955,7 @@ dependencies = [
  "rattler_conda_types",
  "regex",
  "serde",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "tracing",
 ]
 
@@ -5003,11 +5004,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93605438cbd668185516ab499d589afb7ee1859ea3d5fc8f6b0755e1c7443767"
+checksum = "08f5383f3e0071702bf93ab5ee99b52d26936be9dedd9413067cbdcddcb6141a"
 dependencies = [
- "thiserror-impl 2.0.7",
+ "thiserror-impl 2.0.8",
 ]
 
 [[package]]
@@ -5023,9 +5024,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.7"
+version = "2.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1d8749b4531af2117677a5fcd12b1348a3fe2b81e36e61ffeac5c4aa3273e36"
+checksum = "f2f357fcec90b3caef6623a099691be676d033b40a058ac95d2a6ade6fa0c943"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6307,7 +6308,7 @@ dependencies = [
  "flate2",
  "indexmap 2.7.0",
  "memchr",
- "thiserror 2.0.7",
+ "thiserror 2.0.8",
  "time",
  "zopfli",
 ]
