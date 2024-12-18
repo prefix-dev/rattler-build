@@ -1102,7 +1102,7 @@ This can be used for some light templating, for example:
 
 ```yaml
 build:
-  string: ${{ env.get("GIT_BUILD_STRING") }}_${{ PKG_HASH }}
+  string: ${{ env.get("GIT_BUILD_STRING") }}_${{ hash }}
 ```
 
 #### `match` function
