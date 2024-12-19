@@ -12,12 +12,14 @@ use tracing::debug;
 use tracing::info;
 use url::Url;
 
+use crate::url_with_trailing_slash::UrlWithTrailingSlash;
+
 use super::package::ExtractedPackage;
 use super::VERSION;
 
 pub struct Anaconda {
     client: Client,
-    url: Url,
+    url: UrlWithTrailingSlash,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,7 +47,7 @@ struct FileStageResponse {
 }
 
 impl Anaconda {
-    pub fn new(token: String, url: Url) -> Self {
+    pub fn new(token: String, url: UrlWithTrailingSlash) -> Self {
         let mut default_headers = reqwest::header::HeaderMap::new();
 
         default_headers.append(

@@ -48,7 +48,7 @@ pub async fn upload_packages_to_conda_forge(
     opts: CondaForgeOpts,
     package_files: &Vec<PathBuf>,
 ) -> miette::Result<()> {
-    let anaconda = anaconda::Anaconda::new(opts.staging_token, opts.anaconda_url);
+    let anaconda = anaconda::Anaconda::new(opts.staging_token, opts.anaconda_url.into());
 
     let mut channels: HashMap<String, HashMap<_, _>> = HashMap::new();
 
