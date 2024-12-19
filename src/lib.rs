@@ -19,6 +19,7 @@ pub mod system_tools;
 pub mod tool_configuration;
 #[cfg(feature = "tui")]
 pub mod tui;
+mod url_with_trailing_slash;
 pub mod used_variables;
 pub mod utils;
 pub mod variant_config;
@@ -70,6 +71,7 @@ use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
+use tracing::warn;
 use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
@@ -721,54 +723,73 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
                 &store,
                 quetz_opts.api_key,
                 &args.package_files,
-                quetz_opts.url,
+                quetz_opts.url.into(),
                 quetz_opts.channel,
             )
-            .await?;
+            .await
         }
         ServerType::Artifactory(artifactory_opts) => {
-            upload::upload_package_to_artifactory(
-                &store,
+            let token = match (
                 artifactory_opts.username,
                 artifactory_opts.password,
+                artifactory_opts.token,
+            ) {
+                (_, _, Some(token)) => Some(token),
+                (Some(_), Some(password), _) => {
+                    warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
+                    Some(password)
+                }
+                (Some(_), None, _) => {
+                    return Err(miette::miette!(
+                        "Artifactory username provided without a password"
+                    ));
+                }
+                (None, Some(_), _) => {
+                    return Err(miette::miette!(
+                        "Artifactory password provided without a username"
+                    ));
+                }
+                _ => None,
+            };
+            upload::upload_package_to_artifactory(
+                &store,
+                token,
                 &args.package_files,
-                artifactory_opts.url,
+                artifactory_opts.url.into(),
                 artifactory_opts.channel,
             )
-            .await?;
+            .await
         }
         ServerType::Prefix(prefix_opts) => {
             upload::upload_package_to_prefix(
                 &store,
                 prefix_opts.api_key,
                 &args.package_files,
-                prefix_opts.url,
+                prefix_opts.url.into(),
                 prefix_opts.channel,
             )
-            .await?;
+            .await
         }
         ServerType::Anaconda(anaconda_opts) => {
             upload::upload_package_to_anaconda(
                 &store,
                 anaconda_opts.api_key,
                 &args.package_files,
-                anaconda_opts.url,
+                anaconda_opts.url.into(),
                 anaconda_opts.owner,
                 anaconda_opts.channel,
                 anaconda_opts.force,
             )
-            .await?;
+            .await
         }
         ServerType::CondaForge(conda_forge_opts) => {
             upload::conda_forge::upload_packages_to_conda_forge(
                 conda_forge_opts,
                 &args.package_files,
             )
-            .await?;
+            .await
         }
     }
-
-    Ok(())
 }
 
 /// Sort the build outputs (recipes) topologically based on their dependencies.
