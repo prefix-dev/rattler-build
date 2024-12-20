@@ -537,12 +537,16 @@ pub struct ArtifactoryOpts {
     pub channel: String,
 
     /// Your Artifactory username
-    #[arg(short = 'r', long, env = "ARTIFACTORY_USERNAME")]
+    #[arg(long, env = "ARTIFACTORY_USERNAME", hide = true)]
     pub username: Option<String>,
 
     /// Your Artifactory password
-    #[arg(short, long, env = "ARTIFACTORY_PASSWORD")]
+    #[arg(long, env = "ARTIFACTORY_PASSWORD", hide = true)]
     pub password: Option<String>,
+
+    /// Your Artifactory token
+    #[arg(short, long, env = "ARTIFACTORY_TOKEN")]
+    pub token: Option<String>,
 }
 
 /// Options for uploading to a prefix.dev server.
