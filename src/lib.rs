@@ -63,7 +63,6 @@ use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{
     package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
 };
-use rattler_solve::ChannelPriority;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{find_outputs_from_src, Dependency, TestType};
@@ -518,7 +517,7 @@ pub async fn run_build_from_args(
                         )
                         .into_diagnostic()
                         .context("failed to reindex output channel")?,
-                        channel_priority: ChannelPriority::Strict,
+                        channel_priority: tool_configuration.channel_priority,
                         solve_strategy: SolveStrategy::Highest,
                         tool_configuration: tool_configuration.clone(),
                     },
