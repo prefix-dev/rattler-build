@@ -206,6 +206,7 @@ pub async fn get_build_output(
         target_platform,
         host_platform,
         hash: None,
+        build_number: None,
         build_platform: args.build_platform,
         variant: BTreeMap::new(),
         experimental: args.common.experimental,
