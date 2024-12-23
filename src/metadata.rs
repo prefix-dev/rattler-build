@@ -355,13 +355,14 @@ impl BuildConfiguration {
     }
 
     /// Construct a `SelectorConfig` from the given `BuildConfiguration`
-    pub fn selector_config(&self) -> SelectorConfig {
+    pub fn selector_config(&self, build_number: u64) -> SelectorConfig {
         SelectorConfig {
             target_platform: self.target_platform,
             host_platform: self.host_platform.platform,
             build_platform: self.build_platform.platform,
             variant: self.variant.clone(),
             hash: Some(self.hash.clone()),
+            build_number: Some(build_number),
             experimental: false,
             allow_undefined: false,
         }
