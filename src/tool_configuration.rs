@@ -13,6 +13,7 @@ use rattler_networking::{
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -122,6 +123,9 @@ pub fn reqwest_client_from_auth_storage(
             .build()
             .expect("failed to create client"),
     )
+    .with(RetryTransientMiddleware::new_with_policy(
+        ExponentialBackoff::builder().build_with_max_retries(3),
+    ))
     .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
     .build())
 }
