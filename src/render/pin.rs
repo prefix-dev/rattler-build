@@ -149,7 +149,12 @@ impl Pin {
 
         if self.args.exact {
             return Ok(MatchSpec::from_str(
-                &format!("{} {} {}", self.name.as_normalized(), version, build_string),
+                &format!(
+                    "{} =={} {}",
+                    self.name.as_normalized(),
+                    version,
+                    build_string
+                ),
                 ParseStrictness::Strict,
             )
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?);
