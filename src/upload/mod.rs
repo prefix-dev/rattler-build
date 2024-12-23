@@ -10,11 +10,12 @@ use std::{
 use tokio_util::io::ReaderStream;
 use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
+use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
 use reqwest::Method;
-use tracing::info;
+use tracing::{info, warn};
 use url::Url;
 
 use crate::upload::package::{sha256_sum, ExtractedPackage};
@@ -57,12 +58,12 @@ pub async fn upload_package_to_quetz(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: Url,
+    url: UrlWithTrailingSlash,
     channel: String,
 ) -> miette::Result<()> {
     let token = match api_key {
         Some(api_key) => api_key,
-        None => match storage.get_by_url(url.clone()) {
+        None => match storage.get_by_url(Url::from(url.clone())) {
             Ok((_, Some(Authentication::CondaToken(token)))) => token,
             Ok((_, Some(_))) => {
                 return Err(miette::miette!("A Conda token is required for authentication with quetz.
@@ -110,27 +111,33 @@ pub async fn upload_package_to_quetz(
 /// Uploads package files to an Artifactory server.
 pub async fn upload_package_to_artifactory(
     storage: &AuthenticationStorage,
-    username: Option<String>,
-    password: Option<String>,
+    token: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: Url,
+    url: UrlWithTrailingSlash,
     channel: String,
 ) -> miette::Result<()> {
-    let (username, password) = match (username, password) {
-        (Some(u), Some(p)) => (u, p),
-        (Some(_), _) | (_, Some(_)) => {
-            return Err(miette::miette!("A username and password is required for authentication with artifactory, only one was given"));
-        }
-        _ => match storage.get_by_url(url.clone()) {
-            Ok((_, Some(Authentication::BasicHTTP { username, password }))) => (username, password),
+    let token = match token {
+        Some(t) => t,
+        _ => match storage.get_by_url(Url::from(url.clone())) {
+            Ok((_, Some(Authentication::BearerToken(token)))) => token,
+            Ok((
+                _,
+                Some(Authentication::BasicHTTP {
+                    username: _,
+                    password,
+                }),
+            )) => {
+                warn!("A bearer token is required for authentication with artifactory. Using the password from the keychain / auth file to authenticate. Consider switching to a bearer token instead for Artifactory.");
+                password
+            }
             Ok((_, Some(_))) => {
-                return Err(miette::miette!("A username and password is required for authentication with artifactory.
-                            Authentication information found in the keychain / auth file, but it was not a username and password"));
+                return Err(miette::miette!("A bearer token is required for authentication with artifactory.
+                            Authentication information found in the keychain / auth file, but it was not a bearer token"));
             }
             Ok((_, None)) => {
                 return Err(miette::miette!(
-                        "No username and password was given and none was found in the keychain / auth file"
-                    ));
+                    "No bearer token was given and none was found in the keychain / auth file"
+                ));
             }
             Err(e) => {
                 return Err(miette::miette!(
@@ -163,7 +170,7 @@ pub async fn upload_package_to_artifactory(
 
         let prepared_request = client
             .request(Method::PUT, upload_url)
-            .basic_auth(username.clone(), Some(password.clone()));
+            .bearer_auth(token.clone());
 
         send_request(prepared_request, package_file).await?;
     }
@@ -178,11 +185,11 @@ pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
     api_key: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: Url,
+    url: UrlWithTrailingSlash,
     channel: String,
 ) -> miette::Result<()> {
     let check_storage = || {
-        match storage.get_by_url(url.clone()) {
+        match storage.get_by_url(Url::from(url.clone())) {
             Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
             Ok((_, Some(_))) => {
                 Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
@@ -251,7 +258,7 @@ pub async fn upload_package_to_anaconda(
     storage: &AuthenticationStorage,
     token: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: Url,
+    url: UrlWithTrailingSlash,
     owner: String,
     channels: Vec<String>,
     force: bool,
