@@ -373,7 +373,7 @@ dependencies = [
  "itertools 0.13.0",
  "memmap2 0.9.5",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "thiserror 1.0.68",
  "tokio",
  "tokio-stream",
@@ -449,6 +449,19 @@ name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
+
+[[package]]
+name = "birdcage"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "848df95320021558dd6bb4c26de3fe66724cdcbdbbf3fa720150b52b086ae568"
+dependencies = [
+ "bitflags 2.6.0",
+ "libc",
+ "log",
+ "rustix",
+ "seccompiler",
+]
 
 [[package]]
 name = "bisection"
@@ -3516,7 +3529,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "simple_spawn_blocking",
  "smallvec",
  "tempfile",
@@ -3579,6 +3592,7 @@ dependencies = [
  "rattler_package_streaming",
  "rattler_redaction",
  "rattler_repodata_gateway",
+ "rattler_sandbox",
  "rattler_shell",
  "rattler_solve",
  "rattler_virtual_packages",
@@ -3586,7 +3600,7 @@ dependencies = [
  "reflink-copy",
  "regex",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "reqwest-retry",
  "rstest",
  "scroll",
@@ -3642,7 +3656,7 @@ dependencies = [
  "rattler_package_streaming",
  "rayon",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "simple_spawn_blocking",
  "thiserror 2.0.9",
  "tokio",
@@ -3779,7 +3793,7 @@ dependencies = [
  "rattler_digest 0.19.5",
  "regex",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "resolvo 0.4.1",
  "serde",
  "serde_json",
@@ -3826,7 +3840,7 @@ dependencies = [
  "keyring",
  "netrc-rs",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "retry-policies",
  "serde",
  "serde_json",
@@ -3851,7 +3865,7 @@ dependencies = [
  "rattler_networking",
  "rattler_redaction",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "serde_json",
  "tar",
  "tempfile",
@@ -3871,7 +3885,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd7c1c0dd452161e62e6d112ebd12618e61f641609d5205c3a68eb9907254dc2"
 dependencies = [
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "url",
 ]
 
@@ -3913,7 +3927,7 @@ dependencies = [
  "rattler_networking",
  "rattler_redaction",
  "reqwest",
- "reqwest-middleware 0.4.0",
+ "reqwest-middleware",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -3928,6 +3942,18 @@ dependencies = [
  "url",
  "windows-sys 0.59.0",
  "zstd 0.13.2",
+]
+
+[[package]]
+name = "rattler_sandbox"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7db0078c952c515fd59c44a04f802dc620fff06b0cf25a26251de144531e9299"
+dependencies = [
+ "birdcage",
+ "clap",
+ "fs-err 3.0.0",
+ "tokio",
 ]
 
 [[package]]
@@ -4170,21 +4196,6 @@ dependencies = [
 
 [[package]]
 name = "reqwest-middleware"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "562ceb5a604d3f7c885a792d42c199fd8af239d0a51b2fa6a78aafa092452b04"
-dependencies = [
- "anyhow",
- "async-trait",
- "http",
- "reqwest",
- "serde",
- "thiserror 1.0.68",
- "tower-service",
-]
-
-[[package]]
-name = "reqwest-middleware"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1ccd3b55e711f91a9885a2fa6fbbb2e39db1776420b062efc058c6410f7e5e3"
@@ -4212,7 +4223,7 @@ dependencies = [
  "hyper",
  "parking_lot 0.11.2",
  "reqwest",
- "reqwest-middleware 0.3.3",
+ "reqwest-middleware",
  "retry-policies",
  "thiserror 1.0.68",
  "tokio",
@@ -4481,6 +4492,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "seccompiler"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f6575e3c2b3a0fe2ef3e53855b6a8dead7c29f783da5e123d378c8c6a89017e"
+dependencies = [
+ "libc",
 ]
 
 [[package]]
