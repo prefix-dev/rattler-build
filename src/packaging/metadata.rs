@@ -61,7 +61,7 @@ pub fn contains_prefix_text(
     file_path: &Path,
     prefix: &Path,
     target_platform: &Platform,
-) -> Result<bool, PackagingError> {
+) -> Result<Option<String>, PackagingError> {
     // Open the file
     let file = File::open(file_path)?;
 
@@ -70,25 +70,29 @@ pub fn contains_prefix_text(
 
     // Check if the content contains the prefix with memchr
     let prefix_string = prefix.to_string_lossy().to_string();
-    let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
+    if memchr::memmem::find_iter(mmap.as_ref(), &prefix_string)
         .next()
-        .is_some();
+        .is_some()
+    {
+        return Ok(Some(prefix_string));
+    }
 
-    if !contains_prefix && target_platform.is_windows() {
+    if target_platform.is_windows() {
         use crate::utils::to_forward_slash_lossy;
         // absolute and unc paths will break but it,
         // will break either way as C:/ can't be converted
         // to something meaningful in unix either way
         let forward_slash: Cow<'_, str> = to_forward_slash_lossy(prefix);
 
-        let contains_prefix = memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
+        if memchr::memmem::find_iter(mmap.as_ref(), forward_slash.deref())
             .next()
-            .is_some();
-
-        return Ok(contains_prefix);
+            .is_some()
+        {
+            return Ok(Some(forward_slash.to_string()));
+        }
     }
 
-    Ok(contains_prefix)
+    Ok(None)
 }
 
 /// Create a prefix placeholder object for the given file and prefix.
@@ -143,11 +147,11 @@ pub fn create_prefix_placeholder(
     // like a text file since it likely contains NULL bytes etc.
     let file_mode = if detected_is_text && forced_file_type != Some(FileMode::Binary) {
         match contains_prefix_text(file_path, encoded_prefix, target_platform) {
-            Ok(true) => {
-                has_prefix = Some(encoded_prefix.to_path_buf());
+            Ok(Some(prefix)) => {
+                has_prefix = Some(prefix);
                 FileMode::Text
             }
-            Ok(false) => FileMode::Text,
+            Ok(None) => FileMode::Text,
             Err(PackagingError::IoError(ioe)) if ioe.kind() == std::io::ErrorKind::InvalidData => {
                 FileMode::Binary
             }
@@ -175,14 +179,14 @@ pub fn create_prefix_placeholder(
         }
 
         if contains_prefix_binary(file_path, encoded_prefix)? {
-            has_prefix = Some(encoded_prefix.to_path_buf());
+            has_prefix = Some(encoded_prefix.to_string_lossy().to_string());
         }
     }
 
     let file_mode = forced_file_type.unwrap_or(file_mode);
-    Ok(has_prefix.map(|prefix_placeholder| PrefixPlaceholder {
+    Ok(has_prefix.map(|placeholder| PrefixPlaceholder {
         file_mode,
-        placeholder: prefix_placeholder.to_string_lossy().to_string(),
+        placeholder,
     }))
 }
 
