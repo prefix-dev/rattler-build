@@ -440,6 +440,10 @@ def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
             check_path(p, None)
         elif path == "ignore/text_with_prefix":
             check_path(p, None)
+        elif path == "is_text/file_with_forwardslash_prefix":
+            assert "\\" not in p["prefix_placeholder"]
+            assert "/" in p["prefix_placeholder"]
+            check_path(p, "text")
 
 
 def test_empty_folder(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
