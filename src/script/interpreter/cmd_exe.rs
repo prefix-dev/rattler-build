@@ -47,6 +47,7 @@ impl Interpreter for CmdExeInterpreter {
             &cmd_args,
             &args.work_dir,
             &args.replacements("%((var))%"),
+            None,
         )
         .await?;
 

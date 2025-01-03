@@ -1,5 +1,7 @@
 //! Module for running scripts in different interpreters.
 mod interpreter;
+mod sandbox;
+pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
 use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
@@ -47,6 +49,9 @@ pub struct ExecutionArgs {
 
     /// The working directory (`cwd`) in which the script should execute
     pub work_dir: PathBuf,
+
+    /// The sandbox configuration to use for the script execution
+    pub sandbox_config: Option<SandboxConfiguration>,
 }
 
 impl ExecutionArgs {
@@ -226,6 +231,7 @@ impl Script {
         run_prefix: &Path,
         build_prefix: Option<&PathBuf>,
         mut jinja_config: Option<Jinja<'_>>,
+        sandbox_config: Option<&SandboxConfiguration>,
     ) -> Result<(), std::io::Error> {
         // TODO: This is a bit of an out and about way to determine whether or
         //  not nushell is available. It would be best to run the activation
@@ -318,6 +324,7 @@ impl Script {
             run_prefix: run_prefix.to_owned(),
             execution_platform: Platform::current(),
             work_dir,
+            sandbox_config: sandbox_config.cloned(),
         };
 
         match interpreter {
@@ -387,6 +394,7 @@ impl Output {
                 &self.build_configuration.directories.host_prefix,
                 Some(&self.build_configuration.directories.build_prefix),
                 Some(jinja),
+                self.build_configuration.sandbox_config(),
             )
             .await?;
 
@@ -400,34 +408,18 @@ async fn run_process_with_replacements(
     args: &[&str],
     cwd: &Path,
     replacements: &HashMap<String, String>,
+    sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
-    let temp_folder = std::env::var("TMPDIR").ok();
+    let mut command = if let Some(sandbox_config) = sandbox_config {
+        tracing::info!("Sandbox configuration: {}", sandbox_config);
+        rattler_sandbox::tokio::sandboxed_command(
+            args[0],
+            &sandbox_config.with_cwd(cwd).exceptions(),
+        )
+    } else {
+        tokio::process::Command::new(args[0])
+    };
 
-    let mut sandbox_exceptions = vec![
-        rattler_sandbox::Exception::Read("/".to_string()),
-        rattler_sandbox::Exception::ExecuteAndRead("/bin/".to_string()),
-        rattler_sandbox::Exception::ExecuteAndRead("/usr/bin/".to_string()),
-        rattler_sandbox::Exception::ExecuteAndRead("/Users/wolfv/.pixi/".to_string()),
-        rattler_sandbox::Exception::ExecuteAndRead(
-            cwd.parent().unwrap().to_string_lossy().to_string(),
-        ),
-        rattler_sandbox::Exception::ReadAndWrite(
-            cwd.parent().unwrap().to_string_lossy().to_string(),
-        ),
-        // conda compiler activation writes to this tmp folder
-        rattler_sandbox::Exception::ReadAndWrite("/tmp".to_string()),
-        // configure command for curl seems to want to write to this temp folder
-        rattler_sandbox::Exception::ReadAndWrite("/var/tmp".to_string()),
-    ];
-
-    if let Some(temp_folder) = temp_folder {
-        // the is the temp folder from TMPDIR
-        sandbox_exceptions.push(rattler_sandbox::Exception::ReadAndWrite(
-            temp_folder.to_string(),
-        ))
-    }
-
-    let mut command = rattler_sandbox::tokio::sandboxed_command(args[0], &sandbox_exceptions);
     command
         .current_dir(cwd)
         .args(&args[1..])
