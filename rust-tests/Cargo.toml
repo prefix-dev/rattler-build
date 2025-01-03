@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-glob = "0.3.1"
+glob = "0.3.2"
 rattler_package_streaming = { version = "0.22.20", default-features = false }
 serde_json = "1.0.134"
 sha1 = "0.10.6"
