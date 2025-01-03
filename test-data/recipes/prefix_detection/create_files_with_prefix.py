@@ -44,4 +44,6 @@ force_text_folder.mkdir(parents=True, exist_ok=True)
 (force_text_folder / "file_without_prefix").write_bytes(binary_data)
 
 if platform.platform().startswith("Windows"):
-    (is_text_folder / "file_with_forwardslash_prefix").write_text(text_data_with_prefix.replace("\\", "/"))
+    (is_text_folder / "file_with_forwardslash_prefix").write_text(
+        text_data_with_prefix.replace("\\", "/")
+    )

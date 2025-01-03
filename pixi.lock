@@ -82,6 +82,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libzlib-1.3.1-hb9d3cd8_2.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/make-4.3-hd18ef5c_1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mimalloc-2.1.7-hac33072_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/minio-client-2024.11.21.17.21.54-h199d65c_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/linux-64/minio-server-2024.03.10.02.53.48-hbcca054_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/mold-2.35.1-hc93959d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/ncurses-6.5-he02047a_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/nodeenv-1.9.1-pyhd8ed1ab_1.conda
@@ -189,6 +191,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/llvm-openmp-19.1.5-ha54dae1_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/llvm-tools-15.0.7-hbedff68_4.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/make-4.3-h22f3db7_1.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/minio-client-2024.11.21.17.21.54-hd81af70_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/minio-server-2024.03.10.02.53.48-h8857fd0_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/mpc-1.3.1-h9d8efa1_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/mpfr-4.2.1-haed47dc_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ncurses-6.5-hf036a51_1.conda
@@ -301,6 +305,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-openmp-19.1.5-hdb05f8b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-15.0.7-h2621b3d_4.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/make-4.3-he57ea6c_1.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/minio-client-2024.11.21.17.21.54-h7b83518_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/minio-server-2024.03.10.02.53.48-hf0a4a13_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/mpc-1.3.1-h8f1351a_1.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/mpfr-4.2.1-hb693164_3.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ncurses-6.5-h7bae524_1.conda
@@ -391,6 +397,8 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/m2w64-gmp-6.1.0-2.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/win-64/m2w64-libwinpthread-git-5.0.0.4634.697f757-2.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/win-64/make-4.3-h3d2af85_1.tar.bz2
+      - conda: https://conda.anaconda.org/conda-forge/win-64/minio-client-2024.11.21.17.21.54-h265662a_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/minio-server-2024.03.10.02.53.48-h56e8100_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/msys2-conda-epoch-20160418-1.tar.bz2
       - conda: https://conda.anaconda.org/conda-forge/noarch/nodeenv-1.9.1-pyhd8ed1ab_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/openmp-5.0.0-vc14_1.tar.bz2
@@ -4086,6 +4094,96 @@ packages:
   license_family: MIT
   size: 78385
   timestamp: 1716552401566
+- conda: https://conda.anaconda.org/conda-forge/linux-64/minio-client-2024.11.21.17.21.54-h199d65c_0.conda
+  sha256: 2a89995c555c906336c7307976229ca7b378b536e26719c44ad8f610726ba641
+  md5: d6132a4a7474f3d59c40c677b2cfb779
+  depends:
+  - libgcc >=13
+  - __glibc >=2.17,<3.0.a0
+  arch: x86_64
+  platform: linux
+  license: AGPL-3.0-or-later
+  license_family: AGPL
+  size: 18807854
+  timestamp: 1735897852601
+- conda: https://conda.anaconda.org/conda-forge/osx-64/minio-client-2024.11.21.17.21.54-hd81af70_0.conda
+  sha256: b4628c7501ddd9a3288bbf8d8f14e5edaa25d2feaa9ecd8c48b1517834915959
+  md5: adef5a4b7b2361701258caed17df8ca2
+  depends:
+  - __osx >=10.13
+  constrains:
+  - __osx >=10.12
+  arch: x86_64
+  platform: osx
+  license: AGPL-3.0-or-later
+  license_family: AGPL
+  size: 19134629
+  timestamp: 1735897901873
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/minio-client-2024.11.21.17.21.54-h7b83518_0.conda
+  sha256: ae059dc56c2832bee4e68e090746b9e6d93132b6262fa25b51adde5686f43c6d
+  md5: f89f48621c6cd54c3d8bc06f830e1728
+  depends:
+  - __osx >=11.0
+  arch: arm64
+  platform: osx
+  license: AGPL-3.0-or-later
+  license_family: AGPL
+  size: 17883741
+  timestamp: 1735898727826
+- conda: https://conda.anaconda.org/conda-forge/win-64/minio-client-2024.11.21.17.21.54-h265662a_0.conda
+  sha256: a37a81b0dce7bb7dc57d59dde0e1d08eda0a16e267f7b2d82cf7e990ea3f84d0
+  md5: 0e22939f2109a4a0e113ecf3fab8423f
+  depends:
+  - vc >=14.2,<15
+  - vc14_runtime >=14.29.30139
+  - ucrt >=10.0.20348.0
+  - vc >=14.2,<15
+  - vc14_runtime >=14.29.30139
+  - ucrt >=10.0.20348.0
+  arch: x86_64
+  platform: win
+  license: AGPL-3.0-or-later
+  license_family: AGPL
+  size: 19174140
+  timestamp: 1735897885467
+- conda: https://conda.anaconda.org/conda-forge/linux-64/minio-server-2024.03.10.02.53.48-hbcca054_0.conda
+  sha256: de0b4886ca7b1a27008f3b7d33500550191cd571765a5adb1d7315d40efd4a9e
+  md5: 3c3572872ca7690eadfaf532a57bfe1b
+  arch: x86_64
+  platform: linux
+  license: AGPL-3.0-only
+  license_family: AGPL
+  size: 29338301
+  timestamp: 1710216649717
+- conda: https://conda.anaconda.org/conda-forge/osx-64/minio-server-2024.03.10.02.53.48-h8857fd0_0.conda
+  sha256: 1b120375ab7629331212a36f22f842288e266b06ab49a961825474dd031e3981
+  md5: e4c421d22e108008340181bbc7b70582
+  constrains:
+  - __osx>=10.12
+  arch: x86_64
+  platform: osx
+  license: AGPL-3.0-only
+  license_family: AGPL
+  size: 29684080
+  timestamp: 1710217094567
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/minio-server-2024.03.10.02.53.48-hf0a4a13_0.conda
+  sha256: 7c29eb913e1d5e8efcb5af9dd908c1e4ef13b3e87cdc486a9ade6c7a8106a2ef
+  md5: a69c70cb150ba41a60e81b03fc94a954
+  arch: arm64
+  platform: osx
+  license: AGPL-3.0-only
+  license_family: AGPL
+  size: 28447785
+  timestamp: 1710216865211
+- conda: https://conda.anaconda.org/conda-forge/win-64/minio-server-2024.03.10.02.53.48-h56e8100_0.conda
+  sha256: 575c723ba0ae2d10c1b340afd229c41efd80baeee4c6d75d7f249b449ad66348
+  md5: 6126ff5a23af33c9fa987f11783b62e5
+  arch: x86_64
+  platform: win
+  license: AGPL-3.0-only
+  license_family: AGPL
+  size: 29699962
+  timestamp: 1710217343984
 - conda: https://conda.anaconda.org/conda-forge/noarch/mkdocs-1.5.3-pyhd8ed1ab_0.conda
   sha256: cd57f3805a38bc3b3356a37d4bd9af7e227972286f61eae3c88d356216bc7159
   md5: 1e432aebaa009b030cce33a554939d8e
