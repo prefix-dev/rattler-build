@@ -328,19 +328,20 @@ pub async fn upload_package_to_s3(
             "Both endpoint_url and region must be specified together"
         ));
     }
-    let s3_client = if let (Some(endpoint_url), Some(region), Some(force_path_style)) =
+    let s3_config = if let (Some(endpoint_url), Some(region), Some(force_path_style)) =
         (endpoint_url, region, force_path_style)
     {
-        let s3_config = S3Config {
+        S3Config::Custom {
             auth_storage: storage.clone(),
             endpoint_url,
             region,
             force_path_style,
-        };
-        create_s3_client(Some(s3_config), Some(channel.clone())).await
+        }
     } else {
-        create_s3_client(None, None).await
+        S3Config::FromAWS
     };
+
+    let s3_client = create_s3_client(s3_config, Some(channel.clone())).await;
 
     let bucket = channel
         .host_str()

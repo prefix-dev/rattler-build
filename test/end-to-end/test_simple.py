@@ -5,7 +5,6 @@ import platform
 import subprocess
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from time import sleep
 
 import pytest
 import requests
