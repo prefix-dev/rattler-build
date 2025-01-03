@@ -781,6 +781,17 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             )
             .await
         }
+        ServerType::S3(s3_opts) => {
+            upload::upload_package_to_s3(
+                &store,
+                s3_opts.channel,
+                s3_opts.endpoint_url,
+                s3_opts.region,
+                s3_opts.force_path_style,
+                &args.package_files,
+            )
+            .await
+        }
         ServerType::CondaForge(conda_forge_opts) => {
             upload::conda_forge::upload_packages_to_conda_forge(
                 conda_forge_opts,

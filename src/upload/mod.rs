@@ -12,6 +12,7 @@ use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
 use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 use miette::{Context, IntoDiagnostic};
+use rattler_networking::s3_middleware::{create_s3_client, S3Config};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
 use reqwest::Method;
@@ -309,6 +310,65 @@ pub async fn upload_package_to_anaconda(
             }
         }
     }
+    Ok(())
+}
+
+/// Uploads a package to a channel in an S3 bucket.
+pub async fn upload_package_to_s3(
+    storage: &AuthenticationStorage,
+    channel: Url,
+    endpoint_url: Option<Url>,
+    region: Option<String>,
+    force_path_style: Option<bool>,
+    package_files: &Vec<PathBuf>,
+) -> miette::Result<()> {
+    // If either endpoint_url or region is set, ensure that both are set
+    if endpoint_url.is_some() != region.is_some() {
+        return Err(miette::miette!(
+            "Both endpoint_url and region must be specified together"
+        ));
+    }
+    let s3_client = if let (Some(endpoint_url), Some(region), Some(force_path_style)) =
+        (endpoint_url, region, force_path_style)
+    {
+        let s3_config = S3Config {
+            auth_storage: storage.clone(),
+            endpoint_url,
+            region,
+            force_path_style,
+        };
+        create_s3_client(Some(s3_config), Some(channel.clone())).await
+    } else {
+        create_s3_client(None, None).await
+    };
+
+    let bucket = channel
+        .host_str()
+        .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
+    let channel = channel.path().trim_start_matches('/');
+
+    for package_file in package_files {
+        let package = ExtractedPackage::from_package_file(package_file)?;
+        let subdir = package
+            .subdir()
+            .ok_or_else(|| miette::miette!("Failed to get subdir"))?;
+        let filename = package
+            .filename()
+            .ok_or_else(|| miette::miette!("Failed to get filename"))?;
+        let key = format!("{}/{}/{}", channel, subdir, filename);
+        let body = aws_smithy_types::byte_stream::ByteStream::from_path(package_file)
+            .await
+            .into_diagnostic()?;
+        s3_client
+            .put_object()
+            .key(key)
+            .body(body)
+            .bucket(bucket)
+            .send()
+            .await
+            .into_diagnostic()?;
+    }
+
     Ok(())
 }
 
