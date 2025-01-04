@@ -1,0 +1,28 @@
+# test for issue https://github.com/prefix-dev/rattler-build/issues/1290
+recipe:
+  name: foo
+  version: 0.1.0
+
+cache:
+  build:
+    script:
+      - mkdir -p $PREFIX/lib
+      - mkdir -p $PREFIX/include
+      - touch $PREFIX/include/test.h
+      - touch $PREFIX/lib/libdav1d.so.7.0.0
+      - ln -s $PREFIX/lib/libdav1d.so.7.0.0 $PREFIX/lib/libdav1d.so.7
+      - ln -s $PREFIX/lib/libdav1d.so.7 $PREFIX/lib/libdav1d.so
+
+  requirements:
+    build:
+      - ${{ compiler('c') }}
+
+outputs:
+  - package:
+      name: testlib-so-version
+      version: 2.1.4
+
+    build:
+      files:
+        include:
+          - lib/*.so.*

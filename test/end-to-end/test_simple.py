@@ -1181,3 +1181,24 @@ def test_recipe_variant_render(
         )
         for output in rendered
     ]
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_cache_select_files(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    rattler_build.build(
+        recipes / "cache/recipe-compiler.yaml", tmp_path, extra_args=["--experimental"]
+    )
+    pkg = get_extracted_package(tmp_path, "testlib-so-version")
+
+    assert (pkg / "info/paths.json").exists()
+    paths = json.loads((pkg / "info/paths.json").read_text())
+
+    assert paths["paths"].len() == 2
+    assert paths["paths"][0]["_path"] == "lib/libdav1d.so.7"
+    assert paths["paths"][0]["path_type"] == "softlink"
+    assert paths["paths"][1]["_path"] == "lib/libdav1d.so.7.0.0"
+    assert paths["paths"][0]["path_type"] == "hardlink"
