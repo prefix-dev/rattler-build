@@ -1186,9 +1186,7 @@ def test_recipe_variant_render(
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_cache_select_files(
-    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
-):
+def test_cache_select_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "cache/recipe-compiler.yaml", tmp_path, extra_args=["--experimental"]
     )
@@ -1197,8 +1195,8 @@ def test_cache_select_files(
     assert (pkg / "info/paths.json").exists()
     paths = json.loads((pkg / "info/paths.json").read_text())
 
-    assert paths["paths"].len() == 2
+    assert len(paths["paths"]) == 2
     assert paths["paths"][0]["_path"] == "lib/libdav1d.so.7"
     assert paths["paths"][0]["path_type"] == "softlink"
     assert paths["paths"][1]["_path"] == "lib/libdav1d.so.7.0.0"
-    assert paths["paths"][0]["path_type"] == "hardlink"
+    assert paths["paths"][1]["path_type"] == "hardlink"
