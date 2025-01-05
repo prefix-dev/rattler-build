@@ -256,7 +256,7 @@ def test_s3_minio_upload(
 ):
     monkeypatch.setenv("RATTLER_AUTH_FILE", str(s3_credentials_file))
     rattler_build.build(recipes / "globtest", tmp_path)
-    rattler_build(
+    cmd = [
         "upload",
         "-vvv",
         "s3",
@@ -269,7 +269,8 @@ def test_s3_minio_upload(
         "--force-path-style",
         "true",
         str(get_package(tmp_path, "globtest")),
-    )
+    ]
+    rattler_build(*cmd)
 
     # Make sure the package was uploaded
     assert b"globtest" in subprocess.check_output(
@@ -279,6 +280,10 @@ def test_s3_minio_upload(
             "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
         },
     )
+
+    # Raise an error if the same package is uploaded again
+    with pytest.raises(CalledProcessError):
+        rattler_build(*cmd)
 
 
 @pytest.mark.skipif(

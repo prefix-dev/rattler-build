@@ -12,7 +12,7 @@ use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
 use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 use miette::{Context, IntoDiagnostic};
-use rattler_networking::s3_middleware::{create_s3_client, S3Config};
+use rattler_networking::s3_middleware::{S3Config, S3};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
 use reqwest::Method;
@@ -332,7 +332,6 @@ pub async fn upload_package_to_s3(
         (endpoint_url, region, force_path_style)
     {
         S3Config::Custom {
-            auth_storage: storage.clone(),
             endpoint_url,
             region,
             force_path_style,
@@ -341,7 +340,11 @@ pub async fn upload_package_to_s3(
         S3Config::FromAWS
     };
 
-    let s3_client = create_s3_client(s3_config, Some(channel.clone())).await;
+    let s3 = S3::new(s3_config, storage.clone());
+    let s3_client = s3
+        .create_s3_client(Some(channel.clone()))
+        .await
+        .map_err(|e| miette::miette!(e.to_string()))?;
 
     let bucket = channel
         .host_str()
@@ -362,12 +365,14 @@ pub async fn upload_package_to_s3(
             .into_diagnostic()?;
         s3_client
             .put_object()
-            .key(key)
+            .key(key.clone())
+            .if_none_match("*") // Do not allow overwriting existing files
             .body(body)
             .bucket(bucket)
             .send()
             .await
             .into_diagnostic()?;
+        tracing::info!("Uploaded package to s3://{bucket}/{key}");
     }
 
     Ok(())
