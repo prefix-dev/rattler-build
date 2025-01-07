@@ -2,10 +2,12 @@ use rattler_conda_types::PackageName;
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
+/// A key in a variant configuration.
 #[derive(Debug, Clone, Deserialize)]
 pub struct NormalizedKey(pub String);
 
 impl NormalizedKey {
+    /// Returns the normalized form of the key.
     pub fn normalize(&self) -> String {
         self.0
             .chars()
