@@ -75,6 +75,8 @@ use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
 
+pub use normalized_key::NormalizedKey;
+
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
     let recipe_path = canonicalize(path);
