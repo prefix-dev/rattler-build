@@ -371,25 +371,23 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
         // if we have a matchspec that is only numbers, and ., we complain and ask the user to add a
         // `.*` or `==` in front of it.
         let split_string = string.split_whitespace().collect::<Vec<_>>();
-        if split_string.len() >= 2 {
-            if split_string[1].chars().all(|c| c.is_numeric() || c == '.') {
-                let name = split_string[0];
-                let version = split_string[1];
-                let rest = split_string[2..].join(" ");
-                let rest = if rest.is_empty() {
-                    "".to_string()
-                } else {
-                    format!(" {}", rest)
-                };
+        if split_string.len() >= 2 && split_string[1].chars().all(|c| c.is_numeric() || c == '.') {
+            let name = split_string[0];
+            let version = split_string[1];
+            let rest = split_string[2..].join(" ");
+            let rest = if rest.is_empty() {
+                "".to_string()
+            } else {
+                format!(" {}", rest)
+            };
 
-                return Err(vec![_partialerror!(
+            return Err(vec![_partialerror!(
                     *self.span(),
                     ErrorKind::Other,
                     label = format!(
                         "This match spec is ambiguous. Do you mean `{name} =={version}{rest}` or `{name} {version}.*{rest}`?"
                     )
                 )]);
-            }
         }
 
         MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
