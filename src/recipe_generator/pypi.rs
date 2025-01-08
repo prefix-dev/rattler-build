@@ -86,7 +86,7 @@ fn format_requirement(req: &str) -> String {
         let (package, marker) = req.split_once(';').unwrap();
         format!("{} ;MARKER; {}", package.trim(), marker.trim())
     } else {
-        format!("{}", req.trim())
+        req.trim().to_string()
     }
 }
 
@@ -161,7 +161,7 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
             let conda_name = if opts.use_mapping {
                 let mapping = conda_pypi_name_mapping().await?;
                 // Get base package name without markers/version
-                let base_name = req.split(|c| c == ' ' || c == ';').next().unwrap();
+                let base_name = req.split([' ', ';']).next().unwrap();
                 mapping.get(base_name).map_or(req.clone(), |n| {
                     // Replace the package name but keep version and markers
                     req.replacen(base_name, n, 1)

@@ -39,6 +39,7 @@ impl Interpreter for BashInterpreter {
             &cmd_args,
             &args.work_dir,
             &args.replacements("$((var))"),
+            args.sandbox_config.as_ref(),
         )
         .await?;
 
