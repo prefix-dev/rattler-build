@@ -432,6 +432,8 @@ async fn run_process_with_replacements(
         )))]
         {
             tracing::warn!("Sandboxing is not supported on this platform");
+            // mark variable as used
+            let _ = sandbox_config;
             tokio::process::Command::new(args[0])
         }
     } else {

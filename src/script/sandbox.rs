@@ -37,7 +37,7 @@ pub struct SandboxArguments {
 }
 
 /// Configuration for the sandbox
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct SandboxConfiguration {
     allow_network: bool,
     read: Vec<PathBuf>,
@@ -210,15 +210,12 @@ impl From<SandboxArguments> for Option<SandboxConfiguration> {
             let default = SandboxConfiguration::for_linux();
             #[cfg(target_os = "macos")]
             let default = SandboxConfiguration::for_macos();
+            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+            let default = SandboxConfiguration::default();
 
             default
         } else {
-            SandboxConfiguration {
-                allow_network: false,
-                read: Vec::new(),
-                read_execute: Vec::new(),
-                read_write: Vec::new(),
-            }
+            SandboxConfiguration::default()
         };
 
         for path in args.allow_read {
