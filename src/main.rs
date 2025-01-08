@@ -18,6 +18,7 @@ use tempfile::tempdir;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before tokio runtime
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     rattler_sandbox::init_sandbox();
 
     // Create and run the tokio runtime
