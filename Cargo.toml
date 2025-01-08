@@ -19,13 +19,11 @@ default = ['rustls-tls', 'recipe-generation']
 native-tls = [
     'reqwest/native-tls',
     'rattler/native-tls',
-    'rattler_installs_packages/native-tls',
 ]
 rustls-tls = [
     'reqwest/rustls-tls',
     'reqwest/rustls-tls-native-roots',
     'rattler/rustls-tls',
-    'rattler_installs_packages/rustls-tls',
 ]
 tui = [
     'ratatui',
@@ -34,7 +32,7 @@ tui = [
     'throbber-widgets-tui',
     'tui-input',
 ]
-recipe-generation = ['rattler_installs_packages']
+recipe-generation = []
 # This feature needs to add a dependency on
 # clap-markdown = { git = "https://github.com/ruben-arts/clap-markdown", branch = "main" }
 # but in order to be able to publish to crates we remove this feature
@@ -113,7 +111,6 @@ zstd = "0.13.2"
 toml = "0.8.19"
 memmap2 = "0.9.5"
 reqwest-middleware = "0.4.0"
-rattler_installs_packages = { version = "0.10.0", default-features = false, optional = true }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.1"
 memchr = "2.7.4"
