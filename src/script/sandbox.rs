@@ -1,3 +1,5 @@
+//! Sandbox configuration for the build script
+// enable only on linux-64, linux-aarch64, and macos
 use std::{
     fmt::{Display, Formatter},
     path::{Path, PathBuf},
@@ -78,9 +80,10 @@ impl Display for SandboxConfiguration {
 impl SandboxConfiguration {
     /// Create a default sandbox configuration for macOS
     pub fn for_macos() -> Self {
-        let mut read_execute = Vec::new();
-        read_execute.push("/bin/".into());
-        read_execute.push("/usr/bin/".into());
+        let read_execute = vec!["/bin/", "/usr/bin/"]
+            .into_iter()
+            .map(Into::into)
+            .collect();
 
         let mut read_write = Vec::new();
         // Allow writing to temp folders
@@ -101,24 +104,32 @@ impl SandboxConfiguration {
 
     /// Default configuration for Linux
     pub fn for_linux() -> Self {
-        let mut read_execute = Vec::new();
-        read_execute.push("/bin/".into());
-        read_execute.push("/usr/bin/".into());
-
-        // Definitely needed for `ld` but maybe we should make it more specific
-        // to only allow e.g. `/lib/ld-linux-x86-64.so.2`?
-        read_execute.push("/lib64".into());
-        read_execute.push("/usr/lib64".into());
-        read_execute.push("/lib".into());
-        read_execute.push("/usr/lib".into());
+        let read_execute = vec![
+            // System binaries
+            "/bin/",
+            "/usr/bin/",
+            // Definitely needed for `ld` but maybe we should make it more specific
+            // to only allow e.g. `/lib/ld-linux-x86-64.so.2`?
+            "/lib64",
+            "/usr/lib64",
+            "/lib",
+            "/usr/lib",
+        ]
+        .into_iter()
+        .map(Into::into)
+        .collect();
 
         // For now, I am not adding `/sbin` and `/usr/sbin` to the read_execute list as
         // these commands should generally not be needed during the build process.
 
-        let mut read_write = Vec::new();
-        // Allow writing to temp folders
-        read_write.push("/tmp".into());
-        read_write.push("/var/tmp".into());
+        let mut read_write: Vec<PathBuf> = vec![
+            // Temp directories
+            "/tmp", "/var/tmp",
+        ]
+        .into_iter()
+        .map(Into::into)
+        .collect();
+
         let temp_folder = std::env::var("TMPDIR").ok();
         if let Some(temp_folder) = temp_folder {
             read_write.push(temp_folder.into());
@@ -154,6 +165,11 @@ impl SandboxConfiguration {
         }
     }
 
+    #[cfg(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "aarch64"),
+        target_os = "macos"
+    ))]
     /// Get the list of exceptions for the sandbox
     pub fn exceptions(&self) -> Vec<rattler_sandbox::Exception> {
         let mut exceptions = Vec::new();
@@ -194,8 +210,6 @@ impl From<SandboxArguments> for Option<SandboxConfiguration> {
             let default = SandboxConfiguration::for_linux();
             #[cfg(target_os = "macos")]
             let default = SandboxConfiguration::for_macos();
-            #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-            panic!("Unsupported platform for sandbox");
 
             default
         } else {

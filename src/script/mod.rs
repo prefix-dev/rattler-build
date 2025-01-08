@@ -223,6 +223,7 @@ impl Script {
     }
 
     /// Run the script with the given parameters
+    #[allow(clippy::too_many_arguments)]
     pub async fn run_script(
         &self,
         env_vars: HashMap<String, Option<String>>,
@@ -411,11 +412,28 @@ async fn run_process_with_replacements(
     sandbox_config: Option<&SandboxConfiguration>,
 ) -> Result<std::process::Output, std::io::Error> {
     let mut command = if let Some(sandbox_config) = sandbox_config {
-        tracing::info!("Sandbox configuration: {}", sandbox_config);
-        rattler_sandbox::tokio::sandboxed_command(
-            args[0],
-            &sandbox_config.with_cwd(cwd).exceptions(),
-        )
+        #[cfg(any(
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(target_os = "linux", target_arch = "aarch64"),
+            target_os = "macos"
+        ))]
+        {
+            rattler_sandbox::tokio::sandboxed_command(
+                args[0],
+                &sandbox_config.with_cwd(cwd).exceptions(),
+            )
+        }
+
+        // If the platform is not supported, log a warning and run the command without sandboxing
+        #[cfg(not(any(
+            all(target_os = "linux", target_arch = "x86_64"),
+            all(target_os = "linux", target_arch = "aarch64"),
+            target_os = "macos"
+        )))]
+        {
+            tracing::warn!("Sandboxing is not supported on this platform");
+            tokio::process::Command::new(args[0])
+        }
     } else {
         tokio::process::Command::new(args[0])
     };

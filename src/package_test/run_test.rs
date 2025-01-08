@@ -851,9 +851,8 @@ impl DownstreamTest {
                 tracing::info!("Running downstream test with {:?}", &package_file);
                 run_test(path, config, Some(package_file.clone()))
                     .await
-                    .map_err(|e| {
+                    .inspect_err(|_| {
                         tracing::error!("Downstream test with {:?} failed", &package_file);
-                        e
                     })?;
             }
             Err(e) => {
