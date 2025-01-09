@@ -200,6 +200,7 @@ fn should_not_serialize_lfs(lfs: &bool) -> bool {
 }
 
 impl GitSource {
+    /// Create a git source (for testing purposes)
     #[cfg(test)]
     pub fn create(
         url: GitUrl,
