@@ -57,4 +57,4 @@ On Linux, by default, the sandbox configuration is as follows:
 
 ### Windows
 
-Sandboxing the build process is not yet supported on Windows, and thus is entirely ignored.
+Sandboxing the build process is not yet supported on Windows, and thus all passed sandbox flags are entirely ignored.
