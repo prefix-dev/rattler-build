@@ -418,6 +418,7 @@ async fn run_process_with_replacements(
             target_os = "macos"
         ))]
         {
+            tracing::info!("{}", sandbox_config);
             rattler_sandbox::tokio::sandboxed_command(
                 args[0],
                 &sandbox_config.with_cwd(cwd).exceptions(),
