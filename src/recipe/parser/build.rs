@@ -505,6 +505,12 @@ pub struct Python {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,
 
+    /// Whether the package is Python version independent.
+    /// This is used for abi3 packages that are not tied to a specific Python version, but
+    /// still contain compiled code (and thus need to end up in the right subdir).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub version_independent: bool,
+
     /// The relative site-packages path that a Python build _exports_ for other
     /// packages to use. This setting only makes sense for the `python` package
     /// itself. For example, a python 3.13 version could advertise a
