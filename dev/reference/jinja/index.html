@@ -1694,10 +1694,6 @@ will return <code>1</code>) - <code>last</code>: return the last element of a li
 <li><code>min</code>: return the minimum value of a list (e.g. <code>"{{ [1, 2, 3] | min }}"</code> will return <code>1</code>)</li>
 <li><code>max</code>: return the maximum value of a list (e.g. <code>"{{ [1, 2, 3] | max }}"</code> will return <code>3</code>)</li>
 <li><code>reverse</code>: reverse a list (e.g. <code>"{{ [1, 2, 3] | reverse }}"</code> will return <code>[3, 2, 1]</code>)</li>
-<li><code>slice</code>: slice a list (e.g. <code>"{{ [1, 2, 3] | slice(1, 2) }}"</code> will return <code>[2]</code>)</li>
-<li><code>batch</code>: This filter works pretty much like <code>slice</code> just the other way round.
-  It returns a list of lists with the given number of items. If you provide a
-  second parameter this is used to fill up missing items.</li>
 <li><code>sort</code>: sort a list (e.g. <code>"{{ [3, 1, 2] | sort }}"</code> will return <code>[1, 2, 3]</code>)</li>
 <li><code>trim</code>: remove leading and trailing whitespace from a string (e.g. <code>"{{ ' foo ' | trim }}"</code> will return <code>"foo"</code>)</li>
 <li><code>unique</code>: remove duplicates from a list (e.g. <code>"{{ [1, 2, 1, 3] | unique }}"</code> will return <code>[1, 2, 3]</code>)</li>
@@ -1760,6 +1756,13 @@ empty (null) and thus filtered from the final list.</p>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; }}</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="c1"># or an `else` branch can be used, of course</span>
 </span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ 100 if cuda == &quot;yes&quot; else 0 }}</span>
+</span></code></pre></div>
+<h4 id="slicing-lists">Slicing lists<a class="headerlink" href="#slicing-lists" title="Permanent link">#</a></h4>
+<p>Lists can be spliced using the regular Python <code>[i:j]</code> syntax.  Note that when
+lists are obtained through using filters such as <code>split</code>, the whole filter
+expression needs to be parenthesized.</p>
+<p>For example, to slice a version string from <code>x.y.z</code> to <code>x.y</code>:</p>
+<div class="language-jinja highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="x">$</span><span class="cp">{{</span> <span class="o">(</span><span class="nv">version</span> <span class="o">|</span> <span class="nf">split</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">))[:</span><span class="m">2</span><span class="o">]</span> <span class="o">|</span> <span class="nf">join</span><span class="o">(</span><span class="s1">&#39;.&#39;</span><span class="o">)</span> <span class="cp">}}</span>
 </span></code></pre></div>
 
 
