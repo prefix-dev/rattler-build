@@ -278,6 +278,44 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms
 
 
+###### **Sandbox arguments**
+
+- `--sandbox`
+
+	Enable the sandbox
+
+	- Possible values: `true`, `false`
+
+
+- `--allow-network`
+
+	Allow network access during build (default: false if sandbox is enabled)
+
+	- Possible values: `true`, `false`
+
+
+- `--allow-read <ALLOW_READ>`
+
+	Allow read access to the specified paths
+
+
+- `--allow-read-execute <ALLOW_READ_EXECUTE>`
+
+	Allow read and execute access to the specified paths
+
+
+- `--allow-read-write <ALLOW_READ_WRITE>`
+
+	Allow read and write access to the specified paths
+
+
+- `--overwrite-default-sandbox-config`
+
+	Overwrite the default sandbox configuration
+
+	- Possible values: `true`, `false`
+
+
 
 
 
@@ -553,14 +591,19 @@ Options for uploading to a Artifactory channel. Authentication is used from the 
 	The URL to your channel
 
 
-- `-r`, `--username <USERNAME>`
+- `--username <USERNAME>`
 
 	Your Artifactory username
 
 
-- `-p`, `--password <PASSWORD>`
+- `--password <PASSWORD>`
 
 	Your Artifactory password
+
+
+- `-t`, `--token <TOKEN>`
+
+	Your Artifactory token
 
 
 

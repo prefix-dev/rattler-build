@@ -118,6 +118,7 @@ nav:
 
     - Experimental features: experimental_features.md
     - Multiple output cache: multiple_output_cache.md
+    - Sandbox: sandbox.md
     - Generating recipes: recipe_generation.md
     - Tips and tricks: tips_and_tricks.md
 
