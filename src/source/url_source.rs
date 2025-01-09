@@ -184,7 +184,10 @@ pub(crate) async fn url_src(
 ) -> Result<PathBuf, SourceError> {
     // convert sha256 or md5 to Checksum
     let checksum = Checksum::from_url_source(source).ok_or_else(|| {
-        SourceError::NoChecksum(format!("No checksum found for url(s): {:?}", source.urls()))
+        SourceError::NoChecksum(format!(
+            "No checksum found for url(s): {:?}",
+            source.urls().collect::<Vec<_>>()
+        ))
     })?;
 
     let mut last_error = None;
