@@ -714,6 +714,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../sandbox/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Sandbox
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../recipe_generation/" class="md-nav__link">
         
   
@@ -1700,6 +1721,42 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms</p>
 </li>
 </ul>
+<h6 id="sandbox-arguments"><strong>Sandbox arguments</strong><a class="headerlink" href="#sandbox-arguments" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--sandbox</code></p>
+<p>Enable the sandbox</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--allow-network</code></p>
+<p>Allow network access during build (default: false if sandbox is enabled)</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+<li>
+<p><code>--allow-read &lt;ALLOW_READ&gt;</code></p>
+<p>Allow read access to the specified paths</p>
+</li>
+<li>
+<p><code>--allow-read-execute &lt;ALLOW_READ_EXECUTE&gt;</code></p>
+<p>Allow read and execute access to the specified paths</p>
+</li>
+<li>
+<p><code>--allow-read-write &lt;ALLOW_READ_WRITE&gt;</code></p>
+<p>Allow read and write access to the specified paths</p>
+</li>
+<li>
+<p><code>--overwrite-default-sandbox-config</code></p>
+<p>Overwrite the default sandbox configuration</p>
+<ul>
+<li>Possible values: <code>true</code>, <code>false</code></li>
+</ul>
+</li>
+</ul>
 <h3 id="test"><code>test</code><a class="headerlink" href="#test" title="Permanent link">#</a></h3>
 <p>Run a test for a single package</p>
 <p>This creates a temporary directory, copies the package file into it, and then runs the indexing. It then creates a test environment that installs the package and any extra dependencies specified in the package test dependencies file.</p>
@@ -1945,12 +2002,16 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The URL to your channel</p>
 </li>
 <li>
-<p><code>-r</code>, <code>--username &lt;USERNAME&gt;</code></p>
+<p><code>--username &lt;USERNAME&gt;</code></p>
 <p>Your Artifactory username</p>
 </li>
 <li>
-<p><code>-p</code>, <code>--password &lt;PASSWORD&gt;</code></p>
+<p><code>--password &lt;PASSWORD&gt;</code></p>
 <p>Your Artifactory password</p>
+</li>
+<li>
+<p><code>-t</code>, <code>--token &lt;TOKEN&gt;</code></p>
+<p>Your Artifactory token</p>
 </li>
 </ul>
 <h4 id="prefix"><code>prefix</code><a class="headerlink" href="#prefix" title="Permanent link">#</a></h4>

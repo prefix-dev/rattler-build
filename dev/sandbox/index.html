@@ -8,28 +8,28 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/tutorials/go/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/sandbox/">
       
       
-        <link rel="prev" href="../rust/">
+        <link rel="prev" href="../multiple_output_cache/">
       
       
-        <link rel="next" href="../perl/">
+        <link rel="next" href="../recipe_generation/">
       
       
-      <link rel="icon" href="../../assets/favicon.png">
+      <link rel="icon" href="../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.5.20">
     
     
       
-        <title>Go - rattler-build</title>
+        <title>Sandbox - rattler-build</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.66ac8b77.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.66ac8b77.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,9 +48,9 @@
       
     
     
-      <link rel="stylesheet" href="../../stylesheets/extra.css">
+      <link rel="stylesheet" href="../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -59,11 +59,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="Go - rattler-build" >
+        <meta  property="og:title"  content="Sandbox - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/go.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/sandbox.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -71,15 +71,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/tutorials/go/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/sandbox/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="Go - rattler-build" >
+        <meta  name="twitter:title"  content="Sandbox - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/go.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/sandbox.png" >
       
     
     
@@ -102,7 +102,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#packaging-a-go-package" class="md-skip">
+        <a href="#experimental-sandbox" class="md-skip">
           Skip to content
         </a>
       
@@ -124,7 +124,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../../assets/powerdrill.png" alt="logo">
+  <img src="../assets/powerdrill.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -141,7 +141,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Go
+              Sandbox
             
           </span>
         </div>
@@ -266,7 +266,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../../assets/powerdrill.png" alt="logo">
+  <img src="../assets/powerdrill.png" alt="logo">
 
     </a>
     rattler-build
@@ -293,7 +293,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../.." class="md-nav__link">
+      <a href=".." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -313,7 +313,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../highlevel/" class="md-nav__link">
+      <a href="../highlevel/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -322,6 +322,200 @@
   
 
       </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Examples
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/python/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/cpp/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    C++
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/javascript/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Javascript
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/rust/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Rust
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/go/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Go
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/perl/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Perl
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../converting_from_conda_build/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Converting from conda-build
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -347,24 +541,24 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
             
   
   <span class="md-ellipsis">
-    Examples
+    Build options
   </span>
   
 
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Examples
+            Build options
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -375,11 +569,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../python/" class="md-nav__link">
+      <a href="../build_options/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Python
+    Advanced options
   </span>
   
 
@@ -396,11 +590,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../cpp/" class="md-nav__link">
+      <a href="../selectors/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    C++
+    Selector syntax (if/then)
   </span>
   
 
@@ -417,11 +611,11 @@
   
   
     <li class="md-nav__item">
-      <a href="../javascript/" class="md-nav__link">
+      <a href="../build_script/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Javascript
+    Build script
   </span>
   
 
@@ -438,11 +632,74 @@
   
   
     <li class="md-nav__item">
-      <a href="../rust/" class="md-nav__link">
+      <a href="../variants/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    Rust
+    Variants
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../compilers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Compilers and cross compilation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../experimental_features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Experimental features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../multiple_output_cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Multiple output cache
   </span>
   
 
@@ -472,7 +729,7 @@
           
   
   <span class="md-ellipsis">
-    Go
+    Sandbox
   </span>
   
 
@@ -483,7 +740,7 @@
         
   
   <span class="md-ellipsis">
-    Go
+    Sandbox
   </span>
   
 
@@ -505,20 +762,62 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-different-go-compilers" class="md-nav__link">
+  <a href="#example" class="md-nav__link">
     <span class="md-ellipsis">
-      The different Go compilers
+      Example
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-go-recipe" class="md-nav__link">
+  <a href="#options" class="md-nav__link">
     <span class="md-ellipsis">
-      Example Go recipe
+      Options
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-sandbox-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default sandbox configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default sandbox configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      macOS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      Linux
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      Windows
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -538,264 +837,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../perl/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Perl
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../converting_from_conda_build/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Converting from conda-build
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
-            
-  
-  <span class="md-ellipsis">
-    Build options
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            Build options
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../build_options/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Advanced options
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../selectors/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Selector syntax (if/then)
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../build_script/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Build script
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../variants/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Variants
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../compilers/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Compilers and cross compilation
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../experimental_features/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Experimental features
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../multiple_output_cache/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Multiple output cache
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../sandbox/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Sandbox
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../recipe_generation/" class="md-nav__link">
+      <a href="../recipe_generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -816,7 +858,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tips_and_tricks/" class="md-nav__link">
+      <a href="../tips_and_tricks/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -884,7 +926,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../testing/" class="md-nav__link">
+      <a href="../testing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -905,7 +947,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../rebuild/" class="md-nav__link">
+      <a href="../rebuild/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -973,7 +1015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../tui/" class="md-nav__link">
+      <a href="../tui/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -994,7 +1036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../authentication_and_upload/" class="md-nav__link">
+      <a href="../authentication_and_upload/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1015,7 +1057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../automatic_linting/" class="md-nav__link">
+      <a href="../automatic_linting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1083,7 +1125,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../package_spec/" class="md-nav__link">
+      <a href="../package_spec/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1104,7 +1146,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../special_files/" class="md-nav__link">
+      <a href="../special_files/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1125,7 +1167,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../internals/" class="md-nav__link">
+      <a href="../internals/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1193,7 +1235,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/recipe_file/" class="md-nav__link">
+      <a href="../reference/recipe_file/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1214,7 +1256,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/cli/" class="md-nav__link">
+      <a href="../reference/cli/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1235,7 +1277,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../reference/jinja/" class="md-nav__link">
+      <a href="../reference/jinja/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,20 +1325,62 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#the-different-go-compilers" class="md-nav__link">
+  <a href="#example" class="md-nav__link">
     <span class="md-ellipsis">
-      The different Go compilers
+      Example
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-go-recipe" class="md-nav__link">
+  <a href="#options" class="md-nav__link">
     <span class="md-ellipsis">
-      Example Go recipe
+      Options
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#default-sandbox-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Default sandbox configuration
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default sandbox configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#macos" class="md-nav__link">
+    <span class="md-ellipsis">
+      macOS
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#linux" class="md-nav__link">
+    <span class="md-ellipsis">
+      Linux
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#windows" class="md-nav__link">
+    <span class="md-ellipsis">
+      Windows
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1315,7 +1399,7 @@
                   
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/tutorials/go.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/sandbox.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75L3 17.25Z"/></svg>
     </a>
@@ -1323,73 +1407,55 @@
   
 
 
-<h1 id="packaging-a-go-package">Packaging a Go package<a class="headerlink" href="#packaging-a-go-package" title="Permanent link">#</a></h1>
-<p>This tutorial will guide you through making a Go package with <code>rattler-build</code>.</p>
-<p>When building a recipe for Go, most Go dependencies are linked statically. That
-means, we should collect their licenses and add them in the package. The
-<code>go-licenses</code> tool can help you with this task - as shown in the example below.</p>
-<h2 id="the-different-go-compilers">The different Go compilers<a class="headerlink" href="#the-different-go-compilers" title="Permanent link">#</a></h2>
-<p>The <code>conda-forge</code> ecosystem provides two go compilers: <code>go-cgo</code> and <code>go-nocgo</code>.</p>
-<p>By default, if you do not need to link against C libraries, it's recommended to
-use the <code>go-nocgo</code> compiler. It generates fat binaries without libc
-dependencies. The compiler activation scripts will set your <code>CC</code>, <code>CXX</code> and
-related flags to invalid values.</p>
-<p>The <code>go-cgo</code> compiler can generate fat binaries that depend on conda-forge's
-libc. You should use this compiler if the underlying program needs to link
-against other C libraries, in which case make sure to add <code>${{ compiler('c') }}</code>
-(<code>cxx</code>, <code>fortran</code>, ...) for unix and the <code>m2w64</code> equivalent for windows.</p>
-<h2 id="example-go-recipe">Example Go recipe<a class="headerlink" href="#example-go-recipe" title="Permanent link">#</a></h2>
-<p>This example shows how to package the <a href="https://github.com/temporalio/cli">Temporal
-CLI</a>.</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0.13.1&quot;</span>
+<h1 id="experimental-sandbox">Experimental sandbox<a class="headerlink" href="#experimental-sandbox" title="Permanent link">#</a></h1>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The sandbox feature is experimental and may not work as expected. The options might
+change in future releases.</p>
+</div>
+<p>Since the 0.34.0 release, <code>rattler-build</code> has a new experimental feature called
+<code>sandbox</code>. With the sandbox feature enabled (via <code>--sandbox</code>), the build process
+has much more restricted access to system resources on macOS and Linux. 
+As the sandbox feature is experimental it is disabled by default.</p>
+<p>In particular, with the default configuration, the build process can read the entire filesystem, 
+but it cannot write outside of the build directories. The build process also cannot access the network.
+In the future, we plan to enable the sandbox per default and restrict it further. </p>
+<p>On macOS this is achieved by using the <code>sandbox-exec</code> command, which is part of the macOS system.
+On Linux the sandbox is created using Linux namespaces.</p>
+<p>To control the sandbox behavior, you can supply additional arguments to the CLI:</p>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">#</a></h2>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># run the build and sandbox the build process</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>./example/recipe.yaml<span class="w"> </span>--sandbox
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/temporalio/cli/archive/refs/tags/v${{ version }}.tar.gz</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9d8812c96d3404490659fec3915dcd23c4142b421ef4cb7e9622bd9a459e1f74</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&#39;go-nocgo&#39;) }}</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">go-licenses</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="nt">tests</span><span class="p">:</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temporal --version</span>
-</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
-</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="nt">about</span><span class="p">:</span>
-</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://temporal.io</span>
-</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/temporalio/cli</span>
-</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span><span class="nt">documentation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://docs.temporal.io/cli</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Temporal CLI</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">    </span><span class="no">Command-line interface for running Temporal Server and interacting with</span>
-</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">    </span><span class="no">Workflows, Activities, Namespaces, and other parts of Temporal.</span>
-</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MIT</span>
-</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="w">  </span><span class="nt">license_file</span><span class="p">:</span>
-</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LICENSE</span>
-</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="w">    </span><span class="c1"># These license files are generated at build time in the `build.sh` script</span>
-</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="w">    </span><span class="c1"># from all the dependencies of `temporal.io`.</span>
-</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">license-files/</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># to add more permissions to the sandbox</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>./example/recipe.yaml<span class="w"> </span>--sandbox<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span>--allow-read<span class="w"> </span>/some/path<span class="w"> </span>--allow-read<span class="w"> </span>/foo/bar<span class="w"> </span>--allow-network
 </span></code></pre></div>
-<p>The build script (on Unix) should look something like this:</p>
-<div class="language-sh highlight"><span class="filename">build.sh</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># The LDFLAGS are used to set the version of the `temporal` binary. This is a common practice in Go.</span>
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">LDFLAGS</span><span class="si">}</span><span class="s2"> -s -w -X github.com/temporalio/cli/temporalcli.Version=</span><span class="si">${</span><span class="nv">PKG_VERSION</span><span class="si">}</span><span class="s2">&quot;</span>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Build the `temporal` binary and store it in the `$PREFIX/bin` directory.</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>go<span class="w"> </span>build<span class="w"> </span>-ldflags<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$LDFLAGS</span><span class="s2">&quot;</span><span class="w"> </span>-o<span class="w"> </span><span class="nv">$PREFIX</span>/bin/temporal<span class="w"> </span>./cmd/temporal
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Store the license files in a separate directory in the $SRC_DIR. These are embedded in the package</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># in the `license_file` section.</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>go-licenses<span class="w"> </span>save<span class="w"> </span>./cmd/temporal<span class="w"> </span>--save_path<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$SRC_DIR</span><span class="s2">/license-files/&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">true</span>
-</span></code></pre></div>
+<h2 id="options">Options<a class="headerlink" href="#options" title="Permanent link">#</a></h2>
+<ul>
+<li><code>--allow-network</code>: Allow network access (by default network access is disabled)</li>
+<li><code>--allow-read-write /some/path</code>: Allow read and write access to the specified path (and all its subdirectories)</li>
+<li><code>--allow-read /some/path</code>: Allow read access to the specified path (and all its subdirectories)</li>
+<li><code>--allow-read-execute /some/path</code>: Allow read and execute access to the specified path (and all its subdirectories)</li>
+<li><code>--overwrite-default-sandbox-config</code>: Ignore the default sandbox configuration and use only the supplied arguments</li>
+</ul>
+<h2 id="default-sandbox-configuration">Default sandbox configuration<a class="headerlink" href="#default-sandbox-configuration" title="Permanent link">#</a></h2>
+<h3 id="macos">macOS<a class="headerlink" href="#macos" title="Permanent link">#</a></h3>
+<p>On macOS, by default, the sandbox configuration is as follows:</p>
+<ul>
+<li>Read access to the entire filesystem (<code>/</code>)</li>
+<li>Read and execute access to <code>/bin</code>, <code>/usr/bin</code></li>
+<li>Write access to the build directories and <code>/tmp</code>, <code>/var/tmp</code>, and <code>$TMPDIR</code> (if defined)</li>
+</ul>
+<h3 id="linux">Linux<a class="headerlink" href="#linux" title="Permanent link">#</a></h3>
+<p>On Linux, by default, the sandbox configuration is as follows:</p>
+<ul>
+<li>Read access to the entire filesystem (<code>/</code>)</li>
+<li>Read and execute access to <code>/bin</code>, <code>/usr/bin</code>, <code>/lib</code>, <code>/usr/lib</code>, <code>/lib64</code>, <code>/usr/lib64</code></li>
+<li>Write access to the build directories and <code>/tmp</code>, <code>/var/tmp</code>, and <code>$TMPDIR</code> (if defined)</li>
+</ul>
+<h3 id="windows">Windows<a class="headerlink" href="#windows" title="Permanent link">#</a></h3>
+<p>Sandboxing the build process is not yet supported on Windows, and thus all passed sandbox flags are entirely ignored.</p>
 
 
 
@@ -1461,9 +1527,9 @@ CLI</a>.</p>
           
             
             <a
-              href="../rust/"
+              href="../multiple_output_cache/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Rust"
+              aria-label="Previous: Multiple output cache"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1474,7 +1540,7 @@ CLI</a>.</p>
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Rust
+                  Multiple output cache
                 </div>
               </div>
             </a>
@@ -1484,16 +1550,16 @@ CLI</a>.</p>
           
             
             <a
-              href="../perl/"
+              href="../recipe_generation/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Perl"
+              aria-label="Next: Generating recipes"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Perl
+                  Generating recipes
                 </div>
               </div>
               <div class="md-footer__button md-icon">
@@ -1522,7 +1588,7 @@ CLI</a>.</p>
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img src="../../assets/logo_dark.svg" alt="">
+                <img src="../assets/logo_dark.svg" alt="">
             </a>
         </div>
 
@@ -1577,10 +1643,10 @@ CLI</a>.</p>
       <div class="md-progress" data-md-component="progress" role="progressbar"></div>
     
     
-    <script id="__config" type="application/json">{"base": "../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.b8dbb3d2.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../../assets/javascripts/bundle.dd8806f2.min.js"></script>
+      <script src="../assets/javascripts/bundle.dd8806f2.min.js"></script>
       
     
   </body>
