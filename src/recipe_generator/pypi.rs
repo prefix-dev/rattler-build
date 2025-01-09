@@ -19,6 +19,10 @@ pub struct PyPIOpts {
     /// Name of the package to generate
     pub package: String,
 
+    /// Select a version of the package to generate (defaults to latest)
+    #[arg(long)]
+    pub version: Option<String>,
+
     /// Whether to write the recipe to a folder
     #[arg(short, long)]
     pub write: bool,
@@ -32,7 +36,7 @@ pub struct PyPIOpts {
     pub tree: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct PyPiRelease {
     filename: String,
     url: String,
@@ -58,6 +62,12 @@ struct PyPiResponse {
     releases: HashMap<String, Vec<PyPiRelease>>,
 }
 
+#[derive(Deserialize)]
+struct PyPrReleaseResponse {
+    info: PyPiInfo,
+    urls: Vec<PyPiRelease>,
+}
+
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
     static MAPPING: OnceCell<HashMap<String, String>> = OnceCell::new();
     MAPPING.get_or_try_init(async {
@@ -74,19 +84,26 @@ pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String
 }
 
 fn format_requirement(req: &str) -> String {
-    // Add space before version specifiers
-    let mut req = req.to_string();
-    // Find first non-alphanumeric/.-_ character and insert a space
-    if let Some(pos) = req.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_')
+    // Split package name from version specifiers
+    let req = req.trim();
+    let (name, version) = if let Some(pos) =
+        req.find(|c: char| !c.is_alphanumeric() && c != '.' && c != '-' && c != '_')
     {
-        req.insert(pos, ' ');
-    }
-
-    if req.contains(';') {
-        let (package, marker) = req.split_once(';').unwrap();
-        format!("{} ;MARKER; {}", package.trim(), marker.trim())
+        (&req[..pos], &req[pos..])
     } else {
-        req.trim().to_string()
+        (req, "")
+    };
+
+    // Handle markers separately
+    if let Some((version, marker)) = version.split_once(';') {
+        format!(
+            "{} {} ;MARKER; {}",
+            name.to_lowercase(),
+            version.trim(),
+            marker.trim()
+        )
+    } else {
+        format!("{} {}", name.to_lowercase(), version.trim())
     }
 }
 
@@ -112,35 +129,59 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     let client = reqwest::Client::new();
 
     // Fetch package metadata from PyPI JSON API
-    let url = format!("https://pypi.org/pypi/{}/json", package);
-    let response: PyPiResponse = client
-        .get(&url)
-        .send()
-        .await
-        .into_diagnostic()?
-        .json()
-        .await
-        .into_diagnostic()?;
+    let (info, urls) = if let Some(version) = &opts.version {
+        let url = format!("https://pypi.org/pypi/{}/{}/json", package, version);
 
-    let mut recipe = serialize::Recipe::default();
-    recipe.package.name = response.info.name;
-    recipe.package.version = response.info.version.clone();
+        let release: PyPrReleaseResponse = client
+            .get(&url)
+            .send()
+            .await
+            .into_diagnostic()?
+            .json()
+            .await
+            .into_diagnostic()?;
 
-    // Get the latest release
-    let latest_release = response
-        .releases
-        .get(&response.info.version)
-        .and_then(|releases| releases.iter().find(|r| r.filename.ends_with(".tar.gz")))
+        (release.info, release.urls)
+    } else {
+        let url = format!("https://pypi.org/pypi/{}/json", package);
+        let response: PyPiResponse = client
+            .get(&url)
+            .send()
+            .await
+            .into_diagnostic()?
+            .json()
+            .await
+            .into_diagnostic()?;
+
+        // Get the latest release
+        let urls = response
+            .releases
+            .get(&response.info.version)
+            .ok_or_else(|| miette::miette!("No source distribution found"))?;
+        (response.info, urls.clone())
+    };
+
+    let release = urls
+        .iter()
+        .find(|r| r.filename.ends_with(".tar.gz"))
         .ok_or_else(|| miette::miette!("No source distribution found"))?;
 
+    let mut recipe = serialize::Recipe::default();
+    recipe
+        .context
+        .insert("version".to_string(), info.version.clone());
+    recipe.package.name = info.name.to_lowercase();
+    recipe.package.version = "${{ version }}".to_string();
+
+    let release_url = release.url.clone();
     recipe.source.push(serialize::SourceElement {
-        url: latest_release.url.clone(),
-        sha256: latest_release.digests.get("sha256").cloned(),
+        url: release_url.replace(info.version.as_str(), "${{ version }}"),
+        sha256: release.digests.get("sha256").cloned(),
         md5: None,
     });
 
     // Set Python requirements
-    if let Some(python_req) = response.info.requires_python {
+    if let Some(python_req) = info.requires_python {
         recipe
             .requirements
             .host
@@ -156,7 +197,7 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
 
     // Process dependencies
     let mut requirements = Vec::new();
-    if let Some(deps) = response.info.requires_dist {
+    if let Some(deps) = info.requires_dist {
         for req in deps {
             let conda_name = if opts.use_mapping {
                 let mapping = conda_pypi_name_mapping().await?;
@@ -181,12 +222,12 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     recipe.build.script = "python -m pip install .".to_string();
 
     // Set metadata
-    recipe.about.summary = response.info.summary;
-    recipe.about.description = response.info.description;
-    recipe.about.homepage = response.info.home_page;
-    recipe.about.license = response.info.license;
+    recipe.about.summary = info.summary;
+    recipe.about.description = info.description;
+    recipe.about.homepage = info.home_page;
+    recipe.about.license = info.license;
 
-    if let Some(urls) = response.info.project_urls {
+    if let Some(urls) = info.project_urls {
         recipe.about.repository = urls.get("Source Code").cloned();
         recipe.about.documentation = urls.get("Documentation").cloned();
     }
