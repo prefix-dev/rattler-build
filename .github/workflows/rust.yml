@@ -34,7 +34,7 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81.0"
+          toolchain: "1.84.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
       - name: Check
@@ -127,7 +127,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.81.0"
+          toolchain: "1.84.0"
           targets: ${{ matrix.target }}
 
       - name: Install musl-gcc
