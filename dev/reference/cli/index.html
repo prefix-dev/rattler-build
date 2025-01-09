@@ -1559,82 +1559,36 @@
 <li>
 <p><code>--ignore-recipe-variants</code></p>
 <p>Do not read the <code>variants.yaml</code> file next to a recipe</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--render-only</code></p>
 <p>Render the recipe files without executing the build</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--with-solve</code></p>
 <p>Render the recipe files with solving dependencies</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--keep-build</code></p>
 <p>Keep intermediate build artifacts after the build</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--no-build-id</code></p>
 <p>Don't use build id(timestamp) when creating build directory name</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
 <p>The number of threads to use for compression (only relevant when also using <code>--package-format conda</code>)</p>
 </li>
 <li>
-<p><code>--use-zstd</code></p>
-<p>Enable support for repodata.json.zst</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--use-bz2</code></p>
-<p>Enable support for repodata.json.bz2</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
-<p>Path to an auth-file to read authentication information from</p>
 </li>
 <li>
 <p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
 <p>Channel priority to use when solving</p>
 <ul>
 <li>Default value: <code>strict</code></li>
-</ul>
-</li>
-<li>
-<p><code>--tui</code></p>
-<p>Launch the terminal user interface</p>
-<ul>
-<li>Default value: <code>false</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
 </ul>
 </li>
 <li>
@@ -1657,17 +1611,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--no-include-recipe</code></p>
 <p>Don't store the recipe in the final package</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--no-test</code></p>
 <p>Do not run tests after building (deprecated, use <code>--test=skip</code> instead)</p>
-<ul>
-<li>Default value: <code>false</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--test &lt;TEST&gt;</code></p>
@@ -1688,10 +1635,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--color-build-log</code></p>
 <p>Don't force colors in the output of the build script</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
@@ -1726,16 +1669,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--sandbox</code></p>
 <p>Enable the sandbox</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--allow-network</code></p>
 <p>Allow network access during build (default: false if sandbox is enabled)</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--allow-read &lt;ALLOW_READ&gt;</code></p>
@@ -1752,9 +1689,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--overwrite-default-sandbox-config</code></p>
 <p>Overwrite the default sandbox configuration</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 </ul>
 <h3 id="test"><code>test</code><a class="headerlink" href="#test" title="Permanent link">#</a></h3>
@@ -1781,31 +1715,8 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The number of threads to use for compression</p>
 </li>
 <li>
-<p><code>--use-zstd</code></p>
-<p>Enable support for repodata.json.zst</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--use-bz2</code></p>
-<p>Enable support for repodata.json.bz2</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
-<p>Path to an auth-file to read authentication information from</p>
 </li>
 <li>
 <p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
@@ -1837,41 +1748,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--no-test</code></p>
 <p>Do not run tests after building (deprecated, use <code>--test=skip</code> instead)</p>
-<ul>
-<li>Default value: <code>false</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
 <p>The number of threads to use for compression</p>
 </li>
 <li>
-<p><code>--use-zstd</code></p>
-<p>Enable support for repodata.json.zst</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--use-bz2</code></p>
-<p>Enable support for repodata.json.bz2</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
-<p>Path to an auth-file to read authentication information from</p>
 </li>
 <li>
 <p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
@@ -1926,31 +1810,8 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h5 id="options_4"><strong>Options:</strong><a class="headerlink" href="#options_4" title="Permanent link">#</a></h5>
 <ul>
 <li>
-<p><code>--use-zstd</code></p>
-<p>Enable support for repodata.json.zst</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--use-bz2</code></p>
-<p>Enable support for repodata.json.bz2</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
-</li>
-<li>
-<p><code>--auth-file &lt;AUTH_FILE&gt;</code></p>
-<p>Path to an auth-file to read authentication information from</p>
 </li>
 <li>
 <p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
@@ -2000,14 +1861,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
 <p>The URL to your channel</p>
-</li>
-<li>
-<p><code>--username &lt;USERNAME&gt;</code></p>
-<p>Your Artifactory username</p>
-</li>
-<li>
-<p><code>--password &lt;PASSWORD&gt;</code></p>
-<p>Your Artifactory password</p>
 </li>
 <li>
 <p><code>-t</code>, <code>--token &lt;TOKEN&gt;</code></p>
@@ -2065,10 +1918,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-f</code>, <code>--force</code></p>
 <p>Replace files on conflict</p>
-<ul>
-<li>Default value: <code>false</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 </ul>
 <h3 id="completion"><code>completion</code><a class="headerlink" href="#completion" title="Permanent link">#</a></h3>
@@ -2121,24 +1970,14 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-w</code>, <code>--write</code></p>
 <p>Whether to write the recipe to a folder</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>-u</code>, <code>--use-mapping</code></p>
 <p>Whether to use the conda-forge PyPI name mapping</p>
-<ul>
-<li>Default value: <code>true</code></li>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>-t</code>, <code>--tree</code></p>
 <p>Whether to generate recipes for all dependencies</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 </ul>
 <h4 id="cran"><code>cran</code><a class="headerlink" href="#cran" title="Permanent link">#</a></h4>
@@ -2160,16 +1999,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-t</code>, <code>--tree</code></p>
 <p>Whether to create recipes for the whole dependency tree or not</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 <li>
 <p><code>-w</code>, <code>--write</code></p>
 <p>Whether to write the recipe to a folder</p>
-<ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
-</ul>
 </li>
 </ul>
 <h3 id="auth"><code>auth</code><a class="headerlink" href="#auth" title="Permanent link">#</a></h3>
