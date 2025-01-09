@@ -13,6 +13,7 @@ pub(crate) trait Render<T> {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<T, Vec<error::PartialParsingError>>;
 }
 
+/// Assert a miette snapshot using insta.
 #[cfg(test)]
 #[cfg_attr(test, macro_export)]
 macro_rules! assert_miette_snapshot {
