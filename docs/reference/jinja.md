@@ -225,10 +225,6 @@ will return `1`) - `last`: return the last element of a list (e.g. `"{{ [1, 2, 3
 - `min`: return the minimum value of a list (e.g. `"{{ [1, 2, 3] | min }}"` will return `1`)
 - `max`: return the maximum value of a list (e.g. `"{{ [1, 2, 3] | max }}"` will return `3`)
 - `reverse`: reverse a list (e.g. `"{{ [1, 2, 3] | reverse }}"` will return `[3, 2, 1]`)
-- `slice`: slice a list (e.g. `"{{ [1, 2, 3] | slice(1, 2) }}"` will return `[2]`)
-- `batch`: This filter works pretty much like `slice` just the other way round.
-  It returns a list of lists with the given number of items. If you provide a
-  second parameter this is used to fill up missing items.
 - `sort`: sort a list (e.g. `"{{ [3, 1, 2] | sort }}"` will return `[1, 2, 3]`)
 - `trim`: remove leading and trailing whitespace from a string (e.g. `"{{ ' foo ' | trim }}"` will return `"foo"`)
 - `unique`: remove duplicates from a list (e.g. `"{{ [1, 2, 1, 3] | unique }}"` will return `[1, 2, 3]`)
@@ -304,4 +300,16 @@ build:
   number: ${{ 100 if cuda == "yes" }}
   # or an `else` branch can be used, of course
   number: ${{ 100 if cuda == "yes" else 0 }}
+```
+
+#### Slicing lists
+
+Lists can be spliced using the regular Python `[i:j]` syntax.  Note that when
+lists are obtained through using filters such as `split`, the whole filter
+expression needs to be parenthesized.
+
+For example, to slice a version string from `x.y.z` to `x.y`:
+
+```jinja
+${{ (version | split('.'))[:2] | join('.') }}
 ```

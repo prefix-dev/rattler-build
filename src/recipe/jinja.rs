@@ -360,8 +360,6 @@ fn default_filters(env: &mut Environment) {
     env.add_filter("min", minijinja::filters::min);
     env.add_filter("max", minijinja::filters::max);
     env.add_filter("reverse", minijinja::filters::reverse);
-    env.add_filter("slice", minijinja::filters::slice);
-    env.add_filter("batch", minijinja::filters::batch);
     env.add_filter("sort", minijinja::filters::sort);
     env.add_filter("trim", minijinja::filters::trim);
     env.add_filter("unique", minijinja::filters::unique);
