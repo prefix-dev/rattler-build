@@ -301,3 +301,15 @@ build:
   # or an `else` branch can be used, of course
   number: ${{ 100 if cuda == "yes" else 0 }}
 ```
+
+#### Slicing lists
+
+Lists can be spliced using the regular Python `[i:j]` syntax.  Note that when
+lists are obtained through using filters such as `split`, the whole filter
+expression needs to be parenthesized.
+
+For example, to slice a version string from `x.y.z` to `x.y`:
+
+```jinja
+${{ (version | split('.'))[:2] | join('.') }}
+```
