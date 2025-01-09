@@ -122,35 +122,25 @@ Build a package from a recipe
 
 	Do not read the `variants.yaml` file next to a recipe
 
-	- Possible values: `true`, `false`
-
 
 - `--render-only`
 
 	Render the recipe files without executing the build
-
-	- Possible values: `true`, `false`
 
 
 - `--with-solve`
 
 	Render the recipe files with solving dependencies
 
-	- Possible values: `true`, `false`
-
 
 - `--keep-build`
 
 	Keep intermediate build artifacts after the build
 
-	- Possible values: `true`, `false`
-
 
 - `--no-build-id`
 
 	Don't use build id(timestamp) when creating build directory name
-
-	- Possible values: `true`, `false`
 
 
 - `--compression-threads <COMPRESSION_THREADS>`
@@ -158,32 +148,9 @@ Build a package from a recipe
 	The number of threads to use for compression (only relevant when also using `--package-format conda`)
 
 
-- `--use-zstd`
-
-	Enable support for repodata.json.zst
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
-- `--use-bz2`
-
-	Enable support for repodata.json.bz2
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
 - `--experimental`
 
 	Enable experimental features
-
-	- Possible values: `true`, `false`
-
-
-- `--auth-file <AUTH_FILE>`
-
-	Path to an auth-file to read authentication information from
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -191,14 +158,6 @@ Build a package from a recipe
 	Channel priority to use when solving
 
 	- Default value: `strict`
-
-- `--tui`
-
-	Launch the terminal user interface
-
-	- Default value: `false`
-	- Possible values: `true`, `false`
-
 
 - `--extra-meta <EXTRA_META>`
 
@@ -220,15 +179,10 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 	Don't store the recipe in the final package
 
-	- Possible values: `true`, `false`
-
 
 - `--no-test`
 
 	Do not run tests after building (deprecated, use `--test=skip` instead)
-
-	- Default value: `false`
-	- Possible values: `true`, `false`
 
 
 - `--test <TEST>`
@@ -248,9 +202,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--color-build-log`
 
 	Don't force colors in the output of the build script
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
 
 
 - `--output-dir <OUTPUT_DIR>`
@@ -284,14 +235,10 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 	Enable the sandbox
 
-	- Possible values: `true`, `false`
-
 
 - `--allow-network`
 
 	Allow network access during build (default: false if sandbox is enabled)
-
-	- Possible values: `true`, `false`
 
 
 - `--allow-read <ALLOW_READ>`
@@ -312,8 +259,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 - `--overwrite-default-sandbox-config`
 
 	Overwrite the default sandbox configuration
-
-	- Possible values: `true`, `false`
 
 
 
@@ -350,32 +295,9 @@ These test files are written at "package creation time" and are part of the pack
 	The number of threads to use for compression
 
 
-- `--use-zstd`
-
-	Enable support for repodata.json.zst
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
-- `--use-bz2`
-
-	Enable support for repodata.json.bz2
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
 - `--experimental`
 
 	Enable experimental features
-
-	- Possible values: `true`, `false`
-
-
-- `--auth-file <AUTH_FILE>`
-
-	Path to an auth-file to read authentication information from
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -412,41 +334,15 @@ Rebuild a package from a package file instead of a recipe
 
 	Do not run tests after building (deprecated, use `--test=skip` instead)
 
-	- Default value: `false`
-	- Possible values: `true`, `false`
-
 
 - `--compression-threads <COMPRESSION_THREADS>`
 
 	The number of threads to use for compression
 
 
-- `--use-zstd`
-
-	Enable support for repodata.json.zst
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
-- `--use-bz2`
-
-	Enable support for repodata.json.bz2
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
 - `--experimental`
 
 	Enable experimental features
-
-	- Possible values: `true`, `false`
-
-
-- `--auth-file <AUTH_FILE>`
-
-	Path to an auth-file to read authentication information from
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -502,32 +398,9 @@ Upload a package
 
 ##### **Options:**
 
-- `--use-zstd`
-
-	Enable support for repodata.json.zst
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
-- `--use-bz2`
-
-	Enable support for repodata.json.bz2
-
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
-
 - `--experimental`
 
 	Enable experimental features
-
-	- Possible values: `true`, `false`
-
-
-- `--auth-file <AUTH_FILE>`
-
-	Path to an auth-file to read authentication information from
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -589,16 +462,6 @@ Options for uploading to a Artifactory channel. Authentication is used from the 
 - `-c`, `--channel <CHANNEL>`
 
 	The URL to your channel
-
-
-- `--username <USERNAME>`
-
-	Your Artifactory username
-
-
-- `--password <PASSWORD>`
-
-	Your Artifactory password
 
 
 - `-t`, `--token <TOKEN>`
@@ -670,9 +533,6 @@ Options for uploading to a Anaconda.org server
 
 	Replace files on conflict
 
-	- Default value: `false`
-	- Possible values: `true`, `false`
-
 
 
 
@@ -740,22 +600,15 @@ Generate a recipe for a Python package from PyPI
 
 	Whether to write the recipe to a folder
 
-	- Possible values: `true`, `false`
-
 
 - `-u`, `--use-mapping`
 
 	Whether to use the conda-forge PyPI name mapping
 
-	- Default value: `true`
-	- Possible values: `true`, `false`
-
 
 - `-t`, `--tree`
 
 	Whether to generate recipes for all dependencies
-
-	- Possible values: `true`, `false`
 
 
 
@@ -786,14 +639,10 @@ Generate a recipe for an R package from CRAN
 
 	Whether to create recipes for the whole dependency tree or not
 
-	- Possible values: `true`, `false`
-
 
 - `-w`, `--write`
 
 	Whether to write the recipe to a folder
-
-	- Possible values: `true`, `false`
 
 
 
