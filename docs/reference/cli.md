@@ -596,6 +596,11 @@ Generate a recipe for a Python package from PyPI
 
 ##### **Options:**
 
+- `--version <VERSION>`
+
+	Select a version of the package to generate (defaults to latest)
+
+
 - `-w`, `--write`
 
 	Whether to write the recipe to a folder
