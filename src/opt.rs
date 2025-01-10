@@ -414,7 +414,7 @@ pub struct BuildOpts {
 pub struct BuildData {
     pub up_to: Option<String>,
     pub build_platform: Platform,
-    pub target_platform: Option<Platform>,
+    pub target_platform: Platform,
     pub host_platform: Platform,
     pub channel: Vec<String>,
     pub variant_config: Vec<PathBuf>,
@@ -442,7 +442,7 @@ impl Default for BuildData {
         Self {
             up_to: None,
             build_platform: Platform::current(),
-            target_platform: None,
+            target_platform: Platform::current(),
             host_platform: Platform::current(),
             channel: vec!["conda-forge".to_string()],
             variant_config: vec![],
@@ -487,9 +487,13 @@ impl From<BuildOpts> for BuildData {
             build_platform: opts
                 .build_platform
                 .unwrap_or_else(|| build_data_default.build_platform),
-            target_platform: opts.target_platform,
+            target_platform: opts
+                .target_platform
+                .or_else(|| opts.host_platform)
+                .unwrap_or_else(|| build_data_default.target_platform),
             host_platform: opts
                 .host_platform
+                .or_else(|| opts.target_platform)
                 .unwrap_or_else(|| build_data_default.host_platform),
             channel: opts.channel,
             variant_config: opts.variant_config,

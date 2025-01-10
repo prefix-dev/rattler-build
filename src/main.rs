@@ -10,8 +10,8 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
     get_build_output, get_recipe_path, get_tool_config,
-    opt::{App, BuildData, BuildOpts, ShellCompletion, SubCommands},
-    rebuild_from_args, recipe, run_build_from_args, run_test_from_args, skip_noarch,
+    opt::{App, BuildData, ShellCompletion, SubCommands},
+    rebuild_from_args, run_build_from_args, run_test_from_args, skip_noarch,
     sort_build_outputs_topologically, upload_from_args,
 };
 use tempfile::tempdir;
@@ -73,34 +73,7 @@ async fn async_main() -> miette::Result<()> {
             let recipes = build_args.recipe.clone();
             let recipe_dir = build_args.recipe_dir.clone();
             let build_data = BuildData::from(build_args);
-            let mut recipe_paths = Vec::new();
-            let temp_dir = tempdir().into_diagnostic()?;
-            if !std::io::stdin().is_terminal()
-                && recipes.len() == 1
-                && get_recipe_path(&recipes[0]).is_err()
-            {
-                let recipe_path = temp_dir.path().join("recipe.yaml");
-                io::copy(
-                    &mut io::stdin(),
-                    &mut File::create(&recipe_path).into_diagnostic()?,
-                )
-                .into_diagnostic()?;
-                recipe_paths.push(get_recipe_path(&recipe_path)?);
-            } else {
-                for recipe_path in &recipes {
-                    recipe_paths.push(get_recipe_path(recipe_path)?);
-                }
-                if let Some(recipe_dir) = &recipe_dir {
-                    for entry in ignore::Walk::new(recipe_dir) {
-                        let entry = entry.into_diagnostic()?;
-                        if entry.path().is_dir() {
-                            if let Ok(recipe_path) = get_recipe_path(entry.path()) {
-                                recipe_paths.push(recipe_path);
-                            }
-                        }
-                    }
-                }
-            }
+            let recipe_paths = recipe_paths(recipes, recipe_dir)?;
 
             if recipe_paths.is_empty() {
                 miette::bail!("Couldn't detect any recipes.")
@@ -120,44 +93,46 @@ async fn async_main() -> miette::Result<()> {
                     .into_diagnostic()?;
                     rattler_build::tui::run(tui, build_args, recipe_paths, log_handler).await?;
                 }
-            } else {
-                let log_handler = log_handler.expect("logger is not initialized");
-                let tool_config = get_tool_config(&build_data, &log_handler)?;
-                let mut outputs = Vec::new();
-                for recipe_path in &recipe_paths {
-                    let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
-                    outputs.extend(output);
-                }
-
-                if build_data.render_only {
-                    let outputs = if build_data.with_solve {
-                        let mut updated_outputs = Vec::new();
-                        for output in outputs {
-                            updated_outputs.push(
-                                output
-                                    .resolve_dependencies(&tool_config)
-                                    .await
-                                    .into_diagnostic()?,
-                            );
-                        }
-                        updated_outputs
-                    } else {
-                        outputs
-                    };
-
-                    println!(
-                        "{}",
-                        serde_json::to_string_pretty(&outputs).into_diagnostic()?
-                    );
-                    return Ok(());
-                }
-
-                // Skip noarch builds before the topological sort
-                outputs = skip_noarch(outputs, &tool_config).await?;
-
-                sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-                run_build_from_args(outputs, tool_config).await?;
+                return Ok(());
             }
+
+            let log_handler = log_handler.expect("logger is not initialized");
+            let tool_config = get_tool_config(&build_data, &log_handler)?;
+            let mut outputs = Vec::new();
+            for recipe_path in &recipe_paths {
+                let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
+                outputs.extend(output);
+            }
+
+            if build_data.render_only {
+                let outputs = if build_data.with_solve {
+                    let mut updated_outputs = Vec::new();
+                    for output in outputs {
+                        updated_outputs.push(
+                            output
+                                .resolve_dependencies(&tool_config)
+                                .await
+                                .into_diagnostic()?,
+                        );
+                    }
+                    updated_outputs
+                } else {
+                    outputs
+                };
+
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&outputs).into_diagnostic()?
+                );
+                return Ok(());
+            }
+
+            // Skip noarch builds before the topological sort
+            outputs = skip_noarch(outputs, &tool_config).await?;
+
+            sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+            run_build_from_args(outputs, tool_config).await?;
+
             Ok(())
         }
         Some(SubCommands::Test(test_args)) => {
@@ -181,4 +156,39 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
     }
+}
+
+fn recipe_paths(
+    recipes: Vec<std::path::PathBuf>,
+    recipe_dir: Option<std::path::PathBuf>,
+) -> Result<Vec<std::path::PathBuf>, miette::Error> {
+    let mut recipe_paths = Vec::new();
+    let temp_dir = tempdir().into_diagnostic()?;
+    if !std::io::stdin().is_terminal()
+        && recipes.len() == 1
+        && get_recipe_path(&recipes[0]).is_err()
+    {
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        io::copy(
+            &mut io::stdin(),
+            &mut File::create(&recipe_path).into_diagnostic()?,
+        )
+        .into_diagnostic()?;
+        recipe_paths.push(get_recipe_path(&recipe_path)?);
+    } else {
+        for recipe_path in &recipes {
+            recipe_paths.push(get_recipe_path(recipe_path)?);
+        }
+        if let Some(recipe_dir) = &recipe_dir {
+            for entry in ignore::Walk::new(recipe_dir) {
+                let entry = entry.into_diagnostic()?;
+                if entry.path().is_dir() {
+                    if let Ok(recipe_path) = get_recipe_path(entry.path()) {
+                        recipe_paths.push(recipe_path);
+                    }
+                }
+            }
+        }
+    }
+    Ok(recipe_paths)
 }
