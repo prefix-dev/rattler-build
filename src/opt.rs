@@ -16,7 +16,7 @@ use url::Url;
 use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
-    script::SandboxArguments,
+    script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{SkipExisting, TestStrategy},
 };
 
@@ -312,8 +312,8 @@ pub struct BuildOpts {
 
     /// The build platform to use for the build (e.g. for building with
     /// emulation, or rendering).
-    #[arg(long, default_value_t = Platform::current())]
-    pub build_platform: Platform,
+    #[arg(long)]
+    pub build_platform: Option<Platform>,
 
     /// The target platform for the build.
     #[arg(long)]
@@ -321,11 +321,11 @@ pub struct BuildOpts {
 
     /// The host platform for the build. If set, it will be used to determine
     /// also the target_platform (as long as it is not noarch).
-    #[arg(long, default_value_t = Platform::current())]
-    pub host_platform: Platform,
+    #[arg(long)]
+    pub host_platform: Option<Platform>,
 
     /// Add a channel to search for dependencies in.
-    #[arg(short = 'c', long, default_value = "conda-forge")]
+    #[arg(short = 'c', long)]
     pub channel: Vec<String>,
 
     /// Variant configuration files for the build.
@@ -356,12 +356,7 @@ pub struct BuildOpts {
     /// `conda`. You can also add a compression level to the package format,
     /// e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
     /// 22).
-    #[arg(
-        long,
-        default_value = "conda",
-        help_heading = "Modifying result",
-        verbatim_doc_comment
-    )]
+    #[arg(long, help_heading = "Modifying result", verbatim_doc_comment)]
     pub package_format: PackageFormatAndCompression,
 
     #[arg(long)]
@@ -374,15 +369,11 @@ pub struct BuildOpts {
     pub no_include_recipe: bool,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
-    #[arg(long, default_value = "false", help_heading = "Modifying result")]
+    #[arg(long, help_heading = "Modifying result")]
     pub no_test: bool,
 
     /// The strategy to use for running tests
-    #[arg(
-        long,
-        default_value = "native-and-emulated",
-        help_heading = "Modifying result"
-    )]
+    #[arg(long, help_heading = "Modifying result")]
     pub test: TestStrategy,
 
     /// Don't force colors in the output of the build script
@@ -394,7 +385,7 @@ pub struct BuildOpts {
     pub common: CommonOpts,
 
     /// Launch the terminal user interface.
-    #[arg(long, default_value = "false", hide = !cfg!(feature = "tui"))]
+    #[arg(long, hide = !cfg!(feature = "tui"))]
     pub tui: bool,
 
     /// Whether to skip packages that already exist in any channel
@@ -402,13 +393,13 @@ pub struct BuildOpts {
     /// If set to `local`, only skip packages that already exist locally,
     /// default when using `--skip-existing. If set to `all`, skip packages
     /// that already exist in any channel.
-    #[arg(long, default_missing_value = "local", default_value = "none", num_args = 0..=1, help_heading = "Modifying result"
+    #[arg(long, default_missing_value = "local", num_args = 0..=1, help_heading = "Modifying result"
     )]
-    pub skip_existing: SkipExisting,
+    pub skip_existing: Option<SkipExisting>,
 
     /// Define a "noarch platform" for which the noarch packages will be built
     /// for. The noarch builds will be skipped on the other platforms.
-    #[arg(long, default_value = None, help_heading = "Modifying result")]
+    #[arg(long, help_heading = "Modifying result")]
     pub noarch_build_platform: Option<Platform>,
 
     /// Extra metadata to include in about.json
@@ -418,6 +409,111 @@ pub struct BuildOpts {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
+}
+#[allow(missing_docs)]
+pub struct BuildData {
+    pub up_to: Option<String>,
+    pub build_platform: Platform,
+    pub target_platform: Option<Platform>,
+    pub host_platform: Platform,
+    pub channel: Vec<String>,
+    pub variant_config: Vec<PathBuf>,
+    pub ignore_recipe_variants: bool,
+    pub render_only: bool,
+    pub with_solve: bool,
+    pub keep_build: bool,
+    pub no_build_id: bool,
+    pub package_format: PackageFormatAndCompression,
+    pub compression_threads: Option<u32>,
+    pub no_include_recipe: bool,
+    pub no_test: bool,
+    pub test: TestStrategy,
+    pub color_build_log: bool,
+    pub common: CommonOpts,
+    pub tui: bool,
+    pub skip_existing: SkipExisting,
+    pub noarch_build_platform: Option<Platform>,
+    pub extra_meta: Option<Vec<(String, Value)>>,
+    pub sandbox_configuration: Option<SandboxConfiguration>,
+}
+
+impl Default for BuildData {
+    fn default() -> Self {
+        Self {
+            up_to: None,
+            build_platform: Platform::current(),
+            target_platform: None,
+            host_platform: Platform::current(),
+            channel: vec!["conda-forge".to_string()],
+            variant_config: vec![],
+            ignore_recipe_variants: false,
+            render_only: false,
+            with_solve: false,
+            keep_build: false,
+            no_build_id: false,
+            package_format: PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Default,
+            },
+            compression_threads: None,
+            no_include_recipe: false,
+            no_test: false,
+            test: TestStrategy::NativeAndEmulated,
+            color_build_log: true,
+            common: CommonOpts {
+                output_dir: Some(PathBuf::from("./output")),
+                use_zstd: true,
+                use_bz2: true,
+                experimental: false,
+                auth_file: None,
+                channel_priority: ChannelPriorityWrapper {
+                    value: ChannelPriority::Strict,
+                },
+            },
+            tui: false,
+            skip_existing: SkipExisting::None,
+            noarch_build_platform: None,
+            extra_meta: None,
+            sandbox_configuration: None,
+        }
+    }
+}
+
+impl From<BuildOpts> for BuildData {
+    fn from(opts: BuildOpts) -> Self {
+        let build_data_default = BuildData::default();
+        BuildData {
+            up_to: opts.up_to,
+            build_platform: opts
+                .build_platform
+                .unwrap_or_else(|| build_data_default.build_platform),
+            target_platform: opts.target_platform,
+            host_platform: opts
+                .host_platform
+                .unwrap_or_else(|| build_data_default.host_platform),
+            channel: opts.channel,
+            variant_config: opts.variant_config,
+            ignore_recipe_variants: opts.ignore_recipe_variants,
+            render_only: opts.render_only,
+            with_solve: opts.with_solve,
+            keep_build: opts.keep_build,
+            no_build_id: opts.no_build_id,
+            package_format: opts.package_format,
+            compression_threads: opts.compression_threads,
+            no_include_recipe: opts.no_include_recipe,
+            no_test: opts.no_test,
+            test: opts.test,
+            color_build_log: opts.color_build_log,
+            common: opts.common,
+            tui: opts.tui,
+            skip_existing: opts
+                .skip_existing
+                .unwrap_or_else(|| build_data_default.skip_existing),
+            noarch_build_platform: opts.noarch_build_platform,
+            extra_meta: opts.extra_meta,
+            sandbox_configuration: opts.sandbox_arguments.into(),
+        }
+    }
 }
 
 fn is_dir(dir: &str) -> Result<PathBuf, String> {

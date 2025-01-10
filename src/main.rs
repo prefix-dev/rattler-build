@@ -10,8 +10,8 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     console_utils::init_logging,
     get_build_output, get_recipe_path, get_tool_config,
-    opt::{App, ShellCompletion, SubCommands},
-    rebuild_from_args, run_build_from_args, run_test_from_args, skip_noarch,
+    opt::{App, BuildData, BuildOpts, ShellCompletion, SubCommands},
+    rebuild_from_args, recipe, run_build_from_args, run_test_from_args, skip_noarch,
     sort_build_outputs_topologically, upload_from_args,
 };
 use tempfile::tempdir;
@@ -70,11 +70,14 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::Build(build_args)) => {
+            let recipes = build_args.recipe.clone();
+            let recipe_dir = build_args.recipe_dir.clone();
+            let build_data = BuildData::from(build_args);
             let mut recipe_paths = Vec::new();
             let temp_dir = tempdir().into_diagnostic()?;
             if !std::io::stdin().is_terminal()
-                && build_args.recipe.len() == 1
-                && get_recipe_path(&build_args.recipe[0]).is_err()
+                && recipes.len() == 1
+                && get_recipe_path(&recipes[0]).is_err()
             {
                 let recipe_path = temp_dir.path().join("recipe.yaml");
                 io::copy(
@@ -84,10 +87,10 @@ async fn async_main() -> miette::Result<()> {
                 .into_diagnostic()?;
                 recipe_paths.push(get_recipe_path(&recipe_path)?);
             } else {
-                for recipe_path in &build_args.recipe {
+                for recipe_path in &recipes {
                     recipe_paths.push(get_recipe_path(recipe_path)?);
                 }
-                if let Some(recipe_dir) = &build_args.recipe_dir {
+                if let Some(recipe_dir) = &recipe_dir {
                     for entry in ignore::Walk::new(recipe_dir) {
                         let entry = entry.into_diagnostic()?;
                         if entry.path().is_dir() {
@@ -103,7 +106,7 @@ async fn async_main() -> miette::Result<()> {
                 miette::bail!("Couldn't detect any recipes.")
             }
 
-            if build_args.tui {
+            if build_data.tui {
                 #[cfg(feature = "tui")]
                 {
                     let tui = rattler_build::tui::init().await?;
@@ -119,15 +122,15 @@ async fn async_main() -> miette::Result<()> {
                 }
             } else {
                 let log_handler = log_handler.expect("logger is not initialized");
-                let tool_config = get_tool_config(&build_args, &log_handler)?;
+                let tool_config = get_tool_config(&build_data, &log_handler)?;
                 let mut outputs = Vec::new();
                 for recipe_path in &recipe_paths {
-                    let output = get_build_output(&build_args, recipe_path, &tool_config).await?;
+                    let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
                     outputs.extend(output);
                 }
 
-                if build_args.render_only {
-                    let outputs = if build_args.with_solve {
+                if build_data.render_only {
+                    let outputs = if build_data.with_solve {
                         let mut updated_outputs = Vec::new();
                         for output in outputs {
                             updated_outputs.push(
@@ -152,7 +155,7 @@ async fn async_main() -> miette::Result<()> {
                 // Skip noarch builds before the topological sort
                 outputs = skip_noarch(outputs, &tool_config).await?;
 
-                sort_build_outputs_topologically(&mut outputs, build_args.up_to.as_deref())?;
+                sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
                 run_build_from_args(outputs, tool_config).await?;
             }
             Ok(())
