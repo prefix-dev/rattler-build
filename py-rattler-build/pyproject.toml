@@ -20,6 +20,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 license = "BSD-3-Clause"
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/prefix-dev/rattler-build"
