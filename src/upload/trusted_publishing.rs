@@ -3,7 +3,8 @@
 
 //! Trusted publishing (via OIDC) with GitHub actions.
 
-use reqwest::{header, Client, StatusCode};
+use reqwest::{header, StatusCode};
+use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::env::VarError;
@@ -14,7 +15,7 @@ use url::Url;
 use crate::{console_utils::github_action_runner, consts};
 
 /// If applicable, attempt obtaining a token for trusted publishing.
-pub async fn check_trusted_publishing(client: &Client, prefix_url: &Url) -> TrustedPublishResult {
+pub async fn check_trusted_publishing(client: &ClientWithMiddleware, prefix_url: &Url) -> TrustedPublishResult {
     // If we aren't in GitHub Actions, we can't use trusted publishing.
     if !github_action_runner() {
         return TrustedPublishResult::Skipped;
@@ -52,6 +53,8 @@ pub enum TrustedPublishingError {
     Url(#[from] url::ParseError),
     #[error("Failed to fetch: `{0}`")]
     Reqwest(Url, #[source] reqwest::Error),
+    #[error("Failed to fetch: `{0}`")]
+    ReqwestMiddleware(Url, #[source] reqwest_middleware::Error),
     #[error(
         "Prefix.dev returned error code {0}, is trusted publishing correctly configured?\nResponse: {1}"
     )]
@@ -91,7 +94,7 @@ struct MintTokenRequest {
 
 /// Returns the short-lived token to use for uploading.
 pub(crate) async fn get_token(
-    client: &Client,
+    client: &ClientWithMiddleware,
     prefix_url: &Url,
 ) -> Result<TrustedPublishingToken, TrustedPublishingError> {
     // If this fails, we can skip the audience request.
@@ -118,7 +121,7 @@ pub(crate) async fn get_token(
 
 async fn get_oidc_token(
     oidc_token_request_token: &str,
-    client: &Client,
+    client: &ClientWithMiddleware,
 ) -> Result<String, TrustedPublishingError> {
     let oidc_token_url = env::var(consts::ACTIONS_ID_TOKEN_REQUEST_URL).map_err(|err| {
         TrustedPublishingError::from_var_err(consts::ACTIONS_ID_TOKEN_REQUEST_URL, err)
@@ -134,7 +137,7 @@ async fn get_oidc_token(
         .header(header::AUTHORIZATION, authorization)
         .send()
         .await
-        .map_err(|err| TrustedPublishingError::Reqwest(oidc_token_url.clone(), err))?;
+        .map_err(|err| TrustedPublishingError::ReqwestMiddleware(oidc_token_url.clone(), err))?;
     let oidc_token: OidcToken = response
         .error_for_status()
         .map_err(|err| TrustedPublishingError::Reqwest(oidc_token_url.clone(), err))?
@@ -147,7 +150,7 @@ async fn get_oidc_token(
 async fn get_publish_token(
     oidc_token: &str,
     prefix_url: &Url,
-    client: &Client,
+    client: &ClientWithMiddleware,
 ) -> Result<TrustedPublishingToken, TrustedPublishingError> {
     let mint_token_url = prefix_url.join("/api/oidc/mint_token")?;
     tracing::info!("Querying the trusted publishing upload token from {mint_token_url}");
@@ -160,7 +163,7 @@ async fn get_publish_token(
         .json(&mint_token_payload)
         .send()
         .await
-        .map_err(|err| TrustedPublishingError::Reqwest(mint_token_url.clone(), err))?;
+        .map_err(|err| TrustedPublishingError::ReqwestMiddleware(mint_token_url.clone(), err))?;
 
     // reqwest's implementation of `.json()` also goes through `.bytes()`
     let status = response.status();

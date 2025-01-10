@@ -301,7 +301,6 @@ pub async fn upload_package_to_anaconda(
         },
     };
 
-    let client = get_client_with_retry().into_diagnostic()?;
     let anaconda = anaconda::Anaconda::new(token, url);
 
     for package_file in package_files {
@@ -328,7 +327,7 @@ pub async fn upload_package_to_anaconda(
 }
 
 async fn send_request(
-    prepared_request: reqwest::RequestBuilder,
+    prepared_request: reqwest_middleware::RequestBuilder,
     package_file: &Path,
 ) -> miette::Result<reqwest::Response> {
     let file = tokio::fs::File::open(package_file)
