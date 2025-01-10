@@ -1,6 +1,6 @@
 [project]
 name = "py-rattler-build"
-description = "Add a short description here"
+description = "Python bindings for rattler-build"
 authors = [
     "Wolf Vollprecht <wolf@prefix.dev>",
 ]
@@ -68,7 +68,6 @@ docs = { cmd = "mkdocs serve" }
 build-docs = { cmd = "mkdocs build" }
 
 [environments]
-#build = { features = ["build"], solve-group = "default" }
 test = { features = ["build", "test"], solve-group = "default" }
 docs = ["docs"]
 
