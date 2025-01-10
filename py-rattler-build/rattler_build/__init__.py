@@ -1,5 +1,14 @@
-from .rattler_build import get_rattler_build_version_py as _get_rattler_build_version_py
+from .rattler_build import get_rattler_build_version_py
+from .rattler_build import build_recipe_py
+from pathlib import Path
+from typing import Union
+
+__all__ = ["rattler_build_version", "build_recipe"]
 
 
 def rattler_build_version() -> str:
-    return _get_rattler_build_version_py()
+    return get_rattler_build_version_py()
+
+
+def build_recipe(recipe_path: Union[str, Path]) -> None:
+    build_recipe_py(str(recipe_path))
