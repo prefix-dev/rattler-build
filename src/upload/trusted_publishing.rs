@@ -15,7 +15,10 @@ use url::Url;
 use crate::{console_utils::github_action_runner, consts};
 
 /// If applicable, attempt obtaining a token for trusted publishing.
-pub async fn check_trusted_publishing(client: &ClientWithMiddleware, prefix_url: &Url) -> TrustedPublishResult {
+pub async fn check_trusted_publishing(
+    client: &ClientWithMiddleware,
+    prefix_url: &Url,
+) -> TrustedPublishResult {
     // If we aren't in GitHub Actions, we can't use trusted publishing.
     if !github_action_runner() {
         return TrustedPublishResult::Skipped;
