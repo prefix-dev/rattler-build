@@ -1,7 +1,7 @@
 //! Parse the source section of a recipe
 
 use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_with::{formats::PreferOne, serde_as, OneOrMany};
 use std::fmt::Display;
 use std::{fmt, path::PathBuf, str::FromStr};
@@ -380,6 +380,57 @@ impl fmt::Display for GitUrl {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UrlWithTemplate {
+    url: Url,
+    template: Option<String>,
+}
+
+impl TryConvertNode<UrlWithTemplate> for RenderedNode {
+    fn try_convert(&self, _name: &str) -> Result<UrlWithTemplate, Vec<PartialParsingError>> {
+        match self {
+            RenderedNode::Scalar(scalar) => scalar.try_convert(_name),
+            _ => Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::Other,
+                help = "expected a string"
+            )]),
+        }
+    }
+}
+
+impl TryConvertNode<UrlWithTemplate> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<UrlWithTemplate, Vec<PartialParsingError>> {
+        let url: Url = self.try_convert(_name)?;
+        Ok(UrlWithTemplate {
+            url,
+            template: Some(self.source().to_owned()),
+        })
+    }
+}
+
+impl Serialize for UrlWithTemplate {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.url.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for UrlWithTemplate {
+    fn deserialize<D>(deserializer: D) -> Result<UrlWithTemplate, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let url = Url::deserialize(deserializer)?;
+        Ok(UrlWithTemplate {
+            url,
+            template: None,
+        })
+    }
+}
+
 /// A url source (usually a tar.gz or tar.bz2 archive). A compressed file
 /// will be extracted to the `work` (or `work/<folder>` directory).
 #[serde_as]
@@ -387,7 +438,7 @@ impl fmt::Display for GitUrl {
 pub struct UrlSource {
     /// Url to the source code (usually a tar.gz or tar.bz2 etc. file)
     #[serde_as(as = "OneOrMany<_, PreferOne>")]
-    url: Vec<Url>,
+    url: Vec<UrlWithTemplate>,
 
     /// Optionally a sha256 checksum to verify the downloaded file
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -414,8 +465,8 @@ pub struct UrlSource {
 
 impl UrlSource {
     /// Get the url.
-    pub fn urls(&self) -> &[Url] {
-        self.url.as_slice()
+    pub fn urls(&self) -> impl Iterator<Item = &Url> {
+        self.url.iter().map(|u| &u.url)
     }
 
     /// Get the SHA256 checksum of the URL source.

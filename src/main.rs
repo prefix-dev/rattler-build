@@ -126,6 +126,13 @@ async fn async_main() -> miette::Result<()> {
                     outputs.extend(output);
                 }
 
+                if build_args.render_sources {
+                    for output in &outputs {
+                        println!("{:?}", output.recipe.source);
+                    }
+                    return Ok(());
+                }
+
                 if build_args.render_only {
                     let outputs = if build_args.with_solve {
                         let mut updated_outputs = Vec::new();

@@ -302,6 +302,10 @@ pub struct BuildOpts {
     )]
     pub recipe: Vec<PathBuf>,
 
+    /// Render only the sources
+    #[arg(long)]
+    pub render_sources: bool,
+
     /// The directory that contains recipes.
     #[arg(long, value_parser = is_dir)]
     pub recipe_dir: Option<PathBuf>,
