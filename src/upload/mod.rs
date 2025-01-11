@@ -53,6 +53,20 @@ fn get_default_client() -> Result<reqwest::Client, reqwest::Error> {
         .build()
 }
 
+/// Returns a reqwest client with retry middleware.
+fn get_client_with_retry() -> Result<reqwest_middleware::ClientWithMiddleware, reqwest::Error> {
+    let client = reqwest::Client::builder()
+        .no_gzip()
+        .user_agent(APP_USER_AGENT)
+        .build()?;
+
+    Ok(reqwest_middleware::ClientBuilder::new(client)
+        .with(reqwest_retry::RetryTransientMiddleware::new_with_policy(
+            reqwest_retry::policies::ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
+        .build())
+}
+
 /// Uploads package files to a Quetz server.
 pub async fn upload_package_to_quetz(
     storage: &AuthenticationStorage,
@@ -82,7 +96,7 @@ pub async fn upload_package_to_quetz(
         },
     };
 
-    let client = get_default_client().into_diagnostic()?;
+    let client = get_client_with_retry().into_diagnostic()?;
 
     for package_file in package_files {
         let upload_url = url
@@ -162,7 +176,7 @@ pub async fn upload_package_to_artifactory(
             package_file.display()
         ))?;
 
-        let client = get_default_client().into_diagnostic()?;
+        let client = get_client_with_retry().into_diagnostic()?;
 
         let upload_url = url
             .join(&format!("{}/{}/{}", channel, subdir, package_name))
@@ -208,7 +222,7 @@ pub async fn upload_package_to_prefix(
         }
     };
 
-    let client = get_default_client().into_diagnostic()?;
+    let client = get_client_with_retry().into_diagnostic()?;
 
     let token = match api_key {
         Some(api_key) => api_key,
@@ -313,7 +327,7 @@ pub async fn upload_package_to_anaconda(
 }
 
 async fn send_request(
-    prepared_request: reqwest::RequestBuilder,
+    prepared_request: reqwest_middleware::RequestBuilder,
     package_file: &Path,
 ) -> miette::Result<reqwest::Response> {
     let file = tokio::fs::File::open(package_file)

@@ -110,7 +110,9 @@ xz2 = "0.1.7"
 zstd = "0.13.2"
 toml = "0.8.19"
 memmap2 = "0.9.5"
-reqwest-middleware = "0.4.0"
+reqwest-middleware = { version = "0.4.0", features = [
+        "json",
+] }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.1"
 memchr = "2.7.4"
