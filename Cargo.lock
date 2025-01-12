@@ -352,9 +352,9 @@ checksum = "8b75356056920673b02621b35afd0f7dda9306d03c79a30f5c56c44cf256e3de"
 
 [[package]]
 name = "async-trait"
-version = "0.1.83"
+version = "0.1.85"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "721cae7de5c34fbb2acd27e21e6d2cf7b886dce0c27388d46c4e6c47ea4318dd"
+checksum = "3f934833b4b7233644e5848f235df3f57ed8c80f1528a26c3dfa13d2147fa056"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -410,14 +410,12 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "aws-config"
-version = "1.5.12"
+version = "1.5.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "649316840239f4e58df0b7f620c428f5fababbbca2d504488c641534050bd141"
+checksum = "c03a50b30228d3af8865ce83376b4e99e1ffa34728220fe2860e4df0bb5278d6"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
- "aws-sdk-sso",
- "aws-sdk-ssooidc",
  "aws-sdk-sts",
  "aws-smithy-async",
  "aws-smithy-http",
@@ -428,14 +426,11 @@ dependencies = [
  "aws-types",
  "bytes",
  "fastrand",
- "hex",
  "http 0.2.12",
- "ring",
  "time",
  "tokio",
  "tracing",
  "url",
- "zeroize",
 ]
 
 [[package]]
@@ -452,9 +447,9 @@ dependencies = [
 
 [[package]]
 name = "aws-runtime"
-version = "1.5.2"
+version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44f6f1124d6e19ab6daf7f2e615644305dc6cb2d706892a8a8c0b98db35de020"
+checksum = "b16d1aa50accc11a4b4d5c50f7fb81cc0cf60328259c587d0e6b0f11385bde46"
 dependencies = [
  "aws-credential-types",
  "aws-sigv4",
@@ -478,9 +473,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-s3"
-version = "1.67.0"
+version = "1.68.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbc644164269a1e38ce7f2f7373629d3fb3d310c0e3feb5573a29744288b24d3"
+checksum = "bc5ddf1dc70287dc9a2f953766a1fe15e3e74aef02fd1335f2afa475c9b4f4fc"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -511,54 +506,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "aws-sdk-sso"
-version = "1.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb25f7129c74d36afe33405af4517524df8f74b635af8c2c8e91c1552b8397b2"
-dependencies = [
- "aws-credential-types",
- "aws-runtime",
- "aws-smithy-async",
- "aws-smithy-http",
- "aws-smithy-json",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "aws-types",
- "bytes",
- "http 0.2.12",
- "once_cell",
- "regex-lite",
- "tracing",
-]
-
-[[package]]
-name = "aws-sdk-ssooidc"
-version = "1.53.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03a3d5ef14851625eafd89660a751776f938bf32f309308b20dcca41c44b568"
-dependencies = [
- "aws-credential-types",
- "aws-runtime",
- "aws-smithy-async",
- "aws-smithy-http",
- "aws-smithy-json",
- "aws-smithy-runtime",
- "aws-smithy-runtime-api",
- "aws-smithy-types",
- "aws-types",
- "bytes",
- "http 0.2.12",
- "once_cell",
- "regex-lite",
- "tracing",
-]
-
-[[package]]
 name = "aws-sdk-sts"
-version = "1.53.0"
+version = "1.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf3a9f073ae3a53b54421503063dfb87ff1ea83b876f567d92e8b8d9942ba91b"
+checksum = "861d324ef69247c6f3c6823755f408a68877ffb1a9afaff6dd8b0057c760de60"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1802,9 +1753,9 @@ dependencies = [
 
 [[package]]
 name = "file_url"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "percent-encoding",
  "thiserror 2.0.9",
  "typed-path",
@@ -2892,6 +2843,15 @@ name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
 dependencies = [
  "either",
 ]
@@ -4122,7 +4082,7 @@ dependencies = [
 
 [[package]]
 name = "rattler"
-version = "0.28.9"
+version = "0.28.12"
 dependencies = [
  "anyhow",
  "clap",
@@ -4134,14 +4094,14 @@ dependencies = [
  "humantime",
  "indexmap 2.7.0",
  "indicatif",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "memchr",
  "memmap2 0.9.5",
  "once_cell",
  "parking_lot 0.12.3",
  "rattler_cache",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_networking",
  "rattler_package_streaming",
  "rattler_shell",
@@ -4208,7 +4168,7 @@ dependencies = [
  "rattler",
  "rattler_cache",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_index",
  "rattler_installs_packages",
  "rattler_networking",
@@ -4258,7 +4218,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_cache"
-version = "0.3.1"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -4268,10 +4228,10 @@ dependencies = [
  "fs4 0.12.0",
  "futures",
  "fxhash",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "parking_lot 0.12.3",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_networking",
  "rattler_package_streaming",
  "rayon",
@@ -4286,7 +4246,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_conda_types"
-version = "0.29.7"
+version = "0.29.10"
 dependencies = [
  "chrono",
  "dirs",
@@ -4296,11 +4256,11 @@ dependencies = [
  "glob",
  "hex",
  "indexmap 2.7.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "lazy-regex",
  "nom",
  "purl",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_macros",
  "rattler_redaction",
  "rayon",
@@ -4338,7 +4298,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_digest"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "blake2",
  "digest",
@@ -4353,11 +4313,11 @@ dependencies = [
 
 [[package]]
 name = "rattler_index"
-version = "0.20.4"
+version = "0.20.7"
 dependencies = [
  "fs-err 3.0.0",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_package_streaming",
  "serde_json",
  "tracing",
@@ -4427,7 +4387,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_macros"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "quote",
  "syn",
@@ -4435,12 +4395,11 @@ dependencies = [
 
 [[package]]
 name = "rattler_networking"
-version = "0.21.9"
+version = "0.21.10"
 dependencies = [
  "anyhow",
  "async-trait",
  "aws-config",
- "aws-runtime",
  "aws-sdk-s3",
  "base64 0.22.1",
  "chrono",
@@ -4449,7 +4408,7 @@ dependencies = [
  "getrandom",
  "google-cloud-auth",
  "http 1.2.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "keyring",
  "netrc-rs",
  "reqwest",
@@ -4464,7 +4423,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_package_streaming"
-version = "0.22.20"
+version = "0.22.23"
 dependencies = [
  "bzip2 0.5.0",
  "chrono",
@@ -4472,7 +4431,7 @@ dependencies = [
  "futures-util",
  "num_cpus",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_networking",
  "rattler_redaction",
  "reqwest",
@@ -4491,7 +4450,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_redaction"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4500,7 +4459,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_repodata_gateway"
-version = "0.21.29"
+version = "0.21.32"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4520,7 +4479,7 @@ dependencies = [
  "http-cache-semantics",
  "humansize",
  "humantime",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "json-patch",
  "libc",
  "md-5",
@@ -4530,11 +4489,12 @@ dependencies = [
  "pin-project-lite",
  "rattler_cache",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "rattler_networking",
  "rattler_redaction",
  "reqwest",
  "reqwest-middleware",
+ "retry-policies",
  "rmp-serde",
  "serde",
  "serde_json",
@@ -4553,12 +4513,12 @@ dependencies = [
 
 [[package]]
 name = "rattler_shell"
-version = "0.22.12"
+version = "0.22.15"
 dependencies = [
  "enum_dispatch",
  "fs-err 3.0.0",
  "indexmap 2.7.0",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "rattler_conda_types",
  "serde_json",
  "shlex",
@@ -4570,13 +4530,13 @@ dependencies = [
 
 [[package]]
 name = "rattler_solve"
-version = "1.3.1"
+version = "1.3.4"
 dependencies = [
  "chrono",
  "futures",
- "itertools 0.13.0",
+ "itertools 0.14.0",
  "rattler_conda_types",
- "rattler_digest 1.0.4",
+ "rattler_digest 1.0.5",
  "resolvo 0.8.5",
  "serde",
  "tempfile",
@@ -4587,7 +4547,7 @@ dependencies = [
 
 [[package]]
 name = "rattler_virtual_packages"
-version = "1.1.15"
+version = "1.2.0"
 dependencies = [
  "archspec",
  "libloading",

@@ -5,6 +5,7 @@ import platform
 import subprocess
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
+from time import sleep
 
 import pytest
 import requests
@@ -214,17 +215,35 @@ def minio_server(tmp_path: Path):
     tmp_dir = tmp_path / "minio"
     # Start minio server
     proc = subprocess.Popen(
-        ["minio", "server", "--address", "localhost:9000", str(tmp_dir)],
+        [
+            f"minio{'.bat' if os.name == 'nt' else ''}",
+            "server",
+            "--address",
+            "0.0.0.0:9000",
+            str(tmp_dir),
+        ],
     )
-    # Create a bucket
-    subprocess.run(
-        ["mc", "mb", "local/s3-forge"],
-        env={
-            **os.environ,
-            "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
-        },
-        check=True,
-    )
+    # Create a bucket (with retries, in case we have to wait until minio is up and running)
+    retries = 0
+    max_retries = 3
+    while retries < max_retries:
+        try:
+            subprocess.run(
+                [f"mc{'.bat' if os.name == 'nt' else ''}", "mb", "local/s3-forge"],
+                env={
+                    **os.environ,
+                    "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
+                },
+                check=True,
+            )
+            break
+        except CalledProcessError:
+            retries += 1
+            sleep(1)
+            if retries == max_retries:
+                raise RuntimeError(
+                    "Failed to create bucket, could not reach minio server"
+                )
     yield
     proc.kill()
 
@@ -274,7 +293,12 @@ def test_s3_minio_upload(
 
     # Make sure the package was uploaded
     assert b"globtest" in subprocess.check_output(
-        ["mc", "ls", "--recursive", "local/s3-forge/channel"],
+        [
+            f"mc{'.bat' if os.name == 'nt' else ''}",
+            "ls",
+            "--recursive",
+            "local/s3-forge/channel",
+        ],
         env={
             **os.environ,
             "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
