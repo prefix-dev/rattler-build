@@ -238,6 +238,7 @@ impl Output {
                     &self.build_configuration.directories.host_prefix,
                     Some(&self.build_configuration.directories.build_prefix),
                     Some(jinja),
+                    None, // sandbox config
                 )
                 .await
                 .into_diagnostic()?;
@@ -292,6 +293,12 @@ impl Output {
 
             let cache_file = cache_dir.join("cache.json");
             fs::write(cache_file, serde_json::to_string(&cache).unwrap()).into_diagnostic()?;
+
+            // remove prefix to get it in pristine state and restore the cache
+            fs::remove_dir_all(self.prefix()).into_diagnostic()?;
+            let _ = CopyDir::new(&prefix_cache_dir, self.prefix())
+                .run()
+                .into_diagnostic()?;
 
             Ok(Output {
                 finalized_cache_dependencies: Some(finalized_dependencies),

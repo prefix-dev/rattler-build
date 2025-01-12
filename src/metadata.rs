@@ -37,6 +37,7 @@ use crate::{
         parser::{Recipe, Source},
     },
     render::resolved_dependencies::FinalizedDependencies,
+    script::SandboxConfiguration,
     system_tools::SystemTools,
     tool_configuration,
     utils::remove_dir_all_force,
@@ -346,12 +347,21 @@ pub struct BuildConfiguration {
     /// build script or not
     #[serde(skip_serializing, default = "default_true")]
     pub force_colors: bool,
+
+    /// The configuration for the sandbox
+    #[serde(skip_serializing, default)]
+    pub sandbox_config: Option<SandboxConfiguration>,
 }
 
 impl BuildConfiguration {
     /// true if the build is cross-compiling
     pub fn cross_compilation(&self) -> bool {
         self.target_platform != self.build_platform.platform
+    }
+
+    /// Retrieve the sandbox configuration for this output
+    pub fn sandbox_config(&self) -> Option<&SandboxConfiguration> {
+        self.sandbox_config.as_ref()
     }
 
     /// Construct a `SelectorConfig` from the given `BuildConfiguration`

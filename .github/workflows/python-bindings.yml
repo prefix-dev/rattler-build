@@ -26,7 +26,7 @@ permissions:
 
 jobs:
   format_lint_test:
-    name: Format, Lint and Test the Python bindings
+    name: Format, Lint and Test Python bindings
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -34,17 +34,16 @@ jobs:
           submodules: recursive
       - uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          pixi-version: v0.37.0
           manifest-path: py-rattler-build/pixi.toml
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          components: clippy, rustfmt
-      - name: Format and Lint
+      - name: Check formatting
+        working-directory: py-rattler-build
         run: |
-          cd py-rattler-build
-          pixi run -e test lint
           pixi run -e test fmt-check
-      - name: Run tests
+      - name: Lint
+        working-directory: py-rattler-build
         run: |
-          cd py-rattler-build
+          pixi run -e test lint
+      - name: Run tests
+        working-directory: py-rattler-build
+        run: |
           pixi run -e test test --color=yes

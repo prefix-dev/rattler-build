@@ -16,8 +16,24 @@ use rattler_build::{
 };
 use tempfile::tempdir;
 
-#[tokio::main]
-async fn main() -> miette::Result<()> {
+fn main() -> miette::Result<()> {
+    // Initialize sandbox in sync/single-threaded context before tokio runtime
+    #[cfg(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "aarch64"),
+        target_os = "macos"
+    ))]
+    rattler_sandbox::init_sandbox();
+
+    // Create and run the tokio runtime
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async { async_main().await })
+}
+
+async fn async_main() -> miette::Result<()> {
     let app = App::parse();
     let log_handler = if !app.is_tui() {
         Some(

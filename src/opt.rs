@@ -16,6 +16,7 @@ use url::Url;
 use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
+    script::SandboxArguments,
     tool_configuration::{SkipExisting, TestStrategy},
 };
 
@@ -413,6 +414,10 @@ pub struct BuildOpts {
     /// Extra metadata to include in about.json
     #[arg(long, value_parser = parse_key_val)]
     pub extra_meta: Option<Vec<(String, Value)>>,
+
+    #[allow(missing_docs)]
+    #[clap(flatten)]
+    pub sandbox_arguments: SandboxArguments,
 }
 
 fn is_dir(dir: &str) -> Result<PathBuf, String> {
