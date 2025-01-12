@@ -206,15 +206,15 @@ pre-build = [
 # this fork contains fixes for slow zip reading and large file writing
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
-rattler = { path = "../pavelzw-rattler/crates/rattler" }
-rattler_cache = { path = "../pavelzw-rattler/crates/rattler_cache" }
-rattler_conda_types = { path = "../pavelzw-rattler/crates/rattler_conda_types" }
-rattler_digest = { path = "../pavelzw-rattler/crates/rattler_digest" }
-rattler_index = { path = "../pavelzw-rattler/crates/rattler_index" }
-rattler_networking = { path = "../pavelzw-rattler/crates/rattler_networking" }
-rattler_repodata_gateway = { path = "../pavelzw-rattler/crates/rattler_repodata_gateway" }
-rattler_shell = { path = "../pavelzw-rattler/crates/rattler_shell" }
-rattler_solve = { path = "../pavelzw-rattler/crates/rattler_solve" }
-rattler_redaction = { path = "../pavelzw-rattler/crates/rattler_redaction" }
-rattler_virtual_packages = { path = "../pavelzw-rattler/crates/rattler_virtual_packages" }
-rattler_package_streaming = { path = "../pavelzw-rattler/crates/rattler_package_streaming" }
+rattler = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_cache = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_conda_types = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_digest = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_index = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_networking = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_repodata_gateway = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_shell = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_solve = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_redaction = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_virtual_packages = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
+rattler_package_streaming = { git = "https://github.com/pavelzw/rattler", branch = "s3" }
