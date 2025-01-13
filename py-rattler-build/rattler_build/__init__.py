@@ -1,5 +1,5 @@
 from .rattler_build import get_rattler_build_version_py
-from .rattler_build import build_recipe_py
+from .rattler_build import build_recipes_py
 from pathlib import Path
 from typing import Union
 
@@ -11,4 +11,4 @@ def rattler_build_version() -> str:
 
 
 def build_recipe(recipe_path: Union[str, Path]) -> None:
-    build_recipe_py(str(recipe_path))
+    build_recipes_py([str(recipe_path)])

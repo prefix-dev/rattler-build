@@ -8,11 +8,11 @@ use std::{
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
 use rattler_build::{
+    build_recipes,
     console_utils::init_logging,
-    get_build_output, get_recipe_path, get_tool_config,
+    get_recipe_path,
     opt::{App, BuildData, ShellCompletion, SubCommands},
-    rebuild_from_args, run_build_from_args, run_test_from_args, skip_noarch,
-    sort_build_outputs_topologically, upload_from_args,
+    rebuild_from_args, run_test_from_args, upload_from_args,
 };
 use tempfile::tempdir;
 
@@ -96,44 +96,7 @@ async fn async_main() -> miette::Result<()> {
                 return Ok(());
             }
 
-            let log_handler = log_handler.expect("logger is not initialized");
-            let tool_config = get_tool_config(&build_data, &log_handler)?;
-            let mut outputs = Vec::new();
-            for recipe_path in &recipe_paths {
-                let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
-                outputs.extend(output);
-            }
-
-            if build_data.render_only {
-                let outputs = if build_data.with_solve {
-                    let mut updated_outputs = Vec::new();
-                    for output in outputs {
-                        updated_outputs.push(
-                            output
-                                .resolve_dependencies(&tool_config)
-                                .await
-                                .into_diagnostic()?,
-                        );
-                    }
-                    updated_outputs
-                } else {
-                    outputs
-                };
-
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&outputs).into_diagnostic()?
-                );
-                return Ok(());
-            }
-
-            // Skip noarch builds before the topological sort
-            outputs = skip_noarch(outputs, &tool_config).await?;
-
-            sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
-            run_build_from_args(outputs, tool_config).await?;
-
-            Ok(())
+            build_recipes(recipe_paths, build_data, &log_handler).await
         }
         Some(SubCommands::Test(test_args)) => {
             run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await

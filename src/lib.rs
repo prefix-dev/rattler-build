@@ -124,14 +124,13 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
 /// Returns the tool configuration.
 pub fn get_tool_config(
     build_data: &BuildData,
-    fancy_log_handler: &LoggingOutputHandler,
+    fancy_log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<Configuration> {
     let client =
         tool_configuration::reqwest_client_from_auth_storage(build_data.common.auth_file.clone())
             .into_diagnostic()?;
 
-    Ok(Configuration::builder()
-        .with_logging_output_handler(fancy_log_handler.clone())
+    let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
@@ -141,8 +140,15 @@ pub fn get_tool_config(
         .with_bz2_repodata_enabled(build_data.common.use_zstd)
         .with_skip_existing(build_data.skip_existing)
         .with_noarch_build_platform(build_data.noarch_build_platform)
-        .with_channel_priority(build_data.common.channel_priority.value)
-        .finish())
+        .with_channel_priority(build_data.common.channel_priority.value);
+
+    let confguration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
+        configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
+    } else {
+        configuration_builder
+    };
+
+    Ok(confguration_builder.finish())
 }
 
 /// Returns the output for the build.
@@ -862,6 +868,56 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|node| outputs[node.index()].clone())
         .collect();
+
+    Ok(())
+}
+
+/// Get the version of rattler-build.
+pub fn get_rattler_build_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Build rattler-build recipes
+pub async fn build_recipes(
+    recipe_paths: Vec<std::path::PathBuf>,
+    build_data: BuildData,
+    log_handler: &Option<console_utils::LoggingOutputHandler>,
+) -> Result<(), miette::Error> {
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+    let mut outputs = Vec::new();
+    for recipe_path in &recipe_paths {
+        let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
+        outputs.extend(output);
+    }
+
+    if build_data.render_only {
+        let outputs = if build_data.with_solve {
+            let mut updated_outputs = Vec::new();
+            for output in outputs {
+                updated_outputs.push(
+                    output
+                        .resolve_dependencies(&tool_config)
+                        .await
+                        .into_diagnostic()?,
+                );
+            }
+            updated_outputs
+        } else {
+            outputs
+        };
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&outputs).into_diagnostic()?
+        );
+        return Ok(());
+    }
+
+    // Skip noarch builds before the topological sort
+    outputs = skip_noarch(outputs, &tool_config).await?;
+
+    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    run_build_from_args(outputs, tool_config).await?;
 
     Ok(())
 }

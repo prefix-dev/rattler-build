@@ -2,6 +2,7 @@ from pathlib import Path
 
 import rattler_build
 import tomli as tomllib
+import shutil
 
 
 def test_version_match_parent_cargo() -> None:
@@ -16,6 +17,8 @@ def test_version_match_local_cargo() -> None:
     assert rattler_build.rattler_build_version() == local_version
 
 
-def test_build_recipe() -> None:
-    recipe_path = Path("recipe.yaml")
+def test_build_recipe(tmp_path: Path, recipes_dir: Path) -> None:
+    recipe_name = "recipe.yaml"
+    recipe_path = tmp_path.joinpath(recipe_name)
+    shutil.copy(recipes_dir.joinpath("dummy", recipe_name), recipe_path)
     rattler_build.build_recipe(recipe_path)

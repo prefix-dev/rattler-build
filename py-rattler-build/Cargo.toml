@@ -21,8 +21,8 @@ pyo3 = { version = "0.23.2", features = [
     "extension-module",
     "multiple-pymethods",
 ] }
+tokio = {version="1.43.0", features = ["rt", "macros", "rt-multi-thread", "process"]}
 # pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
-# tokio = { version = "1.41" }
 
 [build-dependencies]
 pyo3-build-config = "0.23.2"
