@@ -321,11 +321,11 @@ pub struct BuildOpts {
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long)]
-    pub channel: Vec<String>,
+    pub channel: Option<Vec<String>>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
-    pub variant_config: Vec<PathBuf>,
+    pub variant_config: Option<Vec<PathBuf>>,
 
     /// Do not read the `variants.yaml` file next to a recipe.
     #[arg(long)]
@@ -352,7 +352,7 @@ pub struct BuildOpts {
     /// e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
     /// 22).
     #[arg(long, help_heading = "Modifying result", verbatim_doc_comment)]
-    pub package_format: PackageFormatAndCompression,
+    pub package_format: Option<PackageFormatAndCompression>,
 
     #[arg(long)]
     /// The number of threads to use for compression (only relevant when also
@@ -479,7 +479,7 @@ impl From<BuildOpts> for BuildData {
     fn from(opts: BuildOpts) -> Self {
         let build_data_default = BuildData::default();
         BuildData {
-            up_to: opts.up_to,
+            up_to: opts.up_to.or(build_data_default.up_to),
             build_platform: opts
                 .build_platform
                 .unwrap_or_else(|| build_data_default.build_platform),
@@ -491,26 +491,35 @@ impl From<BuildOpts> for BuildData {
                 .host_platform
                 .or_else(|| opts.target_platform)
                 .unwrap_or_else(|| build_data_default.host_platform),
-            channel: opts.channel,
-            variant_config: opts.variant_config,
-            ignore_recipe_variants: opts.ignore_recipe_variants,
-            render_only: opts.render_only,
-            with_solve: opts.with_solve,
-            keep_build: opts.keep_build,
-            no_build_id: opts.no_build_id,
-            package_format: opts.package_format,
-            compression_threads: opts.compression_threads,
-            no_include_recipe: opts.no_include_recipe,
-            no_test: opts.no_test,
+            channel: opts.channel.unwrap_or(build_data_default.channel),
+            variant_config: opts
+                .variant_config
+                .unwrap_or(build_data_default.variant_config),
+            ignore_recipe_variants: opts.ignore_recipe_variants
+                || build_data_default.ignore_recipe_variants,
+            render_only: opts.render_only || build_data_default.render_only,
+            with_solve: opts.with_solve || build_data_default.with_solve,
+            keep_build: opts.keep_build || build_data_default.keep_build,
+            no_build_id: opts.no_build_id || build_data_default.no_build_id,
+            package_format: opts
+                .package_format
+                .unwrap_or(build_data_default.package_format),
+            compression_threads: opts
+                .compression_threads
+                .or(build_data_default.compression_threads),
+            no_include_recipe: opts.no_include_recipe || build_data_default.no_include_recipe,
+            no_test: opts.no_test || build_data_default.no_test,
             test: opts.test.unwrap_or(TestStrategy::NativeAndEmulated),
-            color_build_log: opts.color_build_log,
+            color_build_log: opts.color_build_log || build_data_default.color_build_log,
             common: opts.common,
-            tui: opts.tui,
+            tui: opts.tui || build_data_default.tui,
             skip_existing: opts
                 .skip_existing
                 .unwrap_or_else(|| build_data_default.skip_existing),
-            noarch_build_platform: opts.noarch_build_platform,
-            extra_meta: opts.extra_meta,
+            noarch_build_platform: opts
+                .noarch_build_platform
+                .or(build_data_default.noarch_build_platform),
+            extra_meta: opts.extra_meta.or(build_data_default.extra_meta),
             sandbox_configuration: opts.sandbox_arguments.into(),
         }
     }
