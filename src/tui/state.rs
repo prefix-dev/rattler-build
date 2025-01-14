@@ -5,8 +5,8 @@ use throbber_widgets_tui::ThrobberState;
 use tui_input::Input;
 
 use crate::{
-    console_utils::LoggingOutputHandler, get_tool_config, metadata::Output, opt::BuildOpts,
-    tool_configuration::Configuration,
+    console_utils::LoggingOutputHandler, get_tool_config, metadata::Output,
+    tool_configuration::Configuration, BuildData,
 };
 
 /// Representation of a package.
@@ -83,8 +83,8 @@ impl BuildProgress {
 /// Application state.
 #[derive(Clone)]
 pub(crate) struct TuiState {
-    /// Build options.
-    pub build_opts: BuildOpts,
+    /// Build data.
+    pub build_data: BuildData,
     /// Tool configuration.
     pub tool_config: Configuration,
     /// Is the application running?
@@ -109,10 +109,10 @@ pub(crate) struct TuiState {
 
 impl TuiState {
     /// Constructs a new instance.
-    pub fn new(build_opts: BuildOpts, log_handler: LoggingOutputHandler) -> Self {
+    pub fn new(build_data: BuildData, log_handler: LoggingOutputHandler) -> Self {
         Self {
-            build_opts: build_opts.clone(),
-            tool_config: get_tool_config(&build_opts, &log_handler)
+            build_data: build_data.clone(),
+            tool_config: get_tool_config(&build_data, &Some(log_handler))
                 .expect("Could not get tool config"),
             running: true,
             packages: Vec::new(),

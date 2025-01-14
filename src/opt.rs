@@ -406,6 +406,7 @@ pub struct BuildOpts {
     pub sandbox_arguments: SandboxArguments,
 }
 #[allow(missing_docs)]
+#[derive(Clone, Debug)]
 pub struct BuildData {
     pub up_to: Option<String>,
     pub build_platform: Platform,

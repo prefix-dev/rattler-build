@@ -91,7 +91,7 @@ async fn async_main() -> miette::Result<()> {
                         Some(tui.event_handler.sender.clone()),
                     )
                     .into_diagnostic()?;
-                    rattler_build::tui::run(tui, build_args, recipe_paths, log_handler).await?;
+                    rattler_build::tui::run(tui, build_data, recipe_paths, log_handler).await?;
                 }
                 return Ok(());
             }
