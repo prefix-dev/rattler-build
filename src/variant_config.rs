@@ -552,6 +552,7 @@ pub struct ParseErrors {
     #[related]
     errs: Vec<ParsingError>,
 }
+
 impl ParseErrors {
     fn from_partial_vec(file: &str, errs: Vec<PartialParsingError>) -> Self {
         Self {
