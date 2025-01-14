@@ -369,7 +369,7 @@ pub struct BuildOpts {
 
     /// The strategy to use for running tests
     #[arg(long, help_heading = "Modifying result")]
-    pub test: TestStrategy,
+    pub test: Option<TestStrategy>,
 
     /// Don't force colors in the output of the build script
     #[arg(long, default_value = "true", help_heading = "Modifying result")]
@@ -502,7 +502,7 @@ impl From<BuildOpts> for BuildData {
             compression_threads: opts.compression_threads,
             no_include_recipe: opts.no_include_recipe,
             no_test: opts.no_test,
-            test: opts.test,
+            test: opts.test.unwrap_or(TestStrategy::NativeAndEmulated),
             color_build_log: opts.color_build_log,
             common: opts.common,
             tui: opts.tui,
