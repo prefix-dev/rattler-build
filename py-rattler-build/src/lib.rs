@@ -10,13 +10,12 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-fn build_recipes_py(recipes: Vec<String>) -> PyResult<()> {
+#[pyo3(signature = (recipes, output_dir=None))]
+fn build_recipes_py(recipes: Vec<String>, output_dir: Option<String>) -> PyResult<()> {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let recipes = recipes.into_iter().map(PathBuf::from).collect();
-    let build_data = BuildData {
-        // Add common here
-        ..Default::default()
-    };
+    let mut build_data = BuildData::default();
+    build_data.common.output_dir = output_dir.map(PathBuf::from);
     rt.block_on(async {
         if let Err(e) = build_recipes(recipes, build_data, &None).await {
             return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(

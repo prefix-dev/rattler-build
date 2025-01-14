@@ -21,4 +21,6 @@ def test_build_recipe(tmp_path: Path, recipes_dir: Path) -> None:
     recipe_name = "recipe.yaml"
     recipe_path = tmp_path.joinpath(recipe_name)
     shutil.copy(recipes_dir.joinpath("dummy", recipe_name), recipe_path)
-    rattler_build.build_recipe(recipe_path)
+    output_dir = tmp_path.joinpath("output")
+    rattler_build.build_recipe(recipe_path, output_dir)
+    assert output_dir.joinpath("noarch").is_dir()
