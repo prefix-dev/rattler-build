@@ -7,19 +7,18 @@ name = "py-rattler-build"
 requires-python = ">=3.8"
 description = "The fastest way to build conda packages programatically"
 readme = "README.md"
-authors = [
-    { name = "Wolf Vollprecht", email = "w.vollprecht@gmail.com" }
-]
+authors = [{ name = "Wolf Vollprecht", email = "w.vollprecht@gmail.com" }]
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: BSD License",
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-    "Typing :: Typed",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: BSD License",
+  "Programming Language :: Rust",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Typing :: Typed",
 ]
 license = "BSD-3-Clause"
+dynamic = ["version"]
 
 [project.urls]
 Homepage = "https://github.com/prefix-dev/rattler-build"

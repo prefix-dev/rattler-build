@@ -74,7 +74,7 @@ fn ext_to_compression<'a>(ext: Option<&OsStr>, file: Box<dyn BufRead + 'a>) -> T
     }
 }
 
-impl<'a> std::io::Read for TarCompression<'a> {
+impl std::io::Read for TarCompression<'_> {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         match self {
             TarCompression::PlainTar(reader) => reader.read(buf),
