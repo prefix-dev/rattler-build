@@ -17,7 +17,15 @@ use crate::{
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
 static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 9] = [
-    "context", "recipe", "source", "build", "outputs", "about", "extra", "cache", "schema_version"
+    "context",
+    "recipe",
+    "source",
+    "build",
+    "outputs",
+    "about",
+    "extra",
+    "cache",
+    "schema_version",
 ];
 
 // Check if the `cache` top-level key is present. If it does not contain a source, but there is a
