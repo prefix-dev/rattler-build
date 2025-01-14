@@ -53,14 +53,12 @@ impl Relinker for Dylib {
         let file = File::open(path).expect("Failed to open the Mach-O binary");
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
         match goblin::mach::Mach::parse(&mmap)? {
-            Mach::Binary(mach) => {
-                Ok(Dylib {
-                    path: path.to_path_buf(),
-                    id: mach.name.map(PathBuf::from),
-                    rpaths: mach.rpaths.iter().map(PathBuf::from).collect(),
-                    libraries: mach.libs.iter().map(PathBuf::from).collect(),
-                })
-            }
+            Mach::Binary(mach) => Ok(Dylib {
+                path: path.to_path_buf(),
+                id: mach.name.map(PathBuf::from),
+                rpaths: mach.rpaths.iter().map(PathBuf::from).collect(),
+                libraries: mach.libs.iter().map(PathBuf::from).collect(),
+            }),
             _ => {
                 tracing::error!("Not a valid Mach-O binary.");
                 Err(RelinkError::FileTypeNotHandled)
