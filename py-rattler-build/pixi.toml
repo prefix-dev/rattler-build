@@ -1,9 +1,7 @@
 [project]
 name = "py-rattler-build"
 description = "Python bindings for rattler-build"
-authors = [
-    "Wolf Vollprecht <wolf@prefix.dev>",
-]
+authors = ["Wolf Vollprecht <wolf@prefix.dev>"]
 channels = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 license = "BSD-3-Clause"
