@@ -118,7 +118,7 @@ impl Default for Jinja<'_> {
     }
 }
 
-impl<'a> Extend<(String, Value)> for Jinja<'a> {
+impl Extend<(String, Value)> for Jinja<'_> {
     fn extend<T: IntoIterator<Item = (String, Value)>>(&mut self, iter: T) {
         self.context.extend(iter);
     }

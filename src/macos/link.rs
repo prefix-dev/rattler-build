@@ -54,12 +54,12 @@ impl Relinker for Dylib {
         let mmap = unsafe { memmap2::Mmap::map(&file)? };
         match goblin::mach::Mach::parse(&mmap)? {
             Mach::Binary(mach) => {
-                return Ok(Dylib {
+                Ok(Dylib {
                     path: path.to_path_buf(),
                     id: mach.name.map(PathBuf::from),
                     rpaths: mach.rpaths.iter().map(PathBuf::from).collect(),
                     libraries: mach.libs.iter().map(PathBuf::from).collect(),
-                });
+                })
             }
             _ => {
                 tracing::error!("Not a valid Mach-O binary.");

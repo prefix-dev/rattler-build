@@ -482,15 +482,15 @@ impl From<BuildOpts> for BuildData {
             up_to: opts.up_to.or(build_data_default.up_to),
             build_platform: opts
                 .build_platform
-                .unwrap_or_else(|| build_data_default.build_platform),
+                .unwrap_or(build_data_default.build_platform),
             target_platform: opts
                 .target_platform
-                .or_else(|| opts.host_platform)
-                .unwrap_or_else(|| build_data_default.target_platform),
+                .or(opts.host_platform)
+                .unwrap_or(build_data_default.target_platform),
             host_platform: opts
                 .host_platform
-                .or_else(|| opts.target_platform)
-                .unwrap_or_else(|| build_data_default.host_platform),
+                .or(opts.target_platform)
+                .unwrap_or(build_data_default.host_platform),
             channel: opts.channel.unwrap_or(build_data_default.channel),
             variant_config: opts
                 .variant_config
@@ -515,7 +515,7 @@ impl From<BuildOpts> for BuildData {
             tui: opts.tui || build_data_default.tui,
             skip_existing: opts
                 .skip_existing
-                .unwrap_or_else(|| build_data_default.skip_existing),
+                .unwrap_or(build_data_default.skip_existing),
             noarch_build_platform: opts
                 .noarch_build_platform
                 .or(build_data_default.noarch_build_platform),

@@ -85,7 +85,7 @@ impl<'a> CustomVisitor<'a> {
     }
 }
 
-impl<'a> field::Visit for CustomVisitor<'a> {
+impl field::Visit for CustomVisitor<'_> {
     fn record_str(&mut self, field: &Field, value: &str) {
         if self.result.is_err() {
             return;
