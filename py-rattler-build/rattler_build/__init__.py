@@ -1,5 +1,4 @@
-from .rattler_build import get_rattler_build_version_py
-from .rattler_build import build_recipes_py
+from .rattler_build import get_rattler_build_version_py, build_recipes_py
 from pathlib import Path
 from typing import Union
 
