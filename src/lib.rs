@@ -142,13 +142,13 @@ pub fn get_tool_config(
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority.value);
 
-    let confguration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
+    let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
     } else {
         configuration_builder
     };
 
-    Ok(confguration_builder.finish())
+    Ok(configuration_builder.finish())
 }
 
 /// Returns the output for the build.
