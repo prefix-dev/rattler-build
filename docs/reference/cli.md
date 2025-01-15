@@ -94,7 +94,6 @@ Build a package from a recipe
 
 	The build platform to use for the build (e.g. for building with emulation, or rendering)
 
-	- Default value: current platform
 
 - `--target-platform <TARGET_PLATFORM>`
 
@@ -105,13 +104,11 @@ Build a package from a recipe
 
 	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
 
-	- Default value: current platform
 
 - `-c`, `--channel <CHANNEL>`
 
 	Add a channel to search for dependencies in
 
-	- Default value: `conda-forge`
 
 - `-m`, `--variant-config <VARIANT_CONFIG>`
 
@@ -173,7 +170,6 @@ Build a package from a recipe
 e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 22).
 
-	- Default value: `conda`
 
 - `--no-include-recipe`
 
@@ -189,7 +185,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 	The strategy to use for running tests
 
-	- Default value: `native-and-emulated`
 	- Possible values:
 		- `skip`:
 			Skip the tests
@@ -214,7 +209,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 	Whether to skip packages that already exist in any channel If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing. If set to `all`, skip packages that already exist in any channel
 
-	- Default value: `none`
 	- Possible values:
 		- `none`:
 			Do not skip any packages
