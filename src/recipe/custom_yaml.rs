@@ -724,6 +724,7 @@ impl ops::DerefMut for MappingNode {
 
 /// Special internal representation of the sequence node.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[allow(clippy::large_enum_variant)]
 pub enum SequenceNodeInternal {
     /// A simple node
     Simple(Node),

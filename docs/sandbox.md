@@ -6,12 +6,12 @@
 
 Since the 0.34.0 release, `rattler-build` has a new experimental feature called
 `sandbox`. With the sandbox feature enabled (via `--sandbox`), the build process
-has much more restricted access to system resources on macOS and Linux. 
+has much more restricted access to system resources on macOS and Linux.
 As the sandbox feature is experimental it is disabled by default.
 
-In particular, with the default configuration, the build process can read the entire filesystem, 
+In particular, with the default configuration, the build process can read the entire filesystem,
 but it cannot write outside of the build directories. The build process also cannot access the network.
-In the future, we plan to enable the sandbox per default and restrict it further. 
+In the future, we plan to enable the sandbox per default and restrict it further.
 
 On macOS this is achieved by using the `sandbox-exec` command, which is part of the macOS system.
 On Linux the sandbox is created using Linux namespaces.

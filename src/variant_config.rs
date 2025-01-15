@@ -626,7 +626,7 @@ mod tests {
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = std::fs::read_to_string(dbg!(test_data_dir.join(filename))).unwrap();
+        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let yaml = Node::parse_yaml(0, &yaml_file).unwrap();
 
         let selector_config = SelectorConfig {
