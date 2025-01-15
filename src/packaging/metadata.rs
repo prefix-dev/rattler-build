@@ -283,6 +283,7 @@ impl Output {
                 return Err(PackagingError::InvalidMetadata("Cannot set python_site_packages_path for a package that is not called `python`".to_string()));
             }
         }
+
         Ok(IndexJson {
             name: self.name().clone(),
             version: self.version().clone().into(),
@@ -308,7 +309,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .dedup()
                 .collect(),
-            noarch: *recipe.build().noarch(),
+            noarch: recipe.build().noarch(),
             track_features,
             features: None,
             python_site_packages_path: recipe.build().python().site_packages_path.clone(),

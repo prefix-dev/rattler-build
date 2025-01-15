@@ -193,7 +193,7 @@ impl Stage1Render {
         }
 
         // fix target_platform value here
-        if !recipe.build().noarch().is_none() {
+        if !recipe.build().noarch().is_none() && !recipe.build().python().version_independent {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
@@ -203,7 +203,7 @@ impl Stage1Render {
     pub fn build_string_for_output(&self, idx: usize) -> Result<String, VariantError> {
         let variant = self.variant_for_output(idx)?;
         let recipe = &self.stage_0_render.rendered_outputs[idx];
-        let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
+        let hash = HashInfo::from_variant(&variant, &recipe.build().noarch());
         let inner = &self.inner[idx];
 
         let mut selector_config = inner.selector_config.clone();

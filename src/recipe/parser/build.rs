@@ -238,8 +238,12 @@ impl Build {
     }
 
     /// Get the noarch type.
-    pub const fn noarch(&self) -> &NoArchType {
-        &self.noarch
+    pub fn noarch(&self) -> NoArchType {
+        if self.python().version_independent {
+            return NoArchType::python();
+        } else {
+            self.noarch.clone()
+        }
     }
 
     /// Python specific build configuration.
@@ -544,7 +548,8 @@ impl TryConvertNode<Python> for RenderedMappingNode {
             entry_points,
             skip_pyc_compilation,
             use_python_app_entrypoint,
-            site_packages_path
+            site_packages_path,
+            version_independent
         );
         Ok(python)
     }

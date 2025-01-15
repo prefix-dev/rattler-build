@@ -440,8 +440,10 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for ((node, recipe), variant) in sx.into_sorted_outputs()? {
-                let target_platform = if recipe.build().noarch().is_none() {
+            for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
+                let target_platform = if recipe.build().noarch().is_none()
+                    || recipe.build().python().version_independent
+                {
                     selector_config.target_platform
                 } else {
                     Platform::NoArch
@@ -454,16 +456,25 @@ impl VariantConfig {
                     .expect("Build string has to be resolved")
                     .to_string();
 
+                if recipe.build().python().version_independent {
+                    recipe
+                        .requirements
+                        .ignore_run_exports
+                        .from_package
+                        .insert("python".parse().unwrap());
+                }
+
+                // TODO do not set target_platform to noarch
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),
                     build_string,
-                    noarch_type: *recipe.build().noarch(),
+                    noarch_type: recipe.build().noarch(),
                     target_platform,
                     node,
                     used_vars: variant.clone(),
                     recipe: recipe.clone(),
-                    hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
+                    hash: HashInfo::from_variant(&variant, &recipe.build().noarch()),
                 });
             }
         }
