@@ -1,0 +1,11 @@
+c_compiler:
+  - gcc                        # [linux]
+  - clang                      # [osx]
+  - vs2019                     # [win and x86_64]
+  - vs2022                     # [win and arm64]
+c_compiler_version:            # [unix]
+  - "13"                         # [linux]
+  - "18"                         # [osx]
+
+other_stuff:
+  - "123"
