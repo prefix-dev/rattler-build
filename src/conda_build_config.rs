@@ -42,40 +42,78 @@ fn evaluate_condition(
 }
 
 /// Load an old-school conda_build_config.yaml file, and apply the selector_config to it
+/// The parser supports only a small subset of (potential) conda_build_config.yaml features.
+/// Especially, only `os.environ.get(...)` is supported.
 pub fn load_conda_build_config(
     r: impl Read,
     selector_config: &SelectorConfig,
 ) -> miette::Result<VariantConfig> {
     // load the text, parse it and load as VariantConfig using serde_yaml
-    let mut config = VariantConfig::default();
-
     let mut input = String::new();
     std::io::BufReader::new(r)
         .read_to_string(&mut input)
         .unwrap();
     let context = selector_config.clone().into_context();
+
     let mut env = Environment::new();
-    // env.set_context(context);
-    let mut out = String::with_capacity(input.len());
+
+    env.add_function(
+        "environ_get",
+        move |name: String, default: Option<String>| {
+            let value = std::env::var(name).unwrap_or_else(|_| default.unwrap_or_default());
+            Ok(Value::from(value))
+        },
+    );
+
+    // replace all `os.environ.get` calls with `environ_get`
+    input = input.replace("os.environ.get", "environ_get");
+
+    let mut lines = Vec::new();
     for line in input.lines() {
-        let parsed = parse_line(&line);
-        if let Some(condition) = &parsed.condition {
+        let parsed = parse_line(line);
+        let mut line_content = if let Some(condition) = &parsed.condition {
             if evaluate_condition(condition, &env, &context) {
-                out.push_str(&parsed.content);
+                parsed.content.to_string()
+            } else {
+                continue;
             }
         } else {
-            out.push_str(&parsed.content);
-        }
-        out.push('\n');
-    }
+            parsed.content.to_string()
+        };
 
-    config = serde_yaml::from_str(&out).into_diagnostic()?;
+        let trimmed = line_content.trim();
+        if let Some(node) = trimmed.strip_prefix("- ") {
+            let s = node.trim();
+            // try to parse as a float or integer
+            if s.parse::<f64>().is_ok() || s.parse::<i64>().is_ok() {
+                line_content = line_content.replace(s, &format!("\"{}\"", s));
+            }
+        }
+
+        lines.push(line_content);
+    }
+    let out = lines.join("\n");
+    // We need to filter "unit keys" from the YAML because our config expects a list (not None)
+    let value: serde_yaml::Value = serde_yaml::from_str(&out).into_diagnostic()?;
+    // filter all empty maps
+    println!("Value: {:?}", value);
+    let value = value
+        .as_mapping()
+        .unwrap()
+        .clone()
+        .into_iter()
+        .filter(|(_, v)| !v.is_null())
+        .collect::<serde_yaml::Mapping>();
+    let config: VariantConfig = serde_yaml::from_value(serde_yaml::Value::Mapping(value)).unwrap();
     Ok(config)
 }
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+
+    use rstest::rstest;
+    use serial_test::serial;
 
     use super::*;
 
@@ -113,18 +151,48 @@ mod tests {
         assert_eq!(evaluate_condition("not py3k", &env, &context), true);
     }
 
-    #[test]
-    fn test_conda_forge() {
-        let path = test_data_dir().join("conda_build_config/test_1.yaml");
+    #[rstest]
+    #[case("conda_build_config/test_1.yaml", None)]
+    #[case("conda_build_config/conda_forge_subset.yaml", Some(false))]
+    #[case("conda_build_config/conda_forge_subset.yaml", Some(true))]
+    #[case("conda_build_config/conda_forge_subset.yaml", None)]
+    #[serial]
+    fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
+        let path = test_data_dir().join(config_path);
         let file = std::fs::File::open(path).unwrap();
         let selector_config = SelectorConfig::default();
-        let config = load_conda_build_config(file, &selector_config).unwrap();
-        insta::assert_yaml_snapshot!(config);
+        if let Some(cuda) = cuda {
+            std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
+        }
+
+        let config = load_conda_build_config(&file, &selector_config).unwrap();
+        insta::assert_yaml_snapshot!(
+            format!(
+                "{}_{}",
+                config_path,
+                cuda.map(|o| o.to_string()).unwrap_or("none".to_string())
+            ),
+            config
+        );
+
+        if let Some(cuda) = cuda {
+            if cuda {
+                assert_eq!(
+                    config.variants[&"environment_var".into()],
+                    vec!["CF_CUDA_ENABLED".to_string()]
+                );
+            } else {
+                assert_eq!(
+                    config.variants[&"environment_var".into()],
+                    vec!["CF_CUDA_DISABLED".to_string()]
+                );
+            }
+            std::env::remove_var("TEST_CF_CUDA_ENABLED");
+        }
     }
 
     fn test_data_dir() -> PathBuf {
-        let test_data_dir =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/");
+        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/");
         return test_data_dir;
     }
 }
