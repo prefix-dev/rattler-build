@@ -1203,7 +1203,7 @@ def test_cache_select_files(rattler_build: RattlerBuild, recipes: Path, tmp_path
 
 
 def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    rattler_build.build(recipes / "abi3", tmp_path)
+    rattler_build.build(recipes / "python-abi3-package-sample", tmp_path)
     pkg = get_extracted_package(tmp_path, "abi3")
 
     assert (pkg / "info/paths.json").exists()
