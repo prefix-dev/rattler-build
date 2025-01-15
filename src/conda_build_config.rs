@@ -158,9 +158,17 @@ mod tests {
     #[case("conda_build_config/conda_forge_subset.yaml", None)]
     #[serial]
     fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
+        use rattler_conda_types::Platform;
+
         let path = test_data_dir().join(config_path);
         let file = std::fs::File::open(path).unwrap();
-        let selector_config = SelectorConfig::default();
+
+        // fix the platform for the snapshots
+        let mut selector_config = SelectorConfig::default();
+        selector_config.target_platform = Platform::OsxArm64;
+        selector_config.host_platform = Platform::OsxArm64;
+        selector_config.build_platform = Platform::OsxArm64;
+
         if let Some(cuda) = cuda {
             std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
         }
