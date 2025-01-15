@@ -4,6 +4,7 @@
 
 pub mod build;
 pub mod cache;
+pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
 mod normalized_key;

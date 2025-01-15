@@ -112,7 +112,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// The variant configuration.
 /// This is usually loaded from a YAML file and contains a mapping of package names to a list of
 /// versions. Each version represents a variant of the package. The variant configuration is
@@ -166,6 +165,7 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 ///
 /// It's also possible to specify additional pins in the variant configuration. These pins are
 /// currently ignored.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct VariantConfig {
     /// Pin run dependencies by using the versions from the build dependencies (and applying the pin).
     /// This is currently ignored (TODO)
