@@ -164,10 +164,12 @@ mod tests {
         let file = std::fs::File::open(path).unwrap();
 
         // fix the platform for the snapshots
-        let mut selector_config = SelectorConfig::default();
-        selector_config.target_platform = Platform::OsxArm64;
-        selector_config.host_platform = Platform::OsxArm64;
-        selector_config.build_platform = Platform::OsxArm64;
+        let selector_config = SelectorConfig {
+            target_platform: Platform::OsxArm64,
+            host_platform: Platform::OsxArm64,
+            build_platform: Platform::OsxArm64,
+            ..Default::default()
+        };
 
         if let Some(cuda) = cuda {
             std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
