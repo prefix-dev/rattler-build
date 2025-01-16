@@ -280,7 +280,7 @@ impl Build {
     pub const fn post_process(&self) -> &Vec<PostProcess> {
         &self.post_process
     }
-    
+
     pub(crate) fn is_python_version_independent(&self) -> bool {
         self.python().version_independent || self.noarch().is_python()
     }
