@@ -2,7 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use indexmap::IndexSet;
@@ -14,6 +14,7 @@ use thiserror::Error;
 
 use crate::{
     _partialerror,
+    conda_build_config::load_conda_build_config,
     normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
@@ -199,6 +200,46 @@ pub enum VariantConfigError {
 }
 
 impl VariantConfig {
+    /// This function loads a single variant configuration file and returns the configuration.
+    fn load_file(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        if path.file_name() == Some("conda_build_config.yaml".as_ref()) {
+            Self::load_conda_build_config(path, selector_config)
+        } else {
+            Self::load_variant_config(path, selector_config)
+        }
+    }
+
+    fn load_variant_config(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        let file = fs_err::read_to_string(path)
+            .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
+        let yaml_node = Node::parse_yaml(0, &file)?;
+        let jinja = Jinja::new(selector_config.clone());
+        let rendered_node: RenderedNode = yaml_node
+            .render(&jinja, path.to_string_lossy().as_ref())
+            .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
+        let config: VariantConfig = rendered_node
+            .try_convert(path.to_string_lossy().as_ref())
+            .map_err(|e| {
+                let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
+                parse_errors
+            })?;
+        Ok(config)
+    }
+
+    /// This function loads an old-style variant configuration file and returns the configuration.
+    fn load_conda_build_config(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        load_conda_build_config(path, selector_config)
+    }
+
     /// This function loads multiple variant configuration files and merges them into a single
     /// configuration. The configuration files are loaded in the order they are provided in the
     /// `files` argument. The `selector_config` argument is used to select the correct configuration
@@ -269,20 +310,7 @@ impl VariantConfig {
         let mut variant_configs = Vec::new();
 
         for filename in files {
-            let file = std::fs::read_to_string(filename)
-                .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
-            let yaml_node = Node::parse_yaml(0, &file)?;
-            let jinja = Jinja::new(selector_config.clone());
-            let rendered_node: RenderedNode = yaml_node
-                .render(&jinja, filename.to_string_lossy().as_ref())
-                .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
-            let config: VariantConfig = rendered_node
-                .try_convert(filename.to_string_lossy().as_ref())
-                .map_err(|e| {
-                    let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
-                    parse_errors
-                })?;
-
+            let config = Self::load_file(filename, selector_config)?;
             variant_configs.push(config);
         }
 

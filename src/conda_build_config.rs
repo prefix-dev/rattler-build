@@ -1,10 +1,12 @@
 //! Module to load deprecated `conda_build_config.yaml` files and apply the selector_config to it
-use std::{collections::BTreeMap, io::Read};
+use std::{collections::BTreeMap, path::Path};
 
-use miette::IntoDiagnostic;
 use minijinja::{Environment, Value};
 
-use crate::{selectors::SelectorConfig, variant_config::VariantConfig};
+use crate::{
+    selectors::SelectorConfig,
+    variant_config::{VariantConfig, VariantConfigError},
+};
 
 #[derive(Debug)]
 struct ParsedLine {
@@ -45,14 +47,14 @@ fn evaluate_condition(
 /// The parser supports only a small subset of (potential) conda_build_config.yaml features.
 /// Especially, only `os.environ.get(...)` is supported.
 pub fn load_conda_build_config(
-    r: impl Read,
+    path: &Path,
     selector_config: &SelectorConfig,
-) -> miette::Result<VariantConfig> {
+) -> Result<VariantConfig, VariantConfigError> {
     // load the text, parse it and load as VariantConfig using serde_yaml
-    let mut input = String::new();
-    std::io::BufReader::new(r)
-        .read_to_string(&mut input)
-        .unwrap();
+
+    let mut input = fs_err::read_to_string(path)
+        .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
+
     let context = selector_config.clone().into_context();
 
     let mut env = Environment::new();
@@ -92,11 +94,18 @@ pub fn load_conda_build_config(
 
         lines.push(line_content);
     }
+
     let out = lines.join("\n");
+
     // We need to filter "unit keys" from the YAML because our config expects a list (not None)
-    let value: serde_yaml::Value = serde_yaml::from_str(&out).into_diagnostic()?;
+    let value: serde_yaml::Value = serde_yaml::from_str(&out).map_err(|e| {
+        VariantConfigError::IOError(
+            path.to_path_buf(),
+            std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+        )
+    })?;
+
     // filter all empty maps
-    println!("Value: {:?}", value);
     let value = value
         .as_mapping()
         .unwrap()
@@ -104,12 +113,21 @@ pub fn load_conda_build_config(
         .into_iter()
         .filter(|(_, v)| !v.is_null())
         .collect::<serde_yaml::Mapping>();
-    let config: VariantConfig = serde_yaml::from_value(serde_yaml::Value::Mapping(value)).unwrap();
+
+    let config: VariantConfig =
+        serde_yaml::from_value(serde_yaml::Value::Mapping(value)).map_err(|e| {
+            VariantConfigError::IOError(
+                path.to_path_buf(),
+                std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+            )
+        })?;
+
     Ok(config)
 }
 
 #[cfg(test)]
 mod tests {
+    use rattler_conda_types::Platform;
     use std::path::PathBuf;
 
     use rstest::rstest;
@@ -158,10 +176,7 @@ mod tests {
     #[case("conda_build_config/conda_forge_subset.yaml", None)]
     #[serial]
     fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
-        use rattler_conda_types::Platform;
-
         let path = test_data_dir().join(config_path);
-        let file = std::fs::File::open(path).unwrap();
 
         // fix the platform for the snapshots
         let selector_config = SelectorConfig {
@@ -175,7 +190,7 @@ mod tests {
             std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
         }
 
-        let config = load_conda_build_config(&file, &selector_config).unwrap();
+        let config = load_conda_build_config(&path, &selector_config).unwrap();
         insta::assert_yaml_snapshot!(
             format!(
                 "{}_{}",
