@@ -1223,4 +1223,4 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["name"] == "python-abi3-package-sample"
     assert index["noarch"] == "python"
     assert index["subdir"] == host_subdir()
-    assert index["platform"] == host_subdir().split('-')[0]
+    assert index["platform"] == host_subdir().split("-")[0]

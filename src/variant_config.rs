@@ -441,9 +441,7 @@ impl VariantConfig {
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
             for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
-                let target_platform = if recipe.build().noarch().is_none()
-                    || recipe.build().python().version_independent
-                {
+                let target_platform = if recipe.build().noarch().is_none() {
                     selector_config.target_platform
                 } else {
                     Platform::NoArch
@@ -469,12 +467,12 @@ impl VariantConfig {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),
                     build_string,
-                    noarch_type: recipe.build().noarch(),
+                    noarch_type: *recipe.build().noarch(),
                     target_platform,
                     node,
                     used_vars: variant.clone(),
                     recipe: recipe.clone(),
-                    hash: HashInfo::from_variant(&variant, &recipe.build().noarch()),
+                    hash: HashInfo::from_variant(&variant, recipe.build().noarch()),
                 });
             }
         }

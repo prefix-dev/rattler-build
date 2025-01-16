@@ -435,7 +435,9 @@ mod tests {
 
         if !tests.site_packages.is_empty() {
             println!("site_package globs: {:?}", tests.site_packages);
-            let globs = tests.site_packages_as_globs(&test_case.platform).unwrap();
+            let globs = tests
+                .site_packages_as_globs(&test_case.platform, false)
+                .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
                 test_glob_matches(&globs, &test_case.fail_paths).unwrap_err();

@@ -238,12 +238,8 @@ impl Build {
     }
 
     /// Get the noarch type.
-    pub fn noarch(&self) -> NoArchType {
-        if self.python().version_independent {
-            return NoArchType::python();
-        } else {
-            self.noarch.clone()
-        }
+    pub fn noarch(&self) -> &NoArchType {
+        &self.noarch
     }
 
     /// Python specific build configuration.
