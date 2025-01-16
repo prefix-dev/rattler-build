@@ -1530,9 +1530,6 @@
 <li>
 <p><code>--build-platform &lt;BUILD_PLATFORM&gt;</code></p>
 <p>The build platform to use for the build (e.g. for building with emulation, or rendering)</p>
-<ul>
-<li>Default value: current platform</li>
-</ul>
 </li>
 <li>
 <p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
@@ -1541,16 +1538,10 @@
 <li>
 <p><code>--host-platform &lt;HOST_PLATFORM&gt;</code></p>
 <p>The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)</p>
-<ul>
-<li>Default value: current platform</li>
-</ul>
 </li>
 <li>
 <p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
 <p>Add a channel to search for dependencies in</p>
-<ul>
-<li>Default value: <code>conda-forge</code></li>
-</ul>
 </li>
 <li>
 <p><code>-m</code>, <code>--variant-config &lt;VARIANT_CONFIG&gt;</code></p>
@@ -1604,9 +1595,6 @@
 <code>conda</code>. You can also add a compression level to the package format,
 e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number&gt;</code> (from -7 to
 22).</p>
-<ul>
-<li>Default value: <code>conda</code></li>
-</ul>
 </li>
 <li>
 <p><code>--no-include-recipe</code></p>
@@ -1620,7 +1608,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--test &lt;TEST&gt;</code></p>
 <p>The strategy to use for running tests</p>
 <ul>
-<li>Default value: <code>native-and-emulated</code></li>
 <li>Possible values:<ul>
 <li><code>skip</code>:
     Skip the tests</li>
@@ -1647,7 +1634,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>--skip-existing &lt;SKIP_EXISTING&gt;</code></p>
 <p>Whether to skip packages that already exist in any channel If set to <code>none</code>, do not skip any packages, default when not specified. If set to <code>local</code>, only skip packages that already exist locally, default when using <code>--skip-existing. If set to</code>all`, skip packages that already exist in any channel</p>
 <ul>
-<li>Default value: <code>none</code></li>
 <li>Possible values:<ul>
 <li><code>none</code>:
     Do not skip any packages</li>
