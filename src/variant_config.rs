@@ -462,7 +462,6 @@ impl VariantConfig {
                         .insert("python".parse().unwrap());
                 }
 
-                // TODO do not set target_platform to noarch
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
                     version: recipe.package().version.to_string(),

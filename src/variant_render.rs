@@ -193,7 +193,7 @@ impl Stage1Render {
         }
 
         // fix target_platform value here
-        if !recipe.build().noarch().is_none() && !recipe.build().python().version_independent {
+        if !recipe.build().noarch().is_none() {
             variant.insert("target_platform".into(), "noarch".into());
         }
 
