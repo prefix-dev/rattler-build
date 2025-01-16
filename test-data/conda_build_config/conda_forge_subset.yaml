@@ -1,0 +1,108 @@
+c_compiler:
+  - gcc                        # [linux]
+  - clang                      # [osx]
+  - vs2019                     # [win and x86_64]
+  - vs2022                     # [win and arm64]
+c_compiler_version:            # [unix]
+  - 13                         # [linux]
+  - 18                         # [osx]
+  - 11                         # [linux and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  # CUDA 12.4 on PPC does not support GCC 13
+  - 12                         # [linux and ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - 13                         # [linux and not ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+c_stdlib:
+  - sysroot                    # [linux]
+  - macosx_deployment_target   # [osx]
+  - vs                         # [win]
+m2w64_c_stdlib:                # [win]
+  - m2w64-toolchain            # [win]
+c_stdlib_version:              # [unix]
+  - 2.17                       # [linux]
+  - 10.13                      # [osx and x86_64]
+  - 11.0                       # [osx and arm64]
+cxx_compiler:
+  - gxx                        # [linux]
+  - clangxx                    # [osx]
+  - vs2019                     # [win and x86_64]
+  - vs2022                     # [win and arm64]
+cxx_compiler_version:          # [unix]
+  - 13                         # [linux]
+  - 18                         # [osx]
+  - 11                         # [linux and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - 12                         # [linux and ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - 13                         # [linux and not ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+llvm_openmp:                   # [osx]
+  - 18                         # [osx]
+fortran_compiler:              # [unix or win64]
+  - gfortran                   # [linux64 or (osx and x86_64)]
+  - gfortran                   # [aarch64 or ppc64le or armv7l or s390x]
+  - flang                      # [win64]
+fortran_compiler_version:      # [unix or win64]
+  - 13                         # [linux]
+  - 13                         # [osx]
+  - 5                          # [win64]
+  - 11                         # [linux and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - 12                         # [linux and ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - 13                         # [linux and not ppc64le and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+m2w64_c_compiler:              # [win]
+  - m2w64-toolchain            # [win]
+m2w64_cxx_compiler:            # [win]
+  - m2w64-toolchain            # [win]
+m2w64_fortran_compiler:        # [win]
+  - m2w64-toolchain            # [win]
+environment_var:
+  - CF_CUDA_ENABLED            # [os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  - CF_CUDA_DISABLED           # [os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "False"]
+
+# armv7l specifics because conda-build sets many things to centos 6
+# this can probably be removed when conda-build gets updated defaults
+# for aarch64
+cdt_arch: armv7l                          # [armv7l]
+BUILD: armv7-conda_cos7-linux-gnueabihf   # [armv7l]
+
+pin_run_as_build:
+  libblst:
+    max_pin: x.x
+  netcdf-cxx4:
+    max_pin: x.x
+  vlfeat:
+    max_pin: x.x.x
+
+# Pinning packages
+
+# blas
+libblas:
+  - 3.9.* *netlib
+libcblas:
+  - 3.9.* *netlib
+liblapack:
+  - 3.9.* *netlib
+liblapacke:
+  - 3.9.* *netlib
+blas_impl:
+  - openblas
+  - mkl          # [x86 or x86_64]
+  - blis         # [x86 or x86_64]
+
+startswith:
+  - truey  # [os.environ.get("SOMETESTVAR", "Blabla").startswith("Bla")]
+  - falsey  # [os.environ.get("SOMETESTVAR", "Blabla").startswith("Baz")]
+
+zip_keys:
+  -                             # [unix]
+    - c_compiler_version        # [unix]
+    - cxx_compiler_version      # [unix]
+    - fortran_compiler_version  # [unix]
+    - cuda_compiler             # [unix and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler_version     # [unix and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True" and os.environ.get("BUILD_PLATFORM").startswith("foo")]
+  -                             # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler             # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler_version     # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  -
+    - python
+    - numpy
+    - python_impl
+    - is_python_min
+  -
+    - libarrow
+    - libarrow_all

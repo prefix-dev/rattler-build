@@ -4,6 +4,7 @@
 
 pub mod build;
 pub mod cache;
+pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
 mod normalized_key;
@@ -219,24 +220,29 @@ pub async fn get_build_output(
     // Check if there is a `variants.yaml` file next to the recipe that we should
     // potentially use.
     let mut variant_configs = None;
-    if let Some(variant_path) = recipe_path
-        .parent()
-        .map(|parent| parent.join(consts::VARIANTS_CONFIG_FILE))
-    {
-        if variant_path.is_file() {
-            if !build_data.ignore_recipe_variants {
-                tracing::info!("Including variants from {}", variant_path.display());
-                let mut configs = build_data.variant_config.clone();
-                configs.push(variant_path);
-                variant_configs = Some(configs);
-            } else {
-                tracing::debug!(
-                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
-                    variant_path.display()
-                );
+
+    // find either variants_config_file or conda_build_config_file automatically
+    for file in [
+        consts::VARIANTS_CONFIG_FILE,
+        consts::CONDA_BUILD_CONFIG_FILE,
+    ] {
+        if let Some(variant_path) = recipe_path.parent().map(|parent| parent.join(file)) {
+            if variant_path.is_file() {
+                if !build_data.ignore_recipe_variants {
+                    tracing::info!("Including variants from {}", variant_path.display());
+                    let mut configs = build_data.variant_config.clone();
+                    configs.push(variant_path);
+                    variant_configs = Some(configs);
+                } else {
+                    tracing::debug!(
+                        "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
+                        variant_path.display()
+                    );
+                }
+                break;
             }
-        }
-    };
+        };
+    }
     let variant_configs = variant_configs
         .as_ref()
         .unwrap_or(&build_data.variant_config);
