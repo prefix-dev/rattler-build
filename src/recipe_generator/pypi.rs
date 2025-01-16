@@ -3,10 +3,12 @@ use clap::Parser;
 use miette::{IntoDiagnostic, WrapErr};
 use serde::Deserialize;
 use std::collections::HashMap;
+use std::io::{Cursor, Read as _};
 use std::path::PathBuf;
+use zip::ZipArchive;
 
 use super::write_recipe;
-use crate::recipe_generator::serialize;
+use crate::recipe_generator::serialize::{self, PythonTest, PythonTestInner, Test};
 
 #[derive(Deserialize)]
 struct CondaPyPiNameMapping {
@@ -54,6 +56,60 @@ struct PyPiInfo {
     requires_dist: Option<Vec<String>>,
     project_urls: Option<HashMap<String, String>>,
     requires_python: Option<String>,
+}
+
+async fn extract_entry_points_from_wheel(
+    url: &str,
+    client: &reqwest::Client,
+) -> miette::Result<Option<Vec<String>>> {
+    // Download the wheel
+    let wheel_data = client
+        .get(url)
+        .send()
+        .await
+        .into_diagnostic()?
+        .bytes()
+        .await
+        .into_diagnostic()?;
+
+    // Read wheel as zip
+    let reader = Cursor::new(wheel_data);
+    let mut archive = ZipArchive::new(reader).into_diagnostic()?;
+
+    // Find entry_points.txt in any .dist-info directory
+    let entry_points_file = (0..archive.len()).find(|&i| {
+        archive
+            .by_index(i)
+            .map(|file| file.name().ends_with(".dist-info/entry_points.txt"))
+            .unwrap_or(false)
+    });
+
+    if let Some(index) = entry_points_file {
+        let mut file = archive.by_index(index).into_diagnostic()?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).into_diagnostic()?;
+
+        // Parse console_scripts section
+        let console_scripts: Vec<String> = contents
+            .lines()
+            .skip_while(|l| !l.contains("[console_scripts]"))
+            .skip(1) // Skip the [console_scripts] line
+            .take_while(|l| !l.trim().is_empty() && !l.starts_with('['))
+            .map(|l| l.trim().to_string())
+            .filter(|l| !l.is_empty())
+            .map(|s| {
+                // make sure that there is a space around the `=` sign
+                let (name, script) = s.split_once('=').unwrap();
+                format!("{} = {}", name, script)
+            })
+            .collect();
+
+        if !console_scripts.is_empty() {
+            return Ok(Some(console_scripts));
+        }
+    }
+
+    Ok(None)
 }
 
 #[derive(Deserialize)]
@@ -180,6 +236,22 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
         md5: None,
     });
 
+    let wheel_url = urls
+        .iter()
+        .find(|r| r.filename.ends_with(".whl"))
+        .map(|r| r.url.clone());
+
+    if let Some(wheel_url) = wheel_url {
+        if let Some(entry_points) = extract_entry_points_from_wheel(&wheel_url, &client).await? {
+            recipe.build.python.entry_points = entry_points;
+        }
+    } else {
+        tracing::warn!(
+            "No wheel found for {} - cannot extract entry points.",
+            package
+        );
+    }
+
     // Set Python requirements
     if let Some(python_req) = info.requires_python {
         recipe
@@ -219,7 +291,14 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
         }
     }
 
-    recipe.build.script = "python -m pip install .".to_string();
+    recipe.build.script = "${{ PYTHON }} -m pip install .".to_string();
+
+    recipe.tests.push(Test::Python(PythonTest {
+        python: PythonTestInner {
+            imports: vec![info.name.clone()],
+            pip_check: true,
+        },
+    }));
 
     // Set metadata
     recipe.about.summary = info.summary;
