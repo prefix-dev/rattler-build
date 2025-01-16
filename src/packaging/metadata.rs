@@ -18,7 +18,7 @@ use rattler_conda_types::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
     },
-    Platform,
+    NoArchType, Platform,
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
 
@@ -250,7 +250,7 @@ impl Output {
     /// Create the contents of the index.json file for the given output.
     pub fn index_json(&self) -> Result<IndexJson, PackagingError> {
         let recipe = &self.recipe;
-        let target_platform = self.build_configuration.target_platform;
+        let target_platform = self.target_platform();
 
         let arch = target_platform.arch().map(|a| a.to_string());
         let platform = target_platform.only_platform().map(|p| p.to_string());
@@ -283,6 +283,14 @@ impl Output {
                 return Err(PackagingError::InvalidMetadata("Cannot set python_site_packages_path for a package that is not called `python`".to_string()));
             }
         }
+
+        // Support CEP-20 / ABI3 packages
+        let noarch = if self.recipe.build().is_python_version_independent() {
+            NoArchType::python()
+        } else {
+            *self.recipe.build().noarch()
+        };
+
         Ok(IndexJson {
             name: self.name().clone(),
             version: self.version().clone().into(),
@@ -308,7 +316,7 @@ impl Output {
                 .map(|dep| dep.spec().to_string())
                 .dedup()
                 .collect(),
-            noarch: *recipe.build().noarch(),
+            noarch,
             track_features,
             features: None,
             python_site_packages_path: recipe.build().python().site_packages_path.clone(),

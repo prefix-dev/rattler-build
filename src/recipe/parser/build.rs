@@ -276,6 +276,13 @@ impl Build {
     pub const fn post_process(&self) -> &Vec<PostProcess> {
         &self.post_process
     }
+
+    /// The output is python version independent if the package is
+    /// `noarch: python` or the python version independent flag is set
+    /// which can also be true for `abi3` packages.
+    pub(crate) fn is_python_version_independent(&self) -> bool {
+        self.python().version_independent || self.noarch().is_python()
+    }
 }
 
 impl TryConvertNode<Build> for RenderedNode {
@@ -505,6 +512,12 @@ pub struct Python {
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub use_python_app_entrypoint: bool,
 
+    /// Whether the package is Python version independent.
+    /// This is used for abi3 packages that are not tied to a specific Python version, but
+    /// still contain compiled code (and thus need to end up in the right subdir).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub version_independent: bool,
+
     /// The relative site-packages path that a Python build _exports_ for other
     /// packages to use. This setting only makes sense for the `python` package
     /// itself. For example, a python 3.13 version could advertise a
@@ -538,7 +551,8 @@ impl TryConvertNode<Python> for RenderedMappingNode {
             entry_points,
             skip_pyc_compilation,
             use_python_app_entrypoint,
-            site_packages_path
+            site_packages_path,
+            version_independent
         );
         Ok(python)
     }

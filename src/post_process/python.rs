@@ -158,7 +158,7 @@ pub fn python(temp_files: &TempFiles, output: &Output) -> Result<HashSet<PathBuf
     let version = output.version();
     let mut result = HashSet::new();
 
-    if !output.recipe.build().noarch().is_python() {
+    if !output.recipe.build().is_python_version_independent() {
         result.extend(compile_pyc(
             output,
             &temp_files.files,

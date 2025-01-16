@@ -440,7 +440,7 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for ((node, recipe), variant) in sx.into_sorted_outputs()? {
+            for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
                 let target_platform = if recipe.build().noarch().is_none() {
                     selector_config.target_platform
                 } else {
@@ -453,6 +453,14 @@ impl VariantConfig {
                     .as_resolved()
                     .expect("Build string has to be resolved")
                     .to_string();
+
+                if recipe.build().python().version_independent {
+                    recipe
+                        .requirements
+                        .ignore_run_exports
+                        .from_package
+                        .insert("python".parse().unwrap());
+                }
 
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
