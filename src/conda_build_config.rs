@@ -161,22 +161,22 @@ mod tests {
         let mut context = BTreeMap::new();
         context.insert("py3k".to_string(), Value::from(true));
         let env = Environment::new();
-        assert_eq!(evaluate_condition("py3k", &env, &context), true);
+        assert!(evaluate_condition("py3k", &env, &context));
 
         let mut context = BTreeMap::new();
         context.insert("py3k".to_string(), Value::from(false));
         let env = Environment::new();
-        assert_eq!(evaluate_condition("py3k", &env, &context), false);
+        assert!(!evaluate_condition("py3k", &env, &context));
 
         let mut context = BTreeMap::new();
         context.insert("py3k".to_string(), Value::from(true));
         let env = Environment::new();
-        assert_eq!(evaluate_condition("not py3k", &env, &context), false);
+        assert!(!evaluate_condition("not py3k", &env, &context));
 
         let mut context = BTreeMap::new();
         context.insert("py3k".to_string(), Value::from(false));
         let env = Environment::new();
-        assert_eq!(evaluate_condition("not py3k", &env, &context), true);
+        assert!(evaluate_condition("not py3k", &env, &context));
     }
 
     #[rstest]
@@ -227,7 +227,6 @@ mod tests {
     }
 
     fn test_data_dir() -> PathBuf {
-        let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/");
-        return test_data_dir;
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/")
     }
 }
