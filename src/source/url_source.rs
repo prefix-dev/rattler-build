@@ -11,7 +11,7 @@ use crate::{
     console_utils::LoggingOutputHandler,
     recipe::parser::UrlSource,
     source::extract::{extract_tar, extract_zip},
-    tool_configuration,
+    tool_configuration::{self, APP_USER_AGENT},
 };
 use tokio::io::AsyncWriteExt;
 
@@ -66,16 +66,24 @@ async fn fetch_remote(
     target: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
-    let client = reqwest::Client::new();
-    let download_size = {
-        let resp = client.head(url.as_str()).send().await?;
+    let client = reqwest::Client::builder()
+        .user_agent(APP_USER_AGENT)
+        .redirect(reqwest::redirect::Policy::limited(50))
+        .build()?;
+
+    let (mut response, download_size) = {
+        let resp = client.get(url.as_str()).send().await?;
+
         match resp.error_for_status() {
-            Ok(resp) => resp
-                .headers()
-                .get(reqwest::header::CONTENT_LENGTH)
-                .and_then(|ct_len| ct_len.to_str().ok())
-                .and_then(|ct_len| ct_len.parse().ok())
-                .unwrap_or(0),
+            Ok(resp) => {
+                let dl_size = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|ct_len| ct_len.to_str().ok())
+                    .and_then(|ct_len| ct_len.parse().ok())
+                    .unwrap_or(0);
+                (resp, dl_size)
+            }
             Err(e) => {
                 return Err(SourceError::Url(e));
             }
@@ -94,12 +102,9 @@ async fn fetch_remote(
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
+
     let mut file = tokio::fs::File::create(&target).await?;
-
-    let request = client.get(url.clone());
-    let mut download = request.send().await?;
-
-    while let Some(chunk) = download.chunk().await? {
+    while let Some(chunk) = response.chunk().await? {
         progress_bar.inc(chunk.len() as u64);
         file.write_all(&chunk).await?;
     }
