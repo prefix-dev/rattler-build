@@ -83,3 +83,26 @@ blas_impl:
   - openblas
   - mkl          # [x86 or x86_64]
   - blis         # [x86 or x86_64]
+
+startswith:
+  - truey  # [os.environ.get("SOMETESTVAR", "Blabla").startswith("Bla")]
+  - falsey  # [os.environ.get("SOMETESTVAR", "Blabla").startswith("Baz")]
+
+zip_keys:
+  -                             # [unix]
+    - c_compiler_version        # [unix]
+    - cxx_compiler_version      # [unix]
+    - fortran_compiler_version  # [unix]
+    - cuda_compiler             # [unix and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler_version     # [unix and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True" and os.environ.get("BUILD_PLATFORM").startswith("foo")]
+  -                             # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler             # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+    - cuda_compiler_version     # [win64 and os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
+  -
+    - python
+    - numpy
+    - python_impl
+    - is_python_min
+  -
+    - libarrow
+    - libarrow_all

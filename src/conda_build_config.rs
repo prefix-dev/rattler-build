@@ -60,7 +60,10 @@ pub fn load_conda_build_config(
     let mut input = fs_err::read_to_string(path)
         .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
 
-    let context = selector_config.clone().into_context();
+    let mut context = selector_config.clone().into_context();
+
+    let short_target_platform = selector_config.target_platform.to_string().replace("-", "");
+    context.insert(short_target_platform, Value::from(true));
 
     let mut env = Environment::new();
 
@@ -74,6 +77,8 @@ pub fn load_conda_build_config(
 
     // replace all `os.environ.get` calls with `environ_get`
     input = input.replace("os.environ.get", "environ_get");
+    // replace calls to `.startswith` with `is startingwith`
+    input = input.replace(".startswith", " is startingwith");
 
     let mut lines = Vec::new();
     for line in input.lines() {

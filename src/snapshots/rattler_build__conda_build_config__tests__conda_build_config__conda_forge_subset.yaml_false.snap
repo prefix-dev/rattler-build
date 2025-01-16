@@ -12,7 +12,16 @@ pin_run_as_build:
   vlfeat:
     max_pin: x.x.x
     min_pin: ~
-zip_keys: ~
+zip_keys:
+  - - c_compiler_version
+    - cxx_compiler_version
+    - fortran_compiler_version
+  - - python
+    - numpy
+    - python_impl
+    - is_python_min
+  - - libarrow
+    - libarrow_all
 blas_impl:
   - openblas
 c_compiler:
@@ -41,3 +50,5 @@ liblapacke:
   - 3.9.* *netlib
 llvm_openmp:
   - "18"
+startswith:
+  - truey
