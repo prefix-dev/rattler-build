@@ -16,21 +16,18 @@ rust-version = "1.81.0"
 
 [features]
 default = ['rustls-tls', 'recipe-generation']
-native-tls = [
-    'reqwest/native-tls',
-    'rattler/native-tls',
-]
+native-tls = ['reqwest/native-tls', 'rattler/native-tls']
 rustls-tls = [
-    'reqwest/rustls-tls',
-    'reqwest/rustls-tls-native-roots',
-    'rattler/rustls-tls',
+  'reqwest/rustls-tls',
+  'reqwest/rustls-tls-native-roots',
+  'rattler/rustls-tls',
 ]
 tui = [
-    'ratatui',
-    'crossterm',
-    'ansi-to-tui',
-    'throbber-widgets-tui',
-    'tui-input',
+  'ratatui',
+  'crossterm',
+  'ansi-to-tui',
+  'throbber-widgets-tui',
+  'tui-input',
 ]
 recipe-generation = []
 # This feature needs to add a dependency on
@@ -51,9 +48,14 @@ walkdir = "2.5.0"
 hex = "0.4.3"
 serde_json = "1.0.135"
 reqwest = { version = "0.12.12", default-features = false, features = [
-    "multipart",
+  "multipart",
 ] }
-tokio = { version = "1.43.0", features = ["rt", "macros", "rt-multi-thread", "process"] }
+tokio = { version = "1.43.0", features = [
+  "rt",
+  "macros",
+  "rt-multi-thread",
+  "process",
+] }
 itertools = "0.14.0"
 content_inspector = "0.2.4"
 serde_with = "3.12.0"
@@ -61,14 +63,14 @@ url = "2.5.4"
 tracing = "0.1.41"
 clap = { version = "4.5.24", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=2.4.0", features = [
-    "unstable_machinery",
-    "custom_syntax",
+  "unstable_machinery",
+  "custom_syntax",
 ] }
 tracing-subscriber = { version = "0.3.19", features = [
-    "env-filter",
-    "fmt",
-    "ansi",
-    "json",
+  "env-filter",
+  "fmt",
+  "ansi",
+  "json",
 ] }
 marked-yaml = { version = "0.7.2" }
 miette = { version = "7.4.0", features = ["fancy"] }
@@ -100,8 +102,8 @@ tokio-util = "0.7.13"
 
 tar = "0.4.43"
 zip = { version = "2.2.2", default-features = false, features = [
-    "flate2",
-    "deflate",
+  "flate2",
+  "deflate",
 ] }
 bzip2 = "0.5.0"
 base64 = "0.22.1"
@@ -110,9 +112,7 @@ xz2 = "0.1.7"
 zstd = "0.13.2"
 toml = "0.8.19"
 memmap2 = "0.9.5"
-reqwest-middleware = { version = "0.4.0", features = [
-        "json",
-] }
+reqwest-middleware = { version = "0.4.0", features = ["json"] }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.1"
 memchr = "2.7.4"
@@ -128,17 +128,33 @@ regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.28.11", default-features = false, features = ["cli-tools", "indicatif"] }
+rattler = { version = "0.28.11", default-features = false, features = [
+  "cli-tools",
+  "indicatif",
+] }
 rattler_cache = { version = "0.3.3", default-features = false }
-rattler_conda_types = { version = "0.29.9", default-features = false, features = ["rayon"] }
-rattler_digest = { version = "1.0.5", default-features = false, features = ["serde"] }
+rattler_conda_types = { version = "0.29.9", default-features = false, features = [
+  "rayon",
+] }
+rattler_digest = { version = "1.0.5", default-features = false, features = [
+  "serde",
+] }
 rattler_index = { version = "0.20.6", default-features = false }
 rattler_networking = { version = "0.21.10", default-features = false }
 rattler_redaction = { version = "0.1.6" }
-rattler_repodata_gateway = { version = "0.21.31", default-features = false, features = ["gateway"] }
-rattler_sandbox = { version = "0.1.2", default-features = false, features = ["tokio"] }
-rattler_shell = { version = "0.22.14", default-features = false, features = ["sysinfo"] }
-rattler_solve = { version = "1.3.3", default-features = false, features = ["resolvo", "serde"] }
+rattler_repodata_gateway = { version = "0.21.31", default-features = false, features = [
+  "gateway",
+] }
+rattler_sandbox = { version = "0.1.2", default-features = false, features = [
+  "tokio",
+] }
+rattler_shell = { version = "0.22.14", default-features = false, features = [
+  "sysinfo",
+] }
+rattler_solve = { version = "1.3.3", default-features = false, features = [
+  "resolvo",
+  "serde",
+] }
 rattler_virtual_packages = { version = "1.1.17", default-features = false }
 rattler_package_streaming = { version = "0.22.22", default-features = false }
 lazy_static = "1.5.0"
@@ -161,19 +177,19 @@ opt-level = 3
 
 [package.metadata.cross.target.x86_64-unknown-linux-gnu]
 pre-build = [
-    "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
 [package.metadata.cross.target.powerpc64le-unknown-linux-gnu]
 pre-build = [
-    "dpkg --add-architecture $CROSS_DEB_ARCH",
-    "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
+  "dpkg --add-architecture $CROSS_DEB_ARCH",
+  "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
 ]
 
 [patch.crates-io]
 # this fork contains fixes for slow zip reading and large file writing
-zip = { git = "https://github.com/wolfv/zip2", branch = "patched"}
+zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
 # rattler = { git = "https://github.com/conda/rattler", branch = "main" }
 # rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
