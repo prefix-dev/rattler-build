@@ -1220,6 +1220,7 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
 
     # load index.json
     index = json.loads((pkg / "info/index.json").read_text())
-    assert index["name"] == "spam"
+    assert index["name"] == "python-abi3-package-sample"
     assert index["noarch"] == "python"
-    assert index["platform"] == host_subdir()
+    assert index["subdir"] == host_subdir()
+    assert index["platform"] == host_subdir().split('-')[0]
