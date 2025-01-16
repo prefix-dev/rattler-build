@@ -120,7 +120,7 @@ impl Output {
             }
         }
 
-        if noarch_type.is_python() {
+        if self.recipe.build().is_python_version_independent() {
             // we need to remove files in bin/ that are registered as entry points
             if path_rel.starts_with("bin") {
                 if let Some(name) = path_rel.file_name() {

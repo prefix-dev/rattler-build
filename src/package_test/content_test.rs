@@ -168,6 +168,7 @@ impl PackageContentsTest {
         let site_packages_base = if target_platform.is_windows() {
             "Lib/site-packages"
         } else if matches!(target_platform, Platform::NoArch) {
+            // TODO version independence
             "site-packages"
         } else {
             "lib/python*/site-packages"

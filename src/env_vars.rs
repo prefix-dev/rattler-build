@@ -255,7 +255,7 @@ pub fn vars(output: &Output, build_state: &str) -> HashMap<String, Option<String
     insert!(vars, "PIP_NO_INDEX", "True");
 
     // For noarch packages, do not write any bytecode
-    if output.build_configuration.target_platform == Platform::NoArch {
+    if output.recipe.build().is_python_version_independent() {
         insert!(vars, "PYTHONDONTWRITEBYTECODE", "1");
     }
 
