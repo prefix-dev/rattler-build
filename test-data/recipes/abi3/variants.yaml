@@ -1,6 +1,2 @@
 python_min:
   - "3.8"
-c_stdlib:
-- macosx_deployment_target
-c_stdlib_version:
-- '11.0'
