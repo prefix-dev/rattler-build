@@ -13,16 +13,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
-    _partialerror,
-    conda_build_config::load_conda_build_config,
-    normalized_key::NormalizedKey,
-    recipe::{
+    _partialerror, conda_build_config::load_conda_build_config, consts::CONDA_BUILD_CONFIG_FILE, normalized_key::NormalizedKey, recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
         Jinja, Render,
-    },
-    selectors::SelectorConfig,
-    variant_render::stage_0_render,
+    }, selectors::SelectorConfig, variant_render::stage_0_render
 };
 use crate::{hash::HashInfo, recipe::Recipe, variant_render::stage_1_render};
 
@@ -205,7 +200,7 @@ impl VariantConfig {
         path: &Path,
         selector_config: &SelectorConfig,
     ) -> Result<VariantConfig, VariantConfigError> {
-        if path.file_name() == Some("conda_build_config.yaml".as_ref()) {
+        if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
             Self::load_conda_build_config(path, selector_config)
         } else {
             Self::load_variant_config(path, selector_config)

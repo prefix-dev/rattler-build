@@ -232,7 +232,7 @@ pub async fn get_build_output(
                 variant_configs = Some(configs);
             } else {
                 tracing::debug!(
-                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
+                    "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
                     variant_path.display()
                 );
             }
