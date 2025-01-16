@@ -1202,6 +1202,9 @@ def test_cache_select_files(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert paths["paths"][1]["path_type"] == "hardlink"
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
 def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "abi3", tmp_path)
     pkg = get_extracted_package(tmp_path, "python-abi3-package-sample")
