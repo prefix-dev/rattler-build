@@ -238,7 +238,7 @@ impl Build {
     }
 
     /// Get the noarch type.
-    pub fn noarch(&self) -> &NoArchType {
+    pub const fn noarch(&self) -> &NoArchType {
         &self.noarch
     }
 
@@ -277,6 +277,9 @@ impl Build {
         &self.post_process
     }
 
+    /// The output is python version independent if the package is
+    /// `noarch: python` or the python version independent flag is set
+    /// which can also be true for `abi3` packages.
     pub(crate) fn is_python_version_independent(&self) -> bool {
         self.python().version_independent || self.noarch().is_python()
     }
