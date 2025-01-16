@@ -9,23 +9,28 @@ use crate::{
 };
 
 #[derive(Debug)]
-struct ParsedLine {
-    content: String,
-    condition: Option<String>,
+struct ParsedLine<'a> {
+    content: &'a str,
+    condition: Option<&'a str>,
 }
 
-fn parse_line(line: &str) -> ParsedLine {
-    let parts: Vec<&str> = line.splitn(2, '#').collect();
-    let content = parts[0].trim().to_string();
-    let condition = parts.get(1).and_then(|c| {
-        if c.trim().starts_with('[') && c.trim().ends_with(']') {
-            Some(c.trim()[1..c.trim().len() - 1].trim().to_string())
-        } else {
-            None
+impl<'a> ParsedLine<'a> {
+    pub fn from_str(s: &'a str) -> ParsedLine<'a> {
+        match s.split_once('#') {
+            Some((content, cond)) => ParsedLine {
+                content: content.trim_end(),
+                condition: cond
+                    .trim()
+                    .strip_prefix('[')
+                    .and_then(|s| s.strip_suffix(']'))
+                    .map(str::trim),
+            },
+            None => ParsedLine {
+                content: s.trim_end(),
+                condition: None,
+            },
         }
-    });
-
-    ParsedLine { content, condition }
+    }
 }
 
 fn evaluate_condition(
@@ -36,7 +41,7 @@ fn evaluate_condition(
     if condition.is_empty() {
         return true;
     }
-    println!("Evaluate condition: {}", condition);
+
     let template_str = format!("{{% if {} %}}true{{% else %}}false{{% endif %}}", condition);
     let template = env.template_from_str(&template_str).unwrap();
 
@@ -72,7 +77,7 @@ pub fn load_conda_build_config(
 
     let mut lines = Vec::new();
     for line in input.lines() {
-        let parsed = parse_line(line);
+        let parsed = ParsedLine::from_str(line);
         let mut line_content = if let Some(condition) = &parsed.condition {
             if evaluate_condition(condition, &env, &context) {
                 parsed.content.to_string()
@@ -137,13 +142,13 @@ mod tests {
 
     #[test]
     fn test_parse_line() {
-        let parsed = parse_line("  - python\n");
-        assert_eq!(parsed.content, "- python");
+        let parsed = ParsedLine::from_str("  - python\n");
+        assert_eq!(parsed.content, "  - python");
         assert_eq!(parsed.condition, None);
 
-        let parsed = parse_line("  - python # [py3k]\n");
-        assert_eq!(parsed.content, "- python");
-        assert_eq!(parsed.condition, Some("py3k".to_string()));
+        let parsed = ParsedLine::from_str("  - python # [py3k]\n");
+        assert_eq!(parsed.content, "  - python");
+        assert_eq!(parsed.condition, Some("py3k"));
     }
 
     #[test]

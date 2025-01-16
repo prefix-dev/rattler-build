@@ -2,8 +2,19 @@
 source: src/conda_build_config.rs
 expression: config
 ---
-pin_run_as_build: ~
+pin_run_as_build:
+  libblst:
+    max_pin: x.x
+    min_pin: ~
+  netcdf-cxx4:
+    max_pin: x.x
+    min_pin: ~
+  vlfeat:
+    max_pin: x.x.x
+    min_pin: ~
 zip_keys: ~
+blas_impl:
+  - openblas
 c_compiler:
   - clang
 c_compiler_version:
@@ -20,5 +31,13 @@ environment_var:
   - CF_CUDA_ENABLED
 fortran_compiler_version:
   - "13"
+libblas:
+  - 3.9.* *netlib
+libcblas:
+  - 3.9.* *netlib
+liblapack:
+  - 3.9.* *netlib
+liblapacke:
+  - 3.9.* *netlib
 llvm_openmp:
   - "18"

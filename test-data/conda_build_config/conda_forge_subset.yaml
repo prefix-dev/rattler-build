@@ -53,3 +53,33 @@ m2w64_fortran_compiler:        # [win]
 environment_var:
   - CF_CUDA_ENABLED            # [os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "True"]
   - CF_CUDA_DISABLED           # [os.environ.get("TEST_CF_CUDA_ENABLED", "False") == "False"]
+
+# armv7l specifics because conda-build sets many things to centos 6
+# this can probably be removed when conda-build gets updated defaults
+# for aarch64
+cdt_arch: armv7l                          # [armv7l]
+BUILD: armv7-conda_cos7-linux-gnueabihf   # [armv7l]
+
+pin_run_as_build:
+  libblst:
+    max_pin: x.x
+  netcdf-cxx4:
+    max_pin: x.x
+  vlfeat:
+    max_pin: x.x.x
+
+# Pinning packages
+
+# blas
+libblas:
+  - 3.9.* *netlib
+libcblas:
+  - 3.9.* *netlib
+liblapack:
+  - 3.9.* *netlib
+liblapacke:
+  - 3.9.* *netlib
+blas_impl:
+  - openblas
+  - mkl          # [x86 or x86_64]
+  - blis         # [x86 or x86_64]
