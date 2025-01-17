@@ -697,6 +697,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#merging-of-multiple-variant-configuration-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Merging of multiple variant configuration files
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#conda-build-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       conda-build Compatibility
@@ -1383,6 +1392,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#merging-of-multiple-variant-configuration-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      Merging of multiple variant configuration files
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#conda-build-compatibility" class="md-nav__link">
     <span class="md-ellipsis">
       conda-build Compatibility
@@ -1540,12 +1558,18 @@ either:</p>
 </ul>
 <p>To disable automatic discovery, use the <code>--ignore-recipe-variants</code> flag.
 If you pass variant configuration files explicitly using <code>--variant-config / -m
-&lt;file&gt;</code>, automatic discovery is disabled as well.</p>
+&lt;file&gt;</code>, the passed variants are loaded with higher priority.</p>
 <h3 id="custom-configuration-files">Custom Configuration Files<a class="headerlink" href="#custom-configuration-files" title="Permanent link">#</a></h3>
 <p>To specify variant configurations from other locations or include multiple
 files, use the <code>--variant-config</code> or <code>-m</code> option:</p>
 <div class="language-sh highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--variant-config<span class="w"> </span>~/user_variants.yaml<span class="w"> </span>--variant-config<span class="w"> </span>/opt/rattler-build/global_variants.yaml<span class="w"> </span>--recipe<span class="w"> </span>myrecipe.yaml
 </span></code></pre></div>
+<h3 id="merging-of-multiple-variant-configuration-files">Merging of multiple variant configuration files<a class="headerlink" href="#merging-of-multiple-variant-configuration-files" title="Permanent link">#</a></h3>
+<p>When multiple variant configuration files are merged, the following rules apply:</p>
+<ul>
+<li>A key from a higher priority file will completely override a key from a lower priority file.</li>
+<li>Zip key lengths must still match.</li>
+</ul>
 <h3 id="conda-build-compatibility"><code>conda-build</code> Compatibility<a class="headerlink" href="#conda-build-compatibility" title="Permanent link">#</a></h3>
 <p>Since version 0.35.0, rattler-build supports conda_build_config.yaml files,
 parsing a subset of conda-build's configuration syntax. The filename must match
