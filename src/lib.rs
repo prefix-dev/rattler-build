@@ -217,9 +217,9 @@ pub async fn get_build_output(
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
 
-    // Check if there is a `variants.yaml` file next to the recipe that we should
-    // potentially use.
-    let mut variant_configs = None;
+    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to the
+    // recipe that we should potentially use.
+    let mut detected_variant_config = None;
 
     // find either variants_config_file or conda_build_config_file automatically
     for file in [
@@ -229,10 +229,9 @@ pub async fn get_build_output(
         if let Some(variant_path) = recipe_path.parent().map(|parent| parent.join(file)) {
             if variant_path.is_file() {
                 if !build_data.ignore_recipe_variants {
-                    tracing::info!("Including variants from {}", variant_path.display());
                     let mut configs = build_data.variant_config.clone();
                     configs.push(variant_path);
-                    variant_configs = Some(configs);
+                    detected_variant_config = Some(configs);
                 } else {
                     tracing::debug!(
                         "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
@@ -243,12 +242,17 @@ pub async fn get_build_output(
             }
         };
     }
-    let variant_configs = variant_configs
-        .as_ref()
-        .unwrap_or(&build_data.variant_config);
+
+    // If `-m foo.yaml` is passed as variant config, we should use that instead of
+    // the auto-detected one.
+    let variant_configs = if !build_data.variant_config.is_empty() {
+        build_data.variant_config.clone()
+    } else {
+        detected_variant_config.unwrap_or_default()
+    };
 
     let variant_config =
-        VariantConfig::from_files(variant_configs, &selector_config).into_diagnostic()?;
+        VariantConfig::from_files(&variant_configs, &selector_config).into_diagnostic()?;
 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
