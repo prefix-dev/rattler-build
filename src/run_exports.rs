@@ -97,7 +97,13 @@ impl RunExportExtractor {
             .expect("semaphore error");
 
         match package_cache
-            .get_or_fetch_from_url_with_retry(cache_key, url, client, default_retry_policy(), Some(Arc::new(progress_reporter)))
+            .get_or_fetch_from_url_with_retry(
+                cache_key,
+                url,
+                client,
+                default_retry_policy(),
+                Some(Arc::new(progress_reporter)),
+            )
             .await
         {
             Ok(package_dir) => Ok(RunExportsJson::from_package_directory(package_dir.path()).ok()),
