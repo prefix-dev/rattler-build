@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.34.1"
+version = "0.35.2"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -40,8 +40,14 @@ name = "rattler-build"
 required-features = ["recipe-generation"]
 
 [dependencies]
-
+itertools = "0.14.0"
 content_inspector = "0.2.4"
+tokio = { version = "1.43.0", features = [
+    "rt",
+    "macros",
+    "rt-multi-thread",
+    "process",
+] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde-untagged = "0.1.6"
@@ -52,17 +58,10 @@ serde_json = "1.0.135"
 reqwest = { version = "0.12.12", default-features = false, features = [
     "multipart",
 ] }
-tokio = { version = "1.43.0", features = [
-    "rt",
-    "macros",
-    "rt-multi-thread",
-    "process",
-] }
-itertools = "0.14.0"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.24", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.26", features = ["derive", "env", "cargo"] }
 minijinja = { version = "=2.4.0", features = [
     "unstable_machinery",
     "custom_syntax",
@@ -83,7 +82,7 @@ comfy-table = "7.1.3"
 futures = "0.3.31"
 indicatif = "0.17.9"
 console = { version = "0.15.10", features = ["windows-console-colors"] }
-thiserror = "2.0.10"
+thiserror = "2.0.11"
 tempfile = "3.15.0"
 chrono = "0.4.39"
 sha1 = "0.10.6"
@@ -97,7 +96,7 @@ indexmap = "2.7.0"
 dunce = "1.0.5"
 fs-err = "3.0.0"
 which = "7.0.1"
-clap_complete = "4.5.41"
+clap_complete = "4.5.42"
 clap_complete_nushell = "4.5.5"
 tokio-util = "0.7.13"
 
@@ -122,44 +121,44 @@ crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.11.1", optional = true }
-reflink-copy = "0.1.21"
+reflink-copy = "0.1.22"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.28.11", default-features = false, features = [
+rattler = { version = "0.28.12", default-features = false, features = [
     "cli-tools",
     "indicatif",
 ] }
-rattler_cache = { version = "0.3.3", default-features = false }
-rattler_conda_types = { version = "0.29.9", default-features = false, features = [
+rattler_cache = { version = "0.3.4", default-features = false }
+rattler_conda_types = { version = "0.29.10", default-features = false, features = [
     "rayon",
 ] }
 rattler_digest = { version = "1.0.5", default-features = false, features = [
     "serde",
 ] }
-rattler_index = { version = "0.20.6", default-features = false }
-rattler_networking = { version = "0.21.10", default-features = false, features = [
+rattler_index = { version = "0.20.7", default-features = false }
+rattler_networking = { version = "0.21.10", features = [
     "s3",
-] }
+], default-features = false }
 rattler_redaction = { version = "0.1.6" }
-rattler_repodata_gateway = { version = "0.21.31", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.21.32", default-features = false, features = [
     "gateway",
 ] }
 rattler_sandbox = { version = "0.1.2", default-features = false, features = [
     "tokio",
 ] }
-rattler_shell = { version = "0.22.14", default-features = false, features = [
+rattler_shell = { version = "0.22.15", default-features = false, features = [
     "sysinfo",
 ] }
-rattler_solve = { version = "1.3.3", default-features = false, features = [
+rattler_solve = { version = "1.3.4", default-features = false, features = [
     "resolvo",
     "serde",
 ] }
-rattler_virtual_packages = { version = "1.1.17", default-features = false }
-rattler_package_streaming = { version = "0.22.22", default-features = false }
+rattler_virtual_packages = { version = "1.2.0", default-features = false }
+rattler_package_streaming = { version = "0.22.23", default-features = false }
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 aws-smithy-types = { version = "1.2.11", default-features = false, features = [
@@ -186,6 +185,7 @@ insta = { version = "1.42.0", features = ["yaml"] }
 rstest = "0.24.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.8"
+serial_test = "3.2.0"
 
 [profile.dev.package."*"]
 opt-level = 3

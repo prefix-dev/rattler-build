@@ -146,7 +146,7 @@ pub async fn run_build(
     for test in output.recipe.tests() {
         if let TestType::PackageContents { package_contents } = test {
             package_contents
-                .run_test(&paths_json, &output.build_configuration.target_platform)
+                .run_test(&paths_json, &output)
                 .into_diagnostic()?;
         }
     }

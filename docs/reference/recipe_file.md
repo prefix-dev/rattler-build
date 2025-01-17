@@ -35,11 +35,12 @@ The reason for a new spec are:
   YAML
 - selectors use a YAML dictionary style (vs. comments in conda-build). Instead
   of `- somepkg  #[osx]` we use:
-   ```yaml
-   if: osx
-   then:
-     - somepkg
-   ```
+  ```yaml
+  if: osx
+  then:
+    - somepkg
+  ```
+
 - `skip` instruction uses a list of skip conditions and not the selector syntax
   from `conda-build` (e.g. `skip: ["osx", "win and py37"]`)
 
@@ -356,19 +357,6 @@ build:
     rpath_allowlist: ["/usr/lib/**"]
 ```
 
-#### Python entry points
-
-The following example creates a Python entry point named "`bsdiff4`" that calls
-``bsdiff4.cli.main_bsdiff4()``.
-
-```yaml
-build:
-  python:
-    entry_points:
-      - bsdiff4 = bsdiff4.cli:main_bsdiff4
-      - bspatch4 = bsdiff4.cli:main_bspatch4
-```
-
 ### Script
 
 By default, `rattler-build` uses a `build.sh` file on Unix (macOS and Linux) and a
@@ -419,8 +407,8 @@ build:
 ```
 
 `noarch: generic` is most useful for packages such as static JavaScript assets
-and source archives. For pure Python packages that can run on any Python
-version, you can use the `noarch: python` value instead:
+and source archives. For pure Python packages (similar to `none-any` wheels)
+that can run on any Python version, you can use the `noarch: python` value instead:
 
 ```yaml
 build:
@@ -433,7 +421,39 @@ build:
     evaluate to `true` in the platform it is built on, which probably will result
     in incorrect/incomplete installation in other platforms.
 
-### Include build recipe
+### Python specific options
+
+#### Entry points
+
+The following example creates a Python entry point named "`bsdiff4`" that calls
+``bsdiff4.cli.main_bsdiff4()``. This is needed in [`noarch: python` packages](#architecture-independent-packages) to create
+OS specific entry points at installation time.
+
+```yaml
+build:
+  python:
+    entry_points:
+      - bsdiff4 = bsdiff4.cli:main_bsdiff4
+      - bspatch4 = bsdiff4.cli:main_bspatch4
+```
+
+#### Version independent (ABI3) packages
+
+Since rattler-build 0.35.0 and [CEP 20](https://github.com/conda/ceps/blob/main/cep-0020.md)
+you can create version-independent Python packages that still contain compiled code.
+
+ABI3 packages support building a native Python extension using a specific Python
+version and running it against any later Python version. ABI3 or stable ABI is
+supported by only CPython - the reference Python implementation with the Global
+Interpreter Lock (GIL) enabled.
+
+```yaml
+build:
+  python:
+    version_independent: true  # defaults to false
+```
+
+## Include build recipe
 
 The recipe and rendered `recipe.yaml` file are included in
 the `package_metadata` by default. You can disable this by passing
@@ -1146,7 +1166,6 @@ cdt('package-name') # outputs: package-name-cos6-aarch64
 
 Example: [`cdt` usage example](https://github.com/prefix-dev/rattler-build/tree/main/examples/match_and_cdt/recipe.yaml)
 
-
 ## Preprocessing selectors
 
 You can add selectors to any item, and the selector is evaluated in a
@@ -1155,7 +1174,6 @@ into the parent element. If a selector evaluates to `false`, the item is
 removed.
 
 Selectors can use `if ... then ... else` as follows:
-
 
 ```yaml
 source:

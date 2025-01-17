@@ -28,7 +28,7 @@ use crate::normalized_key::NormalizedKey;
 ///
 /// used variables - anything with a value in conda_build_config.yaml that applies to this
 ///    recipe.  Includes compiler if compiler jinja2 function is used.
-
+///
 /// This implements a formatter that uses the same formatting as
 /// as the standard lib python `json.dumps()`
 #[derive(Clone, Debug)]

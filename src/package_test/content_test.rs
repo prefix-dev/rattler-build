@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use crate::package_test::TestError;
 use crate::recipe::parser::PackageContentsTest;
+use crate::{metadata::Output, package_test::TestError};
 use globset::{Glob, GlobBuilder, GlobSet};
 use rattler_conda_types::{package::PathsJson, Arch, Platform};
 
@@ -162,13 +162,14 @@ impl PackageContentsTest {
     pub fn site_packages_as_globs(
         &self,
         target_platform: &Platform,
+        version_independent: bool,
     ) -> Result<Vec<(String, GlobSet)>, globset::Error> {
         let mut result = Vec::new();
 
-        let site_packages_base = if target_platform.is_windows() {
-            "Lib/site-packages"
-        } else if matches!(target_platform, Platform::NoArch) {
+        let site_packages_base = if version_independent {
             "site-packages"
+        } else if target_platform.is_windows() {
+            "Lib/site-packages"
         } else {
             "lib/python*/site-packages"
         };
@@ -214,10 +215,10 @@ impl PackageContentsTest {
     }
 
     /// Run the package content test
-    pub fn run_test(&self, paths: &PathsJson, target_platform: &Platform) -> Result<(), TestError> {
+    pub fn run_test(&self, paths: &PathsJson, output: &Output) -> Result<(), TestError> {
         let span = tracing::info_span!("Package content test");
         let _enter = span.enter();
-
+        let target_platform = output.target_platform();
         let paths = paths
             .paths
             .iter()
@@ -227,7 +228,10 @@ impl PackageContentsTest {
         let include_globs = self.include_as_globs(target_platform)?;
         let bin_globs = self.bin_as_globs(target_platform)?;
         let lib_globs = self.lib_as_globs(target_platform)?;
-        let site_package_globs = self.site_packages_as_globs(target_platform)?;
+        let site_package_globs = self.site_packages_as_globs(
+            target_platform,
+            output.recipe.build().is_python_version_independent(),
+        )?;
         let file_globs = self.files_as_globs()?;
 
         fn match_glob<'a>(glob: &GlobSet, paths: &'a Vec<&PathBuf>) -> Vec<&'a PathBuf> {
@@ -431,7 +435,9 @@ mod tests {
 
         if !tests.site_packages.is_empty() {
             println!("site_package globs: {:?}", tests.site_packages);
-            let globs = tests.site_packages_as_globs(&test_case.platform).unwrap();
+            let globs = tests
+                .site_packages_as_globs(&test_case.platform, false)
+                .unwrap();
             test_glob_matches(&globs, &test_case.paths)?;
             if !test_case.fail_paths.is_empty() {
                 test_glob_matches(&globs, &test_case.fail_paths).unwrap_err();

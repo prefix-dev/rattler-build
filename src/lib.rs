@@ -4,6 +4,7 @@
 
 pub mod build;
 pub mod cache;
+pub mod conda_build_config;
 pub mod console_utils;
 pub mod metadata;
 mod normalized_key;
@@ -123,35 +124,41 @@ pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
 
 /// Returns the tool configuration.
 pub fn get_tool_config(
-    args: &BuildOpts,
-    fancy_log_handler: &LoggingOutputHandler,
+    build_data: &BuildData,
+    fancy_log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<Configuration> {
     let client =
-        tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file.clone())
+        tool_configuration::reqwest_client_from_auth_storage(build_data.common.auth_file.clone())
             .into_diagnostic()?;
 
-    Ok(Configuration::builder()
-        .with_logging_output_handler(fancy_log_handler.clone())
-        .with_keep_build(args.keep_build)
-        .with_compression_threads(args.compression_threads)
+    let configuration_builder = Configuration::builder()
+        .with_keep_build(build_data.keep_build)
+        .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
-        .with_testing(!args.no_test)
-        .with_test_strategy(args.test)
-        .with_zstd_repodata_enabled(args.common.use_zstd)
-        .with_bz2_repodata_enabled(args.common.use_zstd)
-        .with_skip_existing(args.skip_existing)
-        .with_noarch_build_platform(args.noarch_build_platform)
-        .with_channel_priority(args.common.channel_priority.value)
-        .finish())
+        .with_testing(!build_data.no_test)
+        .with_test_strategy(build_data.test)
+        .with_zstd_repodata_enabled(build_data.common.use_zstd)
+        .with_bz2_repodata_enabled(build_data.common.use_zstd)
+        .with_skip_existing(build_data.skip_existing)
+        .with_noarch_build_platform(build_data.noarch_build_platform)
+        .with_channel_priority(build_data.common.channel_priority.value);
+
+    let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
+        configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
+    } else {
+        configuration_builder
+    };
+
+    Ok(configuration_builder.finish())
 }
 
 /// Returns the output for the build.
 pub async fn get_build_output(
-    args: &BuildOpts,
+    build_data: &BuildData,
     recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
-    let mut output_dir = args
+    let mut output_dir = build_data
         .common
         .output_dir
         .clone()
@@ -162,25 +169,12 @@ pub async fn get_build_output(
 
     let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
 
-    if args.target_platform == Some(Platform::NoArch) || args.build_platform == Platform::NoArch {
+    if build_data.target_platform == Platform::NoArch
+        || build_data.build_platform == Platform::NoArch
+    {
         return Err(miette::miette!(
             "target-platform / build-platform cannot be `noarch` - that should be defined in the recipe"
         ));
-    }
-
-    let mut host_platform = args.host_platform;
-
-    // If target_platform is not set, we default to the host platform
-    let target_platform = args.target_platform.unwrap_or(host_platform);
-
-    // If target_platform is set and host_platform is not, then we default
-    // host_platform to the target_platform
-    if let Some(target_platform) = args.target_platform {
-        // Check if `host_platform` is set by looking at the args (not ideal)
-        let host_platform_set = std::env::args().any(|arg| arg.starts_with("--host-platform"));
-        if !host_platform_set {
-            host_platform = target_platform
-        }
     }
 
     // Determine virtual packages of the system. These packages define the
@@ -200,19 +194,19 @@ pub async fn get_build_output(
 
     tracing::debug!(
         "Platforms: build: {}, host: {}, target: {}",
-        args.build_platform,
-        host_platform,
-        target_platform
+        build_data.build_platform,
+        build_data.host_platform,
+        build_data.target_platform
     );
 
     let selector_config = SelectorConfig {
         // We ignore noarch here
-        target_platform,
-        host_platform,
+        target_platform: build_data.target_platform,
+        host_platform: build_data.host_platform,
         hash: None,
-        build_platform: args.build_platform,
+        build_platform: build_data.build_platform,
         variant: BTreeMap::new(),
-        experimental: args.common.experimental,
+        experimental: build_data.common.experimental,
         // allow undefined while finding the variants
         allow_undefined: true,
     };
@@ -223,31 +217,39 @@ pub async fn get_build_output(
     // First find all outputs from the recipe
     let outputs = find_outputs_from_src(&recipe_text)?;
 
-    // Check if there is a `variants.yaml` file next to the recipe that we should
-    // potentially use.
-    let mut variant_configs = None;
-    if let Some(variant_path) = recipe_path
-        .parent()
-        .map(|parent| parent.join(consts::VARIANTS_CONFIG_FILE))
-    {
-        if variant_path.is_file() {
-            if !args.ignore_recipe_variants {
-                tracing::info!("Including variants from {}", variant_path.display());
-                let mut configs = args.variant_config.clone();
-                configs.push(variant_path);
-                variant_configs = Some(configs);
-            } else {
-                tracing::debug!(
-                    "Ignoring variants from {} because \"--ignore_recipe_variants\" was specified",
-                    variant_path.display()
-                );
+    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to the
+    // recipe that we should potentially use.
+    let mut detected_variant_config = None;
+
+    // find either variants_config_file or conda_build_config_file automatically
+    for file in [
+        consts::VARIANTS_CONFIG_FILE,
+        consts::CONDA_BUILD_CONFIG_FILE,
+    ] {
+        if let Some(variant_path) = recipe_path.parent().map(|parent| parent.join(file)) {
+            if variant_path.is_file() {
+                if !build_data.ignore_recipe_variants {
+                    let mut configs = build_data.variant_config.clone();
+                    configs.push(variant_path);
+                    detected_variant_config = Some(configs);
+                } else {
+                    tracing::debug!(
+                        "Ignoring variants from {} because \"--ignore-recipe-variants\" was specified",
+                        variant_path.display()
+                    );
+                }
+                break;
             }
-        }
-    };
-    let variant_configs = variant_configs.as_ref().unwrap_or(&args.variant_config);
+        };
+    }
+
+    // If `-m foo.yaml` is passed as variant config, we should use that instead of
+    // the auto-detected one. For that reason we add them to the end of the list.
+    let mut variant_configs = detected_variant_config.unwrap_or_default();
+    variant_configs.extend(build_data.variant_config.clone());
 
     let variant_config =
-        VariantConfig::from_files(variant_configs, &selector_config).into_diagnostic()?;
+        VariantConfig::from_files(&variant_configs, &selector_config).into_diagnostic()?;
 
     let outputs_and_variants =
         variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
@@ -308,7 +310,7 @@ pub async fn get_build_output(
         };
 
         // Add the channels from the args and by default always conda-forge
-        let channels = args
+        let channels = build_data
             .channel
             .clone()
             .into_iter()
@@ -323,11 +325,11 @@ pub async fn get_build_output(
             build_configuration: BuildConfiguration {
                 target_platform: discovered_output.target_platform,
                 host_platform: PlatformWithVirtualPackages {
-                    platform: host_platform,
+                    platform: build_data.host_platform,
                     virtual_packages: virtual_packages.clone(),
                 },
                 build_platform: PlatformWithVirtualPackages {
-                    platform: args.build_platform,
+                    platform: build_data.build_platform,
                     virtual_packages: virtual_packages.clone(),
                 },
                 hash: discovered_output.hash.clone(),
@@ -336,7 +338,7 @@ pub async fn get_build_output(
                     &build_name,
                     recipe_path,
                     &output_dir,
-                    args.no_build_id,
+                    build_data.no_build_id,
                     &timestamp,
                 )
                 .into_diagnostic()?,
@@ -346,12 +348,12 @@ pub async fn get_build_output(
                 timestamp,
                 subpackages: subpackages.clone(),
                 packaging_settings: PackagingSettings::from_args(
-                    args.package_format.archive_type,
-                    args.package_format.compression_level,
+                    build_data.package_format.archive_type,
+                    build_data.package_format.compression_level,
                 ),
-                store_recipe: !args.no_include_recipe,
-                force_colors: args.color_build_log && console::colors_enabled(),
-                sandbox_config: args.sandbox_arguments.clone().into(),
+                store_recipe: !build_data.no_include_recipe,
+                force_colors: build_data.color_build_log && console::colors_enabled(),
+                sandbox_config: build_data.sandbox_configuration.clone(),
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -360,7 +362,8 @@ pub async fn get_build_output(
             system_tools: SystemTools::new(),
             build_summary: Arc::new(Mutex::new(BuildSummary::default())),
             extra_meta: Some(
-                args.extra_meta
+                build_data
+                    .extra_meta
                     .clone()
                     .unwrap_or_default()
                     .into_iter()
@@ -883,6 +886,56 @@ pub fn sort_build_outputs_topologically(
         .iter()
         .map(|node| outputs[node.index()].clone())
         .collect();
+
+    Ok(())
+}
+
+/// Get the version of rattler-build.
+pub fn get_rattler_build_version() -> &'static str {
+    env!("CARGO_PKG_VERSION")
+}
+
+/// Build rattler-build recipes
+pub async fn build_recipes(
+    recipe_paths: Vec<std::path::PathBuf>,
+    build_data: BuildData,
+    log_handler: &Option<console_utils::LoggingOutputHandler>,
+) -> Result<(), miette::Error> {
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+    let mut outputs = Vec::new();
+    for recipe_path in &recipe_paths {
+        let output = get_build_output(&build_data, recipe_path, &tool_config).await?;
+        outputs.extend(output);
+    }
+
+    if build_data.render_only {
+        let outputs = if build_data.with_solve {
+            let mut updated_outputs = Vec::new();
+            for output in outputs {
+                updated_outputs.push(
+                    output
+                        .resolve_dependencies(&tool_config)
+                        .await
+                        .into_diagnostic()?,
+                );
+            }
+            updated_outputs
+        } else {
+            outputs
+        };
+
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&outputs).into_diagnostic()?
+        );
+        return Ok(());
+    }
+
+    // Skip noarch builds before the topological sort
+    outputs = skip_noarch(outputs, &tool_config).await?;
+
+    sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
+    run_build_from_args(outputs, tool_config).await?;
 
     Ok(())
 }

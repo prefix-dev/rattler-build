@@ -57,15 +57,39 @@ Note that variants are _only_ applied if the requirement doesn't specify any
 constraints. If the requirement would be `python >3.8,<3.10` then the variant entry
 would be ignored.
 
-## Automatic `variants.yaml` discovery
-`rattler-build` automatically includes the variant configuration from a `variants.yaml` file next to a recipe.
-Use the `--ignore-recipe-variants` option to disable automatic discovery of `variants.yaml` files next to the recipes.
+## Automatic Discovery
 
-To include a variant config file from another location or include multiple configuration files use the `--variant-config` option:
+`rattler-build` automatically discovers and includes variant configurations from
+either:
+
+- `variants.yaml` file located next to the recipe
+- `conda_build_config.yaml` file located next to the recipe
+
+To disable automatic discovery, use the `--ignore-recipe-variants` flag.
+If you pass variant configuration files explicitly using `--variant-config / -m
+<file>`, the passed variants are loaded with higher priority.
+
+### Custom Configuration Files
+
+To specify variant configurations from other locations or include multiple
+files, use the `--variant-config` or `-m` option:
 
 ```sh
 rattler-build build --variant-config ~/user_variants.yaml --variant-config /opt/rattler-build/global_variants.yaml --recipe myrecipe.yaml
 ```
+
+### Merging of multiple variant configuration files
+
+When multiple variant configuration files are merged, the following rules apply:
+
+- A key from a higher priority file will completely override a key from a lower priority file.
+- Zip key lengths must still match.
+
+### `conda-build` Compatibility
+
+Since version 0.35.0, rattler-build supports conda_build_config.yaml files,
+parsing a subset of conda-build's configuration syntax. The filename must match
+exactly to be recognized as a conda-build config file.
 
 ## Package hash from variant
 

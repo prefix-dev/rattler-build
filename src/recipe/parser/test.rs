@@ -279,7 +279,6 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
 ///////////////////////////
 /// Python Test         ///
 ///////////////////////////
-
 impl TryConvertNode<PythonTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PythonTest, Vec<PartialParsingError>> {
         let mut python_test = PythonTest::default();
@@ -330,7 +329,6 @@ impl TryConvertNode<PythonVersion> for RenderedNode {
 ///////////////////////////
 /// Downstream Test     ///
 ///////////////////////////
-
 impl TryConvertNode<DownstreamTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<DownstreamTest, Vec<PartialParsingError>> {
         let mut downstream = DownstreamTest::default();
@@ -342,7 +340,6 @@ impl TryConvertNode<DownstreamTest> for RenderedMappingNode {
 ///////////////////////////
 /// Commands Test       ///
 ///////////////////////////
-
 impl TryConvertNode<CommandsTestRequirements> for RenderedNode {
     fn try_convert(
         &self,
@@ -402,7 +399,6 @@ impl TryConvertNode<CommandsTest> for RenderedMappingNode {
 ///////////////////////////
 /// Perl Test           ///
 ///////////////////////////
-
 impl TryConvertNode<PerlTest> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<PerlTest, Vec<PartialParsingError>> {
         let mut perl_test = PerlTest::default();
@@ -414,7 +410,6 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
 ///////////////////////////
 /// Package Contents    ///
 ///////////////////////////
-
 impl TryConvertNode<PackageContentsTest> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
         match self {

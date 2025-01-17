@@ -60,10 +60,22 @@ pub struct ScriptTest {
     pub script: Vec<String>,
 }
 
+#[derive(Default, Debug, Serialize)]
+pub struct PythonTestInner {
+    pub imports: Vec<String>,
+    pub pip_check: bool,
+}
+
+#[derive(Default, Debug, Serialize)]
+pub struct PythonTest {
+    pub python: PythonTestInner,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum Test {
     Script(ScriptTest),
+    Python(PythonTest),
 }
 
 #[derive(Default, Debug, Serialize)]

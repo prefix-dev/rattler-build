@@ -79,9 +79,9 @@ environment will be modified in all environments. This is not always desirable,
 and in that case you can use the `always_copy_files` option.
 
 ??? note "How `always_copy_files` works" The `always_copy_files` option works by
-setting the `no_link` option in the `info/paths.json` to `true` for the
-files in question. This means that the files are copied instead of linked
-when the package is installed.
+setting the `no_link` option in the `info/paths.json` to `true` for the files in
+question. This means that the files are copied instead of linked when the
+package is installed.
 
 ```yaml title="recipe.yaml"
 build:
@@ -240,4 +240,110 @@ build:
 
     # what to do when detecting overlinking
     overlinking_behavior: "ignore" or "error" # (defaults to "error")
+```
+
+## Python options
+
+There are some additional options in the `python` section of the `build` key.
+
+The `entry_points` option can be used to specify entry points for the package.
+
+The `use_python_app_entrypoint` option can be used to specify if `python.app`
+which is useful for GUI applications on macOS.
+
+The `skip_pyc_compilation` option can be used to exclude certain files from
+being automatically compiled from `.py` to `.pyc`. Note that `noarch: python`
+packages never contain `.pyc` files. Some packages ship .py files that cannot be
+compiled, such as those that contain templates. Some packages also ship .py
+files that should not be compiled yet, because the Python interpreter that will
+be used is not known at build time. In these cases, conda-build can skip
+attempting to compile these files. The patterns used in this section do not need
+the ** to handle recursive paths.
+
+The `site_packages_path` is a specific option that is only used when build
+`python` itself. It will add metadata to the package record of the python
+package to tell the installer where the `site-packages` path is located. This is
+used to install noarch packages in the correct location.
+
+```yaml title="recipe.yaml"
+build:
+  python:
+    # entry points for the package
+    entry_points:
+      - bsdiff4 = bsdiff4.cli:main_bsdiff4
+      - bspatch4 = bsdiff4.cli:main_bspatch4
+
+    # use python.app entrypoint (macOS only)
+    use_python_app_entrypoint: false  # (defaults to false, only used on macOS)
+
+    # skip pyc compilation for certain files
+    skip_pyc_compilation:
+      - foo/*.py
+
+    # Option to specify whether a package is version independent (aka ABI3)
+    version_independent: true  # defaults to false
+```
+
+And an example of the `site_packages_path` option when building the python
+interpreter:
+
+```yaml title="recipe.yaml"
+package:
+  name: python
+  version: "3.13.0"
+
+build:
+  python:
+    # path to the site-packages folder
+    site_packages_path: "lib/python3.13/site-packages"
+```
+
+### Python Package Version Independence
+
+Conda packages can be made version-independent in two different ways:
+
+#### `noarch: python`
+
+Packages marked as `noarch: python` contain only pure Python code without
+compiled extensions. These packages work across all Python versions and
+platforms from a single build.
+
+#### `version_independent: true`
+
+Packages marked as version_independent support multiple Python versions while
+containing compiled extensions using Python's ABI3 compatibility. These require
+platform-specific builds (Windows, macOS, Linux) but remain compatible across
+different Python versions within each platform.
+
+## Post processing of the package contents (experimental)
+
+rattler-build allows you to post-process the package contents with `regex`
+replacements after the build has finished. This is only useful in very specific
+cases when you cannot easily identify new files and want to run post-processing
+only on new files.
+
+Note that this is an experimental feature and might be removed or changed in the
+future.
+
+The `post_process` key is a list of dictionaries with the following keys:
+
+- files: list of globs to select the files from the package that you want to
+  modify
+- regex: the regular expression to match in the file. Note that this uses Rust
+  regex syntax.
+- replacement: the replacement string to use. Attention: note that Rust supports
+  expanding "named captures" with $name or ${name}. If you want to replace with
+  a env variable, you need to use `$${name}` to get `${name}` in the output.
+
+```yaml title="recipe.yaml"
+build:
+  post_process:
+    - files:
+        - *.txt
+      regex: "foo"
+      replacement: "bar"
+    - files:
+        - '*.pc'
+      regex: (?:-L|-I)?"?([^;\s]+/sysroot/)
+      replacement: '$${CONDA_BUILD_SYSROOT_S}'  # note this expands to `${CONDA_BUILD_SYSROOT_S}`
 ```

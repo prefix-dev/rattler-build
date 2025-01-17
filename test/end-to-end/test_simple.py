@@ -789,7 +789,7 @@ def test_regex_post_process(rattler_build: RattlerBuild, recipes: Path, tmp_path
 
     text_cmake = (pkg / "test.cmake").read_text()
     assert text_cmake.startswith(
-        'target_compile_definitions(test PRIVATE "some_path;{CONDA_BUILD_SYSROOT}/and/more;some_other_path;{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
+        'target_compile_definitions(test PRIVATE "some_path;$ENV{CONDA_BUILD_SYSROOT}/and/more;some_other_path;$ENV{CONDA_BUILD_SYSROOT}/and/more")'  # noqa: E501
     )
 
 
@@ -1302,3 +1302,30 @@ def test_cache_select_files(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert paths["paths"][0]["path_type"] == "softlink"
     assert paths["paths"][1]["_path"] == "lib/libdav1d.so.7.0.0"
     assert paths["paths"][1]["path_type"] == "hardlink"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "abi3", tmp_path)
+    pkg = get_extracted_package(tmp_path, "python-abi3-package-sample")
+
+    assert (pkg / "info/paths.json").exists()
+    paths = json.loads((pkg / "info/paths.json").read_text())
+    # ensure that all paths start with `site-packages`
+    for p in paths["paths"]:
+        assert p["_path"].startswith("site-packages")
+
+    actual_paths = [p["_path"] for p in paths["paths"]]
+    if os.name == "nt":
+        assert "site-packages\\spam.dll" in actual_paths
+    else:
+        assert "site-packages/spam.abi3.so" in actual_paths
+
+    # load index.json
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["name"] == "python-abi3-package-sample"
+    assert index["noarch"] == "python"
+    assert index["subdir"] == host_subdir()
+    assert index["platform"] == host_subdir().split("-")[0]

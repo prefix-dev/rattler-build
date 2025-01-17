@@ -22,8 +22,7 @@ use std::path::PathBuf;
 
 use crate::build::run_build;
 use crate::console_utils::LoggingOutputHandler;
-use crate::opt::BuildOpts;
-use crate::{get_build_output, sort_build_outputs_topologically};
+use crate::{get_build_output, sort_build_outputs_topologically, BuildData};
 
 use self::utils::run_editor;
 
@@ -135,12 +134,12 @@ pub async fn init() -> miette::Result<Tui<CrosstermBackend<Stderr>>> {
 /// Launches the terminal user interface.
 pub async fn run<B: Backend>(
     mut tui: Tui<B>,
-    opts: BuildOpts,
+    build_data: BuildData,
     recipe_paths: Vec<PathBuf>,
     log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
     // Create an application.
-    let mut state = TuiState::new(opts, log_handler);
+    let mut state = TuiState::new(build_data, log_handler);
 
     // Resolve the packages to build.
     tui.event_handler
@@ -169,7 +168,7 @@ pub async fn run<B: Backend>(
                     let mut outputs = Vec::new();
                     for recipe_path in &recipe_paths {
                         let output =
-                            get_build_output(&state.build_opts, recipe_path, &state.tool_config)
+                            get_build_output(&state.build_data, recipe_path, &state.tool_config)
                                 .await
                                 .unwrap();
                         outputs.extend(output);
@@ -180,7 +179,7 @@ pub async fn run<B: Backend>(
                 });
             }
             Event::ProcessBuildOutputs(mut outputs) => {
-                sort_build_outputs_topologically(&mut outputs, state.build_opts.up_to.as_deref())?;
+                sort_build_outputs_topologically(&mut outputs, state.build_data.up_to.as_deref())?;
                 let packages: Vec<Package> = outputs
                     .into_iter()
                     .map(|output| Package::from_output(output, &state.tool_config))
