@@ -67,7 +67,7 @@ either:
 
 To disable automatic discovery, use the `--ignore-recipe-variants` flag.
 If you pass variant configuration files explicitly using `--variant-config / -m
-<file>`, automatic discovery is disabled as well.
+<file>`, the passed variants are loaded with higher priority.
 
 ### Custom Configuration Files
 
@@ -77,6 +77,13 @@ files, use the `--variant-config` or `-m` option:
 ```sh
 rattler-build build --variant-config ~/user_variants.yaml --variant-config /opt/rattler-build/global_variants.yaml --recipe myrecipe.yaml
 ```
+
+### Merging of multiple variant configuration files
+
+When multiple variant configuration files are merged, the following rules apply:
+
+- A key from a higher priority file will completely override a key from a lower priority file.
+- Zip key lengths must still match.
 
 ### `conda-build` Compatibility
 

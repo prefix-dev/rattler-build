@@ -305,7 +305,7 @@ impl VariantConfig {
     /// [python=3.8, compiler=clang]
     /// ```
     pub fn from_files(
-        files: &Vec<PathBuf>,
+        files: &[PathBuf],
         selector_config: &SelectorConfig,
     ) -> Result<Self, VariantConfigError> {
         let mut variant_configs = Vec::new();
