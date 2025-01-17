@@ -383,17 +383,14 @@ where
     }
 
     // Reflink or copy the file
-    match reflink_copy::reflink_or_copy(from, &to)? {
-        None => {
-            // File has been reflinked, on Linux we need to copy the permissions
-            #[cfg(target_os = "linux")]
-            {
-                let metadata = fs_err::metadata(from)?;
-                let permissions = metadata.permissions();
-                fs_err::set_permissions(to, permissions)?;
-            }
+    if (reflink_copy::reflink_or_copy(from, &to)?).is_none() {
+        // File has been reflinked, on Linux we need to copy the permissions
+        #[cfg(target_os = "linux")]
+        {
+            let metadata = fs_err::metadata(from)?;
+            let permissions = metadata.permissions();
+            fs_err::set_permissions(to, permissions)?;
         }
-        Some(_) => {}
     }
 
     Ok(())

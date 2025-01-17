@@ -522,10 +522,12 @@ impl TryConvertNode<RunExports> for RenderedMappingNode {
 /// Run exports to ignore
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct IgnoreRunExports {
+    /// Run exports to ignore by name of the package that is exported
     #[serde(default, skip_serializing_if = "IndexSet::is_empty")]
-    pub(super) by_name: IndexSet<PackageName>,
+    pub by_name: IndexSet<PackageName>,
+    /// Run exports to ignore by the package that applies them
     #[serde(default, skip_serializing_if = "IndexSet::is_empty")]
-    pub(super) from_package: IndexSet<PackageName>,
+    pub from_package: IndexSet<PackageName>,
 }
 
 impl IgnoreRunExports {

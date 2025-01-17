@@ -277,7 +277,7 @@ pub fn package_conda(
 
     tracing::info!("Creating entry points");
     // create any entry points or link.json for noarch packages
-    if output.recipe.build().noarch().is_python() {
+    if output.recipe.build().is_python_version_independent() {
         let link_json = File::create(info_folder.join("link.json"))?;
         serde_json::to_writer_pretty(link_json, &output.link_json()?)?;
         tmp.add_files(vec![info_folder.join("link.json")]);

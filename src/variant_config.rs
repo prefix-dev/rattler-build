@@ -2,7 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use indexmap::IndexSet;
@@ -14,6 +14,8 @@ use thiserror::Error;
 
 use crate::{
     _partialerror,
+    conda_build_config::load_conda_build_config,
+    consts::CONDA_BUILD_CONFIG_FILE,
     normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
@@ -112,7 +114,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
     }
 }
 
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 /// The variant configuration.
 /// This is usually loaded from a YAML file and contains a mapping of package names to a list of
 /// versions. Each version represents a variant of the package. The variant configuration is
@@ -166,6 +167,7 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 ///
 /// It's also possible to specify additional pins in the variant configuration. These pins are
 /// currently ignored.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct VariantConfig {
     /// Pin run dependencies by using the versions from the build dependencies (and applying the pin).
     /// This is currently ignored (TODO)
@@ -199,6 +201,46 @@ pub enum VariantConfigError {
 }
 
 impl VariantConfig {
+    /// This function loads a single variant configuration file and returns the configuration.
+    fn load_file(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
+            Self::load_conda_build_config(path, selector_config)
+        } else {
+            Self::load_variant_config(path, selector_config)
+        }
+    }
+
+    fn load_variant_config(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        let file = fs_err::read_to_string(path)
+            .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
+        let yaml_node = Node::parse_yaml(0, &file)?;
+        let jinja = Jinja::new(selector_config.clone());
+        let rendered_node: RenderedNode = yaml_node
+            .render(&jinja, path.to_string_lossy().as_ref())
+            .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
+        let config: VariantConfig = rendered_node
+            .try_convert(path.to_string_lossy().as_ref())
+            .map_err(|e| {
+                let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
+                parse_errors
+            })?;
+        Ok(config)
+    }
+
+    /// This function loads an old-style variant configuration file and returns the configuration.
+    fn load_conda_build_config(
+        path: &Path,
+        selector_config: &SelectorConfig,
+    ) -> Result<VariantConfig, VariantConfigError> {
+        load_conda_build_config(path, selector_config)
+    }
+
     /// This function loads multiple variant configuration files and merges them into a single
     /// configuration. The configuration files are loaded in the order they are provided in the
     /// `files` argument. The `selector_config` argument is used to select the correct configuration
@@ -263,26 +305,14 @@ impl VariantConfig {
     /// [python=3.8, compiler=clang]
     /// ```
     pub fn from_files(
-        files: &Vec<PathBuf>,
+        files: &[PathBuf],
         selector_config: &SelectorConfig,
     ) -> Result<Self, VariantConfigError> {
         let mut variant_configs = Vec::new();
 
         for filename in files {
-            let file = std::fs::read_to_string(filename)
-                .map_err(|e| VariantConfigError::IOError(filename.clone(), e))?;
-            let yaml_node = Node::parse_yaml(0, &file)?;
-            let jinja = Jinja::new(selector_config.clone());
-            let rendered_node: RenderedNode = yaml_node
-                .render(&jinja, filename.to_string_lossy().as_ref())
-                .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
-            let config: VariantConfig = rendered_node
-                .try_convert(filename.to_string_lossy().as_ref())
-                .map_err(|e| {
-                    let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
-                    parse_errors
-                })?;
-
+            tracing::info!("Loading variant config file: {:?}", filename);
+            let config = Self::load_file(filename, selector_config)?;
             variant_configs.push(config);
         }
 
@@ -440,7 +470,7 @@ impl VariantConfig {
         // Now we need to convert the stage 1 renders to DiscoveredOutputs
         let mut recipes = IndexSet::new();
         for sx in stage_1 {
-            for ((node, recipe), variant) in sx.into_sorted_outputs()? {
+            for ((node, mut recipe), variant) in sx.into_sorted_outputs()? {
                 let target_platform = if recipe.build().noarch().is_none() {
                     selector_config.target_platform
                 } else {
@@ -453,6 +483,14 @@ impl VariantConfig {
                     .as_resolved()
                     .expect("Build string has to be resolved")
                     .to_string();
+
+                if recipe.build().python().version_independent {
+                    recipe
+                        .requirements
+                        .ignore_run_exports
+                        .from_package
+                        .insert("python".parse().unwrap());
+                }
 
                 recipes.insert(DiscoveredOutput {
                     name: recipe.package().name.as_normalized().to_string(),
@@ -552,6 +590,7 @@ pub struct ParseErrors {
     #[related]
     errs: Vec<ParsingError>,
 }
+
 impl ParseErrors {
     fn from_partial_vec(file: &str, errs: Vec<PartialParsingError>) -> Self {
         Self {
@@ -625,7 +664,7 @@ mod tests {
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = std::fs::read_to_string(dbg!(test_data_dir.join(filename))).unwrap();
+        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let yaml = Node::parse_yaml(0, &yaml_file).unwrap();
 
         let selector_config = SelectorConfig {
@@ -666,7 +705,7 @@ mod tests {
             ..Default::default()
         };
 
-        let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
 
         insta::assert_yaml_snapshot!(variant);
     }
@@ -686,7 +725,7 @@ mod tests {
         let recipe_text =
             std::fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
@@ -767,7 +806,7 @@ mod tests {
                 std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
                     .unwrap();
             let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-            let variant_config = VariantConfig::from_files(&vec![], &selector_config).unwrap();
+            let variant_config = VariantConfig::from_files(&[], &selector_config).unwrap();
             let outputs_and_variants = variant_config
                 .find_variants(&outputs, &recipe_text, &selector_config)
                 .unwrap();
@@ -798,7 +837,7 @@ mod tests {
             std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
                 .unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();

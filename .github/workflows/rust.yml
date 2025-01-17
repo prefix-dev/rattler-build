@@ -37,19 +37,8 @@ jobs:
           toolchain: "1.83.0"
           components: clippy,rustfmt
       - uses: Swatinem/rust-cache@v2
-      - name: Check
-        run: cargo check
-      - name: Build
-        run: cargo build --verbose
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
-      - name: Format
-        run: cargo fmt --all -- --check
-      - uses: giraffate/clippy-action@v1
-        with:
-          reporter: "github-pr-check"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          clippy_flags: "--all-targets --workspace"
 
   build:
     name: Build ${{ matrix.target }}

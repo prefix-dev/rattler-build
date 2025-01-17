@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Generate CLI docs by building the `generate-cli-docs` binary and commiting the result to the PR.
+  # Generate CLI docs by building the `generate-cli-docs` binary and committing the result to the PR.
   generate-cli-docs:
     if: github.event_name == 'pull_request' && github.repository == 'prefix-dev/rattler-build'
     runs-on: ubuntu-latest

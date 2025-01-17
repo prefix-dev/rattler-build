@@ -9,11 +9,10 @@ platforms = ["linux-64", "win-64", "osx-64", "osx-arm64"]
 build-release = "cargo build --release"
 install = "cargo install --path . --locked"
 test-end-to-end = { cmd = "pytest test/end-to-end --snapshot-warn-unused --snapshot-details", depends-on = [
-    "build-release",
+  "build-release",
 ] }
 test = "cargo test"
 test-ci = "cargo test --release -p rust-tests -- --test-threads 1"
-lint = "pre-commit run --all"
 generate-cli-docs = "cargo add clap-markdown --git https://github.com/ruben-arts/clap-markdown --branch main && cargo run --bin generate-cli-docs --features generate-cli-docs > docs/reference/cli.md && cargo rm clap-markdown"
 update-snapshots = "pytest test/end-to-end --snapshot-update"
 
@@ -26,7 +25,6 @@ deploy-dev = "mike deploy --push dev devel"
 [dependencies]
 openssl = "3.*"
 rust = ">=1.83.0,<1.84"
-pre-commit = "3.3.3.*"
 compilers = "1.6.0.*"
 libssh2 = "1.11.0.*"
 pkg-config = "0.29.2.*"
@@ -38,6 +36,30 @@ pyyaml = ">=6.0.1,<6.1"
 conda-package-handling = "2.2.0.*"
 requests = ">=2.32.2,<2.33"
 syrupy = "4.6.*"
+
+[feature.lint.dependencies]
+actionlint = ">=1.7.4,<2"
+pre-commit = ">=3.7.1,<4"
+pre-commit-hooks = ">=4.6.0,<5"
+ruff = ">=0.4.8,<0.5"
+shellcheck = ">=0.10.0,<0.11"
+taplo = ">=0.9.1,<0.10"
+typos = ">=1.23.1,<2"
+
+[feature.lint.tasks]
+actionlint = { cmd = "actionlint", env = { SHELLCHECK_OPTS = "-e SC2086" } }
+cargo-clippy = "cargo clippy --all-targets --workspace -- -D warnings -Dclippy::dbg_macro"
+cargo-fmt = "cargo fmt"
+check-openssl = "python tests/scripts/check-openssl.py"
+lint = "pre-commit run --all-files --hook-stage=manual"
+pre-commit-install = "pre-commit install --install-hooks"
+pre-commit-run = "pre-commit run --all-files"
+ruff-format = "ruff format --force-exclude"
+ruff-lint = "ruff check --fix --exit-non-zero-on-fix --force-exclude"
+toml-format = { cmd = "taplo fmt", env = { RUST_LOG = "warn" } }
+toml-lint = "taplo lint --verbose **/pixi.toml"
+typos = "typos --write-changes --force-exclude"
+
 
 [target.linux-64.dependencies]
 clang = ">=18.1.8,<19.0"
@@ -68,5 +90,8 @@ mike = "2.0.0.*"
 # Using same solve group to keep the environment consistent in versions used and improving cache hits
 default = { solve-group = "default" }
 docs = { features = [
-    "docs",
+  "docs",
+], no-default-feature = true, solve-group = "default" }
+lint = { features = [
+  "lint",
 ], no-default-feature = true, solve-group = "default" }
