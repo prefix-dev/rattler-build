@@ -311,6 +311,7 @@ impl VariantConfig {
         let mut variant_configs = Vec::new();
 
         for filename in files {
+            tracing::info!("Loading variant config file: {:?}", filename);
             let config = Self::load_file(filename, selector_config)?;
             variant_configs.push(config);
         }
