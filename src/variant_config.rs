@@ -305,7 +305,7 @@ impl VariantConfig {
     /// [python=3.8, compiler=clang]
     /// ```
     pub fn from_files(
-        files: &Vec<PathBuf>,
+        files: &[PathBuf],
         selector_config: &SelectorConfig,
     ) -> Result<Self, VariantConfigError> {
         let mut variant_configs = Vec::new();
@@ -705,7 +705,7 @@ mod tests {
             ..Default::default()
         };
 
-        let variant = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
 
         insta::assert_yaml_snapshot!(variant);
     }
@@ -725,7 +725,7 @@ mod tests {
         let recipe_text =
             std::fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();
@@ -806,7 +806,7 @@ mod tests {
                 std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
                     .unwrap();
             let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-            let variant_config = VariantConfig::from_files(&vec![], &selector_config).unwrap();
+            let variant_config = VariantConfig::from_files(&[], &selector_config).unwrap();
             let outputs_and_variants = variant_config
                 .find_variants(&outputs, &recipe_text, &selector_config)
                 .unwrap();
@@ -837,7 +837,7 @@ mod tests {
             std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
                 .unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
-        let variant_config = VariantConfig::from_files(&vec![yaml_file], &selector_config).unwrap();
+        let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
             .find_variants(&outputs, &recipe_text, &selector_config)
             .unwrap();

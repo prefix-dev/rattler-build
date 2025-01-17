@@ -244,12 +244,9 @@ pub async fn get_build_output(
     }
 
     // If `-m foo.yaml` is passed as variant config, we should use that instead of
-    // the auto-detected one.
-    let variant_configs = if !build_data.variant_config.is_empty() {
-        build_data.variant_config.clone()
-    } else {
-        detected_variant_config.unwrap_or_default()
-    };
+    // the auto-detected one. For that reason we add them to the end of the list.
+    let mut variant_configs = detected_variant_config.unwrap_or_default();
+    variant_configs.extend(build_data.variant_config.clone());
 
     let variant_config =
         VariantConfig::from_files(&variant_configs, &selector_config).into_diagnostic()?;
