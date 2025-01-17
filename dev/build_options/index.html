@@ -683,6 +683,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#python-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Python options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Python options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-package-version-independence" class="md-nav__link">
+    <span class="md-ellipsis">
+      Python Package Version Independence
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-processing-of-the-package-contents-experimental" class="md-nav__link">
+    <span class="md-ellipsis">
+      Post processing of the package contents (experimental)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1402,6 +1435,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#python-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      Python options
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Python options">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-package-version-independence" class="md-nav__link">
+    <span class="md-ellipsis">
+      Python Package Version Independence
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#post-processing-of-the-package-contents-experimental" class="md-nav__link">
+    <span class="md-ellipsis">
+      Post processing of the package contents (experimental)
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1487,9 +1553,9 @@ the environment to save space – that means that files modified in one
 environment will be modified in all environments. This is not always desirable,
 and in that case you can use the <code>always_copy_files</code> option.</p>
 <p>??? note "How <code>always_copy_files</code> works" The <code>always_copy_files</code> option works by
-setting the <code>no_link</code> option in the <code>info/paths.json</code> to <code>true</code> for the
-files in question. This means that the files are copied instead of linked
-when the package is installed.</p>
+setting the <code>no_link</code> option in the <code>info/paths.json</code> to <code>true</code> for the files in
+question. This means that the files are copied instead of linked when the
+package is installed.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="c1"># include files even if they are already in the environment</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="c1"># as part of some other host dependency</span>
@@ -1615,6 +1681,90 @@ but is not actually used by any of the binaries/libraries in the package.</p>
 </span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
 </span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">    </span><span class="c1"># what to do when detecting overlinking</span>
 </span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="w">    </span><span class="nt">overlinking_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;error&quot;)</span>
+</span></code></pre></div>
+<h2 id="python-options">Python options<a class="headerlink" href="#python-options" title="Permanent link">#</a></h2>
+<p>There are some additional options in the <code>python</code> section of the <code>build</code> key.</p>
+<p>The <code>entry_points</code> option can be used to specify entry points for the package.</p>
+<p>The <code>use_python_app_entrypoint</code> option can be used to specify if <code>python.app</code>
+which is useful for GUI applications on macOS.</p>
+<p>The <code>skip_pyc_compilation</code> option can be used to exclude certain files from
+being automatically compiled from <code>.py</code> to <code>.pyc</code>. Note that <code>noarch: python</code>
+packages never contain <code>.pyc</code> files. Some packages ship .py files that cannot be
+compiled, such as those that contain templates. Some packages also ship .py
+files that should not be compiled yet, because the Python interpreter that will
+be used is not known at build time. In these cases, conda-build can skip
+attempting to compile these files. The patterns used in this section do not need
+the ** to handle recursive paths.</p>
+<p>The <code>site_packages_path</code> is a specific option that is only used when build
+<code>python</code> itself. It will add metadata to the package record of the python
+package to tell the installer where the <code>site-packages</code> path is located. This is
+used to install noarch packages in the correct location.</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">    </span><span class="c1"># entry points for the package</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span><span class="nt">entry_points</span><span class="p">:</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bsdiff4 = bsdiff4.cli:main_bsdiff4</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bspatch4 = bsdiff4.cli:main_bspatch4</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span><span class="c1"># use python.app entrypoint (macOS only)</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">    </span><span class="nt">use_python_app_entrypoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span><span class="w">  </span><span class="c1"># (defaults to false, only used on macOS)</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="c1"># skip pyc compilation for certain files</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">    </span><span class="nt">skip_pyc_compilation</span><span class="p">:</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">foo/*.py</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a><span class="w">    </span><span class="c1"># Option to specify whether a package is version independent (aka ABI3)</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="w">    </span><span class="nt">version_independent</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span><span class="w">  </span><span class="c1"># defaults to false</span>
+</span></code></pre></div>
+<p>And an example of the <code>site_packages_path</code> option when building the python
+interpreter:</p>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3.13.0&quot;</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span><span class="nt">python</span><span class="p">:</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">    </span><span class="c1"># path to the site-packages folder</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">    </span><span class="nt">site_packages_path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;lib/python3.13/site-packages&quot;</span>
+</span></code></pre></div>
+<h3 id="python-package-version-independence">Python Package Version Independence<a class="headerlink" href="#python-package-version-independence" title="Permanent link">#</a></h3>
+<p>Conda packages can be made version-independent in two different ways:</p>
+<h4 id="noarch-python"><code>noarch: python</code><a class="headerlink" href="#noarch-python" title="Permanent link">#</a></h4>
+<p>Packages marked as <code>noarch: python</code> contain only pure Python code without
+compiled extensions. These packages work across all Python versions and
+platforms from a single build.</p>
+<h4 id="version_independent-true"><code>version_independent: true</code><a class="headerlink" href="#version_independent-true" title="Permanent link">#</a></h4>
+<p>Packages marked as version_independent support multiple Python versions while
+containing compiled extensions using Python's ABI3 compatibility. These require
+platform-specific builds (Windows, macOS, Linux) but remain compatible across
+different Python versions within each platform.</p>
+<h2 id="post-processing-of-the-package-contents-experimental">Post processing of the package contents (experimental)<a class="headerlink" href="#post-processing-of-the-package-contents-experimental" title="Permanent link">#</a></h2>
+<p>rattler-build allows you to post-process the package contents with <code>regex</code>
+replacements after the build has finished. This is only useful in very specific
+cases when you cannot easily identify new files and want to run post-processing
+only on new files.</p>
+<p>Note that this is an experimental feature and might be removed or changed in the
+future.</p>
+<p>The <code>post_process</code> key is a list of dictionaries with the following keys:</p>
+<ul>
+<li>files: list of globs to select the files from the package that you want to
+  modify</li>
+<li>regex: the regular expression to match in the file. Note that this uses Rust
+  regex syntax.</li>
+<li>replacement: the replacement string to use. Attention: note that Rust supports
+  expanding "named captures" with $name or ${name}. If you want to replace with
+  a env variable, you need to use <code>$${name}</code> to get <code>${name}</code> in the output.</li>
+</ul>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">post_process</span><span class="p">:</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="err">*</span><span class="l l-Scalar l-Scalar-Plain">.txt</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;foo&quot;</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bar&quot;</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">files</span><span class="p">:</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;*.pc&#39;</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">      </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(?:-L|-I)?&quot;?([^;\s]+/sysroot/)</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;$${CONDA_BUILD_SYSROOT_S}&#39;</span><span class="w">  </span><span class="c1"># note this expands to `${CONDA_BUILD_SYSROOT_S}`</span>
 </span></code></pre></div>
 
 
