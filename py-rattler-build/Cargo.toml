@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.35.4"
+version = "0.35.5"
 edition = "2021"
 license = "BSD-3-Clause"
 publish = false
