@@ -1140,7 +1140,7 @@ def test_missing_pin_subpackage(
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output
+    stdout = e.value.output.decode("utf-8")
     assert "Missing output: test1 (used in pin_subpackage)" in stdout
 
 
@@ -1152,7 +1152,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output
+    stdout = e.value.output.decode("utf-8")
     assert "Found a cycle in the recipe outputs: bazbus" in stdout
 
 
@@ -1235,7 +1235,7 @@ def test_rendering_from_stdin(
 ):
     text = (recipes / "abi3" / "recipe.yaml").read_text()
     # variants = recipes / "abi3" / "variants.yaml" "-m", variants
-    rendered = rattler_build("build", "--render-only", input=text)
+    rendered = rattler_build("build", "--render-only", input=text, text=True)
     loaded = json.loads(rendered)
-    print(loaded)
+
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"

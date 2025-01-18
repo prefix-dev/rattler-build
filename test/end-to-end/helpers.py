@@ -11,7 +11,10 @@ class RattlerBuild:
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         try:
-            return check_output([str(self.path), *args], text=True, **kwds)
+            output = check_output([str(self.path), *args], **kwds)
+            if "text" not in kwds:
+                return output.decode("utf-8")
+            return output
         except CalledProcessError as e:
             if kwds.get("stderr") is None:
                 print(e.output)
