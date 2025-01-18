@@ -1140,7 +1140,7 @@ def test_missing_pin_subpackage(
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output.decode("utf-8")
+    stdout = e.value.output
     assert "Missing output: test1 (used in pin_subpackage)" in stdout
 
 
@@ -1152,7 +1152,7 @@ def test_cycle_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
             tmp_path,
             stderr=STDOUT,
         )
-    stdout = e.value.output.decode("utf-8")
+    stdout = e.value.output
     assert "Found a cycle in the recipe outputs: bazbus" in stdout
 
 
