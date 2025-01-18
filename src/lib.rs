@@ -41,6 +41,7 @@ pub mod upload;
 mod windows;
 
 mod package_cache_reporter;
+pub mod source_code;
 
 use std::{
     collections::{BTreeMap, HashMap},
@@ -59,6 +60,7 @@ use metadata::{
     PackageIdentifier, PackagingSettings,
 };
 use miette::{Context, IntoDiagnostic};
+pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
@@ -75,8 +77,6 @@ use tracing::warn;
 use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
-
-pub use normalized_key::NormalizedKey;
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -168,6 +168,7 @@ pub async fn get_build_output(
     }
 
     let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
+    let recipe_source = Arc::<str>::from(recipe_text.as_str());
 
     if build_data.target_platform == Platform::NoArch
         || build_data.build_platform == Platform::NoArch
@@ -215,10 +216,10 @@ pub async fn get_build_output(
     let enter = span.enter();
 
     // First find all outputs from the recipe
-    let outputs = find_outputs_from_src(&recipe_text)?;
+    let outputs = find_outputs_from_src(recipe_source.clone())?;
 
-    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to the
-    // recipe that we should potentially use.
+    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
+    // the recipe that we should potentially use.
     let mut detected_variant_config = None;
 
     // find either variants_config_file or conda_build_config_file automatically
@@ -248,11 +249,10 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let variant_config =
-        VariantConfig::from_files(&variant_configs, &selector_config).into_diagnostic()?;
+    let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
 
     let outputs_and_variants =
-        variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
+        variant_config.find_variants(&outputs, recipe_source, &selector_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
@@ -550,7 +550,8 @@ pub async fn run_build_from_args(
     Ok(())
 }
 
-/// Check if the noarch builds should be skipped because the noarch platform has been set
+/// Check if the noarch builds should be skipped because the noarch platform has
+/// been set
 pub async fn skip_noarch(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
