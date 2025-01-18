@@ -1,0 +1,6 @@
+---
+source: src/conda_build_config.rs
+expression: config
+---
+pin_run_as_build: ~
+zip_keys: ~
