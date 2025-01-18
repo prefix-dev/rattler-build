@@ -15,6 +15,7 @@ use crate::{
         jinja::Jinja,
         Render,
     },
+    source_code::SourceCode,
 };
 
 use super::{
@@ -85,8 +86,11 @@ impl RenderedNode {
     /// type here is the generic Node enumeration to make it potentially easier
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
-    pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
-        let yaml = parse_yaml(init_span_index, src)?;
+    pub fn parse_yaml<S: SourceCode>(
+        init_span_index: usize,
+        src: S,
+    ) -> Result<Self, ParsingError<S>> {
+        let yaml = parse_yaml(init_span_index, src.clone())?;
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 

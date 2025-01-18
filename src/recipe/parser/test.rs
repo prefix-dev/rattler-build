@@ -492,7 +492,7 @@ mod test {
             .unwrap();
 
         // parse the YAML
-        let yaml_root = RenderedNode::parse_yaml(0, &text)
+        let yaml_root = RenderedNode::parse_yaml(0, text.as_str())
             .map_err(|err| vec![err])
             .unwrap();
 

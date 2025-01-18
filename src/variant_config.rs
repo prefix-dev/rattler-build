@@ -2,30 +2,32 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    fmt::Debug,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use indexmap::IndexSet;
 use miette::Diagnostic;
-use rattler_conda_types::{NoArchType, ParseVersionError, Platform};
+use rattler_conda_types::{NoArchType, Platform};
 use serde::{Deserialize, Serialize};
-
 use thiserror::Error;
 
 use crate::{
     _partialerror,
-    conda_build_config::load_conda_build_config,
+    conda_build_config::{load_conda_build_config, ParseConfigBuildConfigError},
     consts::CONDA_BUILD_CONFIG_FILE,
+    hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
         custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
         error::{ErrorKind, ParsingError, PartialParsingError},
-        Jinja, Render,
+        Jinja, Recipe, Render,
     },
     selectors::SelectorConfig,
-    variant_render::stage_0_render,
+    source_code::SourceCode,
+    variant_render::{stage_0_render, stage_1_render},
 };
-use crate::{hash::HashInfo, recipe::Recipe, variant_render::stage_1_render};
 
 #[allow(missing_docs)]
 #[derive(Debug, Clone)]
@@ -115,9 +117,10 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 }
 
 /// The variant configuration.
-/// This is usually loaded from a YAML file and contains a mapping of package names to a list of
-/// versions. Each version represents a variant of the package. The variant configuration is
-/// used to create a build matrix for a recipe.
+/// This is usually loaded from a YAML file and contains a mapping of package
+/// names to a list of versions. Each version represents a variant of the
+/// package. The variant configuration is used to create a build matrix for a
+/// recipe.
 ///
 /// Example:
 ///
@@ -127,7 +130,8 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 /// - "3.11"
 /// ```
 ///
-/// If you depend on Python in your recipe, this will create two variants of your recipe:
+/// If you depend on Python in your recipe, this will create two variants of
+/// your recipe:
 ///
 /// ```txt
 /// [python=3.10]
@@ -136,9 +140,9 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 /// ```
 ///
 ///
-/// The variant configuration also contains a list of "zip keys". These are keys that are zipped
-/// together to create a list of variants. For example, if the variant configuration contains the
-/// following zip keys:
+/// The variant configuration also contains a list of "zip keys". These are keys
+/// that are zipped together to create a list of variants. For example, if the
+/// variant configuration contains the following zip keys:
 ///
 /// ```yaml
 /// zip_keys:
@@ -154,7 +158,6 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 /// compiler:
 /// - gcc
 /// - clang
-///
 /// ```
 ///
 /// the following variants will be selected:
@@ -165,29 +168,31 @@ impl TryConvertNode<Pin> for RenderedMappingNode {
 /// [python=3.8, compiler=clang]
 /// ```
 ///
-/// It's also possible to specify additional pins in the variant configuration. These pins are
-/// currently ignored.
+/// It's also possible to specify additional pins in the variant configuration.
+/// These pins are currently ignored.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct VariantConfig {
-    /// Pin run dependencies by using the versions from the build dependencies (and applying the pin).
-    /// This is currently ignored (TODO)
+    /// Pin run dependencies by using the versions from the build dependencies
+    /// (and applying the pin). This is currently ignored (TODO)
     pub pin_run_as_build: Option<BTreeMap<String, Pin>>,
 
-    /// The zip keys are used to "zip" together variants to create specific combinations.
+    /// The zip keys are used to "zip" together variants to create specific
+    /// combinations.
     pub zip_keys: Option<Vec<Vec<NormalizedKey>>>,
 
-    /// The variants are a mapping of package names to a list of versions. Each version represents
-    /// a variant for the build matrix.
+    /// The variants are a mapping of package names to a list of versions. Each
+    /// version represents a variant for the build matrix.
     #[serde(flatten)]
     pub variants: BTreeMap<NormalizedKey, Vec<String>>,
 }
 
+/// An error that can occur while parsing a variant configuration file.
 #[allow(missing_docs)]
-#[derive(Debug, thiserror::Error, Diagnostic)]
-pub enum VariantConfigError {
+#[derive(Debug, Error, Diagnostic)]
+pub enum VariantConfigError<S: SourceCode> {
     #[error(transparent)]
     #[diagnostic(transparent)]
-    RecipeParseErrors(#[from] ParseErrors),
+    RecipeParseErrors(#[from] ParseErrors<S>),
 
     #[error("Could not parse variant config file ({0}): {1}")]
     ParseError(PathBuf, serde_yaml::Error),
@@ -197,17 +202,46 @@ pub enum VariantConfigError {
 
     #[error(transparent)]
     #[diagnostic(transparent)]
-    NewParseError(#[from] ParsingError),
+    NewParseError(#[from] ParsingError<S>),
+}
+
+/// An error that indicates variant configuration is invalid.
+#[allow(missing_docs)]
+#[derive(Debug, Error, Diagnostic)]
+pub enum VariantExpandError {
+    #[error("Zip key elements do not all have same length: {0}")]
+    InvalidZipKeyLength(String),
+
+    #[error("Duplicate outputs: {0}")]
+    DuplicateOutputs(String),
+
+    #[error("Missing output: {0} (used in pin_subpackage)")]
+    MissingOutput(String),
+
+    #[error("Found a cycle in the recipe outputs: {0}")]
+    CycleInRecipeOutputs(String),
+}
+
+impl<S: SourceCode> From<ParseConfigBuildConfigError> for VariantConfigError<S> {
+    fn from(e: ParseConfigBuildConfigError) -> Self {
+        match e {
+            ParseConfigBuildConfigError::ParseError(path, err) => {
+                VariantConfigError::ParseError(path, err)
+            }
+            ParseConfigBuildConfigError::IOError(path, e) => VariantConfigError::IOError(path, e),
+        }
+    }
 }
 
 impl VariantConfig {
-    /// This function loads a single variant configuration file and returns the configuration.
+    /// This function loads a single variant configuration file and returns the
+    /// configuration.
     fn load_file(
         path: &Path,
         selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, VariantConfigError> {
+    ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
         if path.file_name() == Some(CONDA_BUILD_CONFIG_FILE.as_ref()) {
-            Self::load_conda_build_config(path, selector_config)
+            Ok(Self::load_conda_build_config(path, selector_config)?)
         } else {
             Self::load_variant_config(path, selector_config)
         }
@@ -216,38 +250,41 @@ impl VariantConfig {
     fn load_variant_config(
         path: &Path,
         selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, VariantConfigError> {
+    ) -> Result<VariantConfig, VariantConfigError<Arc<str>>> {
         let file = fs_err::read_to_string(path)
             .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
-        let yaml_node = Node::parse_yaml(0, &file)?;
+        let source = Arc::<str>::from(file.as_str());
+        let yaml_node = Node::parse_yaml(0, source.clone())?;
         let jinja = Jinja::new(selector_config.clone());
         let rendered_node: RenderedNode = yaml_node
             .render(&jinja, path.to_string_lossy().as_ref())
-            .map_err(|e| ParseErrors::from_partial_vec(&file, e))?;
+            .map_err(|e| ParseErrors::from_partial_vec(source.clone(), e))?;
         let config: VariantConfig = rendered_node
             .try_convert(path.to_string_lossy().as_ref())
             .map_err(|e| {
-                let parse_errors: ParseErrors = ParsingError::from_partial_vec(&file, e).into();
+                let parse_errors: ParseErrors<_> = ParsingError::from_partial_vec(source, e).into();
                 parse_errors
             })?;
         Ok(config)
     }
 
-    /// This function loads an old-style variant configuration file and returns the configuration.
+    /// This function loads an old-style variant configuration file and returns
+    /// the configuration.
     fn load_conda_build_config(
         path: &Path,
         selector_config: &SelectorConfig,
-    ) -> Result<VariantConfig, VariantConfigError> {
+    ) -> Result<VariantConfig, ParseConfigBuildConfigError> {
         load_conda_build_config(path, selector_config)
     }
 
-    /// This function loads multiple variant configuration files and merges them into a single
-    /// configuration. The configuration files are loaded in the order they are provided in the
-    /// `files` argument. The `selector_config` argument is used to select the correct configuration
+    /// This function loads multiple variant configuration files and merges them
+    /// into a single configuration. The configuration files are loaded in
+    /// the order they are provided in the `files` argument. The
+    /// `selector_config` argument is used to select the correct configuration
     /// for the target platform.
     ///
-    /// A variant configuration file is a YAML file that contains a mapping of package names to
-    /// a list of variants. For example:
+    /// A variant configuration file is a YAML file that contains a mapping of
+    /// package names to a list of variants. For example:
     ///
     /// ```yaml
     /// python:
@@ -255,11 +292,12 @@ impl VariantConfig {
     /// - "3.8"
     /// ```
     ///
-    /// The above configuration file will select the `python` package with the variants `3.9` and
-    /// `3.8`.
+    /// The above configuration file will select the `python` package with the
+    /// variants `3.9` and `3.8`.
     ///
-    /// The `selector_config` argument is used to select the correct configuration for the target
-    /// platform. For example, if the `selector_config` is `unix`, the following configuration file:
+    /// The `selector_config` argument is used to select the correct
+    /// configuration for the target platform. For example, if the
+    /// `selector_config` is `unix`, the following configuration file:
     ///
     /// ```yaml
     /// sel(unix):
@@ -279,12 +317,13 @@ impl VariantConfig {
     /// - "3.8"
     /// ```
     ///
-    /// The `files` argument is a list of paths to the variant configuration files. The files are
-    /// loaded in the order they are provided in the `files` argument. The keys of a later file
-    /// replace keys from an earlier file (values are _not_ merged).
+    /// The `files` argument is a list of paths to the variant configuration
+    /// files. The files are loaded in the order they are provided in the
+    /// `files` argument. The keys of a later file replace keys from an
+    /// earlier file (values are _not_ merged).
     ///
-    /// A special key, the `zip_keys` is used to "zip" the values of two keys. For example, if the
-    /// following configuration file is loaded:
+    /// A special key, the `zip_keys` is used to "zip" the values of two keys.
+    /// For example, if the following configuration file is loaded:
     ///
     /// ```yaml
     /// compiler:
@@ -297,7 +336,8 @@ impl VariantConfig {
     /// - [compiler, python]
     /// ```
     ///
-    /// the variant configuration will be zipped so that the following variants are selected:
+    /// the variant configuration will be zipped so that the following variants
+    /// are selected:
     ///
     /// ```txt
     /// [python=3.9, compiler=gcc]
@@ -307,7 +347,7 @@ impl VariantConfig {
     pub fn from_files(
         files: &[PathBuf],
         selector_config: &SelectorConfig,
-    ) -> Result<Self, VariantConfigError> {
+    ) -> Result<Self, VariantConfigError<Arc<str>>> {
         let mut variant_configs = Vec::new();
 
         for filename in files {
@@ -342,19 +382,21 @@ impl VariantConfig {
         Ok(final_config)
     }
 
-    fn validate_zip_keys(&self) -> Result<(), VariantError> {
+    fn validate_zip_keys(&self) -> Result<(), VariantExpandError> {
         if let Some(zip_keys) = &self.zip_keys {
             for zip in zip_keys {
                 let mut prev_len = None;
                 for key in zip {
                     let value = match self.variants.get(key) {
-                        None => return Err(VariantError::InvalidZipKeyLength(key.normalize())),
+                        None => {
+                            return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()))
+                        }
                         Some(value) => value,
                     };
 
                     if let Some(l) = prev_len {
                         if l != value.len() {
-                            return Err(VariantError::InvalidZipKeyLength(key.normalize()));
+                            return Err(VariantExpandError::InvalidZipKeyLength(key.normalize()));
                         }
                     }
                     prev_len = Some(value.len());
@@ -364,17 +406,18 @@ impl VariantConfig {
         Ok(())
     }
 
-    /// This function returns all possible combinations of variants for the given set of used
-    /// variables.
+    /// This function returns all possible combinations of variants for the
+    /// given set of used variables.
     ///
-    /// The `used_vars` argument is a set of variables that are used in the recipe. The `already_used_vars`
-    /// argument is a mapping of variables that are already used in the recipe. This is used to remove variants
+    /// The `used_vars` argument is a set of variables that are used in the
+    /// recipe. The `already_used_vars` argument is a mapping of variables
+    /// that are already used in the recipe. This is used to remove variants
     /// that are already in other parts of the "tree".
     pub fn combinations(
         &self,
         used_vars: &HashSet<NormalizedKey>,
         already_used_vars: Option<&BTreeMap<NormalizedKey, String>>,
-    ) -> Result<Vec<BTreeMap<NormalizedKey, String>>, VariantError> {
+    ) -> Result<Vec<BTreeMap<NormalizedKey, String>>, VariantExpandError> {
         self.validate_zip_keys()?;
         let zip_keys = self.zip_keys.clone().unwrap_or_default();
         let used_zip_keys = zip_keys
@@ -446,23 +489,24 @@ impl VariantConfig {
         }
     }
 
-    /// This function finds all used variables in a recipe and expands the recipe to the full
-    /// build matrix based on the variant configuration (loaded in the `SelectorConfig`).
+    /// This function finds all used variables in a recipe and expands the
+    /// recipe to the full build matrix based on the variant configuration
+    /// (loaded in the `SelectorConfig`).
     ///
-    /// The result is a topologically sorted list of tuples. Each tuple contains the following
-    /// elements:
+    /// The result is a topologically sorted list of tuples. Each tuple contains
+    /// the following elements:
     ///
     /// 1. The name of the package.
     /// 2. The version of the package.
     /// 3. The build string of the package.
     /// 4. The recipe node.
     /// 5. The used variant config.
-    pub fn find_variants(
+    pub fn find_variants<S: SourceCode>(
         &self,
         outputs: &[Node],
-        recipe: &str,
+        recipe: S,
         selector_config: &SelectorConfig,
-    ) -> Result<IndexSet<DiscoveredOutput>, VariantError> {
+    ) -> Result<IndexSet<DiscoveredOutput>, VariantError<S>> {
         // find all jinja variables
         let stage_0 = stage_0_render(outputs, recipe, selector_config, self)?;
         let stage_1 = stage_1_render(stage_0, selector_config, self)?;
@@ -586,50 +630,38 @@ impl VariantKey {
 /// Collection of parse errors to build related diagnostics
 /// TODO: also provide `Vec<PartialParsingError>` with source `&str`
 /// to avoid excessive traversal
-pub struct ParseErrors {
+pub struct ParseErrors<S: SourceCode> {
     #[related]
-    errs: Vec<ParsingError>,
+    errs: Vec<ParsingError<S>>,
 }
 
-impl ParseErrors {
-    fn from_partial_vec(file: &str, errs: Vec<PartialParsingError>) -> Self {
+impl<S: SourceCode> ParseErrors<S> {
+    fn from_partial_vec(source: S, errs: Vec<PartialParsingError>) -> Self
+    where
+        S: Clone + AsRef<str>,
+    {
         Self {
-            errs: ParsingError::from_partial_vec(file, errs),
+            errs: ParsingError::from_partial_vec(source, errs),
         }
     }
 }
 
-impl From<Vec<ParsingError>> for ParseErrors {
-    fn from(errs: Vec<ParsingError>) -> Self {
+impl<S: SourceCode> From<Vec<ParsingError<S>>> for ParseErrors<S> {
+    fn from(errs: Vec<ParsingError<S>>) -> Self {
         Self { errs }
     }
 }
 
 #[allow(missing_docs)]
 #[derive(Error, Debug, Diagnostic)]
-pub enum VariantError {
-    #[error("Zip key elements do not all have same length: {0}")]
-    InvalidZipKeyLength(String),
-
-    #[error("Failed to parse version: {0}")]
-    RecipeParseVersionError(#[from] ParseVersionError),
+pub enum VariantError<S: SourceCode> {
+    #[error(transparent)]
+    #[diagnostic(transparent)]
+    ExpandError(#[from] VariantExpandError),
 
     #[error(transparent)]
     #[diagnostic(transparent)]
-    RecipeParseErrors(#[from] ParseErrors),
-
-    #[error(transparent)]
-    #[diagnostic(transparent)]
-    RecipeParseError(#[from] ParsingError),
-
-    #[error("Duplicate outputs: {0}")]
-    DuplicateOutputs(String),
-
-    #[error("Missing output: {0} (used in pin_subpackage)")]
-    MissingOutput(String),
-
-    #[error("Found a cycle in the recipe outputs: {0}")]
-    CycleInRecipeOutputs(String),
+    ParseErrors(#[from] VariantConfigError<S>),
 }
 
 fn find_combinations(
@@ -656,16 +688,17 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
-    use crate::{normalized_key::NormalizedKey, selectors::SelectorConfig};
     use rattler_conda_types::Platform;
     use rstest::rstest;
+
+    use crate::{normalized_key::NormalizedKey, selectors::SelectorConfig};
 
     #[rstest]
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
-        let yaml = Node::parse_yaml(0, &yaml_file).unwrap();
+        let yaml = Node::parse_yaml(0, yaml_file.as_str()).unwrap();
 
         let selector_config = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -724,10 +757,10 @@ mod tests {
         // First find all outputs from the recipe
         let recipe_text =
             std::fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
-        let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+        let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
-            .find_variants(&outputs, &recipe_text, &selector_config)
+            .find_variants(&outputs, recipe_text.as_str(), &selector_config)
             .unwrap();
 
         let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants
@@ -805,10 +838,11 @@ mod tests {
             let recipe_text =
                 std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
                     .unwrap();
-            let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+            let outputs =
+                crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
             let variant_config = VariantConfig::from_files(&[], &selector_config).unwrap();
             let outputs_and_variants = variant_config
-                .find_variants(&outputs, &recipe_text, &selector_config)
+                .find_variants(&outputs, recipe_text.as_str(), &selector_config)
                 .unwrap();
 
             // assert output order
@@ -836,10 +870,10 @@ mod tests {
         let recipe_text =
             std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
                 .unwrap();
-        let outputs = crate::recipe::parser::find_outputs_from_src(&recipe_text).unwrap();
+        let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
-            .find_variants(&outputs, &recipe_text, &selector_config)
+            .find_variants(&outputs, recipe_text.as_str(), &selector_config)
             .unwrap();
 
         let used_variables_all: Vec<&BTreeMap<NormalizedKey, String>> = outputs_and_variants

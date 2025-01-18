@@ -1,19 +1,20 @@
 //! Error types for the recipe parser.
 
-use std::{borrow::Cow, convert::Infallible, fmt, str::ParseBoolError};
-
+use crate::source_code::SourceCode;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
+use std::fmt::Debug;
+use std::{borrow::Cow, convert::Infallible, fmt, str::ParseBoolError};
 use thiserror::Error;
 
 /// The Error type for the first stage of the recipe parser.
 ///
 /// This type was designed to be compatible with [`miette`], and its [`Diagnostic`] trait.
 #[derive(Debug, Error, Diagnostic)]
-#[error("Parsing: {kind}")]
-pub struct ParsingError {
+#[error("{kind}")]
+pub struct ParsingError<S: SourceCode> {
     /// Source string of the recipe.
     #[source_code]
-    pub src: String,
+    pub src: S,
 
     /// Offset in chars of the error.
     #[label("{}", label.as_deref().unwrap_or("here"))]
@@ -30,16 +31,19 @@ pub struct ParsingError {
     pub kind: ErrorKind,
 }
 
-impl ParsingError {
+impl<S: SourceCode> ParsingError<S> {
     /// Turn a Vec of [`PartialParsingError`] into a Vec of [`ParsingError`] by adding the source string.
     pub fn from_partial_vec(
-        src: &str,
+        src: S,
         errs: impl IntoIterator<Item = PartialParsingError>,
-    ) -> Vec<Self> {
+    ) -> Vec<Self>
+    where
+        S: Clone + AsRef<str>,
+    {
         errs.into_iter()
             .map(|err| Self {
-                src: src.to_owned(),
-                span: marker_span_to_span(src, err.span),
+                src: src.clone(),
+                span: marker_span_to_span(src.as_ref(), err.span),
                 label: err.label,
                 help: err.help,
                 kind: err.kind,
@@ -48,10 +52,13 @@ impl ParsingError {
     }
 
     /// Turn a [`PartialParsingError`] into a [`ParsingError`] by adding the source string.
-    pub fn from_partial(src: &str, err: PartialParsingError) -> Self {
+    pub fn from_partial(src: S, err: PartialParsingError) -> Self
+    where
+        S: AsRef<str>,
+    {
         Self {
-            src: src.to_owned(),
-            span: marker_span_to_span(src, err.span),
+            span: marker_span_to_span(src.as_ref(), err.span),
+            src,
             label: err.label,
             help: err.help,
             kind: err.kind,
@@ -287,7 +294,7 @@ impl From<Infallible> for ErrorKind {
 macro_rules! _error {
     ($src:expr, $span:expr, $kind:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
-            src: $src.to_owned(),
+            src: $src,
             span: $span,
             label: None,
             help: None,
@@ -296,7 +303,7 @@ macro_rules! _error {
     }};
     ($src:expr, $span:expr, $kind:expr, label = $label:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
-            src: $src.to_owned(),
+            src: $src,
             span: $span,
             label: Some($label.into()),
             help: None,
@@ -305,7 +312,7 @@ macro_rules! _error {
     }};
     ($src:expr, $span:expr, $kind:expr, help = $help:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
-            src: $src.to_owned(),
+            src: $src,
             span: $span,
             label: None,
             help: Some($help.into()),
@@ -320,7 +327,7 @@ macro_rules! _error {
     }};
     ($src:expr, $span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
-            src: $src.to_owned(),
+            src: $src,
             span: $span,
             label: Some($label.into()),
             help: Some($help.into()),
@@ -374,10 +381,14 @@ macro_rules! _partialerror {
 }
 
 /// Error handler for [`marked_yaml::LoadError`].
-pub(super) fn load_error_handler(src: &str, err: marked_yaml::LoadError) -> ParsingError {
+pub(super) fn load_error_handler<S: SourceCode>(
+    src: S,
+    err: marked_yaml::LoadError,
+) -> ParsingError<S> {
+    let span = marker_to_span(src.as_ref(), marker(&err));
     _error!(
         src,
-        marker_to_span(src, marker(&err)),
+        span,
         ErrorKind::YamlParsing(err),
         label = Cow::Borrowed(match err {
             marked_yaml::LoadError::TopLevelMustBeMapping(_) => "expected a mapping here",
@@ -518,7 +529,7 @@ mod tests {
         let res = Recipe::from_yaml(fault_yaml, Default::default());
 
         if let Err(err) = res {
-            let err: ParseErrors = err.into();
+            let err: ParseErrors<_> = err.into();
             assert_miette_snapshot!(err);
         }
     }

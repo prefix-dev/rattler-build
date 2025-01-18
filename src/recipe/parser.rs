@@ -2,11 +2,11 @@
 //!
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
-use std::borrow::Cow;
-
 use indexmap::IndexMap;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
+use std::fmt::Debug;
 
 use crate::{
     _partialerror,
@@ -17,6 +17,7 @@ use crate::{
         Render,
     },
     selectors::SelectorConfig,
+    source_code::SourceCode,
 };
 
 mod about;
@@ -130,12 +131,15 @@ impl<T, K, V> FlattenErrors<K, V> for T where T: Iterator<Item = Result<K, Vec<V
 
 impl Recipe {
     /// Build a recipe from a YAML string.
-    pub fn from_yaml(yaml: &str, jinja_opt: SelectorConfig) -> Result<Self, Vec<ParsingError>> {
-        let yaml_root = Node::parse_yaml(0, yaml).map_err(|err| vec![err])?;
+    pub fn from_yaml<S: SourceCode>(
+        yaml: S,
+        jinja_opt: SelectorConfig,
+    ) -> Result<Self, Vec<ParsingError<S>>> {
+        let yaml_root = Node::parse_yaml(0, yaml.clone()).map_err(|err| vec![err])?;
 
         Self::from_node(&yaml_root, jinja_opt).map_err(|errs| {
             errs.into_iter()
-                .map(|err| ParsingError::from_partial(yaml, err))
+                .map(|err| ParsingError::from_partial(yaml.clone(), err))
                 .collect()
         })
     }
@@ -359,7 +363,7 @@ mod tests {
     fn bad_skip_single_output() {
         let raw_recipe = include_str!("../../test-data/recipes/test-parsing/recipe_bad_skip.yaml");
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -375,7 +379,7 @@ mod tests {
                 continue;
             }
             let err = recipe.unwrap_err();
-            let err: ParseErrors = err
+            let err: ParseErrors<_> = err
                 .into_iter()
                 .map(|err| ParsingError::from_partial(raw_recipe, err))
                 .collect::<Vec<_>>()
@@ -395,7 +399,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -411,7 +415,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -419,7 +423,7 @@ mod tests {
     fn jinja_error() {
         let recipe = include_str!("../../test-data/recipes/test-parsing/recipe_jinja_error.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -428,7 +432,7 @@ mod tests {
         let recipe =
             include_str!("../../test-data/recipes/test-parsing/recipe_duplicate_keys.yaml");
         let recipe = Recipe::from_yaml(recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 

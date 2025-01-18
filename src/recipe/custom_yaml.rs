@@ -20,6 +20,7 @@ use crate::{
         error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
         jinja::Jinja,
     },
+    source_code::SourceCode,
 };
 
 mod rendered;
@@ -66,9 +67,12 @@ pub enum Node {
 }
 
 /// Parse YAML from a string and return a Node representing the content.
-pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<marked_yaml::Node, ParsingError> {
+pub fn parse_yaml<S: SourceCode>(
+    init_span_index: usize,
+    src: S,
+) -> Result<marked_yaml::Node, ParsingError<S>> {
     let options = LoaderOptions::default().error_on_duplicate_keys(true);
-    let yaml = parse_yaml_with_options(init_span_index, src, options)
+    let yaml = parse_yaml_with_options(init_span_index, src.clone(), options)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
 
     Ok(yaml)
@@ -87,8 +91,11 @@ impl Node {
     /// type here is the generic Node enumeration to make it potentially easier
     /// for callers to use.  Regardless, it's always possible to treat the
     /// returned node as a mapping node without risk of panic.
-    pub fn parse_yaml(init_span_index: usize, src: &str) -> Result<Self, ParsingError> {
-        let yaml = parse_yaml(init_span_index, src)?;
+    pub fn parse_yaml<S: SourceCode>(
+        init_span_index: usize,
+        src: S,
+    ) -> Result<Self, ParsingError<S>> {
+        let yaml = parse_yaml(init_span_index, src.clone())?;
         Self::try_from(yaml).map_err(|err| ParsingError::from_partial(src, err))
     }
 

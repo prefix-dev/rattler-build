@@ -188,7 +188,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 
@@ -202,7 +202,7 @@ mod tests {
         "#;
 
         let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
-        let err: ParseErrors = recipe.unwrap_err().into();
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
 }
