@@ -115,10 +115,22 @@ pub fn load_conda_build_config(
         )
     })?;
 
+    if value.is_null() {
+        return Ok(VariantConfig::default());
+    }
+
     // filter all empty maps
     let value = value
         .as_mapping()
-        .unwrap()
+        .ok_or_else(|| {
+            VariantConfigError::IOError(
+                path.to_path_buf(),
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Expected `conda_build_config.yaml` to be a mapping",
+                ),
+            )
+        })?
         .clone()
         .into_iter()
         .filter(|(_, v)| !v.is_null())
@@ -181,6 +193,7 @@ mod tests {
 
     #[rstest]
     #[case("conda_build_config/test_1.yaml", None)]
+    #[case("conda_build_config/all_filtered.yaml", None)]
     #[case("conda_build_config/conda_forge_subset.yaml", Some(false))]
     #[case("conda_build_config/conda_forge_subset.yaml", Some(true))]
     #[case("conda_build_config/conda_forge_subset.yaml", None)]
