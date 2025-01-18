@@ -2,8 +2,10 @@ import hashlib
 import json
 import os
 import platform
+import subprocess
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
+from time import sleep
 
 import pytest
 import requests
@@ -206,6 +208,106 @@ def test_anaconda_upload(
     )
 
     assert requests.get(URL).status_code == 200
+
+
+@pytest.fixture()
+def minio_server(tmp_path: Path):
+    tmp_dir = tmp_path / "minio"
+    # Start minio server
+    proc = subprocess.Popen(
+        [
+            f"minio{'.bat' if os.name == 'nt' else ''}",
+            "server",
+            "--address",
+            "0.0.0.0:9000",
+            str(tmp_dir),
+        ],
+    )
+    # Create a bucket (with retries, in case we have to wait until minio is up and running)
+    retries = 0
+    max_retries = 3
+    while retries < max_retries:
+        try:
+            subprocess.run(
+                [f"mc{'.bat' if os.name == 'nt' else ''}", "mb", "local/s3-forge"],
+                env={
+                    **os.environ,
+                    "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
+                },
+                check=True,
+            )
+            break
+        except CalledProcessError:
+            retries += 1
+            sleep(1)
+            if retries == max_retries:
+                raise RuntimeError(
+                    "Failed to create bucket, could not reach minio server"
+                )
+    yield
+    proc.kill()
+
+
+@pytest.fixture()
+def s3_credentials_file(tmp_path: Path) -> Path:
+    path = tmp_path / "credentials.json"
+    path.write_text(
+        """\
+{
+    "s3://s3-forge/channel": {
+        "S3Credentials": {
+            "access_key_id": "minioadmin",
+            "secret_access_key": "minioadmin"
+        }
+    }
+}"""
+    )
+    return path
+
+
+@pytest.mark.usefixtures("minio_server")
+def test_s3_minio_upload(
+    rattler_build: RattlerBuild,
+    recipes: Path,
+    tmp_path: Path,
+    s3_credentials_file: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("RATTLER_AUTH_FILE", str(s3_credentials_file))
+    rattler_build.build(recipes / "globtest", tmp_path)
+    cmd = [
+        "upload",
+        "-vvv",
+        "s3",
+        "--channel",
+        "s3://s3-forge/channel",
+        "--region",
+        "eu-central-1",
+        "--endpoint-url",
+        "http://localhost:9000",
+        "--force-path-style",
+        "true",
+        str(get_package(tmp_path, "globtest")),
+    ]
+    rattler_build(*cmd)
+
+    # Make sure the package was uploaded
+    assert b"globtest" in subprocess.check_output(
+        [
+            f"mc{'.bat' if os.name == 'nt' else ''}",
+            "ls",
+            "--recursive",
+            "local/s3-forge/channel",
+        ],
+        env={
+            **os.environ,
+            "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
+        },
+    )
+
+    # Raise an error if the same package is uploaded again
+    with pytest.raises(CalledProcessError):
+        rattler_build(*cmd)
 
 
 @pytest.mark.skipif(
