@@ -624,4 +624,63 @@ mod tests {
 
         assert!(rattler_build.status.success());
     }
+
+    #[test]
+    fn test_script_scalar_content_with_jinja() {
+        // Create output directory
+        let tmp = tmp("test_script_content_with_jinja");
+        let output_dir = tmp.as_dir().join("output");
+
+        // Create recipe directory
+        let recipe_dir = tmp.as_dir().join("recipe");
+        std::fs::create_dir_all(&recipe_dir).unwrap();
+
+        // Write recipe.yaml file
+        let recipe_content = r#"
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content: ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"#;
+        std::fs::write(recipe_dir.join("recipe.yaml"), recipe_content).unwrap();
+
+        // Build with rattler-build
+        let rattler_build = rattler().build(recipe_dir, output_dir, None, None);
+        assert!(rattler_build.status.success());
+    }
+
+    #[test]
+    fn test_script_sequence_content_with_jinja() {
+        // Create output directory
+        let tmp = tmp("test_script_content_with_jinja");
+        let output_dir = tmp.as_dir().join("output");
+
+        // Create recipe directory
+        let recipe_dir = tmp.as_dir().join("recipe");
+        std::fs::create_dir_all(&recipe_dir).unwrap();
+
+        // Write recipe.yaml file
+        let recipe_content = r#"
+package:
+  name: hellopackage
+  version: 1.0.0
+build:
+  script:
+    content:
+      - ${{ PYTHON }} --help
+requirements:
+  host:
+    - python
+"#;
+        std::fs::write(recipe_dir.join("recipe.yaml"), recipe_content).unwrap();
+
+        // Build with rattler-build
+        let rattler_build = rattler().build(recipe_dir, output_dir, None, None);
+        assert!(rattler_build.status.success());
+    }
 }
