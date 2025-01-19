@@ -298,6 +298,23 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             (Some(file), None) => file.try_convert("file").map(ScriptContent::Path)?,
             (None, Some(content)) => match content {
                 RenderedNode::Scalar(node) => ScriptContent::Command(node.source().to_owned()),
+                RenderedNode::Sequence(seq) => {
+                    let commands: Result<Vec<String>, _> = seq
+                        .iter()
+                        .map(|node| {
+                            if let RenderedNode::Scalar(scalar) = node {
+                                Ok(scalar.source().to_owned())
+                            } else {
+                                Err(vec![_partialerror!(
+                                    *node.span(),
+                                    ErrorKind::ExpectedScalar,
+                                    label = "expected a scalar value in sequence"
+                                )])
+                            }
+                        })
+                        .collect();
+                    ScriptContent::Commands(commands?)
+                }
                 node => node.try_convert("content").map(ScriptContent::Commands)?,
             },
             (None, None) => ScriptContent::Default,
