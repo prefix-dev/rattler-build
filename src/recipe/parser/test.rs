@@ -128,6 +128,13 @@ pub struct PerlTest {
     pub uses: Vec<String>,
 }
 
+/// A special R test that checks if the imports are available and runs `R CMD check`.
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RTest {
+    /// List of r `libraries/uses` to test
+    pub libraries: Vec<String>,
+}
+
 /// A test that runs the tests of a downstream package.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
@@ -148,6 +155,11 @@ pub enum TestType {
     Perl {
         /// The modules to test
         perl: PerlTest,
+    },
+    /// A R test that will test if the modules are available
+    R {
+        /// The modules to test
+        r: RTest,
     },
     /// A test that executes multiple commands in a freshly created environment
     Command(CommandsTest),
@@ -263,10 +275,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::Perl { perl };
                 }
+                "r" => {
+                    let r = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::R { r };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -404,6 +420,18 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
         let mut perl_test = PerlTest::default();
         validate_keys!(perl_test, self.iter(), uses);
         Ok(perl_test)
+    }
+}
+
+///////////////////////////
+/// R Test           ///
+///////////////////////////
+
+impl TryConvertNode<RTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<RTest, Vec<PartialParsingError>> {
+        let mut r_test = RTest::default();
+        validate_keys!(r_test, self.iter(), libraries);
+        Ok(r_test)
     }
 }
 
