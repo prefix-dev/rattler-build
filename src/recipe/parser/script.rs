@@ -297,7 +297,7 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             }
             (Some(file), None) => file.try_convert("file").map(ScriptContent::Path)?,
             (None, Some(content)) => match content {
-                RenderedNode::Scalar(node) => ScriptContent::Command(node.as_str().to_owned()),
+                RenderedNode::Scalar(node) => ScriptContent::Command(node.source().to_owned()),
                 node => node.try_convert("content").map(ScriptContent::Commands)?,
             },
             (None, None) => ScriptContent::Default,
