@@ -2915,7 +2915,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.35.5"
+version = "0.35.6"
 dependencies = [
  "pyo3",
  "pyo3-build-config",
@@ -3137,7 +3137,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.35.5"
+version = "0.35.6"
 dependencies = [
  "anyhow",
  "async-once-cell",
@@ -3192,6 +3192,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
+ "retry-policies",
  "scroll",
  "serde",
  "serde-untagged",
