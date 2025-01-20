@@ -432,6 +432,66 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
 }
 
+impl BuildData {
+    /// Creates a new instance of `BuildData`.
+    pub fn new(
+        up_to: Option<String>,
+        build_platform: Option<Platform>,
+        target_platform: Option<Platform>,
+        host_platform: Option<Platform>,
+        channel: Option<Vec<String>>,
+        variant_config: Option<Vec<PathBuf>>,
+        ignore_recipe_variants: bool,
+        render_only: bool,
+        with_solve: bool,
+        keep_build: bool,
+        no_build_id: bool,
+        package_format: Option<PackageFormatAndCompression>,
+        compression_threads: Option<u32>,
+        no_include_recipe: bool,
+        test: Option<TestStrategy>,
+        color_build_log: bool,
+        common: CommonOpts,
+        tui: bool,
+        skip_existing: Option<SkipExisting>,
+        noarch_build_platform: Option<Platform>,
+        extra_meta: Option<Vec<(String, Value)>>,
+        sandbox_configuration: Option<SandboxConfiguration>,
+    ) -> Self {
+        let build_data_default = BuildData::default();
+        Self {
+            up_to: up_to.or(build_data_default.up_to),
+            build_platform: build_platform.unwrap_or(build_data_default.build_platform),
+            target_platform: target_platform
+                .or(host_platform)
+                .unwrap_or(build_data_default.target_platform),
+            host_platform: host_platform
+                .or(target_platform)
+                .unwrap_or(build_data_default.host_platform),
+            channel: channel.unwrap_or(build_data_default.channel),
+            variant_config: variant_config.unwrap_or(build_data_default.variant_config),
+            ignore_recipe_variants: ignore_recipe_variants
+                || build_data_default.ignore_recipe_variants,
+            render_only: render_only || build_data_default.render_only,
+            with_solve: with_solve || build_data_default.with_solve,
+            keep_build: keep_build || build_data_default.keep_build,
+            no_build_id: no_build_id || build_data_default.no_build_id,
+            package_format: package_format.unwrap_or(build_data_default.package_format),
+            compression_threads: compression_threads.or(build_data_default.compression_threads),
+            no_include_recipe: no_include_recipe || build_data_default.no_include_recipe,
+            test: test.unwrap_or(TestStrategy::NativeAndEmulated),
+            color_build_log: color_build_log || build_data_default.color_build_log,
+            common: common,
+            tui: tui || build_data_default.tui,
+            skip_existing: skip_existing.unwrap_or(build_data_default.skip_existing),
+            noarch_build_platform: noarch_build_platform
+                .or(build_data_default.noarch_build_platform),
+            extra_meta: extra_meta.or(build_data_default.extra_meta),
+            sandbox_configuration: sandbox_configuration,
+        }
+    }
+}
+
 impl Default for BuildData {
     fn default() -> Self {
         Self {
@@ -475,54 +535,34 @@ impl Default for BuildData {
 
 impl From<BuildOpts> for BuildData {
     fn from(opts: BuildOpts) -> Self {
-        let build_data_default = BuildData::default();
-        BuildData {
-            up_to: opts.up_to.or(build_data_default.up_to),
-            build_platform: opts
-                .build_platform
-                .unwrap_or(build_data_default.build_platform),
-            target_platform: opts
-                .target_platform
-                .or(opts.host_platform)
-                .unwrap_or(build_data_default.target_platform),
-            host_platform: opts
-                .host_platform
-                .or(opts.target_platform)
-                .unwrap_or(build_data_default.host_platform),
-            channel: opts.channel.unwrap_or(build_data_default.channel),
-            variant_config: opts
-                .variant_config
-                .unwrap_or(build_data_default.variant_config),
-            ignore_recipe_variants: opts.ignore_recipe_variants
-                || build_data_default.ignore_recipe_variants,
-            render_only: opts.render_only || build_data_default.render_only,
-            with_solve: opts.with_solve || build_data_default.with_solve,
-            keep_build: opts.keep_build || build_data_default.keep_build,
-            no_build_id: opts.no_build_id || build_data_default.no_build_id,
-            package_format: opts
-                .package_format
-                .unwrap_or(build_data_default.package_format),
-            compression_threads: opts
-                .compression_threads
-                .or(build_data_default.compression_threads),
-            no_include_recipe: opts.no_include_recipe || build_data_default.no_include_recipe,
-            test: opts.test.unwrap_or(if opts.no_test {
-                TestStrategy::Skip
+        Self::new(
+            opts.up_to,
+            opts.build_platform,
+            opts.target_platform,
+            opts.host_platform,
+            opts.channel,
+            opts.variant_config,
+            opts.ignore_recipe_variants,
+            opts.render_only,
+            opts.with_solve,
+            opts.keep_build,
+            opts.no_build_id,
+            opts.package_format,
+            opts.compression_threads,
+            opts.no_include_recipe,
+            opts.test.or(if opts.no_test {
+                Some(TestStrategy::Skip)
             } else {
-                TestStrategy::NativeAndEmulated
+                None
             }),
-            color_build_log: opts.color_build_log || build_data_default.color_build_log,
-            common: opts.common,
-            tui: opts.tui || build_data_default.tui,
-            skip_existing: opts
-                .skip_existing
-                .unwrap_or(build_data_default.skip_existing),
-            noarch_build_platform: opts
-                .noarch_build_platform
-                .or(build_data_default.noarch_build_platform),
-            extra_meta: opts.extra_meta.or(build_data_default.extra_meta),
-            sandbox_configuration: opts.sandbox_arguments.into(),
-        }
+            opts.color_build_log,
+            opts.common,
+            opts.tui,
+            opts.skip_existing,
+            opts.noarch_build_platform,
+            opts.extra_meta,
+            opts.sandbox_arguments.into(),
+        )
     }
 }
 
