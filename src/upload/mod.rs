@@ -3,10 +3,11 @@
 use crate::tool_configuration::APP_USER_AGENT;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
-use reqwest_retry::RetryPolicy;
+use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
+    time::{Duration, SystemTime},
 };
 use tokio_util::io::ReaderStream;
 use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
@@ -15,7 +16,7 @@ use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
-use reqwest::Method;
+use reqwest::{Method, StatusCode};
 use tracing::{info, warn};
 use url::Url;
 
@@ -97,7 +98,7 @@ pub async fn upload_package_to_quetz(
         },
     };
 
-    let client = get_client_with_retry().into_diagnostic()?;
+    let client = get_default_client().into_diagnostic()?;
 
     for package_file in package_files {
         let upload_url = url
@@ -115,7 +116,7 @@ pub async fn upload_package_to_quetz(
             .query(&[("force", "false"), ("sha256", &hash)])
             .header("X-API-Key", token.clone());
 
-        send_request(prepared_request, package_file).await?;
+        send_request_with_retry(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to Quetz server");
@@ -177,7 +178,7 @@ pub async fn upload_package_to_artifactory(
             package_file.display()
         ))?;
 
-        let client = get_client_with_retry().into_diagnostic()?;
+        let client = get_default_client().into_diagnostic()?;
 
         let upload_url = url
             .join(&format!("{}/{}/{}", channel, subdir, package_name))
@@ -187,7 +188,7 @@ pub async fn upload_package_to_artifactory(
             .request(Method::PUT, upload_url)
             .bearer_auth(token.clone());
 
-        send_request(prepared_request, package_file).await?;
+        send_request_with_retry(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to Artifactory server");
@@ -223,11 +224,11 @@ pub async fn upload_package_to_prefix(
         }
     };
 
-    let client = get_client_with_retry().into_diagnostic()?;
-
     let token = match api_key {
         Some(api_key) => api_key,
-        None => match check_trusted_publishing(&client, &url).await {
+        None => match check_trusted_publishing(&get_client_with_retry().into_diagnostic()?, &url)
+            .await
+        {
             TrustedPublishResult::Configured(token) => token.secret().to_string(),
             TrustedPublishResult::Skipped => check_storage()?,
             TrustedPublishResult::Ignored(err) => {
@@ -252,7 +253,10 @@ pub async fn upload_package_to_prefix(
 
         let hash = sha256_sum(package_file).into_diagnostic()?;
 
-        let prepared_request = client
+        // Note we cannot use the reqwest client with middleware because we stream
+        // the file during upload
+        let prepared_request = get_default_client()
+            .into_diagnostic()?
             .post(url.clone())
             .header("X-File-Sha256", hash)
             .header("X-File-Name", filename)
@@ -260,8 +264,7 @@ pub async fn upload_package_to_prefix(
             .header("Content-Type", "application/octet-stream")
             .bearer_auth(token.clone());
 
-        
-        send_request(prepared_request, package_file).await?;
+        send_request_with_retry(prepared_request, package_file).await?;
     }
 
     info!("Packages successfully uploaded to prefix.dev server");
@@ -331,13 +334,70 @@ pub async fn upload_package_to_anaconda(
 async fn send_request_with_retry(
     prepared_request: reqwest::RequestBuilder,
     package_file: &Path,
-    retry_strategy: RetryPolicy,
 ) -> miette::Result<reqwest::Response> {
-    let mut attempt = 0;
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
+    let mut current_try = 0;
 
-    Ok(())
+    let request_start = SystemTime::now();
+
+    loop {
+        let request = prepared_request
+            .try_clone()
+            .expect("Could not clone request. Does it have a streaming body?");
+        let response = send_request(request, package_file).await?;
+
+        if response.status().is_success() {
+            return Ok(response);
+        }
+
+        let status = response.status();
+        let body = response.text().await.into_diagnostic()?;
+        let err = miette::miette!(
+            "Failed to upload package file: {}\nStatus: {}\nBody: {}",
+            package_file.display(),
+            status,
+            body
+        );
+
+        // Non-retry status codes
+        match status {
+            // Authentication/Authorization errors
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                return Err(miette::miette!("Authentication error: {}", err));
+            }
+            // Resource conflicts
+            StatusCode::CONFLICT | StatusCode::UNPROCESSABLE_ENTITY => {
+                return Err(miette::miette!("Resource conflict: {}", err));
+            }
+            // Client errors
+            StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND | StatusCode::PAYLOAD_TOO_LARGE => {
+                return Err(miette::miette!("Client error: {}", err));
+            }
+            _ => {}
+        }
+
+        match retry_policy.should_retry(request_start, current_try) {
+            RetryDecision::DoNotRetry => {
+                return Err(err);
+            }
+            RetryDecision::Retry { execute_after } => {
+                let sleep_for = execute_after
+                    .duration_since(SystemTime::now())
+                    .unwrap_or(Duration::ZERO);
+                warn!(
+                    "Failed to upload package file: {}\nStatus: {}\nBody: {}\nRetrying in {} seconds",
+                    package_file.display(),
+                    status,
+                    body,
+                    sleep_for.as_secs()
+                );
+                tokio::time::sleep(sleep_for).await;
+            }
+        }
+
+        current_try += 1;
+    }
 }
-
 
 /// Note that we need to use a regular request. reqwest_retry does not support streaming requests.
 async fn send_request(

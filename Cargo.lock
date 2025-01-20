@@ -3277,6 +3277,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
+ "retry-policies",
  "rstest",
  "scroll",
  "serde",
