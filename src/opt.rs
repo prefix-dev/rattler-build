@@ -422,7 +422,6 @@ pub struct BuildData {
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
     pub no_include_recipe: bool,
-    pub no_test: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
     pub common: CommonOpts,
@@ -453,7 +452,6 @@ impl Default for BuildData {
             },
             compression_threads: None,
             no_include_recipe: false,
-            no_test: false,
             test: TestStrategy::NativeAndEmulated,
             color_build_log: true,
             common: CommonOpts {
@@ -508,8 +506,11 @@ impl From<BuildOpts> for BuildData {
                 .compression_threads
                 .or(build_data_default.compression_threads),
             no_include_recipe: opts.no_include_recipe || build_data_default.no_include_recipe,
-            no_test: opts.no_test || build_data_default.no_test,
-            test: opts.test.unwrap_or(TestStrategy::NativeAndEmulated),
+            test: opts.test.unwrap_or(if opts.no_test {
+                TestStrategy::Skip
+            } else {
+                TestStrategy::NativeAndEmulated
+            }),
             color_build_log: opts.color_build_log || build_data_default.color_build_log,
             common: opts.common,
             tui: opts.tui || build_data_default.tui,

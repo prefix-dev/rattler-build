@@ -135,7 +135,6 @@ pub fn get_tool_config(
         .with_keep_build(build_data.keep_build)
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
-        .with_testing(!build_data.no_test)
         .with_test_strategy(build_data.test)
         .with_zstd_repodata_enabled(build_data.common.use_zstd)
         .with_bz2_repodata_enabled(build_data.common.use_zstd)
