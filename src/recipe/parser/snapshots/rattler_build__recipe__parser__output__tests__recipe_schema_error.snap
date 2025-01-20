@@ -1,8 +1,8 @@
 ---
 source: src/recipe/parser/output.rs
-expression: find_outputs_from_src(&src).unwrap_err()
+expression: find_outputs_from_src(src.as_str()).unwrap_err()
 ---
-  × Parsing: invalid field `package`.
+  × invalid field `package`.
    ╭─[3:1]
  2 │ 
  3 │ package:
@@ -12,4 +12,3 @@ expression: find_outputs_from_src(&src).unwrap_err()
    ╰────
   help: recipe cannot have both `outputs` and `package` fields. Rename
         `package` to `recipe` or remove `outputs`
-

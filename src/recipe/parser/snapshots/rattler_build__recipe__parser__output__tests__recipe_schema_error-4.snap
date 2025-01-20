@@ -1,8 +1,8 @@
 ---
 source: src/recipe/parser/output.rs
-expression: find_outputs_from_src(&src).unwrap_err()
+expression: find_outputs_from_src(src.as_str()).unwrap_err()
 ---
-  × Parsing: invalid field `randomkey`.
+  × invalid field `randomkey`.
     ╭─[11:1]
  10 │ 
  11 │ randomkey:

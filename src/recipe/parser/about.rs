@@ -161,7 +161,7 @@ mod test {
             homepage: license_urla.asda:://sdskd
         "#;
 
-        let err: ParseErrors = Recipe::from_yaml(recipe, SelectorConfig::default())
+        let err: ParseErrors<_> = Recipe::from_yaml(recipe, SelectorConfig::default())
             .unwrap_err()
             .into();
 
@@ -179,7 +179,7 @@ mod test {
             license: MIT/X derivate
         "#;
 
-        let err: ParseErrors = Recipe::from_yaml(recipe, SelectorConfig::default())
+        let err: ParseErrors<_> = Recipe::from_yaml(recipe, SelectorConfig::default())
             .unwrap_err()
             .into();
 
