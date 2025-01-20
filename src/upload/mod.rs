@@ -3,6 +3,7 @@
 use crate::tool_configuration::APP_USER_AGENT;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
+use reqwest_retry::RetryPolicy;
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
@@ -259,6 +260,7 @@ pub async fn upload_package_to_prefix(
             .header("Content-Type", "application/octet-stream")
             .bearer_auth(token.clone());
 
+        
         send_request(prepared_request, package_file).await?;
     }
 
@@ -326,8 +328,20 @@ pub async fn upload_package_to_anaconda(
     Ok(())
 }
 
+async fn send_request_with_retry(
+    prepared_request: reqwest::RequestBuilder,
+    package_file: &Path,
+    retry_strategy: RetryPolicy,
+) -> miette::Result<reqwest::Response> {
+    let mut attempt = 0;
+
+    Ok(())
+}
+
+
+/// Note that we need to use a regular request. reqwest_retry does not support streaming requests.
 async fn send_request(
-    prepared_request: reqwest_middleware::RequestBuilder,
+    prepared_request: reqwest::RequestBuilder,
     package_file: &Path,
 ) -> miette::Result<reqwest::Response> {
     let file = tokio::fs::File::open(package_file)
