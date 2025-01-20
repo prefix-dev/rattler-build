@@ -415,7 +415,7 @@ pub struct BuildOpts {
     pub no_include_recipe: bool,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
-    #[arg(long, help_heading = "Modifying result")]
+    #[arg(long, help_heading = "Modifying result", hide = true)]
     pub no_test: bool,
 
     /// The strategy to use for running tests
