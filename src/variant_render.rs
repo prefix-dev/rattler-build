@@ -359,7 +359,7 @@ pub(crate) fn stage_1_render<S: SourceCode>(
 
             // If the recipe is `noarch: python` we can remove an empty python key that
             // comes from the dependencies
-            if output.build().is_python_version_independent() {
+            if output.build().noarch().is_python() {
                 additional_variables.remove(&"python".into());
             }
 

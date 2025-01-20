@@ -256,11 +256,18 @@ pub async fn get_build_output(
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
+        let skipped = if discovered_output.recipe.build().skip() {
+            console::style(" (skipped)").red().to_string()
+        } else {
+            "".to_string()
+        };
+
         tracing::info!(
-            "Build variant: {}-{}-{}",
+            "\nBuild variant: {}-{}-{}{}",
             discovered_output.name,
             discovered_output.version,
-            discovered_output.build_string
+            discovered_output.build_string,
+            skipped
         );
 
         let mut table = comfy_table::Table::new();
@@ -287,10 +294,6 @@ pub async fn get_build_output(
         let recipe = &discovered_output.recipe;
 
         if recipe.build().skip() {
-            tracing::info!(
-                "Skipping build for variant: {:#?}",
-                discovered_output.used_vars
-            );
             continue;
         }
 
