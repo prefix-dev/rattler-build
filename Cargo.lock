@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.35.5"
+version = "0.35.6"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
