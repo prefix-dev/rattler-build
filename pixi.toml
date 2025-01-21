@@ -64,6 +64,7 @@ typos = "typos --write-changes --force-exclude"
 tbump = "*"
 
 [feature.dev.tasks]
+# Bump version by running `pixi run bump NEW_VERSION`
 bump = "tbump --only-patch"
 
 
