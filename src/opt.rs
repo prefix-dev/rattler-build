@@ -459,7 +459,6 @@ pub struct BuildOpts {
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
 pub struct BuildData {
-    pub recipes: Vec<PathBuf>,
     pub up_to: Option<String>,
     pub build_platform: Platform,
     pub target_platform: Platform,
@@ -488,7 +487,6 @@ impl BuildData {
     /// Creates a new instance of `BuildData`.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        recipes: Vec<PathBuf>,
         up_to: Option<String>,
         build_platform: Option<Platform>,
         target_platform: Option<Platform>,
@@ -512,7 +510,6 @@ impl BuildData {
         sandbox_configuration: Option<SandboxConfiguration>,
     ) -> Self {
         Self {
-            recipes,
             up_to,
             build_platform: build_platform.unwrap_or(Platform::current()),
             target_platform: target_platform
@@ -549,7 +546,6 @@ impl BuildData {
 impl From<BuildOpts> for BuildData {
     fn from(opts: BuildOpts) -> Self {
         Self::new(
-            opts.recipes,
             opts.up_to,
             opts.build_platform,
             opts.target_platform,
