@@ -2,7 +2,6 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     fmt::{Display, Formatter},
-    str::FromStr,
     sync::Arc,
 };
 
@@ -10,9 +9,8 @@ use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
 use rattler_cache::package_cache::PackageCache;
 use rattler_conda_types::{
-    package::RunExportsJson, version_spec::ParseVersionSpecError, ChannelUrl, MatchSpec,
-    PackageName, PackageRecord, ParseStrictness, Platform, RepoDataRecord, StringMatcher,
-    VersionSpec,
+    package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
+    Platform, RepoDataRecord,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -423,17 +421,11 @@ pub enum ResolveError {
     #[error("Could not collect run exports")]
     CouldNotCollectRunExports(#[from] RunExportExtractorError),
 
-    #[error("Could not parse version spec: {0}")]
-    VersionSpecParseError(#[from] ParseVersionSpecError),
-
-    #[error("Could not parse version: {0}")]
-    VersionParseError(#[from] rattler_conda_types::ParseVersionError),
-
     #[error("Could not parse match spec: {0}")]
     MatchSpecParseError(#[from] rattler_conda_types::ParseMatchSpecError),
 
-    #[error("Could not parse build string matcher: {0}")]
-    StringMatcherParseError(#[from] rattler_conda_types::StringMatcherParseError),
+    #[error("Could not parse version spec for variant key {0}: {1}")]
+    VariantSpecParseError(String, rattler_conda_types::ParseMatchSpecError),
 
     #[error("Could not apply pin: {0}")]
     PinApplyError(#[from] PinError),
@@ -479,26 +471,14 @@ pub fn apply_variant(
                                 } else {
                                     spec = version.clone();
                                 }
-
-                                // we split at whitespace to separate into version and build
-                                let mut splitter = spec.split_whitespace();
-                                let version_spec = splitter
-                                    .next()
-                                    .map(|v| VersionSpec::from_str(v, ParseStrictness::Strict))
-                                    .transpose()?;
-                                let build_spec =
-                                    splitter.next().map(StringMatcher::from_str).transpose()?;
                                 let variant = name.as_normalized().to_string();
-                                let final_spec = MatchSpec {
-                                    version: version_spec,
-                                    build: build_spec,
-                                    ..m
-                                };
-                                return Ok(VariantDependency {
-                                    spec: final_spec,
-                                    variant,
-                                }
-                                .into());
+                                let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
+                                    ResolveError::VariantSpecParseError(variant.clone(), e)
+                                })?;
+
+                                let spec = MatchSpec::from_nameless(spec, Some(name.clone()));
+
+                                return Ok(VariantDependency { spec, variant }.into());
                             }
                         }
                     }
@@ -1009,6 +989,8 @@ impl Output {
 
 #[cfg(test)]
 mod tests {
+    use rattler_conda_types::ParseStrictness;
+
     // test rendering of DependencyInfo
     use super::*;
 
