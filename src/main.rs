@@ -70,7 +70,7 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::Build(build_args)) => {
-            let recipes = build_args.recipe.clone();
+            let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
             let build_data = BuildData::from(build_args);
 
@@ -101,11 +101,15 @@ async fn async_main() -> miette::Result<()> {
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
         Some(SubCommands::Test(test_args)) => {
-            run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await
+            run_test_from_args(
+                test_args.into(),
+                log_handler.expect("logger is not initialized"),
+            )
+            .await
         }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild_from_args(
-                rebuild_args,
+                rebuild_args.into(),
                 log_handler.expect("logger is not initialized"),
             )
             .await

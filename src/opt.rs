@@ -170,7 +170,6 @@ pub struct CommonOpts {
     #[clap(
         long,
         env = "CONDA_BLD_PATH",
-        default_value = "./output",
         verbatim_doc_comment,
         help_heading = "Modifying result"
     )]
@@ -193,8 +192,45 @@ pub struct CommonOpts {
     pub auth_file: Option<PathBuf>,
 
     /// Channel priority to use when solving
-    #[arg(long, default_value = "strict")]
-    pub channel_priority: ChannelPriorityWrapper,
+    #[arg(long)]
+    pub channel_priority: Option<ChannelPriorityWrapper>,
+}
+
+#[derive(Clone, Debug)]
+#[allow(missing_docs)]
+pub struct CommonData {
+    pub output_dir: PathBuf,
+    pub experimental: bool,
+    pub auth_file: Option<PathBuf>,
+    pub channel_priority: ChannelPriority,
+}
+
+impl From<CommonOpts> for CommonData {
+    fn from(value: CommonOpts) -> Self {
+        Self::new(
+            value.output_dir,
+            value.experimental,
+            value.auth_file,
+            value.channel_priority.map(|c| c.value),
+        )
+    }
+}
+
+impl CommonData {
+    /// Create a new instance of `CommonData`
+    pub fn new(
+        output_dir: Option<PathBuf>,
+        experimental: bool,
+        auth_file: Option<PathBuf>,
+        channel_priority: Option<ChannelPriority>,
+    ) -> Self {
+        Self {
+            output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
+            experimental,
+            auth_file,
+            channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
+        }
+    }
 }
 
 /// Container for rattler_solver::ChannelPriority so that it can be parsed
@@ -291,11 +327,11 @@ pub struct BuildOpts {
     /// current directory.
     #[arg(
         short,
-        long,
+        long = "recipe",
         default_value = ".",
         default_value_if("recipe_dir", ArgPredicate::IsPresent, None)
     )]
-    pub recipe: Vec<PathBuf>,
+    pub recipes: Vec<PathBuf>,
 
     /// The directory that contains recipes.
     #[arg(long, value_parser = is_dir)]
@@ -422,10 +458,9 @@ pub struct BuildData {
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
     pub no_include_recipe: bool,
-    pub no_test: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
-    pub common: CommonOpts,
+    pub common: CommonData,
     pub tui: bool,
     pub skip_existing: SkipExisting,
     pub noarch_build_platform: Option<Platform>,
@@ -433,95 +468,95 @@ pub struct BuildData {
     pub sandbox_configuration: Option<SandboxConfiguration>,
 }
 
-impl Default for BuildData {
-    fn default() -> Self {
+impl BuildData {
+    /// Creates a new instance of `BuildData`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        up_to: Option<String>,
+        build_platform: Option<Platform>,
+        target_platform: Option<Platform>,
+        host_platform: Option<Platform>,
+        channel: Option<Vec<String>>,
+        variant_config: Option<Vec<PathBuf>>,
+        ignore_recipe_variants: bool,
+        render_only: bool,
+        with_solve: bool,
+        keep_build: bool,
+        no_build_id: bool,
+        package_format: Option<PackageFormatAndCompression>,
+        compression_threads: Option<u32>,
+        no_include_recipe: bool,
+        test: Option<TestStrategy>,
+        common: CommonData,
+        tui: bool,
+        skip_existing: Option<SkipExisting>,
+        noarch_build_platform: Option<Platform>,
+        extra_meta: Option<Vec<(String, Value)>>,
+        sandbox_configuration: Option<SandboxConfiguration>,
+    ) -> Self {
         Self {
-            up_to: None,
-            build_platform: Platform::current(),
-            target_platform: Platform::current(),
-            host_platform: Platform::current(),
-            channel: vec!["conda-forge".to_string()],
-            variant_config: vec![],
-            ignore_recipe_variants: false,
-            render_only: false,
-            with_solve: false,
-            keep_build: false,
-            no_build_id: false,
-            package_format: PackageFormatAndCompression {
+            up_to,
+            build_platform: build_platform.unwrap_or(Platform::current()),
+            target_platform: target_platform
+                .or(host_platform)
+                .unwrap_or(Platform::current()),
+            host_platform: host_platform
+                .or(target_platform)
+                .unwrap_or(Platform::current()),
+            channel: channel.unwrap_or(vec!["conda-forge".to_string()]),
+            variant_config: variant_config.unwrap_or_default(),
+            ignore_recipe_variants,
+            render_only,
+            with_solve,
+            keep_build,
+            no_build_id,
+            package_format: package_format.unwrap_or(PackageFormatAndCompression {
                 archive_type: ArchiveType::Conda,
                 compression_level: CompressionLevel::Default,
-            },
-            compression_threads: None,
-            no_include_recipe: false,
-            no_test: false,
-            test: TestStrategy::NativeAndEmulated,
+            }),
+            compression_threads,
+            no_include_recipe,
+            test: test.unwrap_or_default(),
             color_build_log: true,
-            common: CommonOpts {
-                output_dir: Some(PathBuf::from("./output")),
-                use_zstd: true,
-                use_bz2: true,
-                experimental: false,
-                auth_file: None,
-                channel_priority: ChannelPriorityWrapper {
-                    value: ChannelPriority::Strict,
-                },
-            },
-            tui: false,
-            skip_existing: SkipExisting::None,
-            noarch_build_platform: None,
-            extra_meta: None,
-            sandbox_configuration: None,
+            common,
+            tui,
+            skip_existing: skip_existing.unwrap_or(SkipExisting::None),
+            noarch_build_platform,
+            extra_meta,
+            sandbox_configuration,
         }
     }
 }
 
 impl From<BuildOpts> for BuildData {
     fn from(opts: BuildOpts) -> Self {
-        let build_data_default = BuildData::default();
-        BuildData {
-            up_to: opts.up_to.or(build_data_default.up_to),
-            build_platform: opts
-                .build_platform
-                .unwrap_or(build_data_default.build_platform),
-            target_platform: opts
-                .target_platform
-                .or(opts.host_platform)
-                .unwrap_or(build_data_default.target_platform),
-            host_platform: opts
-                .host_platform
-                .or(opts.target_platform)
-                .unwrap_or(build_data_default.host_platform),
-            channel: opts.channel.unwrap_or(build_data_default.channel),
-            variant_config: opts
-                .variant_config
-                .unwrap_or(build_data_default.variant_config),
-            ignore_recipe_variants: opts.ignore_recipe_variants
-                || build_data_default.ignore_recipe_variants,
-            render_only: opts.render_only || build_data_default.render_only,
-            with_solve: opts.with_solve || build_data_default.with_solve,
-            keep_build: opts.keep_build || build_data_default.keep_build,
-            no_build_id: opts.no_build_id || build_data_default.no_build_id,
-            package_format: opts
-                .package_format
-                .unwrap_or(build_data_default.package_format),
-            compression_threads: opts
-                .compression_threads
-                .or(build_data_default.compression_threads),
-            no_include_recipe: opts.no_include_recipe || build_data_default.no_include_recipe,
-            no_test: opts.no_test || build_data_default.no_test,
-            test: opts.test.unwrap_or(TestStrategy::NativeAndEmulated),
-            color_build_log: opts.color_build_log || build_data_default.color_build_log,
-            common: opts.common,
-            tui: opts.tui || build_data_default.tui,
-            skip_existing: opts
-                .skip_existing
-                .unwrap_or(build_data_default.skip_existing),
-            noarch_build_platform: opts
-                .noarch_build_platform
-                .or(build_data_default.noarch_build_platform),
-            extra_meta: opts.extra_meta.or(build_data_default.extra_meta),
-            sandbox_configuration: opts.sandbox_arguments.into(),
-        }
+        Self::new(
+            opts.up_to,
+            opts.build_platform,
+            opts.target_platform,
+            opts.host_platform,
+            opts.channel,
+            opts.variant_config,
+            opts.ignore_recipe_variants,
+            opts.render_only,
+            opts.with_solve,
+            opts.keep_build,
+            opts.no_build_id,
+            opts.package_format,
+            opts.compression_threads,
+            opts.no_include_recipe,
+            opts.test.or(if opts.no_test {
+                Some(TestStrategy::Skip)
+            } else {
+                None
+            }),
+            opts.common.into(),
+            opts.tui,
+            opts.skip_existing,
+            opts.noarch_build_platform,
+            opts.extra_meta,
+            opts.sandbox_arguments.into(),
+        )
     }
 }
 
@@ -564,6 +599,43 @@ pub struct TestOpts {
     pub common: CommonOpts,
 }
 
+#[derive(Debug, Clone)]
+#[allow(missing_docs)]
+pub struct TestData {
+    pub channel: Vec<String>,
+    pub package_file: PathBuf,
+    pub compression_threads: Option<u32>,
+    pub common: CommonData,
+}
+
+impl From<TestOpts> for TestData {
+    fn from(value: TestOpts) -> Self {
+        Self::new(
+            value.package_file,
+            value.channel,
+            value.compression_threads,
+            value.common.into(),
+        )
+    }
+}
+
+impl TestData {
+    /// Create a new instance of `TestData`
+    pub fn new(
+        package_file: PathBuf,
+        channel: Option<Vec<String>>,
+        compression_threads: Option<u32>,
+        common: CommonData,
+    ) -> Self {
+        Self {
+            package_file,
+            channel: channel.unwrap_or(vec!["conda-forge".to_string()]),
+            compression_threads,
+            common,
+        }
+    }
+}
+
 /// Rebuild options.
 #[derive(Parser)]
 pub struct RebuildOpts {
@@ -572,12 +644,12 @@ pub struct RebuildOpts {
     pub package_file: PathBuf,
 
     /// Do not run tests after building (deprecated, use `--test=skip` instead)
-    #[arg(long, default_value = "false", hide = true)]
+    #[arg(long, hide = true)]
     pub no_test: bool,
 
     /// The strategy to use for running tests
     #[arg(long, help_heading = "Modifying result")]
-    pub test: TestStrategy,
+    pub test: Option<TestStrategy>,
 
     /// The number of threads to use for compression.
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
@@ -586,6 +658,47 @@ pub struct RebuildOpts {
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
+}
+
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct RebuildData {
+    pub package_file: PathBuf,
+    pub test: TestStrategy,
+    pub compression_threads: Option<u32>,
+    pub common: CommonData,
+}
+
+impl From<RebuildOpts> for RebuildData {
+    fn from(value: RebuildOpts) -> Self {
+        Self::new(
+            value.package_file,
+            value.test.unwrap_or(if value.no_test {
+                TestStrategy::Skip
+            } else {
+                TestStrategy::default()
+            }),
+            value.compression_threads,
+            value.common.into(),
+        )
+    }
+}
+
+impl RebuildData {
+    /// Create a new instance of `RebuildData`
+    pub fn new(
+        package_file: PathBuf,
+        test: TestStrategy,
+        compression_threads: Option<u32>,
+        common: CommonData,
+    ) -> Self {
+        Self {
+            package_file,
+            test,
+            compression_threads,
+            common,
+        }
+    }
 }
 
 /// Upload options.
