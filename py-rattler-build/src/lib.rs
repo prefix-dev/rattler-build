@@ -2,7 +2,8 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
-    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression},
+    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression, TestData},
+    run_test,
     tool_configuration::{SkipExisting, TestStrategy},
 };
 use clap::ValueEnum;
@@ -110,9 +111,25 @@ fn build_recipes_py(
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (package_file, channel, compression_threads, output_dir, auth_file, channel_priority))]
+fn test_py(
+    package_file: String,
+    channel: Option<Vec<String>>,
+    compression_threads: Option<u32>,
+    output_dir: Option<String>,
+    auth_file: Option<String>,
+    channel_priority: Option<String>,
+) -> PyResult<()> {
+    let test_data = TestData::new();
+    run_test(test_data, None);
+    Ok(())
+}
+
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(test_py, &m).unwrap())?;
     Ok(())
 }

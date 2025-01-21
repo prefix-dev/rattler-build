@@ -12,7 +12,7 @@ use rattler_build::{
     console_utils::init_logging,
     get_recipe_path,
     opt::{App, BuildData, ShellCompletion, SubCommands},
-    rebuild_from_args, run_test_from_args, upload_from_args,
+    rebuild, run_test, upload_from_args,
 };
 use tempfile::{tempdir, TempDir};
 
@@ -100,15 +100,9 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
-        Some(SubCommands::Test(test_args)) => {
-            run_test_from_args(
-                test_args.into(),
-                log_handler.expect("logger is not initialized"),
-            )
-            .await
-        }
+        Some(SubCommands::Test(test_args)) => run_test(test_args.into(), log_handler).await,
         Some(SubCommands::Rebuild(rebuild_args)) => {
-            rebuild_from_args(
+            rebuild(
                 rebuild_args.into(),
                 log_handler.expect("logger is not initialized"),
             )
