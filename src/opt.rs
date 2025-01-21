@@ -207,15 +207,11 @@ pub struct CommonData {
 
 impl From<CommonOpts> for CommonData {
     fn from(value: CommonOpts) -> Self {
-        let common_default = Self::default();
         Self::new(
-            value.output_dir.unwrap_or(common_default.output_dir),
+            value.output_dir,
             value.experimental,
             value.auth_file,
-            value
-                .channel_priority
-                .map(|c| c.value)
-                .unwrap_or(common_default.channel_priority),
+            value.channel_priority.map(|c| c.value),
         )
     }
 }
@@ -223,27 +219,16 @@ impl From<CommonOpts> for CommonData {
 impl CommonData {
     /// Create a new instance of `CommonData`
     pub fn new(
-        output_dir: PathBuf,
+        output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
-        channel_priority: ChannelPriority,
+        channel_priority: Option<ChannelPriority>,
     ) -> Self {
         Self {
-            output_dir,
+            output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
-            channel_priority,
-        }
-    }
-}
-
-impl Default for CommonData {
-    fn default() -> Self {
-        Self {
-            output_dir: PathBuf::from("./output"),
-            experimental: false,
-            auth_file: None,
-            channel_priority: ChannelPriority::Strict,
+            channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
         }
     }
 }
