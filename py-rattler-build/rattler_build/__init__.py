@@ -66,7 +66,7 @@ def test(
     compression_threads: Union[int, None] = None,
     auth_file: Union[str, Path, None] = None,
     channel_priority: Union[str, None] = None,
-):
-    package_file = package_file if package_file is None else str(package_file)
+) -> None:
+    package_file = str(package_file)
     auth_file = auth_file if auth_file is None else str(auth_file)
     test_py(package_file, channel, compression_threads, auth_file, channel_priority)
