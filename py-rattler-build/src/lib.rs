@@ -42,9 +42,7 @@ fn build_recipes_py(
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
 ) -> PyResult<()> {
-    let rt = tokio::runtime::Runtime::new().unwrap();
     let recipes = recipes.into_iter().map(PathBuf::from).collect();
-
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
@@ -103,6 +101,8 @@ fn build_recipes_py(
         None,
         None,
     );
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         if let Err(e) = build_recipes(recipes, build_data, &None).await {
             return Err(PyRuntimeError::new_err(e.to_string()));
@@ -121,9 +121,23 @@ fn test_py(
     auth_file: Option<String>,
     channel_priority: Option<String>,
 ) -> PyResult<()> {
-    let test_data = TestData::new();
-    run_test(test_data, None);
-    Ok(())
+    let package_file = PathBuf::from(package_file);
+    let output_dir = output_dir.map(PathBuf::from);
+    let auth_file = auth_file.map(PathBuf::from);
+    let channel_priority = channel_priority
+        .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let common = CommonData::new(output_dir, false, auth_file, channel_priority);
+    let test_data = TestData::new(package_file, channel, compression_threads, common);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) = run_test(test_data, None).await {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
 }
 
 #[pymodule]
