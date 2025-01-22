@@ -232,10 +232,10 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     // replace URL with the shorter version that does not contain the hash
     let release_url = if release.url.starts_with("https://files.pythonhosted.org/") {
         let simple_url = format!(
-            "https://pypi.io/packages/source/{}/{}/{}-{}.tar.gz",
+            "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
             &info.name.to_lowercase()[..1],
             info.name.to_lowercase(),
-            info.name.to_lowercase(),
+            info.name.to_lowercase().replace("-", "_"),
             info.version
         );
 
