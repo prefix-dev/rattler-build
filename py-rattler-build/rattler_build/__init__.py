@@ -1,8 +1,8 @@
-from .rattler_build import get_rattler_build_version_py, build_recipes_py, test_py
+from .rattler_build import get_rattler_build_version_py, build_recipes_py, test_package_py, upload_package_to_quetz_py
 from pathlib import Path
 from typing import List, Union
 
-__all__ = ["rattler_build_version", "build_recipe"]
+__all__ = ["rattler_build_version", "build_recipe", "test_package", "upload_package_to_quetz"]
 
 
 def rattler_build_version() -> str:
@@ -60,7 +60,7 @@ def build_recipes(
     )
 
 
-def test(
+def test_package(
     package_file: Union[str, Path],
     channel: Union[List[str], None] = None,
     compression_threads: Union[int, None] = None,
@@ -69,4 +69,14 @@ def test(
 ) -> None:
     package_file = str(package_file)
     auth_file = auth_file if auth_file is None else str(auth_file)
-    test_py(package_file, channel, compression_threads, auth_file, channel_priority)
+    test_package_py(package_file, channel, compression_threads, auth_file, channel_priority)
+
+
+def upload_package_to_quetz(
+    package_files: List[str],
+    url: str,
+    channels: str,
+    api_key: Union[str, None] = None,
+    auth_file: Union[str, Path, None] = None,
+) -> None:
+    upload_package_to_quetz_py(package_files, url, channels, api_key, auth_file)

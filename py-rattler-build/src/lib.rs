@@ -2,14 +2,19 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
-    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression, TestData},
+    opt::{
+        ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
+        PackageFormatAndCompression, QuetzData, TestData,
+    },
     run_test,
-    tool_configuration::{SkipExisting, TestStrategy},
+    tool_configuration::{self, SkipExisting, TestStrategy},
+    upload,
 };
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::Platform;
+use url::Url;
 
 // Bind the get version function to the Python module
 #[pyfunction]
@@ -113,7 +118,7 @@ fn build_recipes_py(
 
 #[pyfunction]
 #[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority))]
-fn test_py(
+fn test_package_py(
     package_file: String,
     channel: Option<Vec<String>>,
     compression_threads: Option<u32>,
@@ -138,10 +143,35 @@ fn test_py(
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (package_files, url, channels, api_key, auth_file))]
+fn upload_package_to_quetz_py(
+    package_files: Vec<PathBuf>,
+    url: String,
+    channels: String,
+    api_key: Option<String>,
+    auth_file: Option<String>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file.map(PathBuf::from))
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+    let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let quetz_data = QuetzData::new(url, channels, api_key);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) = upload::upload_package_to_quetz(&store, &package_files, quetz_data).await {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
-    m.add_function(wrap_pyfunction!(test_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_package_to_quetz_py, &m).unwrap())?;
     Ok(())
 }

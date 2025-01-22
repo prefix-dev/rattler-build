@@ -33,5 +33,5 @@ def test_test(tmp_path: Path, recipes_dir: Path) -> None:
     output_dir = tmp_path.joinpath("output")
     rattler_build.build_recipes([recipe_path], output_dir=output_dir, test="skip")
     for conda_file in output_dir.glob("**/*.conda"):
-        rattler_build.test(conda_file)
+        rattler_build.test_package(conda_file)
     assert output_dir.joinpath("noarch").is_dir()
