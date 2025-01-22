@@ -294,7 +294,7 @@ def test_s3_minio_upload(
     # Make sure the package was uploaded
     assert b"globtest" in subprocess.check_output(
         [
-            f"mc{'.bat' if os.name == 'nt' else ''}",
+            "mc",
             "ls",
             "--recursive",
             "local/s3-forge/channel",
