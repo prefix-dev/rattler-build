@@ -112,23 +112,21 @@ fn build_recipes_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, output_dir, auth_file, channel_priority))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority))]
 fn test_py(
     package_file: String,
     channel: Option<Vec<String>>,
     compression_threads: Option<u32>,
-    output_dir: Option<String>,
     auth_file: Option<String>,
     channel_priority: Option<String>,
 ) -> PyResult<()> {
     let package_file = PathBuf::from(package_file);
-    let output_dir = output_dir.map(PathBuf::from);
     let auth_file = auth_file.map(PathBuf::from);
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let common = CommonData::new(output_dir, false, auth_file, channel_priority);
+    let common = CommonData::new(None, false, auth_file, channel_priority);
     let test_data = TestData::new(package_file, channel, compression_threads, common);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
