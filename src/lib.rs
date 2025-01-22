@@ -72,7 +72,6 @@ use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
-use tracing::warn;
 use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
@@ -306,7 +305,7 @@ pub async fn get_build_output(
 
         // Add the channels from the args and by default always conda-forge
         let channels = build_data
-            .channel
+            .channels
             .clone()
             .into_iter()
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
@@ -612,7 +611,7 @@ pub async fn run_test(
         .finish();
 
     let channels = test_data
-        .channel
+        .channels
         .into_iter()
         .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
         .collect::<Result<Vec<_>, _>>()
@@ -720,73 +719,28 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {
-            upload::upload_package_to_quetz(
-                &store,
-                quetz_opts.api_key,
-                &args.package_files,
-                quetz_opts.url.into(),
-                quetz_opts.channel,
-            )
-            .await
+            let quetz_data = QuetzData::from(quetz_opts);
+            upload::upload_package_to_quetz(&store, &args.package_files, quetz_data).await
         }
         ServerType::Artifactory(artifactory_opts) => {
-            let token = match (
-                artifactory_opts.username,
-                artifactory_opts.password,
-                artifactory_opts.token,
-            ) {
-                (_, _, Some(token)) => Some(token),
-                (Some(_), Some(password), _) => {
-                    warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
-                    Some(password)
-                }
-                (Some(_), None, _) => {
-                    return Err(miette::miette!(
-                        "Artifactory username provided without a password"
-                    ));
-                }
-                (None, Some(_), _) => {
-                    return Err(miette::miette!(
-                        "Artifactory password provided without a username"
-                    ));
-                }
-                _ => None,
-            };
-            upload::upload_package_to_artifactory(
-                &store,
-                token,
-                &args.package_files,
-                artifactory_opts.url.into(),
-                artifactory_opts.channel,
-            )
-            .await
+            let artifactory_data = ArtifactoryData::try_from(artifactory_opts)?;
+
+            upload::upload_package_to_artifactory(&store, &args.package_files, artifactory_data)
+                .await
         }
         ServerType::Prefix(prefix_opts) => {
-            upload::upload_package_to_prefix(
-                &store,
-                prefix_opts.api_key,
-                &args.package_files,
-                prefix_opts.url.into(),
-                prefix_opts.channel,
-            )
-            .await
+            let prefix_data = PrefixData::from(prefix_opts);
+            upload::upload_package_to_prefix(&store, &args.package_files, prefix_data).await
         }
         ServerType::Anaconda(anaconda_opts) => {
-            upload::upload_package_to_anaconda(
-                &store,
-                anaconda_opts.api_key,
-                &args.package_files,
-                anaconda_opts.url.into(),
-                anaconda_opts.owner,
-                anaconda_opts.channel,
-                anaconda_opts.force,
-            )
-            .await
+            let anaconda_data = AnacondaData::from(anaconda_opts);
+            upload::upload_package_to_anaconda(&store, &args.package_files, anaconda_data).await
         }
         ServerType::CondaForge(conda_forge_opts) => {
+            let conda_forge_data = CondaForgeData::from(conda_forge_opts);
             upload::conda_forge::upload_packages_to_conda_forge(
-                conda_forge_opts,
                 &args.package_files,
+                conda_forge_data,
             )
             .await
         }

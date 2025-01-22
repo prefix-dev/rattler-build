@@ -10,6 +10,7 @@ use rattler_conda_types::{package::ArchiveType, Platform};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{json, Value};
+use tracing::warn;
 use url::Url;
 
 #[cfg(feature = "recipe-generation")]
@@ -18,6 +19,7 @@ use crate::{
     console_utils::{Color, LogStyle},
     script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{SkipExisting, TestStrategy},
+    url_with_trailing_slash::UrlWithTrailingSlash,
 };
 
 /// Application subcommands.
@@ -356,8 +358,8 @@ pub struct BuildOpts {
     pub host_platform: Option<Platform>,
 
     /// Add a channel to search for dependencies in.
-    #[arg(short = 'c', long)]
-    pub channel: Option<Vec<String>>,
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<String>>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
@@ -448,7 +450,7 @@ pub struct BuildData {
     pub build_platform: Platform,
     pub target_platform: Platform,
     pub host_platform: Platform,
-    pub channel: Vec<String>,
+    pub channels: Vec<String>,
     pub variant_config: Vec<PathBuf>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
@@ -476,7 +478,7 @@ impl BuildData {
         build_platform: Option<Platform>,
         target_platform: Option<Platform>,
         host_platform: Option<Platform>,
-        channel: Option<Vec<String>>,
+        channels: Option<Vec<String>>,
         variant_config: Option<Vec<PathBuf>>,
         ignore_recipe_variants: bool,
         render_only: bool,
@@ -503,7 +505,7 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channel: channel.unwrap_or(vec!["conda-forge".to_string()]),
+            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
             variant_config: variant_config.unwrap_or_default(),
             ignore_recipe_variants,
             render_only,
@@ -535,7 +537,7 @@ impl From<BuildOpts> for BuildData {
             opts.build_platform,
             opts.target_platform,
             opts.host_platform,
-            opts.channel,
+            opts.channels,
             opts.variant_config,
             opts.ignore_recipe_variants,
             opts.render_only,
@@ -583,8 +585,8 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
 #[derive(Parser)]
 pub struct TestOpts {
     /// Channels to use when testing
-    #[arg(short = 'c', long)]
-    pub channel: Option<Vec<String>>,
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<String>>,
 
     /// The package file to test
     #[arg(short, long)]
@@ -602,7 +604,7 @@ pub struct TestOpts {
 #[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub struct TestData {
-    pub channel: Vec<String>,
+    pub channels: Vec<String>,
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
@@ -612,7 +614,7 @@ impl From<TestOpts> for TestData {
     fn from(value: TestOpts) -> Self {
         Self::new(
             value.package_file,
-            value.channel,
+            value.channels,
             value.compression_threads,
             value.common.into(),
         )
@@ -623,13 +625,13 @@ impl TestData {
     /// Create a new instance of `TestData`
     pub fn new(
         package_file: PathBuf,
-        channel: Option<Vec<String>>,
+        channels: Option<Vec<String>>,
         compression_threads: Option<u32>,
         common: CommonData,
     ) -> Self {
         Self {
             package_file,
-            channel: channel.unwrap_or(vec!["conda-forge".to_string()]),
+            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
             compression_threads,
             common,
         }
@@ -738,13 +740,38 @@ pub struct QuetzOpts {
     pub url: Url,
 
     /// The URL to your channel
-    #[arg(short, long, env = "QUETZ_CHANNEL")]
-    pub channel: String,
+    #[arg(short, long = "channel", env = "QUETZ_CHANNEL")]
+    pub channels: String,
 
     /// The Quetz API key, if none is provided, the token is read from the
     /// keychain / auth-file
     #[arg(short, long, env = "QUETZ_API_KEY")]
     pub api_key: Option<String>,
+}
+
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct QuetzData {
+    pub url: UrlWithTrailingSlash,
+    pub channels: String,
+    pub api_key: Option<String>,
+}
+
+impl From<QuetzOpts> for QuetzData {
+    fn from(value: QuetzOpts) -> Self {
+        Self::new(value.url, value.channels, value.api_key)
+    }
+}
+
+impl QuetzData {
+    /// Create a new instance of `QuetzData`
+    pub fn new(url: Url, channels: String, api_key: Option<String>) -> Self {
+        Self {
+            url: url.into(),
+            channels,
+            api_key,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Parser)]
@@ -756,8 +783,8 @@ pub struct ArtifactoryOpts {
     pub url: Url,
 
     /// The URL to your channel
-    #[arg(short, long, env = "ARTIFACTORY_CHANNEL")]
-    pub channel: String,
+    #[arg(short, long = "channel", env = "ARTIFACTORY_CHANNEL")]
+    pub channels: String,
 
     /// Your Artifactory username
     #[arg(long, env = "ARTIFACTORY_USERNAME", hide = true)]
@@ -770,6 +797,51 @@ pub struct ArtifactoryOpts {
     /// Your Artifactory token
     #[arg(short, long, env = "ARTIFACTORY_TOKEN")]
     pub token: Option<String>,
+}
+
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct ArtifactoryData {
+    pub url: UrlWithTrailingSlash,
+    pub channels: String,
+    pub token: Option<String>,
+}
+
+impl TryFrom<ArtifactoryOpts> for ArtifactoryData {
+    type Error = miette::Error;
+
+    fn try_from(value: ArtifactoryOpts) -> Result<Self, Self::Error> {
+        let token = match (value.username, value.password, value.token) {
+            (_, _, Some(token)) => Some(token),
+            (Some(_), Some(password), _) => {
+                warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
+                Some(password)
+            }
+            (Some(_), None, _) => {
+                return Err(miette::miette!(
+                    "Artifactory username provided without a password"
+                ));
+            }
+            (None, Some(_), _) => {
+                return Err(miette::miette!(
+                    "Artifactory password provided without a username"
+                ));
+            }
+            _ => None,
+        };
+        Ok(Self::new(value.url, value.channels, token))
+    }
+}
+
+impl ArtifactoryData {
+    /// Create a new instance of `ArtifactoryData`
+    pub fn new(url: Url, channels: String, token: Option<String>) -> Self {
+        Self {
+            url: url.into(),
+            channels,
+            token,
+        }
+    }
 }
 
 /// Options for uploading to a prefix.dev server.
@@ -796,6 +868,31 @@ pub struct PrefixOpts {
     pub api_key: Option<String>,
 }
 
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct PrefixData {
+    pub url: UrlWithTrailingSlash,
+    pub channel: String,
+    pub api_key: Option<String>,
+}
+
+impl From<PrefixOpts> for PrefixData {
+    fn from(value: PrefixOpts) -> Self {
+        Self::new(value.url, value.channel, value.api_key)
+    }
+}
+
+impl PrefixData {
+    /// Create a new instance of `PrefixData`
+    pub fn new(url: Url, channel: String, api_key: Option<String>) -> Self {
+        Self {
+            url: url.into(),
+            channel,
+            api_key,
+        }
+    }
+}
+
 /// Options for uploading to a Anaconda.org server
 #[derive(Clone, Debug, PartialEq, Parser)]
 pub struct AnacondaOpts {
@@ -804,8 +901,8 @@ pub struct AnacondaOpts {
     pub owner: String,
 
     /// The channel / label to upload the package to (e.g. main / rc)
-    #[arg(short, long, env = "ANACONDA_CHANNEL", default_value = "main")]
-    pub channel: Vec<String>,
+    #[arg(short, long = "channel", env = "ANACONDA_CHANNEL")]
+    pub channels: Option<Vec<String>>,
 
     /// The Anaconda API key, if none is provided, the token is read from the
     /// keychain / auth-file
@@ -813,65 +910,149 @@ pub struct AnacondaOpts {
     pub api_key: Option<String>,
 
     /// The URL to the Anaconda server
-    #[arg(
-        short,
-        long,
-        env = "ANACONDA_SERVER_URL",
-        default_value = "https://api.anaconda.org"
-    )]
-    pub url: Url,
+    #[arg(short, long, env = "ANACONDA_SERVER_URL")]
+    pub url: Option<Url>,
 
     /// Replace files on conflict
-    #[arg(long, short, env = "ANACONDA_FORCE", default_value = "false")]
+    #[arg(long, short, env = "ANACONDA_FORCE")]
     pub force: bool,
+}
+
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct AnacondaData {
+    pub owner: String,
+    pub channels: Vec<String>,
+    pub api_key: Option<String>,
+    pub url: UrlWithTrailingSlash,
+    pub force: bool,
+}
+
+impl From<AnacondaOpts> for AnacondaData {
+    fn from(value: AnacondaOpts) -> Self {
+        Self::new(
+            value.owner,
+            value.channels,
+            value.api_key,
+            value.url,
+            value.force,
+        )
+    }
+}
+
+impl AnacondaData {
+    /// Create a new instance of `PrefixData`
+    pub fn new(
+        owner: String,
+        channel: Option<Vec<String>>,
+        api_key: Option<String>,
+        url: Option<Url>,
+        force: bool,
+    ) -> Self {
+        Self {
+            owner,
+            channels: channel.unwrap_or_else(|| vec!["main".to_string()]),
+            api_key,
+            url: url
+                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
+                .into(),
+            force,
+        }
+    }
 }
 
 /// Options for uploading to conda-forge
 #[derive(Clone, Debug, PartialEq, Parser)]
 pub struct CondaForgeOpts {
     /// The Anaconda API key
-    #[arg(long, env = "STAGING_BINSTAR_TOKEN", required = true)]
+    #[arg(long, env = "STAGING_BINSTAR_TOKEN")]
     pub staging_token: String,
 
     /// The feedstock name
-    #[arg(long, env = "FEEDSTOCK_NAME", required = true)]
+    #[arg(long, env = "FEEDSTOCK_NAME")]
     pub feedstock: String,
 
     /// The feedstock token
-    #[arg(long, env = "FEEDSTOCK_TOKEN", required = true)]
+    #[arg(long, env = "FEEDSTOCK_TOKEN")]
     pub feedstock_token: String,
 
     /// The staging channel name
-    #[arg(long, env = "STAGING_CHANNEL", default_value = "cf-staging")]
-    pub staging_channel: String,
+    #[arg(long, env = "STAGING_CHANNEL")]
+    pub staging_channel: Option<String>,
 
     /// The Anaconda Server URL
-    #[arg(
-        long,
-        env = "ANACONDA_SERVER_URL",
-        default_value = "https://api.anaconda.org"
-    )]
-    pub anaconda_url: Url,
+    #[arg(long, env = "ANACONDA_SERVER_URL")]
+    pub anaconda_url: Option<Url>,
 
     /// The validation endpoint url
-    #[arg(
-        long,
-        env = "VALIDATION_ENDPOINT",
-        default_value = "https://conda-forge.herokuapp.com/feedstock-outputs/copy"
-    )]
-    pub validation_endpoint: Url,
-
-    /// Post comment on promotion failure
-    #[arg(long, env = "POST_COMMENT_ON_ERROR", default_value = "true")]
-    pub post_comment_on_error: bool,
+    #[arg(long, env = "VALIDATION_ENDPOINT")]
+    pub validation_endpoint: Option<Url>,
 
     /// The CI provider
     #[arg(long, env = "CI")]
     pub provider: Option<String>,
 
     /// Dry run, don't actually upload anything
-    #[arg(long, env = "DRY_RUN", default_value = "false")]
+    #[arg(long, env = "DRY_RUN")]
     pub dry_run: bool,
+}
+
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub struct CondaForgeData {
+    pub staging_token: String,
+    pub feedstock: String,
+    pub feedstock_token: String,
+    pub staging_channel: String,
+    pub anaconda_url: UrlWithTrailingSlash,
+    pub validation_endpoint: Url,
+    pub provider: Option<String>,
+    pub dry_run: bool,
+}
+
+impl From<CondaForgeOpts> for CondaForgeData {
+    fn from(value: CondaForgeOpts) -> Self {
+        Self::new(
+            value.staging_token,
+            value.feedstock,
+            value.feedstock_token,
+            value.staging_channel,
+            value.anaconda_url,
+            value.validation_endpoint,
+            value.provider,
+            value.dry_run,
+        )
+    }
+}
+
+impl CondaForgeData {
+    /// Create a new instance of `PrefixData`
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        staging_token: String,
+        feedstock: String,
+        feedstock_token: String,
+        staging_channel: Option<String>,
+        anaconda_url: Option<Url>,
+        validation_endpoint: Option<Url>,
+        provider: Option<String>,
+        dry_run: bool,
+    ) -> Self {
+        Self {
+            staging_token,
+            feedstock,
+            feedstock_token,
+            staging_channel: staging_channel.unwrap_or_else(|| "cf-staging".to_string()),
+            anaconda_url: anaconda_url
+                .unwrap_or_else(|| Url::parse("https://api.anaconda.org").unwrap())
+                .into(),
+            validation_endpoint: validation_endpoint.unwrap_or_else(|| {
+                Url::parse("https://conda-forge.herokuapp.com/feedstock-outputs/copy").unwrap()
+            }),
+            provider,
+            dry_run,
+        }
+    }
 }
 
 #[cfg(test)]
