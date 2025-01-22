@@ -229,7 +229,7 @@ def minio_server(tmp_path: Path):
     while retries < max_retries:
         try:
             subprocess.run(
-                [f"mc{'.bat' if os.name == 'nt' else ''}", "mb", "local/s3-forge"],
+                ["mc", "mb", "local/s3-forge"],
                 env={
                     **os.environ,
                     "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
