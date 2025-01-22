@@ -21,6 +21,7 @@ mod file_mapper;
 mod metadata;
 pub use file_finder::{content_type, Files, TempFiles};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
+use tempfile::NamedTempFile;
 
 use crate::{
     metadata::Output,
@@ -324,12 +325,13 @@ pub fn package_conda(
     }
 
     let identifier = output.identifier();
-    let out_path = output_folder.join(format!(
+    let tempfile_in_output = NamedTempFile::new_in(&output_folder)?;
+
+    let final_name = output_folder.join(format!(
         "{}{}",
         identifier,
         packaging_settings.archive_type.extension()
     ));
-    let file = File::create(&out_path)?;
 
     tracing::info!("Compressing archive...");
 
@@ -342,7 +344,7 @@ pub fn package_conda(
     match packaging_settings.archive_type {
         ArchiveType::TarBz2 => {
             write_tar_bz2_package(
-                file,
+                tempfile_in_output.as_file(),
                 tmp.temp_dir.path(),
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
@@ -352,7 +354,7 @@ pub fn package_conda(
         }
         ArchiveType::Conda => {
             write_conda_package(
-                file,
+                tempfile_in_output.as_file(),
                 tmp.temp_dir.path(),
                 &tmp.files.iter().cloned().collect::<Vec<_>>(),
                 CompressionLevel::Numeric(packaging_settings.compression_level),
@@ -364,10 +366,14 @@ pub fn package_conda(
         }
     }
 
-    tracing::info!("Archive written to '{}'", out_path.display());
+    // Atomically move the file to the final location
+    tempfile_in_output
+        .persist(&final_name)
+        .map_err(|e| e.error)?;
+    tracing::info!("Archive written to '{}'", final_name.display());
 
     let paths_json = PathsJson::from_path(info_folder.join("paths.json"))?;
-    Ok((out_path, paths_json))
+    Ok((final_name, paths_json))
 }
 
 /// When building package for noarch, we don't create another build-platform
