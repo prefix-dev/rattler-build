@@ -5,8 +5,8 @@ expression: err
   × Failed to parse recipe
 
 Error: 
-  × Parsing: failed to render Jinja expression: unknown function: zcompiler is
-  │ unknown (in <string>:1)
+  × failed to render Jinja expression: unknown function: zcompiler is unknown
+  │ (in <string>:1)
    ╭─[7:7]
  6 │   host:
  7 │     - ${{ zcompiler('c') }}

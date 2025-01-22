@@ -309,6 +309,7 @@ fn default_tests(env: &mut Environment) {
     env.add_test("float", minijinja::tests::is_float);
     env.add_test("string", minijinja::tests::is_string);
     env.add_test("sequence", minijinja::tests::is_sequence);
+    env.add_test("boolean", minijinja::tests::is_boolean);
 
     // operators
     env.add_test("eq", minijinja::tests::is_eq);

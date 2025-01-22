@@ -229,7 +229,26 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     recipe.package.name = info.name.to_lowercase();
     recipe.package.version = "${{ version }}".to_string();
 
-    let release_url = release.url.clone();
+    // replace URL with the shorter version that does not contain the hash
+    let release_url = if release.url.starts_with("https://files.pythonhosted.org/") {
+        let simple_url = format!(
+            "https://pypi.io/packages/source/{}/{}/{}-{}.tar.gz",
+            &info.name.to_lowercase()[..1],
+            info.name.to_lowercase(),
+            info.name.to_lowercase(),
+            info.version
+        );
+
+        // Check if the simple URL exists
+        if client.head(&simple_url).send().await.is_ok() {
+            simple_url
+        } else {
+            release.url.clone()
+        }
+    } else {
+        release.url.clone()
+    };
+
     recipe.source.push(serialize::SourceElement {
         url: release_url.replace(info.version.as_str(), "${{ version }}"),
         sha256: release.digests.get("sha256").cloned(),

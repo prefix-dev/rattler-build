@@ -5,7 +5,7 @@ expression: err
   × Failed to parse recipe
 
 Error: 
-  × Parsing: missing field `version`
+  × missing field `version`
    ╭─[6:11]
  5 │       - package:
  6 │ ╭─▶       name: bla

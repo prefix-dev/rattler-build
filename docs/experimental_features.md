@@ -36,7 +36,7 @@ package:
 
 source:
   git: ${{ source_url }}
-  tag: ${{ source_tag }}}}
+  tag: ${{ source_tag }}
 
 requirements:
   build:

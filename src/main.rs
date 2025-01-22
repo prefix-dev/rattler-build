@@ -12,9 +12,9 @@ use rattler_build::{
     console_utils::init_logging,
     get_recipe_path,
     opt::{App, BuildData, ShellCompletion, SubCommands},
-    rebuild_from_args, run_test_from_args, upload_from_args,
+    rebuild, run_test, upload_from_args,
 };
-use tempfile::tempdir;
+use tempfile::{tempdir, TempDir};
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before tokio runtime
@@ -70,10 +70,12 @@ async fn async_main() -> miette::Result<()> {
             Ok(())
         }
         Some(SubCommands::Build(build_args)) => {
-            let recipes = build_args.recipe.clone();
+            let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
             let build_data = BuildData::from(build_args);
-            let recipe_paths = recipe_paths(recipes, recipe_dir)?;
+
+            // Get all recipe paths and keep tempdir alive until end of the function
+            let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir)?;
 
             if recipe_paths.is_empty() {
                 miette::bail!("Couldn't detect any recipes.")
@@ -98,12 +100,10 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
-        Some(SubCommands::Test(test_args)) => {
-            run_test_from_args(test_args, log_handler.expect("logger is not initialized")).await
-        }
+        Some(SubCommands::Test(test_args)) => run_test(test_args.into(), log_handler).await,
         Some(SubCommands::Rebuild(rebuild_args)) => {
-            rebuild_from_args(
-                rebuild_args,
+            rebuild(
+                rebuild_args.into(),
                 log_handler.expect("logger is not initialized"),
             )
             .await
@@ -124,13 +124,15 @@ async fn async_main() -> miette::Result<()> {
 fn recipe_paths(
     recipes: Vec<std::path::PathBuf>,
     recipe_dir: Option<std::path::PathBuf>,
-) -> Result<Vec<std::path::PathBuf>, miette::Error> {
+) -> Result<(Vec<std::path::PathBuf>, Option<TempDir>), miette::Error> {
     let mut recipe_paths = Vec::new();
-    let temp_dir = tempdir().into_diagnostic()?;
+    let mut temp_dir_opt = None;
     if !std::io::stdin().is_terminal()
         && recipes.len() == 1
         && get_recipe_path(&recipes[0]).is_err()
     {
+        let temp_dir = tempdir().into_diagnostic()?;
+
         let recipe_path = temp_dir.path().join("recipe.yaml");
         io::copy(
             &mut io::stdin(),
@@ -138,6 +140,7 @@ fn recipe_paths(
         )
         .into_diagnostic()?;
         recipe_paths.push(get_recipe_path(&recipe_path)?);
+        temp_dir_opt = Some(temp_dir);
     } else {
         for recipe_path in &recipes {
             recipe_paths.push(get_recipe_path(recipe_path)?);
@@ -153,5 +156,6 @@ fn recipe_paths(
             }
         }
     }
-    Ok(recipe_paths)
+
+    Ok((recipe_paths, temp_dir_opt))
 }

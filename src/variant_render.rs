@@ -16,8 +16,11 @@ use crate::{
         Jinja, ParsingError, Recipe,
     },
     selectors::SelectorConfig,
+    source_code::SourceCode,
     used_variables::used_vars_from_expressions,
-    variant_config::{ParseErrors, VariantConfig, VariantError},
+    variant_config::{
+        ParseErrors, VariantConfig, VariantConfigError, VariantError, VariantExpandError,
+    },
 };
 
 /// All the raw outputs of a single recipe.yaml
@@ -28,57 +31,55 @@ pub struct RawOutputVec {
 
     /// The used variables in each of the nodes
     pub used_vars_jinja: Vec<HashSet<NormalizedKey>>,
-
-    /// The recipe string
-    #[allow(unused)]
-    pub recipe: String,
 }
 
 /// Stage 0 render of a single recipe.yaml
 #[derive(Clone, Debug)]
-pub struct Stage0Render {
+pub struct Stage0Render<S: SourceCode> {
     /// The used variables with their values
     pub variables: BTreeMap<NormalizedKey, String>,
 
     /// The raw outputs of the recipe
     pub raw_outputs: RawOutputVec,
 
-    // Pre-rendered recipe nodes
+    /// Pre-rendered recipe nodes
     pub rendered_outputs: Vec<Recipe>,
+
+    /// The source code of the recipe
+    pub source: S,
 }
 
-pub(crate) fn stage_0_render(
+pub(crate) fn stage_0_render<S: SourceCode>(
     outputs: &[Node],
-    recipe: &str,
+    source: S,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
-) -> Result<Vec<Stage0Render>, VariantError> {
+) -> Result<Vec<Stage0Render<S>>, VariantError<S>> {
     let used_vars = outputs
         .iter()
         .map(|output| {
-            used_vars_from_expressions(output, recipe)
+            used_vars_from_expressions(output, source.clone())
                 .map(|x| x.into_iter().map(Into::into).collect())
         })
-        .collect::<Result<Vec<HashSet<NormalizedKey>>, Vec<ParsingError>>>()
+        .collect::<Result<_, _>>()
         .map_err(|errs| {
-            let errs: ParseErrors = errs.into();
-            VariantError::RecipeParseErrors(errs)
+            let errs: ParseErrors<S> = errs.into();
+            VariantConfigError::RecipeParseErrors(errs)
         })?;
 
     let raw_output_vec = RawOutputVec {
         vec: outputs.to_vec(),
         used_vars_jinja: used_vars,
-        recipe: recipe.to_string(),
     };
 
     // find all the jinja variables from all the expressions
     let mut used_vars = HashSet::<NormalizedKey>::new();
     for output in outputs {
         used_vars.extend(
-            used_vars_from_expressions(output, recipe)
+            used_vars_from_expressions(output, source.clone())
                 .map_err(|errs| {
-                    let errs: ParseErrors = errs.into();
-                    VariantError::RecipeParseErrors(errs)
+                    let errs: ParseErrors<_> = errs.into();
+                    VariantConfigError::RecipeParseErrors(errs)
                 })?
                 .into_iter()
                 .map(Into::into),
@@ -96,14 +97,16 @@ pub(crate) fn stage_0_render(
             let config_with_variant =
                 selector_config.with_variant(combination.clone(), selector_config.target_platform);
 
-            let parsed_recipe = Recipe::from_node(output, config_with_variant).map_err(|err| {
-                let errs: ParseErrors = err
-                    .into_iter()
-                    .map(|err| ParsingError::from_partial(recipe, err))
-                    .collect::<Vec<ParsingError>>()
-                    .into();
-                errs
-            })?;
+            let parsed_recipe = Recipe::from_node(output, config_with_variant)
+                .map_err(|err| {
+                    let errs: ParseErrors<_> = err
+                        .into_iter()
+                        .map(|err| ParsingError::from_partial(source.clone(), err))
+                        .collect::<Vec<ParsingError<_>>>()
+                        .into();
+                    errs
+                })
+                .map_err(VariantConfigError::from)?;
 
             rendered_outputs.push(parsed_recipe);
         }
@@ -112,6 +115,7 @@ pub(crate) fn stage_0_render(
             variables: combination,
             raw_outputs: raw_output_vec.clone(),
             rendered_outputs,
+            source: source.clone(),
         });
     }
 
@@ -128,15 +132,15 @@ pub struct Stage1Inner {
 
 /// Stage 1 render of a single recipe.yaml
 #[derive(Debug)]
-pub struct Stage1Render {
+pub struct Stage1Render<S: SourceCode> {
     pub(crate) variables: BTreeMap<NormalizedKey, String>,
 
     pub(crate) inner: Vec<Stage1Inner>,
 
-    pub(crate) stage_0_render: Stage0Render,
+    pub(crate) stage_0_render: Stage0Render<S>,
 }
 
-impl Stage1Render {
+impl<S: SourceCode> Stage1Render<S> {
     pub fn index_from_name(&self, package_name: &PackageName) -> Option<usize> {
         self.inner
             .iter()
@@ -146,7 +150,7 @@ impl Stage1Render {
     pub fn variant_for_output(
         &self,
         idx: usize,
-    ) -> Result<BTreeMap<NormalizedKey, String>, VariantError> {
+    ) -> Result<BTreeMap<NormalizedKey, String>, VariantExpandError> {
         let inner = &self.inner[idx];
         // combine jinja variables and the variables from the dependencies
         let self_name = self.stage_0_render.rendered_outputs[idx].package().name();
@@ -181,7 +185,9 @@ impl Stage1Render {
                 continue;
             }
             let Some(other_idx) = self.index_from_name(pin) else {
-                return Err(VariantError::MissingOutput(pin.as_source().to_string()));
+                return Err(VariantExpandError::MissingOutput(
+                    pin.as_source().to_string(),
+                ));
             };
             // find the referenced output
             let build_string = self.build_string_for_output(other_idx)?;
@@ -200,7 +206,7 @@ impl Stage1Render {
         Ok(variant)
     }
 
-    pub fn build_string_for_output(&self, idx: usize) -> Result<String, VariantError> {
+    pub fn build_string_for_output(&self, idx: usize) -> Result<String, VariantExpandError> {
         let variant = self.variant_for_output(idx)?;
         let recipe = &self.stage_0_render.rendered_outputs[idx];
         let hash = HashInfo::from_variant(&variant, recipe.build().noarch());
@@ -218,7 +224,7 @@ impl Stage1Render {
     }
 
     /// sort the outputs topologically
-    pub fn sorted_indices(&self) -> Result<Vec<usize>, VariantError> {
+    pub fn sorted_indices(&self) -> Result<Vec<usize>, VariantExpandError> {
         // Create an empty directed graph
         let mut graph = DiGraph::<_, ()>::new();
         let mut node_indices = Vec::new();
@@ -261,7 +267,7 @@ impl Stage1Render {
             Err(cycle) => {
                 let cycle = cycle.node_id();
                 let cycle_name = graph[cycle].package().name();
-                return Err(VariantError::CycleInRecipeOutputs(
+                return Err(VariantExpandError::CycleInRecipeOutputs(
                     cycle_name.as_source().to_string(),
                 ));
             }
@@ -279,7 +285,7 @@ impl Stage1Render {
     #[allow(clippy::type_complexity)]
     pub fn into_sorted_outputs(
         self,
-    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, String>)>, VariantError> {
+    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, String>)>, VariantExpandError> {
         // zip node from stage0 and final render output
         let sorted_indices = self.sorted_indices()?;
 
@@ -302,11 +308,11 @@ impl Stage1Render {
 }
 
 /// Render the stage 1 of the recipe by adding in variants from the dependencies
-pub(crate) fn stage_1_render(
-    stage0_renders: Vec<Stage0Render>,
+pub(crate) fn stage_1_render<S: SourceCode>(
+    stage0_renders: Vec<Stage0Render<S>>,
     selector_config: &SelectorConfig,
     variant_config: &VariantConfig,
-) -> Result<Vec<Stage1Render>, VariantError> {
+) -> Result<Vec<Stage1Render<S>>, VariantError<S>> {
     let mut stage_1_renders = Vec::new();
 
     // TODO we need to add variables from the cache output here!
@@ -329,8 +335,8 @@ pub(crate) fn stage_1_render(
                 }
             }
 
-            // We want to add something to packages that are requiring a subpackage _exactly_ because
-            // that creates additional variants
+            // We want to add something to packages that are requiring a subpackage
+            // _exactly_ because that creates additional variants
             for pin in output.requirements.all_pin_subpackage() {
                 if pin.args.exact {
                     let name = pin.name.clone().as_normalized().to_string();
@@ -351,8 +357,9 @@ pub(crate) fn stage_1_render(
 
             additional_variables.extend(extra_use_keys);
 
-            // If the recipe is `noarch: python` we can remove an empty python key that comes from the dependencies
-            if output.build().is_python_version_independent() {
+            // If the recipe is `noarch: python` we can remove an empty python key that
+            // comes from the dependencies
+            if output.build().noarch().is_python() {
                 additional_variables.remove(&"python".into());
             }
 
@@ -387,7 +394,8 @@ pub(crate) fn stage_1_render(
             exact_pins_per_output.push(exact_pins);
         }
 
-        // Create the additional combinations and attach the whole variant x outputs to the stage 1 render
+        // Create the additional combinations and attach the whole variant x outputs to
+        // the stage 1 render
         let mut all_vars = extra_vars_per_output
             .iter()
             .fold(HashSet::new(), |acc, x| acc.union(x).cloned().collect());
@@ -405,13 +413,14 @@ pub(crate) fn stage_1_render(
 
                 let parsed_recipe = Recipe::from_node(output, config_with_variant.clone())
                     .map_err(|err| {
-                        let errs: ParseErrors = err
+                        let errs: ParseErrors<_> = err
                             .into_iter()
-                            .map(|err| ParsingError::from_partial(&r.raw_outputs.recipe, err))
-                            .collect::<Vec<ParsingError>>()
+                            .map(|err| ParsingError::from_partial(r.source.clone(), err))
+                            .collect::<Vec<_>>()
                             .into();
                         errs
-                    })?;
+                    })
+                    .map_err(VariantConfigError::from)?;
 
                 inner.push(Stage1Inner {
                     used_vars_from_dependencies: extra_vars_per_output[idx].clone(),

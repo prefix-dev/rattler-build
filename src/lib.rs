@@ -41,10 +41,10 @@ pub mod upload;
 mod windows;
 
 mod package_cache_reporter;
+pub mod source_code;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    env::current_dir,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
@@ -59,6 +59,7 @@ use metadata::{
     PackageIdentifier, PackagingSettings,
 };
 use miette::{Context, IntoDiagnostic};
+pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
@@ -71,12 +72,9 @@ use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
-use tracing::warn;
 use variant_config::VariantConfig;
 
 use crate::metadata::PlatformWithVirtualPackages;
-
-pub use normalized_key::NormalizedKey;
 
 /// Returns the recipe path.
 pub fn get_recipe_path(path: &Path) -> miette::Result<PathBuf> {
@@ -135,13 +133,10 @@ pub fn get_tool_config(
         .with_keep_build(build_data.keep_build)
         .with_compression_threads(build_data.compression_threads)
         .with_reqwest_client(client)
-        .with_testing(!build_data.no_test)
         .with_test_strategy(build_data.test)
-        .with_zstd_repodata_enabled(build_data.common.use_zstd)
-        .with_bz2_repodata_enabled(build_data.common.use_zstd)
         .with_skip_existing(build_data.skip_existing)
         .with_noarch_build_platform(build_data.noarch_build_platform)
-        .with_channel_priority(build_data.common.channel_priority.value);
+        .with_channel_priority(build_data.common.channel_priority);
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -158,16 +153,13 @@ pub async fn get_build_output(
     recipe_path: &Path,
     tool_config: &Configuration,
 ) -> miette::Result<Vec<Output>> {
-    let mut output_dir = build_data
-        .common
-        .output_dir
-        .clone()
-        .unwrap_or(current_dir().into_diagnostic()?.join("output"));
+    let mut output_dir = build_data.common.output_dir.clone();
     if output_dir.exists() {
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
     }
 
     let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
+    let recipe_source = Arc::<str>::from(recipe_text.as_str());
 
     if build_data.target_platform == Platform::NoArch
         || build_data.build_platform == Platform::NoArch
@@ -215,10 +207,10 @@ pub async fn get_build_output(
     let enter = span.enter();
 
     // First find all outputs from the recipe
-    let outputs = find_outputs_from_src(&recipe_text)?;
+    let outputs = find_outputs_from_src(recipe_source.clone())?;
 
-    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to the
-    // recipe that we should potentially use.
+    // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
+    // the recipe that we should potentially use.
     let mut detected_variant_config = None;
 
     // find either variants_config_file or conda_build_config_file automatically
@@ -248,19 +240,25 @@ pub async fn get_build_output(
     let mut variant_configs = detected_variant_config.unwrap_or_default();
     variant_configs.extend(build_data.variant_config.clone());
 
-    let variant_config =
-        VariantConfig::from_files(&variant_configs, &selector_config).into_diagnostic()?;
+    let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
 
     let outputs_and_variants =
-        variant_config.find_variants(&outputs, &recipe_text, &selector_config)?;
+        variant_config.find_variants(&outputs, recipe_source, &selector_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
+        let skipped = if discovered_output.recipe.build().skip() {
+            console::style(" (skipped)").red().to_string()
+        } else {
+            "".to_string()
+        };
+
         tracing::info!(
-            "Build variant: {}-{}-{}",
+            "\nBuild variant: {}-{}-{}{}",
             discovered_output.name,
             discovered_output.version,
-            discovered_output.build_string
+            discovered_output.build_string,
+            skipped
         );
 
         let mut table = comfy_table::Table::new();
@@ -287,10 +285,6 @@ pub async fn get_build_output(
         let recipe = &discovered_output.recipe;
 
         if recipe.build().skip() {
-            tracing::info!(
-                "Skipping build for variant: {:#?}",
-                discovered_output.used_vars
-            );
             continue;
         }
 
@@ -311,7 +305,7 @@ pub async fn get_build_output(
 
         // Add the channels from the args and by default always conda-forge
         let channels = build_data
-            .channel
+            .channels
             .clone()
             .into_iter()
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
@@ -550,7 +544,8 @@ pub async fn run_build_from_args(
     Ok(())
 }
 
-/// Check if the noarch builds should be skipped because the noarch platform has been set
+/// Check if the noarch builds should be skipped because the noarch platform has
+/// been set
 pub async fn skip_noarch(
     mut outputs: Vec<Output>,
     tool_configuration: &tool_configuration::Configuration,
@@ -580,37 +575,43 @@ pub async fn skip_noarch(
 }
 
 /// Runs test.
-pub async fn run_test_from_args(
-    args: TestOpts,
-    fancy_log_handler: LoggingOutputHandler,
+pub async fn run_test(
+    test_data: TestData,
+    fancy_log_handler: Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
-    let package_file = canonicalize(args.package_file).into_diagnostic()?;
+    let package_file = canonicalize(test_data.package_file).into_diagnostic()?;
+
+    let mut tool_config_builder = Configuration::builder();
 
     // Determine virtual packages of the system. These packages define the
     // capabilities of the system. Some packages depend on these virtual
     // packages to indicate compatibility with the hardware of the system.
-    let current_platform = fancy_log_handler
-        .wrap_in_progress("determining virtual packages", move || {
-            PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
-        })
-        .into_diagnostic()?;
+    let current_platform = if let Some(fancy_log_handler) = fancy_log_handler {
+        tool_config_builder =
+            tool_config_builder.with_logging_output_handler(fancy_log_handler.clone());
 
-    let tool_config = Configuration::builder()
-        .with_logging_output_handler(fancy_log_handler)
+        fancy_log_handler
+            .wrap_in_progress("determining virtual packages", move || {
+                PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
+            })
+            .into_diagnostic()?
+    } else {
+        PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
+            .into_diagnostic()?
+    };
+
+    let tool_config = tool_config_builder
         .with_keep_build(true)
-        .with_compression_threads(args.compression_threads)
+        .with_compression_threads(test_data.compression_threads)
         .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
+            tool_configuration::reqwest_client_from_auth_storage(test_data.common.auth_file)
                 .into_diagnostic()?,
         )
-        .with_zstd_repodata_enabled(args.common.use_zstd)
-        .with_bz2_repodata_enabled(args.common.use_zstd)
-        .with_channel_priority(args.common.channel_priority.value)
+        .with_channel_priority(test_data.common.channel_priority)
         .finish();
 
-    let channels = args
-        .channel
-        .unwrap_or_else(|| vec!["conda-forge".to_string()])
+    let channels = test_data
+        .channels
         .into_iter()
         .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
         .collect::<Result<Vec<_>, _>>()
@@ -646,8 +647,8 @@ pub async fn run_test_from_args(
 }
 
 /// Rebuild.
-pub async fn rebuild_from_args(
-    args: RebuildOpts,
+pub async fn rebuild(
+    args: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
     tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
@@ -671,10 +672,7 @@ pub async fn rebuild_from_args(
     output.build_configuration.directories.recipe_dir = temp_dir;
 
     // create output dir and set it in the config
-    let output_dir = args
-        .common
-        .output_dir
-        .unwrap_or(current_dir().into_diagnostic()?.join("output"));
+    let output_dir = args.common.output_dir;
 
     fs::create_dir_all(&output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
@@ -688,10 +686,7 @@ pub async fn rebuild_from_args(
             tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file)
                 .into_diagnostic()?,
         )
-        .with_testing(!args.no_test)
         .with_test_strategy(args.test)
-        .with_zstd_repodata_enabled(args.common.use_zstd)
-        .with_bz2_repodata_enabled(args.common.use_zstd)
         .finish();
 
     output
@@ -724,68 +719,22 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
 
     match args.server_type {
         ServerType::Quetz(quetz_opts) => {
-            upload::upload_package_to_quetz(
-                &store,
-                quetz_opts.api_key,
-                &args.package_files,
-                quetz_opts.url.into(),
-                quetz_opts.channel,
-            )
-            .await
+            let quetz_data = QuetzData::from(quetz_opts);
+            upload::upload_package_to_quetz(&store, &args.package_files, quetz_data).await
         }
         ServerType::Artifactory(artifactory_opts) => {
-            let token = match (
-                artifactory_opts.username,
-                artifactory_opts.password,
-                artifactory_opts.token,
-            ) {
-                (_, _, Some(token)) => Some(token),
-                (Some(_), Some(password), _) => {
-                    warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
-                    Some(password)
-                }
-                (Some(_), None, _) => {
-                    return Err(miette::miette!(
-                        "Artifactory username provided without a password"
-                    ));
-                }
-                (None, Some(_), _) => {
-                    return Err(miette::miette!(
-                        "Artifactory password provided without a username"
-                    ));
-                }
-                _ => None,
-            };
-            upload::upload_package_to_artifactory(
-                &store,
-                token,
-                &args.package_files,
-                artifactory_opts.url.into(),
-                artifactory_opts.channel,
-            )
-            .await
+            let artifactory_data = ArtifactoryData::try_from(artifactory_opts)?;
+
+            upload::upload_package_to_artifactory(&store, &args.package_files, artifactory_data)
+                .await
         }
         ServerType::Prefix(prefix_opts) => {
-            upload::upload_package_to_prefix(
-                &store,
-                prefix_opts.api_key,
-                &args.package_files,
-                prefix_opts.url.into(),
-                prefix_opts.channel,
-            )
-            .await
+            let prefix_data = PrefixData::from(prefix_opts);
+            upload::upload_package_to_prefix(&store, &args.package_files, prefix_data).await
         }
         ServerType::Anaconda(anaconda_opts) => {
-            upload::upload_package_to_anaconda(
-                &store,
-                anaconda_opts.api_key,
-                &args.package_files,
-                anaconda_opts.url.into(),
-                anaconda_opts.owner,
-                anaconda_opts.channel,
-                anaconda_opts.force,
-            )
-            .await
+            let anaconda_data = AnacondaData::from(anaconda_opts);
+            upload::upload_package_to_anaconda(&store, &args.package_files, anaconda_data).await
         }
         ServerType::S3(s3_opts) => {
             upload::upload_package_to_s3(
@@ -799,9 +748,10 @@ pub async fn upload_from_args(args: UploadOpts) -> miette::Result<()> {
             .await
         }
         ServerType::CondaForge(conda_forge_opts) => {
+            let conda_forge_data = CondaForgeData::from(conda_forge_opts);
             upload::conda_forge::upload_packages_to_conda_forge(
-                conda_forge_opts,
                 &args.package_files,
+                conda_forge_data,
             )
             .await
         }

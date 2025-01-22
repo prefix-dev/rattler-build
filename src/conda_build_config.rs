@@ -1,12 +1,9 @@
 //! Module to load deprecated `conda_build_config.yaml` files and apply the selector_config to it
+use minijinja::{Environment, Value};
+use std::path::PathBuf;
 use std::{collections::BTreeMap, path::Path};
 
-use minijinja::{Environment, Value};
-
-use crate::{
-    selectors::SelectorConfig,
-    variant_config::{VariantConfig, VariantConfigError},
-};
+use crate::{selectors::SelectorConfig, variant_config::VariantConfig};
 
 #[derive(Debug)]
 struct ParsedLine<'a> {
@@ -48,17 +45,28 @@ fn evaluate_condition(
     template.render(context).unwrap() == "true"
 }
 
+/// An error that can occur when parsing a `conda_build_config.yaml` file
+#[derive(Debug, thiserror::Error)]
+pub enum ParseConfigBuildConfigError {
+    /// An IO error occurred while trying to read the file
+    #[error("Could not open file ({0}): {1}")]
+    IOError(PathBuf, std::io::Error),
+
+    /// An error occurred while parsing the file
+    #[error("Could not parse variant config file ({0}): {1}")]
+    ParseError(PathBuf, serde_yaml::Error),
+}
+
 /// Load an old-school conda_build_config.yaml file, and apply the selector_config to it
 /// The parser supports only a small subset of (potential) conda_build_config.yaml features.
 /// Especially, only `os.environ.get(...)` is supported.
 pub fn load_conda_build_config(
     path: &Path,
     selector_config: &SelectorConfig,
-) -> Result<VariantConfig, VariantConfigError> {
+) -> Result<VariantConfig, ParseConfigBuildConfigError> {
     // load the text, parse it and load as VariantConfig using serde_yaml
-
     let mut input = fs_err::read_to_string(path)
-        .map_err(|e| VariantConfigError::IOError(path.to_path_buf(), e))?;
+        .map_err(|e| ParseConfigBuildConfigError::IOError(path.to_path_buf(), e))?;
 
     let mut context = selector_config.clone().into_context();
 
@@ -109,16 +117,28 @@ pub fn load_conda_build_config(
 
     // We need to filter "unit keys" from the YAML because our config expects a list (not None)
     let value: serde_yaml::Value = serde_yaml::from_str(&out).map_err(|e| {
-        VariantConfigError::IOError(
+        ParseConfigBuildConfigError::IOError(
             path.to_path_buf(),
             std::io::Error::new(std::io::ErrorKind::InvalidData, e),
         )
     })?;
 
+    if value.is_null() {
+        return Ok(VariantConfig::default());
+    }
+
     // filter all empty maps
     let value = value
         .as_mapping()
-        .unwrap()
+        .ok_or_else(|| {
+            ParseConfigBuildConfigError::IOError(
+                path.to_path_buf(),
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Expected `conda_build_config.yaml` to be a mapping",
+                ),
+            )
+        })?
         .clone()
         .into_iter()
         .filter(|(_, v)| !v.is_null())
@@ -126,7 +146,7 @@ pub fn load_conda_build_config(
 
     let config: VariantConfig =
         serde_yaml::from_value(serde_yaml::Value::Mapping(value)).map_err(|e| {
-            VariantConfigError::IOError(
+            ParseConfigBuildConfigError::IOError(
                 path.to_path_buf(),
                 std::io::Error::new(std::io::ErrorKind::InvalidData, e),
             )
@@ -181,6 +201,7 @@ mod tests {
 
     #[rstest]
     #[case("conda_build_config/test_1.yaml", None)]
+    #[case("conda_build_config/all_filtered.yaml", None)]
     #[case("conda_build_config/conda_forge_subset.yaml", Some(false))]
     #[case("conda_build_config/conda_forge_subset.yaml", Some(true))]
     #[case("conda_build_config/conda_forge_subset.yaml", None)]

@@ -176,11 +176,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 	Don't store the recipe in the final package
 
 
-- `--no-test`
-
-	Do not run tests after building (deprecated, use `--test=skip` instead)
-
-
 - `--test <TEST>`
 
 	The strategy to use for running tests
@@ -322,11 +317,6 @@ Rebuild a package from a package file instead of a recipe
 - `-p`, `--package-file <PACKAGE_FILE>`
 
 	The package file to rebuild
-
-
-- `--no-test`
-
-	Do not run tests after building (deprecated, use `--test=skip` instead)
 
 
 - `--compression-threads <COMPRESSION_THREADS>`

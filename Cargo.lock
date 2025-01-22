@@ -3871,7 +3871,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.35.2"
+version = "0.35.6"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
@@ -3933,6 +3933,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
+ "retry-policies",
  "rstest",
  "scroll",
  "serde",

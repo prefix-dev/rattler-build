@@ -1329,3 +1329,15 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["noarch"] == "python"
     assert index["subdir"] == host_subdir()
     assert index["platform"] == host_subdir().split("-")[0]
+
+
+# This is how cf-scripts is using rattler-build - rendering recipes from stdin
+def test_rendering_from_stdin(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    text = (recipes / "abi3" / "recipe.yaml").read_text()
+    # variants = recipes / "abi3" / "variants.yaml" "-m", variants
+    rendered = rattler_build("build", "--render-only", input=text, text=True)
+    loaded = json.loads(rendered)
+
+    assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"

@@ -167,7 +167,7 @@ impl ConfigurationBuilder {
             no_test: false,
             test_strategy: TestStrategy::default(),
             use_zstd: true,
-            use_bz2: false,
+            use_bz2: true,
             skip_existing: SkipExisting::None,
             noarch_build_platform: None,
             channel_config: None,
