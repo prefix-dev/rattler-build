@@ -216,7 +216,7 @@ def minio_server(tmp_path: Path):
     # Start minio server
     proc = subprocess.Popen(
         [
-            f"minio{'.bat' if os.name == 'nt' else ''}",
+            "minio",
             "server",
             "--address",
             "0.0.0.0:9000",
