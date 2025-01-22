@@ -1,6 +1,8 @@
 //! The upload module provides the package upload functionality.
 
-use crate::tool_configuration::APP_USER_AGENT;
+use crate::{
+    tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, PrefixData, QuetzData,
+};
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
 use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
@@ -12,7 +14,6 @@ use std::{
 use tokio_util::io::ReaderStream;
 use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
-use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
@@ -72,14 +73,12 @@ fn get_client_with_retry() -> Result<reqwest_middleware::ClientWithMiddleware, r
 /// Uploads package files to a Quetz server.
 pub async fn upload_package_to_quetz(
     storage: &AuthenticationStorage,
-    api_key: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: UrlWithTrailingSlash,
-    channel: String,
+    quetz_data: QuetzData,
 ) -> miette::Result<()> {
-    let token = match api_key {
+    let token = match quetz_data.api_key {
         Some(api_key) => api_key,
-        None => match storage.get_by_url(Url::from(url.clone())) {
+        None => match storage.get_by_url(Url::from(quetz_data.url.clone())) {
             Ok((_, Some(Authentication::CondaToken(token)))) => token,
             Ok((_, Some(_))) => {
                 return Err(miette::miette!("A Conda token is required for authentication with quetz.
@@ -101,10 +100,11 @@ pub async fn upload_package_to_quetz(
     let client = get_default_client().into_diagnostic()?;
 
     for package_file in package_files {
-        let upload_url = url
+        let upload_url = quetz_data
+            .url
             .join(&format!(
                 "api/channels/{}/upload/{}",
-                channel,
+                quetz_data.channels,
                 package_file.file_name().unwrap().to_string_lossy()
             ))
             .into_diagnostic()?;
@@ -127,14 +127,12 @@ pub async fn upload_package_to_quetz(
 /// Uploads package files to an Artifactory server.
 pub async fn upload_package_to_artifactory(
     storage: &AuthenticationStorage,
-    token: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: UrlWithTrailingSlash,
-    channel: String,
+    artifactory_data: ArtifactoryData,
 ) -> miette::Result<()> {
-    let token = match token {
+    let token = match artifactory_data.token {
         Some(t) => t,
-        _ => match storage.get_by_url(Url::from(url.clone())) {
+        _ => match storage.get_by_url(Url::from(artifactory_data.url.clone())) {
             Ok((_, Some(Authentication::BearerToken(token)))) => token,
             Ok((
                 _,
@@ -180,8 +178,12 @@ pub async fn upload_package_to_artifactory(
 
         let client = get_default_client().into_diagnostic()?;
 
-        let upload_url = url
-            .join(&format!("{}/{}/{}", channel, subdir, package_name))
+        let upload_url = artifactory_data
+            .url
+            .join(&format!(
+                "{}/{}/{}",
+                artifactory_data.channels, subdir, package_name
+            ))
             .into_diagnostic()?;
 
         let prepared_request = client
@@ -199,13 +201,11 @@ pub async fn upload_package_to_artifactory(
 /// Uploads package files to a prefix.dev server.
 pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
-    api_key: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: UrlWithTrailingSlash,
-    channel: String,
+    prefix_data: PrefixData,
 ) -> miette::Result<()> {
     let check_storage = || {
-        match storage.get_by_url(Url::from(url.clone())) {
+        match storage.get_by_url(Url::from(prefix_data.url.clone())) {
             Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
             Ok((_, Some(_))) => {
                 Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
@@ -224,10 +224,13 @@ pub async fn upload_package_to_prefix(
         }
     };
 
-    let token = match api_key {
+    let token = match prefix_data.api_key {
         Some(api_key) => api_key,
-        None => match check_trusted_publishing(&get_client_with_retry().into_diagnostic()?, &url)
-            .await
+        None => match check_trusted_publishing(
+            &get_client_with_retry().into_diagnostic()?,
+            &prefix_data.url,
+        )
+        .await
         {
             TrustedPublishResult::Configured(token) => token.secret().to_string(),
             TrustedPublishResult::Skipped => check_storage()?,
@@ -247,8 +250,9 @@ pub async fn upload_package_to_prefix(
 
         let file_size = package_file.metadata().into_diagnostic()?.len();
 
-        let url = url
-            .join(&format!("api/v1/upload/{}", channel))
+        let url = prefix_data
+            .url
+            .join(&format!("api/v1/upload/{}", prefix_data.channel))
             .into_diagnostic()?;
 
         let hash = sha256_sum(package_file).into_diagnostic()?;
@@ -275,14 +279,10 @@ pub async fn upload_package_to_prefix(
 /// Uploads package files to an Anaconda server.
 pub async fn upload_package_to_anaconda(
     storage: &AuthenticationStorage,
-    token: Option<String>,
     package_files: &Vec<PathBuf>,
-    url: UrlWithTrailingSlash,
-    owner: String,
-    channels: Vec<String>,
-    force: bool,
+    anaconda_data: AnacondaData,
 ) -> miette::Result<()> {
-    let token = match token {
+    let token = match anaconda_data.api_key {
         Some(token) => token,
         None => match storage.get("anaconda.org") {
             Ok(Some(Authentication::CondaToken(token))) => token,
@@ -306,18 +306,27 @@ pub async fn upload_package_to_anaconda(
         },
     };
 
-    let anaconda = anaconda::Anaconda::new(token, url);
+    let anaconda = anaconda::Anaconda::new(token, anaconda_data.url);
 
     for package_file in package_files {
         loop {
             let package = package::ExtractedPackage::from_package_file(package_file)?;
 
-            anaconda.create_or_update_package(&owner, &package).await?;
+            anaconda
+                .create_or_update_package(&anaconda_data.owner, &package)
+                .await?;
 
-            anaconda.create_or_update_release(&owner, &package).await?;
+            anaconda
+                .create_or_update_release(&anaconda_data.owner, &package)
+                .await?;
 
             let successful = anaconda
-                .upload_file(&owner, &channels, force, &package)
+                .upload_file(
+                    &anaconda_data.owner,
+                    &anaconda_data.channels,
+                    anaconda_data.force,
+                    &package,
+                )
                 .await?;
 
             // When running with --force and experiencing a conflict error, we delete the conflicting file.

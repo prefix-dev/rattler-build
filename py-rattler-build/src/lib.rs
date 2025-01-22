@@ -2,14 +2,19 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
-    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression, TestData},
+    opt::{
+        AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
+        CondaForgeData, PackageFormatAndCompression, PrefixData, QuetzData, TestData,
+    },
     run_test,
-    tool_configuration::{SkipExisting, TestStrategy},
+    tool_configuration::{self, SkipExisting, TestStrategy},
+    upload,
 };
 use clap::ValueEnum;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use rattler_conda_types::Platform;
+use url::Url;
 
 // Bind the get version function to the Python module
 #[pyfunction]
@@ -20,13 +25,13 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform))]
 fn build_recipes_py(
-    recipes: Vec<String>,
+    recipes: Vec<PathBuf>,
     up_to: Option<String>,
     build_platform: Option<String>,
     target_platform: Option<String>,
     host_platform: Option<String>,
     channel: Option<Vec<String>>,
-    variant_config: Option<Vec<String>>,
+    variant_config: Option<Vec<PathBuf>>,
     ignore_recipe_variants: bool,
     render_only: bool,
     with_solve: bool,
@@ -36,19 +41,18 @@ fn build_recipes_py(
     compression_threads: Option<u32>,
     no_include_recipe: bool,
     test: Option<String>,
-    output_dir: Option<String>,
+    output_dir: Option<PathBuf>,
     auth_file: Option<String>,
     channel_priority: Option<String>,
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
 ) -> PyResult<()> {
-    let recipes = recipes.into_iter().map(PathBuf::from).collect();
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
     let common = CommonData::new(
-        output_dir.map(PathBuf::from),
+        output_dir,
         false,
         auth_file.map(|a| a.into()),
         channel_priority,
@@ -65,8 +69,6 @@ fn build_recipes_py(
         .map(|p| Platform::from_str(&p))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let variant_config =
-        variant_config.map(|configs| configs.into_iter().map(PathBuf::from).collect());
     let package_format = package_format
         .map(|p| PackageFormatAndCompression::from_str(&p))
         .transpose()
@@ -113,15 +115,13 @@ fn build_recipes_py(
 
 #[pyfunction]
 #[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority))]
-fn test_py(
-    package_file: String,
+fn test_package_py(
+    package_file: PathBuf,
     channel: Option<Vec<String>>,
     compression_threads: Option<u32>,
-    auth_file: Option<String>,
+    auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
 ) -> PyResult<()> {
-    let package_file = PathBuf::from(package_file);
-    let auth_file = auth_file.map(PathBuf::from);
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
@@ -138,10 +138,175 @@ fn test_py(
     })
 }
 
+#[pyfunction]
+#[pyo3(signature = (package_files, url, channels, api_key, auth_file))]
+fn upload_package_to_quetz_py(
+    package_files: Vec<PathBuf>,
+    url: String,
+    channels: String,
+    api_key: Option<String>,
+    auth_file: Option<PathBuf>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+    let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let quetz_data = QuetzData::new(url, channels, api_key);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) = upload::upload_package_to_quetz(&store, &package_files, quetz_data).await {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_files, url, channels, token, auth_file))]
+fn upload_package_to_artifactory_py(
+    package_files: Vec<PathBuf>,
+    url: String,
+    channels: String,
+    token: Option<String>,
+    auth_file: Option<PathBuf>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+    let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let artifactory_data = ArtifactoryData::new(url, channels, token);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) =
+            upload::upload_package_to_artifactory(&store, &package_files, artifactory_data).await
+        {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file))]
+fn upload_package_to_prefix_py(
+    package_files: Vec<PathBuf>,
+    url: String,
+    channel: String,
+    api_key: Option<String>,
+    auth_file: Option<PathBuf>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+    let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let prefix_data = PrefixData::new(url, channel, api_key);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) = upload::upload_package_to_prefix(&store, &package_files, prefix_data).await
+        {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_files, owner, channel, api_key, url, force, auth_file))]
+fn upload_package_to_anaconda_py(
+    package_files: Vec<PathBuf>,
+    owner: String,
+    channel: Option<Vec<String>>,
+    api_key: Option<String>,
+    url: Option<String>,
+    force: bool,
+    auth_file: Option<PathBuf>,
+) -> PyResult<()> {
+    let store = tool_configuration::get_auth_store(auth_file)
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+    let url = url
+        .map(|u| Url::parse(&u))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let anaconda_data = AnacondaData::new(owner, channel, api_key, url, force);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) =
+            upload::upload_package_to_anaconda(&store, &package_files, anaconda_data).await
+        {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_files, staging_token, feedstock, feedstock_token, staging_channel, anaconda_url, validation_endpoint, provider, dry_run))]
+fn upload_packages_to_conda_forge_py(
+    package_files: Vec<PathBuf>,
+    staging_token: String,
+    feedstock: String,
+    feedstock_token: String,
+    staging_channel: Option<String>,
+    anaconda_url: Option<String>,
+    validation_endpoint: Option<String>,
+    provider: Option<String>,
+    dry_run: bool,
+) -> PyResult<()> {
+    let anaconda_url = anaconda_url
+        .map(|u| Url::parse(&u))
+        .transpose()
+        .map_err(|e| {
+            PyRuntimeError::new_err(format!("Error parsing anaconda_url: {}", e.to_string()))
+        })?;
+
+    let validation_endpoint = validation_endpoint
+        .map(|u| Url::parse(&u))
+        .transpose()
+        .map_err(|e| {
+            PyRuntimeError::new_err(format!(
+                "Error parsing validation_endpoint: {}",
+                e.to_string()
+            ))
+        })?;
+
+    let conda_forge_data = CondaForgeData::new(
+        staging_token,
+        feedstock,
+        feedstock_token,
+        staging_channel,
+        anaconda_url,
+        validation_endpoint,
+        provider,
+        dry_run,
+    );
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) =
+            upload::conda_forge::upload_packages_to_conda_forge(&package_files, conda_forge_data)
+                .await
+        {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
 #[pymodule]
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
-    m.add_function(wrap_pyfunction!(test_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(test_package_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_package_to_quetz_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_package_to_artifactory_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_package_to_prefix_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_package_to_anaconda_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(upload_packages_to_conda_forge_py, &m).unwrap())?;
+
     Ok(())
 }

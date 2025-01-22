@@ -8,7 +8,7 @@ use std::{
 use miette::{miette, IntoDiagnostic};
 use tracing::{debug, info};
 
-use crate::{opt::CondaForgeOpts, upload::get_default_client};
+use crate::{upload::get_default_client, CondaForgeData};
 
 use super::{
     anaconda,
@@ -45,10 +45,13 @@ async fn get_channel_target_from_variant_config(
 
 /// Uploads the package conda forge.
 pub async fn upload_packages_to_conda_forge(
-    opts: CondaForgeOpts,
     package_files: &Vec<PathBuf>,
+    conda_forge_data: CondaForgeData,
 ) -> miette::Result<()> {
-    let anaconda = anaconda::Anaconda::new(opts.staging_token, opts.anaconda_url.into());
+    let anaconda = anaconda::Anaconda::new(
+        conda_forge_data.staging_token,
+        conda_forge_data.anaconda_url,
+    );
 
     let mut channels: HashMap<String, HashMap<_, _>> = HashMap::new();
 
@@ -71,23 +74,28 @@ pub async fn upload_packages_to_conda_forge(
                 )
             })?;
 
-        if !opts.dry_run {
+        if !conda_forge_data.dry_run {
             anaconda
-                .create_or_update_package(&opts.staging_channel, &package)
+                .create_or_update_package(&conda_forge_data.staging_channel, &package)
                 .await?;
 
             anaconda
-                .create_or_update_release(&opts.staging_channel, &package)
+                .create_or_update_release(&conda_forge_data.staging_channel, &package)
                 .await?;
 
             anaconda
-                .upload_file(&opts.staging_channel, &[channel.clone()], false, &package)
+                .upload_file(
+                    &conda_forge_data.staging_channel,
+                    &[channel.clone()],
+                    false,
+                    &package,
+                )
                 .await?;
         } else {
             debug!(
                 "Would have uploaded {} to anaconda.org {}/{}",
                 package.path().display(),
-                opts.staging_channel,
+                conda_forge_data.staging_channel,
                 channel
             );
         };
@@ -109,13 +117,15 @@ pub async fn upload_packages_to_conda_forge(
     for (channel, checksums) in channels {
         info!("Uploading packages for conda-forge channel {}", channel);
 
+        let comment_on_error = std::env::var("POST_COMMENT_ON_ERROR").is_ok();
+
         let payload = serde_json::json!({
-            "feedstock": opts.feedstock,
+            "feedstock": conda_forge_data.feedstock,
             "outputs": checksums,
             "channel": channel,
-            "comment_on_error": opts.post_comment_on_error,
+            "comment_on_error": comment_on_error,
             "hash_type": "sha256",
-            "provider": opts.provider
+            "provider": conda_forge_data.provider
         });
 
         let client = get_default_client().into_diagnostic()?;
@@ -125,19 +135,19 @@ pub async fn upload_packages_to_conda_forge(
             serde_json::to_string_pretty(&payload).into_diagnostic()?
         );
 
-        if opts.dry_run {
+        if conda_forge_data.dry_run {
             debug!(
                 "Would have sent payload to validation endpoint {}",
-                opts.validation_endpoint
+                conda_forge_data.validation_endpoint
             );
 
             continue;
         }
 
         let resp = client
-            .post(opts.validation_endpoint.clone())
+            .post(conda_forge_data.validation_endpoint.clone())
             .json(&payload)
-            .header("FEEDSTOCK_TOKEN", opts.feedstock_token.clone())
+            .header("FEEDSTOCK_TOKEN", conda_forge_data.feedstock_token.clone())
             .send()
             .await
             .into_diagnostic()?;
