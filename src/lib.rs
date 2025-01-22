@@ -576,23 +576,32 @@ pub async fn skip_noarch(
 }
 
 /// Runs test.
-pub async fn run_test_from_args(
+pub async fn run_test(
     test_data: TestData,
-    fancy_log_handler: LoggingOutputHandler,
+    fancy_log_handler: Option<LoggingOutputHandler>,
 ) -> miette::Result<()> {
     let package_file = canonicalize(test_data.package_file).into_diagnostic()?;
+
+    let mut tool_config_builder = Configuration::builder();
 
     // Determine virtual packages of the system. These packages define the
     // capabilities of the system. Some packages depend on these virtual
     // packages to indicate compatibility with the hardware of the system.
-    let current_platform = fancy_log_handler
-        .wrap_in_progress("determining virtual packages", move || {
-            PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
-        })
-        .into_diagnostic()?;
+    let current_platform = if let Some(fancy_log_handler) = fancy_log_handler {
+        tool_config_builder =
+            tool_config_builder.with_logging_output_handler(fancy_log_handler.clone());
 
-    let tool_config = Configuration::builder()
-        .with_logging_output_handler(fancy_log_handler)
+        fancy_log_handler
+            .wrap_in_progress("determining virtual packages", move || {
+                PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
+            })
+            .into_diagnostic()?
+    } else {
+        PlatformWithVirtualPackages::detect(&VirtualPackageOverrides::from_env())
+            .into_diagnostic()?
+    };
+
+    let tool_config = tool_config_builder
         .with_keep_build(true)
         .with_compression_threads(test_data.compression_threads)
         .with_reqwest_client(
@@ -639,7 +648,7 @@ pub async fn run_test_from_args(
 }
 
 /// Rebuild.
-pub async fn rebuild_from_args(
+pub async fn rebuild(
     args: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {

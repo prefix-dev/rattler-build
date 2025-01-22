@@ -1,4 +1,4 @@
-from .rattler_build import get_rattler_build_version_py, build_recipes_py
+from .rattler_build import get_rattler_build_version_py, build_recipes_py, test_py
 from pathlib import Path
 from typing import List, Union
 
@@ -58,3 +58,15 @@ def build_recipes(
         skip_existing,
         noarch_build_platform,
     )
+
+
+def test(
+    package_file: Union[str, Path],
+    channel: Union[List[str], None] = None,
+    compression_threads: Union[int, None] = None,
+    auth_file: Union[str, Path, None] = None,
+    channel_priority: Union[str, None] = None,
+) -> None:
+    package_file = str(package_file)
+    auth_file = auth_file if auth_file is None else str(auth_file)
+    test_py(package_file, channel, compression_threads, auth_file, channel_priority)

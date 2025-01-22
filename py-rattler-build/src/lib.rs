@@ -2,7 +2,8 @@ use std::{path::PathBuf, str::FromStr};
 
 use ::rattler_build::{
     build_recipes, get_rattler_build_version,
-    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression},
+    opt::{BuildData, ChannelPriorityWrapper, CommonData, PackageFormatAndCompression, TestData},
+    run_test,
     tool_configuration::{SkipExisting, TestStrategy},
 };
 use clap::ValueEnum;
@@ -41,9 +42,7 @@ fn build_recipes_py(
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
 ) -> PyResult<()> {
-    let rt = tokio::runtime::Runtime::new().unwrap();
     let recipes = recipes.into_iter().map(PathBuf::from).collect();
-
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
@@ -102,8 +101,37 @@ fn build_recipes_py(
         None,
         None,
     );
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
         if let Err(e) = build_recipes(recipes, build_data, &None).await {
+            return Err(PyRuntimeError::new_err(e.to_string()));
+        }
+        Ok(())
+    })
+}
+
+#[pyfunction]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority))]
+fn test_py(
+    package_file: String,
+    channel: Option<Vec<String>>,
+    compression_threads: Option<u32>,
+    auth_file: Option<String>,
+    channel_priority: Option<String>,
+) -> PyResult<()> {
+    let package_file = PathBuf::from(package_file);
+    let auth_file = auth_file.map(PathBuf::from);
+    let channel_priority = channel_priority
+        .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
+        .transpose()
+        .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let common = CommonData::new(None, false, auth_file, channel_priority);
+    let test_data = TestData::new(package_file, channel, compression_threads, common);
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(async {
+        if let Err(e) = run_test(test_data, None).await {
             return Err(PyRuntimeError::new_err(e.to_string()));
         }
         Ok(())
@@ -114,5 +142,6 @@ fn build_recipes_py(
 fn rattler_build<'py>(_py: Python<'py>, m: Bound<'py, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_rattler_build_version_py, &m).unwrap())?;
     m.add_function(wrap_pyfunction!(build_recipes_py, &m).unwrap())?;
+    m.add_function(wrap_pyfunction!(test_py, &m).unwrap())?;
     Ok(())
 }
