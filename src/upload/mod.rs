@@ -17,7 +17,10 @@ use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
-use reqwest::{Method, StatusCode};
+use reqwest::{
+    header::{self, HeaderMap, HeaderValue},
+    Method, StatusCode,
+};
 use tracing::{info, warn};
 use url::Url;
 
@@ -204,6 +207,12 @@ pub async fn upload_package_to_prefix(
     package_files: &Vec<PathBuf>,
     prefix_data: PrefixData,
 ) -> miette::Result<()> {
+    if !prefix_data.attestations.is_empty() && package_files.len() > 1 {
+        return Err(miette::miette!(
+            "When providing one or more attestations, only a single package file can be uploaded at a time."
+        ));
+    }
+
     let check_storage = || {
         match storage.get_by_url(Url::from(prefix_data.url.clone())) {
             Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
@@ -233,9 +242,21 @@ pub async fn upload_package_to_prefix(
         .await
         {
             TrustedPublishResult::Configured(token) => token.secret().to_string(),
-            TrustedPublishResult::Skipped => check_storage()?,
+            TrustedPublishResult::Skipped => {
+                if !prefix_data.attestations.is_empty() {
+                    return Err(miette::miette!(
+                        "Attestations were provided, but trusted publishing was not configured"
+                    ));
+                }
+                check_storage()?
+            }
             TrustedPublishResult::Ignored(err) => {
                 tracing::warn!("Checked for trusted publishing but failed with {err}");
+                if !prefix_data.attestations.is_empty() {
+                    return Err(miette::miette!(
+                        "Attestations were provided, but trusted publishing failed"
+                    ));
+                }
                 check_storage()?
             }
         },
@@ -255,20 +276,65 @@ pub async fn upload_package_to_prefix(
             .join(&format!("api/v1/upload/{}", prefix_data.channel))
             .into_diagnostic()?;
 
+        let mut form = reqwest::multipart::Form::new();
+
+        let progress_bar = indicatif::ProgressBar::new(file_size)
+            .with_prefix("Uploading")
+            .with_style(default_bytes_style().into_diagnostic()?);
+
+        let progress_bar_clone = progress_bar.clone();
+        let reader_stream = ReaderStream::new(
+            tokio::fs::File::open(package_file)
+                .await
+                .into_diagnostic()?,
+        )
+        .inspect_ok(move |bytes| {
+            progress_bar_clone.inc(bytes.len() as u64);
+        })
+        .inspect_err(|e| {
+            println!("Error while uploading: {}", e);
+        });
+
         let hash = sha256_sum(package_file).into_diagnostic()?;
+
+        let mut file_headers = HeaderMap::new();
+        file_headers.insert(
+            header::CONTENT_TYPE,
+            HeaderValue::from_static("application/octet-stream"),
+        );
+        file_headers.insert(
+            header::CONTENT_LENGTH,
+            file_size.to_string().parse().into_diagnostic()?,
+        );
+        file_headers.insert("X-File-Name", filename.parse().unwrap());
+        file_headers.insert("X-File-SHA256", hash.parse().unwrap());
+
+        let file_part = reqwest::multipart::Part::stream_with_length(
+            reqwest::Body::wrap_stream(reader_stream),
+            file_size,
+        )
+        .headers(file_headers);
+
+        form = form.part("file", file_part);
+
+        for attestation in &prefix_data.attestations {
+            let text = tokio::fs::read_to_string(attestation)
+                .await
+                .into_diagnostic()?;
+            let attestation = reqwest::multipart::Part::text(text);
+            form = form.part("attestation", attestation);
+        }
 
         // Note we cannot use the reqwest client with middleware because we stream
         // the file during upload
         let prepared_request = get_default_client()
             .into_diagnostic()?
             .post(url.clone())
-            .header("X-File-Sha256", hash)
-            .header("X-File-Name", filename)
-            .header("Content-Length", file_size)
-            .header("Content-Type", "application/octet-stream")
+            .multipart(form)
             .bearer_auth(token.clone());
 
-        send_request_with_retry(prepared_request, package_file).await?;
+        // send_request_with_retry(prepared_request, package_file).await?;
+        let _ = prepared_request.send().await.into_diagnostic()?;
     }
 
     info!("Packages successfully uploaded to prefix.dev server");
