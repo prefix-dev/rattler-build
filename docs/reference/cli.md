@@ -74,7 +74,7 @@ Build a package from a recipe
 
 ##### **Options:**
 
-- `-r`, `--recipe <RECIPE>`
+- `-r`, `--recipe <RECIPES>`
 
 	The recipe file or directory containing `recipe.yaml`. Defaults to the current directory
 
@@ -154,7 +154,6 @@ Build a package from a recipe
 
 	Channel priority to use when solving
 
-	- Default value: `strict`
 
 - `--extra-meta <EXTRA_META>`
 
@@ -198,7 +197,6 @@ e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to
 
 	Output directory for build artifacts.
 
-	- Default value: `./output`
 
 - `--skip-existing <SKIP_EXISTING>`
 
@@ -293,7 +291,6 @@ These test files are written at "package creation time" and are part of the pack
 
 	Channel priority to use when solving
 
-	- Default value: `strict`
 
 ###### **Modifying result**
 
@@ -301,7 +298,6 @@ These test files are written at "package creation time" and are part of the pack
 
 	Output directory for build artifacts.
 
-	- Default value: `./output`
 
 
 
@@ -310,7 +306,7 @@ These test files are written at "package creation time" and are part of the pack
 
 Rebuild a package from a package file instead of a recipe
 
-**Usage:** `rattler-build rebuild [OPTIONS] --package-file <PACKAGE_FILE> --test <TEST>`
+**Usage:** `rattler-build rebuild [OPTIONS] --package-file <PACKAGE_FILE>`
 
 ##### **Options:**
 
@@ -333,7 +329,6 @@ Rebuild a package from a package file instead of a recipe
 
 	Channel priority to use when solving
 
-	- Default value: `strict`
 
 ###### **Modifying result**
 
@@ -354,7 +349,6 @@ Rebuild a package from a package file instead of a recipe
 
 	Output directory for build artifacts.
 
-	- Default value: `./output`
 
 
 
@@ -391,7 +385,6 @@ Upload a package
 
 	Channel priority to use when solving
 
-	- Default value: `strict`
 
 ###### **Modifying result**
 
@@ -399,7 +392,6 @@ Upload a package
 
 	Output directory for build artifacts.
 
-	- Default value: `./output`
 
 
 
