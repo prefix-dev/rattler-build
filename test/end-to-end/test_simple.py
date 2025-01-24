@@ -211,25 +211,14 @@ def test_anaconda_upload(
 
 
 @pytest.fixture()
-def minio_server(tmp_path: Path):
-    tmp_dir = tmp_path / "minio"
-    # Start minio server
-    proc = subprocess.Popen(
-        [
-            "minio",
-            "server",
-            "--address",
-            "0.0.0.0:9000",
-            str(tmp_dir),
-        ],
-    )
+def create_s3_channel():
     # Create a bucket (with retries, in case we have to wait until minio is up and running)
     retries = 0
     max_retries = 3
     while retries < max_retries:
         try:
             subprocess.run(
-                ["mc", "mb", "local/s3-forge"],
+                ["mc", "mb", "local/s3-forge", "--ignore-existing"],
                 env={
                     **os.environ,
                     "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
@@ -245,7 +234,6 @@ def minio_server(tmp_path: Path):
                     "Failed to create bucket, could not reach minio server"
                 )
     yield
-    proc.kill()
 
 
 @pytest.fixture()
@@ -265,7 +253,7 @@ def s3_credentials_file(tmp_path: Path) -> Path:
     return path
 
 
-@pytest.mark.usefixtures("minio_server")
+@pytest.mark.usefixtures("create_s3_channel")
 def test_s3_minio_upload(
     rattler_build: RattlerBuild,
     recipes: Path,
