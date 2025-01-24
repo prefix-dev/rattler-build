@@ -187,10 +187,13 @@ impl Recipe {
                     context.insert(k.as_str().to_string(), rendered.as_str().to_string());
                     // also immediately insert into jinja context so that the value can be used
                     // in later jinja expressions
-                    jinja.context_mut().insert(
-                        k.as_str().to_string(),
-                        Value::from_safe_string(rendered.as_str().to_string()),
-                    );
+                    for (k, v) in context.iter() {
+                        jinja.insert(k.as_str().to_string(), Value::from(v.as_str()));
+                    }
+                    // jinja.context_mut().insert(
+                    //     k.as_str().to_string(),
+                    //     Value::from_safe_string(rendered.as_str().to_string()),
+                    // );
                 }
             }
         }

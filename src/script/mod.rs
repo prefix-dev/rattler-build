@@ -272,13 +272,13 @@ impl Script {
             .collect::<IndexMap<String, String>>();
 
         // Get the contents of the script.
-        for (k, v) in &env_vars {
-            jinja_config.as_mut().map(|jinja| {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()))
-            });
-        }
+        // for (k, v) in &env_vars {
+        //     jinja_config.as_mut().map(|jinja| {
+        //         jinja
+        //             .context_mut()
+        //             .insert(k.clone(), Value::from_safe_string(v.clone()))
+        //     });
+        // }
 
         let contents = self.resolve_content(recipe_dir, jinja_config, &valid_script_extensions)?;
 

@@ -222,11 +222,11 @@ impl Output {
 
             let selector_config = self.build_configuration.selector_config();
             let mut jinja = Jinja::new(selector_config.clone());
-            for (k, v) in self.recipe.context.iter() {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()));
-            }
+            // for (k, v) in self.recipe.context.iter() {
+            //     jinja
+            //         .context_mut()
+            //         .insert(k.clone(), Value::from_safe_string(v.clone()));
+            // }
 
             cache
                 .build
