@@ -5,9 +5,15 @@ expression: unix_recipe.unwrap()
 Recipe {
     schema_version: 1,
     context: {
-        "name": "xtensor",
-        "version": "0.24.6",
-        "vc": "14",
+        "name": Variable(
+            "xtensor",
+        ),
+        "version": Variable(
+            "0.24.6",
+        ),
+        "vc": Variable(
+            "14",
+        ),
     },
     package: Package {
         name: PackageName {
