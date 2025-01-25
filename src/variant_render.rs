@@ -11,7 +11,10 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
-        custom_yaml::Node, parser::{BuildString, Dependency}, variable::Variable, Jinja, ParsingError, Recipe
+        custom_yaml::Node,
+        parser::{BuildString, Dependency},
+        variable::Variable,
+        Jinja, ParsingError, Recipe,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -172,7 +175,10 @@ impl<S: SourceCode> Stage1Render<S> {
             if let Dependency::Spec(spec) = run_requirement {
                 if let Some(ref name) = spec.name {
                     if name.as_normalized().starts_with("__") {
-                        variant.insert(name.as_normalized().into(), Variable::from_str(&spec.to_string()));
+                        variant.insert(
+                            name.as_normalized().into(),
+                            Variable::from_str(&spec.to_string()),
+                        );
                     }
                 }
             }

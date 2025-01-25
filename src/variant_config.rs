@@ -20,7 +20,10 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
-        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode}, error::{ErrorKind, ParsingError, PartialParsingError}, variable::Variable, Jinja, Recipe, Render
+        custom_yaml::{HasSpan, Node, RenderedMappingNode, RenderedNode, TryConvertNode},
+        error::{ErrorKind, ParsingError, PartialParsingError},
+        variable::Variable,
+        Jinja, Recipe, Render,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -370,11 +373,15 @@ impl VariantConfig {
         // always insert target_platform and build_platform
         final_config.variants.insert(
             "target_platform".into(),
-            vec![Variable::from_str(&selector_config.target_platform.to_string())],
+            vec![Variable::from_str(
+                &selector_config.target_platform.to_string(),
+            )],
         );
         final_config.variants.insert(
             "build_platform".into(),
-            vec![Variable::from_str(&selector_config.build_platform.to_string())],
+            vec![Variable::from_str(
+                &selector_config.build_platform.to_string(),
+            )],
         );
 
         Ok(final_config)
@@ -775,8 +782,14 @@ mod tests {
     #[test]
     fn test_variant_combinations() {
         let mut variants = BTreeMap::<NormalizedKey, Vec<Variable>>::new();
-        variants.insert("a".into(), vec![Variable::from_str("1"), Variable::from_str("2")]);
-        variants.insert("b".into(), vec![Variable::from_str("3"), Variable::from_str("4")]);
+        variants.insert(
+            "a".into(),
+            vec![Variable::from_str("1"), Variable::from_str("2")],
+        );
+        variants.insert(
+            "b".into(),
+            vec![Variable::from_str("3"), Variable::from_str("4")],
+        );
         let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
 
         let used_vars = vec!["a".into()].into_iter().collect();
@@ -795,7 +808,11 @@ mod tests {
 
         config.variants.insert(
             "c".into(),
-            vec![Variable::from_str("5"), Variable::from_str("6"), Variable::from_str("7")],
+            vec![
+                Variable::from_str("5"),
+                Variable::from_str("6"),
+                Variable::from_str("7"),
+            ],
         );
         let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()

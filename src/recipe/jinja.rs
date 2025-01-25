@@ -62,10 +62,9 @@ impl<'a> Jinja<'a> {
     }
 
     /// Add in the variables from the given context.
-    pub fn with_context(mut self, context: &IndexMap<String, String>) -> Self {
+    pub fn with_context(mut self, context: &IndexMap<String, Variable>) -> Self {
         for (k, v) in context {
-            self.context_mut()
-                .insert(k.clone(), Value::from_safe_string(v.clone()));
+            self.context_mut().insert(k.clone(), v.clone().into());
         }
         self
     }
@@ -208,41 +207,39 @@ fn jinja_pin_function(
 }
 
 fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
-    Some(
-        Variable::from_str(match language {
-            // Platform agnostic compilers
-            "fortran" => "gfortran",
-            lang if !["c", "cxx"].contains(&lang) => lang,
-            // Platform specific compilers
-            _ => {
-                if platform.is_windows() {
-                    match language {
-                        "c" => "vs2017",
-                        "cxx" => "vs2017",
-                        _ => unreachable!(),
-                    }
-                } else if platform.is_osx() {
-                    match language {
-                        "c" => "clang",
-                        "cxx" => "clangxx",
-                        _ => unreachable!(),
-                    }
-                } else if matches!(platform, Platform::EmscriptenWasm32) {
-                    match language {
-                        "c" => "emscripten",
-                        "cxx" => "emscripten",
-                        _ => unreachable!(),
-                    }
-                } else {
-                    match language {
-                        "c" => "gcc",
-                        "cxx" => "gxx",
-                        _ => unreachable!(),
-                    }
+    Some(Variable::from_str(match language {
+        // Platform agnostic compilers
+        "fortran" => "gfortran",
+        lang if !["c", "cxx"].contains(&lang) => lang,
+        // Platform specific compilers
+        _ => {
+            if platform.is_windows() {
+                match language {
+                    "c" => "vs2017",
+                    "cxx" => "vs2017",
+                    _ => unreachable!(),
+                }
+            } else if platform.is_osx() {
+                match language {
+                    "c" => "clang",
+                    "cxx" => "clangxx",
+                    _ => unreachable!(),
+                }
+            } else if matches!(platform, Platform::EmscriptenWasm32) {
+                match language {
+                    "c" => "emscripten",
+                    "cxx" => "emscripten",
+                    _ => unreachable!(),
+                }
+            } else {
+                match language {
+                    "c" => "gcc",
+                    "cxx" => "gxx",
+                    _ => unreachable!(),
                 }
             }
-        })
-    )
+        }
+    }))
 }
 
 fn compiler_stdlib_eval(
@@ -461,13 +458,16 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
                             "No target or build architecture provided.",
                         )
                     })?
-                    .as_str().to_string(),
+                    .as_str()
+                    .to_string(),
             }
         };
 
         let cdt_name = variant_clone.get(&"cdt_name".into()).map_or_else(
             || match arch {
-                Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => "cos7".to_string(),
+                Some(Arch::S390X | Arch::Aarch64 | Arch::Ppc64le | Arch::Ppc64) => {
+                    "cos7".to_string()
+                }
                 _ => "cos6".to_string(),
             },
             |s| s.to_string(),
