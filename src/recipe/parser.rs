@@ -179,10 +179,8 @@ impl Recipe {
                         help = "`context` values must always be scalars (strings)"
                     )]
                 })?;
-                println!("Val: {:?}", val);
                 let rendered: Option<ScalarNode> =
                     val.render(&jinja, &format!("context.{}", k.as_str()))?;
-                println!("Val: {:?}", rendered);
                 if let Some(rendered) = rendered {
                     let variable = if let Some(value) = rendered.as_bool() {
                         Variable::from(value)
@@ -361,7 +359,6 @@ mod tests {
         };
 
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
-        dbg!(&win_recipe);
         assert!(win_recipe.is_ok());
         insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
     }

@@ -64,7 +64,6 @@ impl SelectorConfig {
                 );
             }
         }
-        dbg!(&context);
         context.insert(
             "unix".to_string(),
             Value::from(self.host_platform.is_unix()),
@@ -89,7 +88,6 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            println!("From variant: {:?} {:?}", key, v);
             context.insert(key.normalize(), v.clone().into());
         }
 

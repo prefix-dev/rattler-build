@@ -207,8 +207,6 @@ mod tests {
     #[case("conda_build_config/conda_forge_subset.yaml", None)]
     #[serial]
     fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
-        use crate::recipe::variable::Variable;
-
         let path = test_data_dir().join(config_path);
 
         // fix the platform for the snapshots

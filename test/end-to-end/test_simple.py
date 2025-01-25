@@ -1239,3 +1239,13 @@ def test_rendering_from_stdin(
     loaded = json.loads(rendered)
 
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"
+
+
+def test_jinja_types(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json):
+    # render only and snapshot json
+    rendered = rattler_build.render(
+        recipes / "jinja-types", tmp_path
+    )
+    print(rendered)
+    # load as json
+    assert snapshot_json == rendered
