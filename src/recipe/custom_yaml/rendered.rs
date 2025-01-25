@@ -389,6 +389,7 @@ impl From<bool> for RenderedScalarNode {
         }
     }
 }
+
 macro_rules! scalar_from_to_number {
     ($t:ident, $as:ident) => {
         impl From<$t> for RenderedScalarNode {

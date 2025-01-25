@@ -34,7 +34,7 @@ use crate::{
     normalized_key::NormalizedKey,
     recipe::{
         jinja::SelectorConfig,
-        parser::{Recipe, Source},
+        parser::{Recipe, Source}, variable::Variable,
     },
     render::resolved_dependencies::FinalizedDependencies,
     script::SandboxConfiguration,
@@ -321,7 +321,7 @@ pub struct BuildConfiguration {
     /// The build platform (the platform that the build is running on)
     pub build_platform: PlatformWithVirtualPackages,
     /// The selected variant for this build
-    pub variant: BTreeMap<NormalizedKey, String>,
+    pub variant: BTreeMap<NormalizedKey, Variable>,
     /// THe computed hash of the variant
     pub hash: HashInfo,
     /// The directories for the build (work, source, build, host, ...)
@@ -504,7 +504,7 @@ impl Output {
     }
 
     /// Shorthand to retrieve the variant configuration for this output
-    pub fn variant(&self) -> &BTreeMap<NormalizedKey, String> {
+    pub fn variant(&self) -> &BTreeMap<NormalizedKey, Variable> {
         &self.build_configuration.variant
     }
 
@@ -690,7 +690,7 @@ impl Output {
             table.set_header(vec!["Key", "Value"]);
         }
         self.build_configuration.variant.iter().for_each(|(k, v)| {
-            table.add_row(vec![&k.normalize(), v]);
+            table.add_row(vec![&k.normalize(), &v.to_string()]);
         });
         writeln!(f, "{}\n", table)?;
 

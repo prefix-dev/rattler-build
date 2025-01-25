@@ -11,9 +11,7 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
-        custom_yaml::Node,
-        parser::{BuildString, Dependency},
-        Jinja, ParsingError, Recipe,
+        custom_yaml::Node, parser::{BuildString, Dependency}, variable::Variable, Jinja, ParsingError, Recipe
     },
     selectors::SelectorConfig,
     source_code::SourceCode,
@@ -37,7 +35,7 @@ pub struct RawOutputVec {
 #[derive(Clone, Debug)]
 pub struct Stage0Render<S: SourceCode> {
     /// The used variables with their values
-    pub variables: BTreeMap<NormalizedKey, String>,
+    pub variables: BTreeMap<NormalizedKey, Variable>,
 
     /// The raw outputs of the recipe
     pub raw_outputs: RawOutputVec,
@@ -133,7 +131,7 @@ pub struct Stage1Inner {
 /// Stage 1 render of a single recipe.yaml
 #[derive(Debug)]
 pub struct Stage1Render<S: SourceCode> {
-    pub(crate) variables: BTreeMap<NormalizedKey, String>,
+    pub(crate) variables: BTreeMap<NormalizedKey, Variable>,
 
     pub(crate) inner: Vec<Stage1Inner>,
 
@@ -150,7 +148,7 @@ impl<S: SourceCode> Stage1Render<S> {
     pub fn variant_for_output(
         &self,
         idx: usize,
-    ) -> Result<BTreeMap<NormalizedKey, String>, VariantExpandError> {
+    ) -> Result<BTreeMap<NormalizedKey, Variable>, VariantExpandError> {
         let inner = &self.inner[idx];
         // combine jinja variables and the variables from the dependencies
         let self_name = self.stage_0_render.rendered_outputs[idx].package().name();
@@ -174,7 +172,7 @@ impl<S: SourceCode> Stage1Render<S> {
             if let Dependency::Spec(spec) = run_requirement {
                 if let Some(ref name) = spec.name {
                     if name.as_normalized().starts_with("__") {
-                        variant.insert(name.as_normalized().into(), spec.to_string());
+                        variant.insert(name.as_normalized().into(), Variable::from_str(&spec.to_string()));
                     }
                 }
             }
@@ -194,13 +192,13 @@ impl<S: SourceCode> Stage1Render<S> {
             let version = self.inner[other_idx].recipe.package().version();
             variant.insert(
                 pin.as_normalized().into(),
-                format!("{} {}", version, build_string),
+                Variable::from_str(&format!("{} {}", version, build_string)),
             );
         }
 
         // fix target_platform value here
         if !recipe.build().noarch().is_none() {
-            variant.insert("target_platform".into(), "noarch".into());
+            variant.insert("target_platform".into(), Variable::from_str("noarch"));
         }
 
         Ok(variant)
@@ -285,7 +283,7 @@ impl<S: SourceCode> Stage1Render<S> {
     #[allow(clippy::type_complexity)]
     pub fn into_sorted_outputs(
         self,
-    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, String>)>, VariantExpandError> {
+    ) -> Result<Vec<((Node, Recipe), BTreeMap<NormalizedKey, Variable>)>, VariantExpandError> {
         // zip node from stage0 and final render output
         let sorted_indices = self.sorted_indices()?;
 

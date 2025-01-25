@@ -62,7 +62,7 @@ serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
 clap = { version = "4.5.26", features = ["derive", "env", "cargo"] }
-minijinja = { version = "2.6.0", features = [
+minijinja = { version = "2.6.0", path = "../minijinja/minijinja", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -160,6 +160,7 @@ rattler_package_streaming = { version = "0.22.23", default-features = false }
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
+strum = "0.26.3"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 sha2 = { version = "0.10.8", features = ["asm"] }
