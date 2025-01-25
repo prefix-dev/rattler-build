@@ -175,10 +175,7 @@ impl<S: SourceCode> Stage1Render<S> {
             if let Dependency::Spec(spec) = run_requirement {
                 if let Some(ref name) = spec.name {
                     if name.as_normalized().starts_with("__") {
-                        variant.insert(
-                            name.as_normalized().into(),
-                            Variable::from_str(&spec.to_string()),
-                        );
+                        variant.insert(name.as_normalized().into(), spec.to_string().into());
                     }
                 }
             }
@@ -198,13 +195,13 @@ impl<S: SourceCode> Stage1Render<S> {
             let version = self.inner[other_idx].recipe.package().version();
             variant.insert(
                 pin.as_normalized().into(),
-                Variable::from_str(&format!("{} {}", version, build_string)),
+                format!("{} {}", version, build_string).into(),
             );
         }
 
         // fix target_platform value here
         if !recipe.build().noarch().is_none() {
-            variant.insert("target_platform".into(), Variable::from_str("noarch"));
+            variant.insert("target_platform".into(), "noarch".into());
         }
 
         Ok(variant)
