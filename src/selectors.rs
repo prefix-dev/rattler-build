@@ -5,7 +5,10 @@ use std::collections::BTreeMap;
 use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
-    recipe::{jinja::{Env, Git}, variable::Variable},
+    recipe::{
+        jinja::{Env, Git},
+        variable::Variable,
+    },
 };
 
 use minijinja::value::Value;
@@ -86,6 +89,7 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
+            println!("From variant: {:?} {:?}", key, v);
             context.insert(key.normalize(), v.clone().into());
         }
 

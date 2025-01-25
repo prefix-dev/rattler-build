@@ -6,7 +6,6 @@ use std::{
 
 use fs_err as fs;
 use miette::{Context, IntoDiagnostic};
-use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -15,7 +14,9 @@ use crate::{
     metadata::{build_reindexed_channels, Output},
     packaging::Files,
     recipe::{
-        parser::{Dependency, Requirements, Source}, variable::Variable, Jinja
+        parser::{Dependency, Requirements, Source},
+        variable::Variable,
+        Jinja,
     },
     render::resolved_dependencies::{
         install_environments, resolve_dependencies, FinalizedDependencies,
@@ -95,7 +96,10 @@ impl Output {
             // we are using the `host_platform` here because for the cache it should not
             // matter whether it's being build for `noarch` or not (one can have
             // mixed outputs, in fact).
-            selected_variant.insert("host_platform", Variable::from_str(&self.host_platform().platform.to_string()));
+            selected_variant.insert(
+                "host_platform",
+                Variable::from_str(&self.host_platform().platform.to_string()),
+            );
             selected_variant.insert(
                 "build_platform",
                 Variable::from_str(&self.build_configuration.build_platform.platform.to_string()),
@@ -222,9 +226,7 @@ impl Output {
             let selector_config = self.build_configuration.selector_config();
             let mut jinja = Jinja::new(selector_config.clone());
             for (k, v) in self.recipe.context.iter() {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()));
+                jinja.context_mut().insert(k.clone(), v.clone().into());
             }
 
             cache

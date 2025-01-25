@@ -304,11 +304,13 @@ impl PartialEq for RenderedScalarNode {
     fn eq(&self, other: &Self) -> bool {
         self.value == other.value
     }
+
     #[allow(clippy::partialeq_ne_impl)]
     fn ne(&self, other: &Self) -> bool {
         self.value != other.value
     }
 }
+
 impl Eq for RenderedScalarNode {}
 
 impl Hash for RenderedScalarNode {

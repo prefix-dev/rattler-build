@@ -201,7 +201,10 @@ mod tests {
             "CONDA_BUILD_SYSROOT".into(),
             Variable::from_str("/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk")
         );
-        input.insert("channel_targets".into(), Variable::from_str("conda-forge main"));
+        input.insert(
+            "channel_targets".into(),
+            Variable::from_str("conda-forge main"),
+        );
         input.insert("python".into(), Variable::from_str("3.11.* *_cpython"));
         input.insert("c_compiler_version".into(), Variable::from_str("14"));
 

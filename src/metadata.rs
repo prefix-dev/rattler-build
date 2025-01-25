@@ -34,7 +34,8 @@ use crate::{
     normalized_key::NormalizedKey,
     recipe::{
         jinja::SelectorConfig,
-        parser::{Recipe, Source}, variable::Variable,
+        parser::{Recipe, Source},
+        variable::Variable,
     },
     render::resolved_dependencies::FinalizedDependencies,
     script::SandboxConfiguration,
