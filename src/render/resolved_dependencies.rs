@@ -462,15 +462,14 @@ pub fn apply_variant(
                             if let Some(version) = variant.get(&name.into()) {
                                 // if the variant starts with an alphanumeric character,
                                 // we have to add a '=' to the version spec
-                                let mut spec = version.clone();
+                                let mut spec = version.to_string();
 
                                 // check if all characters are alphanumeric or ., in that case add
                                 // a '=' to get "startswith" behavior
                                 if spec.chars().all(|c| c.is_alphanumeric() || c == '.') {
-                                    spec = format!("={}", version);
-                                } else {
-                                    spec = version.clone();
+                                    spec = format!("={spec}");
                                 }
+
                                 let variant = name.as_normalized().to_string();
                                 let spec: NamelessMatchSpec = spec.parse().map_err(|e| {
                                     ResolveError::VariantSpecParseError(variant.clone(), e)

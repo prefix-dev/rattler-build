@@ -7,6 +7,7 @@ Recipe {
     context: {
         "name": "xtensor",
         "version": "0.24.6",
+        "vc": "14",
     },
     package: Package {
         name: PackageName {
@@ -93,12 +94,12 @@ Recipe {
         skip: Skip(
             [
                 (
-                    "win and vc14",
+                    "win and match(vc, \"<14\")",
                     Span {
                         start: Some(
                             Marker {
                                 source: 0,
-                                line: 16,
+                                line: 17,
                                 column: 9,
                             },
                         ),
@@ -115,7 +116,7 @@ Recipe {
             env: {},
             secrets: [],
             content: CommandOrPath(
-                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
+                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmakecar\nnmake install\n",
             ),
             cwd: None,
         },

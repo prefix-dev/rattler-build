@@ -1,4 +1,4 @@
-//! find used variables on a Raw (YAML) recipe
+//! Find used variables on a Raw (YAML) recipe
 //! This does an initial "prerender" step where we evaluate the Jinja
 //! expressions globally based on the variables in the `context` section of the
 //! recipe. This also evaluates any Jinja functions such as `compiler` and

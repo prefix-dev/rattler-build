@@ -207,6 +207,8 @@ mod tests {
     #[case("conda_build_config/conda_forge_subset.yaml", None)]
     #[serial]
     fn test_conda_forge(#[case] config_path: &str, #[case] cuda: Option<bool>) {
+        use crate::recipe::variable::Variable;
+
         let path = test_data_dir().join(config_path);
 
         // fix the platform for the snapshots
@@ -235,12 +237,12 @@ mod tests {
             if cuda {
                 assert_eq!(
                     config.variants[&"environment_var".into()],
-                    vec!["CF_CUDA_ENABLED".to_string()]
+                    vec![Variable::from_str("CF_CUDA_ENABLED")]
                 );
             } else {
                 assert_eq!(
                     config.variants[&"environment_var".into()],
-                    vec!["CF_CUDA_DISABLED".to_string()]
+                    vec![Variable::from_str("CF_CUDA_DISABLED")]
                 );
             }
             std::env::remove_var("TEST_CF_CUDA_ENABLED");

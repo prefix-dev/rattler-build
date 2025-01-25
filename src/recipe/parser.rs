@@ -355,6 +355,7 @@ mod tests {
         };
 
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
+        dbg!(&win_recipe);
         assert!(win_recipe.is_ok());
         insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
     }
