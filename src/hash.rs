@@ -192,21 +192,18 @@ mod tests {
     #[test]
     fn test_hash() {
         let mut input = BTreeMap::new();
-        input.insert("rust_compiler".into(), Variable::from_str("rust"));
-        input.insert("build_platform".into(), Variable::from_str("osx-64"));
-        input.insert("c_compiler".into(), Variable::from_str("clang"));
-        input.insert("target_platform".into(), Variable::from_str("osx-arm64"));
-        input.insert("openssl".into(), Variable::from_str("3"));
+        input.insert("rust_compiler".into(), "rust".into());
+        input.insert("build_platform".into(), "osx-64".into());
+        input.insert("c_compiler".into(), "clang".into());
+        input.insert("target_platform".into(), "osx-arm64".into());
+        input.insert("openssl".into(), "3".into());
         input.insert(
             "CONDA_BUILD_SYSROOT".into(),
-            Variable::from_str("/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk")
+            "/Applications/Xcode_13.2.1.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.0.sdk".into()
         );
-        input.insert(
-            "channel_targets".into(),
-            Variable::from_str("conda-forge main"),
-        );
-        input.insert("python".into(), Variable::from_str("3.11.* *_cpython"));
-        input.insert("c_compiler_version".into(), Variable::from_str("14"));
+        input.insert("channel_targets".into(), "conda-forge main".into());
+        input.insert("python".into(), "3.11.* *_cpython".into());
+        input.insert("c_compiler_version".into(), "14".into());
 
         let build_string_from_output = HashInfo::from_variant(&input, &NoArchType::none());
         assert_eq!(build_string_from_output.to_string(), "py311h507f6e9");

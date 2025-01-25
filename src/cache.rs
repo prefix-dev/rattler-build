@@ -15,7 +15,6 @@ use crate::{
     packaging::Files,
     recipe::{
         parser::{Dependency, Requirements, Source},
-        variable::Variable,
         Jinja,
     },
     render::resolved_dependencies::{
@@ -98,11 +97,15 @@ impl Output {
             // mixed outputs, in fact).
             selected_variant.insert(
                 "host_platform",
-                Variable::from_str(&self.host_platform().platform.to_string()),
+                self.host_platform().platform.to_string().into(),
             );
             selected_variant.insert(
                 "build_platform",
-                Variable::from_str(&self.build_configuration.build_platform.platform.to_string()),
+                self.build_configuration
+                    .build_platform
+                    .platform
+                    .to_string()
+                    .into(),
             );
 
             let cache_key = (cache, selected_variant, self.prefix());

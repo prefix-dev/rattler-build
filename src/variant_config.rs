@@ -373,15 +373,11 @@ impl VariantConfig {
         // always insert target_platform and build_platform
         final_config.variants.insert(
             "target_platform".into(),
-            vec![Variable::from_str(
-                &selector_config.target_platform.to_string(),
-            )],
+            vec![selector_config.target_platform.to_string().into()],
         );
         final_config.variants.insert(
             "build_platform".into(),
-            vec![Variable::from_str(
-                &selector_config.build_platform.to_string(),
-            )],
+            vec![selector_config.build_platform.to_string().into()],
         );
 
         Ok(final_config)
@@ -782,14 +778,8 @@ mod tests {
     #[test]
     fn test_variant_combinations() {
         let mut variants = BTreeMap::<NormalizedKey, Vec<Variable>>::new();
-        variants.insert(
-            "a".into(),
-            vec![Variable::from_str("1"), Variable::from_str("2")],
-        );
-        variants.insert(
-            "b".into(),
-            vec![Variable::from_str("3"), Variable::from_str("4")],
-        );
+        variants.insert("a".into(), vec!["1".into(), "2".into()]);
+        variants.insert("b".into(), vec!["3".into(), "4".into()]);
         let zip_keys = vec![vec!["a".into(), "b".into()].into_iter().collect()];
 
         let used_vars = vec!["a".into()].into_iter().collect();
@@ -806,14 +796,9 @@ mod tests {
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2);
 
-        config.variants.insert(
-            "c".into(),
-            vec![
-                Variable::from_str("5"),
-                Variable::from_str("6"),
-                Variable::from_str("7"),
-            ],
-        );
+        config
+            .variants
+            .insert("c".into(), vec!["5".into(), "6".into(), "7".into()]);
         let used_vars = vec!["a".into(), "b".into(), "c".into()]
             .into_iter()
             .collect();
@@ -827,7 +812,7 @@ mod tests {
         let combinations = config.combinations(&used_vars, None).unwrap();
         assert_eq!(combinations.len(), 2 * 2 * 3);
 
-        let already_used_vars = BTreeMap::from_iter(vec![("a".into(), Variable::from_str("1"))]);
+        let already_used_vars = BTreeMap::from_iter(vec![("a".into(), "1".into())]);
         let c2 = config
             .combinations(&used_vars, Some(&already_used_vars))
             .unwrap();

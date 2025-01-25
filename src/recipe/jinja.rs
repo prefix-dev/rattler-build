@@ -100,7 +100,7 @@ impl<'a> Jinja<'a> {
 
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
-        let expr = self.env.compile_expression(&str)?;
+        let expr = self.env.compile_expression(str)?;
         expr.eval(self.context())
     }
 }
@@ -207,39 +207,42 @@ fn jinja_pin_function(
 }
 
 fn default_compiler(platform: Platform, language: &str) -> Option<Variable> {
-    Some(Variable::from_str(match language {
-        // Platform agnostic compilers
-        "fortran" => "gfortran",
-        lang if !["c", "cxx"].contains(&lang) => lang,
-        // Platform specific compilers
-        _ => {
-            if platform.is_windows() {
-                match language {
-                    "c" => "vs2017",
-                    "cxx" => "vs2017",
-                    _ => unreachable!(),
-                }
-            } else if platform.is_osx() {
-                match language {
-                    "c" => "clang",
-                    "cxx" => "clangxx",
-                    _ => unreachable!(),
-                }
-            } else if matches!(platform, Platform::EmscriptenWasm32) {
-                match language {
-                    "c" => "emscripten",
-                    "cxx" => "emscripten",
-                    _ => unreachable!(),
-                }
-            } else {
-                match language {
-                    "c" => "gcc",
-                    "cxx" => "gxx",
-                    _ => unreachable!(),
+    Some(
+        match language {
+            // Platform agnostic compilers
+            "fortran" => "gfortran",
+            lang if !["c", "cxx"].contains(&lang) => lang,
+            // Platform specific compilers
+            _ => {
+                if platform.is_windows() {
+                    match language {
+                        "c" => "vs2017",
+                        "cxx" => "vs2017",
+                        _ => unreachable!(),
+                    }
+                } else if platform.is_osx() {
+                    match language {
+                        "c" => "clang",
+                        "cxx" => "clangxx",
+                        _ => unreachable!(),
+                    }
+                } else if matches!(platform, Platform::EmscriptenWasm32) {
+                    match language {
+                        "c" => "emscripten",
+                        "cxx" => "emscripten",
+                        _ => unreachable!(),
+                    }
+                } else {
+                    match language {
+                        "c" => "gcc",
+                        "cxx" => "gxx",
+                        _ => unreachable!(),
+                    }
                 }
             }
         }
-    }))
+        .into(),
+    )
 }
 
 fn compiler_stdlib_eval(
@@ -1014,7 +1017,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_match() {
-        let variant = BTreeMap::from_iter(vec![("python".into(), Variable::from_str("3.7"))]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7".into())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,
@@ -1036,7 +1039,7 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn eval_complicated_match() {
-        let variant = BTreeMap::from_iter(vec![("python".into(), Variable::from_str("3.7.* *_cpython"))]);
+        let variant = BTreeMap::from_iter(vec![("python".into(), "3.7.* *_cpython".into())]);
 
         let options = SelectorConfig {
             target_platform: Platform::Linux64,

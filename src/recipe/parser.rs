@@ -53,9 +53,7 @@ pub use self::{
     },
 };
 
-use crate::recipe::custom_yaml::Node;
-
-use super::{custom_yaml::RenderedScalarNode, variable::Variable};
+use crate::recipe::{custom_yaml::Node, variable::Variable};
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,7 +189,7 @@ impl Recipe {
                     } else if let Some(value) = rendered.as_i64() {
                         Variable::from(value)
                     } else {
-                        Variable::from_str(&rendered)
+                        Variable::from_string(&rendered)
                     };
                     context.insert(k.as_str().to_string(), variable.clone());
                     // also immediately insert into jinja context so that the value can be used
