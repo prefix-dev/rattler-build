@@ -189,19 +189,20 @@ fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, attestation_files=None))]
 fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
     channel: String,
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
+    attestations: Option<Vec<PathBuf>>,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let prefix_data = PrefixData::new(url, channel, api_key);
+    let prefix_data = PrefixData::new(url, channel, api_key, attestations);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {

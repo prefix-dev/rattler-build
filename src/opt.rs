@@ -879,23 +879,33 @@ pub struct PrefixData {
     pub url: UrlWithTrailingSlash,
     pub channel: String,
     pub api_key: Option<String>,
-    pub attestations: Vec<String>,
+    pub attestations: Vec<PathBuf>,
 }
 
 impl From<PrefixOpts> for PrefixData {
     fn from(value: PrefixOpts) -> Self {
-        Self::new(value.url, value.channel, value.api_key)
+        Self::new(
+            value.url,
+            value.channel,
+            value.api_key,
+            Some(value.attestation),
+        )
     }
 }
 
 impl PrefixData {
     /// Create a new instance of `PrefixData`
-    pub fn new(url: Url, channel: String, api_key: Option<String>) -> Self {
+    pub fn new(
+        url: Url,
+        channel: String,
+        api_key: Option<String>,
+        attestations: Option<Vec<PathBuf>>,
+    ) -> Self {
         Self {
             url: url.into(),
             channel,
             api_key,
-            attestations: vec![],
+            attestations: attestations.unwrap_or_default(),
         }
     }
 }
