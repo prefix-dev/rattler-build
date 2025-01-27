@@ -149,7 +149,7 @@ impl Recipe {
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
         let experimental = jinja_opt.experimental;
-        let mut jinja = Jinja::new(jinja_opt);
+        let mut jinja = Jinja::new(jinja_opt.clone());
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
             vec![_partialerror!(
@@ -163,6 +163,7 @@ impl Recipe {
         let mut context = IndexMap::new();
 
         if let Some(context_map) = root_node.get("context") {
+            let mut strict_jinja = Jinja::new_strict(jinja_opt);
             let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
                     *context_map.span(),
@@ -181,7 +182,7 @@ impl Recipe {
                 })?;
                 println!("Val: {:?}", val);
                 let rendered: Option<ScalarNode> =
-                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
+                    val.render(&strict_jinja, &format!("context.{}", k.as_str()))?;
                 println!("Val: {:?}", rendered);
                 if let Some(rendered) = rendered {
                     let variable = if let Some(value) = rendered.as_bool() {
@@ -194,9 +195,14 @@ impl Recipe {
                     context.insert(k.as_str().to_string(), variable.clone());
                     // also immediately insert into jinja context so that the value can be used
                     // in later jinja expressions
-                    jinja
-                        .context_mut()
-                        .insert(k.as_str().to_string(), variable.into());
+                    strict_jinja.extend_context(std::iter::once((
+                        k.as_str().to_string(),
+                        variable.clone(),
+                    )));
+                    jinja.extend_context(std::iter::once((
+                        k.as_str().to_string(),
+                        variable.clone(),
+                    )));
                 }
             }
         }

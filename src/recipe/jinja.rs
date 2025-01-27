@@ -3,12 +3,14 @@
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
+use serde::Serialize;
+use std::collections::HashSet;
 use std::process::Command;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::{from_args, Kwargs, Object};
-use minijinja::{Environment, Value};
+use minijinja::value::{from_args, Enumerator, Kwargs, Object, ObjectExt};
+use minijinja::{Environment, UndefinedBehavior, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
 use crate::normalized_key::NormalizedKey;
@@ -50,22 +52,39 @@ impl InternalRepr {
 #[derive(Debug, Clone)]
 pub struct Jinja<'a> {
     env: Environment<'a>,
-    context: BTreeMap<String, Value>,
+    // context: BTreeMap<String, Value>,
+    context: Arc<Mutex<TrackingContextInner>>,
 }
 
 impl<'a> Jinja<'a> {
     /// Create a new Jinja instance with the given selector configuration.
-    pub fn new(config: SelectorConfig) -> Self {
-        let env = set_jinja(&config);
+    fn new_impl(config: SelectorConfig, undefined_behavior: UndefinedBehavior) -> Self {
+        let env = set_jinja(&config, undefined_behavior);
         let context = config.into_context();
+        let context = Arc::new(Mutex::new(TrackingContextInner {
+            context,
+            undefined: HashSet::new(),
+        }));
         Self { env, context }
     }
 
+    /// Create a new Jinja instance with the given selector configuration.
+    pub fn new(config: SelectorConfig) -> Self {
+        Self::new_impl(config, UndefinedBehavior::Lenient)
+    }
+
+    /// Create a new Jinja instance with the given selector configuration.
+    pub fn new_strict(config: SelectorConfig) -> Self {
+        Self::new_impl(config, UndefinedBehavior::Strict)
+    }
+
     /// Add in the variables from the given context.
-    pub fn with_context(mut self, context: &IndexMap<String, Variable>) -> Self {
-        for (k, v) in context {
-            self.context_mut().insert(k.clone(), v.clone().into());
+    pub fn with_context(self, new_context: &IndexMap<String, Variable>) -> Self {
+        let mut context = self.context.lock().unwrap();
+        for (k, v) in new_context.iter() {
+            context.context.insert(k.clone(), v.clone().into());
         }
+        drop(context);
         self
     }
 
@@ -81,42 +100,103 @@ impl<'a> Jinja<'a> {
         &mut self.env
     }
 
-    /// Get a reference to the minijinja context.
-    pub fn context(&self) -> &BTreeMap<String, Value> {
-        &self.context
+    /// Extend context from an iterator over additional values.
+    pub fn extend_context<M, K, V>(&self, additional_values: M)
+    where
+        M: IntoIterator<Item = (K, V)>,
+        K: Into<String>,
+        V: AsRef<Value>,
+    {
+        let mut context = self.context.lock().unwrap();
+        for (k, v) in additional_values {
+            context.context.insert(k.into(), v.as_ref().clone());
+        }
     }
 
-    /// Get a mutable reference to the minijinja context.
-    ///
-    /// This is useful for adding custom variables to the context.
-    pub fn context_mut(&mut self) -> &mut BTreeMap<String, Value> {
-        &mut self.context
-    }
+    // /// Get a reference to the minijinja context.
+    // pub fn context(&self) -> &BTreeMap<String, Value> {
+    //     &self.context
+    // }
+
+    // /// Get a mutable reference to the minijinja context.
+    // ///
+    // /// This is useful for adding custom variables to the context.
+    // pub fn context_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    //     &mut self.context
+    // }
 
     /// Render a template with the current context.
     pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
-        self.env.render_str(template, &self.context)
+        println!(
+            "Rendering string: {} with context {:?}",
+            template, self.context
+        );
+        let result = self.env.render_str(template, &self.context_to_object())?;
+        // check if any undefined variables were used
+        let context = self.context.lock().unwrap();
+        if !context.undefined.is_empty() {
+            return Err(minijinja::Error::new(
+                minijinja::ErrorKind::UndefinedError,
+                format!(
+                    "Undefined variables used in template: {:?}",
+                    context.undefined
+                ),
+            ));
+        } else {
+            Ok(result)
+        }
+    }
+
+    /// Blabla
+    pub fn context_to_object(&self) -> Value {
+        Value::from_object(TrackingContext {
+            inner: self.context.clone(),
+        })
     }
 
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
         let expr = self.env.compile_expression(str)?;
-        expr.eval(self.context())
+        expr.eval(&self.context_to_object())
     }
 }
 
-impl Default for Jinja<'_> {
-    fn default() -> Self {
-        Self {
-            env: set_jinja(&SelectorConfig::default()),
-            context: BTreeMap::new(),
-        }
-    }
+#[derive(Debug)]
+struct TrackingContextInner {
+    pub context: BTreeMap<String, Value>,
+    pub undefined: HashSet<String>,
+}
+#[derive(Debug)]
+struct TrackingContext {
+    pub inner: Arc<Mutex<TrackingContextInner>>,
 }
 
-impl Extend<(String, Value)> for Jinja<'_> {
-    fn extend<T: IntoIterator<Item = (String, Value)>>(&mut self, iter: T) {
-        self.context.extend(iter);
+impl Object for TrackingContext {
+    fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
+        let name = name.as_str()?;
+        let mut inner = self.inner.lock().unwrap();
+        println!("Getting value for: {}", name);
+        inner
+            .context
+            .get(name)
+            .map(|v| v.clone().into())
+            .or_else(|| {
+                if !inner.undefined.contains(name) {
+                    inner.undefined.insert(name.to_string());
+                }
+                None
+            })
+    }
+
+    fn enumerate(self: &Arc<Self>) -> Enumerator {
+        let inner = self.inner.lock().unwrap();
+        let keys = inner
+            .context
+            .keys()
+            .map(|k| Value::from_safe_string(k.clone()))
+            .collect();
+
+        Enumerator::Values(keys)
     }
 }
 
@@ -384,7 +464,10 @@ lazy_static::lazy_static! {
         .unwrap();
 }
 
-fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
+fn set_jinja(
+    config: &SelectorConfig,
+    undefined_behavior: UndefinedBehavior,
+) -> minijinja::Environment<'static> {
     let SelectorConfig {
         target_platform,
         host_platform,
@@ -396,7 +479,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     } = config.clone();
 
     let mut env = Environment::empty();
-    env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    env.set_undefined_behavior(undefined_behavior);
     default_tests(&mut env);
     default_filters(&mut env);
 

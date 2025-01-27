@@ -3,6 +3,7 @@ mod interpreter;
 mod sandbox;
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
+use crate::recipe::variable::Variable;
 use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
 use interpreter::{
@@ -272,12 +273,8 @@ impl Script {
             .collect::<IndexMap<String, String>>();
 
         // Get the contents of the script.
-        for (k, v) in &env_vars {
-            jinja_config.as_mut().map(|jinja| {
-                jinja
-                    .context_mut()
-                    .insert(k.clone(), Value::from_safe_string(v.clone()))
-            });
+        if let Some(ref mut config) = jinja_config {
+            config.extend_context(env_vars.iter().map(|(k, v)| (k, Variable::from_string(v))));
         }
 
         let contents = self.resolve_content(recipe_dir, jinja_config, &valid_script_extensions)?;
