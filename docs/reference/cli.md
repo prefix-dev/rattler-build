@@ -105,7 +105,7 @@ Build a package from a recipe
 	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	Add a channel to search for dependencies in
 
@@ -267,7 +267,7 @@ These test files are written at "package creation time" and are part of the pack
 
 ##### **Options:**
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	Channels to use when testing
 
@@ -362,11 +362,9 @@ Upload a package
 ##### **Subcommands:**
 
 * `quetz` — Upload to a Quetz server. Authentication is used from the keychain / auth-file
-* `artifactory` — Upload to a Artifactory channel. Authentication is used from the keychain / auth-file
-* `prefix` — Upload to a prefix.dev server. Authentication is used from the keychain / auth-file
-* `anaconda` — Upload to a Anaconda.org server
-* `conda-forge` — Upload to conda forge
-
+* `artifactory` — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
+* `prefix` — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file
+* `anaconda` — Options for uploading to a Anaconda.org server
 
 ##### **Arguments:**
 
@@ -402,7 +400,7 @@ Upload a package
 
 Upload to a Quetz server. Authentication is used from the keychain / auth-file
 
-**Usage:** `rattler-build upload quetz [OPTIONS] --url <URL> --channel <CHANNEL>`
+**Usage:** `rattler-build upload quetz [OPTIONS] --url <URL> --channel <CHANNELS>`
 
 ##### **Options:**
 
@@ -411,7 +409,7 @@ Upload to a Quetz server. Authentication is used from the keychain / auth-file
 	The URL to your Quetz server
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The URL to your channel
 
@@ -428,7 +426,7 @@ Upload to a Quetz server. Authentication is used from the keychain / auth-file
 
 Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
 
-**Usage:** `rattler-build upload artifactory [OPTIONS] --url <URL> --channel <CHANNEL>`
+**Usage:** `rattler-build upload artifactory [OPTIONS] --url <URL> --channel <CHANNELS>`
 
 ##### **Options:**
 
@@ -437,7 +435,7 @@ Options for uploading to a Artifactory channel. Authentication is used from the 
 	The URL to your Artifactory server
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The URL to your channel
 
@@ -490,11 +488,10 @@ Options for uploading to a Anaconda.org server
 	The owner of the distribution (e.g. conda-forge or your username)
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The channel / label to upload the package to (e.g. main / rc)
 
-	- Default value: `main`
 
 - `-a`, `--api-key <API_KEY>`
 
@@ -505,7 +502,6 @@ Options for uploading to a Anaconda.org server
 
 	The URL to the Anaconda server
 
-	- Default value: `https://api.anaconda.org`
 
 - `-f`, `--force`
 
