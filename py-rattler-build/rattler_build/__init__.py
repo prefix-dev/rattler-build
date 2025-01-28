@@ -15,7 +15,7 @@ from typing import List, Union
 
 __all__ = [
     "rattler_build_version",
-    "build_recipe",
+    "build_recipes",
     "test_package",
     "upload_package_to_quetz",
     "upload_package_to_artifactory",
@@ -26,6 +26,7 @@ __all__ = [
 
 
 def rattler_build_version() -> str:
+    """Get the version of the rattler-build package"""
     return get_rattler_build_version_py()
 
 
@@ -52,6 +53,7 @@ def build_recipes(
     skip_existing: Union[str, None] = None,
     noarch_build_platform: Union[str, None] = None,
 ) -> None:
+    """Build packages from a list of recipes"""
     build_recipes_py(
         recipes,
         up_to,
@@ -84,6 +86,7 @@ def test_package(
     auth_file: Union[str, Path, None] = None,
     channel_priority: Union[str, None] = None,
 ) -> None:
+    """Run a test for a single package"""
     test_package_py(package_file, channel, compression_threads, auth_file, channel_priority)
 
 
@@ -94,6 +97,7 @@ def upload_package_to_quetz(
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
+    """Upload to a Quetz server. Authentication is used from the keychain / auth-file"""
     upload_package_to_quetz_py(package_files, url, channels, api_key, auth_file)
 
 
@@ -104,6 +108,7 @@ def upload_package_to_artifactory(
     token: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
+    """Upload to a Artifactory channel. Authentication is used from the keychain / auth-file"""
     upload_package_to_artifactory_py(package_files, url, channels, token, auth_file)
 
 
@@ -114,6 +119,7 @@ def upload_package_to_prefix(
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
+    """Upload to a prefix.dev server. Authentication is used from the keychain / auth-file"""
     upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file)
 
 
@@ -126,6 +132,7 @@ def upload_package_to_anaconda(
     force: bool = False,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
+    """Upload to a Anaconda.org server"""
     upload_package_to_anaconda_py(package_files, owner, channel, api_key, url, force, auth_file)
 
 
@@ -140,6 +147,7 @@ def upload_packages_to_conda_forge(
     provider: Union[str, None] = None,
     dry_run: bool = False,
 ) -> None:
+    """Upload to conda forge"""
     upload_packages_to_conda_forge_py(
         package_files,
         staging_token,

@@ -362,9 +362,11 @@ Upload a package
 ##### **Subcommands:**
 
 * `quetz` — Upload to a Quetz server. Authentication is used from the keychain / auth-file
-* `artifactory` — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
-* `prefix` — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file
-* `anaconda` — Options for uploading to a Anaconda.org server
+* `artifactory` — Upload to a Artifactory channel. Authentication is used from the keychain / auth-file
+* `prefix` — Upload to a prefix.dev server. Authentication is used from the keychain / auth-file
+* `anaconda` — Upload to a Anaconda.org server
+* `conda-forge` — Upload to conda forge
+
 
 ##### **Arguments:**
 
