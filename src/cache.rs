@@ -227,7 +227,7 @@ impl Output {
                 .into_diagnostic()?;
 
             let selector_config = self.build_configuration.selector_config();
-            let mut jinja = Jinja::new(selector_config.clone());
+            let jinja = Jinja::new(selector_config.clone());
             jinja.extend_context(&self.recipe.context);
 
             cache

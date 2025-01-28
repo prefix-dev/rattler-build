@@ -149,7 +149,7 @@ impl Recipe {
         jinja_opt: SelectorConfig,
     ) -> Result<Self, Vec<PartialParsingError>> {
         let experimental = jinja_opt.experimental;
-        let mut jinja = Jinja::new(jinja_opt.clone());
+        let jinja = Jinja::new(jinja_opt.clone());
 
         let root_node = root_node.as_mapping().ok_or_else(|| {
             vec![_partialerror!(
@@ -163,7 +163,7 @@ impl Recipe {
         let mut context = IndexMap::new();
 
         if let Some(context_map) = root_node.get("context") {
-            let mut strict_jinja = Jinja::new_strict(jinja_opt);
+            let strict_jinja = Jinja::new_strict(jinja_opt);
             let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
                     *context_map.span(),
@@ -180,10 +180,8 @@ impl Recipe {
                         help = "`context` values must always be scalars (strings)"
                     )]
                 })?;
-                println!("Val: {:?}", val);
                 let rendered: Option<ScalarNode> =
                     val.render(&strict_jinja, &format!("context.{}", k.as_str()))?;
-                println!("Val: {:?}", rendered);
                 if let Some(rendered) = rendered {
                     let variable = if let Some(value) = rendered.as_bool() {
                         Variable::from(value)
@@ -367,7 +365,6 @@ mod tests {
         };
 
         let win_recipe = Recipe::from_yaml(recipe, selector_config_win);
-        dbg!(&win_recipe);
         assert!(win_recipe.is_ok());
         insta::assert_debug_snapshot!("recipe_windows", win_recipe.unwrap());
     }

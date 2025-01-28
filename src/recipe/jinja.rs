@@ -3,13 +3,12 @@
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
-use serde::Serialize;
 use std::collections::HashSet;
 use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::{from_args, Enumerator, Kwargs, Object, ObjectExt};
+use minijinja::value::{from_args, Enumerator, Kwargs, Object};
 use minijinja::{Environment, UndefinedBehavior, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -127,21 +126,17 @@ impl<'a> Jinja<'a> {
 
     /// Render a template with the current context.
     pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
-        println!(
-            "Rendering string: {} with context {:?}",
-            template, self.context
-        );
-        let result = self.env.render_str(template, &self.context_to_object())?;
+        let result = self.env.render_str(template, self.context_to_object())?;
         // check if any undefined variables were used
         let context = self.context.lock().unwrap();
         if !context.undefined.is_empty() {
-            return Err(minijinja::Error::new(
+            Err(minijinja::Error::new(
                 minijinja::ErrorKind::UndefinedError,
                 format!(
                     "Undefined variables used in template: {:?}",
                     context.undefined
                 ),
-            ));
+            ))
         } else {
             Ok(result)
         }
@@ -157,7 +152,7 @@ impl<'a> Jinja<'a> {
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
         let expr = self.env.compile_expression(str)?;
-        expr.eval(&self.context_to_object())
+        expr.eval(self.context_to_object())
     }
 }
 
@@ -175,17 +170,12 @@ impl Object for TrackingContext {
     fn get_value(self: &Arc<Self>, name: &Value) -> Option<Value> {
         let name = name.as_str()?;
         let mut inner = self.inner.lock().unwrap();
-        println!("Getting value for: {}", name);
-        inner
-            .context
-            .get(name)
-            .map(|v| v.clone().into())
-            .or_else(|| {
-                if !inner.undefined.contains(name) {
-                    inner.undefined.insert(name.to_string());
-                }
-                None
-            })
+        inner.context.get(name).cloned().or_else(|| {
+            if !inner.undefined.contains(name) {
+                inner.undefined.insert(name.to_string());
+            }
+            None
+        })
     }
 
     fn enumerate(self: &Arc<Self>) -> Enumerator {
@@ -1187,11 +1177,9 @@ mod tests {
     fn test_split() {
         let options = SelectorConfig::default();
 
-        let mut jinja = Jinja::new(options);
-        let mut split_test = |s: &str, sep: Option<&str>| {
-            jinja
-                .context_mut()
-                .insert("var".to_string(), Value::from_safe_string(s.to_string()));
+        let jinja = Jinja::new(options);
+        let split_test = |s: &str, sep: Option<&str>| {
+            jinja.extend_context([("var".to_string(), Variable::from_string(s))]);
 
             let func = if let Some(sep) = sep {
                 format!("split('{}')", sep)
@@ -1209,10 +1197,7 @@ mod tests {
         assert_eq!(split_test("foobar", None), "[\"foobar\"]");
         assert_eq!(split_test("1.2.3", Some(".")), "[\"1\", \"2\", \"3\"]");
 
-        jinja.context_mut().insert(
-            "var".to_string(),
-            Value::from_safe_string("1.2.3".to_string()),
-        );
+        jinja.extend_context([("var".to_string(), Variable::from_string("1.2.3"))]);
 
         assert_eq!(
             jinja.eval("(var | split('.'))[2]").unwrap().to_string(),

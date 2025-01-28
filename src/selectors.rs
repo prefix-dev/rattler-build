@@ -64,7 +64,6 @@ impl SelectorConfig {
                 );
             }
         }
-        dbg!(&context);
         context.insert(
             "unix".to_string(),
             Value::from(self.host_platform.is_unix()),

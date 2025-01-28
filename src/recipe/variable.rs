@@ -78,7 +78,7 @@ impl TryConvertNode<Variable> for RenderedScalarNode {
         } else if let Some(value) = self.as_i64() {
             Variable::from(value)
         } else {
-            Variable::from_string(&self)
+            Variable::from_string(self)
         };
 
         Ok(variable)

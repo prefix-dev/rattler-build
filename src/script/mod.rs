@@ -10,7 +10,6 @@ use interpreter::{
     BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
 };
 use itertools::Itertools;
-use minijinja::Value;
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::ffi::OsStr;
