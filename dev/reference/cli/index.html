@@ -48,6 +48,8 @@
       
     
     
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
       <link rel="stylesheet" href="../../stylesheets/extra.css">
     
     <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
@@ -1309,6 +1311,27 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_bindings/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python Bindings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1540,7 +1563,7 @@
 <p>The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)</p>
 </li>
 <li>
-<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
 <p>Add a channel to search for dependencies in</p>
 </li>
 <li>
@@ -1679,7 +1702,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <h5 id="options_2"><strong>Options:</strong><a class="headerlink" href="#options_2" title="Permanent link">#</a></h5>
 <ul>
 <li>
-<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
 <p>Channels to use when testing</p>
 </li>
 <li>
@@ -1787,7 +1810,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <h4 id="quetz"><code>quetz</code><a class="headerlink" href="#quetz" title="Permanent link">#</a></h4>
 <p>Upload to a Quetz server. Authentication is used from the keychain / auth-file</p>
-<p><strong>Usage:</strong> <code>rattler-build upload quetz [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNEL&gt;</code></p>
+<p><strong>Usage:</strong> <code>rattler-build upload quetz [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNELS&gt;</code></p>
 <h5 id="options_5"><strong>Options:</strong><a class="headerlink" href="#options_5" title="Permanent link">#</a></h5>
 <ul>
 <li>
@@ -1795,7 +1818,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The URL to your Quetz server</p>
 </li>
 <li>
-<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
 <p>The URL to your channel</p>
 </li>
 <li>
@@ -1805,7 +1828,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 </ul>
 <h4 id="artifactory"><code>artifactory</code><a class="headerlink" href="#artifactory" title="Permanent link">#</a></h4>
 <p>Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file</p>
-<p><strong>Usage:</strong> <code>rattler-build upload artifactory [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNEL&gt;</code></p>
+<p><strong>Usage:</strong> <code>rattler-build upload artifactory [OPTIONS] --url &lt;URL&gt; --channel &lt;CHANNELS&gt;</code></p>
 <h5 id="options_6"><strong>Options:</strong><a class="headerlink" href="#options_6" title="Permanent link">#</a></h5>
 <ul>
 <li>
@@ -1813,7 +1836,7 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The URL to your Artifactory server</p>
 </li>
 <li>
-<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
 <p>The URL to your channel</p>
 </li>
 <li>
@@ -1852,11 +1875,8 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The owner of the distribution (e.g. conda-forge or your username)</p>
 </li>
 <li>
-<p><code>-c</code>, <code>--channel &lt;CHANNEL&gt;</code></p>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
 <p>The channel / label to upload the package to (e.g. main / rc)</p>
-<ul>
-<li>Default value: <code>main</code></li>
-</ul>
 </li>
 <li>
 <p><code>-a</code>, <code>--api-key &lt;API_KEY&gt;</code></p>
@@ -1865,9 +1885,6 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>-u</code>, <code>--url &lt;URL&gt;</code></p>
 <p>The URL to the Anaconda server</p>
-<ul>
-<li>Default value: <code>https://api.anaconda.org</code></li>
-</ul>
 </li>
 <li>
 <p><code>-f</code>, <code>--force</code></p>
