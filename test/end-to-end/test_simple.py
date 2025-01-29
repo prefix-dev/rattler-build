@@ -1249,4 +1249,7 @@ def test_jinja_types(
     print(rendered)
     # load as json
     assert snapshot_json == rendered[0]["recipe"]["context"]
-    assert snapshot_json == rendered[0]["build_configuration"]["variant"]
+    variant = rendered[0]["build_configuration"]["variant"]
+    # remove target_platform from the variant
+    variant.pop("target_platform")
+    assert snapshot_json == variant

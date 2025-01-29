@@ -1,5 +1,4 @@
 {
-  "target_platform": "osx-arm64",
   "xboolean": true,
   "xfloat": "1.23",
   "xinteger": 5,
