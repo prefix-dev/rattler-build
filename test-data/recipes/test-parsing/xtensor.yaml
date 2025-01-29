@@ -3,7 +3,6 @@
 context:
   name: xtensor
   version: 0.24.6
-  vc: "14"
 
 package:
   name: ${{ name|lower }}
@@ -14,12 +13,12 @@ source:
   sha256: f87259b51aabafdd1183947747edfff4cff75d55375334f2e81cee6dc68ef655
 build:
   number: 0
-  skip: win and match(vc, "<14")
+  skip: win and vc14
   script:
     - if: win
       then: |
         cmake -G "NMake Makefiles" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%
-        nmakecar
+        nmake
         nmake install
       else: |
         cmake ${CMAKE_ARGS} -DBUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX=$PREFIX $SRC_DIR -DCMAKE_INSTALL_LIBDIR=lib

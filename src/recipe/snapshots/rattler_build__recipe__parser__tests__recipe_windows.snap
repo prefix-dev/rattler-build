@@ -5,15 +5,8 @@ expression: win_recipe.unwrap()
 Recipe {
     schema_version: 1,
     context: {
-        "name": Variable(
-            "xtensor",
-        ),
-        "version": Variable(
-            "0.24.6",
-        ),
-        "vc": Variable(
-            "14",
-        ),
+        "name": "xtensor",
+        "version": "0.24.6",
     },
     package: Package {
         name: PackageName {
@@ -100,12 +93,12 @@ Recipe {
         skip: Skip(
             [
                 (
-                    "win and match(vc, \"<14\")",
+                    "win and vc14",
                     Span {
                         start: Some(
                             Marker {
                                 source: 0,
-                                line: 17,
+                                line: 16,
                                 column: 9,
                             },
                         ),
@@ -122,7 +115,7 @@ Recipe {
             env: {},
             secrets: [],
             content: CommandOrPath(
-                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmakecar\nnmake install\n",
+                "cmake -G \"NMake Makefiles\" -D BUILD_TESTS=OFF -D CMAKE_INSTALL_PREFIX=%LIBRARY_PREFIX% %SRC_DIR%\nnmake\nnmake install\n",
             ),
             cwd: None,
         },
