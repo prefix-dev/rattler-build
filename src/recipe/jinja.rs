@@ -1189,19 +1189,19 @@ mod tests {
 
     #[test]
     fn test_default_compiler() {
-        // let platform = Platform::Linux64;
-        // assert_eq!("gxx", default_compiler(platform, "cxx").unwrap());
-        // assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
-        // assert_eq!("gcc", default_compiler(platform, "c").unwrap());
+        let platform = Platform::Linux64;
+        assert_eq!("gxx", default_compiler(platform, "cxx").unwrap().to_string());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap().to_string());
+        assert_eq!("gcc", default_compiler(platform, "c").unwrap().to_string());
 
-        // let platform = Platform::Linux32;
-        // assert_eq!("gxx", default_compiler(platform, "cxx").unwrap());
-        // assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
-        // assert_eq!("gcc", default_compiler(platform, "c").unwrap());
+        let platform = Platform::Linux32;
+        assert_eq!("gxx", default_compiler(platform, "cxx").unwrap().to_string());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap().to_string());
+        assert_eq!("gcc", default_compiler(platform, "c").unwrap().to_string());
 
-        // let platform = Platform::Win64;
-        // assert_eq!("vs2017", default_compiler(platform, "cxx").unwrap());
-        // assert_eq!("vs2017", default_compiler(platform, "c").unwrap());
-        // assert_eq!("cuda", default_compiler(platform, "cuda").unwrap());
+        let platform = Platform::Win64;
+        assert_eq!("vs2017", default_compiler(platform, "cxx").unwrap().to_string());
+        assert_eq!("vs2017", default_compiler(platform, "c").unwrap().to_string());
+        assert_eq!("cuda", default_compiler(platform, "cuda").unwrap().to_string());
     }
 }
