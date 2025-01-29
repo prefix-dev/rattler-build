@@ -1,7 +1,7 @@
 github_url = "https://github.com/prefix-dev/rattler-build"
 
 [version]
-current = "0.35.7"
+current = "0.35.8"
 
 # Example of a semver regexp.
 # Make sure this matches current_version before
