@@ -2427,8 +2427,7 @@ dependencies = [
 [[package]]
 name = "minijinja"
 version = "2.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cff7b8df5e85e30b87c2b0b3f58ba3a87b68e133738bf512a7713769326dbca9"
+source = "git+https://github.com/mitsuhiko/minijinja?branch=feature/mostly-undefined#384262513d25424a1a3cd0b72ca6b3006e2822db"
 dependencies = [
  "aho-corasick",
  "serde",
