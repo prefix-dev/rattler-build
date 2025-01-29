@@ -1,0 +1,23 @@
+context:
+  integer: ${{ xinteger }}
+  float: ${{ xfloat }}
+  string: ${{ xstring }}
+  boolean: ${{ xboolean }}
+  cinteger: 5
+  cfloat: 1.23
+  cstring: "blah"
+  cboolean: true
+  cquoted: "5"
+  is_integer: ${{ xinteger is integer }}
+  is_float: ${{ xfloat is float }}
+  is_string: ${{ xstring is string }}
+  is_boolean: ${{ xboolean is boolean }}
+  is_cinteger: ${{ cinteger is integer }}
+  is_cfloat: ${{ cfloat is float }}
+  is_cstring: ${{ cstring is string }}
+  is_cboolean: ${{ cboolean is boolean }}
+  is_cquoted: ${{ cquoted is string }}
+
+package:
+  name: testtypes
+  version: "1.2.3"
