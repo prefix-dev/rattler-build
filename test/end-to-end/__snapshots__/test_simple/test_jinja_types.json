@@ -1,93 +1,20 @@
-[
-  {
-    "build_configuration": {
-      "build_platform": {
-        "platform": "osx-arm64",
-        "virtual_packages": [
-          "__unix=0=0",
-          "__osx=15.2=0",
-          "__archspec=1=m2"
-        ]
-      },
-      "channel_priority": "strict",
-      "channels": [
-        "https://conda.anaconda.org/conda-forge"
-      ],
-      "directories": {
-        "build_dir": "/private/var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/pytest-of-wolfv/pytest-43/test_jinja_types0/bld/rattler-build_testtypes_1738085378",
-        "build_prefix": "/private/var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/pytest-of-wolfv/pytest-43/test_jinja_types0/bld/rattler-build_testtypes_1738085378/build_env",
-        "host_prefix": "/private/var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/pytest-of-wolfv/pytest-43/test_jinja_types0/bld/rattler-build_testtypes_1738085378/host_env_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placehold_placeh",
-        "work_dir": "/private/var/folders/ls/nd2_c1qn1tz8c8sccxmg83m00000gn/T/pytest-of-wolfv/pytest-43/test_jinja_types0/bld/rattler-build_testtypes_1738085378/work"
-      },
-      "hash": {
-        "hash": "c1f54e9"
-      },
-      "host_platform": {
-        "platform": "osx-arm64",
-        "virtual_packages": [
-          "__unix=0=0",
-          "__osx=15.2=0",
-          "__archspec=1=m2"
-        ]
-      },
-      "packaging_settings": {
-        "archive_type": "tar_bz2",
-        "compression_level": 9
-      },
-      "solve_strategy": "highest",
-      "subpackages": {
-        "testtypes": {
-          "build_string": "hc1f54e9_0",
-          "name": "testtypes",
-          "version": "1.2.3"
-        }
-      },
-      "target_platform": "osx-arm64",
-      "timestamp": "2025-01-28T17:29:38.324517Z",
-      "variant": {
-        "target_platform": "osx-arm64",
-        "xboolean": true,
-        "xfloat": "1.23",
-        "xinteger": 5,
-        "xstring": "blah"
-      }
-    },
-    "finalized_dependencies": null,
-    "finalized_sources": null,
-    "recipe": {
-      "build": {
-        "number": 0,
-        "string": "hc1f54e9_0"
-      },
-      "context": {
-        "boolean": true,
-        "cboolean": true,
-        "cfloat": "1.23",
-        "cinteger": 5,
-        "cquoted": "5",
-        "cstring": "blah",
-        "float": "1.23",
-        "integer": 5,
-        "is_boolean": true,
-        "is_cboolean": true,
-        "is_cfloat": false,
-        "is_cinteger": true,
-        "is_cquoted": true,
-        "is_cstring": true,
-        "is_float": false,
-        "is_integer": true,
-        "is_string": true,
-        "string": "blah"
-      },
-      "package": {
-        "name": "testtypes",
-        "version": "1.2.3"
-      },
-      "requirements": {},
-      "schema_version": 1
-    },
-    "system_tools": {
-      "rattler-build": "0.35.6"
-    }
-  }
-]
+{
+  "boolean": true,
+  "cboolean": true,
+  "cfloat": "1.23",
+  "cinteger": 5,
+  "cquoted": "5",
+  "cstring": "blah",
+  "float": "1.23",
+  "integer": 5,
+  "is_boolean": true,
+  "is_cboolean": true,
+  "is_cfloat": false,
+  "is_cinteger": true,
+  "is_cquoted": true,
+  "is_cstring": true,
+  "is_float": false,
+  "is_integer": true,
+  "is_string": true,
+  "string": "blah"
+}
