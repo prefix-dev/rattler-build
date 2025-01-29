@@ -293,7 +293,7 @@ impl ResolvedDependencies {
         transient.sort_by(|(a, _), (b, _)| a.package_record.name.cmp(&b.package_record.name));
 
         for (record, dep_info) in &explicit {
-            table.add_row(vec![
+            table.add_row([
                 record.package_record.name.as_normalized().to_string(),
                 dep_info
                     .expect("partition contains only values with Some")
@@ -309,7 +309,7 @@ impl ResolvedDependencies {
             ]);
         }
         for (record, _) in &transient {
-            table.add_row(vec![
+            table.add_row([
                 record.package_record.name.as_normalized().to_string(),
                 "".to_string(),
                 record.package_record.version.to_string(),

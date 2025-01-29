@@ -2,7 +2,7 @@
 use crate::_partialerror;
 use minijinja::Value;
 use serde::{Deserialize, Serialize};
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use super::{
     custom_yaml::{HasSpan, RenderedNode, RenderedScalarNode, TryConvertNode},
@@ -11,7 +11,7 @@ use super::{
 
 /// This represents a variable in a recipe. It is a wrapper around a `minijinja::Value`,
 /// but more constrained (it can only be a string, a number, a boolean, or a list of these types).
-#[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Variable(Value);
 
 impl From<Variable> for Value {
@@ -59,11 +59,16 @@ impl Variable {
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // quote if it's a string
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Debug for Variable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(s) = self.0.as_str() {
             write!(f, "\"{}\"", s)
         } else {
-            write!(f, "{}", self.0)
+            write!(f, "{:?}", self.0)
         }
     }
 }

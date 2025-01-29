@@ -688,10 +688,10 @@ impl Output {
         writeln!(f, "Variant configuration (hash: {}):", self.build_string())?;
         let mut table = template();
         if table_format != comfy_table::presets::UTF8_FULL {
-            table.set_header(vec!["Key", "Value"]);
+            table.set_header(["Key", "Value"]);
         }
         self.build_configuration.variant.iter().for_each(|(k, v)| {
-            table.add_row(vec![&k.normalize(), &v.to_string()]);
+            table.add_row([k.normalize(), format!("{:?}", v)]);
         });
         writeln!(f, "{}\n", table)?;
 
