@@ -9,7 +9,9 @@ use std::{collections::BTreeMap, str::FromStr};
 
 use minijinja::value::{from_args, Kwargs, Object};
 use minijinja::{Environment, Value};
-use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
+use rattler_conda_types::{
+    Arch, NamelessMatchSpec, PackageName, ParseStrictness, Platform, Version, VersionSpec,
+};
 
 use crate::normalized_key::NormalizedKey;
 use crate::render::pin::PinArgs;
@@ -396,7 +398,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     } = config.clone();
 
     let mut env = Environment::empty();
-    // env.set_undefined_behavior(minijinja::UndefinedBehavior::Strict);
+    env.set_undefined_behavior(minijinja::UndefinedBehavior::MostlyStrict);
     default_tests(&mut env);
     default_filters(&mut env);
 
@@ -419,8 +421,22 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function("match", |a: &Value, spec: &str| {
         if let Some(variant) = a.as_str() {
             // check if version matches spec
-            let (version, _) = variant.split_once(' ').unwrap_or((variant, ""));
+            let nameless_matchspec = NamelessMatchSpec::from_str(variant, ParseStrictness::Lenient)
+                .map_err(|e| {
+                    minijinja::Error::new(
+                        minijinja::ErrorKind::SyntaxError,
+                        format!("Bad syntax for `variant`: {}", e),
+                    )
+                })?;
+
+            let Some(version) = nameless_matchspec.version else {
+                return Err(minijinja::Error::new(
+                    minijinja::ErrorKind::InvalidOperation,
+                    "Failed to parse version from variant",
+                ));
+            };
             // remove trailing .* or *
+            let version = version.to_string();
             let version = version.trim_end_matches(".*").trim_end_matches('*');
 
             let version = Version::from_str(version).map_err(|e| {
