@@ -83,7 +83,8 @@ pub fn python_vars(output: &Output) -> HashMap<String, Option<String>> {
     }
 
     if let Some(npy_version) = output.variant().get(&"numpy".into()) {
-        let npy_ver: Vec<_> = npy_version.split('.').take(2).collect();
+        let npy_ver = npy_version.to_string();
+        let npy_ver: Vec<_> = npy_ver.split('.').take(2).collect();
         let npy_ver = npy_ver.join(".");
         insert!(result, "NPY_VER", npy_ver);
         insert!(result, "NPY_DISTUTILS_APPEND_FLAGS", "1");

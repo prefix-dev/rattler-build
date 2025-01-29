@@ -94,7 +94,7 @@ class RattlerBuild:
         if with_solve:
             args += ["--with-solve"]
         output = self(*args, "--render-only", **kwargs)
-
+        print(output)
         return json.loads(output)
 
 

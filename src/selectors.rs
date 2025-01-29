@@ -5,11 +5,15 @@ use std::collections::BTreeMap;
 use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
-    recipe::jinja::{Env, Git},
+    recipe::{
+        jinja::{Env, Git},
+        variable::Variable,
+    },
 };
 
 use minijinja::value::Value;
 use rattler_conda_types::Platform;
+use strum::IntoEnumIterator as _;
 
 /// The selector config is used to render the recipe.
 #[derive(Clone, Debug)]
@@ -23,7 +27,7 @@ pub struct SelectorConfig {
     /// The hash, if available
     pub hash: Option<HashInfo>,
     /// The variant config
-    pub variant: BTreeMap<NormalizedKey, String>,
+    pub variant: BTreeMap<NormalizedKey, Variable>,
     /// Enable experimental features
     pub experimental: bool,
     /// Allow undefined variables
@@ -45,17 +49,21 @@ impl SelectorConfig {
             Value::from_safe_string(self.host_platform.to_string()),
         );
 
-        if let Some(platform) = self.host_platform.only_platform() {
-            context.insert(
-                platform.to_string(),
-                Value::from_safe_string(platform.to_string()),
-            );
-        }
+        for platform in Platform::iter() {
+            if let Some(only_platform) = platform.only_platform() {
+                context.insert(
+                    only_platform.to_string(),
+                    Value::from(self.host_platform.only_platform() == Some(only_platform)),
+                );
+            }
 
-        if let Some(arch) = self.target_platform.arch() {
-            context.insert(arch.to_string(), Value::from(true));
+            if let Some(arch) = platform.arch() {
+                context.insert(
+                    arch.to_string(),
+                    Value::from(self.host_platform.arch() == Some(arch)),
+                );
+            }
         }
-
         context.insert(
             "unix".to_string(),
             Value::from(self.host_platform.is_unix()),
@@ -80,7 +88,7 @@ impl SelectorConfig {
         );
 
         for (key, v) in self.variant {
-            context.insert(key.normalize(), Value::from_safe_string(v));
+            context.insert(key.normalize(), v.clone().into());
         }
 
         context
@@ -89,7 +97,7 @@ impl SelectorConfig {
     /// Create a new selector config from an existing one, replacing the variant
     pub fn with_variant(
         &self,
-        variant: BTreeMap<NormalizedKey, String>,
+        variant: BTreeMap<NormalizedKey, Variable>,
         target_platform: Platform,
     ) -> Self {
         Self {

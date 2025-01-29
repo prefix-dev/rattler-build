@@ -1,0 +1,8 @@
+xfloat:
+  - 1.23
+xinteger:
+  - 5
+xstring:
+  - "blah"
+xboolean:
+  - true

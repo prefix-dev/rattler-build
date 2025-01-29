@@ -42,7 +42,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
             package.channel.as_deref().unwrap_or_default().to_string()
         };
 
-        table.add_row(vec![
+        table.add_row([
             package.package_record.name.as_normalized().to_string(),
             package.package_record.version.to_string(),
             package.package_record.build.clone(),
