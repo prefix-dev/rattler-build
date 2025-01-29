@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.35.8"
+version = "0.35.9"
 edition = "2021"
 license = "BSD-3-Clause"
 publish = false
@@ -17,7 +17,7 @@ rustls-tls = ["rattler-build/rustls-tls"]
 [dependencies]
 rattler-build = { path = "../" }
 pyo3 = { version = "0.23.4", features = [
-  "abi3-py39",
+  "abi3-py38",
   "extension-module",
   "multiple-pymethods",
 ] }
