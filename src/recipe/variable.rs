@@ -50,6 +50,12 @@ impl From<&str> for Variable {
     }
 }
 
+impl From<Vec<Variable>> for Variable {
+    fn from(value: Vec<Variable>) -> Self {
+        Variable(Value::from_serialize(value))
+    }
+}
+
 impl Variable {
     /// Create a variable from a string
     pub fn from_string(value: &str) -> Self {

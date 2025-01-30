@@ -2,6 +2,7 @@
 
 use crate::source_code::SourceCode;
 use miette::{Diagnostic, SourceOffset, SourceSpan};
+use minijinja::value::ValueKind;
 use std::fmt::Debug;
 use std::{borrow::Cow, convert::Infallible, fmt, str::ParseBoolError};
 use thiserror::Error;
@@ -163,6 +164,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::glob_parsing))]
     RegexParsing(#[from] regex::Error),
 
+    /// Error when a sequence mixes different types.
+    #[diagnostic(code(error::sequence_mixed_types))]
+    SequenceMixedTypes((ValueKind, ValueKind)),
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -276,6 +281,10 @@ impl fmt::Display for ErrorKind {
             }
             ErrorKind::GlobParsing(err) => write!(f, "failed to parse glob: {}", err),
             ErrorKind::RegexParsing(err) => write!(f, "failed to parse regex: {}", err),
+            ErrorKind::SequenceMixedTypes((t1, t2)) => write!(
+                f,
+                "mixed types in sequence: subsequent member is `{t1}` in a list of `{t2}`."
+            ),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
             ErrorKind::ExperimentalOnly(s) => write!(f, "experimental only: `{}`.", s),
         }

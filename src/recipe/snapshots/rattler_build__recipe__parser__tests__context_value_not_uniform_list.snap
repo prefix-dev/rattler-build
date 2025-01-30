@@ -1,0 +1,17 @@
+---
+source: src/recipe/parser.rs
+expression: err
+---
+  × Failed to parse recipe
+
+Error: 
+  × mixed types in sequence: subsequent member is `number` in a list of
+  │ `string`.
+   ╭─[6:15]
+ 5 │             - bar
+ 6 │             - 3
+   ·               ┬
+   ·               ╰── here
+ 7 │             - 4
+   ╰────
+  help: sequence `context` must have all members of the same scalar type
