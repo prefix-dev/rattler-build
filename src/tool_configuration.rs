@@ -97,13 +97,13 @@ pub fn get_auth_store(
 ) -> Result<AuthenticationStorage, FileStorageError> {
     match auth_file {
         Some(auth_file) => {
-            let mut store = AuthenticationStorage::new();
+            let mut store = AuthenticationStorage::empty();
             store.add_backend(Arc::from(
-                authentication_storage::backends::file::FileStorage::new(auth_file)?,
+                authentication_storage::backends::file::FileStorage::from_path(auth_file)?,
             ));
             Ok(store)
         }
-        None => Ok(rattler_networking::AuthenticationStorage::default()),
+        None => Ok(rattler_networking::AuthenticationStorage::from_env_and_defaults()?),
     }
 }
 
@@ -126,7 +126,9 @@ pub fn reqwest_client_from_auth_storage(
     .with(RetryTransientMiddleware::new_with_policy(
         ExponentialBackoff::builder().build_with_max_retries(3),
     ))
-    .with_arc(Arc::new(AuthenticationMiddleware::new(auth_storage)))
+    .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+        auth_storage,
+    )))
     .build())
 }
 
