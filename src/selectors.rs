@@ -76,6 +76,8 @@ impl SelectorConfig {
 
         if let Some(hash) = self.hash {
             context.insert("hash".to_string(), Value::from_safe_string(hash.hash));
+        } else {
+            context.insert("hash".to_string(), Value::from_safe_string("hPLACEHOLDER".to_string()));
         }
 
         context.insert("env".to_string(), Value::from_object(Env));

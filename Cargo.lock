@@ -2424,7 +2424,7 @@ dependencies = [
 [[package]]
 name = "minijinja"
 version = "2.7.0"
-source = "git+https://github.com/mitsuhiko/minijinja?branch=feature/mostly-undefined#384262513d25424a1a3cd0b72ca6b3006e2822db"
+source = "git+https://github.com/mitsuhiko/minijinja?branch=main#5a368426d864453099c318bf36d74385944ad96a"
 dependencies = [
  "aho-corasick",
  "serde",
