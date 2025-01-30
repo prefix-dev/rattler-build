@@ -26,6 +26,8 @@ fn print_as_table(packages: &[RepoDataRecord]) {
         "Package", "Version", "Build", "Channel", "Size",
         // "License",
     ]);
+    let column = table.column_mut(4).expect("This should be column five");
+    column.set_cell_alignment(comfy_table::CellAlignment::Right);
 
     for package in packages
         .iter()
