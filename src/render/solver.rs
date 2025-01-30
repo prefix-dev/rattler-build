@@ -111,14 +111,14 @@ pub async fn solve_environment(
     // Next, use a solver to solve this specific problem. This provides us with all
     // the operations we need to apply to our environment to bring it up to
     // date.
-    let required_packages = tool_configuration
+    let solver_result = tool_configuration
         .fancy_log_handler
         .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
     // Print the result as a table
-    print_as_table(&required_packages);
+    print_as_table(&solver_result.records);
 
-    Ok(required_packages)
+    Ok(solver_result.records)
 }
 
 #[allow(clippy::too_many_arguments)]
