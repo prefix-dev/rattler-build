@@ -70,6 +70,7 @@ use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
+use source_code::Source;
 use system_tools::SystemTools;
 use tool_configuration::{Configuration, TestStrategy};
 use variant_config::VariantConfig;
@@ -158,9 +159,6 @@ pub async fn get_build_output(
         output_dir = canonicalize(&output_dir).into_diagnostic()?;
     }
 
-    let recipe_text = fs::read_to_string(recipe_path).into_diagnostic()?;
-    let recipe_source = Arc::<str>::from(recipe_text.as_str());
-
     if build_data.target_platform == Platform::NoArch
         || build_data.build_platform == Platform::NoArch
     {
@@ -207,7 +205,9 @@ pub async fn get_build_output(
     let enter = span.enter();
 
     // First find all outputs from the recipe
-    let outputs = find_outputs_from_src(recipe_source.clone())?;
+    println!("Finding outputs from recipe <NAMED SOURCE!>");
+    let named_source = Source::from_path(recipe_path).into_diagnostic()?;
+    let outputs = find_outputs_from_src(named_source.clone())?;
 
     // Check if there is a `variants.yaml` or `conda_build_config.yaml` file next to
     // the recipe that we should potentially use.
@@ -243,7 +243,7 @@ pub async fn get_build_output(
     let variant_config = VariantConfig::from_files(&variant_configs, &selector_config)?;
 
     let outputs_and_variants =
-        variant_config.find_variants(&outputs, recipe_source, &selector_config)?;
+        variant_config.find_variants(&outputs, named_source, &selector_config)?;
 
     tracing::info!("Found {} variants\n", outputs_and_variants.len());
     for discovered_output in &outputs_and_variants {
