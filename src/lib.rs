@@ -205,7 +205,6 @@ pub async fn get_build_output(
     let enter = span.enter();
 
     // First find all outputs from the recipe
-    println!("Finding outputs from recipe <NAMED SOURCE!>");
     let named_source = Source::from_path(recipe_path).into_diagnostic()?;
     let outputs = find_outputs_from_src(named_source.clone())?;
 
