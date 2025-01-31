@@ -154,7 +154,6 @@ plugins:
           options:
             separate_signature: true
             show_source: false
-            show_signature_annotations: true
   - mike:
       # These fields are all optional; the defaults are as below...
       # alias_type: symlink

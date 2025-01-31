@@ -1,8 +1,6 @@
 # Python bindings
 
 These are the API docs for the `rattler_build` Python bindings.
-Every function corresponds to a CLI command.
-For a description of its parameters and behavior we therefore refer to the [CLI reference](./cli.md).
 
 ::: rattler_build
     options:

@@ -53,7 +53,36 @@ def build_recipes(
     skip_existing: Union[str, None] = None,
     noarch_build_platform: Union[str, None] = None,
 ) -> None:
-    """Build packages from a list of recipes"""
+    """
+    Build packages from a list of recipes.
+
+    Args:
+        recipes: The recipe files or directories containing `recipe.yaml`.
+        up_to: Build recipes up to the specified package.
+        build_platform: The build platform to use for the build (e.g. for building with emulation, or rendering).
+        target_platform: The target platform for the build.
+        host_platform: The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch).
+        channel: Add a channel to search for dependencies in.
+        variant_config: Variant configuration files for the build.
+        ignore_recipe_variants: Do not read the `variants.yaml` file next to a recipe.
+        render_only: Render the recipe files without executing the build.
+        with_solve: Render the recipe files with solving dependencies.
+        keep_build: Keep intermediate build artifacts after the build.
+        no_build_id: Don't use build id(timestamp) when creating build directory name.
+        package_format: The package format to use for the build. Can be one of `tar-bz2` or `conda`. You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
+        compression_threads: The number of threads to use for compression (only relevant when also using `--package-format conda`).
+        no_include_recipe: Don't store the recipe in the final package.
+        test: The strategy to use for running tests.
+        output_dir: The directory to store the output.
+        auth_file: The authentication file.
+        channel_priority: The channel priority.
+        skip_existing: Whether to skip packages that already exist in any channel. If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing`. If set to `all`, skip packages that already exist in any channel.
+        noarch_build_platform: Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms.
+
+    Returns:
+        None
+    """
+
     build_recipes_py(
         recipes,
         up_to,
@@ -86,7 +115,19 @@ def test_package(
     auth_file: Union[str, Path, None] = None,
     channel_priority: Union[str, None] = None,
 ) -> None:
-    """Run a test for a single package"""
+    """
+    Run a test for a single package.
+
+    Args:
+        package_file: The package file to test.
+        channel: Channels to use when testing.
+        compression_threads: The number of threads to use for compression.
+        auth_file: The authentication file.
+        channel_priority: The channel priority.
+
+    Returns:
+        None
+    """
     test_package_py(package_file, channel, compression_threads, auth_file, channel_priority)
 
 
@@ -97,7 +138,19 @@ def upload_package_to_quetz(
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
-    """Upload to a Quetz server. Authentication is used from the keychain / auth-file"""
+    """
+    Upload to a Quetz server. Authentication is used from the keychain / auth-file.
+
+    Args:
+        package_files: The package files to upload.
+        url: The URL of the Quetz server.
+        channels: The channels to upload the package to.
+        api_key: The API key for authentication.
+        auth_file: The authentication file.
+
+    Returns:
+        None
+    """
     upload_package_to_quetz_py(package_files, url, channels, api_key, auth_file)
 
 
@@ -108,7 +161,19 @@ def upload_package_to_artifactory(
     token: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
-    """Upload to a Artifactory channel. Authentication is used from the keychain / auth-file"""
+    """
+    Upload to an Artifactory channel. Authentication is used from the keychain / auth-file.
+
+    Args:
+        package_files: The package files to upload.
+        url: The URL to your Artifactory server.
+        channels: The URL to your channel.
+        token: Your Artifactory token.
+        auth_file: The authentication file.
+
+    Returns:
+        None
+    """
     upload_package_to_artifactory_py(package_files, url, channels, token, auth_file)
 
 
@@ -119,7 +184,19 @@ def upload_package_to_prefix(
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
-    """Upload to a prefix.dev server. Authentication is used from the keychain / auth-file"""
+    """
+    Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.
+
+    Args:
+        package_files: The package files to upload.
+        url: The URL to the prefix.dev server (only necessary for self-hosted instances).
+        channels: The channel to upload the package to.
+        api_key: The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file.
+        auth_file: The authentication file.
+
+    Returns:
+        None
+    """
     upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file)
 
 
@@ -132,7 +209,21 @@ def upload_package_to_anaconda(
     force: bool = False,
     auth_file: Union[str, Path, None] = None,
 ) -> None:
-    """Upload to a Anaconda.org server"""
+    """
+    Upload to an Anaconda.org server.
+
+    Args:
+        package_files: The package files to upload.
+        owner: The owner of the Anaconda.org account.
+        channel: The channels to upload the package to.
+        api_key: The Anaconda.org API key.
+        url: The URL to the Anaconda.org server.
+        force: Whether to force the upload.
+        auth_file: The authentication file.
+
+    Returns:
+        None
+    """
     upload_package_to_anaconda_py(package_files, owner, channel, api_key, url, force, auth_file)
 
 
@@ -147,7 +238,23 @@ def upload_packages_to_conda_forge(
     provider: Union[str, None] = None,
     dry_run: bool = False,
 ) -> None:
-    """Upload to conda forge"""
+    """
+    Upload to conda forge.
+
+    Args:
+        package_files: The package files to upload.
+        staging_token: The staging token for conda forge.
+        feedstock: The feedstock repository.
+        feedstock_token: The feedstock token.
+        staging_channel: The staging channel for the upload.
+        anaconda_url: The URL to the Anaconda.org server.
+        validation_endpoint: The validation endpoint.
+        provider: The provider for the upload.
+        dry_run: Whether to perform a dry run.
+
+    Returns:
+        None
+    """
     upload_packages_to_conda_forge_py(
         package_files,
         staging_token,
