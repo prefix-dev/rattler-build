@@ -387,8 +387,11 @@ def test_down_prioritize(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 
     assert (pkg / "info/index.json").exists()
     index = json.loads((pkg / "info/index.json").read_text())
-    assert len(index["track_features"]) == 4
-    assert index["track_features"][0] == "down_prioritize-p-0"
+    assert isinstance(index["track_features"], str)
+    assert (
+        index["track_features"]
+        == "down_prioritize-p-0 down_prioritize-p-1 down_prioritize-p-2 down_prioritize-p-3"
+    )
 
 
 def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
