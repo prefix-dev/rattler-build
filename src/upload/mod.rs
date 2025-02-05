@@ -324,7 +324,27 @@ pub async fn upload_package_to_prefix(
             .bearer_auth(token.clone());
 
         // send_request_with_retry(prepared_request, package_file).await?;
-        let _ = prepared_request.send().await.into_diagnostic()?;
+        let response = prepared_request.send().await.into_diagnostic()?;
+
+        if response.status().is_success() {
+            progress_bar.finish();
+            info!(
+                "Upload complete for package file: {}",
+                package_file
+                    .file_name()
+                    .expect("no filename found")
+                    .to_string_lossy()
+            );
+        } else {
+            let status = response.status();
+            let body = response.text().await.into_diagnostic()?;
+            return Err(miette::miette!(
+                "Failed to upload package file: {}\nStatus: {}\nBody: {}",
+                package_file.display(),
+                status,
+                body
+            ));
+        }
     }
 
     info!("Packages successfully uploaded to prefix.dev server");
