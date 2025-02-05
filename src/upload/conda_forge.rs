@@ -5,10 +5,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::{upload::get_default_client, CondaForgeData};
+use fs_err::tokio as fs;
 use miette::{miette, IntoDiagnostic};
 use tracing::{debug, info};
-
-use crate::{upload::get_default_client, CondaForgeData};
 
 use super::{
     anaconda,
@@ -18,7 +18,7 @@ use super::{
 async fn get_channel_target_from_variant_config(
     variant_config_path: &Path,
 ) -> miette::Result<String> {
-    let variant_config = tokio::fs::read_to_string(variant_config_path)
+    let variant_config = fs::read_to_string(variant_config_path)
         .await
         .into_diagnostic()?;
 

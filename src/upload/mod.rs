@@ -3,6 +3,7 @@
 use crate::{
     tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, PrefixData, QuetzData,
 };
+use fs_err::tokio as fs;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
 use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
@@ -277,17 +278,14 @@ pub async fn upload_package_to_prefix(
             .with_style(default_bytes_style().into_diagnostic()?);
 
         let progress_bar_clone = progress_bar.clone();
-        let reader_stream = ReaderStream::new(
-            tokio::fs::File::open(package_file)
-                .await
-                .into_diagnostic()?,
-        )
-        .inspect_ok(move |bytes| {
-            progress_bar_clone.inc(bytes.len() as u64);
-        })
-        .inspect_err(|e| {
-            println!("Error while uploading: {}", e);
-        });
+        let reader_stream =
+            ReaderStream::new(fs::File::open(package_file).await.into_diagnostic()?)
+                .inspect_ok(move |bytes| {
+                    progress_bar_clone.inc(bytes.len() as u64);
+                })
+                .inspect_err(|e| {
+                    println!("Error while uploading: {}", e);
+                });
 
         let hash = sha256_sum(package_file).into_diagnostic()?;
 
@@ -312,9 +310,7 @@ pub async fn upload_package_to_prefix(
         form = form.part("file", file_part);
 
         if let Some(attestation) = &prefix_data.attestation {
-            let text = tokio::fs::read_to_string(attestation)
-                .await
-                .into_diagnostic()?;
+            let text = fs::read_to_string(attestation).await.into_diagnostic()?;
             let attestation = reqwest::multipart::Part::text(text);
             form = form.part("attestation", attestation);
         }
@@ -473,9 +469,7 @@ async fn send_request(
     prepared_request: reqwest::RequestBuilder,
     package_file: &Path,
 ) -> miette::Result<reqwest::Response> {
-    let file = tokio::fs::File::open(package_file)
-        .await
-        .into_diagnostic()?;
+    let file = fs::File::open(package_file).await.into_diagnostic()?;
 
     let file_size = file.metadata().await.into_diagnostic()?.len();
     info!(

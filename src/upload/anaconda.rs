@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use miette::miette;
-use miette::IntoDiagnostic;
+use fs_err::tokio as fs;
+use miette::{miette, IntoDiagnostic};
 use rattler_conda_types::package::AboutJson;
 use rattler_conda_types::PackageName;
 use reqwest::multipart::Form;
@@ -415,7 +415,7 @@ impl Anaconda {
             form_data = form_data.text(key, value);
         }
 
-        let content = tokio::fs::read(package.path()).await.into_diagnostic()?;
+        let content = fs::read(package.path()).await.into_diagnostic()?;
 
         form_data = form_data.text("Content-Length", file_size.to_string());
         form_data = form_data.text("Content-MD5", base64_md5.to_string());
