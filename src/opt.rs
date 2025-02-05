@@ -866,6 +866,11 @@ pub struct PrefixOpts {
     /// keychain / auth-file
     #[arg(short, long, env = "PREFIX_API_KEY")]
     pub api_key: Option<String>,
+
+    /// Upload one or more attestation files alongside the package
+    /// Note: if you add an attestation, you can _only_ upload a single package.
+    #[arg(long, required = false)]
+    pub attestation: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -874,21 +879,28 @@ pub struct PrefixData {
     pub url: UrlWithTrailingSlash,
     pub channel: String,
     pub api_key: Option<String>,
+    pub attestation: Option<PathBuf>,
 }
 
 impl From<PrefixOpts> for PrefixData {
     fn from(value: PrefixOpts) -> Self {
-        Self::new(value.url, value.channel, value.api_key)
+        Self::new(value.url, value.channel, value.api_key, value.attestation)
     }
 }
 
 impl PrefixData {
     /// Create a new instance of `PrefixData`
-    pub fn new(url: Url, channel: String, api_key: Option<String>) -> Self {
+    pub fn new(
+        url: Url,
+        channel: String,
+        api_key: Option<String>,
+        attestation: Option<PathBuf>,
+    ) -> Self {
         Self {
             url: url.into(),
             channel,
             api_key,
+            attestation,
         }
     }
 }
