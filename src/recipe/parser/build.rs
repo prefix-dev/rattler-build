@@ -296,7 +296,7 @@ impl TryConvertNode<Build> for RenderedNode {
 impl TryConvertNode<Build> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<Build, Vec<PartialParsingError>> {
         let mut build = Build::default();
-
+        println!("Assigning script and others: {:?}", self.iter());
         validate_keys! {
             build,
             self.iter(),
