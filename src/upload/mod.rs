@@ -305,6 +305,7 @@ pub async fn upload_package_to_prefix(
             reqwest::Body::wrap_stream(reader_stream),
             file_size,
         )
+        .file_name(filename)
         .headers(file_headers);
 
         form = form.part("file", file_part);
