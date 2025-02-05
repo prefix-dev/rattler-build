@@ -870,7 +870,7 @@ pub struct PrefixOpts {
     /// Upload one or more attestation files alongside the package
     /// Note: if you add an attestation, you can _only_ upload a single package.
     #[arg(long, required = false)]
-    pub attestation: Vec<PathBuf>,
+    pub attestation: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -879,17 +879,12 @@ pub struct PrefixData {
     pub url: UrlWithTrailingSlash,
     pub channel: String,
     pub api_key: Option<String>,
-    pub attestations: Vec<PathBuf>,
+    pub attestation: Option<PathBuf>,
 }
 
 impl From<PrefixOpts> for PrefixData {
     fn from(value: PrefixOpts) -> Self {
-        Self::new(
-            value.url,
-            value.channel,
-            value.api_key,
-            Some(value.attestation),
-        )
+        Self::new(value.url, value.channel, value.api_key, value.attestation)
     }
 }
 
@@ -899,13 +894,13 @@ impl PrefixData {
         url: Url,
         channel: String,
         api_key: Option<String>,
-        attestations: Option<Vec<PathBuf>>,
+        attestation: Option<PathBuf>,
     ) -> Self {
         Self {
             url: url.into(),
             channel,
             api_key,
-            attestations: attestations.unwrap_or_default(),
+            attestation,
         }
     }
 }

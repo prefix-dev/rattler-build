@@ -207,12 +207,6 @@ pub async fn upload_package_to_prefix(
     package_files: &Vec<PathBuf>,
     prefix_data: PrefixData,
 ) -> miette::Result<()> {
-    if !prefix_data.attestations.is_empty() && package_files.len() > 1 {
-        return Err(miette::miette!(
-            "When providing one or more attestations, only a single package file can be uploaded at a time."
-        ));
-    }
-
     let check_storage = || {
         match storage.get_by_url(Url::from(prefix_data.url.clone())) {
             Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
@@ -243,18 +237,18 @@ pub async fn upload_package_to_prefix(
         {
             TrustedPublishResult::Configured(token) => token.secret().to_string(),
             TrustedPublishResult::Skipped => {
-                if !prefix_data.attestations.is_empty() {
+                if prefix_data.attestation.is_some() {
                     return Err(miette::miette!(
-                        "Attestations were provided, but trusted publishing was not configured"
+                        "An attestation was provided, but trusted publishing is not configured"
                     ));
                 }
                 check_storage()?
             }
             TrustedPublishResult::Ignored(err) => {
                 tracing::warn!("Checked for trusted publishing but failed with {err}");
-                if !prefix_data.attestations.is_empty() {
+                if prefix_data.attestation.is_some() {
                     return Err(miette::miette!(
-                        "Attestations were provided, but trusted publishing failed"
+                        "An attestation was provided, but trusted publishing is not configured"
                     ));
                 }
                 check_storage()?
@@ -317,7 +311,7 @@ pub async fn upload_package_to_prefix(
 
         form = form.part("file", file_part);
 
-        for attestation in &prefix_data.attestations {
+        if let Some(attestation) = &prefix_data.attestation {
             let text = tokio::fs::read_to_string(attestation)
                 .await
                 .into_diagnostic()?;
