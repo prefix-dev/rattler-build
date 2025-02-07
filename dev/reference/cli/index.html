@@ -1864,6 +1864,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p><code>-a</code>, <code>--api-key &lt;API_KEY&gt;</code></p>
 <p>The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file</p>
 </li>
+<li>
+<p><code>--attestation &lt;ATTESTATION&gt;</code></p>
+<p>Upload one or more attestation files alongside the package Note: if you add an attestation, you can <em>only</em> upload a single package</p>
+</li>
 </ul>
 <h4 id="anaconda"><code>anaconda</code><a class="headerlink" href="#anaconda" title="Permanent link">#</a></h4>
 <p>Options for uploading to a Anaconda.org server</p>
@@ -2015,6 +2019,18 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--conda-token &lt;CONDA_TOKEN&gt;</code></p>
 <p>The token to use on anaconda.org / quetz authentication</p>
+</li>
+<li>
+<p><code>--s3-access-key-id &lt;S3_ACCESS_KEY_ID&gt;</code></p>
+<p>The S3 access key ID</p>
+</li>
+<li>
+<p><code>--s3-secret-access-key &lt;S3_SECRET_ACCESS_KEY&gt;</code></p>
+<p>The S3 secret access key</p>
+</li>
+<li>
+<p><code>--s3-session-token &lt;S3_SESSION_TOKEN&gt;</code></p>
+<p>The S3 session token</p>
 </li>
 </ul>
 <h4 id="logout"><code>logout</code><a class="headerlink" href="#logout" title="Permanent link">#</a></h4>
