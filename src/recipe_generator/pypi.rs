@@ -38,14 +38,14 @@ pub struct PyPIOpts {
     pub tree: bool,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(Deserialize, Clone, Debug, Default)]
 struct PyPiRelease {
     filename: String,
     url: String,
     digests: HashMap<String, String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug, Clone, Default)]
 struct PyPiInfo {
     name: String,
     version: String,
@@ -100,7 +100,7 @@ async fn extract_entry_points_from_wheel(
             .map(|s| {
                 // make sure that there is a space around the `=` sign
                 let (name, script) = s.split_once('=').unwrap();
-                format!("{} = {}", name, script)
+                format!("{} = {}", name.trim(), script.trim())
             })
             .collect();
 
@@ -122,6 +122,14 @@ struct PyPiResponse {
 struct PyPrReleaseResponse {
     info: PyPiInfo,
     urls: Vec<PyPiRelease>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PyPiMetadata {
+    info: PyPiInfo,
+    urls: Vec<PyPiRelease>,
+    release: PyPiRelease,
+    wheel_url: Option<String>,
 }
 
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
@@ -178,7 +186,8 @@ fn post_process_markers(recipe_yaml: String) -> String {
 }
 
 async fn is_noarch_python(urls: &[PyPiRelease]) -> bool {
-    let wheels: Vec<_> = urls.iter()
+    let wheels: Vec<_> = urls
+        .iter()
         .filter(|r| r.filename.ends_with(".whl"))
         .collect();
 
@@ -188,20 +197,17 @@ async fn is_noarch_python(urls: &[PyPiRelease]) -> bool {
     }
 
     // Check if all wheels are pure Python
-    wheels.iter().all(|wheel| wheel.filename.contains("-none-any.whl"))
+    wheels
+        .iter()
+        .all(|wheel| wheel.filename.contains("-none-any.whl"))
 }
 
-#[async_recursion::async_recursion]
-pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
-    eprintln!("Generating recipe for {}", opts.package);
-
-    let package = &opts.package;
-    let client = reqwest::Client::new();
-
-    // Fetch package metadata from PyPI JSON API
+async fn fetch_pypi_metadata(
+    opts: &PyPIOpts,
+    client: &reqwest::Client,
+) -> miette::Result<PyPiMetadata> {
     let (info, urls) = if let Some(version) = &opts.version {
-        let url = format!("https://pypi.org/pypi/{}/{}/json", package, version);
-
+        let url = format!("https://pypi.org/pypi/{}/{}/json", opts.package, version);
         let release: PyPrReleaseResponse = client
             .get(&url)
             .send()
@@ -210,10 +216,9 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
             .json()
             .await
             .into_diagnostic()?;
-
         (release.info, release.urls)
     } else {
-        let url = format!("https://pypi.org/pypi/{}/json", package);
+        let url = format!("https://pypi.org/pypi/{}/json", opts.package);
         let response: PyPiResponse = client
             .get(&url)
             .send()
@@ -234,64 +239,82 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     let release = urls
         .iter()
         .find(|r| r.filename.ends_with(".tar.gz"))
-        .ok_or_else(|| miette::miette!("No source distribution found"))?;
-
-    let mut recipe = serialize::Recipe::default();
-    recipe
-        .context
-        .insert("version".to_string(), info.version.clone());
-    recipe.package.name = info.name.to_lowercase();
-    recipe.package.version = "${{ version }}".to_string();
-
-    // replace URL with the shorter version that does not contain the hash
-    let release_url = if release.url.starts_with("https://files.pythonhosted.org/") {
-        let simple_url = format!(
-            "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
-            &info.name.to_lowercase()[..1],
-            info.name.to_lowercase(),
-            info.name.to_lowercase().replace("-", "_"),
-            info.version
-        );
-
-        // Check if the simple URL exists
-        if client.head(&simple_url).send().await.is_ok() {
-            simple_url
-        } else {
-            release.url.clone()
-        }
-    } else {
-        release.url.clone()
-    };
-
-    recipe.source.push(serialize::SourceElement {
-        url: release_url.replace(info.version.as_str(), "${{ version }}"),
-        sha256: release.digests.get("sha256").cloned(),
-        md5: None,
-    });
+        .ok_or_else(|| miette::miette!("No source distribution found"))?
+        .clone();
 
     let wheel_url = urls
         .iter()
         .find(|r| r.filename.ends_with(".whl"))
         .map(|r| r.url.clone());
 
-    if let Some(wheel_url) = wheel_url {
+    Ok(PyPiMetadata {
+        info,
+        urls,
+        release,
+        wheel_url,
+    })
+}
+
+pub async fn create_recipe(
+    opts: &PyPIOpts,
+    metadata: &PyPiMetadata,
+    client: &reqwest::Client,
+) -> miette::Result<serialize::Recipe> {
+    let mut recipe = serialize::Recipe::default();
+    recipe
+        .context
+        .insert("version".to_string(), metadata.info.version.clone());
+    recipe.package.name = metadata.info.name.to_lowercase();
+    recipe.package.version = "${{ version }}".to_string();
+
+    // replace URL with the shorter version that does not contain the hash
+    let release_url = if metadata
+        .release
+        .url
+        .starts_with("https://files.pythonhosted.org/")
+    {
+        let simple_url = format!(
+            "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
+            &metadata.info.name.to_lowercase()[..1],
+            metadata.info.name.to_lowercase(),
+            metadata.info.name.to_lowercase().replace("-", "_"),
+            metadata.info.version
+        );
+
+        // Check if the simple URL exists
+        if client.head(&simple_url).send().await.is_ok() {
+            simple_url
+        } else {
+            metadata.release.url.clone()
+        }
+    } else {
+        metadata.release.url.clone()
+    };
+
+    recipe.source.push(serialize::SourceElement {
+        url: release_url.replace(metadata.info.version.as_str(), "${{ version }}"),
+        sha256: metadata.release.digests.get("sha256").cloned(),
+        md5: None,
+    });
+
+    if let Some(wheel_url) = &metadata.wheel_url {
         if let Some(entry_points) = extract_entry_points_from_wheel(&wheel_url, &client).await? {
             recipe.build.python.entry_points = entry_points;
         }
     } else {
         tracing::warn!(
             "No wheel found for {} - cannot extract entry points.",
-            package
+            opts.package
         );
     }
 
     // Check if package is noarch: python
-    if is_noarch_python(&urls).await {
+    if is_noarch_python(&metadata.urls).await {
         recipe.build.noarch = Some("python".to_string());
     }
 
     // Set Python requirements
-    if let Some(python_req) = info.requires_python {
+    if let Some(python_req) = &metadata.info.requires_python {
         recipe
             .requirements
             .host
@@ -307,7 +330,7 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
 
     // Process dependencies
     let mut requirements = Vec::new();
-    if let Some(deps) = info.requires_dist {
+    if let Some(deps) = &metadata.info.requires_dist {
         for req in deps {
             let conda_name = if opts.use_mapping {
                 let mapping = conda_pypi_name_mapping().await?;
@@ -318,7 +341,7 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
                     req.replacen(base_name, n, 1)
                 })
             } else {
-                req
+                req.clone()
             };
             let formatted_req = format_requirement(&conda_name);
             recipe
@@ -333,32 +356,44 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
-            imports: vec![info.name.clone()],
+            imports: vec![metadata.info.name.clone()],
             pip_check: true,
         },
     }));
 
     // Set metadata
-    recipe.about.summary = info.summary;
-    recipe.about.description = info.description;
-    recipe.about.homepage = info.home_page;
-    recipe.about.license = info.license;
+    recipe.about.summary = metadata.info.summary.clone();
+    recipe.about.description = metadata.info.description.clone();
+    recipe.about.homepage = metadata.info.home_page.clone();
+    recipe.about.license = metadata.info.license.clone();
 
-    if let Some(urls) = info.project_urls {
+    if let Some(urls) = &metadata.info.project_urls {
         recipe.about.repository = urls.get("Source Code").cloned();
         recipe.about.documentation = urls.get("Documentation").cloned();
     }
 
+    Ok(recipe)
+}
+
+#[async_recursion::async_recursion]
+pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
+    eprintln!("Generating recipe for {}", opts.package);
+    let client = reqwest::Client::new();
+
+    let metadata = fetch_pypi_metadata(opts, &client).await?;
+    let recipe = create_recipe(opts, &metadata, &client).await?;
+
     let string = format!("{}", recipe);
     let string = post_process_markers(string);
+
     if opts.write {
-        write_recipe(package, &string).into_diagnostic()?;
+        write_recipe(&opts.package, &string).into_diagnostic()?;
     } else {
         print!("{}", string);
     }
 
     if opts.tree {
-        for dep in requirements {
+        for dep in metadata.info.requires_dist.unwrap_or_default() {
             let dep = dep.split_whitespace().next().unwrap();
             if !PathBuf::from(dep).exists() {
                 let opts = PyPIOpts {
@@ -371,4 +406,44 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use insta::assert_yaml_snapshot;
+
+    #[tokio::test]
+    async fn test_recipe_generation() {
+        let opts = PyPIOpts {
+            package: "numpy".into(),
+            version: Some("1.24.0".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+        };
+
+        let client = reqwest::Client::new();
+        let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
+        let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
+
+        assert_yaml_snapshot!(recipe);
+    }
+
+    #[tokio::test]
+    async fn test_flask_noarch_recipe_generation() {
+        let opts = PyPIOpts {
+            package: "flask".into(),
+            version: Some("3.1.0".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+        };
+
+        let client = reqwest::Client::new();
+        let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
+        let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
+
+        assert_yaml_snapshot!(recipe);
+    }
 }
