@@ -177,6 +177,20 @@ fn post_process_markers(recipe_yaml: String) -> String {
     result.join("\n")
 }
 
+async fn is_noarch_python(urls: &[PyPiRelease]) -> bool {
+    let wheels: Vec<_> = urls.iter()
+        .filter(|r| r.filename.ends_with(".whl"))
+        .collect();
+
+    if wheels.is_empty() {
+        // Conservative: if no wheels found, assume arch-specific
+        return false;
+    }
+
+    // Check if all wheels are pure Python
+    wheels.iter().all(|wheel| wheel.filename.contains("-none-any.whl"))
+}
+
 #[async_recursion::async_recursion]
 pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
     eprintln!("Generating recipe for {}", opts.package);
@@ -269,6 +283,11 @@ pub async fn generate_pypi_recipe(opts: &PyPIOpts) -> miette::Result<()> {
             "No wheel found for {} - cannot extract entry points.",
             package
         );
+    }
+
+    // Check if package is noarch: python
+    if is_noarch_python(&urls).await {
+        recipe.build.noarch = Some("python".to_string());
     }
 
     // Set Python requirements

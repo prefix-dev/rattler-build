@@ -17,6 +17,8 @@ pub struct Build {
     pub script: String,
     #[serde(skip_serializing_if = "Python::is_default")]
     pub python: Python,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub noarch: Option<String>,
 }
 
 #[derive(Default, Debug, Serialize)]
