@@ -14,10 +14,12 @@
 //!      variant
 use std::collections::{HashSet, VecDeque};
 
-use marked_yaml::Span;
-use minijinja::machinery::{
-    ast::{self, CallArg, Expr, Stmt},
-    parse_expr, WhitespaceConfig,
+use minijinja::{
+    machinery::{
+        ast::{self, CallArg, Expr, Stmt},
+        parse_expr, WhitespaceConfig,
+    },
+    Value,
 };
 
 use crate::recipe::{
@@ -29,18 +31,24 @@ use crate::recipe::{
 use crate::source_code::SourceCode;
 
 /// Extract all variables from a jinja statement
-fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
+fn extract_variables<S: SourceCode>(
+    node: &Stmt,
+    source: &SourceWithSpan<S>,
+    variables: &mut HashSet<String>,
+) -> Result<(), ParsingError<S>> {
     match node {
         Stmt::Template(stmt) => {
-            stmt.children.iter().for_each(|child| {
-                extract_variables(child, variables);
-            });
+            for child in &stmt.children {
+                extract_variables(child, source, variables)?;
+            }
         }
         Stmt::EmitExpr(expr) => {
-            extract_variable_from_expression(&expr.expr, variables);
+            extract_variable_from_expression(&expr.expr, source, variables)?;
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 fn parse<'source>(
@@ -66,32 +74,66 @@ fn get_pos_expr<'a>(call_args: &'a [CallArg<'a>], idx: usize) -> Option<&'a Expr
     }
 }
 
+struct SourceWithSpan<'a, S: SourceCode> {
+    pub source: &'a S,
+    pub span: &'a marked_yaml::Span,
+}
+
+/// Check if a variable is constant string `"true"` or `"false"` and warn about it
+fn check_deprecations<S: SourceCode>(
+    expr: &Expr,
+    source: &SourceWithSpan<S>,
+) -> Result<(), ParsingError<S>> {
+    let true_string = Value::from_safe_string("true".to_string());
+    let false_string = Value::from_safe_string("false".to_string());
+    if let Expr::Const(constant) = expr {
+        if constant.value == true_string || constant.value == false_string {
+            return Err(ParsingError::from_partial(
+                source.source.clone(),
+                crate::_partialerror!(
+                    *source.span,
+                    crate::recipe::error::ErrorKind::ExpectedScalar,
+                    label = "true/false as string",
+                    help = "Use true/false as boolean (without quotes) instead of a string"
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Extract all variables from a jinja expression (called from
 /// [`extract_variables`])
-fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>) {
+fn extract_variable_from_expression<S: SourceCode>(
+    expr: &Expr,
+    source: &SourceWithSpan<S>,
+    variables: &mut HashSet<String>,
+) -> Result<(), ParsingError<S>> {
     match expr {
         Expr::Var(var) => {
             variables.insert(var.id.into());
         }
         Expr::BinOp(binop) => {
-            extract_variable_from_expression(&binop.left, variables);
-            extract_variable_from_expression(&binop.right, variables);
+            check_deprecations(&binop.left, source)?;
+            check_deprecations(&binop.right, source)?;
+            extract_variable_from_expression(&binop.left, source, variables)?;
+            extract_variable_from_expression(&binop.right, source, variables)?;
         }
         Expr::UnaryOp(unaryop) => {
-            extract_variable_from_expression(&unaryop.expr, variables);
+            extract_variable_from_expression(&unaryop.expr, source, variables)?;
         }
         Expr::Filter(filter) => {
             if let Some(expr) = &filter.expr {
-                extract_variable_from_expression(expr, variables);
+                extract_variable_from_expression(expr, source, variables)?;
             }
             // for arg in &filter.args {
-            //     extract_variable_from_expression(arg, variables);
+            //     extract_variable_from_expression(arg, source, variables)?;
             // }
         }
         Expr::Call(call) => {
             if let ast::CallType::Function(function) = call.identify_call() {
                 let Some(arg) = get_pos_expr(&call.args, 0) else {
-                    return;
+                    return Ok(());
                 };
                 if function == "compiler" {
                     if let Expr::Const(constant) = arg {
@@ -105,25 +147,27 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
                     }
                 } else if function == "pin_subpackage" || function == "pin_compatible" {
                     if !call.args.is_empty() {
-                        extract_variable_from_expression(arg, variables);
+                        extract_variable_from_expression(arg, source, variables)?;
                     }
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "match" {
-                    extract_variable_from_expression(arg, variables);
+                    extract_variable_from_expression(arg, source, variables)?;
                 }
             }
         }
         Expr::IfExpr(ifexpr) => {
-            extract_variable_from_expression(&ifexpr.test_expr, variables);
-            extract_variable_from_expression(&ifexpr.true_expr, variables);
+            extract_variable_from_expression(&ifexpr.test_expr, source, variables)?;
+            extract_variable_from_expression(&ifexpr.true_expr, source, variables)?;
             if let Some(false_expr) = &ifexpr.false_expr {
-                extract_variable_from_expression(false_expr, variables);
+                extract_variable_from_expression(false_expr, source, variables)?;
             }
         }
         _ => {}
     }
+
+    Ok(())
 }
 
 /// This recursively finds all `if/then/else` expressions in a YAML node
@@ -175,7 +219,16 @@ fn find_jinja<S: SourceCode>(
                         SequenceNodeInternal::Conditional(if_sel) => {
                             match parse_expr(if_sel.cond().as_str()) {
                                 Ok(expr) => {
-                                    extract_variable_from_expression(&expr, variables);
+                                    let source_with_span = SourceWithSpan {
+                                        source: &src,
+                                        span: if_sel.cond().span(),
+                                    };
+                                    extract_variable_from_expression(
+                                        &expr,
+                                        &source_with_span,
+                                        variables,
+                                    )
+                                    .unwrap();
                                     queue.push_back(if_sel.then());
 
                                     if let Some(otherwise) = if_sel.otherwise() {
@@ -200,8 +253,16 @@ fn find_jinja<S: SourceCode>(
             }
             Node::Scalar(scalar) => {
                 if scalar.contains("${{") {
+                    let source_with_span = SourceWithSpan {
+                        source: &src,
+                        span: scalar.span(),
+                    };
+
                     match parse(scalar, "jinja.yaml") {
-                        Ok(ast) => extract_variables(&ast, variables),
+                        Ok(ast) => match extract_variables(&ast, &source_with_span, variables) {
+                            Ok(_) => {}
+                            Err(err) => errs.push(err),
+                        },
                         Err(err) => {
                             let err = crate::recipe::ParsingError::from_partial(
                                 src.clone(),
@@ -228,22 +289,21 @@ fn find_jinja<S: SourceCode>(
 
 fn variables_from_raw_expr<S: SourceCode>(
     expr: &str,
-    src: S,
-    span: &Span,
+    source_with_span: &SourceWithSpan<S>,
 ) -> Result<HashSet<String>, ParsingError<S>> {
     let selector_tmpl = format!("${{{{ {} }}}}", expr);
     let ast = parse(&selector_tmpl, "selector.yaml").map_err(|e| {
         ParsingError::from_partial(
-            src,
+            source_with_span.source.clone(),
             crate::_partialerror!(
-                *span,
+                *source_with_span.span,
                 crate::recipe::error::ErrorKind::from(e),
                 label = "failed to parse as jinja expression"
             ),
         )
     })?;
     let mut variables = HashSet::new();
-    extract_variables(&ast, &mut variables);
+    extract_variables(&ast, source_with_span, &mut variables)?;
     Ok(variables)
 }
 
@@ -264,7 +324,11 @@ fn variables_from_skip<S: SourceCode>(
         Some(custom_yaml::Node::Sequence(node)) => {
             for item in node.iter() {
                 if let SequenceNodeInternal::Simple(custom_yaml::Node::Scalar(scalar)) = item {
-                    let vars = variables_from_raw_expr(scalar.as_str(), src.clone(), scalar.span());
+                    let source_with_span = SourceWithSpan {
+                        source: &src,
+                        span: scalar.span(),
+                    };
+                    let vars = variables_from_raw_expr(scalar.as_str(), &source_with_span);
                     match vars {
                         Ok(vars) => variables.extend(vars),
                         Err(err) => errors.push(err),
@@ -273,7 +337,12 @@ fn variables_from_skip<S: SourceCode>(
             }
         }
         Some(custom_yaml::Node::Scalar(scalar)) => {
-            let vars = variables_from_raw_expr(scalar.as_str(), src.clone(), scalar.span());
+            let source_with_span = SourceWithSpan {
+                source: &src,
+                span: scalar.span(),
+            };
+
+            let vars = variables_from_raw_expr(scalar.as_str(), &source_with_span);
             match vars {
                 Ok(vars) => variables.extend(vars),
                 Err(err) => errors.push(err),
@@ -301,7 +370,11 @@ pub(crate) fn used_vars_from_expressions<S: SourceCode>(
     selectors
         .iter()
         .map(|selector| -> Result<(), ParsingError<S>> {
-            let vars = variables_from_raw_expr(selector.as_str(), src.clone(), selector.span())?;
+            let source_with_span = SourceWithSpan {
+                source: &src,
+                span: selector.span(),
+            };
+            let vars = variables_from_raw_expr(selector.as_str(), &source_with_span)?;
             variables.extend(vars);
             Ok(())
         })
