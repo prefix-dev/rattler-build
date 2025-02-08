@@ -80,6 +80,7 @@ pub trait Interpreter {
             };
 
             let build_activation = build_prefix_activator.activation(activation_vars)?;
+            // TODO make things correct if merge_build_host: true
             shell_script.append_script(&host_activation.script);
             shell_script.append_script(&build_activation.script);
         } else {
