@@ -6,6 +6,7 @@ use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
 use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use std::{
+    collections::HashMap,
     fmt::Write,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
@@ -293,9 +294,11 @@ pub async fn upload_package_to_s3(
         S3Config::FromAWS
     };
 
-    let s3 = S3::new(s3_config, storage.clone());
+    let config_map = HashMap::from([(channel.to_string(), s3_config.clone())]);
+
+    let s3 = S3::new(config_map, storage.clone());
     let s3_client = s3
-        .create_s3_client(Some(channel.clone()))
+        .create_s3_client(channel.clone())
         .await
         .map_err(|e| miette::miette!(e.to_string()))?;
 

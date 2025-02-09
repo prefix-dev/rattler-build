@@ -3874,9 +3874,9 @@ dependencies = [
 
 [[package]]
 name = "rattler"
-version = "0.30.0"
+version = "0.31.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e2b15d6db3042d80b4c11129de8ad77508ba4e27a3446e84491a4e11abcc852"
+checksum = "be2cb261862e1e5652f9865235ad6ab986b87c76835425f66c13ebd9d3f8f8cf"
 dependencies = [
  "anyhow",
  "clap",
@@ -3922,6 +3922,7 @@ dependencies = [
  "anyhow",
  "async-once-cell",
  "async-recursion",
+ "aws-smithy-types",
  "base64 0.22.1",
  "bzip2 0.5.0",
  "chrono",

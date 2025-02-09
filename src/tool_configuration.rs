@@ -103,7 +103,7 @@ pub fn get_auth_store(
             ));
             Ok(store)
         }
-        None => Ok(rattler_networking::AuthenticationStorage::from_env_and_defaults()?),
+        None => Ok(rattler_networking::AuthenticationStorage::from_env_and_defaults().map_err(|e| FileStorageError::IOError(std::io::Error::new(std::io::ErrorKind::Other, e)))?),
     }
 }
 
