@@ -477,8 +477,11 @@ def test_down_prioritize(rattler_build: RattlerBuild, recipes: Path, tmp_path: P
 
     assert (pkg / "info/index.json").exists()
     index = json.loads((pkg / "info/index.json").read_text())
-    assert len(index["track_features"]) == 4
-    assert index["track_features"][0] == "down_prioritize-p-0"
+    assert isinstance(index["track_features"], str)
+    assert (
+        index["track_features"]
+        == "down_prioritize-p-0 down_prioritize-p-1 down_prioritize-p-2 down_prioritize-p-3"
+    )
 
 
 def test_prefix_detection(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1086,7 +1089,7 @@ def test_env_vars_override(rattler_build: RattlerBuild, recipes: Path, tmp_path:
 
     text = (pkg / "pybind_abi.txt").read_text()
     assert text.strip() == "4"
-    assert variant_config["pybind11_abi"] == "4"
+    assert variant_config["pybind11_abi"] == 4
 
     # Check that we used the variant in the rendered recipe
     rendered_recipe = yaml.safe_load(
@@ -1329,3 +1332,17 @@ def test_rendering_from_stdin(
     loaded = json.loads(rendered)
 
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"
+
+
+def test_jinja_types(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
+    # render only and snapshot json
+    rendered = rattler_build.render(recipes / "jinja-types", tmp_path)
+    print(rendered)
+    # load as json
+    assert snapshot_json == rendered[0]["recipe"]["context"]
+    variant = rendered[0]["build_configuration"]["variant"]
+    # remove target_platform from the variant
+    variant.pop("target_platform")
+    assert snapshot_json == variant

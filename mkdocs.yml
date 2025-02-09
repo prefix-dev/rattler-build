@@ -140,10 +140,20 @@ nav:
       - Recipe file: reference/recipe_file.md
       - CLI: reference/cli.md
       - Jinja: reference/jinja.md
+      - Python Bindings: reference/python_bindings.md
 
 plugins:
   - search
   - social
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths:
+            - py-rattler-build
+          options:
+            separate_signature: true
+            show_source: false
   - mike:
       # These fields are all optional; the defaults are as below...
       # alias_type: symlink

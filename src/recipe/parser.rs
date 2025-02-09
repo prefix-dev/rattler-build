@@ -3,7 +3,6 @@
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use indexmap::IndexMap;
-use minijinja::Value;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -54,7 +53,7 @@ pub use self::{
     },
 };
 
-use crate::recipe::custom_yaml::Node;
+use crate::recipe::{custom_yaml::Node, variable::Variable};
 
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +61,7 @@ pub struct Recipe {
     /// The schema version of this recipe YAML file
     pub schema_version: u64,
     /// The context values of this recipe
-    pub context: IndexMap<String, String>,
+    pub context: IndexMap<String, Variable>,
     /// The package information
     pub package: Package,
     /// The cache build that should be used for this package
@@ -182,15 +181,20 @@ impl Recipe {
                 })?;
                 let rendered: Option<ScalarNode> =
                     val.render(&jinja, &format!("context.{}", k.as_str()))?;
-
                 if let Some(rendered) = rendered {
-                    context.insert(k.as_str().to_string(), rendered.as_str().to_string());
+                    let variable = if let Some(value) = rendered.as_bool() {
+                        Variable::from(value)
+                    } else if let Some(value) = rendered.as_i64() {
+                        Variable::from(value)
+                    } else {
+                        Variable::from_string(&rendered)
+                    };
+                    context.insert(k.as_str().to_string(), variable.clone());
                     // also immediately insert into jinja context so that the value can be used
                     // in later jinja expressions
-                    jinja.context_mut().insert(
-                        k.as_str().to_string(),
-                        Value::from_safe_string(rendered.as_str().to_string()),
-                    );
+                    jinja
+                        .context_mut()
+                        .insert(k.as_str().to_string(), variable.into());
                 }
             }
         }

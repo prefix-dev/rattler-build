@@ -1,8 +1,7 @@
 //! The upload module provides the package upload functionality.
 
-use crate::{
-    tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, PrefixData, QuetzData,
-};
+use crate::{tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, QuetzData};
+use fs_err::tokio as fs;
 use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
 use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
@@ -12,7 +11,6 @@ use std::{
     time::{Duration, SystemTime},
 };
 use tokio_util::io::ReaderStream;
-use trusted_publishing::{check_trusted_publishing, TrustedPublishResult};
 
 use miette::{Context, IntoDiagnostic};
 use rattler_networking::s3_middleware::{S3Config, S3};
@@ -27,7 +25,10 @@ use crate::upload::package::{sha256_sum, ExtractedPackage};
 mod anaconda;
 pub mod conda_forge;
 mod package;
+mod prefix;
 mod trusted_publishing;
+
+pub use prefix::upload_package_to_prefix;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -195,84 +196,6 @@ pub async fn upload_package_to_artifactory(
     }
 
     info!("Packages successfully uploaded to Artifactory server");
-
-    Ok(())
-}
-
-/// Uploads package files to a prefix.dev server.
-pub async fn upload_package_to_prefix(
-    storage: &AuthenticationStorage,
-    package_files: &Vec<PathBuf>,
-    prefix_data: PrefixData,
-) -> miette::Result<()> {
-    let check_storage = || {
-        match storage.get_by_url(Url::from(prefix_data.url.clone())) {
-            Ok((_, Some(Authentication::BearerToken(token)))) => Ok(token),
-            Ok((_, Some(_))) => {
-                Err(miette::miette!("A Conda token is required for authentication with prefix.dev.
-                        Authentication information found in the keychain / auth file, but it was not a Bearer token"))
-            }
-            Ok((_, None)) => {
-                Err(miette::miette!(
-                    "No prefix.dev api key was given and none was found in the keychain / auth file"
-                ))
-            }
-            Err(e) => {
-                Err(miette::miette!(
-                    "Failed to get authentication information from keychain: {e}"
-                ))
-            }
-        }
-    };
-
-    let token = match prefix_data.api_key {
-        Some(api_key) => api_key,
-        None => match check_trusted_publishing(
-            &get_client_with_retry().into_diagnostic()?,
-            &prefix_data.url,
-        )
-        .await
-        {
-            TrustedPublishResult::Configured(token) => token.secret().to_string(),
-            TrustedPublishResult::Skipped => check_storage()?,
-            TrustedPublishResult::Ignored(err) => {
-                tracing::warn!("Checked for trusted publishing but failed with {err}");
-                check_storage()?
-            }
-        },
-    };
-
-    for package_file in package_files {
-        let filename = package_file
-            .file_name()
-            .expect("no filename found")
-            .to_string_lossy()
-            .to_string();
-
-        let file_size = package_file.metadata().into_diagnostic()?.len();
-
-        let url = prefix_data
-            .url
-            .join(&format!("api/v1/upload/{}", prefix_data.channel))
-            .into_diagnostic()?;
-
-        let hash = sha256_sum(package_file).into_diagnostic()?;
-
-        // Note we cannot use the reqwest client with middleware because we stream
-        // the file during upload
-        let prepared_request = get_default_client()
-            .into_diagnostic()?
-            .post(url.clone())
-            .header("X-File-Sha256", hash)
-            .header("X-File-Name", filename)
-            .header("Content-Length", file_size)
-            .header("Content-Type", "application/octet-stream")
-            .bearer_auth(token.clone());
-
-        send_request_with_retry(prepared_request, package_file).await?;
-    }
-
-    info!("Packages successfully uploaded to prefix.dev server");
 
     Ok(())
 }
@@ -481,9 +404,7 @@ async fn send_request(
     prepared_request: reqwest::RequestBuilder,
     package_file: &Path,
 ) -> miette::Result<reqwest::Response> {
-    let file = tokio::fs::File::open(package_file)
-        .await
-        .into_diagnostic()?;
+    let file = fs::File::open(package_file).await.into_diagnostic()?;
 
     let file_size = file.metadata().await.into_diagnostic()?.len();
     info!(

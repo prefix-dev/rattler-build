@@ -71,7 +71,9 @@ pub fn parse_yaml<S: SourceCode>(
     init_span_index: usize,
     src: S,
 ) -> Result<marked_yaml::Node, ParsingError<S>> {
-    let options = LoaderOptions::default().error_on_duplicate_keys(true);
+    let options = LoaderOptions::default()
+        .error_on_duplicate_keys(true)
+        .prevent_coercion(true);
     let yaml = parse_yaml_with_options(init_span_index, src.clone(), options)
         .map_err(|err| crate::recipe::error::load_error_handler(src, err))?;
 
@@ -160,7 +162,11 @@ impl Render<Node> for ScalarNode {
             )]
         })?;
 
-        Ok(Node::from(ScalarNode::new(*self.span(), rendered)))
+        Ok(Node::from(ScalarNode::new(
+            *self.span(),
+            rendered,
+            self.may_coerce,
+        )))
     }
 }
 
@@ -181,7 +187,11 @@ impl Render<Option<ScalarNode>> for ScalarNode {
         if rendered.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(ScalarNode::new(*self.span(), rendered)))
+            Ok(Some(ScalarNode::new(
+                *self.span(),
+                rendered,
+                self.may_coerce,
+            )))
         }
     }
 }
@@ -225,7 +235,11 @@ impl Render<Node> for SequenceNodeInternal {
                 if let Some(if_res) = if_res {
                     Ok(if_res.render(jinja, name)?)
                 } else {
-                    Ok(Node::Null(ScalarNode::new(*self.span(), "".to_owned())))
+                    Ok(Node::Null(ScalarNode::new(
+                        *self.span(),
+                        "".to_owned(),
+                        false,
+                    )))
                 }
             }
         }
@@ -248,6 +262,7 @@ impl Render<SequenceNodeInternal> for SequenceNodeInternal {
                     Ok(Self::Simple(Node::Null(ScalarNode::new(
                         *self.span(),
                         "".to_owned(),
+                        false,
                     ))))
                 }
             }
@@ -372,12 +387,17 @@ impl TryFrom<&marked_yaml::Node> for Node {
 pub struct ScalarNode {
     span: marked_yaml::Span,
     value: String,
+    may_coerce: bool,
 }
 
 impl ScalarNode {
     /// Create a new scalar node with a span
-    pub fn new(span: marked_yaml::Span, value: String) -> Self {
-        Self { span, value }
+    pub fn new(span: marked_yaml::Span, value: String, may_coerce: bool) -> Self {
+        Self {
+            span,
+            value,
+            may_coerce,
+        }
     }
 
     /// Treat the scalar node as a string
@@ -403,6 +423,9 @@ impl ScalarNode {
     ///
     /// Everything else is not a boolean and so will return None
     pub fn as_bool(&self) -> Option<bool> {
+        if !self.may_coerce {
+            return None;
+        }
         match self.value.as_str() {
             "true" | "True" | "TRUE" => Some(true),
             "false" | "False" | "FALSE" => Some(false),
@@ -451,14 +474,14 @@ impl fmt::Debug for ScalarNode {
 impl<'a> From<&'a str> for ScalarNode {
     /// Convert from any borrowed string into a node
     fn from(value: &'a str) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.to_owned())
+        Self::new(marked_yaml::Span::new_blank(), value.to_owned(), false)
     }
 }
 
 impl From<String> for ScalarNode {
     /// Convert from any owned string into a node
     fn from(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value)
+        Self::new(marked_yaml::Span::new_blank(), value, false)
     }
 }
 
@@ -484,7 +507,7 @@ impl From<MarkedScalarNode> for ScalarNode {
 
 impl From<&MarkedScalarNode> for ScalarNode {
     fn from(value: &MarkedScalarNode) -> Self {
-        Self::new(*value.span(), value.as_str().to_owned())
+        Self::new(*value.span(), value.as_str().to_owned(), value.may_coerce())
     }
 }
 
@@ -498,6 +521,7 @@ impl From<bool> for ScalarNode {
         }
     }
 }
+
 macro_rules! scalar_from_to_number {
     ($t:ident, $as:ident) => {
         impl From<$t> for ScalarNode {
@@ -520,6 +544,9 @@ a shortcut for using the `FromStr` trait on the return value of
 `.as_str()`."#]
             pub fn $as(&self) -> Option<$t> {
                 use std::str::FromStr;
+                if !self.may_coerce {
+                    return None;
+                }
                 $t::from_str(&self.value).ok()
             }
         }

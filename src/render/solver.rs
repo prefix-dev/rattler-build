@@ -26,6 +26,8 @@ fn print_as_table(packages: &[RepoDataRecord]) {
         "Package", "Version", "Build", "Channel", "Size",
         // "License",
     ]);
+    let column = table.column_mut(4).expect("This should be column five");
+    column.set_cell_alignment(comfy_table::CellAlignment::Right);
 
     for package in packages
         .iter()
@@ -42,7 +44,7 @@ fn print_as_table(packages: &[RepoDataRecord]) {
             package.channel.as_deref().unwrap_or_default().to_string()
         };
 
-        table.add_row(vec![
+        table.add_row([
             package.package_record.name.as_normalized().to_string(),
             package.package_record.version.to_string(),
             package.package_record.build.clone(),
@@ -109,14 +111,14 @@ pub async fn solve_environment(
     // Next, use a solver to solve this specific problem. This provides us with all
     // the operations we need to apply to our environment to bring it up to
     // date.
-    let required_packages = tool_configuration
+    let solver_result = tool_configuration
         .fancy_log_handler
         .wrap_in_progress("solving", move || Solver.solve(solver_task))?;
 
     // Print the result as a table
-    print_as_table(&required_packages);
+    print_as_table(&solver_result.records);
 
-    Ok(required_packages)
+    Ok(solver_result.records)
 }
 
 #[allow(clippy::too_many_arguments)]

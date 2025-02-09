@@ -235,12 +235,12 @@ mod tests {
             if cuda {
                 assert_eq!(
                     config.variants[&"environment_var".into()],
-                    vec!["CF_CUDA_ENABLED".to_string()]
+                    vec!["CF_CUDA_ENABLED".into()]
                 );
             } else {
                 assert_eq!(
                     config.variants[&"environment_var".into()],
-                    vec!["CF_CUDA_DISABLED".to_string()]
+                    vec!["CF_CUDA_DISABLED".into()]
                 );
             }
             std::env::remove_var("TEST_CF_CUDA_ENABLED");

@@ -1,4 +1,4 @@
-//! find used variables on a Raw (YAML) recipe
+//! Find used variables on a Raw (YAML) recipe
 //! This does an initial "prerender" step where we evaluate the Jinja
 //! expressions globally based on the variables in the `context` section of the
 //! recipe. This also evaluates any Jinja functions such as `compiler` and
@@ -16,7 +16,7 @@ use std::collections::{HashSet, VecDeque};
 
 use marked_yaml::Span;
 use minijinja::machinery::{
-    ast::{self, Expr, Stmt},
+    ast::{self, CallArg, Expr, Stmt},
     parse_expr, WhitespaceConfig,
 };
 
@@ -45,7 +45,7 @@ fn extract_variables(node: &Stmt, variables: &mut HashSet<String>) {
 
 fn parse<'source>(
     expr: &'source str,
-    filename: &str,
+    filename: &'source str,
 ) -> Result<ast::Stmt<'source>, minijinja::Error> {
     minijinja::machinery::parse(
         expr,
@@ -53,6 +53,17 @@ fn parse<'source>(
         SYNTAX_CONFIG.clone(),
         WhitespaceConfig::default(),
     )
+}
+
+fn get_pos_expr<'a>(call_args: &'a [CallArg<'a>], idx: usize) -> Option<&'a Expr<'a>> {
+    if idx < call_args.len() {
+        match &call_args[idx] {
+            CallArg::Pos(expr) => Some(expr),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Extract all variables from a jinja expression (called from
@@ -73,31 +84,34 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
             if let Some(expr) = &filter.expr {
                 extract_variable_from_expression(expr, variables);
             }
-            for arg in &filter.args {
-                extract_variable_from_expression(arg, variables);
-            }
+            // for arg in &filter.args {
+            //     extract_variable_from_expression(arg, variables);
+            // }
         }
         Expr::Call(call) => {
             if let ast::CallType::Function(function) = call.identify_call() {
+                let Some(arg) = get_pos_expr(&call.args, 0) else {
+                    return;
+                };
                 if function == "compiler" {
-                    if let Expr::Const(constant) = &call.args[0] {
+                    if let Expr::Const(constant) = arg {
                         variables.insert(format!("{}_compiler", &constant.value));
                         variables.insert(format!("{}_compiler_version", &constant.value));
                     }
                 } else if function == "stdlib" {
-                    if let Expr::Const(constant) = &call.args[0] {
+                    if let Expr::Const(constant) = arg {
                         variables.insert(format!("{}_stdlib", &constant.value));
                         variables.insert(format!("{}_stdlib_version", &constant.value));
                     }
                 } else if function == "pin_subpackage" || function == "pin_compatible" {
                     if !call.args.is_empty() {
-                        extract_variable_from_expression(&call.args[0], variables);
+                        extract_variable_from_expression(arg, variables);
                     }
                 } else if function == "cdt" {
                     variables.insert("cdt_name".into());
                     variables.insert("cdt_arch".into());
                 } else if function == "match" {
-                    extract_variable_from_expression(&call.args[0], variables);
+                    extract_variable_from_expression(arg, variables);
                 }
             }
         }

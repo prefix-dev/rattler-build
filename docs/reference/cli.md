@@ -105,7 +105,7 @@ Build a package from a recipe
 	The host platform for the build. If set, it will be used to determine also the target_platform (as long as it is not noarch)
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	Add a channel to search for dependencies in
 
@@ -267,7 +267,7 @@ These test files are written at "package creation time" and are part of the pack
 
 ##### **Options:**
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	Channels to use when testing
 
@@ -400,7 +400,7 @@ Upload a package
 
 Upload to a Quetz server. Authentication is used from the keychain / auth-file
 
-**Usage:** `rattler-build upload quetz [OPTIONS] --url <URL> --channel <CHANNEL>`
+**Usage:** `rattler-build upload quetz [OPTIONS] --url <URL> --channel <CHANNELS>`
 
 ##### **Options:**
 
@@ -409,7 +409,7 @@ Upload to a Quetz server. Authentication is used from the keychain / auth-file
 	The URL to your Quetz server
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The URL to your channel
 
@@ -426,7 +426,7 @@ Upload to a Quetz server. Authentication is used from the keychain / auth-file
 
 Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
 
-**Usage:** `rattler-build upload artifactory [OPTIONS] --url <URL> --channel <CHANNEL>`
+**Usage:** `rattler-build upload artifactory [OPTIONS] --url <URL> --channel <CHANNELS>`
 
 ##### **Options:**
 
@@ -435,7 +435,7 @@ Options for uploading to a Artifactory channel. Authentication is used from the 
 	The URL to your Artifactory server
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The URL to your channel
 
@@ -472,6 +472,11 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 	The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
 
 
+- `--attestation <ATTESTATION>`
+
+	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
+
+
 
 
 
@@ -488,11 +493,10 @@ Options for uploading to a Anaconda.org server
 	The owner of the distribution (e.g. conda-forge or your username)
 
 
-- `-c`, `--channel <CHANNEL>`
+- `-c`, `--channel <CHANNELS>`
 
 	The channel / label to upload the package to (e.g. main / rc)
 
-	- Default value: `main`
 
 - `-a`, `--api-key <API_KEY>`
 
@@ -503,7 +507,6 @@ Options for uploading to a Anaconda.org server
 
 	The URL to the Anaconda server
 
-	- Default value: `https://api.anaconda.org`
 
 - `-f`, `--force`
 
@@ -676,6 +679,21 @@ Store authentication information for a given host
 - `--conda-token <CONDA_TOKEN>`
 
 	The token to use on anaconda.org / quetz authentication
+
+
+- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
+
+	The S3 access key ID
+
+
+- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
+
+	The S3 secret access key
+
+
+- `--s3-session-token <S3_SESSION_TOKEN>`
+
+	The S3 session token
 
 
 
