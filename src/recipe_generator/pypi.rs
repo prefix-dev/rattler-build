@@ -132,6 +132,54 @@ pub struct PyPiMetadata {
     wheel_url: Option<String>,
 }
 
+async fn extract_build_requirements(
+    url: &str,
+    client: &reqwest::Client,
+) -> miette::Result<Vec<String>> {
+    let tar_data = client
+        .get(url)
+        .send()
+        .await
+        .into_diagnostic()?
+        .bytes()
+        .await
+        .into_diagnostic()?;
+    let tar = flate2::read::GzDecoder::new(&tar_data[..]);
+    let mut archive = tar::Archive::new(tar);
+
+    // Find and read pyproject.toml
+    for entry in archive.entries().into_diagnostic()? {
+        let mut entry = entry.into_diagnostic()?;
+        if entry.path().into_diagnostic()?.ends_with("pyproject.toml") {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents).into_diagnostic()?;
+
+            // Parse TOML
+            let toml: toml::Value = contents.parse().into_diagnostic()?;
+
+            // Try different build system specs
+            return Ok(match toml.get("build-system") {
+                Some(build) => {
+                    let reqs = build
+                        .get("requires")
+                        .and_then(|r| r.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    reqs
+                }
+                None => Vec::new(),
+            });
+        }
+    }
+
+    Ok(Vec::new())
+}
+
 pub async fn conda_pypi_name_mapping() -> miette::Result<&'static HashMap<String, String>> {
     static MAPPING: OnceCell<HashMap<String, String>> = OnceCell::new();
     MAPPING.get_or_try_init(async {
@@ -255,6 +303,26 @@ async fn fetch_pypi_metadata(
     })
 }
 
+async fn map_requirement(
+    req: &str,
+    mapping: &HashMap<String, String>,
+    use_mapping: bool,
+) -> String {
+    if !use_mapping {
+        return req.to_string();
+    }
+    println!("Mapping: {:#?}", mapping);
+    // Get base package name without markers/version
+    if let Some(base_name) = req.split([' ', ';']).next() {
+        if let Some(mapped_name) = mapping.get(base_name) {
+            println!("Mapping {} to {}", base_name, mapped_name);
+            // Replace the package name but keep version and markers
+            return req.replacen(base_name, mapped_name, 1).to_string();
+        }
+    }
+    req.to_string()
+}
+
 pub async fn create_recipe(
     opts: &PyPIOpts,
     metadata: &PyPiMetadata,
@@ -326,29 +394,33 @@ pub async fn create_recipe(
     } else {
         recipe.requirements.host.push("python".to_string());
     }
+
+    let mapping = if opts.use_mapping {
+        conda_pypi_name_mapping().await?
+    } else {
+        &HashMap::new()
+    };
+
+    // Check for build requirements
+    let build_reqs = extract_build_requirements(&metadata.release.url, client).await?;
+    if !build_reqs.is_empty() {
+        for req in build_reqs {
+            println!("Adding build requirement: {}", req);
+            let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
+            recipe.requirements.host.push(mapped_req);
+        }
+    }
     recipe.requirements.host.push("pip".to_string());
 
-    // Process dependencies
-    let mut requirements = Vec::new();
+    // Process runtime dependencies
     if let Some(deps) = &metadata.info.requires_dist {
         for req in deps {
-            let conda_name = if opts.use_mapping {
-                let mapping = conda_pypi_name_mapping().await?;
-                // Get base package name without markers/version
-                let base_name = req.split([' ', ';']).next().unwrap();
-                mapping.get(base_name).map_or(req.clone(), |n| {
-                    // Replace the package name but keep version and markers
-                    req.replacen(base_name, n, 1)
-                })
-            } else {
-                req.clone()
-            };
-            let formatted_req = format_requirement(&conda_name);
+            let mapped_req = map_requirement(req, mapping, opts.use_mapping).await;
+            let formatted_req = format_requirement(&mapped_req);
             recipe
                 .requirements
                 .run
                 .push(formatted_req.trim_start_matches("- ").to_string());
-            requirements.push(conda_name);
         }
     }
 
