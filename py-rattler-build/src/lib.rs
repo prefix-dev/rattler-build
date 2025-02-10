@@ -24,6 +24,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 
 #[pyfunction]
 #[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform))]
+#[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
     up_to: Option<String>,
@@ -247,6 +248,7 @@ fn upload_package_to_anaconda_py(
 
 #[pyfunction]
 #[pyo3(signature = (package_files, staging_token, feedstock, feedstock_token, staging_channel, anaconda_url, validation_endpoint, provider, dry_run))]
+#[allow(clippy::too_many_arguments)]
 fn upload_packages_to_conda_forge_py(
     package_files: Vec<PathBuf>,
     staging_token: String,
@@ -261,19 +263,12 @@ fn upload_packages_to_conda_forge_py(
     let anaconda_url = anaconda_url
         .map(|u| Url::parse(&u))
         .transpose()
-        .map_err(|e| {
-            PyRuntimeError::new_err(format!("Error parsing anaconda_url: {}", e.to_string()))
-        })?;
+        .map_err(|e| PyRuntimeError::new_err(format!("Error parsing anaconda_url: {e}")))?;
 
     let validation_endpoint = validation_endpoint
         .map(|u| Url::parse(&u))
         .transpose()
-        .map_err(|e| {
-            PyRuntimeError::new_err(format!(
-                "Error parsing validation_endpoint: {}",
-                e.to_string()
-            ))
-        })?;
+        .map_err(|e| PyRuntimeError::new_err(format!("Error parsing validation_endpoint: {e}",)))?;
 
     let conda_forge_data = CondaForgeData::new(
         staging_token,
