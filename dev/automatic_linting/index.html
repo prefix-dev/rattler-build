@@ -1275,10 +1275,6 @@
 <h1 id="enabling-automatic-linting-in-vscode">Enabling Automatic Linting in VSCode<a class="headerlink" href="#enabling-automatic-linting-in-vscode" title="Permanent link">#</a></h1>
 <p>Our new recipe format adheres to a strict JSON schema, which you can access <a href="https://github.com/prefix-dev/recipe-format">here</a>.</p>
 <p>This schema is implemented using <code>pydantic</code> and can be rendered into a JSON schema file. The <a href="https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml">YAML language server extension in VSCode</a> is capable of recognizing this schema, providing useful hints during the editing process.</p>
-<p>To enable automatic linting with the YAML language server, you need to add the following line at the beginning of your recipe file:</p>
-<div class="language-yaml highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json</span>
-</span></code></pre></div>
-<p><strong>Alternatively</strong>, if you prefer not to add this line to your file, you can install the <a href="https://marketplace.visualstudio.com/items?itemName=remcohaszing.schemastore">JSON Schema Store Catalog extension</a>. This extension will also enable automatic linting for your recipe files.</p>
 
 
 
