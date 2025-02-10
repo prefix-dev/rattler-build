@@ -311,11 +311,9 @@ async fn map_requirement(
     if !use_mapping {
         return req.to_string();
     }
-    println!("Mapping: {:#?}", mapping);
     // Get base package name without markers/version
     if let Some(base_name) = req.split([' ', ';']).next() {
         if let Some(mapped_name) = mapping.get(base_name) {
-            println!("Mapping {} to {}", base_name, mapped_name);
             // Replace the package name but keep version and markers
             return req.replacen(base_name, mapped_name, 1).to_string();
         }
@@ -405,7 +403,6 @@ pub async fn create_recipe(
     let build_reqs = extract_build_requirements(&metadata.release.url, client).await?;
     if !build_reqs.is_empty() {
         for req in build_reqs {
-            println!("Adding build requirement: {}", req);
             let mapped_req = map_requirement(&req, mapping, opts.use_mapping).await;
             recipe.requirements.host.push(mapped_req);
         }

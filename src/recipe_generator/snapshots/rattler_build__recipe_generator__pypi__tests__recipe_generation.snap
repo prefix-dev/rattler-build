@@ -20,6 +20,9 @@ build:
 requirements:
   host:
     - python >=3.8
+    - setuptools==59.2.0
+    - wheel==0.37.0
+    - "Cython>=0.29.30,<3.0"
     - pip
   run:
     - python >=3.8
