@@ -294,17 +294,17 @@ pub async fn upload_package_to_s3(
         S3Config::FromAWS
     };
 
-    let config_map = HashMap::from([(channel.to_string(), s3_config.clone())]);
+    let bucket = channel
+        .host_str()
+        .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
 
+    let config_map = HashMap::from([(bucket.to_string(), s3_config.clone())]);
     let s3 = S3::new(config_map, storage.clone());
     let s3_client = s3
         .create_s3_client(channel.clone())
         .await
         .map_err(|e| miette::miette!(e.to_string()))?;
 
-    let bucket = channel
-        .host_str()
-        .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
     let channel = channel.path().trim_start_matches('/');
 
     for package_file in package_files {
