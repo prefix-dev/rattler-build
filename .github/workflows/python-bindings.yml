@@ -39,6 +39,10 @@ jobs:
         working-directory: py-rattler-build
         run: |
           pixi run -e test fmt-check
+      - name: Check Cargo.lock
+        working-directory: py-rattler-build
+        run: |
+          pixi run -e test check-cargo-lock
       - name: Lint
         working-directory: py-rattler-build
         run: |

@@ -472,6 +472,11 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 	The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file
 
 
+- `--attestation <ATTESTATION>`
+
+	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
+
+
 
 
 
@@ -674,6 +679,21 @@ Store authentication information for a given host
 - `--conda-token <CONDA_TOKEN>`
 
 	The token to use on anaconda.org / quetz authentication
+
+
+- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
+
+	The S3 access key ID
+
+
+- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
+
+	The S3 secret access key
+
+
+- `--s3-session-token <S3_SESSION_TOKEN>`
+
+	The S3 session token
 
 
 

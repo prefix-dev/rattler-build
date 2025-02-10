@@ -38,13 +38,14 @@ typer = "*"
 types-networkx = "*"
 
 [feature.test.tasks]
-test = { cmd = "pytest --doctest-modules", depends-on = ["build"] }
+check-cargo-lock = "cargo check --locked"
+fmt = { depends-on = ["fmt-python", "fmt-rust"] }
 fmt-python = "ruff format rattler_build examples tests"
 fmt-rust = "cargo fmt --all"
-lint-python = "ruff check ."
-lint-rust = "cargo clippy --all"
-fmt = { depends-on = ["fmt-python", "fmt-rust"] }
 lint = { depends-on = ["type-check", "lint-python", "lint-rust"] }
+lint-python = "ruff check ."
+lint-rust = "cargo clippy --all-targets --workspace -- -D warnings"
+test = { cmd = "pytest --doctest-modules", depends-on = ["build"] }
 type-check = { cmd = "mypy", depends-on = ["build"] }
 
 # checks for the CI
