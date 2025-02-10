@@ -298,7 +298,7 @@ pub async fn create_recipe(
     });
 
     if let Some(wheel_url) = &metadata.wheel_url {
-        if let Some(entry_points) = extract_entry_points_from_wheel(&wheel_url, &client).await? {
+        if let Some(entry_points) = extract_entry_points_from_wheel(wheel_url, client).await? {
             recipe.build.python.entry_points = entry_points;
         }
     } else {
