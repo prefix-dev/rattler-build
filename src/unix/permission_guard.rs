@@ -9,6 +9,7 @@ mod unix {
     use std::io;
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
+    use fs_err as fs;
 
     /// A guard that modifies the permissions of a file and restores them when dropped.
     pub struct PermissionGuard {
@@ -22,13 +23,13 @@ mod unix {
         /// Create a new `PermissionGuard` for the given path with the given permissions.
         pub fn new<P: AsRef<Path>>(path: P, permissions: u32) -> io::Result<Self> {
             let path = path.as_ref().to_path_buf();
-            let metadata = std::fs::metadata(&path)?;
+            let metadata = fs::metadata(&path)?;
             let original_permissions = metadata.permissions();
 
             let new_permissions = Permissions::from_mode(original_permissions.mode() | permissions);
 
             // Set new permissions
-            std::fs::set_permissions(&path, new_permissions)?;
+            fs::set_permissions(&path, new_permissions)?;
 
             Ok(Self {
                 path,
@@ -41,7 +42,7 @@ mod unix {
         fn drop(&mut self) {
             if self.path.exists() {
                 if let Err(e) =
-                    std::fs::set_permissions(&self.path, self.original_permissions.clone())
+                    fs::set_permissions(&self.path, self.original_permissions.clone())
                 {
                     eprintln!("Failed to restore file permissions: {}", e);
                 }

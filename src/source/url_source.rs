@@ -2,10 +2,10 @@
 
 use std::{
     ffi::OsStr,
-    fs,
     io::{Read as _, Write as _},
     path::{Path, PathBuf},
 };
+use fs_err as fs;
 
 use crate::{
     console_utils::LoggingOutputHandler,
