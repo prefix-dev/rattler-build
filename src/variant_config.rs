@@ -260,7 +260,7 @@ impl VariantConfig {
         let rendered_node: RenderedNode = yaml_node
             .render(&jinja, path.to_string_lossy().as_ref())
             .map_err(|e| ParseErrors::from_partial_vec(source.clone(), e))?;
-        println!("{:?}", rendered_node);
+
         let config: VariantConfig = rendered_node
             .try_convert(path.to_string_lossy().as_ref())
             .map_err(|e| {
