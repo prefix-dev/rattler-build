@@ -83,9 +83,10 @@ impl TryConvertNode<Variable> for RenderedNode {
 
 impl TryConvertNode<Variable> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<Variable, Vec<PartialParsingError>> {
+        println!("try_convert Variable from RenderedScalarNode {:?}", self);
         let variable = if let Some(value) = self.as_bool() {
             Variable::from(value)
-        } else if let Some(value) = self.as_i64() {
+        } else if let Some(value) = self.as_integer() {
             Variable::from(value)
         } else {
             Variable::from_string(self)
