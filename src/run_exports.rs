@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use futures::future::OptionFuture;
-use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
-use rattler_conda_types::{
-    package::{PackageFile, RunExportsJson},
-    RepoDataRecord,
+use rattler::package_cache::CacheReporter;
+use rattler_cache::archive_cache::{
+    ArchiveCache, ArchiveCacheError, CacheKey, CacheKeyError as ArchiveCacheKeyError,
 };
+use rattler_conda_types::{package::RunExportsJson, RepoDataRecord};
 use rattler_networking::retry_policies::default_retry_policy;
+use rattler_package_streaming::ExtractError;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
 use tokio::sync::Semaphore;
@@ -20,14 +21,21 @@ use crate::package_cache_reporter::PackageCacheReporter;
 #[derive(Default)]
 pub struct RunExportExtractor {
     max_concurrent_requests: Option<Arc<Semaphore>>,
-    package_cache: Option<(PackageCache, PackageCacheReporter)>,
+    archive_cache: Option<ArchiveCache>,
+    reporter: Option<PackageCacheReporter>,
     client: Option<ClientWithMiddleware>,
 }
 
 #[derive(Debug, Error)]
 pub enum RunExportExtractorError {
     #[error(transparent)]
-    PackageCache(#[from] PackageCacheError),
+    ArchiveCache(#[from] ArchiveCacheError),
+
+    #[error(transparent)]
+    Extract(#[from] ExtractError),
+
+    #[error(transparent)]
+    CacheKey(#[from] ArchiveCacheKeyError),
 
     #[error("the operation was cancelled")]
     Cancelled,
@@ -43,15 +51,18 @@ impl RunExportExtractor {
         }
     }
 
-    /// Set the package cache that the extractor can use as well as a reporter
-    /// to allow progress reporting.
-    pub fn with_package_cache(
-        self,
-        package_cache: PackageCache,
-        reporter: PackageCacheReporter,
-    ) -> Self {
+    /// Set the archive cache that the extractor can use
+    pub fn with_archive_cache(self, archive_cache: ArchiveCache) -> Self {
         Self {
-            package_cache: Some((package_cache, reporter)),
+            archive_cache: Some(archive_cache),
+            ..self
+        }
+    }
+
+    /// Set the archive cache reporter
+    pub fn with_reporter(self, reporter: PackageCacheReporter) -> Self {
+        Self {
+            reporter: Some(reporter),
             ..self
         }
     }
@@ -79,15 +90,23 @@ impl RunExportExtractor {
         &mut self,
         record: &RepoDataRecord,
     ) -> Result<Option<RunExportsJson>, RunExportExtractorError> {
-        let Some((package_cache, mut package_cache_reporter)) = self.package_cache.clone() else {
+        let Some(archive_cache) = self.archive_cache.clone() else {
             return Ok(None);
         };
         let Some(client) = self.client.clone() else {
             return Ok(None);
         };
 
-        let progress_reporter = package_cache_reporter.add(record);
-        let cache_key = CacheKey::from(&record.package_record);
+        let reporter: Option<Arc<dyn CacheReporter>> =
+            if let Some(mut reporter) = self.reporter.clone() {
+                let progress_reporter = reporter.add(record);
+                Some(Arc::new(progress_reporter))
+            } else {
+                None
+            };
+
+        // let progress_reporter = package_cache_reporter.add(record);
+        let cache_key = CacheKey::new(&record.package_record, &record.file_name)?;
         let url = record.url.clone();
         let max_concurrent_requests = self.max_concurrent_requests.clone();
 
@@ -96,18 +115,64 @@ impl RunExportExtractor {
             .transpose()
             .expect("semaphore error");
 
-        match package_cache
+        match archive_cache
             .get_or_fetch_from_url_with_retry(
-                cache_key,
+                &cache_key,
                 url,
                 client,
                 default_retry_policy(),
-                Some(Arc::new(progress_reporter)),
+                reporter,
             )
             .await
         {
-            Ok(package_dir) => Ok(RunExportsJson::from_package_directory(package_dir.path()).ok()),
+            Ok(archive) => {
+                let file =
+                    rattler_package_streaming::seek::read_package_file::<RunExportsJson>(archive)?;
+                Ok(Some(file))
+            }
             Err(e) => Err(e.into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rattler::default_cache_dir;
+    use rattler_conda_types::{PackageName, PackageRecord, Version};
+    use std::str::FromStr;
+    use url::Url;
+
+    #[tokio::test]
+    async fn test_extracting_run_exports_from_archive() {
+        let archive_dir = default_cache_dir().unwrap().join("archive");
+
+        let archive_cache = ArchiveCache::new(archive_dir);
+
+        let run_exports_extractor = RunExportExtractor::default()
+            .with_archive_cache(archive_cache)
+            .with_client(ClientWithMiddleware::from(reqwest::Client::new()));
+
+        let record = RepoDataRecord {
+            package_record: PackageRecord::new(
+                PackageName::from_str("zlib").unwrap(),
+                Version::from_str("1.3.1").unwrap(),
+                "hb9d3cd8_2".to_string(),
+            ),
+            url: Url::parse(
+                "https://repo.prefix.dev/conda-forge/linux-64/zlib-1.3.1-hb9d3cd8_2.conda",
+            )
+            .unwrap(),
+            file_name: "zlib-1.3.1-hb9d3cd8_2.conda".to_string(),
+            channel: Some("conda-forge".to_string()),
+        };
+
+        let run_exports = run_exports_extractor
+            .extract(&record)
+            .await
+            .unwrap()
+            .unwrap();
+
+        insta::assert_yaml_snapshot!(run_exports);
     }
 }

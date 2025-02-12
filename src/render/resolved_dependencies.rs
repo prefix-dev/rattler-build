@@ -7,7 +7,7 @@ use std::{
 
 use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
+use rattler_cache::archive_cache::ArchiveCache;
 use rattler_conda_types::{
     package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
     Platform, RepoDataRecord,
@@ -528,7 +528,7 @@ pub fn apply_variant(
 async fn amend_run_exports(
     records: &mut [RepoDataRecord],
     client: ClientWithMiddleware,
-    package_cache: PackageCache,
+    archive_cache: ArchiveCache,
     multi_progress: MultiProgress,
     progress_prefix: impl Into<Cow<'static, str>>,
     top_level_pb: Option<ProgressBar>,
@@ -551,7 +551,8 @@ async fn amend_run_exports(
         let extractor = RunExportExtractor::default()
             .with_max_concurrent_requests(max_concurrent_requests.clone())
             .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+            .with_archive_cache(archive_cache.clone())
+            .with_reporter(progress.clone());
 
         let tx = tx.clone();
         let record = pkg.clone();
@@ -692,7 +693,7 @@ pub(crate) async fn resolve_dependencies(
                 amend_run_exports(
                     &mut resolved,
                     tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
+                    tool_configuration.archive_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
                         .multi_progress()
@@ -788,7 +789,7 @@ pub(crate) async fn resolve_dependencies(
                 amend_run_exports(
                     &mut resolved,
                     tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
+                    tool_configuration.archive_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
                         .multi_progress()

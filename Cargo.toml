@@ -194,16 +194,30 @@ pre-build = [
 # this fork contains fixes for slow zip reading and large file writing
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
-# rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-# rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+# rattler = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_sandbox = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_cache = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_index = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_networking = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_repodata_gateway = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_shell = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_solve = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_redaction = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+# rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "feat/partial-unpacking" }
+
+rattler = { path = "../rattler-1/crates/rattler" }
+rattler_sandbox = { path = "../rattler-1/crates/rattler_sandbox" }
+rattler_cache = { path = "../rattler-1/crates/rattler_cache" }
+rattler_conda_types = { path = "../rattler-1/crates/rattler_conda_types" }
+rattler_digest = { path = "../rattler-1/crates/rattler_digest" }
+rattler_index = { path = "../rattler-1/crates/rattler_index" }
+rattler_networking = { path = "../rattler-1/crates/rattler_networking" }
+rattler_repodata_gateway = { path = "../rattler-1/crates/rattler_repodata_gateway" }
+rattler_shell = { path = "../rattler-1/crates/rattler_shell" }
+rattler_solve = { path = "../rattler-1/crates/rattler_solve" }
+rattler_redaction = { path = "../rattler-1/crates/rattler_redaction" }
+rattler_virtual_packages = { path = "../rattler-1/crates/rattler_virtual_packages" }
+rattler_package_streaming = { path = "../rattler-1/crates/rattler_package_streaming" }

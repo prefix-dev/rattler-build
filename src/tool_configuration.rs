@@ -5,6 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
+use rattler_cache::archive_cache::ArchiveCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
     authentication_storage::{self, AuthenticationStorageError},
@@ -81,8 +82,11 @@ pub struct Configuration {
     /// threads does not matter for the final result.
     pub compression_threads: Option<u32>,
 
-    /// The package cache to use to store packages in.
+    /// The package cache to use to store unpacked packages in.
     pub package_cache: PackageCache,
+
+    /// The package cache to use to store packages archives in.
+    pub archive_cache: ArchiveCache,
 
     /// The repodata gateway to use for querying repodata
     pub repodata_gateway: Gateway,
@@ -298,6 +302,8 @@ impl ConfigurationBuilder {
             reqwest_client_from_auth_storage(None).expect("failed to create client")
         });
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
+        let archive_cache = ArchiveCache::new(cache_dir.join(rattler_cache::ARCHIVE_CACHE_DIR));
+
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
                 std::env::current_dir().unwrap_or_else(|_err| PathBuf::from("/")),
@@ -336,6 +342,7 @@ impl ConfigurationBuilder {
             channel_config,
             compression_threads: self.compression_threads,
             package_cache,
+            archive_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,
         }
