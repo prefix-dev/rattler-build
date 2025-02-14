@@ -14,7 +14,10 @@ pub(crate) use python::PythonInterpreter;
 
 use rattler_conda_types::Platform;
 use rattler_shell::{
-    activation::{prefix_path_entries, ActivationError, ActivationVariables, Activator, PathModificationBehavior},
+    activation::{
+        prefix_path_entries, ActivationError, ActivationVariables, Activator,
+        PathModificationBehavior,
+    },
     shell::{self, Shell},
 };
 
@@ -56,15 +59,12 @@ pub trait Interpreter {
         let host_prefix_activator =
             Activator::from_path(&args.run_prefix, shell_type, args.execution_platform)?;
 
-        let current_path = std::env::var(shell_type.path_var(&args.execution_platform))
-            .ok()
-            .map(|p| std::env::split_paths(&p).collect::<Vec<_>>());
         let conda_prefix = std::env::var("CONDA_PREFIX").ok().map(|p| p.into());
 
         let activation_vars = ActivationVariables {
             conda_prefix,
-            path: current_path,
-            path_modification_behavior: Default::default(),
+            path: None,
+            path_modification_behavior: PathModificationBehavior::Prepend,
         };
 
         let host_activation = host_prefix_activator.activation(activation_vars)?;
