@@ -88,13 +88,13 @@ scripts = ["scripts/activate.sh"]
 scripts = ["scripts/activate.bat"]
 
 [feature.docs.dependencies]
-mkdocs = "1.5.3.*"
-mkdocs-material = ">=9.5.16,<9.7"
-pillow = ">=9.4.0"
 cairosvg = "2.7.1.*"
 mike = "2.0.0.*"
+mkdocs = ">=1.6.1,<2"
+mkdocs-material = ">=9.6.4,<10"
 mkdocstrings = ">=0.27.0,<0.28"
 mkdocstrings-python = ">=1.13.0,<2"
+pillow = ">=9.4.0"
 ruff = ">=0.4.10,<0.5"
 
 
