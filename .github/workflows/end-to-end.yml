@@ -45,10 +45,9 @@ jobs:
       # build in release mode so that it's reasonably fast to run the tests
       - run: pixi run build-release
       - run: pixi run test-ci
-      - run: |
-          mkdir -p ${{ runner.temp }}/minio-data
-          pixi run minio server --address 127.0.0.1:9000 ${{ runner.temp }}/minio-data &
-          pixi run test-end-to-end -s -v
+      - run: pixi run test-end-to-end -s -v
         env:
           PREFIX_DEV_READ_ONLY_TOKEN: ${{ secrets.PREFIX_DEV_READ_ONLY_TOKEN }}
           ANACONDA_ORG_TEST_TOKEN: ${{ secrets.ANACONDA_ORG_TEST_TOKEN }}
+          S3_ACCESS_KEY_ID: ${{ secrets.S3_UPLOAD_ACCESS_KEY_ID }}
+          S3_SECRET_ACCESS_KEY: ${{ secrets.S3_UPLOAD_ACCESS_KEY_SECRET }}

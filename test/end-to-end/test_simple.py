@@ -2,11 +2,13 @@ import hashlib
 import json
 import os
 import platform
-import subprocess
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from time import sleep
+from typing import Iterator, cast
 
+import boto3
 import pytest
 import requests
 import yaml
@@ -210,55 +212,90 @@ def test_anaconda_upload(
     assert requests.get(URL).status_code == 200
 
 
-@pytest.fixture()
-def create_s3_channel():
-    # Create a bucket (with retries, in case we have to wait until minio is up and running)
-    retries = 0
-    max_retries = 3
-    while retries < max_retries:
-        try:
-            subprocess.run(
-                ["mc", "mb", "local/s3-forge", "--ignore-existing"],
-                env={
-                    **os.environ,
-                    "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
-                },
-                check=True,
-            )
-            break
-        except CalledProcessError:
-            retries += 1
-            sleep(1)
-            if retries == max_retries:
-                raise RuntimeError(
-                    "Failed to create bucket, could not reach minio server"
-                )
-    yield
+@dataclass
+class S3Config:
+    access_key_id: str
+    secret_access_key: str
+    region: str = "auto"
+    endpoint_url: str = (
+        "https://e1a7cde76f1780ec06bac859036dbaf7.r2.cloudflarestorage.com"
+    )
+    bucket_name: str = "rattler-build-upload-test"
+    channel_name: str = field(default_factory=lambda: f"channel{uuid.uuid4()}")
 
 
 @pytest.fixture()
-def s3_credentials_file(tmp_path: Path) -> Path:
+def s3_config() -> S3Config:
+    access_key_id = os.environ.get("S3_ACCESS_KEY_ID")
+    if not access_key_id:
+        pytest.skip("S3_ACCESS_KEY_ID environment variable is not set")
+    secret_access_key = os.environ.get("S3_SECRET_ACCESS_KEY")
+    if not secret_access_key:
+        pytest.skip("S3_SECRET_ACCESS_KEY environment variable is not set")
+    return S3Config(
+        access_key_id=access_key_id,
+        secret_access_key=secret_access_key,
+    )
+
+
+@pytest.fixture()
+def s3_client(s3_config: S3Config):
+    return boto3.client(
+        service_name="s3",
+        endpoint_url=s3_config.endpoint_url,
+        aws_access_key_id=s3_config.access_key_id,
+        aws_secret_access_key=s3_config.secret_access_key,
+        region_name=s3_config.region,
+    )
+
+
+@pytest.fixture()
+def s3_channel(s3_config: S3Config, s3_client) -> Iterator[str]:
+    channel_url = f"s3://{s3_config.bucket_name}/{s3_config.channel_name}"
+
+    yield channel_url
+
+    # Clean up the channel after the test
+    objects_to_delete = s3_client.list_objects_v2(
+        Bucket=s3_config.bucket_name, Prefix=f"{s3_config.channel_name}/"
+    )
+    delete_keys = [{"Key": obj["Key"]} for obj in objects_to_delete.get("Contents", [])]
+    if delete_keys:
+        result = s3_client.delete_objects(
+            Bucket=s3_config.bucket_name, Delete={"Objects": delete_keys}
+        )
+        assert result["ResponseMetadata"]["HTTPStatusCode"] == 200
+
+
+@pytest.fixture()
+def s3_credentials_file(
+    tmp_path: Path,
+    s3_config: S3Config,
+    s3_channel: str,
+) -> Path:
     path = tmp_path / "credentials.json"
     path.write_text(
-        """\
-{
-    "s3://s3-forge/channel": {
-        "S3Credentials": {
-            "access_key_id": "minioadmin",
-            "secret_access_key": "minioadmin"
-        }
-    }
-}"""
+        f"""\
+{{
+    "{s3_channel}": {{
+        "S3Credentials": {{
+            "access_key_id": "{s3_config.access_key_id}",
+            "secret_access_key": "{s3_config.secret_access_key}"
+        }}
+    }}
+}}"""
     )
     return path
 
 
-@pytest.mark.usefixtures("create_s3_channel")
 def test_s3_minio_upload(
     rattler_build: RattlerBuild,
     recipes: Path,
     tmp_path: Path,
     s3_credentials_file: Path,
+    s3_config: S3Config,
+    s3_channel: str,
+    s3_client,
     monkeypatch,
 ):
     monkeypatch.setenv("RATTLER_AUTH_FILE", str(s3_credentials_file))
@@ -268,30 +305,24 @@ def test_s3_minio_upload(
         "-vvv",
         "s3",
         "--channel",
-        "s3://s3-forge/channel",
+        s3_channel,
         "--region",
-        "eu-central-1",
+        s3_config.region,
         "--endpoint-url",
-        "http://localhost:9000",
+        s3_config.endpoint_url,
         "--force-path-style",
         "true",
         str(get_package(tmp_path, "globtest")),
     ]
     rattler_build(*cmd)
 
-    # Make sure the package was uploaded
-    assert b"globtest" in subprocess.check_output(
-        [
-            "mc",
-            "ls",
-            "--recursive",
-            "local/s3-forge/channel",
-        ],
-        env={
-            **os.environ,
-            "MC_HOST_local": "http://minioadmin:minioadmin@localhost:9000",
-        },
+    # Check if package was correctly uploaded
+    package_key = f"{s3_config.channel_name}/{host_subdir()}/globtest-0.24.6-{variant_hash({'target_platform': host_subdir()})}_0.tar.bz2"
+    result = s3_client.head_object(
+        Bucket=s3_config.bucket_name,
+        Key=package_key,
     )
+    assert result["ResponseMetadata"]["HTTPStatusCode"] == 200
 
     # Raise an error if the same package is uploaded again
     with pytest.raises(CalledProcessError):
