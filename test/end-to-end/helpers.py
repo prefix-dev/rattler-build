@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output
 from typing import Any, Optional
-
 from conda_package_handling.api import extract
 
 
