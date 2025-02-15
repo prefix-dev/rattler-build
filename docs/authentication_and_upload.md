@@ -19,6 +19,13 @@ point to a JSON file with the following structure:
     },
     "anaconda.org": {
         "CondaToken": "your_token"
+    },
+    "s3://my-bucket/my-channel": {
+        "S3Credentials": {
+            "access_key_id": "your_access_key_id",
+            "secret_access_key": "your_secret_access_key",
+            "session_token": null
+        }
     }
 }
 ```
@@ -33,17 +40,19 @@ The following known authentication methods are supported:
 - `BearerToken`: prefix.dev
 - `CondaToken`: anaconda.org, quetz
 - `BasicHTTP`: artifactory
+- `S3Credentials`: S3 buckets
 
 ## Uploading packages
 
 If you want to upload packages, then rattler-build comes with a built-in
-`upload` command. There are 4 options:
+`upload` command. There are the following options:
 
 - `prefix.dev`: you can create public or private channels on the prefix.dev
   hosted server
 - `anaconda.org`: you can upload packages to the free anaconda.org server
 - `quetz`: you can host your own quetz server and upload packages to it
 - `artifactory`: you can upload packages to a JFrog Artifactory server
+- `s3`: you can upload packages to an S3 bucket
 
 The command is:
 
@@ -58,12 +67,11 @@ authenticate with the server.
 
 #### Trusted publishing via OIDC
 
-`rattler-build` supports authentication with https://prefix.dev through OIDC with GitHub Actions.
+`rattler-build` supports authentication with <https://prefix.dev> through OIDC with GitHub Actions.
 An API key is no longer required, rattler-build can manage the complete authentication workflow for you.
 You only have to set up a specific repository and workflow under "Trusted Publishers" on prefix.dev.
 
 ![Trusted Publisher](assets/trusted_publisher.png)
-
 
 Here you can find an example GitHub Actions workflow
 
@@ -92,7 +100,6 @@ jobs:
           done
           exit $EXIT_CODE
 ```
-
 
 #### Token
 
@@ -147,4 +154,20 @@ overwrite any existing ones).
 ```bash
 export ANACONDA_API_KEY=<your_token>
 rattler-build upload anaconda -o <your_username> -c <label> <package_files>
+```
+
+### S3
+
+To upload to an S3 bucket, you need to set access key ID, secret access key and (optionally) a session token.
+If not using `rattler-build auth login s3://my-bucket --s3-access-key-id <access-key-id> --s3-secret-access-key <secret-access-key> --s3-session-token <session-token>`, you can set the corresponding `AWS_*` environment variables (even if not using AWS S3).
+For instance, the following example uploads to an Cloudflare R2 S3 bucket:
+
+```bash
+export AWS_ACCESS_KEY_ID=<your_access_key_id>
+export AWS_SECRET_ACCESS_KEY=<your_secret_access_key>
+rattler-build upload s3 \
+  --channel s3://my-bucket/my-channel \
+  --region auto \
+  --endpoint-url https://xyz.r2.cloudflarestorage.com \
+  --force-path-style true
 ```
