@@ -160,7 +160,7 @@ rattler-build upload anaconda -o <your_username> -c <label> <package_files>
 
 To upload to an S3 bucket, you need to set access key ID, secret access key and (optionally) a session token.
 If not using `rattler-build auth login s3://my-bucket --s3-access-key-id <access-key-id> --s3-secret-access-key <secret-access-key> --s3-session-token <session-token>`, you can set the corresponding `AWS_*` environment variables (even if not using AWS S3).
-For instance, the following example uploads to an Cloudflare R2 S3 bucket:
+For instance, the following example uploads to a Cloudflare R2 S3 bucket:
 
 ```bash
 export AWS_ACCESS_KEY_ID=<your_access_key_id>
