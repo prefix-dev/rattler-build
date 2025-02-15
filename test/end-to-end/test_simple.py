@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from subprocess import DEVNULL, STDOUT, CalledProcessError, check_output
-from typing import Iterator, cast
+from typing import Iterator
 
 import boto3
 import pytest
