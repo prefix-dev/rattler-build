@@ -124,8 +124,6 @@ There is also a [terminal user interface (TUI)](https://prefix-dev.github.io/rat
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-
 context:
   name: xtensor
   version: 0.24.6

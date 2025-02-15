@@ -147,7 +147,7 @@ There is a GitHub Action for `rattler-build`. It can be used to install `rattler
 A simple example recipe for the `xtensor` header-only C++ library:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
+
 
 context:
   name: xtensor

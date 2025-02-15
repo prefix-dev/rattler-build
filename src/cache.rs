@@ -232,6 +232,12 @@ impl Output {
                 jinja.context_mut().insert(k.clone(), v.clone().into());
             }
 
+            let build_prefix = if cache.build.merge_build_and_host_envs {
+                None
+            } else {
+                Some(&self.build_configuration.directories.build_prefix)
+            };
+
             cache
                 .build
                 .script()
@@ -240,7 +246,7 @@ impl Output {
                     &self.build_configuration.directories.work_dir,
                     &self.build_configuration.directories.recipe_dir,
                     &self.build_configuration.directories.host_prefix,
-                    Some(&self.build_configuration.directories.build_prefix),
+                    build_prefix,
                     Some(jinja),
                     None, // sandbox config
                 )

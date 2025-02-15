@@ -61,7 +61,7 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.27", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.28", features = ["derive", "env", "cargo"] }
 minijinja = { version = "2.7.0", features = [
   "unstable_machinery",
   "custom_syntax",
@@ -78,7 +78,7 @@ num_cpus = "1.16.0"
 goblin = "0.9.3"
 scroll = "0.12.0"
 pathdiff = "0.2.3"
-comfy-table = "7.1.3"
+comfy-table = "7.1.4"
 futures = "0.3.31"
 indicatif = "0.17.11"
 console = { version = "0.15.10", features = ["windows-console-colors"] }
@@ -95,7 +95,7 @@ petgraph = "0.7.1"
 indexmap = "2.7.1"
 dunce = "1.0.5"
 fs-err = "3.1.0"
-which = "7.0.1"
+which = "7.0.2"
 clap_complete = "4.5.44"
 clap_complete_nushell = "4.5.5"
 tokio-util = "0.7.13"
@@ -110,7 +110,7 @@ base64 = "0.22.1"
 flate2 = "1.0.35"
 xz2 = "0.1.7"
 zstd = "0.13.2"
-toml = "0.8.19"
+toml = "0.8.20"
 memmap2 = "0.9.5"
 reqwest-middleware = { version = "0.4.0", features = ["json"] }
 async-once-cell = "0.5.4"
@@ -133,7 +133,7 @@ rattler = { version = "0.31.1", default-features = false, features = [
   "indicatif",
 ] }
 rattler_cache = { version = "0.3.8", default-features = false }
-rattler_conda_types = { version = "0.30.1", default-features = false, features = [
+rattler_conda_types = { version = "0.30.2", default-features = false, features = [
   "rayon",
 ] }
 rattler_digest = { version = "1.0.5", default-features = false, features = [

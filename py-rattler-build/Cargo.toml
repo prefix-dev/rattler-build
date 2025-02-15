@@ -27,11 +27,9 @@ tokio = { version = "1.43.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.30.0"
-clap = "4.5.27"
+rattler_conda_types = "0.30.2"
+clap = "4.5.28"
 url = "2.5.4"
-
-# pyo3-async-runtimes = { version = "0.23.0", features = ["tokio-runtime"] }
 
 [build-dependencies]
 pyo3-build-config = "0.23.4"

@@ -1,0 +1,40 @@
+---
+source: src/recipe_generator/pypi.rs
+expression: recipe
+---
+context:
+  version: 1.24.0
+package:
+  name: numpy
+  version: "${{ version }}"
+source:
+  - url: "https://pypi.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
+    sha256: c4ab7c9711fe6b235e86487ca74c1b092a6dd59a3cb45b63241ea0a148501853
+build:
+  script: "${{ PYTHON }} -m pip install ."
+  python:
+    entry_points:
+      - "f2py = numpy.f2py.f2py2e:main"
+      - "f2py3 = numpy.f2py.f2py2e:main"
+      - "f2py3.10 = numpy.f2py.f2py2e:main"
+requirements:
+  host:
+    - python >=3.8
+    - setuptools==59.2.0
+    - wheel==0.37.0
+    - "Cython>=0.29.30,<3.0"
+    - pip
+  run:
+    - python >=3.8
+tests:
+  - python:
+      imports:
+        - numpy
+      pip_check: true
+about:
+  homepage: "https://www.numpy.org"
+  summary: Fundamental package for array computing in Python
+  description: "<h1 align=\"center\">\n<img src=\"/branding/logo/primary/numpylogo.svg\" width=\"300\">\n</h1><br>\n\n\n[![Powered by NumFOCUS](https://img.shields.io/badge/powered%20by-NumFOCUS-orange.svg?style=flat&colorA=E1523D&colorB=007D8A)](\nhttps://numfocus.org)\n[![PyPI Downloads](https://img.shields.io/pypi/dm/numpy.svg?label=PyPI%20downloads)](\nhttps://pypi.org/project/numpy/)\n[![Conda Downloads](https://img.shields.io/conda/dn/conda-forge/numpy.svg?label=Conda%20downloads)](\nhttps://anaconda.org/conda-forge/numpy)\n[![Stack Overflow](https://img.shields.io/badge/stackoverflow-Ask%20questions-blue.svg)](\nhttps://stackoverflow.com/questions/tagged/numpy)\n[![Nature Paper](https://img.shields.io/badge/DOI-10.1038%2Fs41592--019--0686--2-blue)](\nhttps://doi.org/10.1038/s41586-020-2649-2)\n[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/numpy/numpy/badge)](https://api.securityscorecards.dev/projects/github.com/numpy/numpy)\n\n\nNumPy is the fundamental package for scientific computing with Python.\n\n- **Website:** https://www.numpy.org\n- **Documentation:** https://numpy.org/doc\n- **Mailing list:** https://mail.python.org/mailman/listinfo/numpy-discussion\n- **Source code:** https://github.com/numpy/numpy\n- **Contributing:** https://www.numpy.org/devdocs/dev/index.html\n- **Bug reports:** https://github.com/numpy/numpy/issues\n- **Report a security vulnerability:** https://tidelift.com/docs/security\n\nIt provides:\n\n- a powerful N-dimensional array object\n- sophisticated (broadcasting) functions\n- tools for integrating C/C++ and Fortran code\n- useful linear algebra, Fourier transform, and random number capabilities\n\nTesting:\n\nNumPy requires `pytest` and `hypothesis`.  Tests can then be run after installation with:\n\n    python -c 'import numpy; numpy.test()'\n\nCode of Conduct\n----------------------\n\nNumPy is a community-driven open source project developed by a diverse group of\n[contributors](https://numpy.org/teams/). The NumPy leadership has made a strong\ncommitment to creating an open, inclusive, and positive community. Please read the\n[NumPy Code of Conduct](https://numpy.org/code-of-conduct/) for guidance on how to interact\nwith others in a way that makes our community thrive.\n\nCall for Contributions\n----------------------\n\nThe NumPy project welcomes your expertise and enthusiasm!\n\nSmall improvements or fixes are always appreciated. If you are considering larger contributions\nto the source code, please contact us through the [mailing\nlist](https://mail.python.org/mailman/listinfo/numpy-discussion) first.\n\nWriting code isn’t the only way to contribute to NumPy. You can also:\n- review pull requests\n- help us stay on top of new and old issues\n- develop tutorials, presentations, and other educational materials\n- maintain and improve [our website](https://github.com/numpy/numpy.org)\n- develop graphic design for our brand assets and promotional materials\n- translate website content\n- help with outreach and onboard new contributors\n- write grant proposals and help with other fundraising efforts\n\nFor more information about the ways you can contribute to NumPy, visit [our website](https://numpy.org/contribute/). \nIf you’re unsure where to start or how your skills fit in, reach out! You can\nask on the mailing list or here, on GitHub, by opening a new issue or leaving a\ncomment on a relevant issue that is already open.\n\nOur preferred channels of communication are all public, but if you’d like to\nspeak to us in private first, contact our community coordinators at\nnumpy-team@googlegroups.com or on Slack (write numpy-team@googlegroups.com for\nan invitation).\n\nWe also have a biweekly community call, details of which are announced on the\nmailing list. You are very welcome to join.\n\nIf you are new to contributing to open source, [this\nguide](https://opensource.guide/how-to-contribute/) helps explain why, what,\nand how to successfully get involved.\n\n\n"
+  license: BSD-3-Clause
+  repository: "https://github.com/numpy/numpy"
+  documentation: "https://numpy.org/doc/1.24"

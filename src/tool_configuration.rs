@@ -7,7 +7,7 @@ use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
-    authentication_storage::{self, backends::file::FileStorageError},
+    authentication_storage::{self, AuthenticationStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
 };
 use rattler_repodata_gateway::Gateway;
@@ -94,7 +94,7 @@ pub struct Configuration {
 /// Get the authentication storage from the given file
 pub fn get_auth_store(
     auth_file: Option<PathBuf>,
-) -> Result<AuthenticationStorage, FileStorageError> {
+) -> Result<AuthenticationStorage, AuthenticationStorageError> {
     match auth_file {
         Some(auth_file) => {
             let mut store = AuthenticationStorage::empty();
@@ -103,18 +103,14 @@ pub fn get_auth_store(
             ));
             Ok(store)
         }
-        None => Ok(
-            rattler_networking::AuthenticationStorage::from_env_and_defaults().map_err(|e| {
-                FileStorageError::IOError(std::io::Error::new(std::io::ErrorKind::Other, e))
-            })?,
-        ),
+        None => rattler_networking::AuthenticationStorage::from_env_and_defaults(),
     }
 }
 
 /// Create a reqwest client with the authentication middleware
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-) -> Result<ClientWithMiddleware, FileStorageError> {
+) -> Result<ClientWithMiddleware, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
     let timeout = 5 * 60;

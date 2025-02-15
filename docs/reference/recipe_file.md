@@ -66,19 +66,6 @@ validation).<br/>
 The schema (and `pydantic` source file) can be found in this repository:
 [`recipe-format`](https://github.com/prefix-dev/recipe-format)
 
-???+ info "To use with VSCode(yaml-plugin) and other IDEs:"
-    Either start the document with the following line:
-    ```html
-    # yaml-language-server: $schema=https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json
-    ```
-    Or, using `yaml.schemas`,
-    ```yaml
-    yaml.schemas: {
-      "https://raw.githubusercontent.com/prefix-dev/recipe-format/main/schema.json": "**/recipe.yaml",
-    }
-    ```
-    Read more about this [here](https://github.com/redhat-developer/yaml-language-server).
-
 
 See more in the [automatic linting](../automatic_linting.md) chapter.
 
