@@ -3969,6 +3969,7 @@ name = "rust-tests"
 version = "0.1.0"
 dependencies = [
  "duct",
+ "fs-err",
  "glob",
  "rattler_package_streaming",
  "serde_json",

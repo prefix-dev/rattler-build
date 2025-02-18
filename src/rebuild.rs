@@ -1,8 +1,8 @@
 //! The rebuild module contains rebuild helper functions.
 
-use std::path::{Path, PathBuf};
-
+use fs_err as fs;
 use rattler_conda_types::package::ArchiveType;
+use std::path::{Path, PathBuf};
 
 /// Extracts a folder from a tar.bz2 archive.
 fn folder_from_tar_bz2(
@@ -10,7 +10,7 @@ fn folder_from_tar_bz2(
     find_path: &Path,
     dest_folder: &Path,
 ) -> Result<(), std::io::Error> {
-    let reader = std::fs::File::open(archive_path)?;
+    let reader = fs::File::open(archive_path)?;
     let mut archive = rattler_package_streaming::read::stream_tar_bz2(reader);
     archive.set_preserve_permissions(true);
 
@@ -21,7 +21,7 @@ fn folder_from_tar_bz2(
             let dest_file = dest_folder.join(stripped_path);
             if let Some(parent_folder) = dest_file.parent() {
                 if !parent_folder.exists() {
-                    std::fs::create_dir_all(parent_folder)?;
+                    fs::create_dir_all(parent_folder)?;
                 }
             }
             entry.unpack(dest_file)?;
@@ -36,7 +36,7 @@ fn folder_from_conda(
     find_path: &Path,
     dest_folder: &Path,
 ) -> Result<(), std::io::Error> {
-    let reader = std::fs::File::open(archive_path)?;
+    let reader = fs::File::open(archive_path)?;
 
     let mut archive = if find_path.starts_with("info") {
         rattler_package_streaming::seek::stream_conda_info(reader)
@@ -54,7 +54,7 @@ fn folder_from_conda(
             let dest_file = dest_folder.join(stripped_path);
             if let Some(parent_folder) = dest_file.parent() {
                 if !parent_folder.exists() {
-                    std::fs::create_dir_all(parent_folder)?;
+                    fs::create_dir_all(parent_folder)?;
                 }
             }
             entry.unpack(dest_file)?;

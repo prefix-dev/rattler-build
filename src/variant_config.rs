@@ -690,6 +690,7 @@ fn find_combinations(
 
 #[cfg(test)]
 mod tests {
+    use fs_err as fs;
     use rattler_conda_types::Platform;
     use rstest::rstest;
 
@@ -699,7 +700,7 @@ mod tests {
     #[case("selectors/config_1.yaml")]
     fn test_flatten_selectors(#[case] filename: &str) {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
-        let yaml_file = std::fs::read_to_string(test_data_dir.join(filename)).unwrap();
+        let yaml_file = fs::read_to_string(test_data_dir.join(filename)).unwrap();
         let yaml = Node::parse_yaml(0, yaml_file.as_str()).unwrap();
 
         let selector_config = SelectorConfig {
@@ -761,7 +762,7 @@ mod tests {
 
         // First find all outputs from the recipe
         let recipe_text =
-            std::fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
+            fs::read_to_string(test_data_dir.join("recipes/variants/recipe.yaml")).unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config
@@ -840,7 +841,7 @@ mod tests {
         for _ in 1..3 {
             // First find all outputs from the recipe
             let recipe_text =
-                std::fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
+                fs::read_to_string(test_data_dir.join("recipes/output_order/order_1.yaml"))
                     .unwrap();
             let outputs =
                 crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
@@ -872,8 +873,7 @@ mod tests {
 
         // First find all outputs from the recipe
         let recipe_text =
-            std::fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml"))
-                .unwrap();
+            fs::read_to_string(test_data_dir.join("recipes/variants/boltons_recipe.yaml")).unwrap();
         let outputs = crate::recipe::parser::find_outputs_from_src(recipe_text.as_str()).unwrap();
         let variant_config = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
         let outputs_and_variants = variant_config

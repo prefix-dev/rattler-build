@@ -442,7 +442,7 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod test {
-    use std::fs;
+    use fs_err as fs;
 
     use super::TestType;
     use insta::assert_snapshot;

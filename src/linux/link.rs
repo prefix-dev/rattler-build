@@ -403,7 +403,8 @@ fn builtin_relink(elf_path: &Path, new_rpath: &[PathBuf]) -> Result<(), RelinkEr
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{fs, path::Path};
+    use fs_err as fs;
+    use std::path::Path;
     use tempfile::tempdir_in;
 
     // Assert the following case:

@@ -485,7 +485,7 @@ impl Output {
         new_files.insert(index_json_path);
 
         let hash_input_path = info_folder.join("hash_input.json");
-        std::fs::write(&hash_input_path, self.hash_input().as_bytes())?;
+        fs::write(&hash_input_path, self.hash_input().as_bytes())?;
         new_files.insert(hash_input_path);
 
         let about_json_path = root_dir.join(AboutJson::package_path());

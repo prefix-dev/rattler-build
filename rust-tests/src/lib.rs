@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
     use duct::cmd;
+    use fs_err as fs;
     use rattler_package_streaming::read::extract_tar_bz2;
     use std::{
         collections::HashMap,
@@ -137,7 +138,7 @@ mod tests {
         /// delete temp dir after the fact
         fn drop(&mut self) {
             // self.0.exists().then_some({
-            //     _ = std::fs::remove_dir_all(&self.0);
+            //     _ = fs::remove_dir_all(&self.0);
             // });
         }
     }
@@ -154,7 +155,7 @@ mod tests {
 
     fn tmp(s: impl AsRef<str>) -> WithTemp {
         let path = std::env::temp_dir().join(s.as_ref());
-        _ = std::fs::create_dir_all(&path);
+        _ = fs::create_dir_all(&path);
         for i in 0.. {
             let p = path.join(format!("{i}"));
             if p.exists() {
@@ -192,10 +193,10 @@ mod tests {
 
         // Create recipe directory
         let recipe_dir = tmp.as_dir().join("recipe");
-        std::fs::create_dir_all(&recipe_dir).unwrap();
+        fs::create_dir_all(&recipe_dir).unwrap();
 
         // Write recipe.yaml file
-        std::fs::write(recipe_dir.join("recipe.yaml"), recipe_yaml_string).unwrap();
+        fs::write(recipe_dir.join("recipe.yaml"), recipe_yaml_string).unwrap();
 
         // Build with rattler-build
         let rattler_build = rattler().build(recipe_dir, output_dir, None, None);
@@ -239,15 +240,14 @@ mod tests {
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
         assert!(pkg.join("info/run_exports.json").exists());
         let actual_run_export: HashMap<String, Vec<String>> =
-            serde_json::from_slice(&std::fs::read(pkg.join("info/run_exports.json")).unwrap())
-                .unwrap();
+            serde_json::from_slice(&fs::read(pkg.join("info/run_exports.json")).unwrap()).unwrap();
         assert!(actual_run_export.contains_key("weak"));
         assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
         let x = &actual_run_export.get("weak").unwrap()[0];
         assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
-            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+            serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
         assert!(!index_json.contains_key("depends"));
     }
 
@@ -261,15 +261,14 @@ mod tests {
         let pkg = get_extracted_package(tmp.as_dir(), "run_exports_test");
         assert!(pkg.join("info/run_exports.json").exists());
         let actual_run_export: HashMap<String, Vec<String>> =
-            serde_json::from_slice(&std::fs::read(pkg.join("info/run_exports.json")).unwrap())
-                .unwrap();
+            serde_json::from_slice(&fs::read(pkg.join("info/run_exports.json")).unwrap()).unwrap();
         assert!(actual_run_export.contains_key("weak"));
         assert_eq!(actual_run_export.get("weak").unwrap().len(), 1);
         let x = &actual_run_export.get("weak").unwrap()[0];
         assert!(x.starts_with("run_exports_test ==1.0.0 h") && x.ends_with("_0"));
         assert!(pkg.join("info/index.json").exists());
         let index_json: HashMap<String, serde_json::Value> =
-            serde_json::from_slice(&std::fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
+            serde_json::from_slice(&fs::read(pkg.join("info/index.json")).unwrap()).unwrap();
         assert!(!index_json.contains_key("depends"));
     }
 
@@ -353,13 +352,13 @@ mod tests {
             let expected = expected.join(f);
             // println!("expected = {}", expected.display());
             let mut cmp: HashMap<String, serde_json::Value> =
-                serde_json::from_slice(&std::fs::read(expected).unwrap()).unwrap();
+                serde_json::from_slice(&fs::read(expected).unwrap()).unwrap();
 
             let actual_path = folder.join("info").join(f);
             assert!(actual_path.exists());
             // println!("actual = {}", actual_path.display());
             let actual: HashMap<String, serde_json::Value> =
-                serde_json::from_slice(&std::fs::read(actual_path).unwrap()).unwrap();
+                serde_json::from_slice(&fs::read(actual_path).unwrap()).unwrap();
 
             if f == "index.json" {
                 cmp.insert("timestamp".to_string(), actual["timestamp"].clone());
@@ -400,7 +399,7 @@ mod tests {
         assert!(pkg.join("info/licenses/LICENSE").exists());
         let installer = pkg.join("site-packages/toml-0.10.2.dist-info/INSTALLER");
         assert!(installer.exists());
-        assert_eq!(std::fs::read_to_string(installer).unwrap().trim(), "conda");
+        assert_eq!(fs::read_to_string(installer).unwrap().trim(), "conda");
         check_info(pkg, recipes().join("toml/expected"));
     }
 
@@ -415,7 +414,7 @@ mod tests {
         // this is to ensure that the clone happens correctly
         let license = pkg.join("info/licenses/LICENSE");
         assert!(license.exists());
-        let src = std::fs::read_to_string(license).unwrap();
+        let src = fs::read_to_string(license).unwrap();
         assert!(src.contains(" Georgi "));
     }
 
