@@ -7,8 +7,8 @@ zip_keys: ~
 c_compiler:
   - super_g++
 cplusplus:
-  - 10
-  - 1000
+  - "10"
+  - "1000"
 cxx_compiler:
   - super_gcc
 python:

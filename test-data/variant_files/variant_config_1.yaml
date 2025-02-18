@@ -74,3 +74,7 @@ arrow_cpp:
 assimp:
   - 5.2.5
 aws_sdk_cpp: "4.5"
+integer: 5
+boolean: true
+noboolean: "true"
+nointeger: "5"

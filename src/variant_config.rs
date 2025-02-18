@@ -260,6 +260,7 @@ impl VariantConfig {
         let rendered_node: RenderedNode = yaml_node
             .render(&jinja, path.to_string_lossy().as_ref())
             .map_err(|e| ParseErrors::from_partial_vec(source.clone(), e))?;
+
         let config: VariantConfig = rendered_node
             .try_convert(path.to_string_lossy().as_ref())
             .map_err(|e| {
@@ -577,9 +578,9 @@ impl TryConvertNode<VariantConfig> for RenderedMappingNode {
                     config.zip_keys = value.try_convert(key_str)?;
                 }
                 _ => {
-                    let variants: Option<Vec<_>> = value.try_convert(key_str)?;
+                    let variants: Option<Vec<Variable>> = value.try_convert(key_str)?;
                     if let Some(variants) = variants {
-                        config.variants.insert(key_str.into(), variants.clone());
+                        config.variants.insert(key_str.into(), variants);
                     }
                 }
             }
@@ -740,7 +741,10 @@ mod tests {
         };
 
         let variant = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
-
+        assert_eq!(
+            variant.variants.get(&"noboolean".into()).unwrap(),
+            &vec![Variable::from_string("true")]
+        );
         insta::assert_yaml_snapshot!(variant);
     }
 

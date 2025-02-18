@@ -432,6 +432,14 @@ impl ScalarNode {
             _ => None,
         }
     }
+
+    /// Convert the scalar node to an integer and follow coercion rules
+    pub fn as_integer(&self) -> Option<i64> {
+        if !self.may_coerce {
+            return None;
+        }
+        self.value.parse().ok()
+    }
 }
 
 impl HasSpan for ScalarNode {
