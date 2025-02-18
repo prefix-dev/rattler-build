@@ -713,13 +713,13 @@ impl Object for Env {
 #[cfg(test)]
 mod tests {
     // git version is too old in cross container for aarch64
+    use fs_err as fs;
+    use rattler_conda_types::Platform;
     #[cfg(not(all(
         any(target_arch = "aarch64", target_arch = "powerpc64"),
         target_os = "linux"
     )))]
     use std::path::Path;
-
-    use rattler_conda_types::Platform;
 
     use crate::utils::to_forward_slash_lossy;
 
@@ -733,9 +733,9 @@ mod tests {
     fn with_temp_dir(key: &'static str, f: impl Fn(&std::path::Path)) {
         let tempdir = tempfile::tempdir().unwrap();
         let dir = tempdir.path().join(key);
-        std::fs::create_dir_all(&dir).unwrap();
+        fs::create_dir_all(&dir).unwrap();
         f(&dir);
-        std::fs::remove_dir_all(dir).unwrap();
+        fs::remove_dir_all(dir).unwrap();
     }
 
     // git version is too old in cross container for aarch64
@@ -749,7 +749,7 @@ mod tests {
 	name = John Doe
 	email = johndoe@example.ne
 "#;
-        std::fs::write(path.join(".git/config"), git_config)?;
+        fs::write(path.join(".git/config"), git_config)?;
         Ok(())
     }
 
@@ -772,7 +772,7 @@ mod tests {
         };
         if git_with_args("init", &[])? {
             git_setup(path.as_ref())?;
-            std::fs::write(path.as_ref().join("README.md"), "init")?;
+            fs::write(path.as_ref().join("README.md"), "init")?;
             let git_add = git_with_args("add", &["."])?;
             let commit_created = git_with_args("commit", &["-m", "init", "--no-gpg-sign"])?;
             let tag_created = git_with_args("tag", &[tag.as_ref()])?;
@@ -831,14 +831,14 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test.json");
         let path_str = to_forward_slash_lossy(&path);
-        std::fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
+        fs::write(&path, "{ \"hello\": \"world\" }").unwrap();
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 1").as_str(),
             Some("world"),
         );
 
         let path = temp_dir.path().join("test.yaml");
-        std::fs::write(&path, "hello: world").unwrap();
+        fs::write(&path, "hello: world").unwrap();
         let path_str = to_forward_slash_lossy(&path);
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
@@ -847,7 +847,7 @@ mod tests {
 
         let path = temp_dir.path().join("test.toml");
         let path_str = to_forward_slash_lossy(&path);
-        std::fs::write(&path, "hello = 'world'").unwrap();
+        fs::write(&path, "hello = 'world'").unwrap();
         assert_eq!(
             jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
             Some("world"),

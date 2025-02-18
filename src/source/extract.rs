@@ -183,7 +183,8 @@ pub(crate) fn extract_zip(
 
 #[cfg(test)]
 mod test {
-    use std::{fs::File, io::Write};
+    use fs_err::{self as fs, File};
+    use std::io::Write;
 
     use crate::{console_utils::LoggingOutputHandler, source::SourceError};
 
@@ -220,7 +221,7 @@ mod test {
         ));
         assert!(res.err().is_none());
         assert!(tempdir.path().join("text.txt").exists());
-        assert!(std::fs::read_to_string(tempdir.path().join("text.txt"))
+        assert!(fs::read_to_string(tempdir.path().join("text.txt"))
             .unwrap()
             .contains("Hello, World"));
     }

@@ -1,11 +1,11 @@
 //! Relink a dylib to use relative paths for rpaths
+use fs_err::File;
 use goblin::mach::Mach;
 use indexmap::IndexSet;
 use memmap2::MmapMut;
 use scroll::Pread;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
@@ -536,12 +536,11 @@ fn install_name_tool(
 #[cfg(test)]
 #[cfg(target_os = "macos")]
 mod tests {
+    use fs_err as fs;
     use std::{
         collections::{HashMap, HashSet},
-        fs,
         path::{Path, PathBuf},
     };
-
     use tempfile::tempdir_in;
 
     use super::{install_name_tool, RelinkError};

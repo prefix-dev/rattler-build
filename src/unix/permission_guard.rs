@@ -51,7 +51,8 @@ mod unix {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::fs::{self, File};
+        use fs_err as fs;
+        use fs_err::File;
         use tempfile::tempdir;
 
         #[test]
