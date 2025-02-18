@@ -741,7 +741,10 @@ mod tests {
         };
 
         let variant = VariantConfig::from_files(&[yaml_file], &selector_config).unwrap();
-        assert_eq!(variant.variants.get(&"noboolean".into()).unwrap(), &vec![Variable::from_string("true")]);
+        assert_eq!(
+            variant.variants.get(&"noboolean".into()).unwrap(),
+            &vec![Variable::from_string("true")]
+        );
         insta::assert_yaml_snapshot!(variant);
     }
 

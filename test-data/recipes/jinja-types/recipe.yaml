@@ -21,6 +21,7 @@ context:
   computed_int: ${{ "12.3" | replace(".", "") | int }}
   is_computed_int: ${{ computed_int is integer }}
   is_quoted_true: ${{ cquoted_bool is string }}
+  # quoted bool is quoted in variants.yaml and thus should be a string
   is_quoted_true_var: ${{ quoted_bool is string }}
   is_quoted_int_var: ${{ quoted_int is string }}
 

@@ -184,7 +184,7 @@ impl Recipe {
                 if let Some(rendered) = rendered {
                     let variable = if let Some(value) = rendered.as_bool() {
                         Variable::from(value)
-                    } else if let Some(value) = rendered.as_i64() {
+                    } else if let Some(value) = rendered.as_integer() {
                         Variable::from(value)
                     } else {
                         Variable::from_string(&rendered)

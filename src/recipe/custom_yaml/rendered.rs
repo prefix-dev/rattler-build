@@ -257,7 +257,12 @@ impl RenderedScalarNode {
     }
 
     pub fn new_blank() -> Self {
-        Self::new(marked_yaml::Span::new_blank(), String::new(), String::new(), false)
+        Self::new(
+            marked_yaml::Span::new_blank(),
+            String::new(),
+            String::new(),
+            false,
+        )
     }
 
     /// Treat the scalar node as a string
@@ -669,7 +674,12 @@ impl Render<RenderedNode> for ScalarNode {
             )]
         })?;
         // unsure whether this should be allowed to coerce // check if it's quoted?
-        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered, self.may_coerce);
+        let rendered = RenderedScalarNode::new(
+            *self.span(),
+            self.as_str().to_string(),
+            rendered,
+            self.may_coerce,
+        );
 
         if rendered.is_empty() {
             Ok(RenderedNode::Null(rendered))
@@ -694,7 +704,12 @@ impl Render<Option<RenderedNode>> for ScalarNode {
         })?;
 
         // TODO check if it should coerce or not here?!
-        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered, self.may_coerce);
+        let rendered = RenderedScalarNode::new(
+            *self.span(),
+            self.as_str().to_string(),
+            rendered,
+            self.may_coerce,
+        );
 
         if rendered.is_empty() {
             Ok(None)

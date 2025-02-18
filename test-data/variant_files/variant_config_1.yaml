@@ -78,4 +78,3 @@ integer: 5
 boolean: true
 noboolean: "true"
 nointeger: "5"
-
