@@ -1,8 +1,8 @@
 //! The rebuild module contains rebuild helper functions.
 
-use std::path::{Path, PathBuf};
 use fs_err as fs;
 use rattler_conda_types::package::ArchiveType;
+use std::path::{Path, PathBuf};
 
 /// Extracts a folder from a tar.bz2 archive.
 fn folder_from_tar_bz2(

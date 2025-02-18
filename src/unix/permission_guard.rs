@@ -5,11 +5,11 @@ pub const READ_WRITE: u32 = 0o600;
 
 #[cfg(unix)]
 mod unix {
+    use fs_err as fs;
     use std::fs::Permissions;
     use std::io;
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
-    use fs_err as fs;
 
     /// A guard that modifies the permissions of a file and restores them when dropped.
     pub struct PermissionGuard {
@@ -41,9 +41,7 @@ mod unix {
     impl Drop for PermissionGuard {
         fn drop(&mut self) {
             if self.path.exists() {
-                if let Err(e) =
-                    fs::set_permissions(&self.path, self.original_permissions.clone())
-                {
+                if let Err(e) = fs::set_permissions(&self.path, self.original_permissions.clone()) {
                     eprintln!("Failed to restore file permissions: {}", e);
                 }
             }

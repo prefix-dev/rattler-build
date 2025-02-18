@@ -1,11 +1,11 @@
 //! This module contains the implementation of the fetching for a `UrlSource` struct.
 
+use fs_err as fs;
 use std::{
     ffi::OsStr,
     io::{Read as _, Write as _},
     path::{Path, PathBuf},
 };
-use fs_err as fs;
 
 use crate::{
     console_utils::LoggingOutputHandler,
