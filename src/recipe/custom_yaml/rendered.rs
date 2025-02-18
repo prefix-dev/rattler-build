@@ -703,7 +703,6 @@ impl Render<Option<RenderedNode>> for ScalarNode {
             )]
         })?;
 
-        // TODO check if it should coerce or not here?!
         let rendered = RenderedScalarNode::new(
             *self.span(),
             self.as_str().to_string(),
