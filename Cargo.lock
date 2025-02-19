@@ -1693,8 +1693,7 @@ dependencies = [
 [[package]]
 name = "file_url"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f75ca0511313d95b0ca15b916b4532975b31b92ed882ddeaa23cbfca4955f32a"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -3856,8 +3855,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab5f53a286c4dee652b3e986fd0a03f662d45f01e476f0bcbdd0874e8d892563"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "anyhow",
  "clap",
@@ -3995,8 +3993,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "453b425cfea126dc62839ad6e40e1125020989489a2dc2069cf16d5cf2a8e0fd"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -4015,7 +4012,9 @@ dependencies = [
  "rayon",
  "reqwest",
  "reqwest-middleware",
+ "serde_json",
  "simple_spawn_blocking",
+ "tempfile",
  "thiserror 2.0.11",
  "tokio",
  "tracing",
@@ -4025,8 +4024,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.30.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d52bc8c582e96cf777fd5ae74de7e247aff99608ed1ba54b8afd918254a180f"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "chrono",
  "dirs",
@@ -4064,8 +4062,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da135964124c18d81b9b02864e027e4f993881fa782c876c443bafb2e35ebc2f"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "blake2",
  "digest",
@@ -4081,8 +4078,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.20.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c156e10ff8190f6c6a9c7cbf25b2b7323e1db15f6ba93b8b74105e156cd48735"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -4097,8 +4093,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "382cfcb2acfcdd5a0d7efdbb86705e03435c76c784f404d78b517649b522d244"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "quote",
  "syn",
@@ -4107,8 +4102,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.22.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1ead7c1cbbf911d244656016a50533511156e95514e01c92af83a4f083a5bff"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4137,8 +4131,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.22.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1d425d69e2f3bb74e1714ddcddfc9ea239e262c03287a6d4f85cb2310fda2ac"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "bzip2 0.5.1",
  "chrono",
@@ -4152,6 +4145,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "serde_json",
+ "simple_spawn_blocking",
  "tar",
  "tempfile",
  "thiserror 2.0.11",
@@ -4166,8 +4160,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb2602372bcb67b3046098075fdee8507484545d4a9604918afdee003fd8db5b"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4177,8 +4170,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.21.37"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc074e814745f22fc2d3d23d711581f14ffb7d37c68520df8685d712637a62a2"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4233,8 +4225,7 @@ dependencies = [
 [[package]]
 name = "rattler_sandbox"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39339447da626331852b0c1d889434fdc364595ddca6a7af6b8e58c5d736737a"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "birdcage",
  "clap",
@@ -4245,8 +4236,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.22.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea6a26f07860b788b3dfc14b86736e79028b75483d3834ec41d2aba2f5529a86"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "enum_dispatch",
  "fs-err",
@@ -4264,8 +4254,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "1.3.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90d56b5bc5c97ba1ac45002fd368dc685f9312f9c0bb7bc522fe609fd91e1603"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "chrono",
  "futures",
@@ -4284,8 +4273,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "397e6658e354206c2d9fdb88ab9dafcce76388f7047a55262b41d14ca5867daa"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "archspec",
  "libloading",
@@ -5228,8 +5216,7 @@ dependencies = [
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b31ed96d1593e129cc76cb7aca364fb5c173558bfda922c15aac4e2f2f5844e"
+source = "git+https://github.com/conda/rattler?branch=main#70a2319879040667652e962aecb2d9a2ebfc05a9"
 dependencies = [
  "tokio",
 ]

@@ -7,7 +7,7 @@ use std::{
 
 use indicatif::{HumanBytes, MultiProgress, ProgressBar};
 use rattler::install::Placement;
-use rattler_cache::package_cache::PackageCache;
+use rattler_cache::run_exports_cache::RunExportsCache;
 use rattler_conda_types::{
     package::RunExportsJson, ChannelUrl, MatchSpec, NamelessMatchSpec, PackageName, PackageRecord,
     Platform, RepoDataRecord,
@@ -522,13 +522,11 @@ pub fn apply_variant(
 /// Collect run exports from the package cache and add them to the package
 /// records.
 /// TODO: There are many ways that would allow us to optimize this function.
-/// 1. This currently downloads an entire package, but we only need the
-///    `run_exports.json`.
-/// 2. There are special run_exports.json files available for some channels.
+/// 1. There are special run_exports.json files available for some channels.
 async fn amend_run_exports(
     records: &mut [RepoDataRecord],
     client: ClientWithMiddleware,
-    package_cache: PackageCache,
+    run_exports_cache: RunExportsCache,
     multi_progress: MultiProgress,
     progress_prefix: impl Into<Cow<'static, str>>,
     top_level_pb: Option<ProgressBar>,
@@ -551,7 +549,7 @@ async fn amend_run_exports(
         let extractor = RunExportExtractor::default()
             .with_max_concurrent_requests(max_concurrent_requests.clone())
             .with_client(client.clone())
-            .with_package_cache(package_cache.clone(), progress.clone());
+            .with_run_exports_cache(run_exports_cache.clone(), progress.clone());
 
         let tx = tx.clone();
         let record = pkg.clone();
@@ -692,7 +690,7 @@ pub(crate) async fn resolve_dependencies(
                 amend_run_exports(
                     &mut resolved,
                     tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
+                    tool_configuration.run_exports_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
                         .multi_progress()
@@ -788,7 +786,7 @@ pub(crate) async fn resolve_dependencies(
                 amend_run_exports(
                     &mut resolved,
                     tool_configuration.client.clone(),
-                    tool_configuration.package_cache.clone(),
+                    tool_configuration.run_exports_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
                         .multi_progress()

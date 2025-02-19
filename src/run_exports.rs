@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
 use futures::future::OptionFuture;
-use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
-use rattler_conda_types::{
-    package::{PackageFile, RunExportsJson},
-    RepoDataRecord,
+use rattler_cache::run_exports_cache::{
+    CacheKey, CacheKeyError, RunExportsCache, RunExportsCacheError,
 };
+use rattler_conda_types::{package::RunExportsJson, RepoDataRecord};
 use rattler_networking::retry_policies::default_retry_policy;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
@@ -20,14 +19,17 @@ use crate::package_cache_reporter::PackageCacheReporter;
 #[derive(Default)]
 pub struct RunExportExtractor {
     max_concurrent_requests: Option<Arc<Semaphore>>,
-    package_cache: Option<(PackageCache, PackageCacheReporter)>,
+    run_exports_cache: Option<(RunExportsCache, PackageCacheReporter)>,
     client: Option<ClientWithMiddleware>,
 }
 
 #[derive(Debug, Error)]
 pub enum RunExportExtractorError {
     #[error(transparent)]
-    PackageCache(#[from] PackageCacheError),
+    RunExportsCache(#[from] RunExportsCacheError),
+
+    #[error(transparent)]
+    CacheKey(#[from] CacheKeyError),
 
     #[error("the operation was cancelled")]
     Cancelled,
@@ -43,15 +45,15 @@ impl RunExportExtractor {
         }
     }
 
-    /// Set the package cache that the extractor can use as well as a reporter
+    /// Set the run exports cache that the extractor can use as well as a reporter
     /// to allow progress reporting.
-    pub fn with_package_cache(
+    pub fn with_run_exports_cache(
         self,
-        package_cache: PackageCache,
+        run_exports_cache: RunExportsCache,
         reporter: PackageCacheReporter,
     ) -> Self {
         Self {
-            package_cache: Some((package_cache, reporter)),
+            run_exports_cache: Some((run_exports_cache, reporter)),
             ..self
         }
     }
@@ -70,24 +72,25 @@ impl RunExportExtractor {
         mut self,
         record: &RepoDataRecord,
     ) -> Result<Option<RunExportsJson>, RunExportExtractorError> {
-        self.extract_into_package_cache(record).await
+        self.extract_into_run_exports_cache(record).await
     }
 
-    /// Extract the run exports from a package by downloading it to the cache
-    /// and then reading the run_exports.json file.
-    async fn extract_into_package_cache(
+    /// Extract the run exports from a package by downloading and extracting only the run_exports.json file into the cache.
+    async fn extract_into_run_exports_cache(
         &mut self,
         record: &RepoDataRecord,
     ) -> Result<Option<RunExportsJson>, RunExportExtractorError> {
-        let Some((package_cache, mut package_cache_reporter)) = self.package_cache.clone() else {
+        let Some((run_exports_cache, mut run_exports_cache_reporter)) =
+            self.run_exports_cache.clone()
+        else {
             return Ok(None);
         };
         let Some(client) = self.client.clone() else {
             return Ok(None);
         };
 
-        let progress_reporter = package_cache_reporter.add(record);
-        let cache_key = CacheKey::from(&record.package_record);
+        let progress_reporter = run_exports_cache_reporter.add(record);
+        let cache_key = CacheKey::create(&record.package_record, &record.file_name)?;
         let url = record.url.clone();
         let max_concurrent_requests = self.max_concurrent_requests.clone();
 
@@ -96,9 +99,9 @@ impl RunExportExtractor {
             .transpose()
             .expect("semaphore error");
 
-        match package_cache
+        match run_exports_cache
             .get_or_fetch_from_url_with_retry(
-                cache_key,
+                &cache_key,
                 url,
                 client,
                 default_retry_policy(),
@@ -106,7 +109,7 @@ impl RunExportExtractor {
             )
             .await
         {
-            Ok(package_dir) => Ok(RunExportsJson::from_package_directory(package_dir.path()).ok()),
+            Ok(cached_run_exports) => Ok(cached_run_exports.run_exports()),
             Err(e) => Err(e.into()),
         }
     }
