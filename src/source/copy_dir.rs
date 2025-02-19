@@ -475,7 +475,8 @@ impl Match {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashSet, fs, fs::File};
+    use fs_err::{self as fs, File};
+    use std::collections::HashSet;
 
     use crate::recipe::parser::GlobVec;
 
@@ -491,10 +492,10 @@ mod test {
         // test_dir/test.md
         // test_dir/test_dir2/
 
-        std::fs::write(dir.join("test.txt"), "test").unwrap();
-        std::fs::create_dir(dir.join("test_dir")).unwrap();
-        std::fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
-        std::fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
+        fs::write(dir.join("test.txt"), "test").unwrap();
+        fs::create_dir(dir.join("test_dir")).unwrap();
+        fs::write(dir.join("test_dir").join("test.md"), "test").unwrap();
+        fs::create_dir(dir.join("test_dir").join("test_dir2")).unwrap();
 
         let dest_dir = tmp_dir_path.as_path().join("test_copy_dir_dest");
         let _copy_dir = super::CopyDir::new(&dir, &dest_dir)
@@ -622,7 +623,7 @@ mod test {
 
         let broken_symlink_dest = dest_dir.path().join("broken_symlink");
         assert_eq!(
-            std::fs::read_link(broken_symlink_dest).unwrap(),
+            fs::read_link(broken_symlink_dest).unwrap(),
             std::path::PathBuf::from("/does/not/exist")
         );
     }

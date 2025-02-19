@@ -234,6 +234,7 @@ pub struct RenderedScalarNode {
     span: marked_yaml::Span,
     source: String,
     value: String,
+    may_coerce: bool,
 }
 
 impl Serialize for RenderedScalarNode {
@@ -246,16 +247,22 @@ impl Serialize for RenderedScalarNode {
 }
 
 impl RenderedScalarNode {
-    pub fn new(span: marked_yaml::Span, source: String, value: String) -> Self {
+    pub fn new(span: marked_yaml::Span, source: String, value: String, may_coerce: bool) -> Self {
         Self {
             span,
             source,
             value,
+            may_coerce,
         }
     }
 
     pub fn new_blank() -> Self {
-        Self::new(marked_yaml::Span::new_blank(), String::new(), String::new())
+        Self::new(
+            marked_yaml::Span::new_blank(),
+            String::new(),
+            String::new(),
+            false,
+        )
     }
 
     /// Treat the scalar node as a string
@@ -286,11 +293,21 @@ impl RenderedScalarNode {
     ///
     /// Everything else is not a boolean and so will return None
     pub fn as_bool(&self) -> Option<bool> {
+        if !self.may_coerce {
+            return None;
+        }
         match self.value.as_str() {
             "true" | "True" | "TRUE" => Some(true),
             "false" | "False" | "FALSE" => Some(false),
             _ => None,
         }
+    }
+
+    pub fn as_integer(&self) -> Option<i64> {
+        if !self.may_coerce {
+            return None;
+        }
+        self.value.parse().ok()
     }
 }
 
@@ -340,6 +357,7 @@ impl<'a> From<&'a str> for RenderedScalarNode {
             marked_yaml::Span::new_blank(),
             value.to_owned(),
             value.to_owned(),
+            false,
         )
     }
 }
@@ -347,7 +365,7 @@ impl<'a> From<&'a str> for RenderedScalarNode {
 impl From<String> for RenderedScalarNode {
     /// Convert from any owned string into a node
     fn from(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.clone(), value)
+        Self::new(marked_yaml::Span::new_blank(), value.clone(), value, false)
     }
 }
 
@@ -377,6 +395,7 @@ impl From<&MarkedScalarNode> for RenderedScalarNode {
             *value.span(),
             value.as_str().to_owned(),
             value.as_str().to_owned(),
+            value.may_coerce(),
         )
     }
 }
@@ -639,6 +658,7 @@ impl Render<RenderedNode> for Node {
                 *n.span(),
                 n.as_str().to_owned(),
                 n.as_str().to_owned(),
+                false,
             ))),
         }
     }
@@ -653,7 +673,13 @@ impl Render<RenderedNode> for ScalarNode {
                 label = jinja_error_to_label(&err),
             )]
         })?;
-        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
+        // unsure whether this should be allowed to coerce // check if it's quoted?
+        let rendered = RenderedScalarNode::new(
+            *self.span(),
+            self.as_str().to_string(),
+            rendered,
+            self.may_coerce,
+        );
 
         if rendered.is_empty() {
             Ok(RenderedNode::Null(rendered))
@@ -677,7 +703,12 @@ impl Render<Option<RenderedNode>> for ScalarNode {
             )]
         })?;
 
-        let rendered = RenderedScalarNode::new(*self.span(), self.as_str().to_string(), rendered);
+        let rendered = RenderedScalarNode::new(
+            *self.span(),
+            self.as_str().to_string(),
+            rendered,
+            self.may_coerce,
+        );
 
         if rendered.is_empty() {
             Ok(None)
@@ -708,6 +739,7 @@ impl Render<RenderedMappingNode> for MappingNode {
                 *key.span(),
                 key.as_str().to_owned(),
                 key.as_str().to_owned(),
+                false,
             );
             let value: RenderedNode = value.render(jinja, &format!("{name}.{}", key.as_str()))?;
             if value.is_null() {
@@ -730,6 +762,7 @@ impl Render<RenderedNode> for SequenceNode {
                 *self.span(),
                 String::new(),
                 String::new(),
+                false,
             )));
         }
 

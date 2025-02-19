@@ -7,7 +7,7 @@ zip_keys: ~
 c_compiler:
   - vs2019
 cplusplus:
-  - 100
+  - "100"
 cxx_compiler:
   - vs2019
 python:

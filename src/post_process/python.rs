@@ -345,7 +345,7 @@ pub(crate) fn create_entry_points(
             file.write_all(script.as_bytes())?;
 
             #[cfg(target_family = "unix")]
-            std::fs::set_permissions(
+            fs::set_permissions(
                 &script_path,
                 std::os::unix::fs::PermissionsExt::from_mode(0o775),
             )?;

@@ -73,6 +73,9 @@ fn extract_variable_from_expression(expr: &Expr, variables: &mut HashSet<String>
         Expr::Var(var) => {
             variables.insert(var.id.into());
         }
+        Expr::Test(test) => {
+            extract_variable_from_expression(&test.expr, variables);
+        }
         Expr::BinOp(binop) => {
             extract_variable_from_expression(&binop.left, variables);
             extract_variable_from_expression(&binop.right, variables);
@@ -337,6 +340,7 @@ mod test {
             - ${{ pin_compatible(abc ~ def) }}
             - if: match(xpython, ">=3.7")
               then: numpy 100
+            - ${{ testexprvar is string }}
         "#;
 
         let recipe_node = crate::recipe::custom_yaml::Node::parse_yaml(0, recipe).unwrap();
@@ -354,6 +358,7 @@ mod test {
         assert!(used_vars.contains("abc"));
         assert!(used_vars.contains("def"));
         assert!(used_vars.contains("xpython"));
+        assert!(used_vars.contains("testexprvar"));
     }
 
     #[test]

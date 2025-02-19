@@ -6,3 +6,7 @@ xstring:
   - "blah"
 xboolean:
   - true
+quoted_bool:
+  - "true"
+quoted_int:
+  - "5"

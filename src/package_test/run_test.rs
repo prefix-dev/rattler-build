@@ -282,9 +282,9 @@ pub async fn run_test(
     };
 
     let subdir = tmp_repo.path().join(target_platform.to_string());
-    std::fs::create_dir_all(&subdir)?;
+    fs::create_dir_all(&subdir)?;
 
-    std::fs::copy(
+    fs::copy(
         package_file,
         subdir.join(
             package_file
@@ -295,7 +295,7 @@ pub async fn run_test(
 
     // Also copy the downstream package if it exists
     if let Some(ref downstream_package) = downstream_package {
-        std::fs::copy(
+        fs::copy(
             downstream_package,
             subdir.join(
                 downstream_package

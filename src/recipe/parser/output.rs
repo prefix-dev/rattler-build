@@ -259,28 +259,28 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
-
     use super::*;
     use crate::{
         assert_miette_snapshot,
         recipe::{jinja::SelectorConfig, Recipe},
     };
+    use fs_err as fs;
+    use insta::assert_debug_snapshot;
 
     #[test]
     fn recipe_schema_error() {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_and_package.yaml");
-        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let src = fs::read_to_string(yaml_file).unwrap();
         assert_miette_snapshot!(find_outputs_from_src(src.as_str()).unwrap_err());
 
         let yaml_file =
             test_data_dir.join("recipes/test-parsing/recipe_outputs_and_requirements.yaml");
-        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let src = fs::read_to_string(yaml_file).unwrap();
         assert_miette_snapshot!(find_outputs_from_src(src.as_str()).unwrap_err());
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_missing_version.yaml");
-        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let src = fs::read_to_string(yaml_file).unwrap();
         let nodes = find_outputs_from_src(src.as_str()).unwrap();
         let parsed_recipe =
             Recipe::from_node(&nodes[0], SelectorConfig::default()).map_err(|err| {
@@ -292,7 +292,7 @@ mod tests {
         assert_miette_snapshot!(err);
 
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_extra_keys.yaml");
-        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let src = fs::read_to_string(yaml_file).unwrap();
         assert_miette_snapshot!(find_outputs_from_src(src.as_str()).unwrap_err());
     }
 
@@ -300,7 +300,7 @@ mod tests {
     fn recipe_outputs_merging() {
         let test_data_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data");
         let yaml_file = test_data_dir.join("recipes/test-parsing/recipe_outputs_merging.yaml");
-        let src = std::fs::read_to_string(yaml_file).unwrap();
+        let src = fs::read_to_string(yaml_file).unwrap();
         assert_debug_snapshot!(find_outputs_from_src(src.as_str()).unwrap());
     }
 }

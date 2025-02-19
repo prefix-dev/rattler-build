@@ -1,6 +1,6 @@
 [package]
 name = "py-rattler-build"
-version = "0.35.9"
+version = "0.36.0"
 edition = "2021"
 license = "BSD-3-Clause"
 publish = false
@@ -27,8 +27,8 @@ tokio = { version = "1.43.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.30.2"
-clap = "4.5.28"
+rattler_conda_types = "0.30.3"
+clap = "4.5.30"
 url = "2.5.4"
 
 [build-dependencies]

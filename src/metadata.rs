@@ -776,9 +776,8 @@ mod tests {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
     use chrono::TimeZone;
+    use fs_err as fs;
     use insta::assert_yaml_snapshot;
     use rattler_conda_types::{
         MatchSpec, NoArchType, PackageName, PackageRecord, ParseStrictness, RepoDataRecord,
@@ -786,6 +785,7 @@ mod test {
     };
     use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
     use rstest::*;
+    use std::str::FromStr;
     use url::Url;
 
     use super::{Directories, Output};
@@ -866,7 +866,7 @@ mod test {
 
         let test_data_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
-        let yaml3 = std::fs::read_to_string(test_data_dir.join("dependencies.yaml")).unwrap();
+        let yaml3 = fs::read_to_string(test_data_dir.join("dependencies.yaml")).unwrap();
         let parsed_yaml3: resolved_dependencies::ResolvedDependencies =
             serde_yaml::from_str(&yaml3).unwrap();
 
@@ -880,7 +880,7 @@ mod test {
         let test_data_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
 
-        let recipe = std::fs::read_to_string(test_data_dir.join(&recipe_path)).unwrap();
+        let recipe = fs::read_to_string(test_data_dir.join(&recipe_path)).unwrap();
         let output: Output = serde_yaml::from_str(&recipe).unwrap();
         assert_yaml_snapshot!(recipe_path, output);
     }
@@ -890,7 +890,7 @@ mod test {
         let test_data_dir =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/rendered_recipes");
         let recipe_1 = test_data_dir.join("git_source.yaml");
-        let recipe_1 = std::fs::read_to_string(recipe_1).unwrap();
+        let recipe_1 = fs::read_to_string(recipe_1).unwrap();
 
         let git_source_output: Output = serde_yaml::from_str(&recipe_1).unwrap();
         assert_yaml_snapshot!(git_source_output);

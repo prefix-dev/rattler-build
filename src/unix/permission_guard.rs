@@ -5,6 +5,7 @@ pub const READ_WRITE: u32 = 0o600;
 
 #[cfg(unix)]
 mod unix {
+    use fs_err as fs;
     use std::fs::Permissions;
     use std::io;
     use std::os::unix::fs::PermissionsExt;
@@ -22,13 +23,13 @@ mod unix {
         /// Create a new `PermissionGuard` for the given path with the given permissions.
         pub fn new<P: AsRef<Path>>(path: P, permissions: u32) -> io::Result<Self> {
             let path = path.as_ref().to_path_buf();
-            let metadata = std::fs::metadata(&path)?;
+            let metadata = fs::metadata(&path)?;
             let original_permissions = metadata.permissions();
 
             let new_permissions = Permissions::from_mode(original_permissions.mode() | permissions);
 
             // Set new permissions
-            std::fs::set_permissions(&path, new_permissions)?;
+            fs::set_permissions(&path, new_permissions)?;
 
             Ok(Self {
                 path,
@@ -40,9 +41,7 @@ mod unix {
     impl Drop for PermissionGuard {
         fn drop(&mut self) {
             if self.path.exists() {
-                if let Err(e) =
-                    std::fs::set_permissions(&self.path, self.original_permissions.clone())
-                {
+                if let Err(e) = fs::set_permissions(&self.path, self.original_permissions.clone()) {
                     eprintln!("Failed to restore file permissions: {}", e);
                 }
             }
@@ -52,7 +51,8 @@ mod unix {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use std::fs::{self, File};
+        use fs_err as fs;
+        use fs_err::File;
         use tempfile::tempdir;
 
         #[test]

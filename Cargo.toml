@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.35.9"
+version = "0.36.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2021"
@@ -61,7 +61,7 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.28", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.30", features = ["derive", "env", "cargo"] }
 minijinja = { version = "2.7.0", features = [
   "unstable_machinery",
   "custom_syntax",
@@ -83,7 +83,7 @@ futures = "0.3.31"
 indicatif = "0.17.11"
 console = { version = "0.15.10", features = ["windows-console-colors"] }
 thiserror = "2.0.11"
-tempfile = "3.16.0"
+tempfile = "3.17.1"
 chrono = "0.4.39"
 sha1 = "0.10.6"
 spdx = "0.10.8"
@@ -96,7 +96,7 @@ indexmap = "2.7.1"
 dunce = "1.0.5"
 fs-err = "3.1.0"
 which = "7.0.2"
-clap_complete = "4.5.44"
+clap_complete = "4.5.45"
 clap_complete_nushell = "4.5.5"
 tokio-util = "0.7.13"
 
@@ -105,7 +105,7 @@ zip = { version = "2.2.2", default-features = false, features = [
   "flate2",
   "deflate",
 ] }
-bzip2 = "0.5.0"
+bzip2 = "0.5.1"
 base64 = "0.22.1"
 flate2 = "1.0.35"
 xz2 = "0.1.7"
@@ -128,41 +128,41 @@ regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.31.1", default-features = false, features = [
+rattler = { version = "0.32.0", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.8", default-features = false }
-rattler_conda_types = { version = "0.30.2", default-features = false, features = [
+rattler_cache = { version = "0.3.9", default-features = false }
+rattler_conda_types = { version = "0.30.3", default-features = false, features = [
   "rayon",
 ] }
-rattler_digest = { version = "1.0.5", default-features = false, features = [
+rattler_digest = { version = "1.0.6", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.20.11", default-features = false }
-rattler_networking = { version = "0.22.3", default-features = false, features = [
+rattler_index = { version = "0.20.12", default-features = false }
+rattler_networking = { version = "0.22.4", default-features = false, features = [
   "s3",
 ] }
 rattler_redaction = { version = "0.1.6" }
-rattler_repodata_gateway = { version = "0.21.36", default-features = false, features = [
+rattler_repodata_gateway = { version = "0.21.37", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.2", default-features = false, features = [
+rattler_sandbox = { version = "0.1.3", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.18", default-features = false, features = [
+rattler_shell = { version = "0.22.19", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.3.7", default-features = false, features = [
+rattler_solve = { version = "1.3.8", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.2", default-features = false }
-rattler_package_streaming = { version = "0.22.27", default-features = false }
+rattler_virtual_packages = { version = "2.0.3", default-features = false }
+rattler_package_streaming = { version = "0.22.28", default-features = false }
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
-strum = "0.26.3"
+strum = "0.27.1"
 aws-smithy-types = "1.2.13"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
