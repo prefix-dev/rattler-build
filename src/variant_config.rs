@@ -481,7 +481,7 @@ impl VariantConfig {
                     } else {
                         already_used_vars
                             .iter()
-                            .all(|(key, value)| combination.get(key).map_or(false, |v| v == value))
+                            .all(|(key, value)| combination.get(key) == Some(value))
                     }
                 })
                 .collect();

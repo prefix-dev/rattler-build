@@ -6,6 +6,7 @@ use futures::TryStreamExt;
 use indicatif::{style::TemplateError, HumanBytes, ProgressState};
 use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
 use std::{
+    collections::HashMap,
     fmt::Write,
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
@@ -13,6 +14,7 @@ use std::{
 use tokio_util::io::ReaderStream;
 
 use miette::{Context, IntoDiagnostic};
+use rattler_networking::s3_middleware::{S3Config, S3};
 use rattler_networking::{Authentication, AuthenticationStorage};
 use rattler_redaction::Redact;
 use reqwest::{Method, StatusCode};
@@ -260,6 +262,73 @@ pub async fn upload_package_to_anaconda(
             }
         }
     }
+    Ok(())
+}
+
+/// Uploads a package to a channel in an S3 bucket.
+pub async fn upload_package_to_s3(
+    storage: &AuthenticationStorage,
+    channel: Url,
+    endpoint_url: Option<Url>,
+    region: Option<String>,
+    force_path_style: Option<bool>,
+    package_files: &Vec<PathBuf>,
+) -> miette::Result<()> {
+    // If either endpoint_url or region is set, ensure that both are set
+    if endpoint_url.is_some() != region.is_some() {
+        return Err(miette::miette!(
+            "Both endpoint_url and region must be specified together"
+        ));
+    }
+    let s3_config = if let (Some(endpoint_url), Some(region), Some(force_path_style)) =
+        (endpoint_url, region, force_path_style)
+    {
+        S3Config::Custom {
+            endpoint_url,
+            region,
+            force_path_style,
+        }
+    } else {
+        S3Config::FromAWS
+    };
+
+    let bucket = channel
+        .host_str()
+        .ok_or_else(|| miette::miette!("Failed to get host from channel URL"))?;
+
+    let config_map = HashMap::from([(bucket.to_string(), s3_config.clone())]);
+    let s3 = S3::new(config_map, storage.clone());
+    let s3_client = s3
+        .create_s3_client(channel.clone())
+        .await
+        .map_err(|e| miette::miette!(e.to_string()))?;
+
+    let channel = channel.path().trim_start_matches('/');
+
+    for package_file in package_files {
+        let package = ExtractedPackage::from_package_file(package_file)?;
+        let subdir = package
+            .subdir()
+            .ok_or_else(|| miette::miette!("Failed to get subdir"))?;
+        let filename = package
+            .filename()
+            .ok_or_else(|| miette::miette!("Failed to get filename"))?;
+        let key = format!("{}/{}/{}", channel, subdir, filename);
+        let body = aws_smithy_types::byte_stream::ByteStream::from_path(package_file)
+            .await
+            .into_diagnostic()?;
+        s3_client
+            .put_object()
+            .key(key.clone())
+            .if_none_match("*") // Do not allow overwriting existing files
+            .body(body)
+            .bucket(bucket)
+            .send()
+            .await
+            .into_diagnostic()?;
+        tracing::info!("Uploaded package to s3://{bucket}/{key}");
+    }
+
     Ok(())
 }
 

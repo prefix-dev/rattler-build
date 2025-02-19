@@ -365,6 +365,7 @@ Upload a package
 * `artifactory` — Options for uploading to a Artifactory channel. Authentication is used from the keychain / auth-file
 * `prefix` — Options for uploading to a prefix.dev server. Authentication is used from the keychain / auth-file
 * `anaconda` — Options for uploading to a Anaconda.org server
+* `s3` — Options for uploading to S3
 
 ##### **Arguments:**
 
@@ -511,6 +512,39 @@ Options for uploading to a Anaconda.org server
 - `-f`, `--force`
 
 	Replace files on conflict
+
+
+
+
+
+#### `s3`
+
+Options for uploading to S3
+
+**Usage:** `rattler-build upload s3 [OPTIONS] --channel <CHANNEL>`
+
+##### **Options:**
+
+- `-c`, `--channel <CHANNEL>`
+
+	The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
+
+
+- `-e`, `--endpoint-url <ENDPOINT_URL>`
+
+	The endpoint URL of the S3 backend
+
+
+- `-r`, `--region <REGION>`
+
+	The region of the S3 backend
+
+
+- `-f`, `--force-path-style <FORCE_PATH_STYLE>`
+
+	Whether to use path-style S3 URLs
+
+	- Possible values: `true`, `false`
 
 
 

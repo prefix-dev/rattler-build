@@ -727,6 +727,7 @@ pub enum ServerType {
     Artifactory(ArtifactoryOpts),
     Prefix(PrefixOpts),
     Anaconda(AnacondaOpts),
+    S3(S3Opts),
     #[clap(hide = true)]
     CondaForge(CondaForgeOpts),
 }
@@ -928,6 +929,38 @@ pub struct AnacondaOpts {
     /// Replace files on conflict
     #[arg(long, short, env = "ANACONDA_FORCE")]
     pub force: bool,
+}
+
+fn parse_s3_url(value: &str) -> Result<Url, String> {
+    let url: Url = Url::parse(value).map_err(|_| format!("`{}` isn't a valid URL", value))?;
+    if url.scheme() == "s3" && url.host_str().is_some() {
+        Ok(url)
+    } else {
+        Err(format!(
+            "Only S3 URLs of format s3://bucket/... can be used, not `{}`",
+            value
+        ))
+    }
+}
+
+/// Options for uploading to S3
+#[derive(Clone, Debug, PartialEq, Parser)]
+pub struct S3Opts {
+    /// The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
+    #[arg(short, long, env = "S3_CHANNEL", value_parser = parse_s3_url)]
+    pub channel: Url,
+
+    /// The endpoint URL of the S3 backend
+    #[arg(short, long, env = "S3_ENDPOINT_URL", requires_all = ["region", "force_path_style"])]
+    pub endpoint_url: Option<Url>,
+
+    /// The region of the S3 backend
+    #[arg(short, long, env = "S3_REGION", requires_all = ["endpoint_url", "force_path_style"])]
+    pub region: Option<String>,
+
+    /// Whether to use path-style S3 URLs
+    #[arg(short, long, env = "S3_FORCE_PATH_STYLE", requires_all = ["endpoint_url", "region"])]
+    pub force_path_style: Option<bool>,
 }
 
 #[derive(Debug)]
