@@ -280,8 +280,6 @@ pub async fn upload_package_to_s3(
             "Both endpoint_url and region must be specified together"
         ));
     }
-    // TODO: Add CLI args for SECRET_ACCESS_KEY, ACCESS_KEY_ID, and SESSION_TOKEN
-    // and insert custom auth storage backend at position zero
     let s3_config = if let (Some(endpoint_url), Some(region), Some(force_path_style)) =
         (endpoint_url, region, force_path_style)
     {
