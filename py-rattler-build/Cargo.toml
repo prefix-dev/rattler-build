@@ -37,6 +37,20 @@ pyo3-build-config = "0.23.4"
 
 [patch.crates-io]
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
+rattler = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_sandbox = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_cache = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_index = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_networking = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_repodata_gateway = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_shell = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_solve = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_redaction = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+
 
 # Prevent package from thinking it's in the workspace
 [workspace]
