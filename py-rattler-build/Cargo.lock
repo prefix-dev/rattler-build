@@ -1629,7 +1629,7 @@ dependencies = [
 [[package]]
 name = "file_url"
 version = "0.2.3"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "itertools 0.14.0",
  "percent-encoding",
@@ -3796,7 +3796,7 @@ dependencies = [
 [[package]]
 name = "rattler"
 version = "0.32.0"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "anyhow",
  "clap",
@@ -3924,7 +3924,7 @@ dependencies = [
 [[package]]
 name = "rattler_cache"
 version = "0.3.9"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "anyhow",
  "dashmap",
@@ -3955,7 +3955,7 @@ dependencies = [
 [[package]]
 name = "rattler_conda_types"
 version = "0.30.3"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "chrono",
  "dirs",
@@ -3993,7 +3993,7 @@ dependencies = [
 [[package]]
 name = "rattler_digest"
 version = "1.0.6"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "blake2",
  "digest",
@@ -4009,7 +4009,7 @@ dependencies = [
 [[package]]
 name = "rattler_index"
 version = "0.20.12"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "fs-err",
  "rattler_conda_types",
@@ -4024,7 +4024,7 @@ dependencies = [
 [[package]]
 name = "rattler_macros"
 version = "1.0.6"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "quote",
  "syn",
@@ -4033,7 +4033,7 @@ dependencies = [
 [[package]]
 name = "rattler_networking"
 version = "0.22.4"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -4062,7 +4062,7 @@ dependencies = [
 [[package]]
 name = "rattler_package_streaming"
 version = "0.22.28"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "bzip2 0.5.1",
  "chrono",
@@ -4091,7 +4091,7 @@ dependencies = [
 [[package]]
 name = "rattler_redaction"
 version = "0.1.6"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "reqwest",
  "reqwest-middleware",
@@ -4101,7 +4101,7 @@ dependencies = [
 [[package]]
 name = "rattler_repodata_gateway"
 version = "0.21.37"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "anyhow",
  "async-compression",
@@ -4156,7 +4156,7 @@ dependencies = [
 [[package]]
 name = "rattler_sandbox"
 version = "0.1.3"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "birdcage",
  "clap",
@@ -4167,7 +4167,7 @@ dependencies = [
 [[package]]
 name = "rattler_shell"
 version = "0.22.19"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "enum_dispatch",
  "fs-err",
@@ -4185,7 +4185,7 @@ dependencies = [
 [[package]]
 name = "rattler_solve"
 version = "1.3.8"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "chrono",
  "futures",
@@ -4204,7 +4204,7 @@ dependencies = [
 [[package]]
 name = "rattler_virtual_packages"
 version = "2.0.3"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "archspec",
  "libloading",
@@ -5022,7 +5022,7 @@ dependencies = [
 [[package]]
 name = "simple_spawn_blocking"
 version = "1.0.0"
-source = "git+https://github.com/nichmor/rattler?branch=misc%2Frun-exports-handle-file-path#c1eb3dd993ac365cd58eb63b719a936b1b2cc4c3"
+source = "git+https://github.com/conda/rattler?branch=main#e5341672503cae5e18ac058360e95fa1d0ae7012"
 dependencies = [
  "tokio",
 ]
