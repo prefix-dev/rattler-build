@@ -197,16 +197,16 @@ pre-build = [
 # this fork contains fixes for slow zip reading and large file writing
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
-rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+rattler = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_sandbox = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_cache = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_conda_types = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_digest = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_index = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_networking = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_repodata_gateway = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_shell = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_solve = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_redaction = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_virtual_packages = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
+rattler_package_streaming = { git = "https://github.com/nichmor/rattler", branch = "misc/run-exports-handle-file-path" }
