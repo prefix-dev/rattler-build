@@ -143,6 +143,33 @@ impl Recipe {
         })
     }
 
+    fn context_scalar_to_var(
+        k: &ScalarNode,
+        v: &Node,
+        jinja: &Jinja,
+    ) -> Result<Option<Variable>, Vec<PartialParsingError>> {
+        let val = v.as_scalar().ok_or_else(|| {
+            vec![_partialerror!(
+                *v.span(),
+                ErrorKind::ExpectedScalar,
+                help = "`context` values must always be scalars (booleans, integers or strings) or uniform lists of scalars"
+            )]
+        })?;
+        let rendered: Option<ScalarNode> = val.render(jinja, &format!("context.{}", k.as_str()))?;
+        if let Some(rendered) = rendered {
+            let variable = if let Some(value) = rendered.as_bool() {
+                Variable::from(value)
+            } else if let Some(value) = rendered.as_integer() {
+                Variable::from(value)
+            } else {
+                Variable::from_string(&rendered)
+            };
+            Ok(Some(variable))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Create recipes from a YAML [`Node`] structure.
     pub fn from_node(
         root_node: &Node,
@@ -160,7 +187,7 @@ impl Recipe {
         })?;
 
         // add context values
-        let mut context = IndexMap::new();
+        let mut context: IndexMap<String, Variable> = IndexMap::new();
 
         if let Some(context_map) = root_node.get("context") {
             let context_map = context_map.as_mapping().ok_or_else(|| {
@@ -172,30 +199,39 @@ impl Recipe {
             })?;
 
             for (k, v) in context_map.iter() {
-                let val = v.as_scalar().ok_or_else(|| {
-                    vec![_partialerror!(
-                        *v.span(),
-                        ErrorKind::ExpectedScalar,
-                        help = "`context` values must always be scalars (strings)"
-                    )]
-                })?;
-                let rendered: Option<ScalarNode> =
-                    val.render(&jinja, &format!("context.{}", k.as_str()))?;
-                if let Some(rendered) = rendered {
-                    let variable = if let Some(value) = rendered.as_bool() {
-                        Variable::from(value)
-                    } else if let Some(value) = rendered.as_integer() {
-                        Variable::from(value)
-                    } else {
-                        Variable::from_string(&rendered)
-                    };
-                    context.insert(k.as_str().to_string(), variable.clone());
-                    // also immediately insert into jinja context so that the value can be used
-                    // in later jinja expressions
-                    jinja
-                        .context_mut()
-                        .insert(k.as_str().to_string(), variable.into());
-                }
+                let variable = if let Some(sequence) = v.as_sequence() {
+                    let mut rendered_sequence: Vec<Variable> = Vec::with_capacity(sequence.len());
+
+                    for (index, item) in sequence.iter().enumerate() {
+                        let rendered_item: Node =
+                            item.render(&jinja, &format!("context.{}[{}]", k.as_str(), index))?;
+                        if let Some(variable) =
+                            Self::context_scalar_to_var(k, &rendered_item, &jinja)?
+                        {
+                            if index != 0
+                                && variable.as_ref().kind() != rendered_sequence[0].as_ref().kind()
+                            {
+                                return Err(vec![_partialerror!(
+                                    *item.span(),
+                                    ErrorKind::SequenceMixedTypes((variable.as_ref().kind(), rendered_sequence[0].as_ref().kind())),
+                                    help = "sequence `context` must have all members of the same scalar type"
+                                )]);
+                            }
+                            rendered_sequence.push(variable);
+                        }
+                    }
+                    Variable::from(rendered_sequence)
+                } else if let Some(variable) = Self::context_scalar_to_var(k, v, &jinja)? {
+                    variable
+                } else {
+                    continue;
+                };
+                context.insert(k.as_str().to_string(), variable.clone());
+                // also immediately insert into jinja context so that the value can be used
+                // in later jinja expressions
+                jinja
+                    .context_mut()
+                    .insert(k.as_str().to_string(), variable.into());
             }
         }
 
@@ -411,7 +447,30 @@ mod tests {
     fn context_value_not_scalar() {
         let raw_recipe = r#"
         context:
-          key: ["not-scalar"]
+          key:
+            foo:
+              - [not, scalar]
+
+        package:
+            name: test
+            version: 0.1.0
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn context_value_not_uniform_list() {
+        let raw_recipe = r#"
+        context:
+          foo:
+            - foo
+            - bar
+            - 3
+            - 4
+            - baz
 
         package:
             name: test

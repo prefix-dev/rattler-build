@@ -8,6 +8,11 @@
   "cquoted_bool": "true",
   "cstring": "blah",
   "float": "1.23",
+  "inline_list": [
+    "a",
+    "b",
+    "c"
+  ],
   "integer": 5,
   "is_boolean": true,
   "is_cboolean": true,
@@ -17,10 +22,18 @@
   "is_cquoted": true,
   "is_cstring": true,
   "is_float": false,
+  "is_inline_list": true,
   "is_integer": true,
+  "is_list": true,
+  "is_list_elem": true,
   "is_quoted_int_var": true,
   "is_quoted_true": true,
   "is_quoted_true_var": true,
   "is_string": true,
+  "list": [
+    "a",
+    "b",
+    "c"
+  ],
   "string": "blah"
 }
