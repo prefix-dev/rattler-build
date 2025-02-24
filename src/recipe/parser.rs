@@ -487,10 +487,13 @@ mod tests {
             version: 0.1.0
         "#;
 
-        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig {
-            experimental: true,
-            ..SelectorConfig::default()
-        });
+        let recipe = Recipe::from_yaml(
+            raw_recipe,
+            SelectorConfig {
+                experimental: true,
+                ..SelectorConfig::default()
+            },
+        );
         let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }
