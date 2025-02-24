@@ -200,27 +200,35 @@ impl Recipe {
 
             for (k, v) in context_map.iter() {
                 let variable = if let Some(sequence) = v.as_sequence() {
-                    let mut rendered_sequence: Vec<Variable> = Vec::with_capacity(sequence.len());
+                    if experimental {
+                        let mut rendered_sequence: Vec<Variable> = Vec::with_capacity(sequence.len());
 
-                    for (index, item) in sequence.iter().enumerate() {
-                        let rendered_item: Node =
-                            item.render(&jinja, &format!("context.{}[{}]", k.as_str(), index))?;
-                        if let Some(variable) =
-                            Self::context_scalar_to_var(k, &rendered_item, &jinja)?
-                        {
-                            if index != 0
-                                && variable.as_ref().kind() != rendered_sequence[0].as_ref().kind()
+                        for (index, item) in sequence.iter().enumerate() {
+                            let rendered_item: Node =
+                                item.render(&jinja, &format!("context.{}[{}]", k.as_str(), index))?;
+                            if let Some(variable) =
+                                Self::context_scalar_to_var(k, &rendered_item, &jinja)?
                             {
-                                return Err(vec![_partialerror!(
-                                    *item.span(),
-                                    ErrorKind::SequenceMixedTypes((variable.as_ref().kind(), rendered_sequence[0].as_ref().kind())),
-                                    help = "sequence `context` must have all members of the same scalar type"
-                                )]);
+                                if index != 0
+                                    && variable.as_ref().kind() != rendered_sequence[0].as_ref().kind()
+                                {
+                                    return Err(vec![_partialerror!(
+                                        *item.span(),
+                                        ErrorKind::SequenceMixedTypes((variable.as_ref().kind(), rendered_sequence[0].as_ref().kind())),
+                                        help = "sequence `context` must have all members of the same scalar type"
+                                    )]);
+                                }
+                                rendered_sequence.push(variable);
                             }
-                            rendered_sequence.push(variable);
                         }
+                        Variable::from(rendered_sequence)
+                    } else {
+                        return Err(vec![_partialerror!(
+                            *k.span(),
+                            ErrorKind::ExperimentalOnly("context-list".to_string()),
+                            help = "Sequence values in `context` are only allowed in experimental mode (`--experimental`)"
+                        )])
                     }
-                    Variable::from(rendered_sequence)
                 } else if let Some(variable) = Self::context_scalar_to_var(k, v, &jinja)? {
                     variable
                 } else {

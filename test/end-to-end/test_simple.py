@@ -1369,7 +1369,8 @@ def test_jinja_types(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
     # render only and snapshot json
-    rendered = rattler_build.render(recipes / "jinja-types", tmp_path)
+    rendered = rattler_build.render(recipes / "jinja-types", tmp_path,
+                                    extra_args=["--experimental"])
     print(rendered)
     # load as json
     assert snapshot_json == rendered[0]["recipe"]["context"]
