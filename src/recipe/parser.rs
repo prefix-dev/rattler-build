@@ -201,7 +201,8 @@ impl Recipe {
             for (k, v) in context_map.iter() {
                 let variable = if let Some(sequence) = v.as_sequence() {
                     if experimental {
-                        let mut rendered_sequence: Vec<Variable> = Vec::with_capacity(sequence.len());
+                        let mut rendered_sequence: Vec<Variable> =
+                            Vec::with_capacity(sequence.len());
 
                         for (index, item) in sequence.iter().enumerate() {
                             let rendered_item: Node =
@@ -210,7 +211,8 @@ impl Recipe {
                                 Self::context_scalar_to_var(k, &rendered_item, &jinja)?
                             {
                                 if index != 0
-                                    && variable.as_ref().kind() != rendered_sequence[0].as_ref().kind()
+                                    && variable.as_ref().kind()
+                                        != rendered_sequence[0].as_ref().kind()
                                 {
                                     return Err(vec![_partialerror!(
                                         *item.span(),
@@ -227,7 +229,7 @@ impl Recipe {
                             *k.span(),
                             ErrorKind::ExperimentalOnly("context-list".to_string()),
                             help = "Sequence values in `context` are only allowed in experimental mode (`--experimental`)"
-                        )])
+                        )]);
                     }
                 } else if let Some(variable) = Self::context_scalar_to_var(k, v, &jinja)? {
                     variable
