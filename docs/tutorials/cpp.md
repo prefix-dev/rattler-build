@@ -76,8 +76,8 @@ tests:
       include: # (4)!
         - xtensor/xarray.hpp
       files: # (5)!
-        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfig.cmake
-        - ${{ "Library" if win }}/share/cmake/xtensor/xtensorConfigVersion.cmake
+        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfig.cmake
+        - ${{ "Library/" if win }}share/cmake/xtensor/xtensorConfigVersion.cmake
 
 about:
   homepage: https://github.com/xtensor-stack/xtensor
