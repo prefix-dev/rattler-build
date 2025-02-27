@@ -302,7 +302,7 @@ pub async fn get_build_output(
             recipe.package().name().as_normalized().to_string()
         };
 
-        let variant_channels = if let Some(channel_sources) = discovered_output
+        let channel_names = if let Some(channel_sources) = discovered_output
             .used_vars
             .get(&NormalizedKey("channel_sources".to_string()))
         {
@@ -312,13 +312,12 @@ pub async fn get_build_output(
                 .map(str::to_string)
                 .collect::<Vec<_>>()
         } else {
-            Vec::new()
+            build_data.channels.clone()
         };
 
         // Add the channels from the args and by default always conda-forge
-        let channels = variant_channels
+        let channels = channel_names
             .into_iter()
-            .chain(build_data.channels.clone())
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
