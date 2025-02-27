@@ -309,7 +309,7 @@ pub async fn get_build_output(
             channel_sources
                 .to_string()
                 .split(",")
-                .map(str::to_string)
+                .map(|x| x.trim().to_string())
                 .collect::<Vec<_>>()
         } else {
             build_data.channels.clone()
