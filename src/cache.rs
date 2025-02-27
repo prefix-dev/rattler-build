@@ -214,6 +214,7 @@ impl Output {
 
             // Reindex the channels
             let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
+                .await
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
 

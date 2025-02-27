@@ -22,7 +22,7 @@ use rattler_conda_types::{
     package::{ArchiveIdentifier, IndexJson, PackageFile},
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
 };
-use rattler_index::index;
+use rattler_index::index_fs;
 use rattler_shell::{
     activation::ActivationError,
     shell::{Shell, ShellEnum},
@@ -309,7 +309,13 @@ pub async fn run_test(
     let package_file = downstream_package.as_deref().unwrap_or(package_file);
 
     // index the temporary channel
-    index(tmp_repo.path(), Some(&target_platform))?;
+    index_fs(
+        tmp_repo.path(),
+        Some(target_platform),
+        false,
+        num_cpus::get_physical(),
+    )
+    .await?;
 
     let cache_dir = rattler::default_cache_dir()?;
 

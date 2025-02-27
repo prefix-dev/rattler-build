@@ -34,6 +34,7 @@ pub async fn skip_existing(
 
     let all_channels =
         build_reindexed_channels(&first_output.build_configuration, tool_configuration)
+            .await
             .into_diagnostic()
             .context("failed to reindex output channel")?;
 
