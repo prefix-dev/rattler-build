@@ -16,7 +16,7 @@ rustls-tls = ["rattler-build/rustls-tls"]
 
 [dependencies]
 rattler-build = { path = "../" }
-pyo3 = { version = "0.23.4", features = [
+pyo3 = { version = "0.23.5", features = [
   "abi3-py38",
   "extension-module",
   "multiple-pymethods",
@@ -27,12 +27,12 @@ tokio = { version = "1.43.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.30.3"
-clap = "4.5.30"
+rattler_conda_types = "0.31.1"
+clap = "4.5.31"
 url = "2.5.4"
 
 [build-dependencies]
-pyo3-build-config = "0.23.4"
+pyo3-build-config = "0.23.5"
 
 
 [patch.crates-io]
