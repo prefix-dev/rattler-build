@@ -505,7 +505,7 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channels: channels,
+            channels,
             variant_config: variant_config.unwrap_or_default(),
             ignore_recipe_variants,
             render_only,
