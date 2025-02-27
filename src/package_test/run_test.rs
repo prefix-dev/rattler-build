@@ -314,6 +314,7 @@ pub async fn run_test(
         Some(target_platform),
         false,
         num_cpus::get_physical(),
+        None,
     )
     .await?;
 

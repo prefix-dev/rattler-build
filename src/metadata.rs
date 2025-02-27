@@ -751,6 +751,7 @@ pub async fn build_reindexed_channels(
         Some(build_configuration.target_platform),
         false,
         num_cpus::get_physical(),
+        None,
     )
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
