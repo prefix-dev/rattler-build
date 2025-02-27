@@ -85,6 +85,9 @@ pub enum PackagingError {
 
     #[error("Invalid Metadata: {0}")]
     InvalidMetadata(String),
+
+    #[error("Invalid MenuInst schema file: {0} - {1}")]
+    InvalidMenuInstSchema(PathBuf, serde_json::Error),
 }
 
 /// This function copies the license files to the info/licenses folder.
@@ -248,6 +251,8 @@ pub fn package_conda(
     tracing::info!("Copying done!");
 
     post_process::relink::relink(&tmp, output)?;
+
+    post_process::menuinst::menuinst(&tmp)?;
 
     tmp.add_files(post_process::python::python(&tmp, output)?);
 

@@ -954,6 +954,7 @@ impl Output {
         }
 
         let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
+            .await
             .map_err(ResolveError::RefreshChannelError)?;
 
         let finalized_dependencies = resolve_dependencies(
