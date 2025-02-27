@@ -1084,7 +1084,7 @@ For example, if the variant specifies a pin for `numpy: 1.11`, one can use
 ```yaml
 requirements:
   host:
-    # this will select nupy 1.11
+    # this will select numpy 1.11
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
