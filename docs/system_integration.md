@@ -35,7 +35,7 @@ package:
   name: ripgrep
   version: "1.24.3"
 
-# ... other fields ommitted for brevity
+# ... other fields omitted for brevity
 
 build:
   number: 1
