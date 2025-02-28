@@ -16,11 +16,18 @@ rust-version = "1.81.0"
 
 [features]
 default = ['rustls-tls', 'recipe-generation']
-native-tls = ['reqwest/native-tls', 'rattler/native-tls']
+native-tls = [
+  'reqwest/native-tls',
+  'rattler/native-tls',
+  'rattler_repodata_gateway/native-tls',
+  'rattler_networking/native-tls',
+]
 rustls-tls = [
   'reqwest/rustls-tls',
   'reqwest/rustls-tls-native-roots',
   'rattler/rustls-tls',
+  'rattler_repodata_gateway/rustls-tls',
+  'rattler_networking/rustls-tls',
 ]
 tui = [
   'ratatui',
