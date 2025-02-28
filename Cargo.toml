@@ -21,6 +21,7 @@ native-tls = [
   'rattler/native-tls',
   'rattler_repodata_gateway/native-tls',
   'rattler_networking/native-tls',
+  'rattler_package_streaming/native-tls',
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
@@ -29,6 +30,7 @@ rustls-tls = [
   'rattler/rustls-tls',
   'rattler_repodata_gateway/rustls-tls',
   'rattler_networking/rustls-tls',
+  'rattler_package_streaming/rustls-tls',
 ]
 tui = [
   'ratatui',
@@ -186,21 +188,6 @@ rstest = "0.24.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.9"
 serial_test = "3.2.0"
-
-[profile.dev.package."*"]
-opt-level = 3
-
-[package.metadata.cross.target.x86_64-unknown-linux-gnu]
-pre-build = [
-  "dpkg --add-architecture $CROSS_DEB_ARCH",
-  "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
-]
-
-[package.metadata.cross.target.powerpc64le-unknown-linux-gnu]
-pre-build = [
-  "dpkg --add-architecture $CROSS_DEB_ARCH",
-  "apt-get update && apt-get install --assume-yes libssl-dev:$CROSS_DEB_ARCH",
-]
 
 [patch.crates-io]
 # this fork contains fixes for slow zip reading and large file writing
