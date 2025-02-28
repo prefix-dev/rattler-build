@@ -236,10 +236,10 @@ build:
     missing_dso_allowlist: list of globs
 
     # what to do when detecting overdepending
-    overdepending_behavior: "ignore" or "error" # (defaults to "error")
+    overdepending_behavior: "ignore" or "error" # (defaults to "ignore")
 
     # what to do when detecting overlinking
-    overlinking_behavior: "ignore" or "error" # (defaults to "error")
+    overlinking_behavior: "ignore" or "error" # (defaults to "ignore")
 ```
 
 ## Python options

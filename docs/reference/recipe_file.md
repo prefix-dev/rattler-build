@@ -987,6 +987,11 @@ context:
   # later keys can reference previous keys
   # and use jinja functions to compute new values
   major_version: ${{ version.split('.')[0] }}
+  tests_to_skip:
+    # fails for one reason
+    - test_foo
+    # fails for another reason
+    - test_bar
 ```
 
 Later in your `recipe.yaml` you can use these values in string interpolation
@@ -995,6 +1000,10 @@ with Jinja:
 ```yaml
 source:
   url: https://github.com/mamba-org/${{ name }}/v${{ version }}.tar.gz
+
+tests:
+  - script:
+    - pytest -k "not (${{ tests_to_skip | join(" or ")" }})"
 ```
 
 Jinja has built-in support for some common string manipulations.
@@ -1084,7 +1093,7 @@ For example, if the variant specifies a pin for `numpy: 1.11`, one can use
 ```yaml
 requirements:
   host:
-    # this will select nupy 1.11
+    # this will select numpy 1.11
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin

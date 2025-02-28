@@ -18,7 +18,7 @@ use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
 };
-use rattler_index::index;
+use rattler_index::index_fs;
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_repodata_gateway::SubdirSelection;
 use rattler_solve::{ChannelPriority, SolveStrategy};
@@ -727,7 +727,7 @@ impl Display for Output {
 }
 
 /// Builds the channel list and reindexes the output channel.
-pub fn build_reindexed_channels(
+pub async fn build_reindexed_channels(
     build_configuration: &BuildConfiguration,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<Vec<ChannelUrl>, std::io::Error> {
@@ -746,7 +746,15 @@ pub fn build_reindexed_channels(
     );
 
     // Reindex the output channel from the files on disk
-    index(output_dir, Some(&build_configuration.target_platform))?;
+    index_fs(
+        output_dir,
+        Some(build_configuration.target_platform),
+        false,
+        num_cpus::get_physical(),
+        None,
+    )
+    .await
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
     Ok(iter::once(output_channel.base_url)
         .chain(build_configuration.channels.iter().cloned())

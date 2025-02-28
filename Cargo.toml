@@ -40,13 +40,13 @@ name = "rattler-build"
 required-features = ["recipe-generation"]
 
 [dependencies]
-serde = { version = "1.0.217", features = ["derive"] }
+serde = { version = "1.0.218", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde-untagged = "0.1.6"
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 walkdir = "2.5.0"
 hex = "0.4.3"
-serde_json = "1.0.138"
+serde_json = "1.0.139"
 reqwest = { version = "0.12.12", default-features = false, features = [
   "multipart",
 ] }
@@ -61,7 +61,7 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.30", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.31", features = ["derive", "env", "cargo"] }
 minijinja = { version = "2.7.0", features = [
   "unstable_machinery",
   "custom_syntax",
@@ -84,11 +84,11 @@ indicatif = "0.17.11"
 console = { version = "0.15.10", features = ["windows-console-colors"] }
 thiserror = "2.0.11"
 tempfile = "3.17.1"
-chrono = "0.4.39"
+chrono = "0.4.40"
 sha1 = "0.10.6"
 spdx = "0.10.8"
 ignore = "0.4.23"
-globset = "0.4.15"
+globset = "0.4.16"
 clap-verbosity-flag = "3.0.2"
 tracing-core = "0.1.33"
 petgraph = "0.7.1"
@@ -96,23 +96,23 @@ indexmap = "2.7.1"
 dunce = "1.0.5"
 fs-err = "3.1.0"
 which = "7.0.2"
-clap_complete = "4.5.45"
+clap_complete = "4.5.46"
 clap_complete_nushell = "4.5.5"
 tokio-util = "0.7.13"
 
-tar = "0.4.43"
-zip = { version = "2.2.2", default-features = false, features = [
+tar = "0.4.44"
+zip = { version = "=2.2.2", default-features = false, features = [
   "flate2",
   "deflate",
 ] }
 bzip2 = "0.5.1"
 base64 = "0.22.1"
-flate2 = "1.0.35"
+flate2 = "1.1.0"
 xz2 = "0.1.7"
-zstd = "0.13.2"
+zstd = "0.13.3"
 toml = "0.8.20"
 memmap2 = "0.9.5"
-reqwest-middleware = { version = "0.4.0", features = ["json"] }
+reqwest-middleware = { version = "0.4.1", features = ["json"] }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.1"
 memchr = "2.7.4"
@@ -121,44 +121,45 @@ crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.11.1", optional = true }
-reflink-copy = "0.1.23"
+reflink-copy = "0.1.24"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.11.1"
 async-recursion = "1.1.1"
 
 # Rattler crates
-rattler = { version = "0.32.0", default-features = false, features = [
+rattler = { version = "0.32.2", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.9", default-features = false }
-rattler_conda_types = { version = "0.30.3", default-features = false, features = [
+rattler_cache = { version = "0.3.11", default-features = false }
+rattler_conda_types = { version = "0.31.1", default-features = false, features = [
   "rayon",
 ] }
 rattler_digest = { version = "1.0.6", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.20.12", default-features = false }
-rattler_networking = { version = "0.22.4", default-features = false, features = [
+rattler_index = { version = "0.21.0", default-features = false }
+rattler_networking = { version = "0.22.6", default-features = false, features = [
   "s3",
 ] }
-rattler_redaction = { version = "0.1.6" }
-rattler_repodata_gateway = { version = "0.21.37", default-features = false, features = [
+rattler_redaction = { version = "0.1.7" }
+rattler_repodata_gateway = { version = "0.21.39", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.3", default-features = false, features = [
+rattler_sandbox = { version = "0.1.4", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.19", default-features = false, features = [
+rattler_shell = { version = "0.22.21", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.3.8", default-features = false, features = [
+rattler_solve = { version = "1.3.10", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.3", default-features = false }
-rattler_package_streaming = { version = "0.22.28", default-features = false }
+rattler_virtual_packages = { version = "2.0.5", default-features = false }
+rattler_package_streaming = { version = "0.22.30", default-features = false }
+rattler_menuinst = "0.2.0"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
@@ -197,16 +198,17 @@ pre-build = [
 # this fork contains fixes for slow zip reading and large file writing
 zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
-rattler = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_sandbox = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_cache = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_conda_types = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_digest = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_index = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_networking = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_repodata_gateway = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_shell = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_solve = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_redaction = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_virtual_packages = { git = "https://github.com/conda/rattler", branch = "main" }
-rattler_package_streaming = { git = "https://github.com/conda/rattler", branch = "main" }
+# rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_conda_types = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_digest = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_index = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_networking = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_repodata_gateway = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_shell = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_solve = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_redaction = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_virtual_packages = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_package_streaming = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
+# rattler_menuinst = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }

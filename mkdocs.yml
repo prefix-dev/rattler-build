@@ -135,6 +135,7 @@ nav:
     - Package specification: package_spec.md
     - Package scripts: special_files.md
     - Package Internals: internals.md
+    - System integration: system_integration.md
 
   - References:
       - Recipe file: reference/recipe_file.md

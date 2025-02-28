@@ -484,6 +484,7 @@ pub async fn run_build_from_args(
         if skip_test {
             tracing::info!("Skipping tests because {}", skip_test_reason);
             build_reindexed_channels(&output.build_configuration, &tool_configuration)
+                .await
                 .into_diagnostic()
                 .context("failed to reindex output channel")?;
         } else {
@@ -516,6 +517,7 @@ pub async fn run_build_from_args(
                             &output.build_configuration,
                             &tool_configuration,
                         )
+                        .await
                         .into_diagnostic()
                         .context("failed to reindex output channel")?,
                         channel_priority: tool_configuration.channel_priority,
