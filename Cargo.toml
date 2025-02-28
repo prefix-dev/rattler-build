@@ -24,6 +24,7 @@ native-tls = [
 ]
 rustls-tls = [
   'reqwest/rustls-tls',
+  'reqwest-middleware/rustls-tls',
   'reqwest/rustls-tls-native-roots',
   'rattler/rustls-tls',
   'rattler_repodata_gateway/rustls-tls',
