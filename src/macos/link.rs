@@ -277,6 +277,7 @@ fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> 
         .arg("-f")
         .arg("-s")
         .arg("-")
+        .arg("--preserve-metadata=entitlements,requirements")
         .arg(path)
         .output()
         .map(|_| ())
