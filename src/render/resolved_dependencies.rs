@@ -361,32 +361,61 @@ impl FinalizedRunDependencies {
             .set_content_arrangement(comfy_table::ContentArrangement::Dynamic)
             .set_header(vec!["Name", "Spec"]);
 
-        if !self.depends.is_empty() {
+        // Helper function to add a section with optional padding
+        let mut add_section = |section_name: &str, items: &[String], needs_padding: bool| {
+            if items.is_empty() {
+                return needs_padding;
+            }
+
+            if needs_padding {
+                table.add_row(vec!["", ""]);
+            }
+
             let mut row = comfy_table::Row::new();
             row.add_cell(
-                comfy_table::Cell::new("Run dependencies")
-                    .add_attribute(comfy_table::Attribute::Bold),
+                comfy_table::Cell::new(section_name).add_attribute(comfy_table::Attribute::Bold),
             );
             table.add_row(row);
 
-            self.depends.iter().for_each(|d| {
-                let rendered = d.render(long);
-                table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
+            items.iter().for_each(|item| {
+                table.add_row(item.splitn(2, ' ').collect::<Vec<&str>>());
             });
-        }
 
-        if !self.constraints.is_empty() {
-            let mut row = comfy_table::Row::new();
-            row.add_cell(
-                comfy_table::Cell::new("Run constraints")
-                    .add_attribute(comfy_table::Attribute::Bold),
-            );
-            table.add_row(row);
+            true
+        };
 
-            self.constraints.iter().for_each(|d| {
-                let rendered = d.render(long);
-                table.add_row(rendered.splitn(2, ' ').collect::<Vec<&str>>());
-            });
+        // Add dependencies section
+        let depends_rendered: Vec<String> = self.depends.iter().map(|d| d.render(long)).collect();
+        let mut has_previous_section = add_section("Run dependencies", &depends_rendered, false);
+
+        // Add constraints section
+        let constraints_rendered: Vec<String> =
+            self.constraints.iter().map(|d| d.render(long)).collect();
+        has_previous_section = add_section(
+            "Run constraints",
+            &constraints_rendered,
+            has_previous_section,
+        );
+
+        // Add run exports sections if not empty
+        if !self.run_exports.is_empty() {
+            let sections = [
+                ("Weak", &self.run_exports.weak),
+                ("Strong", &self.run_exports.strong),
+                ("Noarch", &self.run_exports.noarch),
+                ("Weak constrains", &self.run_exports.weak_constrains),
+                ("Strong constrains", &self.run_exports.strong_constrains),
+            ];
+
+            for (name, exports) in sections {
+                if !exports.is_empty() {
+                    has_previous_section = add_section(
+                        &format!("Run exports ({name})"),
+                        exports,
+                        has_previous_section,
+                    );
+                }
+            }
         }
 
         table

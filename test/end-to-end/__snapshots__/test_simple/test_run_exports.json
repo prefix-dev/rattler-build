@@ -1,0 +1,20 @@
+{
+  "noarch": [
+    "python"
+  ],
+  "strong": [
+    "def",
+    "ghi"
+  ],
+  "strong_constraints": [
+    "pqr",
+    "stu"
+  ],
+  "weak": [
+    "abc"
+  ],
+  "weak_constraints": [
+    "jkl",
+    "mno"
+  ]
+}

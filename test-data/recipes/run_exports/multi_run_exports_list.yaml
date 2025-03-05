@@ -1,0 +1,8 @@
+package:
+  name: run_exports_test_list
+  version: "1.0.0"
+
+requirements:
+  run_exports:
+    - abc
+    - def
