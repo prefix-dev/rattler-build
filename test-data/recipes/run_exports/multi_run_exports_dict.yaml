@@ -1,0 +1,19 @@
+package:
+  name: run_exports_test_list
+  version: "1.0.0"
+
+requirements:
+  run_exports:
+    weak:
+      - abc
+    strong:
+      - def
+      - ghi
+    weak_constraints:
+      - jkl
+      - mno
+    strong_constraints:
+      - pqr
+      - stu
+    noarch:
+      - python

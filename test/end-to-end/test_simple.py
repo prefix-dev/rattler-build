@@ -74,7 +74,9 @@ def test_python_noarch(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     check_info(pkg, expected=recipes / "toml" / "expected")
 
 
-def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+def test_run_exports(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
+):
     rattler_build.build(recipes / "run_exports", tmp_path)
     pkg = get_extracted_package(tmp_path, "run_exports_test")
 
@@ -88,6 +90,18 @@ def test_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
     assert (pkg / "info/index.json").exists()
     index_json = json.loads((pkg / "info/index.json").read_text())
     assert index_json.get("depends") is None
+
+    rendered = rattler_build.render(
+        recipes / "run_exports/multi_run_exports_list.yaml", tmp_path
+    )
+    assert rendered[0]["recipe"]["requirements"]["run_exports"] == {
+        "weak": ["abc", "def"]
+    }
+
+    rendered = rattler_build.render(
+        recipes / "run_exports/multi_run_exports_dict.yaml", tmp_path
+    )
+    assert rendered[0]["recipe"]["requirements"]["run_exports"] == snapshot_json
 
 
 def host_subdir():
