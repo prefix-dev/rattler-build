@@ -493,8 +493,8 @@ impl TryConvertNode<RunExports> for RenderedSequenceNode {
         let mut run_exports = RunExports::default();
 
         for node in self.iter() {
-            let deps = node.try_convert(name)?;
-            run_exports.weak = deps;
+            let deps: Vec<Dependency> = node.try_convert(name)?;
+            run_exports.weak.extend(deps);
         }
 
         Ok(run_exports)
