@@ -233,10 +233,29 @@ impl Relinker for Dylib {
         }
 
         let exchange_dylib = |path: &Path| {
-            if let Ok(relpath) = path.strip_prefix(prefix) {
+            let mut _path = path;
+            let path_str = path.to_string_lossy();
+            let encoded_prefix_lib = encoded_prefix.join("lib");
+            let resolved_path = encoded_prefix_lib.join(path);
+            // treat 'libfoo.dylib' the same as $PREFIX/lib/libfoo.dylib
+            // if that's where it is installed
+            if path.parent() == Some(Path::new(""))
+                && !path_str.starts_with("@")
+                && prefix.join("lib").join(path).is_file()
+            {
+                _path = resolved_path.as_path();
+                tracing::debug!(
+                    "Treating relative {} as {}",
+                    path.display(),
+                    _path.display(),
+                );
+            }
+            if let Ok(relpath) = _path.strip_prefix(encoded_prefix_lib) {
+                // absolute $PREFIX/lib/...
                 let new_path = PathBuf::from(format!("@rpath/{}", relpath.to_string_lossy()));
                 Some(new_path)
             } else {
+                tracing::debug!("No need to exchange dylib {}", path.display());
                 None
             }
         };
