@@ -272,19 +272,27 @@ impl Relinker for Dylib {
 
 fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
     tracing::info!("codesigning {:?}", path.file_name().unwrap_or_default());
-    system_tools
+    let output = system_tools
         .call(Tool::Codesign)?
         .arg("-f")
         .arg("-s")
         .arg("-")
-        .arg("--preserve-metadata=entitlements,requirements")
+        // .arg("--preserve-metadata=entitlements,requirements")
         .arg(path)
         .output()
-        .map(|_| ())
         .map_err(|e| {
             tracing::error!("codesign failed: {}", e);
             e
         })?;
+
+    if !output.status.success() {
+        tracing::error!(
+            "codesign failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return Err(RelinkError::CodesignFailed);
+    }
+
     Ok(())
 }
 

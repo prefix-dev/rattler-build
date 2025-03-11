@@ -23,6 +23,9 @@ pub enum RelinkError {
     #[error("failed to run install_name_tool")]
     InstallNameToolFailed,
 
+    #[error("Codesign failed")]
+    CodesignFailed,
+
     #[error(transparent)]
     SystemToolError(#[from] ToolError),
 
