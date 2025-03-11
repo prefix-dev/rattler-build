@@ -325,10 +325,10 @@ def test_s3_minio_upload(
         "--endpoint-url",
         s3_config.endpoint_url,
         "--force-path-style",
-        "true",
         str(get_package(tmp_path, "globtest")),
     ]
     rattler_build(*cmd)
+    breakpoint()
 
     # Check if package was correctly uploaded
     package_key = f"{s3_config.channel_name}/{host_subdir()}/globtest-0.24.6-{variant_hash({'target_platform': host_subdir()})}_0.tar.bz2"

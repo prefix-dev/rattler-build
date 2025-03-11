@@ -530,24 +530,34 @@ Options for uploading to S3
 	The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel
 
 
-- `-e`, `--endpoint-url <ENDPOINT_URL>`
+- `--endpoint-url <ENDPOINT_URL>`
 
 	The endpoint URL of the S3 backend
 
 
-- `-r`, `--region <REGION>`
+- `--region <REGION>`
 
 	The region of the S3 backend
 
 
-- `-f`, `--force-path-style <FORCE_PATH_STYLE>`
+- `--force-path-style`
 
-	Whether to use path-style S3 URLs
-
-	- Possible values: `true`, `false`
+	Enables path-style S3 URLs
 
 
+- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
 
+	The S3 access key ID
+
+
+- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
+
+	The S3 secret access key
+
+
+- `--s3-session-token <S3_SESSION_TOKEN>`
+
+	The S3 session token
 
 
 ### `completion`

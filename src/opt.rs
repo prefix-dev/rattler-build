@@ -951,16 +951,32 @@ pub struct S3Opts {
     pub channel: Url,
 
     /// The endpoint URL of the S3 backend
-    #[arg(short, long, env = "S3_ENDPOINT_URL", requires_all = ["region", "force_path_style"])]
-    pub endpoint_url: Option<Url>,
+    #[arg(
+        long,
+        env = "S3_ENDPOINT_URL",
+        default_value = "https://s3.amazonaws.com"
+    )]
+    pub endpoint_url: Url,
 
     /// The region of the S3 backend
-    #[arg(short, long, env = "S3_REGION", requires_all = ["endpoint_url", "force_path_style"])]
-    pub region: Option<String>,
+    #[arg(long, env = "S3_REGION", default_value = "eu-central-1")]
+    pub region: String,
 
     /// Whether to use path-style S3 URLs
-    #[arg(short, long, env = "S3_FORCE_PATH_STYLE", requires_all = ["endpoint_url", "region"])]
-    pub force_path_style: Option<bool>,
+    #[arg(long, env = "S3_FORCE_PATH_STYLE", default_value = "false")]
+    pub force_path_style: bool,
+
+    /// The access key ID for the S3 bucket.
+    #[arg(long, env = "S3_ACCESS_KEY_ID", requires_all = ["secret_access_key"])]
+    pub access_key_id: Option<String>,
+
+    /// The secret access key for the S3 bucket.
+    #[arg(long, env = "S3_SECRET_ACCESS_KEY", requires_all = ["access_key_id"])]
+    pub secret_access_key: Option<String>,
+
+    /// The session token for the S3 bucket.
+    #[arg(long, env = "S3_SESSION_TOKEN", requires_all = ["access_key_id", "secret_access_key"])]
+    pub session_token: Option<String>,
 }
 
 #[derive(Debug)]
