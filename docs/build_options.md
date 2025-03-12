@@ -256,7 +256,7 @@ build:
     overlinking_behavior: "ignore" or "error" # (defaults to "ignore")
 
   prefix_detection:
-    # A set of files to ignore prefix detection for altogether, see 
+    # A set of files to ignore prefix detection for altogether, see
     ignore: list of globs
 
     force_file_type:
