@@ -14,15 +14,24 @@ use crate::recipe::custom_yaml::{
 };
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
+/// A glob with the source string
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct GlobWithSource {
+pub struct GlobWithSource {
+    /// The glob
     glob: Glob,
+    /// The source string
     source: String,
 }
 
 impl GlobWithSource {
-    pub fn glob(&self) -> &str {
-        &self.glob.glob()
+    /// Returns the glob
+    pub fn glob(&self) -> &Glob {
+        &self.glob
+    }
+
+    /// Returns the source string
+    pub fn source(&self) -> &str {
+        &self.source
     }
 }
 
@@ -245,7 +254,7 @@ impl TryConvertNode<GlobVec> for RenderedNode {
 
 fn to_vector_of_globs(
     sequence: &RenderedSequenceNode,
-) -> Result<Vec<Glob>, Vec<PartialParsingError>> {
+) -> Result<Vec<GlobWithSource>, Vec<PartialParsingError>> {
     let mut vec = Vec::with_capacity(sequence.len());
     for item in sequence.iter() {
         let str: String = item.try_convert("globs")?;
