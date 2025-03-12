@@ -271,23 +271,34 @@ impl Relinker for Dylib {
 }
 
 fn codesign(path: &Path, system_tools: &SystemTools) -> Result<(), RelinkError> {
-    tracing::info!("codesigning {:?}", path.file_name().unwrap_or_default());
-    let output = system_tools
-        .call(Tool::Codesign)?
-        .arg("-f")
-        .arg("-s")
-        .arg("-")
-        // .arg("--preserve-metadata=entitlements,requirements")
-        .arg(path)
-        .output()
-        .map_err(|e| {
-            tracing::error!("codesign failed: {}", e);
-            e
-        })?;
+    let codesign = system_tools.find_tool(Tool::Codesign).map_err(|e| {
+        tracing::error!("codesign not found: {}", e);
+        RelinkError::CodesignFailed
+    })?;
+
+    let is_system_codesign = codesign.starts_with("/usr/bin/");
+
+    let mut cmd = std::process::Command::new(codesign);
+    cmd.args(["-f", "-s", "-"]);
+
+    if is_system_codesign {
+        cmd.arg("--preserve-metadata=entitlements,requirements");
+    }
+    cmd.arg(path);
+
+    // log the cmd invocation
+    tracing::info!("Running codesign: {:?}", cmd);
+
+    let output = cmd.output().map_err(|e| {
+        tracing::error!("codesign failed: {}", e);
+        e
+    })?;
 
     if !output.status.success() {
         tracing::error!(
-            "codesign failed: {}",
+            "codesign failed with status {}. \n  stdout: {}\n  stderr: {}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
         return Err(RelinkError::CodesignFailed);
