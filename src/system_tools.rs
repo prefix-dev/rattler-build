@@ -115,7 +115,7 @@ impl SystemTools {
     }
 
     /// Find the tool in the system and return the path to the tool
-    fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
+    pub fn find_tool(&self, tool: Tool) -> Result<PathBuf, which::Error> {
         let which = |tool: &str| -> Result<PathBuf, which::Error> {
             if let Some(build_prefix) = &self.build_prefix {
                 let build_prefix_activator =
