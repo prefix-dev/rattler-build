@@ -312,6 +312,7 @@ pub async fn run_test(
     index_fs(
         tmp_repo.path(),
         Some(target_platform),
+        None,
         false,
         num_cpus::get_physical(),
         None,

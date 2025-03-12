@@ -749,6 +749,7 @@ pub async fn build_reindexed_channels(
     index_fs(
         output_dir,
         Some(build_configuration.target_platform),
+        None,
         false,
         num_cpus::get_physical(),
         None,
