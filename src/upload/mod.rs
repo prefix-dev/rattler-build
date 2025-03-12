@@ -265,6 +265,7 @@ pub async fn upload_package_to_anaconda(
 }
 
 /// Uploads a package to a channel in an S3 bucket.
+#[allow(clippy::too_many_arguments)]
 pub async fn upload_package_to_s3(
     storage: &AuthenticationStorage,
     channel: Url,
