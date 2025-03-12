@@ -1967,19 +1967,34 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <p>The channel URL in the S3 bucket to upload the package to, e.g., s3://my-bucket/my-channel</p>
 </li>
 <li>
-<p><code>-e</code>, <code>--endpoint-url &lt;ENDPOINT_URL&gt;</code></p>
+<p><code>--endpoint-url &lt;ENDPOINT_URL&gt;</code></p>
 <p>The endpoint URL of the S3 backend</p>
-</li>
-<li>
-<p><code>-r</code>, <code>--region &lt;REGION&gt;</code></p>
-<p>The region of the S3 backend</p>
-</li>
-<li>
-<p><code>-f</code>, <code>--force-path-style &lt;FORCE_PATH_STYLE&gt;</code></p>
-<p>Whether to use path-style S3 URLs</p>
 <ul>
-<li>Possible values: <code>true</code>, <code>false</code></li>
+<li>Default value: <code>https://s3.amazonaws.com</code></li>
 </ul>
+</li>
+<li>
+<p><code>--region &lt;REGION&gt;</code></p>
+<p>The region of the S3 backend</p>
+<ul>
+<li>Default value: <code>eu-central-1</code></li>
+</ul>
+</li>
+<li>
+<p><code>--force-path-style</code></p>
+<p>Whether to use path-style S3 URLs</p>
+</li>
+<li>
+<p><code>--access-key-id &lt;ACCESS_KEY_ID&gt;</code></p>
+<p>The access key ID for the S3 bucket</p>
+</li>
+<li>
+<p><code>--secret-access-key &lt;SECRET_ACCESS_KEY&gt;</code></p>
+<p>The secret access key for the S3 bucket</p>
+</li>
+<li>
+<p><code>--session-token &lt;SESSION_TOKEN&gt;</code></p>
+<p>The session token for the S3 bucket</p>
 </li>
 </ul>
 <h3 id="completion"><code>completion</code><a class="headerlink" href="#completion" title="Permanent link">#</a></h3>
