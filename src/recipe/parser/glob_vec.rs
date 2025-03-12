@@ -2,7 +2,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::ops::Deref;
 use std::path::Path;
 
-use globset::{Glob, GlobSet};
+use wax::Glob;
 
 use serde::ser::{SerializeMap, SerializeSeq};
 use serde::{Deserialize, Serialize};
@@ -14,52 +14,58 @@ use crate::recipe::custom_yaml::{
 };
 use crate::recipe::error::{ErrorKind, PartialParsingError};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GlobString(String);
+
+impl From<String> for GlobString {
+    fn from(s: String) -> Result<Self, wax::BuildError> {
+        // parse as glob and raise an error
+        Glob::new(&s)?;
+        Ok(Self(s))
+    }
+}
+
+
 /// Wrapper type to simplify serialization of Vec<Glob>
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct InnerGlobVec(Vec<Glob>);
+struct InnerGlobVec(Vec<GlobString>);
 
 impl Deref for InnerGlobVec {
-    type Target = Vec<Glob>;
+    type Target = Vec<GlobString>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl InnerGlobVec {
-    fn globset(&self) -> Result<GlobSet, globset::Error> {
-        let mut globset_builder = globset::GlobSetBuilder::new();
-        for glob in self.iter() {
-            globset_builder.add(glob.clone());
-        }
-        globset_builder.build()
-    }
-}
+// impl InnerGlobVec {
+//     fn globset(&self) -> Result<GlobSet, globset::Error> {
+//         let mut globset_builder = globset::GlobSetBuilder::new();
+//         for glob in self.iter() {
+//             globset_builder.add(glob.clone());
+//         }
+//         globset_builder.build()
+//     }
+// }
 
 impl From<Vec<String>> for InnerGlobVec {
     fn from(vec: Vec<String>) -> Self {
         let vec = vec
             .into_iter()
-            .map(|glob| to_glob(&glob).expect("glob parsing failed"))
+            .map(|glob| GlobString::from(glob).expect("glob parsing failed"))
             .collect();
         Self(vec)
     }
 }
 
-impl From<Vec<Glob>> for InnerGlobVec {
-    fn from(vec: Vec<Glob>) -> Self {
-        Self(vec)
-    }
-}
-
-fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
-    if glob.ends_with('/') && !glob.contains('*') {
-        // we treat folders as globs that match everything in the folder
-        Glob::new(&format!("{}**", glob))
-    } else {
-        Glob::new(glob)
-    }
-}
+// fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
+//     if glob.ends_with('/') && !glob.contains('*') {
+//         // we treat folders as globs that match everything in the folder
+//         Glob::new(&format!("{}**", glob))
+//     } else {
+//         Glob::new(glob)
+//     }
+// }
 
 /// A vector of globs that is also immediately converted to a globset
 /// to enhance parser errors.
@@ -67,8 +73,6 @@ fn to_glob(glob: &str) -> Result<Glob, globset::Error> {
 pub struct GlobVec {
     include: InnerGlobVec,
     exclude: InnerGlobVec,
-    include_globset: GlobSet,
-    exclude_globset: GlobSet,
 }
 
 impl PartialEq for GlobVec {
@@ -83,7 +87,7 @@ impl Serialize for InnerGlobVec {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut seq = serializer.serialize_seq(Some(self.len()))?;
         for glob in self.iter() {
-            seq.serialize_element(glob.glob())?;
+            seq.serialize_element(&glob.0)?;
         }
         seq.end()
     }
@@ -105,7 +109,7 @@ impl Serialize for GlobVec {
 impl Debug for GlobVec {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_list()
-            .entries(self.include.iter().map(|glob| glob.glob()))
+            .entries(self.include.iter().map(|glob| &glob.0))
             .finish()
     }
 }
@@ -139,13 +143,9 @@ impl<'de> Deserialize<'de> for GlobVec {
 impl GlobVec {
     /// Create a new GlobVec from a vector of globs
     fn new(include: InnerGlobVec, exclude: InnerGlobVec) -> Result<Self, globset::Error> {
-        let include_globset = include.globset()?;
-        let exclude_globset = exclude.globset()?;
         Ok(Self {
             include,
             exclude,
-            include_globset,
-            exclude_globset,
         })
     }
 
@@ -154,15 +154,15 @@ impl GlobVec {
         self.include.is_empty() && self.exclude.is_empty()
     }
 
-    /// Returns an iterator over the globs
-    pub fn include_globs(&self) -> &Vec<Glob> {
-        &self.include
-    }
+    // /// Returns an iterator over the globs
+    // pub fn include_globs(&self) -> &Vec<Glob> {
+    //     &self.include
+    // }
 
-    /// Returns an iterator over the globs
-    pub fn exclude_globs(&self) -> &Vec<Glob> {
-        &self.exclude
-    }
+    // /// Returns an iterator over the globs
+    // pub fn exclude_globs(&self) -> &Vec<Glob> {
+    //     &self.exclude
+    // }
 
     /// Returns true if the path matches any include glob and does not match any exclude glob
     /// If there are no globs at all, we match nothing.
