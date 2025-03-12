@@ -325,7 +325,6 @@ def test_s3_minio_upload(
         "--endpoint-url",
         s3_config.endpoint_url,
         "--force-path-style",
-        "true",
         str(get_package(tmp_path, "globtest")),
     ]
     rattler_build(*cmd)
