@@ -1,0 +1,23 @@
+context:
+  c_compiler: clang
+  c_compiler_version: "19"
+
+package:
+  name: test-relink
+  version: 0.0.0
+
+build:
+  number: 0
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+tests:
+  - script:
+      - otool -L $PREFIX/lib/libabsolute.dylib $PREFIX/lib/librelative.dylib $PREFIX/bin/test_link
+      # verify that links are rewritten with @rpath
+      - otool -L $PREFIX/lib/libabsolute.dylib | grep @rpath/libabsolute.dylib
+      - otool -L $PREFIX/lib/librelative.dylib | grep @rpath/librelative.dylib
+      - otool -L $PREFIX/bin/test_link | grep @rpath/libabsolute.dylib
+      - otool -L $PREFIX/bin/test_link | grep @rpath/librelative.dylib
+      - test_link
