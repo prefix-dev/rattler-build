@@ -534,30 +534,35 @@ Options for uploading to S3
 
 	The endpoint URL of the S3 backend
 
+	- Default value: `https://s3.amazonaws.com`
 
 - `--region <REGION>`
 
 	The region of the S3 backend
 
+	- Default value: `eu-central-1`
 
 - `--force-path-style`
 
-	Enables path-style S3 URLs
+	Whether to use path-style S3 URLs
 
 
-- `--s3-access-key-id <S3_ACCESS_KEY_ID>`
+- `--access-key-id <ACCESS_KEY_ID>`
 
-	The S3 access key ID
-
-
-- `--s3-secret-access-key <S3_SECRET_ACCESS_KEY>`
-
-	The S3 secret access key
+	The access key ID for the S3 bucket
 
 
-- `--s3-session-token <S3_SESSION_TOKEN>`
+- `--secret-access-key <SECRET_ACCESS_KEY>`
 
-	The S3 session token
+	The secret access key for the S3 bucket
+
+
+- `--session-token <SESSION_TOKEN>`
+
+	The session token for the S3 bucket
+
+
+
 
 
 ### `completion`
