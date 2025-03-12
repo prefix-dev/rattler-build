@@ -182,7 +182,7 @@ impl Relinker for Dylib {
                     final_rpaths.push(rpath.clone());
                 }
                 tracing::info!(
-                    "Rpath not in prefix or allow-listed: {} – removing it",
+                    "Rpath not in prefix or allow-listed: {} - removing it",
                     rpath.display()
                 );
             } else if let Ok(rel) = rpath.strip_prefix(encoded_prefix) {
@@ -206,7 +206,7 @@ impl Relinker for Dylib {
                 final_rpaths.push(rpath.clone());
             } else {
                 tracing::info!(
-                    "Rpath not in prefix or allow-listed: {} – removing it",
+                    "Rpath not in prefix or allow-listed: {} - removing it",
                     rpath.display()
                 );
             }
@@ -232,11 +232,31 @@ impl Relinker for Dylib {
             modified = true;
         }
 
+        // find the first rpath that looks like `lib/` and extends the prefix
+        // by default, the first element of custom_rpaths is `lib/`
+        let base_rpath = custom_rpaths
+            .iter()
+            .find(|r| !r.contains("@") && !r.starts_with('/') && !r.starts_with('.'));
+
         let exchange_dylib = |path: &Path| {
-            if let Ok(relpath) = path.strip_prefix(prefix) {
+            // treat 'libfoo.dylib' the same as $PREFIX/lib/libfoo.dylib
+            // if that's where it is installed
+            let encoded_prefix_lib = encoded_prefix.join(base_rpath.cloned().unwrap_or_default());
+            let resolved_path = encoded_prefix_lib.join(path);
+
+            let path = if path.components().count() == 1 && resolved_path.exists() {
+                tracing::debug!("Treating relative {:?} as {:?}", path, resolved_path);
+                resolved_path
+            } else {
+                path.to_path_buf()
+            };
+
+            if let Ok(relpath) = path.strip_prefix(encoded_prefix_lib) {
+                // absolute $PREFIX/lib/...
                 let new_path = PathBuf::from(format!("@rpath/{}", relpath.to_string_lossy()));
                 Some(new_path)
             } else {
+                tracing::debug!("No need to exchange dylib {}", path.display());
                 None
             }
         };

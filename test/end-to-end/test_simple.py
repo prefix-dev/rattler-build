@@ -1392,3 +1392,8 @@ def test_jinja_types(
     # remove target_platform from the variant
     variant.pop("target_platform")
     assert snapshot_json == variant
+
+
+@pytest.mark.skipif(platform.system() != "Darwin", reason="macos-only")
+def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-relink", tmp_path)
