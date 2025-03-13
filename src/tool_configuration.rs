@@ -81,6 +81,9 @@ pub struct Configuration {
     /// threads does not matter for the final result.
     pub compression_threads: Option<u32>,
 
+    /// Concurrency limit for I/O operations
+    pub io_concurrency_limit: Option<usize>,
+
     /// The package cache to use to store packages in.
     pub package_cache: PackageCache,
 
@@ -146,6 +149,7 @@ pub struct ConfigurationBuilder {
     noarch_build_platform: Option<Platform>,
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
+    io_concurrency_limit: Option<usize>,
     channel_priority: ChannelPriority,
 }
 
@@ -172,6 +176,7 @@ impl ConfigurationBuilder {
             noarch_build_platform: None,
             channel_config: None,
             compression_threads: None,
+            io_concurrency_limit: None,
             channel_priority: ChannelPriority::Strict,
         }
     }
@@ -220,6 +225,15 @@ impl ConfigurationBuilder {
     pub fn with_compression_threads(self, compression_threads: Option<u32>) -> Self {
         Self {
             compression_threads,
+            ..self
+        }
+    }
+
+    /// Set the maximum I/O concurrency during package installation or None to use
+    /// a default based on number of cores
+    pub fn with_io_concurrency_limit(self, io_concurrency_limit: Option<usize>) -> Self {
+        Self {
+            io_concurrency_limit,
             ..self
         }
     }
@@ -335,6 +349,7 @@ impl ConfigurationBuilder {
             noarch_build_platform: self.noarch_build_platform,
             channel_config,
             compression_threads: self.compression_threads,
+            io_concurrency_limit: self.io_concurrency_limit,
             package_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,
