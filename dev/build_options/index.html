@@ -1743,6 +1743,18 @@ not specified in the run requirements. This is usually a mistake because the
 library would not be present in the environment when the package is installed.</p>
 <p>Conversely, "overdepending" is when a library is part of the run requirements,
 but is not actually used by any of the binaries/libraries in the package.</p>
+<p>In addition to handling binary dependencies, <code>rattler-build</code> also ensures that
+packages containing hardcoded paths into the environment are relocatable when
+installed outside the of the build environment. To do this, <code>rattler-build</code>
+constructs a host environment with a 255 character name of the form
+<code>host_env_placehold[_placehold[_placehold[...]]]</code> (for details, see the
+<a href="../internals/">internals</a> docs). At install time, conda will find these paths
+and replace them in binaries with the path to the environment being installed
+into.</p>
+<p>Since this process may not be safe for all packages, and not all packages will
+require these modifications (if packages are already internally avoiding
+embedding invalid absolute paths, for example), then this process may be
+disabled using the <code>prefix_detection</code> options shown below.</p>
 <div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nt">build</span><span class="p">:</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="c1"># settings for shared libraries and executables</span>
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">dynamic_linking</span><span class="p">:</span>
@@ -1765,6 +1777,16 @@ but is not actually used by any of the binaries/libraries in the package.</p>
 </span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>
 </span><span id="__span-7-21"><a id="__codelineno-7-21" name="__codelineno-7-21" href="#__codelineno-7-21"></a><span class="w">    </span><span class="c1"># what to do when detecting overlinking</span>
 </span><span id="__span-7-22"><a id="__codelineno-7-22" name="__codelineno-7-22" href="#__codelineno-7-22"></a><span class="w">    </span><span class="nt">overlinking_behavior</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ignore&quot;</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">or &quot;error&quot;</span><span class="w"> </span><span class="c1"># (defaults to &quot;ignore&quot;)</span>
+</span><span id="__span-7-23"><a id="__codelineno-7-23" name="__codelineno-7-23" href="#__codelineno-7-23"></a>
+</span><span id="__span-7-24"><a id="__codelineno-7-24" name="__codelineno-7-24" href="#__codelineno-7-24"></a><span class="w">  </span><span class="nt">prefix_detection</span><span class="p">:</span>
+</span><span id="__span-7-25"><a id="__codelineno-7-25" name="__codelineno-7-25" href="#__codelineno-7-25"></a><span class="w">    </span><span class="c1"># A set of files to ignore prefix detection for altogether, see</span>
+</span><span id="__span-7-26"><a id="__codelineno-7-26" name="__codelineno-7-26" href="#__codelineno-7-26"></a><span class="w">    </span><span class="nt">ignore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
+</span><span id="__span-7-27"><a id="__codelineno-7-27" name="__codelineno-7-27" href="#__codelineno-7-27"></a>
+</span><span id="__span-7-28"><a id="__codelineno-7-28" name="__codelineno-7-28" href="#__codelineno-7-28"></a><span class="w">    </span><span class="nt">force_file_type</span><span class="p">:</span>
+</span><span id="__span-7-29"><a id="__codelineno-7-29" name="__codelineno-7-29" href="#__codelineno-7-29"></a><span class="w">      </span><span class="c1"># Force replacement of files as binary blobs regardless of their type</span>
+</span><span id="__span-7-30"><a id="__codelineno-7-30" name="__codelineno-7-30" href="#__codelineno-7-30"></a><span class="w">      </span><span class="nt">binary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
+</span><span id="__span-7-31"><a id="__codelineno-7-31" name="__codelineno-7-31" href="#__codelineno-7-31"></a><span class="w">      </span><span class="c1"># Force replacement of files as text (strings) regardless of their type</span>
+</span><span id="__span-7-32"><a id="__codelineno-7-32" name="__codelineno-7-32" href="#__codelineno-7-32"></a><span class="w">      </span><span class="nt">text</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">list of globs</span>
 </span></code></pre></div>
 <h2 id="python-options">Python options<a class="headerlink" href="#python-options" title="Permanent link">#</a></h2>
 <p>There are some additional options in the <code>python</code> section of the <code>build</code> key.</p>
