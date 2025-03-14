@@ -136,7 +136,7 @@ Recipe {
             ),
             missing_dso_allowlist: [],
             rpath_allowlist: [
-                "/usr/lib/**",
+                "/usr/lib/**{,/**}",
             ],
             overdepending_behavior: Ignore,
             overlinking_behavior: Ignore,
@@ -373,14 +373,14 @@ Recipe {
         PackageContents {
             package_contents: PackageContentsTest {
                 files: [
-                    "share/cmake/xtensor/xtensorConfig.cmake",
-                    "share/cmake/xtensor/xtensorConfigVersion.cmake",
+                    "share/cmake/xtensor/xtensorConfig.cmake{,/**}",
+                    "share/cmake/xtensor/xtensorConfigVersion.cmake{,/**}",
                 ],
                 site_packages: [],
                 bin: [],
                 lib: [],
                 include: [
-                    "xtensor/xarray.hpp",
+                    "xtensor/xarray.hpp{,/**}",
                 ],
             },
         },
@@ -471,7 +471,7 @@ Recipe {
         ),
         license_family: None,
         license_file: [
-            "LICENSE",
+            "LICENSE{,/**}",
         ],
         license_url: None,
         summary: Some(

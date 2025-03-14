@@ -67,12 +67,10 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-2022
     env:
-      #
       # These are some environment variables that configure the build so that the binary size is reduced.
       # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
       # They're only enable it on main and releases.
       #
-
       # Enable Link Time Optimization (LTO) for our release builds. This increases link time but drastically reduces
       # binary size.
       CARGO_PROFILE_RELEASE_LTO: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'true' || 'false' }}
@@ -134,13 +132,6 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cross
-
-      - name: Add macOS cross build capability
-        if: matrix.target == 'aarch64-apple-darwin'
-        run: |
-          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
-          rustup default stable-aarch64-apple-darwin
 
       - name: Show version information (Rust, cargo, GCC)
         run: |

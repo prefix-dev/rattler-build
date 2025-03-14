@@ -81,7 +81,7 @@ build:
   post_process:
   - files:
     - '*.cmake'
-    - bla/**
+    - bla/
     regex: complicated(.*)regex
     replacement: simple_string
   files:
@@ -93,7 +93,7 @@ build:
     exclude:
     - foo/*
     - bar.txt
-    - baz/**
+    - baz/
 requirements:
   build:
   - gcc_linux-64
@@ -139,7 +139,7 @@ tests:
     - bash
   files:
     source:
-    - include/**
+    - include/
     - src/*.c
     - src_file.txt
 - package_contents:

@@ -344,7 +344,7 @@ mod tests {
             .filter(|s| s.is_ok())
             .count();
         _ = std::env::set_current_dir(path);
-        assert_eq!(glen, 6);
+        assert_eq!(glen, 8);
     }
 
     fn check_info(folder: PathBuf, expected: PathBuf) {
