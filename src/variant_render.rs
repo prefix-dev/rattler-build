@@ -372,8 +372,9 @@ pub(crate) fn stage_1_render<S: SourceCode>(
                 additional_variables.insert("CONDA_BUILD_SYSROOT".into());
             }
 
-            // also always add `target_platform` and `channel_targets`
+            // also always add `target_platform`, `channel_sources` and `channel_targets`
             additional_variables.insert("target_platform".into());
+            additional_variables.insert("channel_sources".into());
             additional_variables.insert("channel_targets".into());
 
             // Environment variables can be overwritten by the variant configuration
