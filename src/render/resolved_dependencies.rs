@@ -959,7 +959,11 @@ pub(crate) async fn resolve_dependencies(
     if run_specs.depends.is_empty() && run_specs.constraints.is_empty() {
         tracing::info!("\nFinalized run dependencies: this output has no run dependencies");
     } else {
-        tracing::info!("\nFinalized run dependencies:\n{}", run_specs);
+        tracing::info!(
+            "\nFinalized run dependencies ({}):\n{}",
+            output.identifier(),
+            run_specs
+        );
     }
 
     Ok(FinalizedDependencies {
