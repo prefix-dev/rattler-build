@@ -10,7 +10,7 @@ use globset::Glob;
 use ignore::WalkBuilder;
 use rayon::iter::{ParallelBridge, ParallelIterator};
 
-use crate::recipe::parser::GlobVec;
+use crate::recipe::parser::{GlobVec, GlobWithSource};
 
 use super::SourceError;
 
@@ -398,8 +398,8 @@ where
 
 pub(crate) struct CopyDirResult {
     copied_paths: Vec<PathBuf>,
-    include_globs: HashMap<Glob, Match>,
-    exclude_globs: HashMap<Glob, Match>,
+    include_globs: HashMap<String, Match>,
+    exclude_globs: HashMap<String, Match>,
 }
 
 impl CopyDirResult {
@@ -407,11 +407,11 @@ impl CopyDirResult {
         &self.copied_paths
     }
 
-    pub fn include_globs(&self) -> &HashMap<Glob, Match> {
+    pub fn include_globs(&self) -> &HashMap<String, Match> {
         &self.include_globs
     }
 
-    fn include_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
+    fn include_globs_mut(&mut self) -> &mut HashMap<String, Match> {
         &mut self.include_globs
     }
 
@@ -420,11 +420,11 @@ impl CopyDirResult {
     }
 
     #[allow(unused)]
-    pub fn exclude_globs(&self) -> &HashMap<Glob, Match> {
+    pub fn exclude_globs(&self) -> &HashMap<String, Match> {
         &self.exclude_globs
     }
 
-    fn exclude_globs_mut(&mut self) -> &mut HashMap<Glob, Match> {
+    fn exclude_globs_mut(&mut self) -> &mut HashMap<String, Match> {
         &mut self.exclude_globs
     }
 
@@ -434,12 +434,12 @@ impl CopyDirResult {
     }
 }
 
-fn make_glob_match_map(globs: &[Glob]) -> Result<HashMap<Glob, Match>, SourceError> {
+fn make_glob_match_map(globs: &[GlobWithSource]) -> Result<HashMap<String, Match>, SourceError> {
     globs
         .iter()
         .map(|glob| {
-            let matcher = Match::new(glob);
-            Ok(((*glob).clone(), matcher))
+            let matcher = Match::new(glob.glob());
+            Ok((glob.source().to_string(), matcher))
         })
         .collect()
 }

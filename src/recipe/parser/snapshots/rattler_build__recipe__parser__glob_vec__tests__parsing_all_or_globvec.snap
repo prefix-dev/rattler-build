@@ -6,4 +6,3 @@ globs:
 - foo
 - bar
 - baz/**/qux
-

@@ -23,7 +23,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, io_concurrency_limit, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -40,6 +40,7 @@ fn build_recipes_py(
     no_build_id: bool,
     package_format: Option<String>,
     compression_threads: Option<u32>,
+    io_concurrency_limit: Option<usize>,
     no_include_recipe: bool,
     test: Option<String>,
     output_dir: Option<PathBuf>,
@@ -95,6 +96,7 @@ fn build_recipes_py(
         no_build_id,
         package_format,
         compression_threads,
+        io_concurrency_limit,
         no_include_recipe,
         test,
         common,
@@ -190,20 +192,21 @@ fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, attestation_file=None))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, attestation_file=None,))]
 fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
     channel: String,
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
+    skip_existing: bool,
     attestation_file: Option<PathBuf>,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file);
+    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file, skip_existing);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {

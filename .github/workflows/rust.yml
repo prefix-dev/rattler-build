@@ -29,14 +29,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         with:
           toolchain: "1.83.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
 
@@ -67,12 +67,10 @@ jobs:
           - target: x86_64-pc-windows-msvc
             os: windows-2022
     env:
-      #
       # These are some environment variables that configure the build so that the binary size is reduced.
       # Inspiration was taken from this blog: https://arusahni.net/blog/2020/03/optimizing-rust-binary-size.html
       # They're only enable it on main and releases.
       #
-
       # Enable Link Time Optimization (LTO) for our release builds. This increases link time but drastically reduces
       # binary size.
       CARGO_PROFILE_RELEASE_LTO: ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')) && 'true' || 'false' }}
@@ -93,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Extract version
         shell: bash
@@ -114,7 +112,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         with:
           toolchain: "1.83.0"
           targets: ${{ matrix.target }}
@@ -127,20 +125,13 @@ jobs:
         if: matrix.target == 'powerpc64le-unknown-linux-gnu'
         run: sudo apt install libssl-dev
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
         with:
           tool: cross
-
-      - name: Add macOS cross build capability
-        if: matrix.target == 'aarch64-apple-darwin'
-        run: |
-          echo "SDKROOT=$(xcrun -sdk macosx --show-sdk-path)" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx --show-sdk-platform-version)" >> $GITHUB_ENV
-          rustup default stable-aarch64-apple-darwin
 
       - name: Show version information (Rust, cargo, GCC)
         run: |
@@ -220,13 +211,13 @@ jobs:
           echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ steps.package.outputs.pkg-name }}
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
@@ -238,7 +229,7 @@ jobs:
 
       - name: Create issue on failure
         if: startsWith(github.ref, 'refs/tags/v') && failure()
-        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2
+        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2 # cdb57ab6ff8862aa09fee2be6ba77a59581921c2
         with:
           token: ${{ github.token }}
           title: GitHub release failed
@@ -251,7 +242,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |

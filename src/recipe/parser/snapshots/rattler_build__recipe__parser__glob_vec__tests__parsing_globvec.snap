@@ -5,4 +5,3 @@ expression: "&as_yaml"
 - foo
 - bar
 - baz/**/qux
-

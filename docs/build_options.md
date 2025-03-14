@@ -217,6 +217,20 @@ library would not be present in the environment when the package is installed.
 Conversely, "overdepending" is when a library is part of the run requirements,
 but is not actually used by any of the binaries/libraries in the package.
 
+In addition to handling binary dependencies, `rattler-build` also ensures that
+packages containing hardcoded paths into the environment are relocatable when
+installed outside the of the build environment. To do this, `rattler-build`
+constructs a host environment with a 255 character name of the form
+`host_env_placehold[_placehold[_placehold[...]]]` (for details, see the
+[internals](internals.md) docs). At install time, conda will find these paths
+and replace them in binaries with the path to the environment being installed
+into.
+
+Since this process may not be safe for all packages, and not all packages will
+require these modifications (if packages are already internally avoiding
+embedding invalid absolute paths, for example), then this process may be
+disabled using the `prefix_detection` options shown below.
+
 ```yaml title="recipe.yaml"
 build:
   # settings for shared libraries and executables
@@ -240,6 +254,16 @@ build:
 
     # what to do when detecting overlinking
     overlinking_behavior: "ignore" or "error" # (defaults to "ignore")
+
+  prefix_detection:
+    # A set of files to ignore prefix detection for altogether, see
+    ignore: list of globs
+
+    force_file_type:
+      # Force replacement of files as binary blobs regardless of their type
+      binary: list of globs
+      # Force replacement of files as text (strings) regardless of their type
+      text: list of globs
 ```
 
 ## Python options

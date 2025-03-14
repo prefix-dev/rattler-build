@@ -45,6 +45,7 @@ def build_recipes(
     no_build_id: bool = False,
     package_format: Union[str, None] = None,
     compression_threads: Union[int, None] = None,
+    io_concurrency_limit: Union[int, None] = None,
     no_include_recipe: bool = False,
     test: Union[str, None] = None,
     output_dir: Union[str, Path, None] = None,
@@ -71,6 +72,7 @@ def build_recipes(
         no_build_id: Don't use build id(timestamp) when creating build directory name.
         package_format: The package format to use for the build. Can be one of `tar-bz2` or `conda`. You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
         compression_threads: The number of threads to use for compression (only relevant when also using `--package-format conda`).
+        io_concurrency_limit: The maximum number of concurrent I/O operations. This is useful for limiting the number of concurrent file operations.
         no_include_recipe: Don't store the recipe in the final package.
         test: The strategy to use for running tests.
         output_dir: The directory to store the output.
@@ -98,6 +100,7 @@ def build_recipes(
         no_build_id,
         package_format,
         compression_threads,
+        io_concurrency_limit,
         no_include_recipe,
         test,
         output_dir,
@@ -183,6 +186,7 @@ def upload_package_to_prefix(
     channels: str,
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
+    skip_existing: bool = False,
 ) -> None:
     """
     Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.
@@ -193,11 +197,12 @@ def upload_package_to_prefix(
         channels: The channel to upload the package to.
         api_key: The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file.
         auth_file: The authentication file.
+        skip_existing: Skip upload if package is existed.
 
     Returns:
         None
     """
-    upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file)
+    upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file, skip_existing)
 
 
 def upload_package_to_anaconda(
