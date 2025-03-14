@@ -961,7 +961,7 @@ pub(crate) async fn resolve_dependencies(
     } else {
         tracing::info!(
             "\nFinalized run dependencies ({}):\n{}",
-            output.name().as_normalized(),
+            output.identifier(),
             run_specs
         );
     }
