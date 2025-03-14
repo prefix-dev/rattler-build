@@ -29,10 +29,11 @@ def test_license_glob(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
     assert (pkg / "info/licenses/cmake/FindTBB.cmake").exists()
     assert (pkg / "info/licenses/docs/ghp_environment.yml").exists()
     assert (pkg / "info/licenses/docs/rtd_environment.yml").exists()
+    assert (pkg / "info/licenses/tools/check_circular.py").exists()
 
     # Check that the total number of files under the license folder is correct
-    # 4 files + 2 folders = 6
-    assert len(list(pkg.glob("info/licenses/**/*"))) == 6
+    # 5 files + 3 folders = 8
+    assert len(list(pkg.glob("info/licenses/**/*"))) == 8
 
 
 def check_info(folder: Path, expected: Path):

@@ -1,5 +1,3 @@
-
-
 context:
   name: globtest
   version: "0.24.6"
@@ -19,3 +17,5 @@ about:
     - LICENSE
     - cmake/
     - docs/*.yml
+    # this should include the entire `tools` directory
+    - tools
