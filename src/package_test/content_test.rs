@@ -137,10 +137,7 @@ impl PackageContentsTest {
                     }
                 } else if target_platform.is_linux() || target_platform.arch() == Some(Arch::Wasm32)
                 {
-                    if raw.ends_with(".so")
-                        || raw.contains(".so.")
-                        || raw.ends_with(".a")
-                    {
+                    if raw.ends_with(".so") || raw.contains(".so.") || raw.ends_with(".a") {
                         GlobSet::builder()
                             .add(Glob::new(&format!("lib/{raw}"))?)
                             .build()
@@ -181,7 +178,10 @@ impl PackageContentsTest {
             let mut globset = GlobSet::builder();
 
             if site_package.source().contains('/') {
-                globset.add(build_glob(format!("{site_packages_base}/{}", site_package.source()))?);
+                globset.add(build_glob(format!(
+                    "{site_packages_base}/{}",
+                    site_package.source()
+                ))?);
             } else {
                 let mut split = site_package.source().split('.').collect::<Vec<_>>();
                 let last_elem = split.pop().unwrap_or_default();
@@ -210,7 +210,7 @@ impl PackageContentsTest {
         let mut result = Vec::new();
 
         for file in self.files.include_globs() {
-            let glob = Glob::new(&file.source())?;
+            let glob = Glob::new(file.source())?;
             let globset = GlobSet::builder().add(glob).build()?;
             result.push((file.glob().to_string(), globset));
         }
