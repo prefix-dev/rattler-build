@@ -37,8 +37,14 @@ pub struct PyPIOpts {
     #[arg(short, long)]
     pub tree: bool,
 
-    /// Specify the PyPI index URL(s) to use for recipe generation 
-    #[arg(long = "pypi-index-url", env = "RATTLER_PYPI_INDEX_URL", default_value = "https://pypi.org/pypi", value_delimiter = ',', help = "Specify the PyPI index URL(s) to use for recipe generation")]
+    /// Specify the PyPI index URL(s) to use for recipe generation
+    #[arg(
+        long = "pypi-index-url",
+        env = "RATTLER_PYPI_INDEX_URL",
+        default_value = "https://pypi.org/pypi",
+        value_delimiter = ',',
+        help = "Specify the PyPI index URL(s) to use for recipe generation"
+    )]
     pub pypi_index_urls: Vec<String>,
 }
 
@@ -278,15 +284,15 @@ async fn fetch_pypi_metadata(
                     .await
                     .into_diagnostic()
                     .context(format!("Failed to fetch from {}", url))?;
-                
+
                 if !response.status().is_success() {
-                    return Err(miette::miette!("Server returned status code: {}", response.status()));
+                    return Err(miette::miette!(
+                        "Server returned status code: {}",
+                        response.status()
+                    ));
                 }
-                
-                let release: PyPrReleaseResponse = response
-                    .json()
-                    .await
-                    .into_diagnostic()?;
+
+                let release: PyPrReleaseResponse = response.json().await.into_diagnostic()?;
                 Ok((release.info, release.urls))
             } else {
                 let url = format!("{}{}/json", base_url, opts.package);
@@ -296,15 +302,15 @@ async fn fetch_pypi_metadata(
                     .await
                     .into_diagnostic()
                     .context(format!("Failed to fetch from {}", url))?;
-                
+
                 if !response.status().is_success() {
-                    return Err(miette::miette!("Server returned status code: {}", response.status()));
+                    return Err(miette::miette!(
+                        "Server returned status code: {}",
+                        response.status()
+                    ));
                 }
-                
-                let response: PyPiResponse = response
-                    .json()
-                    .await
-                    .into_diagnostic()?;
+
+                let response: PyPiResponse = response.json().await.into_diagnostic()?;
 
                 // Get the latest release
                 let urls = response
@@ -313,13 +319,14 @@ async fn fetch_pypi_metadata(
                     .ok_or_else(|| miette::miette!("No source distribution found"))?;
                 Ok((response.info, urls.clone()))
             }
-        }.await;
+        }
+        .await;
 
         match result {
             Ok((info, urls)) => {
                 // Found a working PyPI index, use it
                 eprintln!("Successfully fetched metadata from {}", base_url);
-                
+
                 let release = urls
                     .iter()
                     .find(|r| r.filename.ends_with(".tar.gz"))
@@ -385,10 +392,18 @@ pub async fn create_recipe(
     recipe.package.version = "${{ version }}".to_string();
 
     // Check if we're using the standard PyPI
-    let is_default_pypi = opts.pypi_index_urls.iter().any(|url| url.starts_with("https://pypi.org"));
+    let is_default_pypi = opts
+        .pypi_index_urls
+        .iter()
+        .any(|url| url.starts_with("https://pypi.org"));
 
     // replace URL with the shorter version that does not contain the hash if using the standard PyPI
-    let release_url = if is_default_pypi && metadata.release.url.starts_with("https://files.pythonhosted.org/") {
+    let release_url = if is_default_pypi
+        && metadata
+            .release
+            .url
+            .starts_with("https://files.pythonhosted.org/")
+    {
         let simple_url = format!(
             "https://pypi.org/packages/source/{}/{}/{}-{}.tar.gz",
             &metadata.info.name.to_lowercase()[..1],
@@ -571,7 +586,7 @@ mod tests {
 
         assert_yaml_snapshot!(recipe);
     }
-    
+
     #[tokio::test]
     async fn test_multiple_pypi_index_urls() {
         // Test with multiple PyPI index URLs, starting with an invalid one
@@ -589,7 +604,7 @@ mod tests {
 
         let client = reqwest::Client::new();
         let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
-        
+
         // Verify that the valid URL was used (by checking that metadata was found)
         assert_eq!(metadata.info.name.to_lowercase(), "requests");
         assert_eq!(metadata.info.version, "2.31.0");
@@ -599,28 +614,28 @@ mod tests {
     fn test_format_requirement() {
         // Test basic requirement formatting
         assert_eq!(format_requirement("numpy>=1.20.0"), "numpy >=1.20.0");
-        
+
         // Test requirement with marker
         assert_eq!(
-            format_requirement("importlib-metadata>=3.6.0;python_version<\"3.10\""), 
+            format_requirement("importlib-metadata>=3.6.0;python_version<\"3.10\""),
             "importlib-metadata >=3.6.0 ;MARKER; python_version<\"3.10\""
         );
     }
-    
+
     #[test]
     fn test_post_process_markers() {
         let input = "dependencies:\n- numpy >=1.20.0\n- importlib-metadata >=3.6.0 ;MARKER; python_version<\"3.10\"\n- packaging";
         let expected = "dependencies:\n- numpy >=1.20.0\n# - importlib-metadata >=3.6.0 # python_version<\"3.10\"\n- packaging";
-        
+
         assert_eq!(post_process_markers(input.to_string()), expected);
     }
-    
+
     #[tokio::test]
     async fn test_url_simplification() {
         let client = reqwest::Client::new();
-        
+
         // Create a PyPI metadata with a PyPI-hosted URL
-        let mut metadata = PyPiMetadata {
+        let metadata = PyPiMetadata {
             info: PyPiInfo {
                 name: "requests".to_string(),
                 version: "2.31.0".to_string(),
@@ -644,7 +659,7 @@ mod tests {
             },
             wheel_url: None,
         };
-        
+
         // Create options with default PyPI
         let opts = PyPIOpts {
             package: "requests".into(),
@@ -654,10 +669,12 @@ mod tests {
             tree: false,
             pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
         };
-        
+
         let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
-        
+
         // Check if the URL was simplified
-        assert!(recipe.source[0].url.contains("https://pypi.org/packages/source/"));
+        assert!(recipe.source[0]
+            .url
+            .contains("https://pypi.org/packages/source/"));
     }
 }
