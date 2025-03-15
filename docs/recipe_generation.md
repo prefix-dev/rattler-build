@@ -15,6 +15,23 @@ rattler-build generate-recipe pypi jinja2
 
 This will generate a recipe for the `jinja2` package from PyPI and print it to the console. To turn it into a recipe, you can either pipe the stdout to a file or use the `-w` flag. The `-w` flag will create a new folder with the recipe in it.
 
+The PyPI recipe generation supports additional flags:
+
+- `-w/--write` write the recipe to a folder
+- `-m/--use-mapping` use the conda-forge PyPI name mapping (defaults to true)
+- `-t/--tree` generate recipes for all dependencies
+- `--pypi-index-url` specify one or more PyPI index URLs to use for recipe generation (comma-separated)
+
+The `--pypi-index-url` option allows you to use alternative PyPI mirrors or private PyPI repositories. You can specify multiple URLs, and the system will try each in order until one succeeds. This is especially useful for organizations with private packages or in environments with limited internet access. You can also set the `RATTLER_PYPI_INDEX_URL` environment variable.
+
+```sh
+# Use a custom PyPI index
+rattler-build generate-recipe pypi --pypi-index-url https://my-custom-pypi.example.com/pypi my-package
+
+# Use multiple PyPI indexes (will try each in order)
+rattler-build generate-recipe pypi --pypi-index-url https://my-custom-pypi.example.com/pypi,https://pypi.org/pypi my-package
+```
+
 The generated recipe for `jinja2` will look something like:
 
 ```yaml title="recipe.yaml"
