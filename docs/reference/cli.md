@@ -644,6 +644,14 @@ Generate a recipe for a Python package from PyPI
 	Whether to generate recipes for all dependencies
 
 
+- `--pypi-index-url <PYPI_INDEX_URLS>`
+
+	Specify the PyPI index URL(s) to use for recipe generation. Multiple URLs can be specified as a comma-separated list. The system will try each URL in order until one succeeds.
+
+	- Default value: `https://pypi.org/pypi`
+	- Environment variable: `RATTLER_PYPI_INDEX_URL`
+
+
 
 
 
