@@ -571,4 +571,93 @@ mod tests {
 
         assert_yaml_snapshot!(recipe);
     }
+    
+    #[tokio::test]
+    async fn test_multiple_pypi_index_urls() {
+        // Test with multiple PyPI index URLs, starting with an invalid one
+        let opts = PyPIOpts {
+            package: "requests".into(),
+            version: Some("2.31.0".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+            pypi_index_urls: vec![
+                "https://invalid-pypi-url.example.com/".to_string(),
+                "https://pypi.org/pypi".to_string(),
+            ],
+        };
+
+        let client = reqwest::Client::new();
+        let metadata = fetch_pypi_metadata(&opts, &client).await.unwrap();
+        
+        // Verify that the valid URL was used (by checking that metadata was found)
+        assert_eq!(metadata.info.name.to_lowercase(), "requests");
+        assert_eq!(metadata.info.version, "2.31.0");
+    }
+
+    #[test]
+    fn test_format_requirement() {
+        // Test basic requirement formatting
+        assert_eq!(format_requirement("numpy>=1.20.0"), "numpy >=1.20.0");
+        
+        // Test requirement with marker
+        assert_eq!(
+            format_requirement("importlib-metadata>=3.6.0;python_version<\"3.10\""), 
+            "importlib-metadata >=3.6.0 ;MARKER; python_version<\"3.10\""
+        );
+    }
+    
+    #[test]
+    fn test_post_process_markers() {
+        let input = "dependencies:\n- numpy >=1.20.0\n- importlib-metadata >=3.6.0 ;MARKER; python_version<\"3.10\"\n- packaging";
+        let expected = "dependencies:\n- numpy >=1.20.0\n# - importlib-metadata >=3.6.0 # python_version<\"3.10\"\n- packaging";
+        
+        assert_eq!(post_process_markers(input.to_string()), expected);
+    }
+    
+    #[tokio::test]
+    async fn test_url_simplification() {
+        let client = reqwest::Client::new();
+        
+        // Create a PyPI metadata with a PyPI-hosted URL
+        let mut metadata = PyPiMetadata {
+            info: PyPiInfo {
+                name: "requests".to_string(),
+                version: "2.31.0".to_string(),
+                summary: None,
+                description: None,
+                home_page: None,
+                license: None,
+                requires_dist: None,
+                project_urls: None,
+                requires_python: None,
+            },
+            urls: vec![],
+            release: PyPiRelease {
+                filename: "requests-2.31.0.tar.gz".to_string(),
+                url: "https://files.pythonhosted.org/packages/source/r/requests/requests-2.31.0.tar.gz".to_string(),
+                digests: {
+                    let mut map = HashMap::new();
+                    map.insert("sha256".to_string(), "dummy_hash".to_string());
+                    map
+                },
+            },
+            wheel_url: None,
+        };
+        
+        // Create options with default PyPI
+        let opts = PyPIOpts {
+            package: "requests".into(),
+            version: Some("2.31.0".into()),
+            write: false,
+            use_mapping: true,
+            tree: false,
+            pypi_index_urls: vec!["https://pypi.org/pypi".to_string()],
+        };
+        
+        let recipe = create_recipe(&opts, &metadata, &client).await.unwrap();
+        
+        // Check if the URL was simplified
+        assert!(recipe.source[0].url.contains("https://pypi.org/packages/source/"));
+    }
 }
