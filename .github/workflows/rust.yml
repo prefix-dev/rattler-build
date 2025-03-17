@@ -29,14 +29,14 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           submodules: recursive
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         with:
           toolchain: "1.83.0"
           components: clippy,rustfmt
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
       - name: Run tests
         run: cargo test --features=tui,recipe-generation --verbose -- --nocapture
 
@@ -91,7 +91,7 @@ jobs:
 
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
 
       - name: Extract version
         shell: bash
@@ -112,7 +112,7 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@888c2e1ea69ab0d4330cbf0af1ecc7b68f368cc1 # master
         with:
           toolchain: "1.83.0"
           targets: ${{ matrix.target }}
@@ -125,11 +125,11 @@ jobs:
         if: matrix.target == 'powerpc64le-unknown-linux-gnu'
         run: sudo apt install libssl-dev
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@d7975a1de23014ff85d5da2d113615774467bcc1 # v2
         with:
           tool: cross
 
@@ -211,13 +211,13 @@ jobs:
           echo "binary-path=binaries/rattler-build-${{ matrix.target }}${{ contains(matrix.target, 'pc-windows') && '.exe' || '' }}" >> $GITHUB_OUTPUT
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
         with:
           name: ${{ steps.package.outputs.pkg-name }}
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
@@ -229,7 +229,7 @@ jobs:
 
       - name: Create issue on failure
         if: startsWith(github.ref, 'refs/tags/v') && failure()
-        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2
+        uses: dacbd/create-issue-action@cdb57ab6ff8862aa09fee2be6ba77a59581921c2 # cdb57ab6ff8862aa09fee2be6ba77a59581921c2
         with:
           token: ${{ github.token }}
           title: GitHub release failed
@@ -242,7 +242,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Set as latest release
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
