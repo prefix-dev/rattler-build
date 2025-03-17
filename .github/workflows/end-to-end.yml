@@ -36,8 +36,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3 # v2
         with:
           workspaces: ". -> target-pixi"
           key: ${{ hashFiles('pixi.lock') }}
