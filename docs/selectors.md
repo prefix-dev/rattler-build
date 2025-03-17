@@ -54,7 +54,7 @@ host:
 Other examples often found in the wild:
 
 ```yaml
-if: build_platform != target_platform ... # true if cross-platform build
+if: build_platform != host_platform ... # true if cross-platform build
 if: osx and arm64 ... # true for apple silicon (osx-arm64)
 if: linux and (aarch64 or ppc64le)) ... # true for linux ppc64le or linux-aarch64
 ```
@@ -65,15 +65,16 @@ The following variables are available during rendering of the recipe:
 
 | Variable             | Description                                                            |
 |----------------------|------------------------------------------------------------------------|
-| `target_platform`    | the configured `target_platform` for the build                         |
 | `build_platform`     | the configured `build_platform` for the build                          |
-| `linux`              | "true" if `target_platform` is Linux                                   |
-| `osx`                | "true" if `target_platform` is OSX / macOS                             |
-| `win`                | "true" if `target_platform` is Windows                                 |
-| `unix`               | "true" if `target_platform` is a Unix (macOS or Linux)                 |
+| `host_platform`      | the configured `host_platform` for the build                           |
+| `target_platform`    | the configured `target_platform` for the build                         |
+| `linux`              | "true" if `host_platform` is Linux                                     |
+| `osx`                | "true" if `host_platform` is OSX / macOS                               |
+| `win`                | "true" if `host_platform` is Windows                                   |
+| `unix`               | "true" if `host_platform` is a Unix (macOS or Linux)                   |
 | `x86`, `x86_64`      | x86 32/64-bit Architecture                                             |
-| `aarch64`            | 64-bit Arm (if `target_platform` is `linux-aarch64`)                   |
-| `arm64`              | 64-bit Arm (if `target_platform` is `osx-arm64` or `win-arm64`)        |
+| `aarch64`            | 64-bit Arm (if `host_platform` is `linux-aarch64`)                     |
+| `arm64`              | 64-bit Arm (if `host_platform` is `osx-arm64` or `win-arm64`)          |
 | `armV6l`, `armV7l`   | 32-bit Arm                                                             |
 | `ppc64`, `s390x`,    | Big endian                                                             |
 | `ppc64le`            | Little endian                                                          |
@@ -150,9 +151,9 @@ Some notable options are:
 ```yaml
 - if: python == "3.8" # equal
 - if: python != "3.8" # not equal
-- if: python and linux # true if python variant is set and the target_platform is linux
-- if: python and not linux # true if python variant is set and the target_platform is not linux
-- if: python and (linux or osx) # true if python variant is set and the target_platform is linux or osx
+- if: python and linux # true if python variant is set and the host_platform is linux
+- if: python and not linux # true if python variant is set and the host_platform is not linux
+- if: python and (linux or osx) # true if python variant is set and the host_platform is linux or osx
 ```
 
 [minijinja]: https://github.com/mitsuhiko/minijinja

@@ -558,11 +558,11 @@ requirements:
 
 ### Host
 
-Represents packages that need to be specific to the target platform when the
-target platform is not necessarily the same as the native build platform. For
+Represents packages that need to be specific to the host platform when the
+host platform is not necessarily the same as the native build platform. For
 example, in order for a recipe to be "cross-capable", shared libraries
 requirements must be listed in the `host` section, rather than the `build` section,
-so that the shared libraries that get linked are ones for the target platform,
+so that the shared libraries that get linked are ones for the host platform,
 rather than the native build platform. You should also include the base
 interpreter for packages that need one. In other words, a Python package would
 list `python` here and an R package would list `mro-base` or `r-base`.
@@ -581,8 +581,8 @@ requirements:
 !!! note
     When both "`build`" and "`host`" sections are defined, the `build` section can
     be thought of as "build tools" - things that run on the native platform, but
-    output results for the target platform (e.g. a cross-compiler that runs on
-    `linux-64`, but targets `linux-armv7`).
+    output results for the host platform (e.g. a cross-compiler that runs on
+    `linux-64`, but builds for `linux-armv7`).
 
 
 The `PREFIX` environment variable points to the host prefix. With respect to
@@ -1171,7 +1171,7 @@ available during the `rattler-build` process: `pin_compatible`, `pin_subpackage`
 and `compiler`.
 
 The compiler function takes `c`, `cxx`, `fortran` and other values as argument
-and automatically selects the right (cross-)compiler for the target platform.
+and automatically selects the right (cross-)compiler for the host platform.
 
 ```
 build:

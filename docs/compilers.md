@@ -3,7 +3,7 @@
 To use a compiler in your project, it's best to use the `${{ compiler('lang')
 }}` template function. The compiler function works by taking a language,
 determining the configured compiler for that language, and adding some
-information about the target platform to the selected compiler. To configure a
+information about the host platform to the selected compiler. To configure a
 compiler for a specific language, the `variants.yaml` file can be used.
 
 For example, in a recipe that uses a C-compiler, you can use the following code:
@@ -35,7 +35,7 @@ variant config.
 
 Cross-compilation is supported by `rattler-build` and the compiler template
 function is part of what makes it possible. When you want to cross-compile from
-`linux-64` to `linux-aarch64` (i.e. intel to ARM), you can pass `--target-platform
+`linux-64` to `linux-aarch64` (i.e. intel to ARM), you can pass `--host-platform
 linux-aarch64` to the `rattler-build` command. This will cause the compiler
 template function to select a compiler that is configured for `linux-aarch64`.
 The above example would resolve to `gcc_linux-aarch64 9.3.0`. Provided that the
@@ -57,7 +57,7 @@ build:
   - cmake
   - ${{ compiler('c') }}
 # packages that we want to link against in the architecture we are
-# cross-compiling to the target_platform
+# cross-compiling to the host_platform
 host:
   - libcurl
   - openssl
