@@ -187,7 +187,14 @@ pub async fn upload_package_to_prefix(
                 StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
                     return Err(miette::miette!("Authentication error: {}", err));
                 }
-                StatusCode::CONFLICT | StatusCode::UNPROCESSABLE_ENTITY => {
+                StatusCode::CONFLICT =>{
+                    if prefix_data.skip_existed{
+                        info!("Skip existed package: {}", filename);
+                    }else{
+                         return Err(miette::miette!("Resource conflict: {}", err));
+                    }
+                }
+                 StatusCode::UNPROCESSABLE_ENTITY => {
                     return Err(miette::miette!("Resource conflict: {}", err));
                 }
                 StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND | StatusCode::PAYLOAD_TOO_LARGE => {

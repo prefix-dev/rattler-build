@@ -183,6 +183,7 @@ def upload_package_to_prefix(
     channels: str,
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
+    skip_existed:bool = False,
 ) -> None:
     """
     Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.
@@ -193,11 +194,12 @@ def upload_package_to_prefix(
         channels: The channel to upload the package to.
         api_key: The prefix.dev API key, if none is provided, the token is read from the keychain / auth-file.
         auth_file: The authentication file.
+        skip_existed: Skip upload if package is existed.
 
     Returns:
         None
     """
-    upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file)
+    upload_package_to_prefix_py(package_files, url, channels, api_key, auth_file, skip_existed)
 
 
 def upload_package_to_anaconda(
