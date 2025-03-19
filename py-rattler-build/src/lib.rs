@@ -190,15 +190,15 @@ fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, attestation_file=None,skip_existing=false))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, skip_existing, attestation_file=None,))]
 fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
     channel: String,
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
-    attestation_file: Option<PathBuf>,
     skip_existing: bool,
+    attestation_file: Option<PathBuf>,
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
