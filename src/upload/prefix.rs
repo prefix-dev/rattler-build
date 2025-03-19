@@ -189,7 +189,7 @@ pub async fn upload_package_to_prefix(
                 }
                 StatusCode::CONFLICT => {
                     // skip if package is existed
-                    if prefix_data.skip_existed {
+                    if prefix_data.skip_existing {
                         progress_bar.finish();
                         info!("Skip existed package: {}", filename);
                         return Ok(());

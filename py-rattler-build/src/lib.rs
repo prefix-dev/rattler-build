@@ -198,13 +198,13 @@ fn upload_package_to_prefix_py(
     api_key: Option<String>,
     auth_file: Option<PathBuf>,
     attestation_file: Option<PathBuf>,
-    skip_existed: bool
+    skip_existing: bool
 ) -> PyResult<()> {
     let store = tool_configuration::get_auth_store(auth_file)
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
 
     let url = Url::parse(&url).map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file,skip_existed);
+    let prefix_data = PrefixData::new(url, channel, api_key, attestation_file,skip_existing);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
