@@ -208,7 +208,7 @@ fn upload_package_to_prefix_py(
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     rt.block_on(async {
-        if let Err(e) = upload::upload_package_to_prefix(&store, &package_files, prefix_data).await
+        if let Err(e) = upload::upload_package_to_prefix(&store, &package_files, prefix_data,skip_existed).await
         {
             return Err(PyRuntimeError::new_err(e.to_string()));
         }

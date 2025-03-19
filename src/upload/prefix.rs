@@ -31,7 +31,7 @@ async fn create_upload_form(
     file_size: u64,
     progress_bar: indicatif::ProgressBar,
     attestation: &Option<PathBuf>,
-    skip_existed:bool
+    skip_existed: bool
 ) -> miette::Result<reqwest::multipart::Form> {
     let mut form = reqwest::multipart::Form::new();
 
