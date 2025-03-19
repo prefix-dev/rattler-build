@@ -191,7 +191,7 @@ pub async fn upload_package_to_prefix(
                     // skip if package is existed
                     if prefix_data.skip_existing {
                         progress_bar.finish();
-                        info!("Skip existed package: {}", filename);
+                        info!("Skip existing package: {}", filename);
                         return Ok(());
                     } else {
                         return Err(miette::miette!("Resource conflict: {}", err));
