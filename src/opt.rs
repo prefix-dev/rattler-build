@@ -872,6 +872,11 @@ pub struct PrefixOpts {
     /// Note: if you add an attestation, you can _only_ upload a single package.
     #[arg(long, required = false)]
     pub attestation: Option<PathBuf>,
+
+    /// Skip upload if package is existed
+    /// Note: if you add an attestation, you can _only_ upload a single package.
+    #[arg(long)]
+    pub skip_existed: bool,
 }
 
 #[derive(Debug)]
@@ -881,11 +886,18 @@ pub struct PrefixData {
     pub channel: String,
     pub api_key: Option<String>,
     pub attestation: Option<PathBuf>,
+    pub skip_existed: bool,
 }
 
 impl From<PrefixOpts> for PrefixData {
     fn from(value: PrefixOpts) -> Self {
-        Self::new(value.url, value.channel, value.api_key, value.attestation)
+        Self::new(
+            value.url,
+            value.channel,
+            value.api_key,
+            value.attestation,
+            value.skip_existed,
+        )
     }
 }
 
@@ -896,12 +908,14 @@ impl PrefixData {
         channel: String,
         api_key: Option<String>,
         attestation: Option<PathBuf>,
+        skip_existed: bool,
     ) -> Self {
         Self {
             url: url.into(),
             channel,
             api_key,
             attestation,
+            skip_existed,
         }
     }
 }

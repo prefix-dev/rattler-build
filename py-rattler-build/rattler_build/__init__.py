@@ -183,7 +183,7 @@ def upload_package_to_prefix(
     channels: str,
     api_key: Union[str, None] = None,
     auth_file: Union[str, Path, None] = None,
-    skip_existed:bool = False,
+    skip_existed: bool = False,
 ) -> None:
     """
     Upload to a prefix.dev server. Authentication is used from the keychain / auth-file.

@@ -76,7 +76,6 @@ pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
     package_files: &Vec<PathBuf>,
     prefix_data: PrefixData,
-    skip_existed: bool,
 ) -> miette::Result<()> {
     let check_storage = || {
         match storage.get_by_url(Url::from(prefix_data.url.clone())) {
@@ -189,8 +188,11 @@ pub async fn upload_package_to_prefix(
                     return Err(miette::miette!("Authentication error: {}", err));
                 }
                 StatusCode::CONFLICT => {
-                    if skip_existed {
+                    // skip if package is existed
+                    if prefix_data.skip_existed {
+                        progress_bar.finish();
                         info!("Skip existed package: {}", filename);
+                        return Ok(());
                     } else {
                         return Err(miette::miette!("Resource conflict: {}", err));
                     }
