@@ -190,7 +190,7 @@ fn upload_package_to_artifactory_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_files, url, channel, api_key, auth_file, attestation_file=None))]
+#[pyo3(signature = (package_files, url, channel, api_key, auth_file, attestation_file=None,skip_existing=false))]
 fn upload_package_to_prefix_py(
     package_files: Vec<PathBuf>,
     url: String,
