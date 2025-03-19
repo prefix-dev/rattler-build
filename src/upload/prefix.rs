@@ -31,6 +31,7 @@ async fn create_upload_form(
     file_size: u64,
     progress_bar: indicatif::ProgressBar,
     attestation: &Option<PathBuf>,
+    skip_existed:bool
 ) -> miette::Result<reqwest::multipart::Form> {
     let mut form = reqwest::multipart::Form::new();
 
@@ -188,7 +189,7 @@ pub async fn upload_package_to_prefix(
                     return Err(miette::miette!("Authentication error: {}", err));
                 }
                 StatusCode::CONFLICT =>{
-                    if prefix_data.skip_existed{
+                    if skip_existed{
                         info!("Skip existed package: {}", filename);
                     }else{
                          return Err(miette::miette!("Resource conflict: {}", err));
