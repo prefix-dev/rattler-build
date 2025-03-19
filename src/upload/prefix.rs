@@ -31,7 +31,6 @@ async fn create_upload_form(
     file_size: u64,
     progress_bar: indicatif::ProgressBar,
     attestation: &Option<PathBuf>,
-    skip_existed: bool
 ) -> miette::Result<reqwest::multipart::Form> {
     let mut form = reqwest::multipart::Form::new();
 
@@ -77,6 +76,7 @@ pub async fn upload_package_to_prefix(
     storage: &AuthenticationStorage,
     package_files: &Vec<PathBuf>,
     prefix_data: PrefixData,
+    skip_existed: bool,
 ) -> miette::Result<()> {
     let check_storage = || {
         match storage.get_by_url(Url::from(prefix_data.url.clone())) {
@@ -188,14 +188,14 @@ pub async fn upload_package_to_prefix(
                 StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
                     return Err(miette::miette!("Authentication error: {}", err));
                 }
-                StatusCode::CONFLICT =>{
-                    if skip_existed{
+                StatusCode::CONFLICT => {
+                    if skip_existed {
                         info!("Skip existed package: {}", filename);
-                    }else{
-                         return Err(miette::miette!("Resource conflict: {}", err));
+                    } else {
+                        return Err(miette::miette!("Resource conflict: {}", err));
                     }
                 }
-                 StatusCode::UNPROCESSABLE_ENTITY => {
+                StatusCode::UNPROCESSABLE_ENTITY => {
                     return Err(miette::miette!("Resource conflict: {}", err));
                 }
                 StatusCode::BAD_REQUEST | StatusCode::NOT_FOUND | StatusCode::PAYLOAD_TOO_LARGE => {
