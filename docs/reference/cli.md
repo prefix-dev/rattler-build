@@ -480,7 +480,7 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 
 - `-s`, `--skip-existing`
 
-	Skip existing package
+	Skip upload if package is existed
 
 
 
