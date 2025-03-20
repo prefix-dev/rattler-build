@@ -139,7 +139,7 @@ impl<'de> Deserialize<'de> for Script {
                 interpreter,
                 env,
                 secrets,
-                cwd: cwd.map(PathBuf::from),
+                cwd,
                 content: match content {
                     Some(RawScriptContent::Command { content }) => ScriptContent::Command(content),
                     Some(RawScriptContent::Commands { content }) => {
