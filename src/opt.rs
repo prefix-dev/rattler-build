@@ -874,7 +874,7 @@ pub struct PrefixOpts {
     pub attestation: Option<PathBuf>,
 
     /// Skip upload if package is existed.
-    #[arg(long)]
+    #[arg(short, long)]
     pub skip_existing: bool,
 }
 

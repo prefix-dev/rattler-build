@@ -478,6 +478,11 @@ Options for uploading to a prefix.dev server. Authentication is used from the ke
 	Upload one or more attestation files alongside the package Note: if you add an attestation, you can _only_ upload a single package
 
 
+- `-s`, `--skip-existing`
+
+	Skip existing package
+
+
 
 
 
