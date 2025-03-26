@@ -15,6 +15,16 @@ use crate::{
 
 use super::FlattenErrors;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TopLevelRecipe {
+    /// The name of the recipe (used in the cache build)
+    pub name: String,
+
+    /// The version of the recipe (used as default in the outputs)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<VersionWithSource>,
+}
+
 /// A recipe package information.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Package {
@@ -86,6 +96,50 @@ impl TryConvertNode<Package> for RenderedMappingNode {
         };
 
         Ok(Package { name, version })
+    }
+}
+
+impl TryConvertNode<TopLevelRecipe> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<TopLevelRecipe, Vec<PartialParsingError>> {
+        self.as_mapping()
+            .ok_or_else(|| vec![_partialerror!(*self.span(), ErrorKind::ExpectedMapping,)])
+            .and_then(|m| m.try_convert(name))
+    }
+}
+
+impl TryConvertNode<TopLevelRecipe> for RenderedMappingNode {
+    fn try_convert(&self, name: &str) -> Result<TopLevelRecipe, Vec<PartialParsingError>> {
+        let mut name_val = None;
+        let mut version = None;
+
+        self.iter()
+            .map(|(key, value)| {
+                let key_str = key.as_str();
+                match key_str {
+                    "name" => name_val = value.try_convert(key_str)?,
+                    "version" => version = value.try_convert(key_str)?,
+                    invalid => {
+                        return Err(vec![_partialerror!(
+                            *key.span(),
+                            ErrorKind::InvalidField(invalid.to_string().into()),
+                            help = format!("valid fields for `{name}` are `name` and `version`")
+                        )])
+                    }
+                }
+                Ok(())
+            })
+            .flatten_errors()?;
+
+        let Some(name) = name_val else {
+            return Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("name".into()),
+                label = "add the field `name` in between here",
+                help = format!("the field `name` is required for `{name}`")
+            )]);
+        };
+
+        Ok(TopLevelRecipe { name, version })
     }
 }
 

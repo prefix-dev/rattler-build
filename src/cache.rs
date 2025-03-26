@@ -212,6 +212,35 @@ impl Output {
             let mut env_vars = env_vars::vars(&self, "BUILD");
             env_vars.extend(env_vars::os_vars(self.prefix(), &target_platform));
 
+            // We need to keep the PKG_NAME and PKG_VERSION for the build script consistent
+            // across different cache builds. To this end we use the top level metadata.
+            env_vars.insert(
+                "PKG_NAME".to_string(),
+                Some(
+                    self.recipe
+                        .top_level_recipe_metadata
+                        .as_ref()
+                        .map(|x| x.name.clone())
+                        .unwrap_or("cache".to_string()),
+                ),
+            );
+            env_vars.insert(
+                "PKG_VERSION".to_string(),
+                Some(
+                    self.recipe
+                        .top_level_recipe_metadata
+                        .as_ref()
+                        .map(|x| x.version.clone())
+                        .flatten()
+                        .map(|v| v.to_string())
+                        .unwrap_or("0.0.0".to_string()),
+                ),
+            );
+
+            env_vars.insert("PKG_HASH".to_string(), Some("".to_string()));
+            env_vars.insert("PKG_BUILDNUM".to_string(), Some("0".to_string()));
+            env_vars.insert("PKG_BUILD_STRING".to_string(), Some("".to_string()));
+
             // Reindex the channels
             let channels = build_reindexed_channels(&self.build_configuration, tool_configuration)
                 .await
