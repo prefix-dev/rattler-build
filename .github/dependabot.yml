@@ -15,7 +15,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     labels:
       - "dependencies"
     commit-message:
@@ -23,3 +23,7 @@ updates:
     ignore:
       - dependency-name: "crate-ci/typos"
         update-types: ["version-update:semver-patch"]
+    groups:
+      github_actions:
+        patterns:
+          - "*"
