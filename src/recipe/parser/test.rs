@@ -56,6 +56,15 @@ pub struct CommandsTest {
     pub files: CommandsTestFiles,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AbiCheck {
+    /// The files to compare
+    pub files: Vec<String>,
+
+    /// The other package to compare against (MatchSpec)
+    pub package: String,
+}
+
 impl CommandsTestRequirements {
     /// Check if the requirements are empty
     pub fn is_empty(&self) -> bool {
@@ -153,6 +162,8 @@ pub enum TestType {
     Command(CommandsTest),
     /// A test that runs the tests of a downstream package
     Downstream(DownstreamTest),
+    /// Check that the ABI of the package is the same as in a previous version
+    AbiCheck(AbiCheck),
     /// A test that checks the contents of the package
     PackageContents {
         /// The package contents to test against
