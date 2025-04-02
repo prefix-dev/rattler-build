@@ -891,7 +891,7 @@ outputs:
       name: test
     requirements:
       build:
-        - ${{ pin_subpackage('libtest', max_pin='x.x') }}
+        - ${{ pin_subpackage('libtest', upper_bound='x.x') }}
 ```
 
 The outputs are topologically sorted by the dependency graph which is taking the
@@ -1051,17 +1051,20 @@ specified rules.
 
 #### Pin expressions
 
-`rattler-build` knows pin expressions. A pin expression can have a `min_pin`,
-`max_pin` and `exact` value. A `max_pin` and `min_pin` are specified with a
-string containing only `x` and `.`, e.g. `max_pin="x.x.x"` would signify to pin
+`rattler-build` knows pin expressions. A pin expression can have a `lower_bound`,
+`upper_bound` and `exact` value. A `upper_bound` and `lower_bound` are specified with a
+string containing only `x` and `.`, e.g. `upper_bound="x.x.x"` would signify to pin
 the given package to `<1.2.3` (if the package version is `1.2.2`, for example).
 
-A pin with `min_pin="x.x",max_pin="x.x"` for a package of version `1.2.2` would
+A pin with `lower_bound="x.x",upper_bound="x.x"` for a package of version `1.2.2` would
 evaluate to `>=1.2,<1.3.0a0`.
 
 If `exact=true`, then the `hash` is included, and the package is pinned exactly,
 e.g. `==1.2.2 h1234`. This is a unique package variant that cannot exist more
 than once, and thus is "exactly" pinned.
+
+You can also hard-code version strings into `lower_bound` and `upper_bound`.
+See the [Jinja Reference](./jinja.md) for more information.
 
 #### Pin subpackage
 
@@ -1079,7 +1082,7 @@ package:
 requirements:
   run_exports:
     # this will evaluate to `mypkg <1.3`
-    - ${{ pin_subpackage(name, max_pin='x.x') }}
+    - ${{ pin_subpackage(name, upper_bound='x.x') }}
 ```
 
 #### Pin compatible
@@ -1097,7 +1100,7 @@ requirements:
     - numpy
   run:
     # this will export `numpy >=1.11,<2`, instead of the stricter `1.11` pin
-    - ${{ pin_compatible('numpy', min_pin='x.x', max_pin='x') }}
+    - ${{ pin_compatible('numpy', min_pin='x.x', upper_bound='x') }}
 ```
 
 #### The env Jinja functions
