@@ -2746,7 +2746,7 @@ same recipe.</p>
 </span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test</span>
 </span><span id="__span-45-6"><a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="w">    </span><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-45-7"><a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a><span class="w">      </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-45-8"><a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libtest&#39;, max_pin=&#39;x.x&#39;) }}</span>
+</span><span id="__span-45-8"><a id="__codelineno-45-8" name="__codelineno-45-8" href="#__codelineno-45-8"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(&#39;libtest&#39;, upper_bound=&#39;x.x&#39;) }}</span>
 </span></code></pre></div>
 <p>The outputs are topologically sorted by the dependency graph which is taking the
 <code>pin_subpackage</code> invocations into account. When using <code>pin_subpackage(name,
@@ -2867,15 +2867,17 @@ the supplied parameters.</p>
 <p>Similarly, the <code>pin_compatible</code> function will pin a package according to the
 specified rules.</p>
 <h4 id="pin-expressions">Pin expressions<a class="headerlink" href="#pin-expressions" title="Permanent link">#</a></h4>
-<p><code>rattler-build</code> knows pin expressions. A pin expression can have a <code>min_pin</code>,
-<code>max_pin</code> and <code>exact</code> value. A <code>max_pin</code> and <code>min_pin</code> are specified with a
-string containing only <code>x</code> and <code>.</code>, e.g. <code>max_pin="x.x.x"</code> would signify to pin
+<p><code>rattler-build</code> knows pin expressions. A pin expression can have a <code>lower_bound</code>,
+<code>upper_bound</code> and <code>exact</code> value. A <code>upper_bound</code> and <code>lower_bound</code> are specified with a
+string containing only <code>x</code> and <code>.</code>, e.g. <code>upper_bound="x.x.x"</code> would signify to pin
 the given package to <code>&lt;1.2.3</code> (if the package version is <code>1.2.2</code>, for example).</p>
-<p>A pin with <code>min_pin="x.x",max_pin="x.x"</code> for a package of version <code>1.2.2</code> would
+<p>A pin with <code>lower_bound="x.x",upper_bound="x.x"</code> for a package of version <code>1.2.2</code> would
 evaluate to <code>&gt;=1.2,&lt;1.3.0a0</code>.</p>
 <p>If <code>exact=true</code>, then the <code>hash</code> is included, and the package is pinned exactly,
 e.g. <code>==1.2.2 h1234</code>. This is a unique package variant that cannot exist more
 than once, and thus is "exactly" pinned.</p>
+<p>You can also hard-code version strings into <code>lower_bound</code> and <code>upper_bound</code>.
+See the <a href="../jinja/">Jinja Reference</a> for more information.</p>
 <h4 id="pin-subpackage">Pin subpackage<a class="headerlink" href="#pin-subpackage" title="Permanent link">#</a></h4>
 <p>Pin subpackage refers to another package from the same recipe file. It is
 commonly used in the <code>build/run_exports</code> section to export a run export from the
@@ -2888,7 +2890,7 @@ package, or with multiple outputs to refer to a previous build.</p>
 </span><span id="__span-54-5"><a id="__codelineno-54-5" name="__codelineno-54-5" href="#__codelineno-54-5"></a><span class="nt">requirements</span><span class="p">:</span>
 </span><span id="__span-54-6"><a id="__codelineno-54-6" name="__codelineno-54-6" href="#__codelineno-54-6"></a><span class="w">  </span><span class="nt">run_exports</span><span class="p">:</span>
 </span><span id="__span-54-7"><a id="__codelineno-54-7" name="__codelineno-54-7" href="#__codelineno-54-7"></a><span class="w">    </span><span class="c1"># this will evaluate to `mypkg &lt;1.3`</span>
-</span><span id="__span-54-8"><a id="__codelineno-54-8" name="__codelineno-54-8" href="#__codelineno-54-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(name, max_pin=&#39;x.x&#39;) }}</span>
+</span><span id="__span-54-8"><a id="__codelineno-54-8" name="__codelineno-54-8" href="#__codelineno-54-8"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_subpackage(name, upper_bound=&#39;x.x&#39;) }}</span>
 </span></code></pre></div>
 <h4 id="pin-compatible">Pin compatible<a class="headerlink" href="#pin-compatible" title="Permanent link">#</a></h4>
 <p>Pin compatible lets you pin a package based on the version retrieved from the
@@ -2901,7 +2903,7 @@ variant file (if the pinning from the variant file needs customization).</p>
 </span><span id="__span-55-4"><a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">numpy</span>
 </span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
 </span><span id="__span-55-6"><a id="__codelineno-55-6" name="__codelineno-55-6" href="#__codelineno-55-6"></a><span class="w">    </span><span class="c1"># this will export `numpy &gt;=1.11,&lt;2`, instead of the stricter `1.11` pin</span>
-</span><span id="__span-55-7"><a id="__codelineno-55-7" name="__codelineno-55-7" href="#__codelineno-55-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, min_pin=&#39;x.x&#39;, max_pin=&#39;x&#39;) }}</span>
+</span><span id="__span-55-7"><a id="__codelineno-55-7" name="__codelineno-55-7" href="#__codelineno-55-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ pin_compatible(&#39;numpy&#39;, min_pin=&#39;x.x&#39;, upper_bound=&#39;x&#39;) }}</span>
 </span></code></pre></div>
 <h4 id="the-env-jinja-functions">The env Jinja functions<a class="headerlink" href="#the-env-jinja-functions" title="Permanent link">#</a></h4>
 <p>You can access the current environment variables using the <code>env</code> object in
