@@ -339,6 +339,7 @@ pub async fn install_packages(
         .with_execute_link_scripts(true)
         .with_package_cache(tool_configuration.package_cache.clone())
         .with_installed_packages(installed_packages)
+        .with_io_concurrency_limit(tool_configuration.io_concurrency_limit.unwrap_or_default())
         .with_reporter(
             IndicatifReporter::builder()
                 .with_multi_progress(
