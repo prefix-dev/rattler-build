@@ -246,7 +246,9 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
             }
         }
 
-        output_map.remove("recipe");
+        if let Some(recipe_node) = output_map.remove("recipe") {
+            output_map.insert("__top_level_recipe".into(), recipe_node);
+        }
 
         let recipe = match Node::try_from(output_node) {
             Ok(node) => node,
