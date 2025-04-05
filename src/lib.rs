@@ -126,9 +126,11 @@ pub fn get_tool_config(
     build_data: &BuildData,
     fancy_log_handler: &Option<LoggingOutputHandler>,
 ) -> miette::Result<Configuration> {
-    let client =
-        tool_configuration::reqwest_client_from_auth_storage(build_data.common.auth_file.clone(), build_data.common.insecure)
-            .into_diagnostic()?;
+    let client = tool_configuration::reqwest_client_from_auth_storage(
+        build_data.common.auth_file.clone(),
+        build_data.common.insecure,
+    )
+    .into_diagnostic()?;
 
     let configuration_builder = Configuration::builder()
         .with_keep_build(build_data.keep_build)
