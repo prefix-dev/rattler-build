@@ -189,6 +189,10 @@ pub struct CommonOpts {
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
 
+    /// Skip SSL certificate verification
+    #[arg(long)]
+    pub insecure: bool,
+
     /// Path to an auth-file to read authentication information from
     #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
     pub auth_file: Option<PathBuf>,
@@ -205,6 +209,7 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    pub insecure: bool,
 }
 
 impl From<CommonOpts> for CommonData {
@@ -214,6 +219,7 @@ impl From<CommonOpts> for CommonData {
             value.experimental,
             value.auth_file,
             value.channel_priority.map(|c| c.value),
+            value.insecure,
         )
     }
 }
@@ -225,12 +231,14 @@ impl CommonData {
         experimental: bool,
         auth_file: Option<PathBuf>,
         channel_priority: Option<ChannelPriority>,
+        insecure: bool,
     ) -> Self {
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
+            insecure,
         }
     }
 }

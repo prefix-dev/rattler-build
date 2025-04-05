@@ -89,6 +89,9 @@ pub struct Configuration {
 
     /// What channel priority to use in solving
     pub channel_priority: ChannelPriority,
+
+    /// Whether to skip SSL certificate verification in the reqwest client.
+    pub insecure: bool,
 }
 
 /// Get the authentication storage from the given file
@@ -110,6 +113,7 @@ pub fn get_auth_store(
 /// Create a reqwest client with the authentication middleware
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
+    insecure: bool,
 ) -> Result<ClientWithMiddleware, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
@@ -120,6 +124,7 @@ pub fn reqwest_client_from_auth_storage(
             .pool_max_idle_per_host(20)
             .user_agent(APP_USER_AGENT)
             .read_timeout(std::time::Duration::from_secs(timeout))
+            .danger_accept_invalid_certs(insecure)
             .build()
             .expect("failed to create client"),
     )
@@ -147,6 +152,7 @@ pub struct ConfigurationBuilder {
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
     channel_priority: ChannelPriority,
+    insecure: bool,
 }
 
 impl Configuration {
@@ -173,6 +179,7 @@ impl ConfigurationBuilder {
             channel_config: None,
             compression_threads: None,
             channel_priority: ChannelPriority::Strict,
+            insecure: false,
         }
     }
 
@@ -289,13 +296,18 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Sets whether to skip SSL certificate verification in the reqwest client.
+    pub fn with_insecure(self, insecure: bool) -> Self {
+        Self { insecure, ..self }
+    }
+
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
         let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None).expect("failed to create client")
+            reqwest_client_from_auth_storage(None, self.insecure).expect("failed to create client")
         });
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
@@ -338,6 +350,7 @@ impl ConfigurationBuilder {
             package_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,
+            insecure: self.insecure,
         }
     }
 }
