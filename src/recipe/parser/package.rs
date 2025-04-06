@@ -167,7 +167,22 @@ impl TryConvertNode<PackageName> for RenderedNode {
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
-        PackageName::from_str(self.as_str())
+        let input = self.as_str();
+
+        let package_name_str = input
+            .split_once(' ')
+            .and_then(|(name, version)| {
+                if name.contains('_')
+                    && (version.starts_with('=') || version.chars().any(|c| c.is_ascii_digit()))
+                {
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(input);
+
+        PackageName::from_str(package_name_str)
             .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])
     }
 }
