@@ -128,7 +128,7 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
-        build_data.common.insecure,
+        build_data.common.allow_insecure_host.is_some(),
     )
     .into_diagnostic()?;
 
@@ -140,7 +140,7 @@ pub fn get_tool_config(
         .with_skip_existing(build_data.skip_existing)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
-        .with_insecure(build_data.common.insecure);
+        .with_allow_insecure_host(build_data.common.allow_insecure_host.clone());
 
     let configuration_builder = if let Some(fancy_log_handler) = fancy_log_handler {
         configuration_builder.with_logging_output_handler(fancy_log_handler.clone())
@@ -608,8 +608,11 @@ pub async fn run_test(
         .with_keep_build(true)
         .with_compression_threads(test_data.compression_threads)
         .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(test_data.common.auth_file, false)
-                .into_diagnostic()?,
+            tool_configuration::reqwest_client_from_auth_storage(
+                test_data.common.auth_file,
+                test_data.common.allow_insecure_host.is_some(),
+            )
+            .into_diagnostic()?,
         )
         .with_channel_priority(test_data.common.channel_priority)
         .finish();
@@ -687,8 +690,11 @@ pub async fn rebuild(
         .with_keep_build(true)
         .with_compression_threads(args.compression_threads)
         .with_reqwest_client(
-            tool_configuration::reqwest_client_from_auth_storage(args.common.auth_file, false)
-                .into_diagnostic()?,
+            tool_configuration::reqwest_client_from_auth_storage(
+                args.common.auth_file,
+                args.common.allow_insecure_host.is_some(),
+            )
+            .into_diagnostic()?,
         )
         .with_test_strategy(args.test)
         .finish();

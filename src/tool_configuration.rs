@@ -90,8 +90,8 @@ pub struct Configuration {
     /// What channel priority to use in solving
     pub channel_priority: ChannelPriority,
 
-    /// Whether to skip SSL certificate verification in the reqwest client.
-    pub insecure: bool,
+    /// List of hosts for which SSL certificate verification should be skipped
+    pub allow_insecure_host: Option<Vec<String>>,
 }
 
 /// Get the authentication storage from the given file
@@ -113,7 +113,7 @@ pub fn get_auth_store(
 /// Create a reqwest client with the authentication middleware
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-    insecure: bool,
+    allow_insecure: bool,
 ) -> Result<ClientWithMiddleware, AuthenticationStorageError> {
     let auth_storage = get_auth_store(auth_file)?;
 
@@ -124,7 +124,7 @@ pub fn reqwest_client_from_auth_storage(
             .pool_max_idle_per_host(20)
             .user_agent(APP_USER_AGENT)
             .read_timeout(std::time::Duration::from_secs(timeout))
-            .danger_accept_invalid_certs(insecure)
+            .danger_accept_invalid_certs(allow_insecure)
             .build()
             .expect("failed to create client"),
     )
@@ -152,7 +152,7 @@ pub struct ConfigurationBuilder {
     channel_config: Option<ChannelConfig>,
     compression_threads: Option<u32>,
     channel_priority: ChannelPriority,
-    insecure: bool,
+    allow_insecure_host: Option<Vec<String>>,
 }
 
 impl Configuration {
@@ -179,7 +179,7 @@ impl ConfigurationBuilder {
             channel_config: None,
             compression_threads: None,
             channel_priority: ChannelPriority::Strict,
-            insecure: false,
+            allow_insecure_host: None,
         }
     }
 
@@ -296,9 +296,12 @@ impl ConfigurationBuilder {
         }
     }
 
-    /// Sets whether to skip SSL certificate verification in the reqwest client.
-    pub fn with_insecure(self, insecure: bool) -> Self {
-        Self { insecure, ..self }
+    /// Set the list of hosts for which SSL certificate verification should be skipped
+    pub fn with_allow_insecure_host(self, allow_insecure_host: Option<Vec<String>>) -> Self {
+        Self {
+            allow_insecure_host,
+            ..self
+        }
     }
 
     /// Construct a [`Configuration`] from the builder.
@@ -307,7 +310,8 @@ impl ConfigurationBuilder {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
         let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None, self.insecure).expect("failed to create client")
+            reqwest_client_from_auth_storage(None, self.allow_insecure_host.is_some())
+                .expect("failed to create client")
         });
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
@@ -350,7 +354,7 @@ impl ConfigurationBuilder {
             package_cache,
             repodata_gateway,
             channel_priority: self.channel_priority,
-            insecure: self.insecure,
+            allow_insecure_host: self.allow_insecure_host,
         }
     }
 }
