@@ -57,7 +57,7 @@ anyhow = "1.0.97"
 walkdir = "2.5.0"
 hex = "0.4.3"
 serde_json = "1.0.140"
-reqwest = { version = "=0.12.12", default-features = false, features = [
+reqwest = { version = "0.12.15", default-features = false, features = [
   "multipart",
 ] }
 tokio = { version = "1.44.0", features = [
@@ -111,7 +111,7 @@ clap_complete_nushell = "4.5.5"
 tokio-util = "0.7.13"
 
 tar = "0.4.44"
-zip = { version = "2.2.3", default-features = false, features = [
+zip = { version = "2.6.1", default-features = false, features = [
   "flate2",
   "deflate",
 ] }
@@ -141,36 +141,36 @@ opendal = { version = "0.51.2", default-features = false, features = [
 ] }
 
 # Rattler crates
-rattler = { version = "0.33.0", default-features = false, features = [
+rattler = { version = "0.33.4", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.14", default-features = false }
-rattler_conda_types = { version = "0.31.4", default-features = false, features = [
+rattler_cache = { version = "0.3.16", default-features = false }
+rattler_conda_types = { version = "0.31.6", default-features = false, features = [
   "rayon",
 ] }
-rattler_digest = { version = "1.0.8", default-features = false, features = [
+rattler_digest = { version = "1.1.0", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.22.0", default-features = false }
-rattler_networking = { version = "0.22.9", default-features = false }
-rattler_redaction = { version = "0.1.8" }
-rattler_repodata_gateway = { version = "0.22.1", default-features = false, features = [
+rattler_index = { version = "0.22.3", default-features = false }
+rattler_networking = { version = "0.22.11", default-features = false }
+rattler_redaction = { version = "0.1.9" }
+rattler_repodata_gateway = { version = "0.22.4", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.5", default-features = false, features = [
+rattler_sandbox = { version = "0.1.6", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.23", default-features = false, features = [
+rattler_shell = { version = "0.22.25", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.4.1", default-features = false, features = [
+rattler_solve = { version = "1.4.3", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.7", default-features = false }
-rattler_package_streaming = { version = "0.22.33", default-features = false }
-rattler_menuinst = "0.2.3"
+rattler_virtual_packages = { version = "2.0.9", default-features = false }
+rattler_package_streaming = { version = "0.22.35", default-features = false }
+rattler_menuinst = "0.2.6"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
@@ -190,9 +190,6 @@ tracing-indicatif = "0.3.9"
 serial_test = "3.2.0"
 
 [patch.crates-io]
-# this fork contains fixes for slow zip reading and large file writing
-zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
-
 # rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
 # rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
 # rattler_cache = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
