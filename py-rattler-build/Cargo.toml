@@ -36,7 +36,6 @@ pyo3-build-config = "0.24.0"
 
 
 [patch.crates-io]
-zip = { git = "https://github.com/wolfv/zip2", branch = "patched" }
 
 # Prevent package from thinking it's in the workspace
 [workspace]
