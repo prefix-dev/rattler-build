@@ -1398,3 +1398,32 @@ def test_jinja_types(
 @pytest.mark.skipif(platform.system() != "Darwin", reason="macos-only")
 def test_relink_rpath(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(recipes / "test-relink", tmp_path)
+
+
+def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "test-parsing/recipe_ignore_run_exports.yaml",
+        tmp_path,
+    )
+    pkg = get_extracted_package(tmp_path, "mypkg")
+
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    # load yaml
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    rendered_recipe = yaml.safe_load(text)
+
+    current_subdir = host_subdir()
+    if current_subdir.startswith("linux"):
+        expected_compiler = f"gxx_{current_subdir}"
+    elif current_subdir.startswith("osx"):
+        expected_compiler = f"clangxx_{current_subdir}"
+    elif current_subdir.startswith("win"):
+        expected_compiler = f"vs2019_{current_subdir}"
+    else:
+        pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
+
+    # verify ignore_run_exports is rendered correctly using the multiple-os expectation
+    assert "requirements" in rendered_recipe["recipe"]
+    assert "ignore_run_exports" in rendered_recipe["recipe"]["requirements"]
+    assert "from_package" in rendered_recipe["recipe"]["requirements"]["ignore_run_exports"]
+    assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"]["from_package"] == [expected_compiler]
