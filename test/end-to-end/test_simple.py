@@ -1425,5 +1425,10 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     # verify ignore_run_exports is rendered correctly using the multiple-os expectation
     assert "requirements" in rendered_recipe["recipe"]
     assert "ignore_run_exports" in rendered_recipe["recipe"]["requirements"]
-    assert "from_package" in rendered_recipe["recipe"]["requirements"]["ignore_run_exports"]
-    assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"]["from_package"] == [expected_compiler]
+    assert (
+        "from_package"
+        in rendered_recipe["recipe"]["requirements"]["ignore_run_exports"]
+    )
+    assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"][
+        "from_package"
+    ] == [expected_compiler]
