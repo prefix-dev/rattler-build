@@ -1418,7 +1418,7 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     elif current_subdir.startswith("osx"):
         expected_compiler = f"clangxx_{current_subdir}"
     elif current_subdir.startswith("win"):
-        expected_compiler = f"vs2019_{current_subdir}"
+        expected_compiler = f"vs2017_{current_subdir}"
     else:
         pytest.fail(f"Unsupported platform for compiler check: {current_subdir}")
 
