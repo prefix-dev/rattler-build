@@ -566,23 +566,50 @@ impl TryConvertNode<IgnoreRunExports> for RenderedNode {
 impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
     fn try_convert(&self, _name: &str) -> Result<IgnoreRunExports, Vec<PartialParsingError>> {
         let mut ignore_run_exports = IgnoreRunExports::default();
+        let mut errors = vec![];
 
-        crate::validate_keys!(ignore_run_exports, self.iter(), by_name, from_package);
+        let known_fields = std::collections::HashSet::from(["by_name", "from_package"]);
+        for (key, _value) in self.iter() {
+            let key_str = key.as_str();
+            if !known_fields.contains(key_str) {
+                errors.push(_partialerror!(
+                    *key.span(),
+                    ErrorKind::InvalidField(key_str.to_string().into()),
+                    help = "valid fields for `ignore_run_exports` are: `by_name`, `from_package`"
+                ));
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
+        }
 
         if let Some(by_name_node) = self.get("by_name") {
-            let specs: Vec<MatchSpec> = by_name_node.try_convert("by_name")?;
-            ignore_run_exports.by_name = specs
-                .into_iter()
-                .map(|ms| ms.name.expect("MatchSpec must have a name"))
-                .collect();
+            match TryConvertNode::<Vec<MatchSpec>>::try_convert(by_name_node, "by_name") {
+                Ok(specs) => {
+                    ignore_run_exports.by_name = specs
+                        .into_iter()
+                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .collect();
+                }
+                Err(e) => errors.extend(e),
+            }
         }
 
         if let Some(from_package_node) = self.get("from_package") {
-            let specs: Vec<MatchSpec> = from_package_node.try_convert("from_package")?;
-            ignore_run_exports.from_package = specs
-                .into_iter()
-                .map(|ms| ms.name.expect("MatchSpec must have a name"))
-                .collect();
+            match TryConvertNode::<Vec<MatchSpec>>::try_convert(from_package_node, "from_package") {
+                Ok(specs) => {
+                    ignore_run_exports.from_package = specs
+                        .into_iter()
+                        .map(|ms: MatchSpec| ms.name.expect("MatchSpec must have a name"))
+                        .collect();
+                }
+                Err(e) => errors.extend(e),
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(errors);
         }
 
         Ok(ignore_run_exports)

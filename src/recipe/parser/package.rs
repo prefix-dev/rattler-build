@@ -1,4 +1,6 @@
-use rattler_conda_types::{MatchSpec, PackageName, ParseStrictness, VersionWithSource};
+use std::str::FromStr;
+
+use rattler_conda_types::{PackageName, VersionWithSource};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -165,11 +167,8 @@ impl TryConvertNode<PackageName> for RenderedNode {
 
 impl TryConvertNode<PackageName> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<PackageName, Vec<PartialParsingError>> {
-        let input = self.as_str();
-        match MatchSpec::from_str(input, ParseStrictness::Strict) {
-            Ok(match_spec) => Ok(match_spec.name.expect("MatchSpec must have a name")),
-            Err(err) => Err(vec![_partialerror!(*self.span(), ErrorKind::from(err),)]),
-        }
+        PackageName::from_str(self.as_str())
+            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::from(err),)])
     }
 }
 
