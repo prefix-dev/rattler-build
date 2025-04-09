@@ -569,6 +569,22 @@ impl TryConvertNode<IgnoreRunExports> for RenderedMappingNode {
 
         crate::validate_keys!(ignore_run_exports, self.iter(), by_name, from_package);
 
+        if let Some(by_name_node) = self.get("by_name") {
+            let specs: Vec<MatchSpec> = by_name_node.try_convert("by_name")?;
+            ignore_run_exports.by_name = specs
+                .into_iter()
+                .map(|ms| ms.name.expect("MatchSpec must have a name"))
+                .collect();
+        }
+
+        if let Some(from_package_node) = self.get("from_package") {
+            let specs: Vec<MatchSpec> = from_package_node.try_convert("from_package")?;
+            ignore_run_exports.from_package = specs
+                .into_iter()
+                .map(|ms| ms.name.expect("MatchSpec must have a name"))
+                .collect();
+        }
+
         Ok(ignore_run_exports)
     }
 }
