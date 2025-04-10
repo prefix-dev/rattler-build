@@ -48,12 +48,12 @@ impl InternalRepr {
 
 /// A type that hold the minijinja environment and context for Jinja template processing.
 #[derive(Debug, Clone)]
-pub struct Jinja<'a> {
-    env: Environment<'a>,
+pub struct Jinja {
+    env: Environment<'static>,
     context: BTreeMap<String, Value>,
 }
 
-impl<'a> Jinja<'a> {
+impl Jinja {
     /// Create a new Jinja instance with the given selector configuration.
     pub fn new(config: SelectorConfig) -> Self {
         let env = set_jinja(&config);
@@ -70,14 +70,14 @@ impl<'a> Jinja<'a> {
     }
 
     /// Get a reference to the minijinja environment.
-    pub fn env(&self) -> &Environment<'a> {
+    pub fn env(&self) -> &Environment<'static> {
         &self.env
     }
 
     /// Get a mutable reference to the minijinja environment.
     ///
     /// This is useful for adding custom functions to the environment.
-    pub fn env_mut(&mut self) -> &mut Environment<'a> {
+    pub fn env_mut(&mut self) -> &mut Environment<'static> {
         &mut self.env
     }
 
@@ -105,7 +105,7 @@ impl<'a> Jinja<'a> {
     }
 }
 
-impl Default for Jinja<'_> {
+impl Default for Jinja {
     fn default() -> Self {
         Self {
             env: set_jinja(&SelectorConfig::default()),
@@ -114,7 +114,7 @@ impl Default for Jinja<'_> {
     }
 }
 
-impl Extend<(String, Value)> for Jinja<'_> {
+impl Extend<(String, Value)> for Jinja {
     fn extend<T: IntoIterator<Item = (String, Value)>>(&mut self, iter: T) {
         self.context.extend(iter);
     }

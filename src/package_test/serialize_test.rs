@@ -56,8 +56,7 @@ impl CommandsTest {
 
 fn default_jinja_context(output: &Output) -> Jinja {
     let selector_config = output.build_configuration.selector_config();
-    let jinja = Jinja::new(selector_config).with_context(&output.recipe.context);
-    jinja
+    Jinja::new(selector_config).with_context(&output.recipe.context)
 }
 
 /// Write out the test files for the final package
