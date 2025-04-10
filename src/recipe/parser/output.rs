@@ -5,6 +5,7 @@
 //! `test`, and `about` fields.
 
 use marked_yaml::types::MarkedMappingNode;
+use std::collections::HashMap;
 
 use crate::{
     _partialerror,
@@ -17,7 +18,7 @@ use crate::{
 };
 
 static DEEP_MERGE_KEYS: [&str; 4] = ["package", "about", "extra", "build"];
-static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 9] = [
+static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 10] = [
     "context",
     "recipe",
     "source",
@@ -27,6 +28,7 @@ static ALLOWED_KEYS_MULTI_OUTPUTS: [&str; 9] = [
     "extra",
     "cache",
     "schema_version",
+    "inherits",
 ];
 
 // Check if the `cache` top-level key is present. If it does not contain a
@@ -51,6 +53,137 @@ fn check_src_cache(root: &MarkedMappingNode) -> Result<(), PartialParsingError> 
     Ok(())
 }
 
+/// Apply inheritance to an output map based on the provided ancestors
+fn apply_inheritance<S: SourceCode>(
+    output_map: &mut MarkedMappingNode,
+    ancestors: &[MarkedMappingNode],
+    src: &S,
+) -> Result<(), PartialParsingError> {
+    for ancestor in ancestors {
+        for (key, value) in ancestor.iter() {
+            if !output_map.contains_key(key) {
+                output_map.insert(key.clone(), value.clone());
+            } else if DEEP_MERGE_KEYS.contains(&key.as_str()) {
+                // Deep merge for specific keys
+                let output_map_span = *output_map.span();
+                let Some(output_value) = output_map.get_mut(key) else {
+                    return Err(_partialerror!(
+                        output_map_span,
+                        ErrorKind::MissingField(key.as_str().to_owned().into()),
+                    ));
+                };
+                let output_value_span = *output_value.span();
+                let Some(output_value_map) = output_value.as_mapping_mut() else {
+                    return Err(_partialerror!(output_value_span, ErrorKind::ExpectedMapping,));
+                };
+
+                let mut ancestor_value = value.clone();
+                let Some(ancestor_value_map) = ancestor_value.as_mapping_mut() else {
+                    return Err(_partialerror!(*value.span(), ErrorKind::ExpectedMapping,));
+                };
+
+                for (key, value) in ancestor_value_map.iter() {
+                    if !output_value_map.contains_key(key) {
+                        output_value_map.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Find if the output has a name (either in package.name or cache.name)
+fn get_output_name(output_map: &MarkedMappingNode) -> Option<String> {
+    // Try to get name from package
+    if let Some(package) = output_map.get("package") {
+        if let Some(package_map) = package.as_mapping() {
+            if let Some(name) = package_map.get("name") {
+                if let Some(name_str) = name.as_str() {
+                    return Some(name_str.to_string());
+                }
+            }
+        }
+    }
+    
+    // Try to get name from cache
+    if let Some(cache) = output_map.get("cache") {
+        if let Some(cache_map) = cache.as_mapping() {
+            if let Some(name) = cache_map.get("name") {
+                if let Some(name_str) = name.as_str() {
+                    return Some(name_str.to_string());
+                }
+            }
+        }
+    }
+    
+    None
+}
+
+/// Resolve inheritance for an output
+fn resolve_inheritance<S: SourceCode>(
+    output_map: &mut MarkedMappingNode,
+    named_outputs: &HashMap<String, MarkedMappingNode>,
+    root: &MarkedMappingNode,
+    src: &S,
+    processed_names: &mut Vec<String>
+) -> Result<(), PartialParsingError> {
+    // Check for inherits field
+    if let Some(inherits) = output_map.get("inherits") {
+        let inherits_span = *inherits.span();
+        let Some(inherits_seq) = inherits.as_sequence() else {
+            return Err(_partialerror!(
+                inherits_span,
+                ErrorKind::ExpectedSequence,
+                help = "`inherits` must be a sequence of strings"
+            ));
+        };
+        
+        let mut ancestors = Vec::new();
+        
+        for inherit_node in inherits_seq.iter() {
+            let inherit_span = *inherit_node.span();
+            let Some(inherit_name) = inherit_node.as_str() else {
+                return Err(_partialerror!(
+                    inherit_span,
+                    ErrorKind::ExpectedString,
+                    help = "each item in `inherits` must be a string"
+                ));
+            };
+            
+            // Check for circular dependencies
+            if processed_names.contains(&inherit_name.to_string()) {
+                return Err(_partialerror!(
+                    inherit_span,
+                    ErrorKind::InvalidValue(inherit_name.to_string().into()),
+                    help = format!("circular dependency detected in `inherits`: {}", inherit_name)
+                ));
+            }
+            
+            let Some(ancestor) = named_outputs.get(inherit_name) else {
+                return Err(_partialerror!(
+                    inherit_span,
+                    ErrorKind::InvalidValue(inherit_name.to_string().into()),
+                    help = format!("referenced output `{}` not found", inherit_name)
+                ));
+            };
+            
+            ancestors.push(ancestor.clone());
+        }
+        
+        // Apply inheritance from specified ancestors
+        apply_inheritance(output_map, &ancestors, src)?;
+        
+        // Remove the inherits field after processing
+        output_map.remove("inherits");
+    } else {
+        // Implicit inheritance from root if no inherits field
+        apply_inheritance(output_map, &[root.clone()], src)?;
+    }
+    
+    Ok(())
+}
+
 /// Retrieve all outputs from the recipe source (YAML)
 pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, ParsingError<S>> {
     let root_node = parse_yaml(0, src.clone())?;
@@ -69,6 +202,7 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
         return Err(ParsingError::from_partial(src, err));
     };
 
+    // Validate the structure for multi-output recipes
     if root_map.contains_key("outputs") {
         if root_map.contains_key("package") {
             let key = root_map
@@ -114,6 +248,7 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
         }
     }
 
+    // Handle single output recipes (no outputs field)
     let Some(outputs) = root_map.get("outputs") else {
         let recipe =
             Node::try_from(root_node).map_err(|err| ParsingError::from_partial(src, err))?;
@@ -121,8 +256,8 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
     };
 
     let mut recipe_version: Option<marked_yaml::Node> = None;
-    // If `recipe` exists in root we will use the version as default for all outputs
-    // We otherwise ignore the `recipe.name` value.
+
+    // Extract recipe version for defaulting
     if let Some(recipe_mapping) = root_map
         .get("recipe")
         .and_then(|recipe| recipe.as_mapping())
@@ -157,24 +292,34 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
         ));
     };
 
+    // First pass: collect all named outputs for inheritance
+    let mut named_outputs = HashMap::new();
+    let mut root = root_map.clone();
+    root.remove("outputs");
+    
+    for output in outputs.iter() {
+        let Some(output_map) = output.as_mapping() else {
+            return Err(ParsingError::from_partial(
+                src,
+                _partialerror!(
+                    *output.span(),
+                    ErrorKind::ExpectedMapping,
+                    help = "individual `output` must always be a mapping"
+                ),
+            ));
+        };
+        
+        if let Some(name) = get_output_name(output_map) {
+            named_outputs.insert(name, output_map.clone());
+        }
+    }
+
     let mut res = Vec::with_capacity(outputs.len());
 
-    // the schema says that `outputs` can be either an output, a if-selector or a
-    // sequence of outputs and if-selectors. We need to handle all of these
-    // cases but for now, lets handle only sequence of outputs
+    // Second pass: process outputs with inheritance
     for output in outputs.iter() {
-        // 1. clone the root node
-        // 2. remove the `outputs` key
-        // 3. substitute repeated value (make sure to preserve the spans)
-        // 4. merge skip values (make sure to preserve the spans)
-        // Note: Make sure to preserve the spans of the original root span so the error
-        // messages remain accurate and point the correct part of the original recipe
-        // src
-        let mut root = root_map.clone();
-        root.remove("outputs");
-
         let mut output_node = output.clone();
-
+        
         let Some(output_map) = output_node.as_mapping_mut() else {
             return Err(ParsingError::from_partial(
                 src,
@@ -185,48 +330,19 @@ pub fn find_outputs_from_src<S: SourceCode>(src: S) -> Result<Vec<Node>, Parsing
                 ),
             ));
         };
-
-        for (key, value) in root.iter() {
-            if !output_map.contains_key(key) {
-                output_map.insert(key.clone(), value.clone());
-            } else {
-                // deep merge
-                if DEEP_MERGE_KEYS.contains(&key.as_str()) {
-                    let output_map_span = *output_map.span();
-                    let Some(output_value) = output_map.get_mut(key) else {
-                        return Err(ParsingError::from_partial(
-                            src,
-                            _partialerror!(
-                                output_map_span,
-                                ErrorKind::MissingField(key.as_str().to_owned().into()),
-                            ),
-                        ));
-                    };
-                    let output_value_span = *output_value.span();
-                    let Some(output_value_map) = output_value.as_mapping_mut() else {
-                        return Err(ParsingError::from_partial(
-                            src,
-                            _partialerror!(output_value_span, ErrorKind::ExpectedMapping,),
-                        ));
-                    };
-
-                    let mut root_value = value.clone();
-                    let Some(root_value_map) = root_value.as_mapping_mut() else {
-                        return Err(ParsingError::from_partial(
-                            src,
-                            _partialerror!(*value.span(), ErrorKind::ExpectedMapping,),
-                        ));
-                    };
-
-                    for (key, value) in root_value_map.iter() {
-                        if !output_value_map.contains_key(key) {
-                            output_value_map.insert(key.clone(), value.clone());
-                        }
-                    }
-                }
-            }
+        
+        // Track processed outputs to detect circular dependencies
+        let mut processed_names = Vec::new();
+        if let Some(name) = get_output_name(output_map) {
+            processed_names.push(name);
         }
-
+        
+        // Apply inheritance based on the inherits field
+        if let Err(err) = resolve_inheritance(output_map, &named_outputs, &root, &src, &mut processed_names) {
+            return Err(ParsingError::from_partial(src, err));
+        }
+        
+        // Apply version from recipe if needed
         if let Some(version) = recipe_version.as_ref() {
             let Some(package_map) = output_map
                 .get_mut("package")
