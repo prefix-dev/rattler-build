@@ -22,6 +22,16 @@ source:
   - file.patch
   target_directory: test-package
   file_name: test-package.tar.gz
+  files:
+    include:
+    - include/*
+    - '**/foo.txt'
+    - x.txt
+    - out/**
+    exclude:
+    - foo/*
+    - bar.txt
+    - baz/
 - git: https://github.com/test/package
   depth: 10
   patches:
