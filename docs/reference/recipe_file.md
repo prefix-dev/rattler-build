@@ -310,6 +310,32 @@ source:
 Here, the two URL tarballs will go into one folder, and the `git` repo is checked
 out into its own space. `git` will not clone into a non-empty folder.
 
+### Include only certain files from source
+
+While you could specify only the files you need from a source, `source.files` gives you the option to filter with globs instead.
+
+```yaml title="recipe.yaml"
+source:
+  path: /path/to/source
+  files:
+    - list
+    - of
+    - globs
+```
+
+Glob patterns throughout the recipe file can also use a flexible `include` /
+`exclude` pair, such as:
+
+```yaml title="recipe.yaml"
+source:
+  path: /path/to/source
+  files:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
+
 ## Build section
 
 Specifies build information.
@@ -407,6 +433,37 @@ build:
     of preprocess-selectors: `noarch` packages are built with the directives which
     evaluate to `true` in the platform it is built on, which probably will result
     in incorrect/incomplete installation in other platforms.
+
+### Include only certain files in the package
+
+Sometimes you may want to include only a subset of the files installed by the
+build process in your package. For this, the `files` key can be used. Only _new_
+files are considered for inclusion (ie. files that were not in the host
+environment beforehand).
+
+```yaml title="recipe.yaml"
+build:
+  # select files to be included in the package
+  # this can be used to remove files from the package, even if they are installed in the
+  # environment
+  files:
+    - list
+    - of
+    - globs
+```
+
+Glob patterns throughout the recipe file can also use a flexible `include` /
+`exclude` pair, such as:
+
+```yaml title="recipe.yaml"
+build:
+  files:
+    include:
+      - include/**/*.h
+    exclude:
+      - include/**/private.h
+```
+
 
 ### Python specific options
 

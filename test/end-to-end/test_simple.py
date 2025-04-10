@@ -874,18 +874,30 @@ def test_post_link(
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_include_files(
+def test_build_files(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot_json
 ):
-    path_to_recipe = recipes / "include_files"
+    path_to_recipe = recipes / "build_files"
     args = rattler_build.build_args(
         path_to_recipe,
         tmp_path,
     )
     rattler_build(*args)
 
-    pkg = get_extracted_package(tmp_path, "include_files")
+    pkg = get_extracted_package(tmp_path, "build_files")
     assert snapshot_json == json.loads((pkg / "info/paths.json").read_text())
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="recipe does not support execution on windows"
+)
+def test_source_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "source_files"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+    rattler_build(*args)
 
 
 def test_nushell_implicit_recipe(
