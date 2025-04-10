@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
       time: "04:00" # UTC
     labels:
       - "dependencies"
@@ -12,10 +12,14 @@ updates:
     open-pull-requests-limit: 10
     ignore:
       - dependency-name: "rattler*"
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     labels:
       - "dependencies"
     commit-message:
@@ -23,3 +27,7 @@ updates:
     ignore:
       - dependency-name: "crate-ci/typos"
         update-types: ["version-update:semver-patch"]
+    groups:
+      github-actions:
+        patterns:
+          - "*"
