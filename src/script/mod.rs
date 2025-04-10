@@ -231,7 +231,7 @@ impl Script {
         recipe_dir: &Path,
         run_prefix: &Path,
         build_prefix: Option<&PathBuf>,
-        mut jinja_config: Option<Jinja<'_>>,
+        mut jinja_config: Option<Jinja>,
         sandbox_config: Option<&SandboxConfiguration>,
     ) -> Result<(), std::io::Error> {
         // TODO: This is a bit of an out and about way to determine whether or
