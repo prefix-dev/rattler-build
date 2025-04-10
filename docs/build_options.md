@@ -20,7 +20,10 @@ build:
   # select files to be included in the package
   # this can be used to remove files from the package, even if they are installed in the
   # environment
-  files: list of globs
+  files:
+    - list
+    - of
+    - globs
 ```
 
 For example, to only include the header files in a package, you could use:

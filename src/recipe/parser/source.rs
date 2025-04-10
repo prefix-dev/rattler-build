@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::FlattenErrors;
+use super::{FlattenErrors, GlobVec};
 
 /// Source information.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -537,6 +537,9 @@ pub struct PathSource {
         skip_serializing_if = "should_not_serialize_use_gitignore"
     )]
     pub use_gitignore: bool,
+    /// Only take certain files from the source
+    #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
+    pub filter: GlobVec,
 }
 
 fn default_gitignore() -> bool {
@@ -581,6 +584,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
         let mut patches = Vec::new();
         let mut target_directory = None;
         let mut use_gitignore = true;
+        let mut filter = GlobVec::default();
         let mut file_name = None;
         let mut sha256 = None;
         let mut md5 = None;
@@ -602,6 +606,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
                 "target_directory" => target_directory = value.try_convert("target_directory")?,
                 "file_name" => file_name = value.try_convert("file_name")?,
                 "use_gitignore" => use_gitignore = value.try_convert("use_gitignore")?,
+                "filter" => filter = value.try_convert("filter")?,
                 invalid_key => {
                     return Err(vec![_partialerror!(
                         *key.span(),
@@ -637,6 +642,7 @@ impl TryConvertNode<PathSource> for RenderedMappingNode {
             target_directory,
             file_name,
             use_gitignore,
+            filter,
         })
     }
 }
@@ -697,6 +703,7 @@ mod tests {
             target_directory: None,
             file_name: None,
             use_gitignore: true,
+            filter: GlobVec::default(),
         };
 
         let json = serde_json::to_string(&path_source).unwrap();
