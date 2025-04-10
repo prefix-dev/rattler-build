@@ -1656,6 +1656,10 @@
 <p>The number of threads to use for compression (only relevant when also using <code>--package-format conda</code>)</p>
 </li>
 <li>
+<p><code>--io-concurrency-limit &lt;IO_CONCURRENCY_LIMIT&gt;</code></p>
+<p>The maximum number of concurrent I/O operations to use when installing packages This can be controlled by the <code>RATTLER_IO_CONCURRENCY_LIMIT</code> environment variable Defaults to 8 times the number of CPUs</p>
+</li>
+<li>
 <p><code>--experimental</code></p>
 <p>Enable experimental features</p>
 </li>
@@ -1802,6 +1806,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--compression-threads &lt;COMPRESSION_THREADS&gt;</code></p>
 <p>The number of threads to use for compression</p>
+</li>
+<li>
+<p><code>--io-concurrency-limit &lt;IO_CONCURRENCY_LIMIT&gt;</code></p>
+<p>The number of threads to use for I/O operations when installing packages</p>
 </li>
 <li>
 <p><code>--experimental</code></p>
