@@ -132,7 +132,13 @@ fn test_package_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let common = CommonData::new(None, false, auth_file, channel_priority, allow_insecure_host);
+    let common = CommonData::new(
+        None,
+        false,
+        auth_file,
+        channel_priority,
+        allow_insecure_host,
+    );
     let test_data = TestData::new(package_file, channel, compression_threads, common);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
