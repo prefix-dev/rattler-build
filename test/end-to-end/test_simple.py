@@ -891,8 +891,8 @@ def test_build_files(
 @pytest.mark.skipif(
     os.name == "nt", reason="recipe does not support execution on windows"
 )
-def test_source_files(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
-    path_to_recipe = recipes / "source_files"
+def test_source_filter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "source_filter"
     args = rattler_build.build_args(
         path_to_recipe,
         tmp_path,

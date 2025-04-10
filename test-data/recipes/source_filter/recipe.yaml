@@ -1,0 +1,18 @@
+package:
+  name: source_filter
+  version: 1.0.0
+
+source:
+  - path: ./test-folder
+    filter:
+      include:
+        - "*.txt"
+      exclude:
+        - "exclude*"
+
+build:
+  script:
+    - echo "running build (test)"
+    - test -f included.txt
+    - test ! -f not-included
+    - test ! -f excluded.txt

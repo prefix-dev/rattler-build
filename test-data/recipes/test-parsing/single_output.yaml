@@ -23,7 +23,7 @@ source:
       - file.patch
     file_name: test-package.tar.gz
     target_directory: test-package
-    files:
+    filter:
       include:
         - include/*
         - "**/foo.txt"

@@ -229,7 +229,7 @@ pub async fn fetch_sources(
                         || {
                             copy_dir::CopyDir::new(&src_path, &dest_dir)
                                 .use_gitignore(src.use_gitignore())
-                                .with_globvec(&src.files)
+                                .with_globvec(&src.filter)
                                 .run()
                         },
                     )?;

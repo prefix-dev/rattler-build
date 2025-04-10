@@ -312,12 +312,12 @@ out into its own space. `git` will not clone into a non-empty folder.
 
 ### Include only certain files from source
 
-While you could specify only the files you need from a source, `source.files` gives you the option to filter with globs instead.
+While you can specify only the files you need from a source, `source.filter` gives you the option to filter with globs instead.
 
 ```yaml title="recipe.yaml"
 source:
   path: /path/to/source
-  files:
+  filter:
     - list
     - of
     - globs
@@ -329,7 +329,7 @@ Glob patterns throughout the recipe file can also use a flexible `include` /
 ```yaml title="recipe.yaml"
 source:
   path: /path/to/source
-  files:
+  filter:
     include:
       - include/**/*.h
     exclude:
