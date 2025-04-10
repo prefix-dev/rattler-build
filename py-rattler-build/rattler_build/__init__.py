@@ -45,6 +45,7 @@ def build_recipes(
     no_build_id: bool = False,
     package_format: Union[str, None] = None,
     compression_threads: Union[int, None] = None,
+    io_concurrency_limit: Union[int, None] = None,
     no_include_recipe: bool = False,
     test: Union[str, None] = None,
     output_dir: Union[str, Path, None] = None,
@@ -71,6 +72,7 @@ def build_recipes(
         no_build_id: Don't use build id(timestamp) when creating build directory name.
         package_format: The package format to use for the build. Can be one of `tar-bz2` or `conda`. You can also add a compression level to the package format, e.g. `tar-bz2:<number>` (from 1 to 9) or `conda:<number>` (from -7 to 22).
         compression_threads: The number of threads to use for compression (only relevant when also using `--package-format conda`).
+        io_concurrency_limit: The maximum number of concurrent I/O operations. This is useful for limiting the number of concurrent file operations.
         no_include_recipe: Don't store the recipe in the final package.
         test: The strategy to use for running tests.
         output_dir: The directory to store the output.
@@ -98,6 +100,7 @@ def build_recipes(
         no_build_id,
         package_format,
         compression_threads,
+        io_concurrency_limit,
         no_include_recipe,
         test,
         output_dir,

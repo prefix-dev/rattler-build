@@ -1,0 +1,14 @@
+package:
+  name: mypkg
+  version: '0.1.0'
+
+build:
+  number: 0
+
+requirements:
+  ignore_run_exports:
+    from_package:
+    - ${{ compiler('cxx') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}

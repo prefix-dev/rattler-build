@@ -405,6 +405,12 @@ pub struct BuildOpts {
     /// using `--package-format conda`)
     pub compression_threads: Option<u32>,
 
+    #[arg(long, env = "RATTLER_IO_CONCURRENCY_LIMIT")]
+    /// The maximum number of concurrent I/O operations to use when installing packages
+    /// This can be controlled by the `RATTLER_IO_CONCURRENCY_LIMIT` environment variable
+    /// Defaults to 8 times the number of CPUs
+    pub io_concurrency_limit: Option<usize>,
+
     /// Don't store the recipe in the final package
     #[arg(long, help_heading = "Modifying result")]
     pub no_include_recipe: bool,
@@ -467,6 +473,7 @@ pub struct BuildData {
     pub no_build_id: bool,
     pub package_format: PackageFormatAndCompression,
     pub compression_threads: Option<u32>,
+    pub io_concurrency_limit: usize,
     pub no_include_recipe: bool,
     pub test: TestStrategy,
     pub color_build_log: bool,
@@ -495,6 +502,7 @@ impl BuildData {
         no_build_id: bool,
         package_format: Option<PackageFormatAndCompression>,
         compression_threads: Option<u32>,
+        io_concurrency_limit: Option<usize>,
         no_include_recipe: bool,
         test: Option<TestStrategy>,
         common: CommonData,
@@ -525,6 +533,7 @@ impl BuildData {
                 compression_level: CompressionLevel::Default,
             }),
             compression_threads,
+            io_concurrency_limit: io_concurrency_limit.unwrap_or(num_cpus::get() * 8),
             no_include_recipe,
             test: test.unwrap_or_default(),
             color_build_log: true,
@@ -554,6 +563,7 @@ impl From<BuildOpts> for BuildData {
             opts.no_build_id,
             opts.package_format,
             opts.compression_threads,
+            opts.io_concurrency_limit,
             opts.no_include_recipe,
             opts.test.or(if opts.no_test {
                 Some(TestStrategy::Skip)
@@ -664,6 +674,10 @@ pub struct RebuildOpts {
     /// The number of threads to use for compression.
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
+
+    /// The number of threads to use for I/O operations when installing packages.
+    #[clap(long, env = "RATTLER_IO_CONCURRENCY_LIMIT")]
+    pub io_concurrency_limit: Option<usize>,
 
     /// Common options.
     #[clap(flatten)]
