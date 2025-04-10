@@ -128,7 +128,7 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
-        build_data.common.allow_insecure_host.is_some(),
+        build_data.common.allow_insecure_host.clone(),
     )
     .into_diagnostic()?;
 
@@ -610,7 +610,7 @@ pub async fn run_test(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 test_data.common.auth_file,
-                test_data.common.allow_insecure_host.is_some(),
+                test_data.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
         )
@@ -692,7 +692,7 @@ pub async fn rebuild(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 args.common.auth_file,
-                args.common.allow_insecure_host.is_some(),
+                args.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
         )

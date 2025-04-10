@@ -14,6 +14,7 @@ use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;
 
@@ -45,6 +46,93 @@ pub enum TestStrategy {
     NativeAndEmulated,
 }
 
+/// A client that can handle both secure and insecure connections
+#[derive(Clone)]
+pub struct BaseClient {
+    /// The standard client with SSL verification enabled
+    client: ClientWithMiddleware,
+    /// The dangerous client with SSL verification disabled
+    dangerous_client: ClientWithMiddleware,
+    /// List of hosts for which SSL verification should be skipped
+    allow_insecure_host: Option<Vec<String>>,
+}
+
+impl BaseClient {
+    /// Create a new BaseClient with both secure and insecure clients
+    pub fn new(
+        auth_file: Option<PathBuf>,
+        allow_insecure_host: Option<Vec<String>>,
+    ) -> Result<Self, AuthenticationStorageError> {
+        let auth_storage = get_auth_store(auth_file)?;
+        let timeout = 5 * 60;
+
+        let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
+            builder
+                .no_gzip()
+                .pool_max_idle_per_host(20)
+                .user_agent(APP_USER_AGENT)
+                .read_timeout(std::time::Duration::from_secs(timeout))
+        };
+
+        let client = reqwest_middleware::ClientBuilder::new(
+            common_settings(reqwest::Client::builder())
+                .build()
+                .expect("failed to create client"),
+        )
+        .with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
+        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+            auth_storage.clone(),
+        )))
+        .build();
+
+        let dangerous_client = reqwest_middleware::ClientBuilder::new(
+            common_settings(reqwest::Client::builder())
+                .danger_accept_invalid_certs(true)
+                .build()
+                .expect("failed to create dangerous client"),
+        )
+        .with(RetryTransientMiddleware::new_with_policy(
+            ExponentialBackoff::builder().build_with_max_retries(3),
+        ))
+        .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
+            auth_storage,
+        )))
+        .build();
+
+        Ok(Self {
+            client,
+            dangerous_client,
+            allow_insecure_host,
+        })
+    }
+
+    /// Get the default client (with SSL verification enabled)
+    pub fn get_client(&self) -> &ClientWithMiddleware {
+        &self.client
+    }
+
+    /// Selects the appropriate client based on the host's trustworthiness
+    pub fn for_host(&self, url: &Url) -> &ClientWithMiddleware {
+        if self.disable_ssl(url) {
+            &self.dangerous_client
+        } else {
+            &self.client
+        }
+    }
+
+    /// Returns true if SSL verification should be disabled for the given URL
+    fn disable_ssl(&self, url: &Url) -> bool {
+        if let Some(hosts) = &self.allow_insecure_host {
+            if let Some(host) = url.host_str() {
+                return hosts.iter().any(|h| h == host);
+            }
+        }
+        false
+    }
+}
+
 /// Global configuration for the build
 #[derive(Clone)]
 pub struct Configuration {
@@ -52,7 +140,7 @@ pub struct Configuration {
     pub fancy_log_handler: LoggingOutputHandler,
 
     /// The authenticated reqwest download client to use
-    pub client: ClientWithMiddleware,
+    pub client: BaseClient,
 
     /// Set this to true if you want to keep the build directory after the build
     /// is done
@@ -111,37 +199,21 @@ pub fn get_auth_store(
 }
 
 /// Create a reqwest client with the authentication middleware
+///
+/// * `auth_file` - Optional path to an authentication file
+/// * `allow_insecure_host` - Optional list of hosts for which to disable SSL certificate verification
 pub fn reqwest_client_from_auth_storage(
     auth_file: Option<PathBuf>,
-    allow_insecure: bool,
-) -> Result<ClientWithMiddleware, AuthenticationStorageError> {
-    let auth_storage = get_auth_store(auth_file)?;
-
-    let timeout = 5 * 60;
-    Ok(reqwest_middleware::ClientBuilder::new(
-        reqwest::Client::builder()
-            .no_gzip()
-            .pool_max_idle_per_host(20)
-            .user_agent(APP_USER_AGENT)
-            .read_timeout(std::time::Duration::from_secs(timeout))
-            .danger_accept_invalid_certs(allow_insecure)
-            .build()
-            .expect("failed to create client"),
-    )
-    .with(RetryTransientMiddleware::new_with_policy(
-        ExponentialBackoff::builder().build_with_max_retries(3),
-    ))
-    .with_arc(Arc::new(AuthenticationMiddleware::from_auth_storage(
-        auth_storage,
-    )))
-    .build())
+    allow_insecure_host: Option<Vec<String>>,
+) -> Result<BaseClient, AuthenticationStorageError> {
+    BaseClient::new(auth_file, allow_insecure_host)
 }
 
 /// A builder for a [`Configuration`].
 pub struct ConfigurationBuilder {
     cache_dir: Option<PathBuf>,
     fancy_log_handler: Option<LoggingOutputHandler>,
-    client: Option<ClientWithMiddleware>,
+    client: Option<BaseClient>,
     no_clean: bool,
     no_test: bool,
     test_strategy: TestStrategy,
@@ -241,7 +313,7 @@ impl ConfigurationBuilder {
     }
 
     /// Sets the request client to use for network requests.
-    pub fn with_reqwest_client(self, client: ClientWithMiddleware) -> Self {
+    pub fn with_reqwest_client(self, client: BaseClient) -> Self {
         Self {
             client: Some(client),
             ..self
@@ -310,7 +382,7 @@ impl ConfigurationBuilder {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
         let client = self.client.unwrap_or_else(|| {
-            reqwest_client_from_auth_storage(None, self.allow_insecure_host.is_some())
+            reqwest_client_from_auth_storage(None, self.allow_insecure_host.clone())
                 .expect("failed to create client")
         });
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
@@ -322,7 +394,7 @@ impl ConfigurationBuilder {
         let repodata_gateway = Gateway::builder()
             .with_cache_dir(cache_dir.join(rattler_cache::REPODATA_CACHE_DIR))
             .with_package_cache(package_cache.clone())
-            .with_client(client.clone())
+            .with_client(client.client.clone())
             .with_channel_config(rattler_repodata_gateway::ChannelConfig {
                 default: rattler_repodata_gateway::SourceConfig {
                     jlap_enabled: true,
