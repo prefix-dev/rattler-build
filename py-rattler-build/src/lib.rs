@@ -23,7 +23,7 @@ fn get_rattler_build_version_py() -> PyResult<String> {
 }
 
 #[pyfunction]
-#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform))]
+#[pyo3(signature = (recipes, up_to, build_platform, target_platform, host_platform, channel, variant_config, ignore_recipe_variants, render_only, with_solve, keep_build, no_build_id, package_format, compression_threads, no_include_recipe, test, output_dir, auth_file, channel_priority, skip_existing, noarch_build_platform, allow_insecure_host=None))]
 #[allow(clippy::too_many_arguments)]
 fn build_recipes_py(
     recipes: Vec<PathBuf>,
@@ -47,6 +47,7 @@ fn build_recipes_py(
     channel_priority: Option<String>,
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
+    allow_insecure_host: Option<Vec<String>>,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -57,6 +58,7 @@ fn build_recipes_py(
         false,
         auth_file.map(|a| a.into()),
         channel_priority,
+        allow_insecure_host,
     );
     let build_platform = build_platform
         .map(|p| Platform::from_str(&p))
@@ -115,19 +117,20 @@ fn build_recipes_py(
 }
 
 #[pyfunction]
-#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority))]
+#[pyo3(signature = (package_file, channel, compression_threads, auth_file, channel_priority, allow_insecure_host=None))]
 fn test_package_py(
     package_file: PathBuf,
     channel: Option<Vec<String>>,
     compression_threads: Option<u32>,
     auth_file: Option<PathBuf>,
     channel_priority: Option<String>,
+    allow_insecure_host: Option<Vec<String>>,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
-    let common = CommonData::new(None, false, auth_file, channel_priority);
+    let common = CommonData::new(None, false, auth_file, channel_priority, allow_insecure_host);
     let test_data = TestData::new(package_file, channel, compression_threads, common);
 
     let rt = tokio::runtime::Runtime::new().unwrap();
