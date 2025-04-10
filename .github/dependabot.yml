@@ -23,3 +23,7 @@ updates:
     ignore:
       - dependency-name: "crate-ci/typos"
         update-types: ["version-update:semver-patch"]
+    groups:
+      github-actions:
+        patterns:
+          - "*"
