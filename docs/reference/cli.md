@@ -145,6 +145,11 @@ Build a package from a recipe
 	The number of threads to use for compression (only relevant when also using `--package-format conda`)
 
 
+- `--io-concurrency-limit <IO_CONCURRENCY_LIMIT>`
+
+	The maximum number of concurrent I/O operations to use when installing packages This can be controlled by the `RATTLER_IO_CONCURRENCY_LIMIT` environment variable Defaults to 8 times the number of CPUs
+
+
 - `--experimental`
 
 	Enable experimental features
@@ -318,6 +323,11 @@ Rebuild a package from a package file instead of a recipe
 - `--compression-threads <COMPRESSION_THREADS>`
 
 	The number of threads to use for compression
+
+
+- `--io-concurrency-limit <IO_CONCURRENCY_LIMIT>`
+
+	The number of threads to use for I/O operations when installing packages
 
 
 - `--experimental`
