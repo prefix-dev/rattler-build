@@ -148,18 +148,9 @@ impl Script {
         extensions: &[&str],
     ) -> Result<ResolvedScriptContents, std::io::Error> {
         let script_content = match self.contents() {
-            // No script was specified, so we try to read the default script. If the file cannot be
-            // found we return an empty string.
+            // No script was specified, which means we return an empty string.
             ScriptContent::Default => {
-                let recipe_file = self.find_file(recipe_dir, extensions, Path::new("build"));
-                if let Some(recipe_file) = recipe_file {
-                    match fs_err::read_to_string(&recipe_file) {
-                        Err(e) => Err(e),
-                        Ok(content) => Ok(ResolvedScriptContents::Path(recipe_file, content)),
-                    }
-                } else {
-                    Ok(ResolvedScriptContents::Missing)
-                }
+                Ok(ResolvedScriptContents::Missing)
             }
 
             // The scripts path was explicitly specified. If the file cannot be found we error out.
