@@ -421,7 +421,7 @@ pub async fn create_recipe(
         }
     }
 
-    recipe.build.script = "${{ PYTHON }} -m pip install .".to_string();
+    recipe.build.script = "${{ PYTHON }} -m pip install --no-deps .".to_string();
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
