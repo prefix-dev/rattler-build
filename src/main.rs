@@ -17,7 +17,7 @@ use rattler_build::{
 use tempfile::{tempdir, TempDir};
 
 fn main() -> miette::Result<()> {
-    // Initialize sandbox in sync/single-threaded context before tokio runtime
+    // Initialize sandbox in sync/single-threaded context before anything else
     #[cfg(any(
         all(target_os = "linux", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "aarch64"),
@@ -25,12 +25,34 @@ fn main() -> miette::Result<()> {
     ))]
     rattler_sandbox::init_sandbox();
 
-    // Create and run the tokio runtime
-    tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap()
-        .block_on(async { async_main().await })
+    // Stack size varies significantly across platforms:
+    // - Windows: only 1MB by default
+    // - macOS/Linux: ~8MB by default
+    //
+    // This discrepancy causes stack overflows primarily on Windows, especially in debug builds
+    // To address this, we spawn another main thread (main2) with a consistent
+    // larger stack size across all platforms.
+    //
+    // 4MB is sufficient for most operations while remaining memory-efficient.
+    // If needed, developers should/can override with RUST_MIN_STACK environment variable.
+    // Further, we preserve error messages from main thread in case something goes wrong.
+    const STACK_SIZE: usize = 4 * 1024 * 1024;
+
+    let thread_handle = std::thread::Builder::new()
+        .stack_size(STACK_SIZE)
+        .spawn(|| {
+            // Create and run the tokio runtime
+            tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap()
+                .block_on(async { async_main().await })
+        })
+        .map_err(|e| miette::miette!("Failed to spawn thread: {}", e))?;
+
+    thread_handle
+        .join()
+        .map_err(|_| miette::miette!("Thread panicked"))?
 }
 
 async fn async_main() -> miette::Result<()> {
