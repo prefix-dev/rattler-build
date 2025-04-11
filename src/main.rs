@@ -17,6 +17,14 @@ use rattler_build::{
 use tempfile::{tempdir, TempDir};
 
 fn main() -> miette::Result<()> {
+    // Initialize sandbox in sync/single-threaded context before anything else
+    #[cfg(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "aarch64"),
+        target_os = "macos"
+    ))]
+    rattler_sandbox::init_sandbox();
+
     // Stack size varies significantly across platforms:
     // - Windows: only 1MB by default
     // - macOS/Linux: ~8MB by default
@@ -33,14 +41,6 @@ fn main() -> miette::Result<()> {
     let thread_handle = std::thread::Builder::new()
         .stack_size(STACK_SIZE)
         .spawn(|| {
-            // Initialize sandbox in sync/single-threaded context before tokio runtime
-            #[cfg(any(
-                all(target_os = "linux", target_arch = "x86_64"),
-                all(target_os = "linux", target_arch = "aarch64"),
-                target_os = "macos"
-            ))]
-            rattler_sandbox::init_sandbox();
-
             // Create and run the tokio runtime
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
