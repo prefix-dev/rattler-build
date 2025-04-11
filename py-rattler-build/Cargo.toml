@@ -27,7 +27,7 @@ tokio = { version = "1.44.0", features = [
   "rt-multi-thread",
   "process",
 ] }
-rattler_conda_types = "0.31.4"
+rattler_conda_types = "0.32.0"
 clap = "4.5.32"
 url = "2.5.4"
 
