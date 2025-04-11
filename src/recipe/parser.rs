@@ -3,6 +3,7 @@
 //! This phase parses YAML and [`SelectorConfig`] into a [`Recipe`], where
 //! if-selectors are handled and any jinja string is processed, resulting in a rendered recipe.
 use indexmap::IndexMap;
+use package::TopLevelRecipe;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -64,6 +65,9 @@ pub struct Recipe {
     pub context: IndexMap<String, Variable>,
     /// The package information
     pub package: Package,
+    /// Contents of the top-level recipe key - only used in multi-output recipes
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top_level_recipe_metadata: Option<TopLevelRecipe>,
     /// The cache build that should be used for this package
     /// This is the same for all outputs of a recipe
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -256,6 +260,7 @@ impl Recipe {
         let mut about = About::default();
         let mut cache = None;
         let mut extra = IndexMap::default();
+        let mut top_level_recipe = Option::<TopLevelRecipe>::None;
 
         rendered_node
             .iter()
@@ -271,6 +276,9 @@ impl Recipe {
                         help =
                             "The recipe field is only allowed in conjunction with multiple outputs"
                     )])
+                    }
+                    "__top_level_recipe" => {
+                        top_level_recipe = value.try_convert(key_str)?;
                     }
                     "cache" => {
                         if experimental {
@@ -318,6 +326,7 @@ impl Recipe {
 
         let recipe = Recipe {
             schema_version,
+            top_level_recipe_metadata: top_level_recipe,
             context,
             package: package.ok_or_else(|| {
                 vec![_partialerror!(

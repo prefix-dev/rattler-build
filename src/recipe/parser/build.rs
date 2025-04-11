@@ -114,6 +114,9 @@ pub struct Build {
     /// Include files in the package
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
     pub files: GlobVec,
+    /// Use the cache output for the build or not
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub use_cache: Option<UseCache>,
 }
 
 /// The build string can be either a user specified string, a resolved string or derived from the variant.
