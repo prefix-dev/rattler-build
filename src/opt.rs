@@ -456,7 +456,7 @@ pub struct BuildData {
     pub build_platform: Platform,
     pub target_platform: Platform,
     pub host_platform: Platform,
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<String>>,
     pub variant_config: Vec<PathBuf>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
@@ -513,7 +513,7 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             variant_config: variant_config.unwrap_or_default(),
             ignore_recipe_variants,
             render_only,
