@@ -1,0 +1,11 @@
+package:
+  name: lua-lpeg
+  version: 1.1.0
+
+source:
+  - url: http://www.inf.puc-rio.br/~roberto/lpeg/lpeg-1.1.0.tar.gz
+    sha256: 4b155d67d2246c1ffa7ad7bc466c1ea899bbc40fef0257cc9c03cecbaed4352a
+  - url: https://untrusted-root.badssl.com/style.css
+    sha256: 0e755b89c8859e52f62869c84913efb0d11c48734437c93c506c210be2157e6b
+  - url: https://self-signed.badssl.com/icons/favicon-red.ico
+    sha256: 1dc349e55c6654635db94b9a4ea4510c94c13416653621b581d6c570076fd266

@@ -720,7 +720,7 @@ pub(crate) async fn resolve_dependencies(
             .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.client.clone(),
+                    tool_configuration.client.get_client().clone(),
                     tool_configuration.package_cache.clone(),
                     tool_configuration
                         .fancy_log_handler
@@ -816,7 +816,7 @@ pub(crate) async fn resolve_dependencies(
             .wrap_in_progress_async_with_progress("Collecting run exports", |pb| {
                 amend_run_exports(
                     &mut resolved,
-                    tool_configuration.client.clone(),
+                    tool_configuration.client.get_client().clone(),
                     tool_configuration.package_cache.clone(),
                     tool_configuration
                         .fancy_log_handler

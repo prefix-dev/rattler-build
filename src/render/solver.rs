@@ -334,7 +334,7 @@ pub async fn install_packages(
 
     tracing::info!("\nInstalling {name} environment\n");
     Installer::new()
-        .with_download_client(tool_configuration.client.clone())
+        .with_download_client(tool_configuration.client.get_client().clone())
         .with_target_platform(target_platform)
         .with_execute_link_scripts(true)
         .with_package_cache(tool_configuration.package_cache.clone())
