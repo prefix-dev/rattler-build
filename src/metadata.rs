@@ -352,6 +352,9 @@ pub struct BuildConfiguration {
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]
     pub sandbox_config: Option<SandboxConfiguration>,
+
+    /// Filename of recipe.yaml
+   pub recipe_filepath: PathBuf,
 }
 
 impl BuildConfiguration {
@@ -375,6 +378,7 @@ impl BuildConfiguration {
             hash: Some(self.hash.clone()),
             experimental: false,
             allow_undefined: false,
+            recipe_filepath: self.recipe_filepath.clone(),
         }
     }
 }

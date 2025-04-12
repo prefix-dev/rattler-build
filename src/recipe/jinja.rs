@@ -392,6 +392,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         variant,
         experimental,
         allow_undefined,
+        recipe_filepath,
         ..
     } = config.clone();
 
@@ -529,23 +530,24 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
                 "Experimental feature: provide the `--experimental` flag to enable this feature",
             ));
         }
-        let src = fs::read_to_string(&path).map_err(|e| {
+
+        let target_path = recipe_filepath.join(path);
+
+        let src = fs::read_to_string(target_path.clone()).map_err(|e| {
             minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
         })?;
-        // tracing::info!("loading from path: {path}");
-        let filename = path
-            .split('/')
-            .last()
-            .expect("unreachable: split will always atleast return empty string");
-        // tracing::info!("loading filename: {filename}");
-        let value: minijinja::Value = match filename.split_once('.') {
-            Some((_, "yaml")) | Some((_, "yml")) => serde_yaml::from_str(&src).map_err(|e| {
+        // tracing::info!("loading from path: {target_path}");
+
+        let ext = target_path.extension().and_then(|ext| ext.to_str());
+
+        let value: minijinja::Value = match ext {
+            Some("yaml") | Some("yml") => serde_yaml::from_str(&src).map_err(|e| {
                 minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
             })?,
-            Some((_, "json")) => serde_json::from_str(&src).map_err(|e| {
+            Some("json") => serde_json::from_str(&src).map_err(|e| {
                 minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
             })?,
-            Some((_, "toml")) => toml::from_str(&src).map_err(|e| {
+            Some("toml") => toml::from_str(&src).map_err(|e| {
                 minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
             })?,
             _ => Value::from(src),
