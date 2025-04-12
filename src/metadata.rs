@@ -354,7 +354,7 @@ pub struct BuildConfiguration {
     pub sandbox_config: Option<SandboxConfiguration>,
 
     /// Filename of recipe.yaml
-   pub recipe_filepath: PathBuf,
+    pub recipe_filepath: PathBuf,
 }
 
 impl BuildConfiguration {
