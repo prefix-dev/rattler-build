@@ -11,7 +11,7 @@ source:
   - url: "https://pypi.org/packages/source/n/numpy/numpy-${{ version }}.tar.gz"
     sha256: c4ab7c9711fe6b235e86487ca74c1b092a6dd59a3cb45b63241ea0a148501853
 build:
-  script: "${{ PYTHON }} -m pip install ."
+  script: "${{ PYTHON }} -m pip install --no-deps ."
   python:
     entry_points:
       - "f2py = numpy.f2py.f2py2e:main"

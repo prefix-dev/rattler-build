@@ -425,7 +425,7 @@ pub async fn create_recipe(
 
     recipe.tests.push(Test::Python(PythonTest {
         python: PythonTestInner {
-            imports: vec![metadata.info.name.clone()],
+            imports: vec![metadata.info.name.clone().replace('-', '_')],
             pip_check: true,
         },
     }));
