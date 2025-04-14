@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-struct Dll {
+pub struct Dll {
     /// Path to the DLL
     path: PathBuf,
     /// Libraries that this DLL depends on
@@ -24,7 +24,7 @@ struct Dll {
 }
 
 /// List of System DLLs that are allowed to be linked against.
-const WIN_ALLOWLIST: &[&str] = &[
+pub const WIN_ALLOWLIST: &[&str] = &[
     "ADVAPI32.dll",
     "bcrypt.dll",
     "COMCTL32.dll",
@@ -89,6 +89,14 @@ impl Relinker for Dll {
     ) -> HashMap<PathBuf, Option<PathBuf>> {
         let mut result = HashMap::new();
         for lib in &self.libraries {
+            if WIN_ALLOWLIST.iter().any(|&sys_dll| {
+                lib.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
+                    .unwrap_or(false)
+            }) {
+                continue;
+            }
             result.insert(lib.clone(), Some(lib.clone()));
         }
         result
@@ -108,5 +116,103 @@ impl Relinker for Dll {
     ) -> Result<(), crate::post_process::relink::RelinkError> {
         // On Windows, we don't need to relink anything
         Ok(())
+    }
+}
+
+#[cfg(test)]
+#[cfg(target_os = "windows")]
+mod tests {
+    use super::*;
+    use fs_err as fs;
+    use std::io::Write;
+    use std::path::Path;
+
+    const TEST_DLL_DIR: &str = "test-data/binary_files/windows/zstd/Library/bin";
+
+    #[test]
+    fn test_dll_detection() -> Result<(), RelinkError> {
+        let dll_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(TEST_DLL_DIR)
+            .join("libzstd.dll");
+        assert!(Dll::test_file(&dll_path)?);
+
+        let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files/windows");
+        fs::create_dir_all(&prefix)?;
+        let invalid_file = prefix.join("invalid.dll");
+        let mut file = File::create(&invalid_file)?;
+        file.write_all(&[0x00, 0x00])?;
+        assert!(!Dll::test_file(&invalid_file)?);
+        fs::remove_file(&invalid_file)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dll_dependencies() -> Result<(), RelinkError> {
+        let dll_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(TEST_DLL_DIR)
+            .join("libzstd.dll");
+        let dll = Dll::new(&dll_path)?;
+
+        let libraries = dll.libraries();
+
+        assert!(!libraries.is_empty(), "Expected DLL to have dependencies");
+
+        let has_kernel32 = libraries.iter().any(|lib| {
+            lib.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
+                .unwrap_or(false)
+        });
+        assert!(has_kernel32, "Expected KERNEL32.dll dependency");
+
+        let resolved = dll.resolve_libraries(&dll_path, &dll_path);
+        assert!(
+            !resolved.iter().any(|(lib, _)| lib
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.eq_ignore_ascii_case("KERNEL32.dll"))
+                .unwrap_or(false)),
+            "System DLLs should be filtered out during resolution"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_system_dll_filtering() {
+        let test_dlls = vec![
+            "KERNEL32.dll",
+            "kernel32.dll",
+            "C:\\Windows\\System32\\KERNEL32.dll",
+            "D:\\Some\\Path\\kernel32.dll",
+            "custom.dll",
+            "myapp.dll",
+        ];
+
+        for dll in test_dlls {
+            let path = PathBuf::from(dll);
+            let is_system = WIN_ALLOWLIST.iter().any(|&sys_dll| {
+                path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.eq_ignore_ascii_case(sys_dll))
+                    .unwrap_or(false)
+            });
+
+            match dll.to_lowercase().as_str() {
+                "kernel32.dll"
+                | "c:\\windows\\system32\\kernel32.dll"
+                | "d:\\some\\path\\kernel32.dll" => {
+                    assert!(is_system, "Expected {} to be identified as system DLL", dll);
+                }
+                _ => {
+                    assert!(
+                        !is_system,
+                        "Expected {} to NOT be identified as system DLL",
+                        dll
+                    );
+                }
+            }
+        }
     }
 }
