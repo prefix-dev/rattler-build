@@ -1,6 +1,6 @@
 # System Integration for Packages
 
-Packages provide software designed for diffent uses.
+Packages provide software designed for different uses.
 Each of these types may be used to satisfy broad use-cases.
 As such each use benefits from specific actions.
 
