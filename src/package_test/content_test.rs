@@ -69,6 +69,11 @@ impl PackageContentsTest {
                     .add(build_glob(format!("Scripts/{bin_raw}{path_ext}"))?)
                     .add(build_glob(format!("bin/{bin_raw}{path_ext}"))?)
                     .build()
+            } else if matches!(target_platform, &Platform::EmscriptenWasm32) {
+                // emscripten build outputs will gonna get .js extension
+                GlobSet::builder()
+                    .add(build_glob(format!("bin/{bin_raw}.js"))?)
+                    .build()
             } else {
                 GlobSet::builder()
                     .add(Glob::new(&format!("bin/{bin_raw}"))?)
@@ -389,6 +394,24 @@ mod tests {
 
         let paths = &["lib/foo".to_string(), "asd/bar".to_string()];
         test_glob_matches(&globs, paths).unwrap_err();
+    }
+
+    #[test]
+    fn test_wasm_bin_globs() {
+        let package_contents = PackageContentsTest {
+            bin: GlobVec::from_vec(vec!["foo", "bar"], None),
+            ..Default::default()
+        };
+
+        let globs = package_contents
+            .bin_as_globs(&Platform::EmscriptenWasm32)
+            .unwrap();
+
+        let paths = &["bin/foo.js".to_string(), "bin/bar.js".to_string()];
+        test_glob_matches(&globs, paths).unwrap();
+
+        let bad_paths = &["bin/foo".to_string(), "bin/bar".to_string()];
+        test_glob_matches(&globs, bad_paths).unwrap_err();
     }
 
     #[derive(Debug, Deserialize)]
