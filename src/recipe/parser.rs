@@ -148,6 +148,14 @@ impl Recipe {
         v: &Node,
         jinja: &Jinja,
     ) -> Result<Option<Variable>, Vec<PartialParsingError>> {
+        if k.as_str().contains('-') {
+            return Err(vec![_partialerror!(
+                *k.span(),
+                ErrorKind::InvalidContextVariableName,
+                help = "`context` variable names cannot contain hyphens (-) as they are not valid in jinja expressions"
+            )]);
+        }
+
         let val = v.as_scalar().ok_or_else(|| {
             vec![_partialerror!(
                 *v.span(),
@@ -494,6 +502,22 @@ mod tests {
                 ..SelectorConfig::default()
             },
         );
+        let err: ParseErrors<_> = recipe.unwrap_err().into();
+        assert_miette_snapshot!(err);
+    }
+
+    #[test]
+    fn context_variable_with_hyphen() {
+        let raw_recipe = r#"
+        context:
+          foo-bar: baz
+
+        package:
+            name: test
+            version: 0.1.0
+        "#;
+
+        let recipe = Recipe::from_yaml(raw_recipe, SelectorConfig::default());
         let err: ParseErrors<_> = recipe.unwrap_err().into();
         assert_miette_snapshot!(err);
     }

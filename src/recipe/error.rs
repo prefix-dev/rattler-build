@@ -168,6 +168,10 @@ pub enum ErrorKind {
     #[diagnostic(code(error::sequence_mixed_types))]
     SequenceMixedTypes((ValueKind, ValueKind)),
 
+    /// Error when a context variable name contains a hyphen.
+    #[diagnostic(code(error::invalid_context_variable_name))]
+    InvalidContextVariableName,
+
     /// Generic unspecified error. If this is returned, the call site should
     /// be annotated with context, if possible.
     #[diagnostic(code(error::other))]
@@ -287,6 +291,7 @@ impl fmt::Display for ErrorKind {
             ),
             ErrorKind::Other => write!(f, "an unspecified error occurred."),
             ErrorKind::ExperimentalOnly(s) => write!(f, "experimental only: `{}`.", s),
+            ErrorKind::InvalidContextVariableName => write!(f, "invalid context variable name."),
         }
     }
 }
