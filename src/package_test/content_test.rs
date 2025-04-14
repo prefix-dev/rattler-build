@@ -73,6 +73,7 @@ impl PackageContentsTest {
                 // emscripten build outputs will gonna get .js extension
                 GlobSet::builder()
                     .add(build_glob(format!("bin/{bin_raw}.js"))?)
+                    .add(build_glob(format!("bin/{bin_raw}.wasm"))?)
                     .build()
             } else {
                 GlobSet::builder()
@@ -407,7 +408,12 @@ mod tests {
             .bin_as_globs(&Platform::EmscriptenWasm32)
             .unwrap();
 
-        let paths = &["bin/foo.js".to_string(), "bin/bar.js".to_string()];
+        let paths = &[
+            "bin/foo.js".to_string(),
+            "bin/bar.js".to_string(),
+            "bin/foo.wasm".to_string(),
+            "bin/bar.wasm".to_string(),
+        ];
         test_glob_matches(&globs, paths).unwrap();
 
         let bad_paths = &["bin/foo".to_string(), "bin/bar".to_string()];
