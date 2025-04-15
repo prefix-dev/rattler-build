@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 prefix = Path(os.environ["PREFIX"])
@@ -13,5 +14,8 @@ file_2 = (
 )
 file_2.write_text(file_2.name)
 
-file_3 = prefix / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
-file_3.write_text(file_3.name)
+# we dont really need to test file path length on windows, windows just auto blocks it system-wide
+# so it produces false negatives
+if sys.platform != "win32":
+    file_3 = prefix / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+    file_3.write_text(file_3.name)

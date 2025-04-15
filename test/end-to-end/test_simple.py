@@ -463,8 +463,10 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     assert file_2.read_text() == file_2.name
 
     # limit on Windows is 260 chars
-    file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
-    assert file_3.read_text() == file_3.name
+    # Only check file_3 on non-Windows platforms
+    if platform.system() != "Windows":
+        file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+        assert file_3.read_text() == file_3.name
 
 
 def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1455,27 +1457,18 @@ def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path
     text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
     rendered_recipe = yaml.safe_load(text)
 
-    if platform.system() != "Windows":
-        assert "tests" in rendered_recipe
-        tests = rendered_recipe["tests"]
-        assert len(tests) == 1
+    assert "tests" in rendered_recipe["recipe"]
+    tests = rendered_recipe["recipe"]["tests"]
+    assert len(tests) == 1
+    test = tests[0]
 
-        test = tests[0]
-        assert test.get("requirements", {}).get("run") == ["bzip2"]
+    run_reqs = test.get("requirements", {}).get("run", [])
+    assert run_reqs == ["bzip2"]
 
-        assert "script" in test
-        script = test["script"]
+    script = test.get("script", [])
+    if platform.system() == "Windows":
+        assert not script or script == []
+    else:
         assert len(script) == 2
         assert script[0] == 'echo "This is a Unix test"'
         assert script[1] == 'test "1" = "1"'
-    else:
-        if "tests" in rendered_recipe:
-            tests = rendered_recipe["tests"]
-            assert len(tests) == 1
-            test = tests[0]
-            assert test.get("requirements", {}).get("run") == ["bzip2"]
-            assert "script" in test
-            script = test["script"]
-            assert not script or script == []
-        else:
-            pass

@@ -248,26 +248,33 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     test = TestType::Python{ python };
                 }
                 "script" | "requirements" | "files"  => {
-                    let commands = self.try_convert(key_str);
-                    match commands {
-                        Ok(commands) => test = TestType::Command(commands),
-                        Err(errs) => {
-                            let is_empty_conditional = errs.iter().all(|e| {
-                                match e.kind {
-                                    ErrorKind::MissingField(ref field) => field == "script",
-                                    ErrorKind::ExpectedSequence => {
-                                        e.label.as_ref().map(|l| l.contains("script")).unwrap_or(false)
-                                    },
-                                    _ => false
-                                }
-                            });
-
-                            if is_empty_conditional {
-                                test = TestType::Command(Default::default());
-                            } else {
-                                return Err(errs);
-                            }
+                    let mut commands = CommandsTest::default();
+                    let mut has_script = false;
+                    let mut had_empty_conditional = false;
+                    if let Some(req_node) = self.get("requirements") {
+                        commands.requirements = req_node.try_convert("requirements")?;
+                    }
+                    if let Some(files_node) = self.get("files") {
+                        commands.files = files_node.try_convert("files")?;
+                    }
+                    if let Some(script_node) = self.get("script") {
+                        match script_node.try_convert("script") {
+                            Ok(script) => {
+                                commands.script = script;
+                                has_script = true;
+                            },
+                            Err(errs) if errs.iter().all(|e| match e.kind {
+                                ErrorKind::MissingField(ref field) => field == "script",
+                                ErrorKind::ExpectedSequence => e.label.as_ref().map_or(false, |l| l.contains("script")),
+                                _ => false
+                            }) => {
+                                had_empty_conditional = true;
+                            },
+                            Err(errs) => return Err(errs),
                         }
+                    }
+                    if has_script || !commands.requirements.is_empty() || !commands.files.is_empty() || had_empty_conditional {
+                        test = TestType::Command(commands);
                     }
                 }
                 "downstream" => {

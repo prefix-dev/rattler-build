@@ -20,7 +20,12 @@ tests:
       files:
         - files/File(Glob …).tmSnippet
         - files/a $random_crazy file name with spaces and (parentheses).txt
-        - files/a_really_long_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt
+  # same reason here, windows if not specially configured to allow it, it will just block it system-wide
+  - if: unix
+    then:
+      package_contents:
+        files:
+          - files/a_really_long_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt
   - script:
       - if: unix
         then:
@@ -31,4 +36,3 @@ tests:
         then:
           - if not exist "%PREFIX%\files\File(Glob …).tmSnippet" exit 1
           - if not exist "%PREFIX%\files\a $random_crazy file name with spaces and (parentheses).txt" exit 1
-          - if not exist "%PREFIX%\files\a_really_long_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.txt" exit 1
