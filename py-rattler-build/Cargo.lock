@@ -3046,7 +3046,7 @@ dependencies = [
 
 [[package]]
 name = "py-rattler-build"
-version = "0.39.0"
+version = "0.40.0"
 dependencies = [
  "clap",
  "pyo3",
@@ -3331,7 +3331,7 @@ dependencies = [
 
 [[package]]
 name = "rattler-build"
-version = "0.39.0"
+version = "0.40.0"
 dependencies = [
  "anyhow",
  "async-once-cell",
