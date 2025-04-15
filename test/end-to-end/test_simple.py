@@ -1466,8 +1466,8 @@ def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path
         assert "script" in test
         script = test["script"]
         assert len(script) == 2
-        assert script[0] == "test -f ${PREFIX}/fonts/Inconsolata-Regular.ttf"
-        assert script[1] == "test -f ${PREFIX}/fonts/Inconsolata-Bold.ttf"
+        assert script[0] == 'echo "This is a Unix test"'
+        assert script[1] == 'test "1" = "1"'
     else:
         if "tests" in rendered_recipe:
             tests = rendered_recipe["tests"]
