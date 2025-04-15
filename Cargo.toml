@@ -53,14 +53,14 @@ required-features = ["recipe-generation"]
 serde = { version = "1.0.219", features = ["derive"] }
 serde_yaml = "0.9.34"
 serde-untagged = "0.1.7"
-anyhow = "1.0.97"
+anyhow = "1.0.98"
 walkdir = "2.5.0"
 hex = "0.4.3"
 serde_json = "1.0.140"
 reqwest = { version = "0.12.15", default-features = false, features = [
   "multipart",
 ] }
-tokio = { version = "1.44.0", features = [
+tokio = { version = "1.44.2", features = [
   "rt",
   "macros",
   "rt-multi-thread",
@@ -71,8 +71,8 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.32", features = ["derive", "env", "cargo"] }
-minijinja = { version = "2.8.0", features = [
+clap = { version = "4.5.36", features = ["derive", "env", "cargo"] }
+minijinja = { version = "2.9.0", features = [
   "unstable_machinery",
   "custom_syntax",
 ] }
@@ -93,7 +93,7 @@ futures = "0.3.31"
 indicatif = "0.17.11"
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 thiserror = "2.0.12"
-tempfile = "3.18.0"
+tempfile = "3.19.1"
 chrono = "0.4.40"
 sha1 = "0.10.6"
 spdx = "0.10.8"
@@ -101,14 +101,14 @@ ignore = "0.4.23"
 globset = "0.4.16"
 clap-verbosity-flag = "3.0.2"
 tracing-core = "0.1.33"
-petgraph = "0.7.1"
-indexmap = "2.8.0"
+petgraph = "0.8.1"
+indexmap = "2.9.0"
 dunce = "1.0.5"
 fs-err = "3.1.0"
-which = "7.0.2"
-clap_complete = "4.5.46"
+which = "7.0.3"
+clap_complete = "4.5.47"
 clap_complete_nushell = "4.5.5"
-tokio-util = "0.7.13"
+tokio-util = "0.7.14"
 
 tar = "0.4.44"
 zip = { version = "2.6.1", default-features = false, features = [
@@ -117,26 +117,26 @@ zip = { version = "2.6.1", default-features = false, features = [
 ] }
 bzip2 = "0.5.2"
 base64 = "0.22.1"
-flate2 = "1.1.0"
+flate2 = "1.1.1"
 xz2 = "0.1.7"
 zstd = "0.13.3"
 toml = "0.8.20"
 memmap2 = "0.9.5"
-reqwest-middleware = { version = "0.4.1", features = ["json"] }
+reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = "0.5.4"
 terminal_size = "0.4.2"
 memchr = "2.7.4"
 ratatui = { version = "0.29.0", optional = true }
-crossterm = { version = "0.28.1", features = ["event-stream"], optional = true }
+crossterm = { version = "0.29.0", features = ["event-stream"], optional = true }
 ansi-to-tui = { version = "7.0.0", optional = true }
 throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.11.1", optional = true }
-reflink-copy = "0.1.25"
+reflink-copy = "0.1.26"
 rayon = "1.10.0"
 patch = "0.7.0"
 regex = "1.11.1"
 async-recursion = "1.1.1"
-opendal = { version = "0.51.2", default-features = false, features = [
+opendal = { version = "0.53.0", default-features = false, features = [
   "services-s3",
 ] }
 
@@ -145,32 +145,32 @@ rattler = { version = "0.33.5", default-features = false, features = [
   "cli-tools",
   "indicatif",
 ] }
-rattler_cache = { version = "0.3.16", default-features = false }
+rattler_cache = { version = "0.3.17", default-features = false }
 rattler_conda_types = { version = "0.32.0", default-features = false, features = [
   "rayon",
 ] }
-rattler_digest = { version = "1.1.0", default-features = false, features = [
+rattler_digest = { version = "1.1.1", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.22.3", default-features = false }
-rattler_networking = { version = "0.22.11", default-features = false }
-rattler_redaction = { version = "0.1.9" }
-rattler_repodata_gateway = { version = "0.22.4", default-features = false, features = [
+rattler_index = { version = "0.22.4", default-features = false }
+rattler_networking = { version = "0.22.12", default-features = false }
+rattler_redaction = { version = "0.1.10" }
+rattler_repodata_gateway = { version = "0.22.5", default-features = false, features = [
   "gateway",
 ] }
-rattler_sandbox = { version = "0.1.6", default-features = false, features = [
+rattler_sandbox = { version = "0.1.7", default-features = false, features = [
   "tokio",
 ] }
-rattler_shell = { version = "0.22.25", default-features = false, features = [
+rattler_shell = { version = "0.22.26", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.4.3", default-features = false, features = [
+rattler_solve = { version = "1.4.4", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
-rattler_virtual_packages = { version = "2.0.9", default-features = false }
-rattler_package_streaming = { version = "0.22.35", default-features = false }
-rattler_menuinst = "0.2.6"
+rattler_virtual_packages = { version = "2.0.10", default-features = false }
+rattler_package_streaming = { version = "0.22.36", default-features = false }
+rattler_menuinst = "0.2.7"
 lazy_static = "1.5.0"
 reqwest-retry = "0.7.0"
 retry-policies = "0.4.0"
