@@ -248,8 +248,27 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     test = TestType::Python{ python };
                 }
                 "script" | "requirements" | "files"  => {
-                    let commands = self.try_convert(key_str)?;
-                    test = TestType::Command(commands);
+                    let commands = self.try_convert(key_str);
+                    match commands {
+                        Ok(commands) => test = TestType::Command(commands),
+                        Err(errs) => {
+                            let is_empty_conditional = errs.iter().all(|e| {
+                                match e.kind {
+                                    ErrorKind::MissingField(ref field) => field == "script",
+                                    ErrorKind::ExpectedSequence => {
+                                        e.label.as_ref().map(|l| l.contains("script")).unwrap_or(false)
+                                    },
+                                    _ => false
+                                }
+                            });
+
+                            if is_empty_conditional {
+                                test = TestType::Command(Default::default());
+                            } else {
+                                return Err(errs);
+                            }
+                        }
+                    }
                 }
                 "downstream" => {
                     let downstream = self.try_convert(key_str)?;

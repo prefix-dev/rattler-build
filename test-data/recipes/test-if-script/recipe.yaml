@@ -1,0 +1,14 @@
+package:
+  name: test-if-script
+  version: 0.1.0
+
+tests:
+  - requirements:
+      run:
+        - bzip2
+    script:
+      - if: unix
+        then: 
+          - test -f ${PREFIX}/fonts/Inconsolata-Regular.ttf
+          - test -f ${PREFIX}/fonts/Inconsolata-Bold.ttf
+ 

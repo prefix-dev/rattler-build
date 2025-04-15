@@ -1444,3 +1444,38 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"][
         "from_package"
     ] == [expected_compiler]
+
+
+def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "test-if-script", tmp_path)
+
+    pkg = get_extracted_package(tmp_path, "test-if-script")
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+
+    text = (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    rendered_recipe = yaml.safe_load(text)
+
+    if platform.system() != "Windows":
+        assert "tests" in rendered_recipe
+        tests = rendered_recipe["tests"]
+        assert len(tests) == 1
+
+        test = tests[0]
+        assert test.get("requirements", {}).get("run") == ["bzip2"]
+
+        assert "script" in test
+        script = test["script"]
+        assert len(script) == 2
+        assert script[0] == "test -f ${PREFIX}/fonts/Inconsolata-Regular.ttf"
+        assert script[1] == "test -f ${PREFIX}/fonts/Inconsolata-Bold.ttf"
+    else:
+        if "tests" in rendered_recipe:
+            tests = rendered_recipe["tests"]
+            assert len(tests) == 1
+            test = tests[0]
+            assert test.get("requirements", {}).get("run") == ["bzip2"]
+            assert "script" in test
+            script = test["script"]
+            assert not script or script == []
+        else:
+            pass
