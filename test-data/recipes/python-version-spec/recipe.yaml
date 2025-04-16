@@ -1,0 +1,17 @@
+package:
+  name: test
+  version: 0.1.0
+
+build:
+  script:
+    - echo "test" > test.txt
+
+requirements:
+  build:
+    - python
+
+tests:
+  - python:
+      imports:
+        - time
+      python_version: "=.*"
