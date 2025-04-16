@@ -549,11 +549,11 @@ mod test {
           - python:
               imports:
                 - pandas
-              python_version: "3.10"
+              python_version: ">=3.10"
           - python:
               imports:
                 - pandas
-              python_version: ["3.10", "3.12"]
+              python_version: [">=3.10", ">=3.12"]
         "#;
 
         // parse the YAML
@@ -576,7 +576,7 @@ mod test {
                 assert!(python.pip_check);
                 assert_eq!(
                     python.python_version,
-                    PythonVersion::Single("3.10".to_string())
+                    PythonVersion::Single(">=3.10".to_string())
                 );
             }
             _ => panic!("expected python test"),
@@ -590,7 +590,7 @@ mod test {
                 assert!(python.pip_check);
                 assert_eq!(
                     python.python_version,
-                    PythonVersion::Multiple(vec!["3.10".to_string(), "3.12".to_string()])
+                    PythonVersion::Multiple(vec![">=3.10".to_string(), ">=3.12".to_string()])
                 );
             }
             _ => panic!("expected python test"),
