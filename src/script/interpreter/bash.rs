@@ -12,7 +12,8 @@ const BASH_PREAMBLE: &str = r#"#!/bin/bash
 if [ -z ${CONDA_BUILD+x} ]; then
     source ((script_path))
 fi
-# enable debug mode for the rest of the script
+# enable debug mode but redirect its output (fd 2) to stderr
+exec {BASH_XTRACEFD}>&2
 set -x
 ## End of preamble
 "#;
