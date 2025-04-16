@@ -352,6 +352,9 @@ pub struct BuildConfiguration {
     /// The configuration for the sandbox
     #[serde(skip_serializing, default)]
     pub sandbox_config: Option<SandboxConfiguration>,
+    /// Whether to enable debug output in build scripts
+    #[serde(skip_serializing, default)]
+    pub debug: bool,
 }
 
 impl BuildConfiguration {

@@ -10,8 +10,8 @@ use miette::IntoDiagnostic;
 use rattler_build::{
     build_recipes,
     console_utils::init_logging,
-    get_recipe_path,
-    opt::{App, BuildData, ShellCompletion, SubCommands},
+    debug_recipe, get_recipe_path,
+    opt::{App, BuildData, DebugData, ShellCompletion, SubCommands},
     rebuild, run_test, upload_from_args,
 };
 use tempfile::{tempdir, TempDir};
@@ -136,6 +136,11 @@ async fn async_main() -> miette::Result<()> {
             rattler_build::recipe_generator::generate_recipe(args).await
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
+        Some(SubCommands::Debug(opts)) => {
+            let debug_data = DebugData::from(opts);
+            debug_recipe(debug_data, &log_handler).await?;
+            Ok(())
+        }
         None => {
             _ = App::command().print_long_help();
             Ok(())

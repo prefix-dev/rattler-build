@@ -52,6 +52,9 @@ pub struct ExecutionArgs {
 
     /// The sandbox configuration to use for the script execution
     pub sandbox_config: Option<SandboxConfiguration>,
+
+    /// Whether to enable debug output
+    pub debug: bool,
 }
 
 impl ExecutionArgs {
@@ -233,6 +236,7 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         mut jinja_config: Option<Jinja>,
         sandbox_config: Option<&SandboxConfiguration>,
+        debug: bool,
     ) -> Result<(), std::io::Error> {
         // TODO: This is a bit of an out and about way to determine whether or
         //  not nushell is available. It would be best to run the activation
@@ -326,6 +330,7 @@ impl Script {
             execution_platform: Platform::current(),
             work_dir,
             sandbox_config: sandbox_config.cloned(),
+            debug,
         };
 
         match interpreter {
@@ -402,6 +407,7 @@ impl Output {
                 build_prefix,
                 Some(jinja),
                 self.build_configuration.sandbox_config(),
+                self.build_configuration.debug,
             )
             .await?;
 
