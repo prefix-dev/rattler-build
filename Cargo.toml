@@ -141,6 +141,7 @@ opendal = { version = "0.53.0", default-features = false, features = [
 ] }
 
 # Rattler crates
+pixi_config = { git = "https://github.com/pavelzw/pixi", branch = "pixi-config-improvements" }
 rattler = { version = "0.33.5", default-features = false, features = [
   "cli-tools",
   "indicatif",

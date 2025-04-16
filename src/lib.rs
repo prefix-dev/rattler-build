@@ -307,7 +307,7 @@ pub async fn get_build_output(
             .channels
             .clone()
             .into_iter()
-            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .map(|c| c.into_base_url(&tool_config.channel_config))
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
