@@ -16,6 +16,7 @@ use rattler_build::{
     rebuild, run_test, upload_from_args,
 };
 use tempfile::{tempdir, TempDir};
+use tokio::fs::read_to_string;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -96,7 +97,7 @@ async fn async_main() -> miette::Result<()> {
             let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
             let config = if let Some(config_path) = app.config_file {
-                let config_str = std::fs::read_to_string(config_path.clone()).into_diagnostic()?;
+                let config_str = read_to_string(&config_path).await.into_diagnostic()?;
                 let (config, _unused_keys) =
                     Config::from_toml(config_str.as_str(), Some(&config_path.clone())).unwrap();
                 Some(config)
