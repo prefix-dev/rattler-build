@@ -3779,6 +3779,7 @@ name = "py-rattler-build"
 version = "0.40.0"
 dependencies = [
  "clap",
+ "pixi_config",
  "pyo3",
  "pyo3-build-config",
  "rattler-build",

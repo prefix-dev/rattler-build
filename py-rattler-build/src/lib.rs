@@ -4,16 +4,17 @@ use ::rattler_build::{
     build_recipes, get_rattler_build_version,
     opt::{
         AnacondaData, ArtifactoryData, BuildData, ChannelPriorityWrapper, CommonData,
-        CondaForgeData, PackageFormatAndCompression, PrefixData, QuetzData, TestData,
+        CondaForgeData, PrefixData, QuetzData, TestData,
     },
     run_test,
     tool_configuration::{self, SkipExisting, TestStrategy},
     upload,
 };
 use clap::ValueEnum;
+use pixi_config::PackageFormatAndCompression;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
-use rattler_conda_types::Platform;
+use rattler_conda_types::{NamedChannelOrUrl, Platform};
 use url::Url;
 
 // Bind the get version function to the Python module
@@ -81,6 +82,18 @@ fn build_recipes_py(
         .map(|p| Platform::from_str(&p))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    let channel = match channel {
+        None => None,
+        Some(channel) => Some(
+            channel
+                .iter()
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+                })
+                .collect::<PyResult<_>>()?,
+        ),
+    };
 
     let build_data = BuildData::new(
         up_to,
