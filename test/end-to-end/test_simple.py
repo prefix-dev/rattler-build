@@ -1456,8 +1456,6 @@ def test_python_version_spec(
         rattler_build(*args, stderr=STDOUT)
 
     error_output = exc_info.value.output.decode("utf-8")
-    assert "invalid python version specification: =.*" in error_output
     assert (
-        "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
-        in error_output
+        "failed to parse match spec: unable to parse version spec: =.*" in error_output
     )

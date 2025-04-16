@@ -6,7 +6,8 @@ use crate::{
     _partialerror,
     recipe::{
         custom_yaml::{
-            HasSpan, RenderedMappingNode, RenderedNode, RenderedSequenceNode, TryConvertNode,
+            HasSpan, RenderedMappingNode, RenderedNode, RenderedScalarNode, RenderedSequenceNode,
+            TryConvertNode,
         },
         error::{ErrorKind, PartialParsingError},
     },
@@ -14,6 +15,7 @@ use crate::{
 };
 
 use super::{glob_vec::GlobVec, FlattenErrors, Script};
+use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -298,47 +300,32 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
 }
 
 impl TryConvertNode<PythonVersion> for RenderedNode {
-    fn try_convert(&self, _name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
+    fn try_convert(&self, name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
         let python_version = match self {
             RenderedNode::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::InvalidField("expected string, sequence or null".into()),
             )])?,
             RenderedNode::Scalar(version) => {
-                let version_str = version.to_string();
-                if rattler_conda_types::MatchSpec::from_str(&version_str, rattler_conda_types::ParseStrictness::Strict).is_err() {
-                    return Err(vec![_partialerror!(
-                        *self.span(),
-                        ErrorKind::InvalidValue(("python_version".to_string(), "Invalid version specification".into())),
-                        label = format!("invalid python version specification: {}", version_str),
-                        help = "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
-                    )]);
-                }
-                PythonVersion::Single(version_str)
-            },
-            RenderedNode::Sequence(versions) => versions
-                .iter()
-                .map(|v| {
-                    let scalar = v.as_scalar()
-                        .ok_or_else(|| {
+                let _: NamelessMatchSpec = version.try_convert(name)?;
+                PythonVersion::Single(version.to_string())
+            }
+            RenderedNode::Sequence(versions) => {
+                let version_strings = versions
+                    .iter()
+                    .map(|v| {
+                        let scalar = v.as_scalar().ok_or_else(|| {
                             vec![_partialerror!(
                                 *self.span(),
                                 ErrorKind::InvalidField("invalid value".into()),
                             )]
                         })?;
-                    let version_str = scalar.to_string();
-                    if rattler_conda_types::MatchSpec::from_str(&version_str, rattler_conda_types::ParseStrictness::Strict).is_err() {
-                        return Err(vec![_partialerror!(
-                            *v.span(),
-                            ErrorKind::InvalidValue(("python_version".to_string(), "Invalid version specification".into())),
-                            label = format!("invalid python version specification: {}", version_str),
-                            help = "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
-                        )]);
-                    }
-                    Ok(version_str)
-                })
-                .collect::<Result<Vec<String>, _>>()
-                .map(PythonVersion::Multiple)?,
+                        let _: NamelessMatchSpec = scalar.try_convert(name)?;
+                        Ok::<String, Vec<PartialParsingError>>(scalar.to_string())
+                    })
+                    .collect::<Result<Vec<String>, _>>()?;
+                PythonVersion::Multiple(version_strings)
+            }
             RenderedNode::Null(_) => PythonVersion::None,
         };
 
@@ -456,6 +443,38 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
             include
         );
         Ok(package_contents)
+    }
+}
+
+///////////////////////////
+/// Python Version     ///
+///////////////////////////
+impl TryConvertNode<NamelessMatchSpec> for RenderedScalarNode {
+    fn try_convert(&self, _name: &str) -> Result<NamelessMatchSpec, Vec<PartialParsingError>> {
+        NamelessMatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {
+            vec![_partialerror!(
+                *self.span(),
+                ErrorKind::from(err),
+                label = format!(
+                    "error parsing `{}` as a version specification",
+                    self.as_str()
+                )
+            )]
+        })
+    }
+}
+
+impl TryConvertNode<NamelessMatchSpec> for RenderedNode {
+    fn try_convert(&self, name: &str) -> Result<NamelessMatchSpec, Vec<PartialParsingError>> {
+        self.as_scalar()
+            .ok_or_else(|| {
+                vec![_partialerror!(
+                    *self.span(),
+                    ErrorKind::ExpectedScalar,
+                    label = format!("expected a string value for `{name}`")
+                )]
+            })
+            .and_then(|s| s.try_convert(name))
     }
 }
 
