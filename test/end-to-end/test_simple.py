@@ -1384,8 +1384,10 @@ def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     text = (recipes / "abi3" / "recipe.yaml").read_text()
-    # variants = recipes / "abi3" / "variants.yaml" "-m", variants
-    rendered = rattler_build("build", "--render-only", input=text, text=True)
+    # variants = recipes / "abi3" / "variants.yaml" "-m", variants (without '--recipe' it will pick up the recipe from root folder)
+    rendered = rattler_build(
+        "build", "--recipe", "-", "--render-only", input=text, text=True
+    )
     loaded = json.loads(rendered)
 
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"
@@ -1444,3 +1446,18 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"][
         "from_package"
     ] == [expected_compiler]
+
+
+def test_python_version_spec(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    with pytest.raises(CalledProcessError) as exc_info:
+        args = rattler_build.build_args(recipes / "python-version-spec", tmp_path)
+        rattler_build(*args, stderr=STDOUT)
+
+    error_output = exc_info.value.output.decode("utf-8")
+    assert "invalid python version specification: =.*" in error_output
+    assert (
+        "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
+        in error_output
+    )

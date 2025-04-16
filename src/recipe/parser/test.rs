@@ -304,18 +304,38 @@ impl TryConvertNode<PythonVersion> for RenderedNode {
                 *self.span(),
                 ErrorKind::InvalidField("expected string, sequence or null".into()),
             )])?,
-            RenderedNode::Scalar(version) => PythonVersion::Single(version.to_string()),
+            RenderedNode::Scalar(version) => {
+                let version_str = version.to_string();
+                if rattler_conda_types::MatchSpec::from_str(&version_str, rattler_conda_types::ParseStrictness::Strict).is_err() {
+                    return Err(vec![_partialerror!(
+                        *self.span(),
+                        ErrorKind::InvalidValue(("python_version".to_string(), "Invalid version specification".into())),
+                        label = format!("invalid python version specification: {}", version_str),
+                        help = "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
+                    )]);
+                }
+                PythonVersion::Single(version_str)
+            },
             RenderedNode::Sequence(versions) => versions
                 .iter()
                 .map(|v| {
-                    v.as_scalar()
+                    let scalar = v.as_scalar()
                         .ok_or_else(|| {
                             vec![_partialerror!(
                                 *self.span(),
                                 ErrorKind::InvalidField("invalid value".into()),
                             )]
-                        })
-                        .map(|s| s.to_string())
+                        })?;
+                    let version_str = scalar.to_string();
+                    if rattler_conda_types::MatchSpec::from_str(&version_str, rattler_conda_types::ParseStrictness::Strict).is_err() {
+                        return Err(vec![_partialerror!(
+                            *v.span(),
+                            ErrorKind::InvalidValue(("python_version".to_string(), "Invalid version specification".into())),
+                            label = format!("invalid python version specification: {}", version_str),
+                            help = "Use a valid version specification like '3.12', '3.12.*', or '>=3.12'"
+                        )]);
+                    }
+                    Ok(version_str)
                 })
                 .collect::<Result<Vec<String>, _>>()
                 .map(PythonVersion::Multiple)?,
