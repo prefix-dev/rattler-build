@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use patch::Patch;
+use gitpatch::Patch;
 
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
@@ -81,4 +81,28 @@ pub(crate) fn apply_patches(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gitpatch::Patch;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_guess_strip_level() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patches_dir = manifest_dir.join("test-data/patches");
+
+        // for all patches, just try parsing the patch
+        for entry in patches_dir.read_dir().unwrap() {
+            let patch = entry.unwrap();
+            let patch_path = patch.path();
+            let ps = fs_err::read_to_string(&patch_path).unwrap();
+            let parsed = Patch::from_multiple(&ps);
+
+            println!("Parsing patch: {} {}", patch_path.display(), parsed.is_ok());
+        }
+    }
 }
