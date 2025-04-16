@@ -1,10 +1,8 @@
 use ansi_to_tui::IntoText;
-use crossterm::event::{
-    Event as CrosstermEvent, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
-    MouseEventKind,
-};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use miette::IntoDiagnostic;
 use ratatui::{
+    crossterm::event::Event as CrosstermEvent,
     layout::{Alignment, Position},
     prelude::*,
     style::{Color, Style, Stylize},
