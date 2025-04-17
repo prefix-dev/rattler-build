@@ -87,11 +87,9 @@ pub(crate) fn apply_patches(
 mod tests {
     use super::*;
     use gitpatch::Patch;
-    use std::fs;
-    use tempfile::TempDir;
 
     #[test]
-    fn test_guess_strip_level() {
+    fn test_parse_patch() {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let patches_dir = manifest_dir.join("test-data/patches");
 
@@ -99,6 +97,10 @@ mod tests {
         for entry in patches_dir.read_dir().unwrap() {
             let patch = entry.unwrap();
             let patch_path = patch.path();
+            if patch_path.extension() != Some("patch".as_ref()) {
+                continue;
+            }
+
             let ps = fs_err::read_to_string(&patch_path).unwrap();
             let parsed = Patch::from_multiple(&ps);
 
