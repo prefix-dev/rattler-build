@@ -31,7 +31,7 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
     env_vars,
-    metadata::PlatformWithVirtualPackages,
+    metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
         CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
         TestType,
@@ -135,7 +135,16 @@ impl Tests {
                 })?;
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
+                    .run_script(
+                        env_vars,
+                        tmp_dir.path(),
+                        cwd,
+                        environment,
+                        None,
+                        None,
+                        None,
+                        Debug::new(true),
+                    )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -147,7 +156,16 @@ impl Tests {
                 };
 
                 script
-                    .run_script(env_vars, tmp_dir.path(), cwd, environment, None, None, None)
+                    .run_script(
+                        env_vars,
+                        tmp_dir.path(),
+                        cwd,
+                        environment,
+                        None,
+                        None,
+                        None,
+                        Debug::new(true),
+                    )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
@@ -584,6 +602,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -599,7 +618,16 @@ impl PythonTest {
                 ..Script::default()
             };
             script
-                .run_script(Default::default(), path, path, prefix, None, None, None)
+                .run_script(
+                    Default::default(),
+                    path,
+                    path,
+                    prefix,
+                    None,
+                    None,
+                    None,
+                    Debug::new(true),
+                )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
 
@@ -672,6 +700,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -781,6 +810,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;

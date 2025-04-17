@@ -5,17 +5,7 @@ use rattler_shell::shell;
 
 use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
 
-use super::{find_interpreter, Interpreter};
-
-const BASH_PREAMBLE: &str = r#"#!/bin/bash
-## Start of bash preamble
-if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
-fi
-# enable debug mode for the rest of the script
-set -x
-## End of preamble
-"#;
+use super::{find_interpreter, Interpreter, BASH_PREAMBLE};
 
 pub(crate) struct BashInterpreter;
 
@@ -33,7 +23,11 @@ impl Interpreter for BashInterpreter {
         tokio::fs::write(&build_script_path, script).await?;
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
-        let cmd_args = ["bash", "-e", &build_script_path_str];
+        let mut cmd_args = vec!["bash", "-e"];
+        if args.debug.is_enabled() {
+            cmd_args.push("-x");
+        }
+        cmd_args.push(&build_script_path_str);
 
         let output = run_process_with_replacements(
             &cmd_args,

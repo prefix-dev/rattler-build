@@ -250,6 +250,7 @@ impl Output {
                     build_prefix,
                     Some(jinja),
                     None, // sandbox config
+                    self.build_configuration.debug,
                 )
                 .await
                 .into_diagnostic()?;

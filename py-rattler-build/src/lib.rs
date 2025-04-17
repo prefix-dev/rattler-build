@@ -107,6 +107,7 @@ fn build_recipes_py(
         noarch_build_platform,
         None,
         None,
+        true,
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
