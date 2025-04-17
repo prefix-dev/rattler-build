@@ -155,6 +155,11 @@ Build a package from a recipe
 	Enable experimental features
 
 
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
 - `--channel-priority <CHANNEL_PRIORITY>`
 
 	Channel priority to use when solving
@@ -292,6 +297,11 @@ These test files are written at "package creation time" and are part of the pack
 	Enable experimental features
 
 
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
+
+
 - `--channel-priority <CHANNEL_PRIORITY>`
 
 	Channel priority to use when solving
@@ -333,6 +343,11 @@ Rebuild a package from a package file instead of a recipe
 - `--experimental`
 
 	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
@@ -390,6 +405,11 @@ Upload a package
 - `--experimental`
 
 	Enable experimental features
+
+
+- `--allow-insecure-host <ALLOW_INSECURE_HOST>`
+
+	List of hosts for which SSL certificate verification should be skipped
 
 
 - `--channel-priority <CHANNEL_PRIORITY>`
