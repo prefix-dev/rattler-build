@@ -6,4 +6,4 @@ build:
   script: |
     echo "This is a test script"
     mkdir -p $PREFIX/test
-    echo "Hello from debug test" > $PREFIX/test/hello.txt 
+    echo "Hello from debug test" > $PREFIX/test/hello.txt
