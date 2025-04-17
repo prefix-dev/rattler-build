@@ -1459,3 +1459,16 @@ def test_python_version_spec(
     assert (
         "failed to parse match spec: unable to parse version spec: =.*" in error_output
     )
+
+
+def test_hatch_vcs_versions(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "hatch_vcs/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "hatch-vcs-example")
+
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["version"] == "0.1.0.dev12+ga47bad07"
