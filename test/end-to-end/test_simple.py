@@ -1474,6 +1474,8 @@ def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path
         assert len(script) == 2
         assert script[0] == 'echo "This is a Unix test"'
         assert script[1] == 'test "1" = "1"'
+
+
 def test_python_version_spec(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
