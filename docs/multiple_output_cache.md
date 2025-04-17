@@ -88,58 +88,58 @@ And the corresponding recipe:
 
 ```yaml title="recipe.yaml"
 recipe:
-name: calculator
-version: 1.0.0
+  name: calculator
+  version: 1.0.0
 
 cache:
-source:
-  path: ../
-
-requirements:
-  build:
-    - ${{ compiler('cxx') }}
-    - cmake
-    - ninja
-build:
-  script:
-    # make sure that `alternative_name.md` is not present
-    - test ! -f ./alternative_name.md
-    - mkdir build
-    - cd build
-    - cmake $SRC_DIR -GNinja ${CMAKE_ARGS}
-    - ninja install
-
-outputs:
-# this first output will include all files installed during the cache build
-- package:
-    name: libcalculator
-
-  requirements:
-    run_exports:
-      - ${{ pin_subpackage('libcalculator') }}
-# This output will build the Python bindings using CMake and then create new
-# packages with the Python bindings
-- package:
-    name: py-calculator
   source:
-    - path: ../README.md
-      file_name: alternative_name.md
+    path: ../
 
   requirements:
     build:
       - ${{ compiler('cxx') }}
       - cmake
       - ninja
-    host:
-      - pybind11
-      - python
-      - libcalculator
-
   build:
     script:
-      # assert that the README.md file is present
-      - test -f ./alternative_name.md
+      # make sure that `alternative_name.md` is not present
+      - test ! -f ./alternative_name.md
+      - mkdir build
       - cd build
-      - cmake $SRC_DIR -GNinja ${CMAKE_ARGS} -DBUILD_PYTHON_BINDINGS=ON
+      - cmake $SRC_DIR -GNinja ${CMAKE_ARGS}
       - ninja install
+
+outputs:
+  # this first output will include all files installed during the cache build
+  - package:
+      name: libcalculator
+
+    requirements:
+      run_exports:
+        - ${{ pin_subpackage('libcalculator') }}
+  # This output will build the Python bindings using CMake and then create new
+  # packages with the Python bindings
+  - package:
+      name: py-calculator
+    source:
+      - path: ../README.md
+        file_name: alternative_name.md
+
+    requirements:
+      build:
+        - ${{ compiler('cxx') }}
+        - cmake
+        - ninja
+      host:
+        - pybind11
+        - python
+        - libcalculator
+
+    build:
+      script:
+        # assert that the README.md file is present
+        - test -f ./alternative_name.md
+        - cd build
+        - cmake $SRC_DIR -GNinja ${CMAKE_ARGS} -DBUILD_PYTHON_BINDINGS=ON
+        - ninja install
 ```
