@@ -76,6 +76,7 @@ use system_tools::SystemTools;
 use tool_configuration::{Configuration, SkipExisting, TestStrategy};
 use variant_config::VariantConfig;
 
+use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
 
 /// Returns the recipe path.
@@ -919,7 +920,7 @@ pub async fn debug_recipe(
         channels: debug_data.channels,
         common: debug_data.common,
         keep_build: true,
-        debug: true,
+        debug: Debug::new(true),
         test: TestStrategy::Skip,
         up_to: None,
         variant_config: Vec::new(),

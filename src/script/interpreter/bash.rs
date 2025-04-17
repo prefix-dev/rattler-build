@@ -24,7 +24,7 @@ impl Interpreter for BashInterpreter {
 
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let mut cmd_args = vec!["bash", "-e"];
-        if args.debug {
+        if args.debug.is_enabled() {
             cmd_args.push("-x");
         }
         cmd_args.push(&build_script_path_str);

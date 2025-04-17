@@ -17,6 +17,7 @@ use url::Url;
 use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
+    metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{SkipExisting, TestStrategy},
     url_with_trailing_slash::UrlWithTrailingSlash,
@@ -490,7 +491,7 @@ pub struct BuildData {
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
-    pub debug: bool,
+    pub debug: Debug,
 }
 
 impl BuildData {
@@ -552,7 +553,7 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug,
+            debug: Debug::from(debug),
         }
     }
 }

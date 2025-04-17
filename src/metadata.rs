@@ -311,6 +311,34 @@ impl<'de> Deserialize<'de> for PlatformWithVirtualPackages {
     }
 }
 
+/// A newtype wrapper around a boolean indicating whether debug output is enabled
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Debug(bool);
+
+impl Debug {
+    /// Create a new Debug instance
+    pub fn new(debug: bool) -> Self {
+        Self(debug)
+    }
+
+    /// Returns true if debug output is enabled
+    pub fn is_enabled(&self) -> bool {
+        self.0
+    }
+}
+
+impl From<bool> for Debug {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Debug> for bool {
+    fn from(value: Debug) -> Self {
+        value.0
+    }
+}
+
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {
@@ -354,7 +382,7 @@ pub struct BuildConfiguration {
     pub sandbox_config: Option<SandboxConfiguration>,
     /// Whether to enable debug output in build scripts
     #[serde(skip_serializing, default)]
-    pub debug: bool,
+    pub debug: Debug,
 }
 
 impl BuildConfiguration {

@@ -31,7 +31,7 @@ use rattler_solve::{ChannelPriority, SolveStrategy};
 
 use crate::{
     env_vars,
-    metadata::PlatformWithVirtualPackages,
+    metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
         CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, Script, ScriptContent,
         TestType,
@@ -143,7 +143,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        true,
+                        Debug::from(true),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -164,7 +164,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        true,
+                        Debug::from(true),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -602,7 +602,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
-                true,
+                Debug::from(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -626,7 +626,7 @@ impl PythonTest {
                     None,
                     None,
                     None,
-                    true,
+                    Debug::from(true),
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -700,7 +700,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
-                true,
+                Debug::from(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -810,7 +810,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
-                true,
+                Debug::from(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;

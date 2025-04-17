@@ -24,7 +24,7 @@ use tokio::io::AsyncBufReadExt as _;
 
 use crate::{
     env_vars::{self},
-    metadata::Output,
+    metadata::{Debug, Output},
     recipe::{
         parser::{Script, ScriptContent},
         Jinja,
@@ -56,7 +56,7 @@ pub struct ExecutionArgs {
     pub sandbox_config: Option<SandboxConfiguration>,
 
     /// Whether to enable debug output
-    pub debug: bool,
+    pub debug: Debug,
 }
 
 impl ExecutionArgs {
@@ -238,7 +238,7 @@ impl Script {
         build_prefix: Option<&PathBuf>,
         mut jinja_config: Option<Jinja>,
         sandbox_config: Option<&SandboxConfiguration>,
-        debug: bool,
+        debug: Debug,
     ) -> Result<(), std::io::Error> {
         // TODO: This is a bit of an out and about way to determine whether or
         //  not nushell is available. It would be best to run the activation
@@ -378,11 +378,8 @@ impl Output {
             .collect()
     }
 
-    /// Run the build script for the output as defined in the YAML `build.script`.
-    pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
-        let span = tracing::info_span!("Running build script");
-        let _enter = span.enter();
-
+    /// Helper method to prepare build script execution arguments
+    async fn prepare_build_script(&self) -> Result<ExecutionArgs, std::io::Error> {
         let host_prefix = self.build_configuration.directories.host_prefix.clone();
         let target_platform = self.build_configuration.target_platform;
         let mut env_vars = env_vars::vars(self, "BUILD");
@@ -398,50 +395,11 @@ impl Output {
             Some(&self.build_configuration.directories.build_prefix)
         };
 
-        self.recipe
-            .build()
-            .script()
-            .run_script(
-                env_vars,
-                &self.build_configuration.directories.work_dir,
-                &self.build_configuration.directories.recipe_dir,
-                &self.build_configuration.directories.host_prefix,
-                build_prefix,
-                Some(jinja),
-                self.build_configuration.sandbox_config(),
-                self.build_configuration.debug,
-            )
-            .await?;
-
-        Ok(())
-    }
-
-    /// Create build scripts without running them
-    pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
-        let span = tracing::info_span!("Creating build script");
-        let _enter = span.enter();
-
-        let host_prefix = self.build_configuration.directories.host_prefix.clone();
-        let target_platform = self.build_configuration.target_platform;
-        let mut env_vars = env_vars::vars(self, "BUILD");
-        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
-        env_vars.extend(self.env_vars_from_variant());
-
-        let selector_config = self.build_configuration.selector_config();
-        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
-
-        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
-            None
-        } else {
-            Some(&self.build_configuration.directories.build_prefix)
-        };
-
-        let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
         let work_dir = &self.build_configuration.directories.work_dir;
-        let exec_args = ExecutionArgs {
+        Ok(ExecutionArgs {
             script: self.recipe.build().script().resolve_content(
                 &self.build_configuration.directories.recipe_dir,
-                Some(jinja),
+                Some(jinja.clone()),
                 if cfg!(windows) { &["bat"] } else { &["sh"] },
             )?,
             env_vars: env_vars
@@ -455,7 +413,79 @@ impl Output {
             work_dir: work_dir.clone(),
             sandbox_config: self.build_configuration.sandbox_config().cloned(),
             debug: self.build_configuration.debug,
+        })
+    }
+
+    /// Run the build script for the output as defined in the recipe's build section.
+    ///
+    /// This method executes the build script with the configured environment variables,
+    /// working directory, and other build settings. The script execution respects the
+    /// configured interpreter (bash/cmd/nushell) and sandbox settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `std::io::Error` if:
+    /// - The script file cannot be read or found
+    /// - The script execution fails
+    /// - The interpreter is not supported or not available
+    pub async fn run_build_script(&self) -> Result<(), std::io::Error> {
+        let span = tracing::info_span!("Running build script");
+        let _enter = span.enter();
+
+        let exec_args = self.prepare_build_script().await?;
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+            None
+        } else {
+            Some(&self.build_configuration.directories.build_prefix)
         };
+
+        self.recipe
+            .build()
+            .script()
+            .run_script(
+                exec_args
+                    .env_vars
+                    .into_iter()
+                    .map(|(k, v)| (k, Some(v)))
+                    .collect(),
+                &self.build_configuration.directories.work_dir,
+                &self.build_configuration.directories.recipe_dir,
+                &self.build_configuration.directories.host_prefix,
+                build_prefix,
+                Some(
+                    Jinja::new(self.build_configuration.selector_config())
+                        .with_context(&self.recipe.context),
+                ),
+                self.build_configuration.sandbox_config(),
+                self.build_configuration.debug,
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    /// Create the build script files without executing them.
+    ///
+    /// This method generates the build script and environment setup files in the working
+    /// directory but does not execute them. This is useful for debugging or when you want
+    /// to inspect or modify the scripts before running them manually.
+    ///
+    /// The method creates two files:
+    /// - A build environment setup file (`build_env.sh`/`build_env.bat`)
+    /// - The main build script file (`conda_build.sh`/`conda_build.bat`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an `std::io::Error` if:
+    /// - The script file cannot be read or found
+    /// - The script files cannot be written to the working directory
+    pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
+        let span = tracing::info_span!("Creating build script");
+        let _enter = span.enter();
+
+        let exec_args = self.prepare_build_script().await?;
+        let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
+        let work_dir = &self.build_configuration.directories.work_dir;
 
         if interpreter == "bash" {
             let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
