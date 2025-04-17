@@ -13,6 +13,7 @@ use crate::{
     source::extract::{extract_tar, extract_zip},
     tool_configuration::{self, APP_USER_AGENT},
 };
+use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
 
 use super::{checksum::Checksum, extract::is_tarball, SourceError};
@@ -66,13 +67,51 @@ async fn fetch_remote(
     target: &Path,
     tool_configuration: &tool_configuration::Configuration,
 ) -> Result<(), SourceError> {
-    let client = reqwest::Client::builder()
-        .user_agent(APP_USER_AGENT)
-        .redirect(reqwest::redirect::Policy::limited(50))
-        .build()?;
+    let client = tool_configuration.client.for_host(url);
 
     let (mut response, download_size) = {
-        let resp = client.get(url.as_str()).send().await?;
+        let resp = client
+            .get(url.as_str())
+            .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
+            .send()
+            .await
+            .map_err(|e| {
+                let err_string = match &e {
+                    MiddlewareError::Reqwest(e) => {
+                        let err_str = e.to_string();
+                        if err_str.contains("SSL")
+                            || err_str.contains("certificate")
+                            || err_str.contains("handshake")
+                        {
+                            format!("SSL certificate error: {}", err_str)
+                        } else {
+                            err_str
+                        }
+                    }
+                    MiddlewareError::Middleware(e) => {
+                        let mut err_msg = e.to_string();
+                        let mut source = e.source();
+
+                        while let Some(err) = source {
+                            let source_str = err.to_string();
+                            if source_str.contains("SSL")
+                                || source_str.contains("certificate")
+                                || source_str.contains("handshake")
+                                || source_str.contains("CERTIFICATE")
+                            {
+                                err_msg = format!("SSL certificate error: {}", source_str);
+                                break;
+                            } else if !source_str.contains("retry") {
+                                err_msg = source_str;
+                            }
+                            source = err.source();
+                        }
+                        err_msg
+                    }
+                };
+
+                SourceError::UnknownError(format!("Error downloading {}: {}", url, err_string))
+            })?;
 
         match resp.error_for_status() {
             Ok(resp) => {
@@ -104,7 +143,7 @@ async fn fetch_remote(
     );
 
     let mut file = tokio::fs::File::create(&target).await?;
-    while let Some(chunk) = response.chunk().await? {
+    while let Some(chunk) = response.chunk().await.map_err(SourceError::Url)? {
         progress_bar.inc(chunk.len() as u64);
         file.write_all(&chunk).await?;
     }

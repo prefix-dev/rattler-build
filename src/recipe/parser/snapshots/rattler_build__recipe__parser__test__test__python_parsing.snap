@@ -1,16 +1,14 @@
 ---
 source: src/recipe/parser/test.rs
-assertion_line: 505
 expression: yaml_serde
-snapshot_kind: text
 ---
 - python:
     imports:
     - pandas
-    python_version: '3.10'
+    python_version: '>=3.10'
 - python:
     imports:
     - pandas
     python_version:
-    - '3.10'
-    - '3.12'
+    - '>=3.10'
+    - '>=3.12'

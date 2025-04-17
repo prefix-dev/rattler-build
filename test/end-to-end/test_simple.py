@@ -1386,8 +1386,10 @@ def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     text = (recipes / "abi3" / "recipe.yaml").read_text()
-    # variants = recipes / "abi3" / "variants.yaml" "-m", variants
-    rendered = rattler_build("build", "--render-only", input=text, text=True)
+    # variants = recipes / "abi3" / "variants.yaml" "-m", variants (without '--recipe' it will pick up the recipe from root folder)
+    rendered = rattler_build(
+        "build", "--recipe", "-", "--render-only", input=text, text=True
+    )
     loaded = json.loads(rendered)
 
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"
@@ -1472,3 +1474,14 @@ def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path
         assert len(script) == 2
         assert script[0] == 'echo "This is a Unix test"'
         assert script[1] == 'test "1" = "1"'
+def test_python_version_spec(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    with pytest.raises(CalledProcessError) as exc_info:
+        args = rattler_build.build_args(recipes / "python-version-spec", tmp_path)
+        rattler_build(*args, stderr=STDOUT)
+
+    error_output = exc_info.value.output.decode("utf-8")
+    assert (
+        "failed to parse match spec: unable to parse version spec: =.*" in error_output
+    )
