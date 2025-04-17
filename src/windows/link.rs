@@ -133,7 +133,7 @@ mod tests {
     fn test_dll_detection() -> Result<(), RelinkError> {
         let dll_path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(TEST_DLL_DIR)
-            .join("libzstd.dll");
+            .join("zstd.dll");
         assert!(Dll::test_file(&dll_path)?);
 
         let prefix = Path::new(env!("CARGO_MANIFEST_DIR")).join("test-data/binary_files/windows");
@@ -151,7 +151,7 @@ mod tests {
     fn test_dll_dependencies() -> Result<(), RelinkError> {
         let dll_path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(TEST_DLL_DIR)
-            .join("libzstd.dll");
+            .join("zstd.dll");
         let dll = Dll::new(&dll_path)?;
 
         let libraries = dll.libraries();
