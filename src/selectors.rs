@@ -1,6 +1,6 @@
 //! Contains the selector config, which is used to render the recipe.
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
     hash::HashInfo,
@@ -32,6 +32,8 @@ pub struct SelectorConfig {
     pub experimental: bool,
     /// Allow undefined variables
     pub allow_undefined: bool,
+    /// Absolute path of recipe.yaml file
+    pub recipe_filepath: PathBuf,
 }
 
 impl SelectorConfig {
@@ -106,6 +108,14 @@ impl SelectorConfig {
             ..self.clone()
         }
     }
+
+    /// Create a new selector config from an existing one, replacing the recipe_filepath
+    pub fn with_recipe_filepath(&self, recipe_filepath: PathBuf) -> Self {
+        Self {
+            recipe_filepath,
+            ..self.clone()
+        }
+    }
 }
 
 impl Default for SelectorConfig {
@@ -118,6 +128,7 @@ impl Default for SelectorConfig {
             variant: Default::default(),
             experimental: false,
             allow_undefined: false,
+            recipe_filepath: PathBuf::default(),
         }
     }
 }

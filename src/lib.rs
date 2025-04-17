@@ -202,6 +202,7 @@ pub async fn get_build_output(
         experimental: build_data.common.experimental,
         // allow undefined while finding the variants
         allow_undefined: true,
+        recipe_filepath: recipe_path.into(),
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");
@@ -350,6 +351,7 @@ pub async fn get_build_output(
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
+                recipe_filepath: recipe_path.into(),
             },
             finalized_dependencies: None,
             finalized_sources: None,
