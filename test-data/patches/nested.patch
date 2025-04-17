@@ -1,0 +1,6 @@
+diff --git a/src/lib/hello.txt b/src/lib/hello.txt
+index e69de29..3b18e51 100644
+--- a/src/lib/hello.txt
++++ b/src/lib/hello.txt
+@@ -0,0 +1 @@
++hello world
