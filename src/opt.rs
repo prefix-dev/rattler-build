@@ -553,7 +553,7 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
-            debug: Debug::from(debug),
+            debug: Debug::new(debug),
         }
     }
 }

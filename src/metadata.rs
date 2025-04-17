@@ -328,18 +328,6 @@ impl Debug {
     }
 }
 
-impl From<bool> for Debug {
-    fn from(value: bool) -> Self {
-        Self(value)
-    }
-}
-
-impl From<Debug> for bool {
-    fn from(value: Debug) -> Self {
-        value.0
-    }
-}
-
 /// The configuration for a build of a package
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildConfiguration {

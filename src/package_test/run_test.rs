@@ -143,7 +143,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::from(true),
+                        Debug::new(true),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -164,7 +164,7 @@ impl Tests {
                         None,
                         None,
                         None,
-                        Debug::from(true),
+                        Debug::new(true),
                     )
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -602,7 +602,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
-                Debug::from(true),
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -626,7 +626,7 @@ impl PythonTest {
                     None,
                     None,
                     None,
-                    Debug::from(true),
+                    Debug::new(true),
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -700,7 +700,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
-                Debug::from(true),
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -810,7 +810,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
-                Debug::from(true),
+                Debug::new(true),
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
