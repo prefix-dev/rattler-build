@@ -17,6 +17,7 @@ use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
+    VersionWithSource,
 };
 use rattler_index::index_fs;
 use rattler_package_streaming::write::CompressionLevel;
@@ -452,7 +453,7 @@ impl Output {
     }
 
     /// The version of the package
-    pub fn version(&self) -> &Version {
+    pub fn version(&self) -> &VersionWithSource {
         self.recipe.package().version()
     }
 
