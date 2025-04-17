@@ -5,15 +5,7 @@ use rattler_shell::shell;
 
 use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
 
-use super::{find_interpreter, Interpreter};
-
-const BASH_PREAMBLE: &str = r#"#!/bin/bash
-## Start of bash preamble
-if [ -z ${CONDA_BUILD+x} ]; then
-    source ((script_path))
-fi
-## End of preamble
-"#;
+use super::{find_interpreter, Interpreter, BASH_PREAMBLE};
 
 pub(crate) struct BashInterpreter;
 

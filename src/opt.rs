@@ -1184,6 +1184,10 @@ pub struct DebugOpts {
     /// Common options
     #[clap(flatten)]
     pub common: CommonOpts,
+
+    /// Name of the specific output to debug (only required when a recipe has multiple outputs)
+    #[arg(long, help = "Name of the specific output to debug")]
+    pub output_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -1203,6 +1207,8 @@ pub struct DebugData {
     pub channels: Vec<String>,
     /// Common configuration options
     pub common: CommonData,
+    /// Name of the specific output to debug (if recipe has multiple outputs)
+    pub output_name: Option<String>,
 }
 
 impl From<DebugOpts> for DebugData {
@@ -1217,6 +1223,7 @@ impl From<DebugOpts> for DebugData {
                 .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
             channels: opts.channels.unwrap_or(vec!["conda-forge".to_string()]),
             common: opts.common.into(),
+            output_name: opts.output_name,
         }
     }
 }

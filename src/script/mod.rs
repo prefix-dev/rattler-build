@@ -7,10 +7,12 @@ use crate::script::interpreter::Interpreter;
 use indexmap::IndexMap;
 use interpreter::{
     BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
+    BASH_PREAMBLE, CMDEXE_PREAMBLE,
 };
 use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;
+use rattler_shell::shell;
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::{
@@ -410,6 +412,86 @@ impl Output {
                 self.build_configuration.debug,
             )
             .await?;
+
+        Ok(())
+    }
+
+    /// Create build scripts without running them
+    pub async fn create_build_script(&self) -> Result<(), std::io::Error> {
+        let span = tracing::info_span!("Creating build script");
+        let _enter = span.enter();
+
+        let host_prefix = self.build_configuration.directories.host_prefix.clone();
+        let target_platform = self.build_configuration.target_platform;
+        let mut env_vars = env_vars::vars(self, "BUILD");
+        env_vars.extend(env_vars::os_vars(&host_prefix, &target_platform));
+        env_vars.extend(self.env_vars_from_variant());
+
+        let selector_config = self.build_configuration.selector_config();
+        let jinja = Jinja::new(selector_config.clone()).with_context(&self.recipe.context);
+
+        let build_prefix = if self.recipe.build().merge_build_and_host_envs() {
+            None
+        } else {
+            Some(&self.build_configuration.directories.build_prefix)
+        };
+
+        let interpreter = if cfg!(windows) { "cmd" } else { "bash" };
+        let work_dir = &self.build_configuration.directories.work_dir;
+        let exec_args = ExecutionArgs {
+            script: self.recipe.build().script().resolve_content(
+                &self.build_configuration.directories.recipe_dir,
+                Some(jinja),
+                if cfg!(windows) { &["bat"] } else { &["sh"] },
+            )?,
+            env_vars: env_vars
+                .into_iter()
+                .filter_map(|(k, v)| v.map(|v| (k, v)))
+                .collect(),
+            secrets: IndexMap::new(),
+            build_prefix: build_prefix.map(|p| p.to_owned()),
+            run_prefix: host_prefix,
+            execution_platform: Platform::current(),
+            work_dir: work_dir.clone(),
+            sandbox_config: self.build_configuration.sandbox_config().cloned(),
+            debug: self.build_configuration.debug,
+        };
+
+        if interpreter == "bash" {
+            let script = BashInterpreter.get_script(&exec_args, shell::Bash).unwrap();
+            let build_env_path = work_dir.join("build_env.sh");
+            let build_script_path = work_dir.join("conda_build.sh");
+
+            tokio::fs::write(&build_env_path, script).await?;
+
+            let preamble =
+                BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
+            let script = format!("{}\n{}", preamble, exec_args.script.script());
+            tokio::fs::write(&build_script_path, script).await?;
+
+            tracing::info!("Build script created at {}", build_script_path.display());
+        } else if interpreter == "cmd" {
+            let script = CmdExeInterpreter
+                .get_script(&exec_args, shell::CmdExe)
+                .unwrap();
+            let build_env_path = work_dir.join("build_env.bat");
+            let build_script_path = work_dir.join("conda_build.bat");
+
+            tokio::fs::write(&build_env_path, script).await?;
+
+            let build_script = format!(
+                "{}\n{}",
+                CMDEXE_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy()),
+                exec_args.script.script()
+            );
+            tokio::fs::write(
+                &build_script_path,
+                &build_script.replace('\n', "\r\n").as_bytes(),
+            )
+            .await?;
+
+            tracing::info!("Build script created at {}", build_script_path.display());
+        }
 
         Ok(())
     }

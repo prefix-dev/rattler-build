@@ -935,7 +935,31 @@ pub async fn debug_recipe(
 
     let tool_config = get_tool_config(&build_data, log_handler)?;
 
-    let outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+    let mut outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+
+    if let Some(output_name) = &debug_data.output_name {
+        let original_count = outputs.len();
+        outputs.retain(|output| output.name().as_normalized() == output_name);
+
+        if outputs.is_empty() {
+            return Err(miette::miette!(
+                "Output with name '{}' not found in recipe. Available outputs: {}",
+                output_name,
+                original_count
+            ));
+        }
+    } else if outputs.len() > 1 {
+        let output_names: Vec<String> = outputs
+            .iter()
+            .map(|output| output.name().as_normalized().to_string())
+            .collect();
+
+        return Err(miette::miette!(
+            "Multiple outputs found in recipe ({}). Please specify which output to debug using --output-name. Available outputs: {}",
+            outputs.len(),
+            output_names.join(", ")
+        ));
+    }
 
     tracing::info!("Build and/or host environments created for debugging.");
 
@@ -954,6 +978,8 @@ pub async fn debug_recipe(
             .install_environments(&tool_config)
             .await
             .into_diagnostic()?;
+
+        output.create_build_script().await.into_diagnostic()?;
 
         if let Some(deps) = &output.finalized_dependencies {
             if deps.build.is_some() {
@@ -979,6 +1005,18 @@ pub async fn debug_recipe(
             "rattler-build build --recipe {}",
             output.build_configuration.directories.recipe_path.display()
         );
+        tracing::info!("Or run the build script directly with:");
+        if cfg!(windows) {
+            tracing::info!(
+                "cd {} && ./conda_build.bat",
+                output.build_configuration.directories.work_dir.display()
+            );
+        } else {
+            tracing::info!(
+                "cd {} && ./conda_build.sh",
+                output.build_configuration.directories.work_dir.display()
+            );
+        }
     }
 
     Ok(())
