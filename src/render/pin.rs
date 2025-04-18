@@ -7,6 +7,7 @@ use std::{
 
 use rattler_conda_types::{
     MatchSpec, PackageName, ParseStrictness, Version, VersionBumpError, VersionBumpType,
+    VersionWithSource,
 };
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -122,7 +123,7 @@ pub enum PinError {
     BuildSpecifierWithExact,
 }
 
-pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBumpError> {
+pub fn increment(version: &VersionWithSource, segments: i32) -> Result<Version, VersionBumpError> {
     if segments == 0 {
         return Err(VersionBumpError::InvalidSegment { index: 0 });
     }
@@ -142,7 +143,11 @@ pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBum
 impl Pin {
     /// Apply the pin to a version and hash of a resolved package. If a max_pin, min_pin or exact pin
     /// are given, the pin is applied to the version accordingly.
-    pub fn apply(&self, version: &Version, build_string: &str) -> Result<MatchSpec, PinError> {
+    pub fn apply(
+        &self,
+        version: &VersionWithSource,
+        build_string: &str,
+    ) -> Result<MatchSpec, PinError> {
         if self.args.build.is_some() && self.args.exact {
             return Err(PinError::BuildSpecifierWithExact);
         }
