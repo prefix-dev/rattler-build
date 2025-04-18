@@ -307,10 +307,23 @@ pub async fn get_build_output(
             recipe.package().name().as_normalized().to_string()
         };
 
+        let channel_names = if let Some(cli_channels) = &build_data.channels {
+            cli_channels.clone()
+        } else if let Some(channel_sources) = discovered_output
+            .used_vars
+            .get(&NormalizedKey("channel_sources".to_string()))
+        {
+            channel_sources
+                .to_string()
+                .split(",")
+                .map(|x| x.trim().to_string())
+                .collect::<Vec<_>>()
+        } else {
+            vec!["conda-forge".to_string()]
+        };
+
         // Add the channels from the args and by default always conda-forge
-        let channels = build_data
-            .channels
-            .clone()
+        let channels = channel_names
             .into_iter()
             .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
             .collect::<Result<Vec<_>, _>>()
