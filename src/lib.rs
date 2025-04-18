@@ -66,15 +66,17 @@ use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use rattler_conda_types::{
     package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
 };
+use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
 use recipe::parser::{find_outputs_from_src, Dependency, TestType};
 use selectors::SelectorConfig;
 use source_code::Source;
 use system_tools::SystemTools;
-use tool_configuration::{Configuration, TestStrategy};
+use tool_configuration::{Configuration, SkipExisting, TestStrategy};
 use variant_config::VariantConfig;
 
+use crate::metadata::Debug;
 use crate::metadata::PlatformWithVirtualPackages;
 
 /// Returns the recipe path.
@@ -350,6 +352,7 @@ pub async fn get_build_output(
                 store_recipe: !build_data.no_include_recipe,
                 force_colors: build_data.color_build_log && console::colors_enabled(),
                 sandbox_config: build_data.sandbox_configuration.clone(),
+                debug: build_data.debug,
             },
             finalized_dependencies: None,
             finalized_sources: None,
@@ -899,6 +902,132 @@ pub async fn build_recipes(
 
     sort_build_outputs_topologically(&mut outputs, build_data.up_to.as_deref())?;
     run_build_from_args(outputs, tool_config).await?;
+
+    Ok(())
+}
+
+/// Debug a recipe by setting up the environment without running the build script
+pub async fn debug_recipe(
+    debug_data: DebugData,
+    log_handler: &Option<LoggingOutputHandler>,
+) -> miette::Result<()> {
+    let recipe_path = get_recipe_path(&debug_data.recipe_path)?;
+
+    let build_data = BuildData {
+        build_platform: debug_data.build_platform,
+        target_platform: debug_data.target_platform,
+        host_platform: debug_data.host_platform,
+        channels: debug_data.channels,
+        common: debug_data.common,
+        keep_build: true,
+        debug: Debug::new(true),
+        test: TestStrategy::Skip,
+        up_to: None,
+        variant_config: Vec::new(),
+        ignore_recipe_variants: false,
+        render_only: false,
+        with_solve: true,
+        no_build_id: false,
+        package_format: PackageFormatAndCompression {
+            archive_type: ArchiveType::Conda,
+            compression_level: CompressionLevel::Default,
+        },
+        compression_threads: None,
+        io_concurrency_limit: num_cpus::get(),
+        no_include_recipe: false,
+        color_build_log: true,
+        tui: false,
+        skip_existing: SkipExisting::None,
+        noarch_build_platform: None,
+        extra_meta: None,
+        sandbox_configuration: None,
+    };
+
+    let tool_config = get_tool_config(&build_data, log_handler)?;
+
+    let mut outputs = get_build_output(&build_data, &recipe_path, &tool_config).await?;
+
+    if let Some(output_name) = &debug_data.output_name {
+        let original_count = outputs.len();
+        outputs.retain(|output| output.name().as_normalized() == output_name);
+
+        if outputs.is_empty() {
+            return Err(miette::miette!(
+                "Output with name '{}' not found in recipe. Available outputs: {}",
+                output_name,
+                original_count
+            ));
+        }
+    } else if outputs.len() > 1 {
+        let output_names: Vec<String> = outputs
+            .iter()
+            .map(|output| output.name().as_normalized().to_string())
+            .collect();
+
+        return Err(miette::miette!(
+            "Multiple outputs found in recipe ({}). Please specify which output to debug using --output-name. Available outputs: {}",
+            outputs.len(),
+            output_names.join(", ")
+        ));
+    }
+
+    tracing::info!("Build and/or host environments created for debugging.");
+
+    for output in outputs {
+        output
+            .build_configuration
+            .directories
+            .recreate_directories()
+            .into_diagnostic()?;
+        let output = output.fetch_sources(&tool_config).await.into_diagnostic()?;
+        let output = output
+            .resolve_dependencies(&tool_config)
+            .await
+            .into_diagnostic()?;
+        output
+            .install_environments(&tool_config)
+            .await
+            .into_diagnostic()?;
+
+        output.create_build_script().await.into_diagnostic()?;
+
+        if let Some(deps) = &output.finalized_dependencies {
+            if deps.build.is_some() {
+                tracing::info!(
+                    "\nBuild dependencies available in {}",
+                    output
+                        .build_configuration
+                        .directories
+                        .build_prefix
+                        .display()
+                );
+            }
+            if deps.host.is_some() {
+                tracing::info!(
+                    "Host dependencies available in {}",
+                    output.build_configuration.directories.host_prefix.display()
+                );
+            }
+        }
+
+        tracing::info!("\nTo run the actual build, use:");
+        tracing::info!(
+            "rattler-build build --recipe {}",
+            output.build_configuration.directories.recipe_path.display()
+        );
+        tracing::info!("Or run the build script directly with:");
+        if cfg!(windows) {
+            tracing::info!(
+                "cd {} && ./conda_build.bat",
+                output.build_configuration.directories.work_dir.display()
+            );
+        } else {
+            tracing::info!(
+                "cd {} && ./conda_build.sh",
+                output.build_configuration.directories.work_dir.display()
+            );
+        }
+    }
 
     Ok(())
 }
