@@ -801,44 +801,44 @@ impl CommandsTest {
         })?;
 
         // evaluate runtime conditions but only if there are any
-        let script = if !self.runtime_conditions.is_empty() {
-            self.runtime_conditions.evaluate(&platform).map_or_else(
-                || self.script.clone(),
-                |selected_script| {
-                    let script_content = match &selected_script.content {
-                        ScriptContent::Default => ScriptContent::Default,
-                        ScriptContent::CommandOrPath(s) => ScriptContent::Command(s.clone()),
-                        ScriptContent::Command(s) => ScriptContent::Command(s.clone()),
-                        ScriptContent::Commands(cmds) => ScriptContent::Commands(cmds.clone()),
-                        ScriptContent::Path(p) => ScriptContent::Path(p.clone()),
-                    };
-                    Script {
-                        content: script_content,
-                        interpreter: selected_script.interpreter.clone(),
-                        env: selected_script.env.clone(),
-                        secrets: selected_script.secrets.clone(),
-                        cwd: selected_script.cwd.clone(),
+        let script_to_run: Option<Script> = if !self.runtime_conditions.is_empty() {
+            self.runtime_conditions
+                .evaluate(&platform)
+                .map(|selected_script| {
+                    let mut new_script = selected_script.clone();
+                    if let ScriptContent::CommandOrPath(s) = new_script.content {
+                        new_script.content = ScriptContent::Command(s);
                     }
-                },
-            )
+                    new_script
+                })
         } else {
-            self.script.clone()
+            Some(self.script.clone())
         };
 
-        tracing::info!("Testing commands:");
-        script
-            .run_script(
-                env_vars,
-                tmp_dir.path(),
-                path,
-                &run_prefix,
-                build_prefix.as_ref(),
-                None,
-                None,
-                Debug::new(true),
-            )
-            .await
-            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+        if let Some(script) = script_to_run {
+            if !self.runtime_conditions.is_empty() {
+                tracing::info!("Testing commands (using script selected by runtime conditions):");
+            } else {
+                tracing::info!("Testing commands (using default script):");
+            }
+            script
+                .run_script(
+                    env_vars,
+                    tmp_dir.path(),
+                    path,
+                    &run_prefix,
+                    build_prefix.as_ref(),
+                    None,
+                    None,
+                    Debug::new(true),
+                )
+                .await
+                .map_err(|e| TestError::TestFailed(e.to_string()))?;
+        } else {
+            tracing::info!(
+                "Skipping test execution because runtime condition evaluated to false and no 'else' script was provided."
+            );
+        }
 
         Ok(())
     }

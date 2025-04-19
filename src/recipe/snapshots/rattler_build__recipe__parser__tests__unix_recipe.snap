@@ -415,7 +415,7 @@ Recipe {
                     recipe: [],
                 },
                 runtime_conditions: RuntimeConditions {
-                    condition: "",
+                    condition: Linux,
                     then_script: None,
                     else_script: None,
                 },

@@ -19,6 +19,56 @@ use crate::{
 use super::{glob_vec::GlobVec, FlattenErrors, Script};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
+/// The platform condition to evaluate at runtime
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum PlatformCondition {
+    /// Windows platform
+    Win,
+    /// Unix platform (non-Windows)
+    Unix,
+    /// macOS platform
+    Osx,
+    /// Linux platform
+    #[default]
+    Linux,
+}
+
+/// Deserialize implementation for PlatformCondition that converts from string
+impl<'de> Deserialize<'de> for PlatformCondition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        // Convert to lowercase for case-insensitive matching
+        match s.to_lowercase().as_str() {
+            "win" => Ok(PlatformCondition::Win),
+            "unix" => Ok(PlatformCondition::Unix),
+            "osx" => Ok(PlatformCondition::Osx),
+            "linux" => Ok(PlatformCondition::Linux),
+            _ => Err(serde::de::Error::custom(format!(
+                "Invalid platform condition: {}. Expected one of: win, unix, osx, linux",
+                s
+            ))),
+        }
+    }
+}
+
+/// Serialize implementation for PlatformCondition that converts to string
+impl Serialize for PlatformCondition {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            PlatformCondition::Win => serializer.serialize_str("win"),
+            PlatformCondition::Unix => serializer.serialize_str("unix"),
+            PlatformCondition::Osx => serializer.serialize_str("osx"),
+            PlatformCondition::Linux => serializer.serialize_str("linux"),
+        }
+    }
+}
+
 /// The extra requirements for the test
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandsTestRequirements {
@@ -67,7 +117,7 @@ pub struct CommandsTest {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeConditions {
     /// The condition to evaluate at runtime
-    pub condition: String,
+    pub condition: PlatformCondition,
     /// The script to run if condition is true
     pub then_script: Option<Script>,
     /// The script to run if condition is false
@@ -77,17 +127,20 @@ pub struct RuntimeConditions {
 impl RuntimeConditions {
     /// Check if the runtime conditions are empty
     pub fn is_empty(&self) -> bool {
-        self.condition.is_empty() && self.then_script.is_none() && self.else_script.is_none()
+        self.then_script.is_none() && self.else_script.is_none()
     }
 
     /// Evaluate the condition at runtime and return the appropriate script
     pub fn evaluate(&self, platform: &Platform) -> Option<&Script> {
-        let condition = match self.condition.as_str() {
-            "win" => platform == &Platform::Win64,
-            "unix" => platform != &Platform::Win64,
-            "osx" => platform == &Platform::Osx64 || platform == &Platform::OsxArm64,
-            "linux" => platform == &Platform::Linux64 || platform == &Platform::LinuxAarch64,
-            _ => false,
+        let condition = match self.condition {
+            PlatformCondition::Win => platform == &Platform::Win64,
+            PlatformCondition::Unix => platform != &Platform::Win64,
+            PlatformCondition::Osx => {
+                platform == &Platform::Osx64 || platform == &Platform::OsxArm64
+            }
+            PlatformCondition::Linux => {
+                platform == &Platform::Linux64 || platform == &Platform::LinuxAarch64
+            }
         };
 
         if condition {
@@ -303,33 +356,52 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                         match script_node {
                             RenderedNode::Mapping(_) => {
                                 let map = as_mapping(script_node, "script")?;
-                                if let (Some(if_node), Some(then_node)) = (map.get("if"), map.get("then")) {
-                                    let condition: String = if_node.try_convert("if")?;
-                                    let then_script: Script = then_node.try_convert("then")?;
-                                    let else_script: Option<Script> = map.get("else").map(|n| n.try_convert("else")).transpose()?;
+                                let if_node_opt = map.get("if");
+                                let then_node_opt = map.get("then");
+                                let else_node_opt = map.get("else");
 
-                                    if !["win", "unix", "osx", "linux"].contains(&condition.as_str()) {
+                                match (if_node_opt, then_node_opt) {
+                                    (Some(if_node), Some(then_node)) => {
+                                        let condition_val: serde_yaml::Value = serde_yaml::to_value(if_node)
+                                            .map_err(|err| vec![_partialerror!(*if_node.span(), ErrorKind::InvalidValue((format!("failed to convert node to YAML value: {}", err), Cow::Borrowed(""))))])?;
+                                        let condition: PlatformCondition = serde_yaml::from_value(condition_val)
+                                            .map_err(|err| vec![_partialerror!(*if_node.span(), ErrorKind::InvalidValue((format!("invalid platform condition: {}", err), Cow::Borrowed("Expected one of: win, unix, osx, linux"))))])?;
+
+                                        let then_script: Script = then_node.try_convert("then")?;
+                                        let else_script: Option<Script> = else_node_opt.map(|n| n.try_convert("else")).transpose()?;
+
+                                        commands.runtime_conditions = RuntimeConditions {
+                                            condition,
+                                            then_script: Some(then_script),
+                                            else_script,
+                                        };
+                                        has_script_or_condition = true;
+                                    }
+                                    (Some(if_node), None) => {
                                         return Err(vec![_partialerror!(
                                             *if_node.span(),
-                                            ErrorKind::InvalidValue((
-                                                format!(
-                                                    "invalid condition '{}', expected one of: win, unix, osx, linux",
-                                                    condition
-                                                ),
-                                                Cow::Borrowed("")
-                                            )),
+                                            ErrorKind::MissingField("then".into()),
+                                            help = "Conditional script has an 'if' but is missing the required 'then' block"
                                         )]);
                                     }
-
-                                    commands.runtime_conditions = RuntimeConditions {
-                                        condition,
-                                        then_script: Some(then_script),
-                                        else_script,
-                                    };
-                                    has_script_or_condition = true;
-                                } else {
-                                    commands.script = script_node.try_convert("script")?;
-                                    has_script_or_condition = !commands.script.is_default();
+                                    (None, Some(then_node)) => {
+                                        return Err(vec![_partialerror!(
+                                            *then_node.span(),
+                                            ErrorKind::MissingField("if".into()),
+                                            help = "Conditional script has a 'then' but is missing the required 'if' condition"
+                                        )]);
+                                    }
+                                    (None, None) => {
+                                        if let Some(else_node) = else_node_opt {
+                                            return Err(vec![_partialerror!(
+                                                *else_node.span(),
+                                                ErrorKind::MissingField("if".into()),
+                                                help = "Conditional script has an 'else' but is missing the required 'if' condition"
+                                            )]);
+                                        }
+                                        commands.script = script_node.try_convert("script")?;
+                                        has_script_or_condition = !commands.script.is_default();
+                                    }
                                 }
                             }
                             _ => {
