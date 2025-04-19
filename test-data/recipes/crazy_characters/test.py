@@ -1,6 +1,21 @@
 import os
-import sys
 from pathlib import Path
+
+
+def windows_long_paths_enabled():
+    if os.name != "nt":
+        return True
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\\CurrentControlSet\\Control\\FileSystem"
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "LongPathsEnabled")
+            return value == 1
+    except Exception:
+        return False
+
 
 prefix = Path(os.environ["PREFIX"])
 
@@ -14,8 +29,13 @@ file_2 = (
 )
 file_2.write_text(file_2.name)
 
-# we dont really need to test file path length on windows, windows just auto blocks it system-wide
-# so it produces false negatives
-if sys.platform != "win32":
-    file_3 = prefix / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+file_3 = prefix / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+if os.name != "nt" or windows_long_paths_enabled():
     file_3.write_text(file_3.name)
+else:
+    print("Skipping long path file creation: Windows long path support is not enabled.")
+    signal_file = prefix / "files" / "long_path_test_skipped.txt"
+    signal_file.touch()
+
+file_crazy_check = prefix / "files" / "test_crazy_chars_present.txt"
+file_crazy_check.touch()

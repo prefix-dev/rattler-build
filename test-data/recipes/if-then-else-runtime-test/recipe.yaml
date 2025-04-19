@@ -1,0 +1,18 @@
+package:
+  name: if-then-else-runtime-test
+  version: 0.1.0
+
+build:
+  script: echo "Building..."
+
+tests:
+  - script:
+      if: win
+      then: |
+        echo "=====RUNTIME_PROOF_WINDOWS====="
+        echo "Current dir: %CD%"
+        echo "PREFIX: %PREFIX%"
+      else: |
+        echo "=====RUNTIME_PROOF_UNIX====="
+        echo "Current dir: $PWD"
+        echo "PREFIX: $PREFIX" 

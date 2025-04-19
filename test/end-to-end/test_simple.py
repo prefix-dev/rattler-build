@@ -446,6 +446,21 @@ def test_script_env_in_recipe(
     assert "FOO is Hello World!" in content
 
 
+def windows_long_paths_enabled():
+    if platform.system() != "Windows":
+        return True
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\\CurrentControlSet\\Control\\FileSystem"
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "LongPathsEnabled")
+            return value == 1
+    except Exception:
+        return False
+
+
 def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     rattler_build.build(
         recipes / "crazy_characters/recipe.yaml",
@@ -462,11 +477,11 @@ def test_crazy_characters(rattler_build: RattlerBuild, recipes: Path, tmp_path: 
     )
     assert file_2.read_text() == file_2.name
 
-    # limit on Windows is 260 chars
-    # Only check file_3 on non-Windows platforms
-    if platform.system() != "Windows":
-        file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+    file_3 = pkg / "files" / ("a_really_long_" + ("a" * 200) + ".txt")
+    if platform.system() != "Windows" or windows_long_paths_enabled():
         assert file_3.read_text() == file_3.name
+    else:
+        print("Skipping long path test: Windows long path support is not enabled.")
 
 
 def test_variant_config(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
@@ -1474,6 +1489,60 @@ def test_conditional_script(rattler_build: RattlerBuild, recipes: Path, tmp_path
         assert len(script) == 2
         assert script[0] == 'echo "This is a Unix test"'
         assert script[1] == 'test "1" = "1"'
+
+
+def test_conditional_script_runtime_evaluation(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    recipe_path = recipes / "if-then-else-runtime-test"
+
+    rattler_build.build(recipe_path, tmp_path)
+    pkg_path = get_package(tmp_path, "if-then-else-runtime-test")
+    test_output = rattler_build.test(pkg_path, "-c", str(tmp_path), "-vvv")
+
+    # check the test output for our marker strings
+    windows_marker = "=====RUNTIME_PROOF_WINDOWS====="
+    unix_marker = "=====RUNTIME_PROOF_UNIX====="
+    expected_marker = windows_marker if platform.system() == "Windows" else unix_marker
+    unexpected_marker = (
+        unix_marker if platform.system() == "Windows" else windows_marker
+    )
+
+    assert (
+        expected_marker in test_output
+    ), f"Expected marker '{expected_marker}' not found in test output.\nFull output:\n{test_output}"
+    assert (
+        unexpected_marker not in test_output
+    ), f"Unexpected marker '{unexpected_marker}' found in test output.\nFull output:\n{test_output}"
+
+    # verify the rendered recipe still contains the conditional structure
+    pkg_extracted_path = get_extracted_package(tmp_path, "if-then-else-runtime-test")
+    rendered_recipe_path = pkg_extracted_path / "info/recipe/rendered_recipe.yaml"
+    assert rendered_recipe_path.exists()
+    rendered_recipe_text = rendered_recipe_path.read_text()
+    rendered_recipe = yaml.safe_load(rendered_recipe_text)
+
+    assert "tests" in rendered_recipe["recipe"]
+    tests = rendered_recipe["recipe"]["tests"]
+    assert len(tests) == 1
+
+    runtime_conditions = tests[0].get("runtime_conditions", {})
+
+    assert isinstance(
+        runtime_conditions, dict
+    ), "Expected runtime_conditions to be a dict"
+    assert (
+        "condition" in runtime_conditions
+    ), "Missing 'condition' key in runtime_conditions"
+    assert (
+        runtime_conditions["condition"] == "win"
+    ), f"Expected condition 'win', got '{runtime_conditions['condition']}'"
+    assert (
+        "then_script" in runtime_conditions
+    ), "Missing 'then_script' key in runtime_conditions"
+    assert (
+        "else_script" in runtime_conditions
+    ), "Missing 'else_script' key in runtime_conditions"
 
 
 def test_python_version_spec(

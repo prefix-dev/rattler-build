@@ -1,6 +1,8 @@
 //! Test parser module.
 
+use rattler_conda_types::Platform;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 use crate::{
     _partialerror,
@@ -18,7 +20,7 @@ use super::{glob_vec::GlobVec, FlattenErrors, Script};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandsTestRequirements {
     /// Extra run requirements for the test.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -30,7 +32,7 @@ pub struct CommandsTestRequirements {
 }
 
 /// The files that should be copied to the test directory (they are stored in the package)
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandsTestFiles {
     /// Files to be copied from the source directory to the test directory.
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -42,7 +44,7 @@ pub struct CommandsTestFiles {
 }
 
 /// A test that executes a script in a freshly created environment
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CommandsTest {
     /// The script to run
     pub script: Script,
@@ -56,6 +58,44 @@ pub struct CommandsTest {
     /// Extra files to include in the test
     #[serde(default, skip_serializing_if = "CommandsTestFiles::is_empty")]
     pub files: CommandsTestFiles,
+    /// Runtime conditions for script evaluation
+    #[serde(default, skip_serializing_if = "RuntimeConditions::is_empty")]
+    pub runtime_conditions: RuntimeConditions,
+}
+
+/// Runtime conditions for script evaluation
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeConditions {
+    /// The condition to evaluate at runtime
+    pub condition: String,
+    /// The script to run if condition is true
+    pub then_script: Option<Script>,
+    /// The script to run if condition is false
+    pub else_script: Option<Script>,
+}
+
+impl RuntimeConditions {
+    /// Check if the runtime conditions are empty
+    pub fn is_empty(&self) -> bool {
+        self.condition.is_empty() && self.then_script.is_none() && self.else_script.is_none()
+    }
+
+    /// Evaluate the condition at runtime and return the appropriate script
+    pub fn evaluate(&self, platform: &Platform) -> Option<&Script> {
+        let condition = match self.condition.as_str() {
+            "win" => platform == &Platform::Win64,
+            "unix" => platform != &Platform::Win64,
+            "osx" => platform == &Platform::Osx64 || platform == &Platform::OsxArm64,
+            "linux" => platform == &Platform::Linux64 || platform == &Platform::LinuxAarch64,
+            _ => false,
+        };
+
+        if condition {
+            self.then_script.as_ref()
+        } else {
+            self.else_script.as_ref()
+        }
+    }
 }
 
 impl CommandsTestRequirements {
@@ -72,16 +112,16 @@ impl CommandsTestFiles {
     }
 }
 
-fn pip_check_true() -> bool {
+const fn pip_check_true() -> bool {
     true
 }
 
-fn is_true(value: &bool) -> bool {
+const fn is_true(value: &bool) -> bool {
     *value
 }
 
 /// The Python version(s) to test the imports against.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum PythonVersion {
     /// A single python version
@@ -95,13 +135,13 @@ pub enum PythonVersion {
 
 impl PythonVersion {
     /// Check if the python version is none
-    pub fn is_none(&self) -> bool {
-        matches!(self, PythonVersion::None)
+    pub const fn is_none(&self) -> bool {
+        matches!(self, Self::None)
     }
 }
 
 /// A special Python test that checks if the imports are available and runs `pip check`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PythonTest {
     /// List of imports to test
     pub imports: Vec<String>,
@@ -124,21 +164,21 @@ impl Default for PythonTest {
 }
 
 /// A special Perl test that checks if the imports are available and runs `cpanm check`.
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerlTest {
     /// List of perl `uses` to test
     pub uses: Vec<String>,
 }
 
 /// A test that runs the tests of a downstream package.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DownstreamTest {
     /// The name of the downstream package
     pub downstream: String,
 }
 
 /// The test type enum
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum TestType {
     /// A Python test that will test if the imports are available and run `pip check`
@@ -152,19 +192,19 @@ pub enum TestType {
         perl: PerlTest,
     },
     /// A test that executes multiple commands in a freshly created environment
-    Command(CommandsTest),
+    Command(Box<CommandsTest>),
     /// A test that runs the tests of a downstream package
     Downstream(DownstreamTest),
     /// A test that checks the contents of the package
     PackageContents {
         /// The package contents to test against
         // Note we use a struct for better serialization
-        package_contents: PackageContentsTest,
+        package_contents: Box<PackageContentsTest>,
     },
 }
 
 /// Package content test that compares the contents of the package with the expected contents.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageContentsTest {
     /// file paths, direct and/or globs
     #[serde(default, skip_serializing_if = "GlobVec::is_empty")]
@@ -187,12 +227,12 @@ pub struct PackageContentsTest {
 impl TryConvertNode<Vec<TestType>> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<Vec<TestType>, Vec<PartialParsingError>> {
         match self {
-            RenderedNode::Sequence(seq) => seq.try_convert(name),
-            RenderedNode::Scalar(_) | RenderedNode::Mapping(_) => Err(vec![_partialerror!(
+            Self::Sequence(seq) => seq.try_convert(name),
+            Self::Scalar(_) | Self::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedSequence,
             )])?,
-            RenderedNode::Null(_) => Ok(vec![]),
+            Self::Null(_) => Ok(vec![]),
         }
     }
 }
@@ -211,13 +251,13 @@ impl TryConvertNode<Vec<TestType>> for RenderedSequenceNode {
 impl TryConvertNode<TestType> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<TestType, Vec<PartialParsingError>> {
         match self {
-            RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => Err(vec![_partialerror!(
+            Self::Mapping(map) => map.try_convert(name),
+            Self::Sequence(_) | Self::Scalar(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(TestType::PackageContents {
-                package_contents: PackageContentsTest::default(),
+            Self::Null(_) => Ok(TestType::PackageContents {
+                package_contents: Box::new(PackageContentsTest::default()),
             }),
         }
     }
@@ -239,7 +279,7 @@ pub fn as_mapping(
 impl TryConvertNode<TestType> for RenderedMappingNode {
     fn try_convert(&self, name: &str) -> Result<TestType, Vec<PartialParsingError>> {
         let mut test = TestType::PackageContents {
-            package_contents: PackageContentsTest::default(),
+            package_contents: Box::new(PackageContentsTest::default()),
         };
 
         self.iter().map(|(key, value)| {
@@ -247,12 +287,12 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
             match key_str {
                 "python" => {
                     let python = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::Python{ python };
+                    test = TestType::Python { python };
                 }
-                "script" | "requirements" | "files"  => {
+                "script" | "requirements" | "files" => {
                     let mut commands = CommandsTest::default();
-                    let mut has_script = false;
-                    let mut had_empty_conditional = false;
+                    let mut has_script_or_condition = false;
+
                     if let Some(req_node) = self.get("requirements") {
                         commands.requirements = req_node.try_convert("requirements")?;
                     }
@@ -260,23 +300,58 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                         commands.files = files_node.try_convert("files")?;
                     }
                     if let Some(script_node) = self.get("script") {
-                        match script_node.try_convert("script") {
-                            Ok(script) => {
-                                commands.script = script;
-                                has_script = true;
-                            },
-                            Err(errs) if errs.iter().all(|e| match e.kind {
-                                ErrorKind::MissingField(ref field) => field == "script",
-                                ErrorKind::ExpectedSequence => e.label.as_ref().map_or(false, |l| l.contains("script")),
-                                _ => false
-                            }) => {
-                                had_empty_conditional = true;
-                            },
-                            Err(errs) => return Err(errs),
+                        match script_node {
+                            RenderedNode::Mapping(_) => {
+                                let map = as_mapping(script_node, "script")?;
+                                if let (Some(if_node), Some(then_node)) = (map.get("if"), map.get("then")) {
+                                    let condition: String = if_node.try_convert("if")?;
+                                    let then_script: Script = then_node.try_convert("then")?;
+                                    let else_script: Option<Script> = map.get("else").map(|n| n.try_convert("else")).transpose()?;
+
+                                    if !["win", "unix", "osx", "linux"].contains(&condition.as_str()) {
+                                        return Err(vec![_partialerror!(
+                                            *if_node.span(),
+                                            ErrorKind::InvalidValue((
+                                                format!(
+                                                    "invalid condition '{}', expected one of: win, unix, osx, linux",
+                                                    condition
+                                                ),
+                                                Cow::Borrowed("")
+                                            )),
+                                        )]);
+                                    }
+
+                                    commands.runtime_conditions = RuntimeConditions {
+                                        condition,
+                                        then_script: Some(then_script),
+                                        else_script,
+                                    };
+                                    has_script_or_condition = true;
+                                } else {
+                                    commands.script = script_node.try_convert("script")?;
+                                    has_script_or_condition = !commands.script.is_default();
+                                }
+                            }
+                            _ => {
+                                commands.script = script_node.try_convert("script")?;
+                                has_script_or_condition = !commands.script.is_default();
+                            }
                         }
                     }
-                    if has_script || !commands.requirements.is_empty() || !commands.files.is_empty() || had_empty_conditional {
-                        test = TestType::Command(commands);
+
+                    if has_script_or_condition || !commands.requirements.is_empty() || !commands.files.is_empty() {
+                        test = TestType::Command(Box::new(commands));
+                    } else if self.contains_key("files") || self.contains_key("site_packages") || self.contains_key("bin") || self.contains_key("lib") || self.contains_key("include") {
+                        let package_contents: PackageContentsTest = self.try_convert("package_contents")?;
+                        test = TestType::PackageContents {
+                            package_contents: Box::new(package_contents),
+                        };
+                    } else {
+                        return Err(vec![_partialerror!(
+                            *self.span(),
+                            ErrorKind::InvalidField("Unrecognized test type or missing required fields".into()),
+                            help = "Test definition must contain one of: python, perl, script, requirements, files, downstream, package_contents"
+                        )]);
                     }
                 }
                 "downstream" => {
@@ -285,7 +360,7 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                 }
                 "package_contents" => {
                     let package_contents = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::PackageContents { package_contents };
+                    test = TestType::PackageContents { package_contents: Box::new(package_contents) };
                 }
                 "perl" => {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
@@ -294,7 +369,7 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `script`, `requirements`, `files`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -328,15 +403,15 @@ impl TryConvertNode<PythonTest> for RenderedMappingNode {
 impl TryConvertNode<PythonVersion> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<PythonVersion, Vec<PartialParsingError>> {
         let python_version = match self {
-            RenderedNode::Mapping(_) => Err(vec![_partialerror!(
+            Self::Mapping(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::InvalidField("expected string, sequence or null".into()),
             )])?,
-            RenderedNode::Scalar(version) => {
+            Self::Scalar(version) => {
                 let _: NamelessMatchSpec = version.try_convert(name)?;
                 PythonVersion::Single(version.to_string())
             }
-            RenderedNode::Sequence(versions) => {
+            Self::Sequence(versions) => {
                 let version_strings = versions
                     .iter()
                     .map(|v| {
@@ -352,7 +427,7 @@ impl TryConvertNode<PythonVersion> for RenderedNode {
                     .collect::<Result<Vec<String>, _>>()?;
                 PythonVersion::Multiple(version_strings)
             }
-            RenderedNode::Null(_) => PythonVersion::None,
+            Self::Null(_) => PythonVersion::None,
         };
 
         Ok(python_version)
@@ -446,12 +521,12 @@ impl TryConvertNode<PerlTest> for RenderedMappingNode {
 impl TryConvertNode<PackageContentsTest> for RenderedNode {
     fn try_convert(&self, name: &str) -> Result<PackageContentsTest, Vec<PartialParsingError>> {
         match self {
-            RenderedNode::Mapping(map) => map.try_convert(name),
-            RenderedNode::Sequence(_) | RenderedNode::Scalar(_) => Err(vec![_partialerror!(
+            Self::Mapping(map) => map.try_convert(name),
+            Self::Sequence(_) | Self::Scalar(_) => Err(vec![_partialerror!(
                 *self.span(),
                 ErrorKind::ExpectedMapping,
             )])?,
-            RenderedNode::Null(_) => Ok(PackageContentsTest::default()),
+            Self::Null(_) => Ok(PackageContentsTest::default()),
         }
     }
 }

@@ -119,7 +119,7 @@ impl Tests {
         let tmp_dir = tempfile::tempdir()?;
 
         match self {
-            Tests::Commands(path) => {
+            Self::Commands(path) => {
                 let script = Script {
                     content: ScriptContent::Path(path.clone()),
                     ..Script::default()
@@ -148,7 +148,7 @@ impl Tests {
                     .await
                     .map_err(|e| TestError::TestFailed(e.to_string()))?;
             }
-            Tests::Python(path) => {
+            Self::Python(path) => {
                 let script = Script {
                     content: ScriptContent::Path(path.clone()),
                     interpreter: Some("python".into()),
@@ -800,8 +800,33 @@ impl CommandsTest {
             ))
         })?;
 
+        // evaluate runtime conditions but only if there are any
+        let script = if !self.runtime_conditions.is_empty() {
+            self.runtime_conditions.evaluate(&platform).map_or_else(
+                || self.script.clone(),
+                |selected_script| {
+                    let script_content = match &selected_script.content {
+                        ScriptContent::Default => ScriptContent::Default,
+                        ScriptContent::CommandOrPath(s) => ScriptContent::Command(s.clone()),
+                        ScriptContent::Command(s) => ScriptContent::Command(s.clone()),
+                        ScriptContent::Commands(cmds) => ScriptContent::Commands(cmds.clone()),
+                        ScriptContent::Path(p) => ScriptContent::Path(p.clone()),
+                    };
+                    Script {
+                        content: script_content,
+                        interpreter: selected_script.interpreter.clone(),
+                        env: selected_script.env.clone(),
+                        secrets: selected_script.secrets.clone(),
+                        cwd: selected_script.cwd.clone(),
+                    }
+                },
+            )
+        } else {
+            self.script.clone()
+        };
+
         tracing::info!("Testing commands:");
-        self.script
+        script
             .run_script(
                 env_vars,
                 tmp_dir.path(),
