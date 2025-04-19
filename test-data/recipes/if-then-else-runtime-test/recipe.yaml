@@ -15,4 +15,4 @@ tests:
       else: |
         echo "=====RUNTIME_PROOF_UNIX====="
         echo "Current dir: $PWD"
-        echo "PREFIX: $PREFIX" 
+        echo "PREFIX: $PREFIX"
