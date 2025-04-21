@@ -129,7 +129,7 @@ jobs:
 
       - name: Install cross
         if: matrix.use-cross
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cross
 
@@ -217,7 +217,7 @@ jobs:
           path: ${{ steps.package.outputs.pkg-path }}
 
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2
+        uses: softprops/action-gh-release@da05d552573ad5aba039eaac05058a918a7bf631 # v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           draft: true
