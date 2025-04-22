@@ -544,6 +544,7 @@ pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin
 #[derive(Default)]
 struct CrLfNormalizer {
     pending_cr: bool,
+    output_buffer: BytesMut,
 }
 
 impl Decoder for CrLfNormalizer {
@@ -559,45 +560,41 @@ impl Decoder for CrLfNormalizer {
             };
         }
 
-        let mut result = BytesMut::with_capacity(src.len());
+        self.output_buffer.clear();
+        self.output_buffer
+            .reserve(src.len().saturating_sub(self.output_buffer.capacity()));
         let mut read_idx = 0;
 
         if std::mem::replace(&mut self.pending_cr, false) {
-            result.put_u8(b'\n');
+            self.output_buffer.put_u8(b'\n');
             if src[0] == b'\n' {
                 read_idx = 1;
             }
         }
 
         while read_idx < src.len() {
-            match src[read_idx] {
-                b'\r' if read_idx + 1 < src.len() && src[read_idx + 1] == b'\n' => {
-                    result.put_u8(b'\n');
-                    read_idx += 2;
-                }
-                b'\r' if read_idx + 1 == src.len() => {
+            let b = src[read_idx];
+            read_idx += 1;
+
+            if b == b'\r' {
+                if read_idx < src.len() {
+                    if src[read_idx] == b'\n' {
+                        read_idx += 1;
+                    }
+                    self.output_buffer.put_u8(b'\n');
+                } else {
                     self.pending_cr = true;
-                    read_idx += 1;
                     break;
                 }
-                b'\r' => {
-                    result.put_u8(b'\n');
-                    read_idx += 1;
-                }
-                b => {
-                    result.put_u8(b);
-                    read_idx += 1;
-                }
+            } else {
+                self.output_buffer.put_u8(b);
             }
         }
 
         let _processed = src.split_to(read_idx);
 
-        Ok(if !result.is_empty() {
-            Some(result)
-        } else {
-            None
-        })
+        let has_output = !self.output_buffer.is_empty();
+        Ok(has_output.then(|| self.output_buffer.split().freeze().into()))
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -605,9 +602,10 @@ impl Decoder for CrLfNormalizer {
 
         if std::mem::replace(&mut self.pending_cr, false) {
             match final_chunk {
-                Some(mut bytes) => {
-                    bytes.put_u8(b'\n');
-                    Ok(Some(bytes))
+                Some(bytes) => {
+                    let mut new_bytes = BytesMut::from(&bytes[..]);
+                    new_bytes.put_u8(b'\n');
+                    Ok(Some(new_bytes))
                 }
                 None => Ok(Some(BytesMut::from(&b"\n"[..]))),
             }
