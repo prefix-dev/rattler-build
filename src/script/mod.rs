@@ -547,12 +547,54 @@ impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
             Poll::Ready(Ok(())) => {
                 // Get a mutable slice of the *newly* filled part of the buffer
                 let newly_filled = &mut buf.filled_mut()[initial_filled..];
+                let len = newly_filled.len();
 
-                for byte in newly_filled.iter_mut() {
-                    if *byte == b'\r' {
-                        *byte = b'\n';
+                if len == 0 {
+                    return Poll::Ready(Ok(()));
+                }
+
+                // Fast path for small buffers
+                if len <= 32 {
+                    let mut has_cr = false;
+                    for i in 0..len {
+                        if newly_filled[i] == b'\r' {
+                            has_cr = true;
+                            break;
+                        }
+                    }
+
+                    if !has_cr {
+                        return Poll::Ready(Ok(()));
                     }
                 }
+
+                let mut i = 0;
+                while i < len {
+                    let chunk_end = std::cmp::min(i + 64, len);
+                    let mut chunk_has_cr = false;
+
+                    for j in i..chunk_end {
+                        if newly_filled[j] == b'\r' {
+                            chunk_has_cr = true;
+                            break;
+                        }
+                    }
+
+                    if !chunk_has_cr {
+                        i = chunk_end;
+                        continue;
+                    }
+
+                    while i < chunk_end {
+                        if newly_filled[i] == b'\r'
+                            && (i + 1 >= len || newly_filled[i + 1] != b'\n')
+                        {
+                            newly_filled[i] = b'\n';
+                        }
+                        i += 1;
+                    }
+                }
+
                 Poll::Ready(Ok(()))
             }
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
