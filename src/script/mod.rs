@@ -601,6 +601,9 @@ async fn run_process_with_replacements(
 
     command
         .current_dir(cwd)
+        // when using `pixi global install bash` the current work dir
+        // causes some strange issues that are fixed when setting the `PWD`
+        .env("PWD", cwd)
         .args(&args[1..])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
