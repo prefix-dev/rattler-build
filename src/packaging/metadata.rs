@@ -293,7 +293,7 @@ impl Output {
 
         Ok(IndexJson {
             name: self.name().clone(),
-            version: self.version().clone().into(),
+            version: self.version().clone(),
             build: self.build_string().into_owned(),
             build_number: recipe.build().number(),
             arch,

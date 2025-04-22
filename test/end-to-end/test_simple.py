@@ -1384,8 +1384,10 @@ def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
     text = (recipes / "abi3" / "recipe.yaml").read_text()
-    # variants = recipes / "abi3" / "variants.yaml" "-m", variants
-    rendered = rattler_build("build", "--render-only", input=text, text=True)
+    # variants = recipes / "abi3" / "variants.yaml" "-m", variants (without '--recipe' it will pick up the recipe from root folder)
+    rendered = rattler_build(
+        "build", "--recipe", "-", "--render-only", input=text, text=True
+    )
     loaded = json.loads(rendered)
 
     assert loaded[0]["recipe"]["package"]["name"] == "python-abi3-package-sample"
@@ -1444,3 +1446,53 @@ def test_ignore_run_exports(rattler_build: RattlerBuild, recipes: Path, tmp_path
     assert rendered_recipe["recipe"]["requirements"]["ignore_run_exports"][
         "from_package"
     ] == [expected_compiler]
+
+
+def test_python_version_spec(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    with pytest.raises(CalledProcessError) as exc_info:
+        args = rattler_build.build_args(recipes / "python-version-spec", tmp_path)
+        rattler_build(*args, stderr=STDOUT)
+
+    error_output = exc_info.value.output.decode("utf-8")
+    assert (
+        "failed to parse match spec: unable to parse version spec: =.*" in error_output
+    )
+
+
+def test_hatch_vcs_versions(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(
+        recipes / "hatch_vcs/recipe.yaml",
+        tmp_path,
+    )
+
+    pkg = get_extracted_package(tmp_path, "hatch-vcs-example")
+
+    assert (pkg / "info/index.json").exists()
+    index = json.loads((pkg / "info/index.json").read_text())
+    assert index["version"] == "0.1.0.dev12+ga47bad07"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Test requires Windows PowerShell behavior")
+def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    path_to_recipe = recipes / "line-breaks"
+    args = rattler_build.build_args(
+        path_to_recipe,
+        tmp_path,
+    )
+
+    output = check_output(
+        [str(rattler_build.path), *args], stderr=STDOUT, text=True, encoding="utf-8"
+    )
+    output_lines = output.splitlines()
+    found_lines = {i: False for i in range(1, 11)}
+    for line in output_lines:
+        for i in range(1, 11):
+            if f"line {i}" in line:
+                found_lines[i] = True
+
+    for i in range(1, 11):
+        assert found_lines[i], f"Expected to find 'line {i}' in the output"
+
+    assert any("done" in line for line in output_lines)

@@ -5,18 +5,7 @@ use rattler_shell::shell;
 
 use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
 
-use super::{find_interpreter, Interpreter};
-
-const CMDEXE_PREAMBLE: &str = r#"
-@chcp 65001 > nul
-@echo on
-IF "%CONDA_BUILD%" == "" (
-    @rem special behavior from conda-build for Windows
-    call ((script_path))
-)
-@rem re-enable echo because the activation scripts might have messed with it
-@echo on
-"#;
+use super::{find_interpreter, Interpreter, CMDEXE_PREAMBLE};
 
 pub(crate) struct CmdExeInterpreter;
 

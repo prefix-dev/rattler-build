@@ -1,0 +1,12 @@
+outputs:
+  - package:
+      name: abc
+      version: '0.46.1.dev1+g703fbb0'
+  - package:
+      name: abc-sub
+      version: '0.1.0'
+    requirements:
+      run:
+        - ${{ pin_subpackage('abc', lower_bound="x.x.x", upper_bound="x.x.x") }}
+    tests:
+      - script: echo hello

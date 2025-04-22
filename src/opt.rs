@@ -18,6 +18,7 @@ use url::Url;
 use crate::recipe_generator::GenerateRecipeOpts;
 use crate::{
     console_utils::{Color, LogStyle},
+    metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
     tool_configuration::{SkipExisting, TestStrategy},
     url_with_trailing_slash::UrlWithTrailingSlash,
@@ -61,6 +62,9 @@ pub enum SubCommands {
 
     /// Handle authentication to external channels
     Auth(rattler::cli::auth::Args),
+
+    /// Debug a recipe by setting up the environment without running the build script
+    Debug(DebugOpts),
 }
 
 /// Shell completion options.
@@ -194,6 +198,10 @@ pub struct CommonOpts {
     #[arg(long, env = "RATTLER_BUILD_EXPERIMENTAL")]
     pub experimental: bool,
 
+    /// List of hosts for which SSL certificate verification should be skipped
+    #[arg(long, value_delimiter = ',')]
+    pub allow_insecure_host: Option<Vec<String>>,
+
     /// Path to an auth-file to read authentication information from
     #[clap(long, env = "RATTLER_AUTH_FILE", hide = true)]
     pub auth_file: Option<PathBuf>,
@@ -210,6 +218,7 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    pub allow_insecure_host: Option<Vec<String>>,
 }
 
 impl From<CommonOpts> for CommonData {
@@ -219,6 +228,7 @@ impl From<CommonOpts> for CommonData {
             value.experimental,
             value.auth_file,
             value.channel_priority.map(|c| c.value),
+            value.allow_insecure_host,
         )
     }
 }
@@ -230,12 +240,14 @@ impl CommonData {
         experimental: bool,
         auth_file: Option<PathBuf>,
         channel_priority: Option<ChannelPriority>,
+        allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
+            allow_insecure_host,
         }
     }
 }
@@ -389,6 +401,10 @@ pub struct BuildOpts {
     #[allow(missing_docs)]
     #[clap(flatten)]
     pub sandbox_arguments: SandboxArguments,
+
+    /// Enable debug output in build scripts
+    #[arg(long, help_heading = "Modifying result")]
+    pub debug: bool,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -416,6 +432,7 @@ pub struct BuildData {
     pub noarch_build_platform: Option<Platform>,
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
+    pub debug: Debug,
 }
 
 impl BuildData {
@@ -444,6 +461,7 @@ impl BuildData {
         noarch_build_platform: Option<Platform>,
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
+        debug: bool,
     ) -> Self {
         Self {
             up_to,
@@ -476,6 +494,7 @@ impl BuildData {
             noarch_build_platform,
             extra_meta,
             sandbox_configuration,
+            debug: Debug::new(debug),
         }
     }
 }
@@ -518,6 +537,7 @@ impl BuildData {
             opts.noarch_build_platform,
             opts.extra_meta,
             opts.sandbox_arguments.into(),
+            opts.debug,
         )
     }
 }
@@ -1090,5 +1110,99 @@ impl CondaForgeData {
             provider,
             dry_run,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use rattler_conda_types::package::ArchiveType;
+    use rattler_package_streaming::write::CompressionLevel;
+
+    use super::PackageFormatAndCompression;
+
+    #[test]
+    fn test_parse_packaging() {
+        let package_format = PackageFormatAndCompression::from_str("tar-bz2").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Default
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("tar-bz2:1").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Numeric(1)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str(".tar.bz2:max").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Highest
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("tarbz2:5").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::TarBz2,
+                compression_level: CompressionLevel::Numeric(5)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:1").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Numeric(1)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:max").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Highest
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:-5").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Numeric(-5)
+            }
+        );
+
+        let package_format = PackageFormatAndCompression::from_str("conda:fast").unwrap();
+        assert_eq!(
+            package_format,
+            PackageFormatAndCompression {
+                archive_type: ArchiveType::Conda,
+                compression_level: CompressionLevel::Lowest
+            }
+        );
     }
 }

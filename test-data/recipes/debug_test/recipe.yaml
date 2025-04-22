@@ -1,0 +1,9 @@
+package:
+  name: debug-test
+  version: 1.0.0
+
+build:
+  script: |
+    echo "This is a test script"
+    mkdir -p $PREFIX/test
+    echo "Hello from debug test" > $PREFIX/test/hello.txt
