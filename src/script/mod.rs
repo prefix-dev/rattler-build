@@ -565,21 +565,29 @@ impl Decoder for CrLfNormalizer {
             .reserve(src.len().saturating_sub(self.output_buffer.capacity()));
         let mut read_idx = 0;
 
+        if std::mem::replace(&mut self.pending_cr, false) {
+            self.output_buffer.put_u8(b'\n');
+            if src[0] == b'\n' {
+                read_idx = 1;
+            }
+        }
+
         while read_idx < src.len() {
             let b = src[read_idx];
             read_idx += 1;
 
             if b == b'\r' {
-                if self.pending_cr {
-                    self.output_buffer.put_u8(b'\r');
+                if read_idx < src.len() {
+                    if src[read_idx] == b'\n' {
+                        read_idx += 1;
+                    }
+                    self.output_buffer.put_u8(b'\n');
+                } else {
+                    self.pending_cr = true;
+                    break;
                 }
-                self.pending_cr = true;
             } else {
-                if self.pending_cr && b != b'\n' {
-                    self.output_buffer.put_u8(b'\r');
-                }
                 self.output_buffer.put_u8(b);
-                self.pending_cr = false;
             }
         }
 
