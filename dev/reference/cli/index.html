@@ -1334,6 +1334,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#debug" class="md-nav__link">
+    <span class="md-ellipsis">
+      debug
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1498,6 +1507,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#debug" class="md-nav__link">
+    <span class="md-ellipsis">
+      debug
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1540,6 +1558,7 @@
 <li><code>completion</code> — Generate shell completion script</li>
 <li><code>generate-recipe</code> — Generate a recipe from PyPI or CRAN</li>
 <li><code>auth</code> — Handle authentication to external channels</li>
+<li><code>debug</code> — Debug a recipe by setting up the environment without running the build script</li>
 </ul>
 <h5 id="options"><strong>Options:</strong><a class="headerlink" href="#options" title="Permanent link">#</a></h5>
 <ul>
@@ -1730,6 +1749,10 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>--noarch-build-platform &lt;NOARCH_BUILD_PLATFORM&gt;</code></p>
 <p>Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms</p>
+</li>
+<li>
+<p><code>--debug</code></p>
+<p>Enable debug output in build scripts</p>
 </li>
 </ul>
 <h6 id="sandbox-arguments"><strong>Sandbox arguments</strong><a class="headerlink" href="#sandbox-arguments" title="Permanent link">#</a></h6>
@@ -2171,6 +2194,59 @@ e.g. <code>tar-bz2:&lt;number&gt;</code> (from 1 to 9) or <code>conda:&lt;number
 <li>
 <p><code>&lt;HOST&gt;</code></p>
 <p>The host to remove authentication for</p>
+</li>
+</ul>
+<h3 id="debug"><code>debug</code><a class="headerlink" href="#debug" title="Permanent link">#</a></h3>
+<p>Debug a recipe by setting up the environment without running the build script</p>
+<p><strong>Usage:</strong> <code>rattler-build debug [OPTIONS] --recipe &lt;RECIPE&gt;</code></p>
+<h5 id="options_14"><strong>Options:</strong><a class="headerlink" href="#options_14" title="Permanent link">#</a></h5>
+<ul>
+<li>
+<p><code>-r</code>, <code>--recipe &lt;RECIPE&gt;</code></p>
+<p>Recipe file to debug</p>
+</li>
+<li>
+<p><code>-o</code>, <code>--output &lt;OUTPUT&gt;</code></p>
+<p>Output directory for build artifacts</p>
+</li>
+<li>
+<p><code>--target-platform &lt;TARGET_PLATFORM&gt;</code></p>
+<p>The target platform to build for</p>
+</li>
+<li>
+<p><code>--host-platform &lt;HOST_PLATFORM&gt;</code></p>
+<p>The host platform to build for (defaults to target_platform)</p>
+</li>
+<li>
+<p><code>--build-platform &lt;BUILD_PLATFORM&gt;</code></p>
+<p>The build platform to build for (defaults to current platform)</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--channel &lt;CHANNELS&gt;</code></p>
+<p>Channels to use when building</p>
+</li>
+<li>
+<p><code>--experimental</code></p>
+<p>Enable experimental features</p>
+</li>
+<li>
+<p><code>--allow-insecure-host &lt;ALLOW_INSECURE_HOST&gt;</code></p>
+<p>List of hosts for which SSL certificate verification should be skipped</p>
+</li>
+<li>
+<p><code>--channel-priority &lt;CHANNEL_PRIORITY&gt;</code></p>
+<p>Channel priority to use when solving</p>
+</li>
+<li>
+<p><code>--output-name &lt;OUTPUT_NAME&gt;</code></p>
+<p>Name of the specific output to debug</p>
+</li>
+</ul>
+<h6 id="modifying-result_4"><strong>Modifying result</strong><a class="headerlink" href="#modifying-result_4" title="Permanent link">#</a></h6>
+<ul>
+<li>
+<p><code>--output-dir &lt;OUTPUT_DIR&gt;</code></p>
+<p>Output directory for build artifacts.</p>
 </li>
 </ul>
 <hr/>
