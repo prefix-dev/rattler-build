@@ -323,7 +323,7 @@ impl Script {
             work_dir.to_owned()
         };
 
-        tracing::debug!("Running script in {}", work_dir.display());
+        tracing::info!("Running script in {}", work_dir.display());
 
         let exec_args = ExecutionArgs {
             script: contents,
@@ -596,12 +596,21 @@ async fn run_process_with_replacements(
             tokio::process::Command::new(args[0])
         }
     } else {
+        tracing::info!("Not using sandboxing");
         tokio::process::Command::new(args[0])
     };
 
+    tracing::info!("Running command: {:?}", args);
+    tracing::info!("Working directory: {:?}", cwd);
+    if !cwd.exists() {
+        tracing::error!("CWD does not exist yet");
+    } else {
+        tracing::info!("CWD exists");
+    }
+
     command
-        .current_dir(cwd)
         .args(&args[1..])
+        .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());

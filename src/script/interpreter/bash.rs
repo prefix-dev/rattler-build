@@ -22,6 +22,9 @@ impl Interpreter for BashInterpreter {
         let script = format!("{}\n{}", preamble, args.script.script());
         tokio::fs::write(&build_script_path, script).await?;
 
+        tokio::fs::set_permissions(&build_script_path, std::os::unix::fs::PermissionsExt::from_mode(0o755)).await?;
+        tokio::fs::set_permissions(&build_env_path, std::os::unix::fs::PermissionsExt::from_mode(0o755)).await?;
+
         let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let mut cmd_args = vec!["bash", "-e"];
         if args.debug.is_enabled() {
