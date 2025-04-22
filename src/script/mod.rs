@@ -594,7 +594,7 @@ impl Decoder for CrLfNormalizer {
         let _processed = src.split_to(read_idx);
 
         let has_output = !self.output_buffer.is_empty();
-        Ok(has_output.then(|| self.output_buffer.split().freeze().into()))
+        Ok(has_output.then(|| std::mem::take(&mut self.output_buffer)))
     }
 
     fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -722,4 +722,127 @@ async fn run_process_with_replacements(
         stdout: stdout_log.into_bytes(),
         stderr: stderr_log.into_bytes(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio_util::bytes::BytesMut;
+
+    #[test]
+    fn test_crlf_normalizer_no_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("test string with no CR or LF");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "test string with no CR or LF");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r\nline2\r\nline3");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\nline2\nline3");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_cr_only() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\rline2\rline3");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\nline2\nline3");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_cr_at_end() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1");
+        assert!(normalizer.pending_cr);
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_some());
+        assert_eq!(eof_result.unwrap(), "\n");
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_split_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+
+        // decoder gets the \r until final part of the buffer so that it doesnt try to solve it as none
+        let mut buffer1 = BytesMut::from("line1\r");
+        let result1 = normalizer.decode(&mut buffer1).unwrap();
+        assert!(result1.is_some());
+        assert_eq!(result1.unwrap(), "line1");
+        assert!(normalizer.pending_cr);
+
+        let mut buffer2 = BytesMut::from("\nline2");
+        let result2 = normalizer.decode(&mut buffer2).unwrap();
+        assert!(result2.is_some());
+        assert_eq!(result2.unwrap(), "\nline2");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_multiple_cr_at_end() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r\r\r");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\n\n");
+        assert!(normalizer.pending_cr);
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_some());
+        assert_eq!(eof_result.unwrap(), "\n");
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_empty_buffer() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::new();
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_none());
+
+        let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_pending_cr_and_empty_buffer() {
+        let mut normalizer = CrLfNormalizer {
+            pending_cr: true,
+            ..Default::default()
+        };
+        let mut buffer = BytesMut::new();
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "\n");
+
+        let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
+        assert!(eof_result.is_none());
+    }
 }
