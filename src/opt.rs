@@ -1112,3 +1112,77 @@ impl CondaForgeData {
         }
     }
 }
+
+/// Debug options
+#[derive(Parser)]
+pub struct DebugOpts {
+    /// Recipe file to debug
+    #[arg(short, long)]
+    pub recipe: PathBuf,
+
+    /// Output directory for build artifacts
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
+
+    /// The target platform to build for
+    #[arg(long)]
+    pub target_platform: Option<Platform>,
+
+    /// The host platform to build for (defaults to target_platform)
+    #[arg(long)]
+    pub host_platform: Option<Platform>,
+
+    /// The build platform to build for (defaults to current platform)
+    #[arg(long)]
+    pub build_platform: Option<Platform>,
+
+    /// Channels to use when building
+    #[arg(short = 'c', long = "channel")]
+    pub channels: Option<Vec<String>>,
+
+    /// Common options
+    #[clap(flatten)]
+    pub common: CommonOpts,
+
+    /// Name of the specific output to debug (only required when a recipe has multiple outputs)
+    #[arg(long, help = "Name of the specific output to debug")]
+    pub output_name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+/// Data structure containing the configuration for debugging a recipe
+pub struct DebugData {
+    /// Path to the recipe file to debug
+    pub recipe_path: PathBuf,
+    /// Directory where build artifacts will be stored
+    pub output_dir: PathBuf,
+    /// Platform where the build is being executed
+    pub build_platform: Platform,
+    /// Target platform for the build
+    pub target_platform: Platform,
+    /// Host platform for runtime dependencies
+    pub host_platform: Platform,
+    /// List of channels to search for dependencies
+    pub channels: Vec<String>,
+    /// Common configuration options
+    pub common: CommonData,
+    /// Name of the specific output to debug (if recipe has multiple outputs)
+    pub output_name: Option<String>,
+}
+
+impl From<DebugOpts> for DebugData {
+    fn from(opts: DebugOpts) -> Self {
+        Self {
+            recipe_path: opts.recipe,
+            output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
+            build_platform: opts.build_platform.unwrap_or(Platform::current()),
+            target_platform: opts.target_platform.unwrap_or(Platform::current()),
+            host_platform: opts
+                .host_platform
+                .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
+            channels: opts.channels.unwrap_or(vec!["conda-forge".to_string()]),
+            common: opts.common.into(),
+            output_name: opts.output_name,
+        }
+    }
+}
