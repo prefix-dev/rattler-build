@@ -16,7 +16,7 @@ use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
     package::{ArchiveType, PathType, PathsEntry, PathsJson},
-    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord, Version,
+    Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
     VersionWithSource,
 };
 use rattler_index::index_fs;
@@ -405,7 +405,7 @@ pub struct PackageIdentifier {
     /// The name of the package
     pub name: PackageName,
     /// The version of the package
-    pub version: Version,
+    pub version: VersionWithSource,
     /// The build string of the package
     pub build_string: String,
 }
