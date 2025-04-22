@@ -543,8 +543,7 @@ pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin
 /// Codec that normalizes CR and CRLF to LF
 #[derive(Default)]
 struct CrLfNormalizer {
-    pending_cr: bool,
-    output_buffer: BytesMut,
+    last_was_cr: bool,
 }
 
 impl Decoder for CrLfNormalizer {
@@ -552,65 +551,28 @@ impl Decoder for CrLfNormalizer {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.is_empty() {
-            return if std::mem::replace(&mut self.pending_cr, false) {
-                Ok(Some(BytesMut::from(&b"\n"[..])))
-            } else {
-                Ok(None)
-            };
-        }
-
-        self.output_buffer.clear();
-        self.output_buffer
-            .reserve(src.len().saturating_sub(self.output_buffer.capacity()));
-        let mut read_idx = 0;
-
-        if std::mem::replace(&mut self.pending_cr, false) {
-            self.output_buffer.put_u8(b'\n');
-            if src[0] == b'\n' {
-                read_idx = 1;
-            }
-        }
-
-        while read_idx < src.len() {
-            let b = src[read_idx];
-            read_idx += 1;
-
-            if b == b'\r' {
-                if read_idx < src.len() {
-                    if src[read_idx] == b'\n' {
-                        read_idx += 1;
-                    }
-                    self.output_buffer.put_u8(b'\n');
-                } else {
-                    self.pending_cr = true;
-                    break;
+        let mut result = BytesMut::with_capacity(src.len());
+        for byte in src.split_off(0) {
+            match byte {
+                b'\r' => {
+                    result.put_u8(b'\n');
+                    self.last_was_cr = true;
                 }
-            } else {
-                self.output_buffer.put_u8(b);
+                b'\n' if self.last_was_cr => {
+                    // Skip writing the newline if the last byte was a carriage return.
+                    self.last_was_cr = false
+                }
+                b => {
+                    result.put_u8(b);
+                    self.last_was_cr = false;
+                }
             }
         }
 
-        let _processed = src.split_to(read_idx);
-
-        let has_output = !self.output_buffer.is_empty();
-        Ok(has_output.then(|| std::mem::take(&mut self.output_buffer)))
-    }
-
-    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let final_chunk = self.decode(buf)?;
-
-        if std::mem::replace(&mut self.pending_cr, false) {
-            match final_chunk {
-                Some(bytes) => {
-                    let mut new_bytes = BytesMut::from(&bytes[..]);
-                    new_bytes.put_u8(b'\n');
-                    Ok(Some(new_bytes))
-                }
-                None => Ok(Some(BytesMut::from(&b"\n"[..]))),
-            }
+        if result.is_empty() {
+            Ok(None)
         } else {
-            Ok(final_chunk)
+            Ok(Some(result))
         }
     }
 }
@@ -775,12 +737,11 @@ mod tests {
 
         let result = normalizer.decode(&mut buffer).unwrap();
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), "line1");
-        assert!(normalizer.pending_cr);
+        assert_eq!(result.unwrap(), "line1\n");
+        assert!(normalizer.last_was_cr);
 
         let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
-        assert!(eof_result.is_some());
-        assert_eq!(eof_result.unwrap(), "\n");
+        assert!(eof_result.is_none());
     }
 
     #[test]
@@ -791,13 +752,13 @@ mod tests {
         let mut buffer1 = BytesMut::from("line1\r");
         let result1 = normalizer.decode(&mut buffer1).unwrap();
         assert!(result1.is_some());
-        assert_eq!(result1.unwrap(), "line1");
-        assert!(normalizer.pending_cr);
+        assert_eq!(result1.unwrap(), "line1\n");
+        assert!(normalizer.last_was_cr);
 
         let mut buffer2 = BytesMut::from("\nline2");
         let result2 = normalizer.decode(&mut buffer2).unwrap();
         assert!(result2.is_some());
-        assert_eq!(result2.unwrap(), "\nline2");
+        assert_eq!(result2.unwrap(), "line2");
 
         let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
         assert!(eof_result.is_none());
@@ -810,12 +771,11 @@ mod tests {
 
         let result = normalizer.decode(&mut buffer).unwrap();
         assert!(result.is_some());
-        assert_eq!(result.unwrap(), "line1\n\n");
-        assert!(normalizer.pending_cr);
+        assert_eq!(result.unwrap(), "line1\n\n\n");
+        assert!(normalizer.last_was_cr);
 
         let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
-        assert!(eof_result.is_some());
-        assert_eq!(eof_result.unwrap(), "\n");
+        assert!(eof_result.is_none());
     }
 
     #[test]
@@ -832,15 +792,11 @@ mod tests {
 
     #[test]
     fn test_crlf_normalizer_with_pending_cr_and_empty_buffer() {
-        let mut normalizer = CrLfNormalizer {
-            pending_cr: true,
-            ..Default::default()
-        };
+        let mut normalizer = CrLfNormalizer { last_was_cr: true };
         let mut buffer = BytesMut::new();
 
         let result = normalizer.decode(&mut buffer).unwrap();
-        assert!(result.is_some());
-        assert_eq!(result.unwrap(), "\n");
+        assert!(result.is_none());
 
         let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
         assert!(eof_result.is_none());
