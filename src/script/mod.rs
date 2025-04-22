@@ -555,13 +555,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
 
                 // Fast path for small buffers
                 if len <= 32 {
-                    let mut has_cr = false;
-                    for i in 0..len {
-                        if newly_filled[i] == b'\r' {
-                            has_cr = true;
-                            break;
-                        }
-                    }
+                    let has_cr = newly_filled.iter().take(len).any(|&byte| byte == b'\r');
 
                     if !has_cr {
                         return Poll::Ready(Ok(()));
@@ -571,14 +565,11 @@ impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
                 let mut i = 0;
                 while i < len {
                     let chunk_end = std::cmp::min(i + 64, len);
-                    let mut chunk_has_cr = false;
-
-                    for j in i..chunk_end {
-                        if newly_filled[j] == b'\r' {
-                            chunk_has_cr = true;
-                            break;
-                        }
-                    }
+                    let chunk_has_cr = newly_filled
+                        .iter()
+                        .skip(i)
+                        .take(chunk_end - i)
+                        .any(|&byte| byte == b'\r');
 
                     if !chunk_has_cr {
                         i = chunk_end;
