@@ -7,6 +7,7 @@ use crate::linux::link::SharedObject;
 use crate::macos::link::Dylib;
 use crate::recipe::parser::GlobVec;
 use crate::system_tools::{SystemTools, ToolError};
+use crate::windows::link::Dll;
 use rattler_conda_types::{Arch, Platform};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -103,12 +104,14 @@ pub trait Relinker {
     ) -> Result<(), RelinkError>;
 }
 
-/// Returns true if the file is valid (i.e. ELF or Mach-o)
+/// Returns true if the file is valid (i.e. ELF or Mach-o or PE)
 pub fn is_valid_file(platform: Platform, path: &Path) -> Result<bool, RelinkError> {
     if platform.is_linux() {
         SharedObject::test_file(path)
     } else if platform.is_osx() {
         Dylib::test_file(path)
+    } else if platform.is_windows() {
+        Dll::test_file(path)
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -123,6 +126,8 @@ pub fn get_relinker(platform: Platform, path: &Path) -> Result<Box<dyn Relinker>
         Ok(Box::new(SharedObject::new(path)?))
     } else if platform.is_osx() {
         Ok(Box::new(Dylib::new(path)?))
+    } else if platform.is_windows() {
+        Ok(Box::new(Dll::new(path)?))
     } else {
         Err(RelinkError::UnknownPlatform)
     }
@@ -152,7 +157,6 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
     let relocation_config = dynamic_linking.binary_relocation();
 
     if target_platform == Platform::NoArch
-        || target_platform.is_windows()
         // skip linking checks for wasm
         || target_platform.arch() == Some(Arch::Wasm32)
         || relocation_config.is_none()
@@ -186,13 +190,15 @@ pub fn relink(temp_files: &TempFiles, output: &Output) -> Result<(), RelinkError
         }
         if is_valid_file(target_platform, p)? {
             let relinker = get_relinker(target_platform, p)?;
-            relinker.relink(
-                tmp_prefix,
-                encoded_prefix,
-                &rpaths,
-                rpath_allowlist,
-                &system_tools,
-            )?;
+            if !target_platform.is_windows() {
+                relinker.relink(
+                    tmp_prefix,
+                    encoded_prefix,
+                    &rpaths,
+                    rpath_allowlist,
+                    &system_tools,
+                )?;
+            }
             binaries.insert(p.clone());
         }
     }
