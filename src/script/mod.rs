@@ -18,9 +18,11 @@ use std::ffi::OsStr;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    pin::Pin,
     process::Stdio,
+    task::{Context, Poll},
 };
-use tokio::io::AsyncBufReadExt as _;
+use tokio::io::{AsyncBufReadExt, AsyncRead, ReadBuf};
 
 use crate::{
     env_vars::{self},
@@ -527,6 +529,38 @@ impl Output {
     }
 }
 
+/// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
+struct CarriageReturnToNewline<R: AsyncRead + Unpin> {
+    inner: R,
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let initial_filled = buf.filled().len();
+
+        // Poll the inner reader
+        match Pin::new(&mut self.inner).poll_read(cx, buf) {
+            Poll::Ready(Ok(())) => {
+                // Get a mutable slice of the *newly* filled part of the buffer
+                let newly_filled = &mut buf.filled_mut()[initial_filled..];
+
+                for byte in newly_filled.iter_mut() {
+                    if *byte == b'\r' {
+                        *byte = b'\n';
+                    }
+                }
+                Poll::Ready(Ok(()))
+            }
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 /// Spawns a process and replaces the given strings in the output with the given replacements.
 /// This is used to replace the host prefix with $PREFIX and the build prefix with $BUILD_PREFIX
 async fn run_process_with_replacements(
@@ -577,8 +611,11 @@ async fn run_process_with_replacements(
     let stdout = child.stdout.take().expect("Failed to take stdout");
     let stderr = child.stderr.take().expect("Failed to take stderr");
 
-    let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+    let stdout_wrapped = CarriageReturnToNewline { inner: stdout };
+    let stderr_wrapped = CarriageReturnToNewline { inner: stderr };
+
+    let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
+    let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
 
     let mut stdout_log = String::new();
     let mut stderr_log = String::new();
