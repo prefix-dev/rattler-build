@@ -4,6 +4,7 @@ mod sandbox;
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
 use crate::script::interpreter::Interpreter;
+use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
@@ -15,14 +16,17 @@ use rattler_conda_types::Platform;
 use rattler_shell::shell;
 use std::collections::HashSet;
 use std::ffi::OsStr;
+use std::io;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    pin::Pin,
     process::Stdio,
-    task::{Context, Poll},
 };
-use tokio::io::{AsyncBufReadExt, AsyncRead, ReadBuf};
+use tokio::io::{AsyncBufReadExt, AsyncRead};
+use tokio_util::bytes::{BufMut, BytesMut};
+use tokio_util::codec::Decoder;
+use tokio_util::codec::FramedRead;
+use tokio_util::compat::FuturesAsyncReadCompatExt;
 
 use crate::{
     env_vars::{self},
@@ -530,66 +534,85 @@ impl Output {
 }
 
 /// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
-struct CarriageReturnToNewline<R: AsyncRead + Unpin> {
-    inner: R,
+pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
+    FramedRead::new(reader, CrLfNormalizer::default())
+        .into_async_read()
+        .compat()
 }
 
-impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        let initial_filled = buf.filled().len();
+/// Codec that normalizes CR and CRLF to LF
+#[derive(Default)]
+struct CrLfNormalizer {
+    pending_cr: bool,
+}
 
-        // Poll the inner reader
-        match Pin::new(&mut self.inner).poll_read(cx, buf) {
-            Poll::Ready(Ok(())) => {
-                // Get a mutable slice of the *newly* filled part of the buffer
-                let newly_filled = &mut buf.filled_mut()[initial_filled..];
-                let len = newly_filled.len();
+impl Decoder for CrLfNormalizer {
+    type Item = BytesMut;
+    type Error = io::Error;
 
-                if len == 0 {
-                    return Poll::Ready(Ok(()));
-                }
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        if src.is_empty() {
+            return if std::mem::replace(&mut self.pending_cr, false) {
+                Ok(Some(BytesMut::from(&b"\n"[..])))
+            } else {
+                Ok(None)
+            };
+        }
 
-                // Fast path for small buffers
-                if len <= 32 {
-                    let has_cr = newly_filled.iter().take(len).any(|&byte| byte == b'\r');
+        let mut result = BytesMut::with_capacity(src.len());
+        let mut read_idx = 0;
 
-                    if !has_cr {
-                        return Poll::Ready(Ok(()));
-                    }
-                }
-
-                let mut i = 0;
-                while i < len {
-                    let chunk_end = std::cmp::min(i + 64, len);
-                    let chunk_has_cr = newly_filled
-                        .iter()
-                        .skip(i)
-                        .take(chunk_end - i)
-                        .any(|&byte| byte == b'\r');
-
-                    if !chunk_has_cr {
-                        i = chunk_end;
-                        continue;
-                    }
-
-                    while i < chunk_end {
-                        if newly_filled[i] == b'\r'
-                            && (i + 1 >= len || newly_filled[i + 1] != b'\n')
-                        {
-                            newly_filled[i] = b'\n';
-                        }
-                        i += 1;
-                    }
-                }
-
-                Poll::Ready(Ok(()))
+        if std::mem::replace(&mut self.pending_cr, false) {
+            result.put_u8(b'\n');
+            if src[0] == b'\n' {
+                read_idx = 1;
             }
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
+        }
+
+        while read_idx < src.len() {
+            match src[read_idx] {
+                b'\r' if read_idx + 1 < src.len() && src[read_idx + 1] == b'\n' => {
+                    result.put_u8(b'\n');
+                    read_idx += 2;
+                }
+                b'\r' if read_idx + 1 == src.len() => {
+                    self.pending_cr = true;
+                    read_idx += 1;
+                    break;
+                }
+                b'\r' => {
+                    result.put_u8(b'\n');
+                    read_idx += 1;
+                }
+                b => {
+                    result.put_u8(b);
+                    read_idx += 1;
+                }
+            }
+        }
+
+        let _processed = src.split_to(read_idx);
+
+        Ok(if !result.is_empty() {
+            Some(result)
+        } else {
+            None
+        })
+    }
+
+    fn decode_eof(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let final_chunk = self.decode(buf)?;
+
+        if std::mem::replace(&mut self.pending_cr, false) {
+            match final_chunk {
+                Some(mut bytes) => {
+                    bytes.put_u8(b'\n');
+                    Ok(Some(bytes))
+                }
+                None => Ok(Some(BytesMut::from(&b"\n"[..]))),
+            }
+        } else {
+            Ok(final_chunk)
         }
     }
 }
@@ -644,8 +667,8 @@ async fn run_process_with_replacements(
     let stdout = child.stdout.take().expect("Failed to take stdout");
     let stderr = child.stderr.take().expect("Failed to take stderr");
 
-    let stdout_wrapped = CarriageReturnToNewline { inner: stdout };
-    let stderr_wrapped = CarriageReturnToNewline { inner: stderr };
+    let stdout_wrapped = normalize_crlf(stdout);
+    let stderr_wrapped = normalize_crlf(stderr);
 
     let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
     let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
