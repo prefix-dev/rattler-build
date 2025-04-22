@@ -296,7 +296,7 @@ pub async fn get_build_output(
             recipe.package().name().clone(),
             PackageIdentifier {
                 name: recipe.package().name().clone(),
-                version: recipe.package().version().version().clone(),
+                version: recipe.package().version().clone(),
                 build_string: discovered_output.build_string.clone(),
             },
         );

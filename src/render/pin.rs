@@ -7,6 +7,7 @@ use std::{
 
 use rattler_conda_types::{
     MatchSpec, PackageName, ParseStrictness, Version, VersionBumpError, VersionBumpType,
+    VersionWithSource,
 };
 use serde::{de, Deserialize, Deserializer, Serialize};
 
@@ -122,7 +123,7 @@ pub enum PinError {
     BuildSpecifierWithExact,
 }
 
-pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBumpError> {
+pub fn increment(version: &VersionWithSource, segments: i32) -> Result<Version, VersionBumpError> {
     if segments == 0 {
         return Err(VersionBumpError::InvalidSegment { index: 0 });
     }
@@ -142,7 +143,11 @@ pub fn increment(version: &Version, segments: i32) -> Result<Version, VersionBum
 impl Pin {
     /// Apply the pin to a version and hash of a resolved package. If a max_pin, min_pin or exact pin
     /// are given, the pin is applied to the version accordingly.
-    pub fn apply(&self, version: &Version, build_string: &str) -> Result<MatchSpec, PinError> {
+    pub fn apply(
+        &self,
+        version: &VersionWithSource,
+        build_string: &str,
+    ) -> Result<MatchSpec, PinError> {
         if self.args.build.is_some() && self.args.exact {
             return Err(PinError::BuildSpecifierWithExact);
         }
@@ -252,7 +257,7 @@ mod test {
             let spec = test.spec;
             // split the spec in 3 parts (name, version, build string)
             let (version, hash) = spec.split_whitespace().collect_tuple().unwrap();
-            let version: Version = version.parse().unwrap();
+            let version: VersionWithSource = version.parse().unwrap();
             let spec = test.pin.apply(&version, hash).unwrap();
             println!("{} -> {}", spec, test.expected);
             assert_eq!(spec.to_string(), test.expected);
@@ -270,12 +275,12 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "1234567890";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4.0a0");
 
-        let short_version = Version::from_str("1").unwrap();
+        let short_version = VersionWithSource::from_str("1").unwrap();
         let spec = pin.apply(&short_version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1,<1.0.1.0a0");
 
@@ -327,7 +332,7 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "h1234_0";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo ==1.2.3 h1234_0");
@@ -344,7 +349,7 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "h1234_0";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3,<2.4");
@@ -353,7 +358,7 @@ mod test {
     #[test]
     fn test_increment() {
         fn increment_to_string(input: &str, segments: i32) -> String {
-            let version = Version::from_str(input).unwrap();
+            let version = VersionWithSource::from_str(input).unwrap();
             increment(&version, segments).unwrap().to_string()
         }
 
