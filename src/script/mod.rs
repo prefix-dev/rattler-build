@@ -14,19 +14,20 @@ use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
-use std::collections::HashSet;
-use std::ffi::OsStr;
-use std::io;
 use std::{
     collections::HashMap,
+    collections::HashSet,
+    ffi::OsStr,
+    io,
     path::{Path, PathBuf},
     process::Stdio,
 };
 use tokio::io::{AsyncBufReadExt, AsyncRead};
-use tokio_util::bytes::{BufMut, BytesMut};
-use tokio_util::codec::Decoder;
-use tokio_util::codec::FramedRead;
-use tokio_util::compat::FuturesAsyncReadCompatExt;
+use tokio_util::{
+    bytes::BytesMut,
+    codec::{Decoder, FramedRead},
+    compat::FuturesAsyncReadCompatExt,
+};
 
 use crate::{
     env_vars::{self},
@@ -551,11 +552,14 @@ impl Decoder for CrLfNormalizer {
     type Error = io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut result = BytesMut::with_capacity(src.len());
-        for byte in src.split_off(0) {
-            match byte {
+        let mut bytes = src.split_off(0);
+        let mut read_index = 0;
+        let mut write_index = 0;
+        while read_index < bytes.len() {
+            match bytes[read_index] {
                 b'\r' => {
-                    result.put_u8(b'\n');
+                    bytes[write_index] = b'\n';
+                    write_index += 1;
                     self.last_was_cr = true;
                 }
                 b'\n' if self.last_was_cr => {
@@ -563,16 +567,19 @@ impl Decoder for CrLfNormalizer {
                     self.last_was_cr = false
                 }
                 b => {
-                    result.put_u8(b);
+                    bytes[write_index] = b;
+                    write_index += 1;
                     self.last_was_cr = false;
                 }
             }
+            read_index += 1;
         }
 
-        if result.is_empty() {
+        if write_index == 0 {
             Ok(None)
         } else {
-            Ok(Some(result))
+            bytes.truncate(write_index);
+            Ok(Some(bytes))
         }
     }
 }
