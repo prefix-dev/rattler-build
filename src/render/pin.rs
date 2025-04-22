@@ -257,7 +257,7 @@ mod test {
             let spec = test.spec;
             // split the spec in 3 parts (name, version, build string)
             let (version, hash) = spec.split_whitespace().collect_tuple().unwrap();
-            let version: Version = version.parse().unwrap();
+            let version: VersionWithSource = version.parse().unwrap();
             let spec = test.pin.apply(&version, hash).unwrap();
             println!("{} -> {}", spec, test.expected);
             assert_eq!(spec.to_string(), test.expected);
@@ -275,12 +275,12 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "1234567890";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3,<1.2.4.0a0");
 
-        let short_version = Version::from_str("1").unwrap();
+        let short_version = VersionWithSource::from_str("1").unwrap();
         let spec = pin.apply(&short_version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1,<1.0.1.0a0");
 
@@ -332,7 +332,7 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "h1234_0";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo ==1.2.3 h1234_0");
@@ -349,7 +349,7 @@ mod test {
             },
         };
 
-        let version = Version::from_str("1.2.3").unwrap();
+        let version = VersionWithSource::from_str("1.2.3").unwrap();
         let hash = "h1234_0";
         let spec = pin.apply(&version, hash).unwrap();
         assert_eq!(spec.to_string(), "foo >=1.2.3,<2.4");
@@ -358,7 +358,7 @@ mod test {
     #[test]
     fn test_increment() {
         fn increment_to_string(input: &str, segments: i32) -> String {
-            let version = Version::from_str(input).unwrap();
+            let version = VersionWithSource::from_str(input).unwrap();
             increment(&version, segments).unwrap().to_string()
         }
 
