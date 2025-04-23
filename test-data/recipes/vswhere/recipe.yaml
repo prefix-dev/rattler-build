@@ -1,0 +1,36 @@
+context:
+  version: "3.1.7"
+
+package:
+  name: vswhere
+  version: ${{ version }}
+
+source:
+  - url: https://github.com/microsoft/vswhere/releases/download/${{ version }}/vswhere.exe
+    sha256: c54f3b7c9164ea9a0db8641e81ecdda80c2664ef5a47c4191406f848cc07c662
+    file_name: vswhere.exe
+  - url: https://raw.githubusercontent.com/microsoft/vswhere/master/LICENSE.txt
+    sha256: a1e41a01dd80dbe3f8ad5edebfd746e64ccff9c2aae3d8f47922746cf83204ef
+
+build:
+  number: 0
+  script: MOVE vswhere.exe %LIBRARY_BIN%\vswhere.exe
+  skip: not win
+
+tests:
+  - script:
+      - vswhere
+
+about:
+  homepage: https://github.com/microsoft/vswhere
+  license: MIT
+  license_file: LICENSE.txt
+  summary: CLI tool to locate Visual Studio 2017 and newer installations
+  description: |
+    vswhere is designed to be a redistributable, single-file executable that
+    can be used in build or deployment scripts to find where Visual Studio
+    - or other products in the Visual Studio family - is located.
+
+extra:
+  recipe-maintainers:
+    - wolfv

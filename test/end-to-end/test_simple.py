@@ -1496,3 +1496,10 @@ def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
         assert found_lines[i], f"Expected to find 'line {i}' in the output"
 
     assert any("done" in line for line in output_lines)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="vswhere recipe only supports Windows")
+def test_vswhere(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "vswhere", tmp_path)
+    pkg = get_extracted_package(tmp_path, "vswhere")
+    assert (pkg / "Library/bin/vswhere.exe").exists()

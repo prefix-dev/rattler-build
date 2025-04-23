@@ -313,6 +313,16 @@ pub async fn install_packages(
             )
         })?;
 
+    // Ensure required environment variable directories exist
+    let env_vars = crate::env_vars::os_vars(target_prefix, &target_platform);
+
+    // Create directories for path variables
+    for dir in env_vars.values().flatten() {
+        if dir.contains('/') || dir.contains('\\') {
+            let _ = tokio::fs::create_dir_all(dir).await;
+        }
+    }
+
     let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
 
     if !installed_packages.is_empty() && name.starts_with("host") {
