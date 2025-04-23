@@ -543,7 +543,7 @@ pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin
 
 /// Codec that normalizes CR and CRLF to LF
 #[derive(Default)]
-struct CrLfNormalizer {
+pub struct CrLfNormalizer {
     last_was_cr: bool,
 }
 

@@ -188,6 +188,11 @@ rstest = "0.25.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.9"
 serial_test = "3.2.0"
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "line_breaks"
+harness = false
 
 [patch.crates-io]
 # rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
