@@ -6,13 +6,13 @@ name = "rattler-build"
 version = "0.40.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
-edition = "2021"
+edition = "2024"
 license = "BSD-3-Clause"
 readme = "README.md"
 description = "A fast CLI tool to build conda packages on Windows, macOS and Linux"
 documentation = "https://prefix-dev.github.io/rattler-build"
 default-run = "rattler-build"
-rust-version = "1.81.0"
+rust-version = "1.86.0"
 
 [features]
 default = ['rustls-tls', 'recipe-generation']
@@ -141,7 +141,7 @@ opendal = { version = "0.53.0", default-features = false, features = [
 ] }
 
 # Rattler crates
-pixi_config = { git = "https://github.com/pavelzw/pixi", branch = "pixi-config-improvements" }
+pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
 rattler = { version = "0.33.5", default-features = false, features = [
   "cli-tools",
   "indicatif",
