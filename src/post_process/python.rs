@@ -5,7 +5,7 @@
 //!   - Compiling `.py` files to `.pyc` files
 //!   - Replacing the contents of `.dist-info/INSTALLER` files with "conda"
 use fs_err as fs;
-use rattler::install::{get_windows_launcher, python_entry_point_template, PythonInfo};
+use rattler::install::{PythonInfo, get_windows_launcher, python_entry_point_template};
 use rattler_conda_types::Platform;
 use std::collections::HashSet;
 use std::io::{self, BufRead, BufReader, Write};

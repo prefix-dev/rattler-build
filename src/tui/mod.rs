@@ -13,16 +13,16 @@ use state::*;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
 use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use miette::IntoDiagnostic;
+use ratatui::Terminal;
 use ratatui::backend::Backend;
 use ratatui::prelude::*;
-use ratatui::Terminal;
 use std::io::{self, Stderr};
 use std::panic;
 use std::path::PathBuf;
 
 use crate::build::run_build;
 use crate::console_utils::LoggingOutputHandler;
-use crate::{get_build_output, sort_build_outputs_topologically, BuildData};
+use crate::{BuildData, get_build_output, sort_build_outputs_topologically};
 
 use self::utils::run_editor;
 

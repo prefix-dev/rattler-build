@@ -9,7 +9,7 @@ use rattler_conda_types::{
     MatchSpec, PackageName, ParseStrictness, Version, VersionBumpError, VersionBumpType,
     VersionWithSource,
 };
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PinExpression(#[serde(deserialize_with = "deserialize_pin_expression")] String);

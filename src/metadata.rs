@@ -15,9 +15,9 @@ use dunce::canonicalize;
 use fs_err as fs;
 use indicatif::HumanBytes;
 use rattler_conda_types::{
-    package::{ArchiveType, PathType, PathsEntry, PathsJson},
     Channel, ChannelUrl, GenericVirtualPackage, PackageName, Platform, RepoDataRecord,
     VersionWithSource,
+    package::{ArchiveType, PathType, PathsEntry, PathsJson},
 };
 use rattler_index::index_fs;
 use rattler_package_streaming::write::CompressionLevel;
@@ -812,7 +812,7 @@ mod test {
         MatchSpec, NoArchType, PackageName, PackageRecord, ParseStrictness, RepoDataRecord,
         VersionWithSource,
     };
-    use rattler_digest::{parse_digest_from_hex, Md5, Sha256};
+    use rattler_digest::{Md5, Sha256, parse_digest_from_hex};
     use rstest::*;
     use std::str::FromStr;
     use url::Url;
@@ -845,10 +845,13 @@ mod test {
     #[test]
     fn test_resolved_dependencies_rendering() {
         let resolved_dependencies = resolved_dependencies::ResolvedDependencies {
-            specs: vec![SourceDependency {
-                spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict).unwrap(),
-            }
-            .into()],
+            specs: vec![
+                SourceDependency {
+                    spec: MatchSpec::from_str("python 3.12.* h12332", ParseStrictness::Strict)
+                        .unwrap(),
+                }
+                .into(),
+            ],
             resolved: vec![RepoDataRecord {
                 package_record: PackageRecord {
                     arch: Some("x86_64".into()),

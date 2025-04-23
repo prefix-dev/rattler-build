@@ -60,7 +60,7 @@ impl TryConvertNode<Package> for RenderedMappingNode {
                             *key.span(),
                             ErrorKind::InvalidField(invalid.to_string().into()),
                             help = format!("valid fields for `{name}` are `name` and `version`")
-                        )])
+                        )]);
                     }
                 }
                 Ok(())
@@ -138,7 +138,7 @@ impl TryConvertNode<OutputPackage> for RenderedMappingNode {
                             *key.span(),
                             ErrorKind::InvalidField(invalid.to_string().into()),
                             help = format!("valid fields for `{name}` are `name` and `version`")
-                        )])
+                        )]);
                     }
                 }
                 Ok(())
@@ -176,7 +176,7 @@ impl TryConvertNode<PackageName> for RenderedScalarNode {
 mod tests {
     use crate::{
         assert_miette_snapshot,
-        recipe::{jinja::SelectorConfig, Recipe},
+        recipe::{Recipe, jinja::SelectorConfig},
         variant_config::ParseErrors,
     };
 

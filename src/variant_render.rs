@@ -11,10 +11,10 @@ use crate::{
     hash::HashInfo,
     normalized_key::NormalizedKey,
     recipe::{
+        Jinja, ParsingError, Recipe,
         custom_yaml::Node,
         parser::{BuildString, Dependency},
         variable::Variable,
-        Jinja, ParsingError, Recipe,
     },
     selectors::SelectorConfig,
     source_code::SourceCode,

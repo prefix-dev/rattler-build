@@ -3,10 +3,10 @@ use futures::TryStreamExt as _;
 use miette::IntoDiagnostic as _;
 use rattler_networking::{Authentication, AuthenticationStorage};
 use reqwest::{
-    header::{self, HeaderMap, HeaderValue},
     StatusCode,
+    header::{self, HeaderMap, HeaderValue},
 };
-use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
+use reqwest_retry::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use std::{
     path::{Path, PathBuf},
     time::{Duration, SystemTime},
@@ -19,7 +19,7 @@ use crate::{
     opt::PrefixData,
     upload::{
         default_bytes_style, get_client_with_retry, get_default_client,
-        trusted_publishing::{check_trusted_publishing, TrustedPublishResult},
+        trusted_publishing::{TrustedPublishResult, check_trusted_publishing},
     },
 };
 

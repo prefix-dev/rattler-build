@@ -3,8 +3,8 @@ use std::sync::Arc;
 use futures::future::OptionFuture;
 use rattler_cache::package_cache::{CacheKey, PackageCache, PackageCacheError};
 use rattler_conda_types::{
-    package::{PackageFile, RunExportsJson},
     RepoDataRecord,
+    package::{PackageFile, RunExportsJson},
 };
 use rattler_networking::retry_policies::default_retry_policy;
 use reqwest_middleware::ClientWithMiddleware;

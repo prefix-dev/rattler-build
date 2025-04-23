@@ -3,9 +3,9 @@ use std::path::PathBuf;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
 
-use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
+use crate::script::{ExecutionArgs, interpreter::DEBUG_HELP, run_process_with_replacements};
 
-use super::{find_interpreter, Interpreter, BASH_PREAMBLE};
+use super::{BASH_PREAMBLE, Interpreter, find_interpreter};
 
 pub(crate) struct BashInterpreter;
 
