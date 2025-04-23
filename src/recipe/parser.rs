@@ -89,10 +89,7 @@ pub struct Recipe {
 pub(crate) trait CollectErrors<K, V>: Iterator<Item = Result<K, V>> + Sized {
     fn collect_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.push(x);
                 acc
@@ -110,10 +107,7 @@ impl<T, K, V> CollectErrors<K, V> for T where T: Iterator<Item = Result<K, V>> +
 pub(crate) trait FlattenErrors<K, V>: Iterator<Item = Result<K, Vec<V>>> + Sized {
     fn flatten_errors(self) -> Result<(), Vec<V>> {
         let err = self
-            .filter_map(|res| match res {
-                Ok(_) => None,
-                Err(err) => Some(err),
-            })
+            .filter_map(|res| res.err())
             .fold(Vec::<V>::new(), |mut acc, x| {
                 acc.extend(x);
                 acc

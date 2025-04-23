@@ -152,7 +152,7 @@ pub fn git_src(
             Some(
                 url.path_segments()?
                     .filter(|x| !x.is_empty())
-                    .last()?
+                    .next_back()?
                     .to_string(),
             )
         })()
@@ -162,7 +162,7 @@ pub fn git_src(
                 url.trim_end_matches(".git")
                     .split('/')
                     .filter(|x| !x.is_empty())
-                    .last()?
+                    .next_back()?
                     .to_string(),
             )
         })()

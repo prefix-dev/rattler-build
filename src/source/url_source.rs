@@ -50,7 +50,7 @@ fn cache_name_from_url(
     checksum: &Checksum,
     with_extension: bool,
 ) -> Option<String> {
-    let filename = url.path_segments()?.filter(|x| !x.is_empty()).last()?;
+    let filename = url.path_segments()?.filter(|x| !x.is_empty()).next_back()?;
 
     let (stem, extension) = split_path(Path::new(filename)).ok()?;
     let checksum_hex = checksum.to_hex();
@@ -137,7 +137,7 @@ async fn fetch_remote(
 
     progress_bar.set_message(
         url.path_segments()
-            .and_then(|segs| segs.last())
+            .and_then(|mut segs| segs.next_back())
             .map(str::to_string)
             .unwrap_or_else(|| "Unknown File".to_string()),
     );
