@@ -79,7 +79,10 @@ async fn async_main() -> miette::Result<()> {
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
-            fn print_completions<G: clap_complete::Generator>(generator: G, cmd: &mut clap::Command) {
+            fn print_completions<G: clap_complete::Generator>(
+                generator: G,
+                cmd: &mut clap::Command,
+            ) {
                 clap_complete::generate(
                     generator,
                     cmd,

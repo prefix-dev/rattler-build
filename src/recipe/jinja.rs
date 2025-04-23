@@ -1060,13 +1060,21 @@ mod tests {
 
     fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn()) {
         if let Ok(old_value) = std::env::var(key.as_ref()) {
-            std::env::set_var(key.as_ref(), value.as_ref());
+            unsafe {
+                std::env::set_var(key.as_ref(), value.as_ref());
+            }
             f();
-            std::env::set_var(key.as_ref(), old_value);
+            unsafe {
+                std::env::set_var(key.as_ref(), old_value);
+            }
         } else {
-            std::env::set_var(key.as_ref(), value.as_ref());
+            unsafe {
+                std::env::set_var(key.as_ref(), value.as_ref());
+            }
             f();
-            std::env::remove_var(key.as_ref());
+            unsafe {
+                std::env::remove_var(key.as_ref());
+            }
         }
     }
     #[test]
