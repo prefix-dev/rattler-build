@@ -8,7 +8,7 @@ build:
     - if: unix
       then:
         - echo "Hello World" > $PREFIX/test-execution.txt
-        - echo "Hello World" > $PREFIX/bin/rust
+        - mkdir $PREFIX/bin && echo "Hello World" > $PREFIX/bin/rust
       else:
         - echo "Hello World" > %PREFIX%\test-execution.txt
         - echo "Hello World" > %PREFIX%\Library\bin\rust.exe
