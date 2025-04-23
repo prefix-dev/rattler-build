@@ -535,7 +535,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         // tracing::info!("loading from path: {path}");
         let filename = path
             .split('/')
-            .last()
+            .next_back()
             .expect("unreachable: split will always atleast return empty string");
         // tracing::info!("loading filename: {filename}");
         let value: minijinja::Value = match filename.split_once('.') {

@@ -154,7 +154,7 @@ pub async fn fetch_sources(
                 tracing::info!("Fetching source from url: {}", first_url);
                 let file_name_from_url = first_url
                     .path_segments()
-                    .and_then(|segments| segments.last().map(|last| last.to_string()))
+                    .and_then(|mut segments| segments.next_back().map(|last| last.to_string()))
                     .ok_or_else(|| SourceError::UrlNotFile(first_url.clone()))?;
 
                 let res = url_source::url_src(src, &cache_src, tool_configuration).await?;
