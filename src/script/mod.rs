@@ -4,6 +4,7 @@ mod sandbox;
 pub use sandbox::{SandboxArguments, SandboxConfiguration};
 
 use crate::script::interpreter::Interpreter;
+use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
@@ -13,16 +14,20 @@ use itertools::Itertools;
 use minijinja::Value;
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
-use std::collections::HashSet;
-use std::ffi::OsStr;
 use std::{
     collections::HashMap,
+    collections::HashSet,
+    ffi::OsStr,
+    io,
     path::{Path, PathBuf},
-    pin::Pin,
     process::Stdio,
-    task::{Context, Poll},
 };
-use tokio::io::{AsyncBufReadExt, AsyncRead, ReadBuf};
+use tokio::io::{AsyncBufReadExt, AsyncRead};
+use tokio_util::{
+    bytes::BytesMut,
+    codec::{Decoder, FramedRead},
+    compat::FuturesAsyncReadCompatExt,
+};
 
 use crate::{
     env_vars::{self},
@@ -530,33 +535,51 @@ impl Output {
 }
 
 /// An AsyncRead wrapper that replaces carriage return (\r) bytes with newline (\n) bytes.
-struct CarriageReturnToNewline<R: AsyncRead + Unpin> {
-    inner: R,
+pub fn normalize_crlf<R: AsyncRead + Unpin>(reader: R) -> impl AsyncRead + Unpin {
+    FramedRead::new(reader, CrLfNormalizer::default())
+        .into_async_read()
+        .compat()
 }
 
-impl<R: AsyncRead + Unpin> AsyncRead for CarriageReturnToNewline<R> {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        let initial_filled = buf.filled().len();
+/// Codec that normalizes CR and CRLF to LF
+#[derive(Default)]
+pub struct CrLfNormalizer {
+    last_was_cr: bool,
+}
 
-        // Poll the inner reader
-        match Pin::new(&mut self.inner).poll_read(cx, buf) {
-            Poll::Ready(Ok(())) => {
-                // Get a mutable slice of the *newly* filled part of the buffer
-                let newly_filled = &mut buf.filled_mut()[initial_filled..];
+impl Decoder for CrLfNormalizer {
+    type Item = BytesMut;
+    type Error = io::Error;
 
-                for byte in newly_filled.iter_mut() {
-                    if *byte == b'\r' {
-                        *byte = b'\n';
-                    }
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let mut bytes = src.split_off(0);
+        let mut read_index = 0;
+        let mut write_index = 0;
+        while read_index < bytes.len() {
+            match bytes[read_index] {
+                b'\r' => {
+                    bytes[write_index] = b'\n';
+                    write_index += 1;
+                    self.last_was_cr = true;
                 }
-                Poll::Ready(Ok(()))
+                b'\n' if self.last_was_cr => {
+                    // Skip writing the newline if the last byte was a carriage return.
+                    self.last_was_cr = false
+                }
+                b => {
+                    bytes[write_index] = b;
+                    write_index += 1;
+                    self.last_was_cr = false;
+                }
             }
-            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
-            Poll::Pending => Poll::Pending,
+            read_index += 1;
+        }
+
+        if write_index == 0 {
+            Ok(None)
+        } else {
+            bytes.truncate(write_index);
+            Ok(Some(bytes))
         }
     }
 }
@@ -614,8 +637,8 @@ async fn run_process_with_replacements(
     let stdout = child.stdout.take().expect("Failed to take stdout");
     let stderr = child.stderr.take().expect("Failed to take stderr");
 
-    let stdout_wrapped = CarriageReturnToNewline { inner: stdout };
-    let stderr_wrapped = CarriageReturnToNewline { inner: stderr };
+    let stdout_wrapped = normalize_crlf(stdout);
+    let stderr_wrapped = normalize_crlf(stderr);
 
     let mut stdout_lines = tokio::io::BufReader::new(stdout_wrapped).lines();
     let mut stderr_lines = tokio::io::BufReader::new(stderr_wrapped).lines();
@@ -668,4 +691,121 @@ async fn run_process_with_replacements(
         stdout: stdout_log.into_bytes(),
         stderr: stderr_log.into_bytes(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio_util::bytes::BytesMut;
+
+    #[test]
+    fn test_crlf_normalizer_no_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("test string with no CR or LF");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "test string with no CR or LF");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r\nline2\r\nline3");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\nline2\nline3");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_cr_only() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\rline2\rline3");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\nline2\nline3");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_cr_at_end() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\n");
+        assert!(normalizer.last_was_cr);
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_split_crlf() {
+        let mut normalizer = CrLfNormalizer::default();
+
+        // decoder gets the \r until final part of the buffer so that it doesnt try to solve it as none
+        let mut buffer1 = BytesMut::from("line1\r");
+        let result1 = normalizer.decode(&mut buffer1).unwrap();
+        assert!(result1.is_some());
+        assert_eq!(result1.unwrap(), "line1\n");
+        assert!(normalizer.last_was_cr);
+
+        let mut buffer2 = BytesMut::from("\nline2");
+        let result2 = normalizer.decode(&mut buffer2).unwrap();
+        assert!(result2.is_some());
+        assert_eq!(result2.unwrap(), "line2");
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_multiple_cr_at_end() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::from("line1\r\r\r");
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "line1\n\n\n");
+        assert!(normalizer.last_was_cr);
+
+        let eof_result = normalizer.decode_eof(&mut BytesMut::new()).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_empty_buffer() {
+        let mut normalizer = CrLfNormalizer::default();
+        let mut buffer = BytesMut::new();
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_none());
+
+        let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
+        assert!(eof_result.is_none());
+    }
+
+    #[test]
+    fn test_crlf_normalizer_with_pending_cr_and_empty_buffer() {
+        let mut normalizer = CrLfNormalizer { last_was_cr: true };
+        let mut buffer = BytesMut::new();
+
+        let result = normalizer.decode(&mut buffer).unwrap();
+        assert!(result.is_none());
+
+        let eof_result = normalizer.decode_eof(&mut buffer).unwrap();
+        assert!(eof_result.is_none());
+    }
 }

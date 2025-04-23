@@ -108,7 +108,7 @@ fs-err = "3.1.0"
 which = "7.0.3"
 clap_complete = "4.5.47"
 clap_complete_nushell = "4.5.5"
-tokio-util = "0.7.14"
+tokio-util = { version = "0.7.14", features = ["codec", "compat"] }
 
 tar = "0.4.44"
 zip = { version = "2.6.1", default-features = false, features = [
@@ -188,6 +188,11 @@ rstest = "0.25.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.9"
 serial_test = "3.2.0"
+criterion = { version = "0.5.1", features = ["html_reports"] }
+
+[[bench]]
+name = "line_breaks"
+harness = false
 
 [patch.crates-io]
 # rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
