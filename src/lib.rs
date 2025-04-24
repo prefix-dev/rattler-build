@@ -55,21 +55,22 @@ use dunce::canonicalize;
 use fs_err as fs;
 use futures::FutureExt;
 use metadata::{
-    build_reindexed_channels, BuildConfiguration, BuildSummary, Directories, Output,
-    PackageIdentifier, PackagingSettings,
+    BuildConfiguration, BuildSummary, Directories, Output, PackageIdentifier, PackagingSettings,
+    build_reindexed_channels,
 };
 use miette::{Context, IntoDiagnostic};
 pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
-    package::ArchiveType, Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform,
+    Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform, package::ArchiveType,
 };
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
 use rattler_virtual_packages::{VirtualPackage, VirtualPackageOverrides};
-use recipe::parser::{find_outputs_from_src, Dependency, TestType};
+use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
 use source_code::Source;
 use system_tools::SystemTools;
@@ -478,7 +479,12 @@ pub async fn run_build_from_args(
                     && output.build_configuration.host_platform.platform
                         != output.build_configuration.build_platform.platform
                 {
-                    let reason = format!("the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})", output.build_configuration.target_platform, output.build_configuration.build_platform.platform, output.build_configuration.host_platform.platform);
+                    let reason = format!(
+                        "the argument --test=native was set and the build is a cross-compilation (target_platform={}, build_platform={}, host_platform={})",
+                        output.build_configuration.target_platform,
+                        output.build_configuration.build_platform.platform,
+                        output.build_configuration.host_platform.platform
+                    );
 
                     (true, reason)
                 } else {

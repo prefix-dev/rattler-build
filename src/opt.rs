@@ -2,15 +2,15 @@
 
 use std::{error::Error, path::PathBuf, str::FromStr};
 
-use clap::{arg, builder::ArgPredicate, crate_version, Parser, ValueEnum};
-use clap_complete::{shells, Generator};
+use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
+use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use pixi_config::PackageFormatAndCompression;
-use rattler_conda_types::{package::ArchiveType, NamedChannelOrUrl, Platform};
+use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::warn;
 use url::Url;
 
@@ -799,7 +799,9 @@ impl TryFrom<ArtifactoryOpts> for ArtifactoryData {
         let token = match (value.username, value.password, value.token) {
             (_, _, Some(token)) => Some(token),
             (Some(_), Some(password), _) => {
-                warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
+                warn!(
+                    "Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead."
+                );
                 Some(password)
             }
             (Some(_), None, _) => {
@@ -1138,7 +1140,7 @@ pub struct DebugOpts {
 
     /// Channels to use when building
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// Common options
     #[clap(flatten)]
@@ -1163,7 +1165,7 @@ pub struct DebugData {
     /// Host platform for runtime dependencies
     pub host_platform: Platform,
     /// List of channels to search for dependencies
-    pub channels: Vec<String>,
+    pub channels: Vec<NamedChannelOrUrl>,
     /// Common configuration options
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
@@ -1180,7 +1182,9 @@ impl From<DebugOpts> for DebugData {
             host_platform: opts
                 .host_platform
                 .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
-            channels: opts.channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels: opts.channels.unwrap_or(vec![
+                NamedChannelOrUrl::from_str("conda-forge").expect("conda-forge is parseable"),
+            ]),
             common: opts.common.into(),
             output_name: opts.output_name,
         }
