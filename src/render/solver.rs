@@ -12,7 +12,7 @@ use indicatif::{HumanBytes, ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use rattler::install::{DefaultProgressFormatter, IndicatifReporter, Installer};
 use rattler_conda_types::{Channel, ChannelUrl, MatchSpec, Platform, PrefixRecord, RepoDataRecord};
-use rattler_solve::{resolvo::Solver, ChannelPriority, SolveStrategy, SolverImpl, SolverTask};
+use rattler_solve::{ChannelPriority, SolveStrategy, SolverImpl, SolverTask, resolvo::Solver};
 use url::Url;
 
 use crate::{metadata::PlatformWithVirtualPackages, packaging::Files, tool_configuration};

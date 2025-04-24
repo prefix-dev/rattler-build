@@ -583,7 +583,7 @@ mod tests {
     };
     use tempfile::tempdir_in;
 
-    use super::{install_name_tool, RelinkError};
+    use super::{RelinkError, install_name_tool};
     use crate::{
         macos::link::{Dylib, DylibChanges},
         system_tools::SystemTools,

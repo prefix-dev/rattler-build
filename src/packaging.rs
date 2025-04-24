@@ -9,17 +9,17 @@ use std::{
 use fs_err as fs;
 use fs_err::File;
 use rattler_conda_types::{
-    package::{ArchiveType, PackageFile, PathsJson},
     Platform,
+    package::{ArchiveType, PackageFile, PathsJson},
 };
 use rattler_package_streaming::write::{
-    write_conda_package, write_tar_bz2_package, CompressionLevel,
+    CompressionLevel, write_conda_package, write_tar_bz2_package,
 };
 
 mod file_finder;
 mod file_mapper;
 mod metadata;
-pub use file_finder::{content_type, Files, TempFiles};
+pub use file_finder::{Files, TempFiles, content_type};
 pub use metadata::{contains_prefix_binary, contains_prefix_text, create_prefix_placeholder};
 use tempfile::NamedTempFile;
 
@@ -130,7 +130,10 @@ fn copy_license_files(
         // issue a warning
         for file in copied_files_recipe_dir {
             if copied_files_work_dir.contains(file) {
-                let warn_str = format!("License file from source directory was overwritten by license file from recipe folder ({})", file.display());
+                let warn_str = format!(
+                    "License file from source directory was overwritten by license file from recipe folder ({})",
+                    file.display()
+                );
                 tracing::warn!(warn_str);
                 output.record_warning(&warn_str);
             }

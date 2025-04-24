@@ -221,9 +221,11 @@ mod test {
         ));
         assert!(res.err().is_none());
         assert!(tempdir.path().join("text.txt").exists());
-        assert!(fs::read_to_string(tempdir.path().join("text.txt"))
-            .unwrap()
-            .contains("Hello, World"));
+        assert!(
+            fs::read_to_string(tempdir.path().join("text.txt"))
+                .unwrap()
+                .contains("Hello, World")
+        );
     }
 
     #[test]

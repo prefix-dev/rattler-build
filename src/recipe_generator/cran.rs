@@ -3,7 +3,7 @@ use std::{collections::HashMap, collections::HashSet, path::PathBuf};
 
 use itertools::Itertools;
 use miette::IntoDiagnostic;
-use rattler_digest::{compute_bytes_digest, Sha256Hash};
+use rattler_digest::{Sha256Hash, compute_bytes_digest};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use url::Url;

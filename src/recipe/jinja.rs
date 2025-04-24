@@ -7,7 +7,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::{from_args, Kwargs, Object};
+use minijinja::value::{Kwargs, Object, from_args};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -1097,7 +1097,10 @@ mod tests {
             ps("upper_bound=None, lower_bound=None"),
             "{\"pin_subpackage\":{\"name\":\"foo\"}}"
         );
-        assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}");
+        assert_eq!(
+            ps("lower_bound='1.2.3'"),
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}"
+        );
     }
 
     #[test]
@@ -1169,14 +1172,18 @@ mod tests {
                     .as_str(),
                 Some("true")
             );
-            assert!(jinja
-                .eval("env.exists('RANDOM_JINJA_ENV_VAR')")
-                .expect("test 5")
-                .is_true());
-            assert!(!jinja
-                .eval("env.exists('RANDOM_JINJA_ENV_VAR2')")
-                .expect("test 6")
-                .is_true());
+            assert!(
+                jinja
+                    .eval("env.exists('RANDOM_JINJA_ENV_VAR')")
+                    .expect("test 5")
+                    .is_true()
+            );
+            assert!(
+                !jinja
+                    .eval("env.exists('RANDOM_JINJA_ENV_VAR2')")
+                    .expect("test 6")
+                    .is_true()
+            );
         });
     }
 

@@ -7,7 +7,7 @@ use std::{
 
 use fs_err::File;
 
-use goblin::pe::{header::DOS_MAGIC, PE};
+use goblin::pe::{PE, header::DOS_MAGIC};
 use scroll::Pread;
 
 use crate::{

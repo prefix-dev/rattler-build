@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-use super::checks::{perform_linking_checks, LinkingCheckError};
+use super::checks::{LinkingCheckError, perform_linking_checks};
 
 #[derive(Error, Debug)]
 #[allow(missing_docs)]

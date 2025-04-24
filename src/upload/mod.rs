@@ -1,11 +1,11 @@
 //! The upload module provides the package upload functionality.
 
-use crate::{tool_configuration::APP_USER_AGENT, AnacondaData, ArtifactoryData, QuetzData};
+use crate::{AnacondaData, ArtifactoryData, QuetzData, tool_configuration::APP_USER_AGENT};
 use fs_err::tokio as fs;
 use futures::TryStreamExt;
-use indicatif::{style::TemplateError, HumanBytes, ProgressState};
-use opendal::{services::S3Config, Configurator, Operator};
-use reqwest_retry::{policies::ExponentialBackoff, RetryDecision, RetryPolicy};
+use indicatif::{HumanBytes, ProgressState, style::TemplateError};
+use opendal::{Configurator, Operator, services::S3Config};
+use reqwest_retry::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 use std::{
     fmt::Write,
     path::{Path, PathBuf},
@@ -20,7 +20,7 @@ use reqwest::{Method, StatusCode};
 use tracing::{info, warn};
 use url::Url;
 
-use crate::upload::package::{sha256_sum, ExtractedPackage};
+use crate::upload::package::{ExtractedPackage, sha256_sum};
 
 mod anaconda;
 pub mod conda_forge;
@@ -143,7 +143,9 @@ pub async fn upload_package_to_artifactory(
                     password,
                 }),
             )) => {
-                warn!("A bearer token is required for authentication with artifactory. Using the password from the keychain / auth file to authenticate. Consider switching to a bearer token instead for Artifactory.");
+                warn!(
+                    "A bearer token is required for authentication with artifactory. Using the password from the keychain / auth file to authenticate. Consider switching to a bearer token instead for Artifactory."
+                );
                 password
             }
             Ok((_, Some(_))) => {

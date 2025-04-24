@@ -6,9 +6,9 @@ use std::{collections::BTreeMap, fmt, hash::Hash, ops, path::PathBuf, str::FromS
 
 use indexmap::{IndexMap, IndexSet};
 use marked_yaml::{
-    loader::{parse_yaml_with_options, LoaderOptions},
-    types::MarkedScalarNode,
     Span,
+    loader::{LoaderOptions, parse_yaml_with_options},
+    types::MarkedScalarNode,
 };
 use rattler_conda_types::VersionWithSource;
 use url::Url;
@@ -17,7 +17,7 @@ use crate::{
     _partialerror,
     normalized_key::NormalizedKey,
     recipe::{
-        error::{jinja_error_to_label, ErrorKind, ParsingError, PartialParsingError},
+        error::{ErrorKind, ParsingError, PartialParsingError, jinja_error_to_label},
         jinja::Jinja,
     },
     source_code::SourceCode,
@@ -522,11 +522,7 @@ impl From<&MarkedScalarNode> for ScalarNode {
 impl From<bool> for ScalarNode {
     /// Convert from a boolean into a node
     fn from(value: bool) -> Self {
-        if value {
-            "true".into()
-        } else {
-            "false".into()
-        }
+        if value { "true".into() } else { "false".into() }
     }
 }
 

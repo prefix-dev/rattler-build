@@ -9,9 +9,9 @@ use marked_yaml::types::MarkedMappingNode;
 use crate::{
     _partialerror,
     recipe::{
-        custom_yaml::{parse_yaml, Node},
-        error::{ErrorKind, PartialParsingError},
         ParsingError,
+        custom_yaml::{Node, parse_yaml},
+        error::{ErrorKind, PartialParsingError},
     },
     source_code::SourceCode,
 };
@@ -44,7 +44,9 @@ fn check_src_cache(root: &MarkedMappingNode) -> Result<(), PartialParsingError> 
         })?;
 
         if !cache_map.contains_key("source") && has_top_level_source {
-            tracing::warn!("The cache has its own `source` key now. You probably want to move the top-level `source` key into the `cache` key.");
+            tracing::warn!(
+                "The cache has its own `source` key now. You probably want to move the top-level `source` key into the `cache` key."
+            );
         }
     }
 
@@ -262,7 +264,7 @@ mod tests {
     use super::*;
     use crate::{
         assert_miette_snapshot,
-        recipe::{jinja::SelectorConfig, Recipe},
+        recipe::{Recipe, jinja::SelectorConfig},
     };
     use fs_err as fs;
     use insta::assert_debug_snapshot;
