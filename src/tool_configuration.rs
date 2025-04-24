@@ -7,13 +7,13 @@ use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
-    authentication_storage::{self, AuthenticationStorageError},
     AuthenticationMiddleware, AuthenticationStorage,
+    authentication_storage::{self, AuthenticationStorageError},
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
 use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use url::Url;
 
 use crate::console_utils::LoggingOutputHandler;

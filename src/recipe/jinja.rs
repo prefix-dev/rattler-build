@@ -7,7 +7,7 @@ use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
 
-use minijinja::value::{from_args, Kwargs, Object};
+use minijinja::value::{Kwargs, Object, from_args};
 use minijinja::{Environment, Value};
 use rattler_conda_types::{Arch, PackageName, ParseStrictness, Platform, Version, VersionSpec};
 
@@ -1060,13 +1060,21 @@ mod tests {
 
     fn with_env((key, value): (impl AsRef<str>, impl AsRef<str>), f: impl Fn()) {
         if let Ok(old_value) = std::env::var(key.as_ref()) {
-            std::env::set_var(key.as_ref(), value.as_ref());
+            unsafe {
+                std::env::set_var(key.as_ref(), value.as_ref());
+            }
             f();
-            std::env::set_var(key.as_ref(), old_value);
+            unsafe {
+                std::env::set_var(key.as_ref(), old_value);
+            }
         } else {
-            std::env::set_var(key.as_ref(), value.as_ref());
+            unsafe {
+                std::env::set_var(key.as_ref(), value.as_ref());
+            }
             f();
-            std::env::remove_var(key.as_ref());
+            unsafe {
+                std::env::remove_var(key.as_ref());
+            }
         }
     }
     #[test]
@@ -1097,7 +1105,10 @@ mod tests {
             ps("upper_bound=None, lower_bound=None"),
             "{\"pin_subpackage\":{\"name\":\"foo\"}}"
         );
-        assert_eq!(ps("lower_bound='1.2.3'"), "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}");
+        assert_eq!(
+            ps("lower_bound='1.2.3'"),
+            "{\"pin_subpackage\":{\"name\":\"foo\",\"lower_bound\":\"1.2.3\",\"upper_bound\":\"x\"}}"
+        );
     }
 
     #[test]
@@ -1169,14 +1180,18 @@ mod tests {
                     .as_str(),
                 Some("true")
             );
-            assert!(jinja
-                .eval("env.exists('RANDOM_JINJA_ENV_VAR')")
-                .expect("test 5")
-                .is_true());
-            assert!(!jinja
-                .eval("env.exists('RANDOM_JINJA_ENV_VAR2')")
-                .expect("test 6")
-                .is_true());
+            assert!(
+                jinja
+                    .eval("env.exists('RANDOM_JINJA_ENV_VAR')")
+                    .expect("test 5")
+                    .is_true()
+            );
+            assert!(
+                !jinja
+                    .eval("env.exists('RANDOM_JINJA_ENV_VAR2')")
+                    .expect("test 6")
+                    .is_true()
+            );
         });
     }
 

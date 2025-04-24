@@ -7,9 +7,9 @@ use rattler_shell::{
     shell::{self, Shell, ShellEnum},
 };
 
-use crate::script::{interpreter::DEBUG_HELP, run_process_with_replacements, ExecutionArgs};
+use crate::script::{ExecutionArgs, interpreter::DEBUG_HELP, run_process_with_replacements};
 
-use super::{find_interpreter, Interpreter};
+use super::{Interpreter, find_interpreter};
 
 pub(crate) struct NuShellInterpreter;
 

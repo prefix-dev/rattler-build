@@ -146,7 +146,7 @@ impl TryConvertNode<License> for RenderedScalarNode {
 mod test {
     use crate::{
         assert_miette_snapshot,
-        recipe::{jinja::SelectorConfig, Recipe},
+        recipe::{Recipe, jinja::SelectorConfig},
         variant_config::ParseErrors,
     };
 

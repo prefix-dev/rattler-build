@@ -6,7 +6,7 @@ mod cran;
 mod pypi;
 mod serialize;
 
-use cran::{generate_r_recipe, CranOpts};
+use cran::{CranOpts, generate_r_recipe};
 use pypi::PyPIOpts;
 pub use serialize::write_recipe;
 

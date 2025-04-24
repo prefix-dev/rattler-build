@@ -11,7 +11,7 @@ use walkdir::WalkDir;
 
 use crate::{metadata::Output, recipe::parser::GlobVec};
 
-use super::{file_mapper, PackagingError};
+use super::{PackagingError, file_mapper};
 
 /// This struct keeps a record of all the files that are new in the prefix (i.e. not present in the previous
 /// conda environment).

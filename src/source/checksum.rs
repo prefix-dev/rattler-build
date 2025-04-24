@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use rattler_digest::{compute_file_digest, serde::SerializableHash, Md5, Md5Hash, Sha256Hash};
+use rattler_digest::{Md5, Md5Hash, Sha256Hash, compute_file_digest, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
