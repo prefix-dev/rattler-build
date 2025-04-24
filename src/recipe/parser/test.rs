@@ -14,7 +14,7 @@ use crate::{
     validate_keys,
 };
 
-use super::{glob_vec::GlobVec, FlattenErrors, Script};
+use super::{FlattenErrors, Script, glob_vec::GlobVec};
 use rattler_conda_types::{NamelessMatchSpec, ParseStrictness};
 
 /// The extra requirements for the test

@@ -16,15 +16,16 @@ use std::collections::{HashSet, VecDeque};
 
 use marked_yaml::Span;
 use minijinja::machinery::{
+    WhitespaceConfig,
     ast::{self, CallArg, Expr, Stmt},
-    parse_expr, WhitespaceConfig,
+    parse_expr,
 };
 
 use crate::recipe::{
+    ParsingError,
     custom_yaml::{self, HasSpan, Node, ScalarNode, SequenceNodeInternal},
     jinja::SYNTAX_CONFIG,
     parser::CollectErrors,
-    ParsingError,
 };
 use crate::source_code::SourceCode;
 

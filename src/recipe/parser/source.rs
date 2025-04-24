@@ -1,8 +1,8 @@
 //! Parse the source section of a recipe
 
-use rattler_digest::{serde::SerializableHash, Md5, Md5Hash, Sha256, Sha256Hash};
+use rattler_digest::{Md5, Md5Hash, Sha256, Sha256Hash, serde::SerializableHash};
 use serde::{Deserialize, Serialize};
-use serde_with::{formats::PreferOne, serde_as, OneOrMany};
+use serde_with::{OneOrMany, formats::PreferOne, serde_as};
 use std::fmt::Display;
 use std::{fmt, path::PathBuf, str::FromStr};
 use url::Url;
@@ -88,7 +88,7 @@ impl TryConvertNode<Vec<Source>> for RenderedNode {
                     *s.span(),
                     ErrorKind::Other,
                     label = "expected mapping or sequence"
-                )])
+                )]);
             }
         }
 

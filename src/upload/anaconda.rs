@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
 use fs_err::tokio as fs;
-use miette::{miette, IntoDiagnostic};
-use rattler_conda_types::package::AboutJson;
+use miette::{IntoDiagnostic, miette};
 use rattler_conda_types::PackageName;
+use rattler_conda_types::package::AboutJson;
+use reqwest::Client;
 use reqwest::multipart::Form;
 use reqwest::multipart::Part;
-use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use tracing::info;
@@ -14,8 +14,8 @@ use url::Url;
 
 use crate::url_with_trailing_slash::UrlWithTrailingSlash;
 
-use super::package::ExtractedPackage;
 use super::VERSION;
+use super::package::ExtractedPackage;
 
 pub struct Anaconda {
     client: Client,
@@ -108,7 +108,7 @@ impl Anaconda {
                 return Err(miette!(
                     "failed to get existing package: {}",
                     response.status()
-                ))
+                ));
             }
         };
 
@@ -201,7 +201,7 @@ impl Anaconda {
                 return Err(miette!(
                     "failed to get existing release: {}",
                     response.status()
-                ))
+                ));
             }
         };
 
@@ -310,7 +310,9 @@ impl Anaconda {
         package: &ExtractedPackage<'_>,
     ) -> miette::Result<bool> {
         if channels.is_empty() {
-            return Err(miette!("No channel selected - please specify at least one channel for upload to Anaconda.org"));
+            return Err(miette!(
+                "No channel selected - please specify at least one channel for upload to Anaconda.org"
+            ));
         }
 
         let sha256 = package.sha256().into_diagnostic()?;
@@ -390,7 +392,7 @@ impl Anaconda {
                 return Err(miette!(
                     "failed to stage file, server replied with: {}",
                     resp.status()
-                ))
+                ));
             }
         }
 

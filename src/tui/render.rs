@@ -2,12 +2,12 @@ use ansi_to_tui::IntoText;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use miette::IntoDiagnostic;
 use ratatui::{
+    Frame,
     crossterm::event::Event as CrosstermEvent,
     layout::{Alignment, Position},
     prelude::*,
     style::{Color, Style, Stylize},
     widgets::{Block, BorderType, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    Frame,
 };
 use tokio::sync::mpsc;
 use tui_input::backend::crossterm::EventHandler;

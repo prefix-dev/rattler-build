@@ -3,9 +3,9 @@ use marked_yaml::Span;
 use crate::{
     _partialerror,
     recipe::{
+        Jinja,
         custom_yaml::{HasSpan, RenderedNode, RenderedSequenceNode, TryConvertNode},
         error::{ErrorKind, PartialParsingError},
-        Jinja,
     },
 };
 
@@ -26,7 +26,7 @@ impl TryConvertNode<Vec<(String, Span)>> for RenderedSequenceNode {
                     return Err(vec![_partialerror!(
                         *node.span(),
                         ErrorKind::ExpectedScalar,
-                    )])
+                    )]);
                 }
             }
         }
@@ -43,7 +43,7 @@ impl TryConvertNode<Skip> for RenderedNode {
                 return Err(vec![_partialerror!(
                     *self.span(),
                     ErrorKind::ExpectedSequence,
-                )])
+                )]);
             }
             RenderedNode::Null(_) => vec![],
         };
@@ -69,7 +69,7 @@ impl Skip {
                     return Err(vec![_partialerror!(
                         condition.1,
                         ErrorKind::JinjaRendering(e),
-                    )])
+                    )]);
                 }
             }
         }

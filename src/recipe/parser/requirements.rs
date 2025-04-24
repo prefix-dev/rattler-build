@@ -382,12 +382,12 @@ impl TryConvertNode<MatchSpec> for RenderedScalarNode {
             };
 
             return Err(vec![_partialerror!(
-                    *self.span(),
-                    ErrorKind::Other,
-                    label = format!(
-                        "This match spec is ambiguous. Do you mean `{name} =={version}{rest}` or `{name} {version}.*{rest}`?"
-                    )
-                )]);
+                *self.span(),
+                ErrorKind::Other,
+                label = format!(
+                    "This match spec is ambiguous. Do you mean `{name} =={version}{rest}` or `{name} {version}.*{rest}`?"
+                )
+            )]);
         }
 
         MatchSpec::from_str(self.as_str(), ParseStrictness::Strict).map_err(|err| {

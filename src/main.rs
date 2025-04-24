@@ -14,7 +14,7 @@ use rattler_build::{
     opt::{App, BuildData, DebugData, ShellCompletion, SubCommands},
     rebuild, run_test, upload_from_args,
 };
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -79,9 +79,12 @@ async fn async_main() -> miette::Result<()> {
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
-            fn print_completions<G: clap_complete::Generator>(gen: G, cmd: &mut clap::Command) {
+            fn print_completions<G: clap_complete::Generator>(
+                generator: G,
+                cmd: &mut clap::Command,
+            ) {
                 clap_complete::generate(
-                    gen,
+                    generator,
                     cmd,
                     cmd.get_name().to_string(),
                     &mut std::io::stdout(),

@@ -17,15 +17,15 @@ pub(crate) use r::RInterpreter;
 use rattler_conda_types::Platform;
 use rattler_shell::{
     activation::{
-        prefix_path_entries, ActivationError, ActivationVariables, Activator,
-        PathModificationBehavior,
+        ActivationError, ActivationVariables, Activator, PathModificationBehavior,
+        prefix_path_entries,
     },
     shell::{self, Shell},
 };
 
 use super::ExecutionArgs;
 
-pub(crate) const DEBUG_HELP : &str  = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
+pub(crate) const DEBUG_HELP: &str = "To debug the build, run it manually in the work directory (execute the `./conda_build.sh` or `conda_build.bat` script)";
 
 pub const BASH_PREAMBLE: &str = r#"#!/bin/bash
 ## Start of bash preamble

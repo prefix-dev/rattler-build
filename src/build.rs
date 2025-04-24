@@ -6,7 +6,7 @@ use miette::{Context, IntoDiagnostic};
 use rattler_conda_types::{Channel, MatchSpec};
 
 use crate::{
-    metadata::{build_reindexed_channels, Output},
+    metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
     render::solver::load_repodatas,
     tool_configuration,
