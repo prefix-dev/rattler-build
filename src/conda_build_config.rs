@@ -218,7 +218,9 @@ mod tests {
         };
 
         if let Some(cuda) = cuda {
-            std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
+            unsafe {
+                std::env::set_var("TEST_CF_CUDA_ENABLED", if cuda { "True" } else { "False" });
+            }
         }
 
         let config = load_conda_build_config(&path, &selector_config).unwrap();
@@ -243,7 +245,9 @@ mod tests {
                     vec!["CF_CUDA_DISABLED".into()]
                 );
             }
-            std::env::remove_var("TEST_CF_CUDA_ENABLED");
+            unsafe {
+                std::env::remove_var("TEST_CF_CUDA_ENABLED");
+            }
         }
     }
 
