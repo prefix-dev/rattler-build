@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NuShellInterpreter,
-    PerlInterpreter, PythonInterpreter, RInterpreter
+    PerlInterpreter, PythonInterpreter, RInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
