@@ -268,8 +268,10 @@ fn to_vector_of_globs(
 
 impl TryConvertNode<GlobVec> for RenderedScalarNode {
     fn try_convert(&self, _name: &str) -> Result<GlobVec, Vec<PartialParsingError>> {
-        let vec = vec![to_glob(self.as_str())
-            .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?];
+        let vec = vec![
+            to_glob(self.as_str())
+                .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])?,
+        ];
         GlobVec::new(vec.into(), InnerGlobVec::default())
             .map_err(|err| vec![_partialerror!(*self.span(), ErrorKind::GlobParsing(err),)])
     }

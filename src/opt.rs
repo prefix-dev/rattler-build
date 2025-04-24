@@ -2,14 +2,14 @@
 
 use std::{error::Error, path::PathBuf, str::FromStr};
 
-use clap::{arg, builder::ArgPredicate, crate_version, Parser, ValueEnum};
-use clap_complete::{shells, Generator};
+use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
+use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::{package::ArchiveType, Platform};
+use rattler_conda_types::{Platform, package::ArchiveType};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tracing::warn;
 use url::Url;
 
@@ -849,7 +849,9 @@ impl TryFrom<ArtifactoryOpts> for ArtifactoryData {
         let token = match (value.username, value.password, value.token) {
             (_, _, Some(token)) => Some(token),
             (Some(_), Some(password), _) => {
-                warn!("Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead.");
+                warn!(
+                    "Using username and password for Artifactory authentication is deprecated, using password as token. Please use an API token instead."
+                );
                 Some(password)
             }
             (Some(_), None, _) => {

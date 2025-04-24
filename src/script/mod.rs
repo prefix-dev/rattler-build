@@ -7,8 +7,8 @@ use crate::script::interpreter::Interpreter;
 use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
-    BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
-    BASH_PREAMBLE, CMDEXE_PREAMBLE,
+    BASH_PREAMBLE, BashInterpreter, CMDEXE_PREAMBLE, CmdExeInterpreter, NuShellInterpreter,
+    PerlInterpreter, PythonInterpreter,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -33,8 +33,8 @@ use crate::{
     env_vars::{self},
     metadata::{Debug, Output},
     recipe::{
-        parser::{Script, ScriptContent},
         Jinja,
+        parser::{Script, ScriptContent},
     },
 };
 
@@ -360,7 +360,7 @@ impl Script {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     format!("Unsupported interpreter: {}", interpreter),
-                ))
+                ));
             }
         };
 

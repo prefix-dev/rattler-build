@@ -333,12 +333,8 @@ macro_rules! _error {
             kind: $kind,
         }
     }};
-    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
-    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_error!($src, $span, $kind, $label, $help)
-    }};
+    ($src:expr, $span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
+    ($src:expr, $span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_error!($src, $span, $kind, $label, $help) }};
     ($src:expr, $span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::ParsingError {
             src: $src,
@@ -378,12 +374,8 @@ macro_rules! _partialerror {
             kind: $kind,
         }
     }};
-    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
-    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{
-        $crate::_partialerror!($span, $kind, $label, $help)
-    }};
+    ($span:expr, $kind:expr, label = $label:expr, help = $help:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
+    ($span:expr, $kind:expr, help = $help:expr, label = $label:expr $(,)?) => {{ $crate::_partialerror!($span, $kind, $label, $help) }};
     ($span:expr, $kind:expr, $label:expr, $help:expr $(,)?) => {{
         $crate::recipe::error::PartialParsingError {
             span: $span,
@@ -470,11 +462,7 @@ pub(super) fn marker_span_to_span(src: &str, span: marked_yaml::Span) -> SourceS
         }
         None => {
             let l = find_length(src, start);
-            if l == 0 {
-                1
-            } else {
-                l
-            }
+            if l == 0 { 1 } else { l }
         }
     };
 

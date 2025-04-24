@@ -253,7 +253,9 @@ impl TryConvertNode<Script> for RenderedMappingNode {
             return Err(vec![_partialerror!(
                 *invalid.span(),
                 ErrorKind::InvalidField(invalid.to_string().into()),
-                help = format!("valid keys for {name} are `env`, `secrets`, `interpreter`, `content` or `file`")
+                help = format!(
+                    "valid keys for {name} are `env`, `secrets`, `interpreter`, `content` or `file`"
+                )
             )]);
         }
 

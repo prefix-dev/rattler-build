@@ -19,8 +19,8 @@ use dunce::canonicalize;
 use fs_err as fs;
 use rattler::package_cache::CacheKey;
 use rattler_conda_types::{
-    package::{ArchiveIdentifier, IndexJson, PackageFile},
     Channel, ChannelUrl, MatchSpec, ParseStrictness, Platform,
+    package::{ArchiveIdentifier, IndexJson, PackageFile},
 };
 use rattler_index::index_fs;
 use rattler_shell::{

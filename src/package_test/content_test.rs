@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use crate::recipe::parser::PackageContentsTest;
 use crate::{metadata::Output, package_test::TestError};
 use globset::{Glob, GlobBuilder, GlobSet};
-use rattler_conda_types::{package::PathsJson, Arch, Platform};
+use rattler_conda_types::{Arch, Platform, package::PathsJson};
 
 fn build_glob(glob: String) -> Result<Glob, globset::Error> {
     tracing::debug!("Building glob: {}", glob);

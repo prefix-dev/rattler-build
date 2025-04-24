@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use rattler_conda_types::{
-    package::RunExportsJson, MatchSpec, PackageName, ParseMatchSpecError, ParseStrictness,
+    MatchSpec, PackageName, ParseMatchSpecError, ParseStrictness, package::RunExportsJson,
 };
 
 use crate::recipe::parser::IgnoreRunExports;

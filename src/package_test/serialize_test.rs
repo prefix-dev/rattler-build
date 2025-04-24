@@ -6,8 +6,8 @@ use crate::{
     metadata::Output,
     packaging::PackagingError,
     recipe::{
-        parser::{CommandsTest, ScriptContent, TestType},
         Jinja,
+        parser::{CommandsTest, ScriptContent, TestType},
     },
     script::ResolvedScriptContents,
 };
@@ -76,7 +76,7 @@ pub(crate) fn write_test_files(
 
     // For each `Command` test, we need to copy the test files to the package
     for (idx, test) in tests.iter_mut().enumerate() {
-        if let TestType::Command(ref mut command_test) = test {
+        if let TestType::Command(command_test) = test {
             let cwd = PathBuf::from(format!("etc/conda/test-files/{name}/{idx}"));
             let folder = tmp_dir_path.join(&cwd);
             let files = command_test.write_to_folder(&folder, output)?;

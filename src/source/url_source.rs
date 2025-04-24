@@ -16,7 +16,7 @@ use crate::{
 use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
 
-use super::{checksum::Checksum, extract::is_tarball, SourceError};
+use super::{SourceError, checksum::Checksum, extract::is_tarball};
 
 /// Splits a path into stem and extension, handling special cases like .tar.gz
 fn split_path(path: &Path) -> std::io::Result<(String, String)> {
@@ -334,27 +334,35 @@ mod tests {
 
     #[test]
     fn test_cache_name() {
-        let cases =
-            vec![
+        let cases = vec![
             (
                 "https://cache-redirector.jetbrains.com/download.jetbrains.com/idea/jdbc-drivers/web/snowflake-3.13.27.zip",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "6a15e95ee7e6c55b862dab9758ea803350aa2e3560d6183027b0c29919fcab18",
+                    )
+                    .unwrap(),
+                ),
                 "snowflake-3_13_27_6a15e95e.zip",
             ),
             (
                 "https://example.com/example.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+                    )
+                    .unwrap(),
+                ),
                 "example_12345678.tar.gz",
             ),
             (
                 "https://github.com/mamba-org/mamba/archive/refs/tags/micromamba-12.23.12.tar.gz",
-                Checksum::Sha256(rattler_digest::parse_digest_from_hex::<Sha256>(
-                    "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
-                ).unwrap()),
+                Checksum::Sha256(
+                    rattler_digest::parse_digest_from_hex::<Sha256>(
+                        "63fd8a1dbec811e63d4f9b5e27757af45d08a219d0900c7c7a19e0b177a576b8",
+                    )
+                    .unwrap(),
+                ),
                 "micromamba-12_23_12_63fd8a1d.tar.gz",
             ),
         ];
