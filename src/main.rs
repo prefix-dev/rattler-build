@@ -102,7 +102,7 @@ async fn async_main() -> miette::Result<()> {
             let config = if let Some(config_path) = app.config_file {
                 let config_str = read_to_string(&config_path).await.into_diagnostic()?;
                 let (config, _unused_keys) =
-                    Config::from_toml(config_str.as_str(), Some(&config_path.clone())).unwrap();
+                    Config::from_toml(config_str.as_str(), Some(&config_path.clone()))?;
                 Some(config)
             } else {
                 None
