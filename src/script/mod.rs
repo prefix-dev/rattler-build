@@ -8,7 +8,7 @@ use futures::TryStreamExt;
 use indexmap::IndexMap;
 use interpreter::{
     BashInterpreter, CmdExeInterpreter, NuShellInterpreter, PerlInterpreter, PythonInterpreter,
-    BASH_PREAMBLE, CMDEXE_PREAMBLE,
+    RInterpreter, BASH_PREAMBLE, CMDEXE_PREAMBLE,
 };
 use itertools::Itertools;
 use minijinja::Value;
@@ -356,6 +356,7 @@ impl Script {
             "cmd" => CmdExeInterpreter.run(exec_args).await?,
             "python" => PythonInterpreter.run(exec_args).await?,
             "perl" => PerlInterpreter.run(exec_args).await?,
+            "r" => RInterpreter.run(exec_args).await?,
             _ => {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::Other,

@@ -1496,3 +1496,27 @@ def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
         assert found_lines[i], f"Expected to find 'line {i}' in the output"
 
     assert any("done" in line for line in output_lines)
+
+
+def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
+    rattler_build.build(recipes / "r-test", tmp_path)
+    pkg = get_extracted_package(tmp_path, "r-test")
+
+    assert (pkg / "r-test-output.txt").exists()
+
+    output_content = (pkg / "r-test-output.txt").read_text()
+    assert (
+        "This file was created by the R interpreter in rattler-build" in output_content
+    )
+    assert "R version:" in output_content
+    assert "PREFIX:" in output_content
+    assert (pkg / "info/recipe/recipe.yaml").exists()
+    assert (pkg / "info/tests/tests.yaml").exists()
+
+    # Verify index.json exists before running test
+    assert (pkg / "info/index.json").exists(), "index.json file missing from package"
+
+    pkg_file = get_package(tmp_path, "r-test")
+    test_result = rattler_build.test(pkg_file)
+    assert "Running script test for recipe:" in test_result
+    assert "all tests passed!" in test_result
