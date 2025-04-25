@@ -32,10 +32,8 @@ source:
 build:
   number: 0
   script:
-    interpreter: r
     content: |
-      # Note, to install the package via source, we need to set the SRC_DIR environment variable
-      install.packages(Sys.getenv("SRC_DIR"), repos=NULL, type="source")
+      Rscript -e "install.packages(Sys.getenv('SRC_DIR'), repos=NULL, type='source')"
 
 requirements:
   build:
@@ -61,11 +59,9 @@ requirements:
     - r-rcpparmadillo
 
 tests:
-  - script:
-      interpreter: r
-      content: |
-        library("SpecsVerification")
-        TRUE
+  - r:
+      libraries:
+        - SpecsVerification
 
 about:
   homepage: https://CRAN.R-project.org/package=SpecsVerification
