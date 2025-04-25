@@ -64,8 +64,6 @@ tests:
   - script:
       interpreter: r
       content: |
-        # Ensure R can find the installed package
-        .libPaths(c(file.path(Sys.getenv("PREFIX"), "lib", "R", "library"), .libPaths()))
         library("SpecsVerification")
         TRUE
 
