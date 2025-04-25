@@ -2,7 +2,78 @@
 
 This guide shows how to create recipes for R packages with scripts to execute them with rattler-build.
 
+## Generating R Package Recipes
+
+The easiest way to get started with R packages is to use the built-in recipe generator:
+
+```bash
+rattler-build generate-recipe cran package_name
+```
+
+For example, to generate a recipe for the "dplyr" package:
+
+```bash
+rattler-build generate-recipe cran dplyr
+```
+
+This will create a recipe.yaml file with all the necessary dependencies and configuration for building the R package.
+
+```yaml title="recipe.yaml"
+package:
+  name: r-specsverification
+  version: 0.1.0
+
+source:
+  url:
+    - https://cran.r-project.org/src/contrib/SpecsVerification_0.5-3.tar.gz
+    - https://cran.r-project.org/src/contrib/Archive/SpecsVerification/SpecsVerification_0.5-3.tar.gz
+  sha256: 630fd876b51cb5e22061fa64dbb447c09e88c14e81fb801001ae18e969a4e6ec
+
+build:
+  number: 0
+  script:
+    interpreter: r
+    content: |
+      # Note, to install the package via source, we need to set the SRC_DIR environment variable
+      install.packages(Sys.getenv("SRC_DIR"), repos=NULL, type="source")
+
+requirements:
+  build:
+    - ${{ compiler('c') }}                # [not win]
+    - ${{ compiler('cxx') }}              # [not win]
+    - mingwpy                             # [win]
+    - ucrt                                # [win]
+    - m2-filesystem                       # [win]
+    - m2-make
+    - m2-sed                              # [win]
+    - m2-coreutils                        # [win]
+    - m2-zip                              # [win]
+  host:
+    - r-base
+    - r-rcpp
+    - r-rcpparmadillo
+  run:
+    - r-base
+    - r-rcpp
+    - r-rcpparmadillo
+
+tests:
+  - script:
+      interpreter: r
+      content: |
+        library('SpecsVerification')
+        TRUE
+
+about:
+  homepage: https://CRAN.R-project.org/package=SpecsVerification
+  license: GPL-2.0-or-later
+  summary: A collection of forecast verification routines developed for the SPECS FP7 project. The emphasis is on comparative verification of ensemble forecasts of weather and climate.
+  license_family: GPL2
+```
+
 ## Basic Recipe
+
+If however you want to start with working through the recipe by yourself, you can start with a basic set of requirements. An example would be:
 
 ```yaml
 package:
