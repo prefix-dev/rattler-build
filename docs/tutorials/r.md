@@ -39,15 +39,18 @@ build:
 
 requirements:
   build:
-    - ${{ compiler('c') }}                # [not win]
-    - ${{ compiler('cxx') }}              # [not win]
-    - mingwpy                             # [win]
-    - ucrt                                # [win]
-    - m2-filesystem                       # [win]
+    - if: unix
+      then:
+        - ${{ compiler('c') }}
+        - ${{ compiler('cxx') }}
+      else:
+        - mingwpy
+        - ucrt
+        - m2-filesystem
+        - m2-sed
+        - m2-coreutils
+        - m2-zip
     - m2-make
-    - m2-sed                              # [win]
-    - m2-coreutils                        # [win]
-    - m2-zip                              # [win]
   host:
     - r-base
     - r-rcpp
@@ -61,14 +64,15 @@ tests:
   - script:
       interpreter: r
       content: |
-        library('SpecsVerification')
+        # Ensure R can find the installed package
+        .libPaths(c(file.path(Sys.getenv("PREFIX"), "lib", "R", "library"), .libPaths()))
+        library("SpecsVerification")
         TRUE
 
 about:
   homepage: https://CRAN.R-project.org/package=SpecsVerification
   license: GPL-2.0-or-later
   summary: A collection of forecast verification routines developed for the SPECS FP7 project. The emphasis is on comparative verification of ensemble forecasts of weather and climate.
-  license_family: GPL2
 ```
 
 ## Basic Recipe
