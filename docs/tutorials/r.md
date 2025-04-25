@@ -102,7 +102,7 @@ Sometimes, conda won't provide prebuilt binaries for Windows. When that happens,
 requirements:
   build:
     - r-base
-    - vs2019_win-64    # Visual Studio
+    - vs2019_win-64    # Visual Studio, you can also use mingwpy
     - m2-coreutils     # For 'basename'
     - m2-base          # MSYS2 utilities
 ```
