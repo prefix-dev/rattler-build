@@ -7,6 +7,7 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
+use pixi_config::Config;
 use rattler_build::{
     build_recipes,
     console_utils::init_logging,
@@ -15,6 +16,7 @@ use rattler_build::{
     rebuild, run_test, upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
+use tokio::fs::read_to_string;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -97,7 +99,15 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Build(build_args)) => {
             let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
-            let build_data = BuildData::from(build_args);
+            let config = if let Some(config_path) = app.config_file {
+                let config_str = read_to_string(&config_path).await.into_diagnostic()?;
+                let (config, _unused_keys) =
+                    Config::from_toml(config_str.as_str(), Some(&config_path.clone()))?;
+                Some(config)
+            } else {
+                None
+            };
+            let build_data = BuildData::from_opts_and_config(build_args, config);
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir)?;

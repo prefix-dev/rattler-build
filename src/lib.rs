@@ -63,6 +63,7 @@ pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
     Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform, package::ArchiveType,
 };
@@ -312,7 +313,7 @@ pub async fn get_build_output(
             .channels
             .clone()
             .into_iter()
-            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .map(|c| c.into_base_url(&tool_config.channel_config))
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
