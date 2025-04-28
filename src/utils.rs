@@ -176,4 +176,73 @@ mod tests {
             assert_eq!(forward_slash, "/foo/bar/baz");
         }
     }
+
+    #[cfg(windows)]
+    mod try_remove_with_retry_tests {
+        use super::*;
+        use std::fs::File;
+        use std::fs::OpenOptions;
+        use std::os::windows::fs::OpenOptionsExt;
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+        use tempfile::TempDir;
+
+        #[test]
+        fn test_successful_removal() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+
+            std::mem::forget(temp_dir);
+            let file_path = dir_path.join("test.txt");
+
+            File::create(&file_path)?;
+            let result = try_remove_with_retry(&dir_path, None);
+            assert!(result.is_ok());
+            assert!(!dir_path.exists());
+
+            Ok(())
+        }
+
+        #[test]
+        fn test_nonexistent_path() {
+            let nonexistent_path = PathBuf::from("/nonexistent/path/that/does/not/exist");
+            let result = try_remove_with_retry(&nonexistent_path, None);
+            assert!(result.is_err());
+        }
+
+        #[test]
+        fn test_locked_file_retry() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("locked.txt");
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .share_mode(0)
+                .open(&file_path)?;
+
+            let file_handle = Arc::new(Mutex::new(Some(file)));
+            let file_handle_clone = file_handle.clone();
+            let locked_file_error = std::io::Error::from_raw_os_error(32);
+            let handle = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                let mut guard = file_handle_clone.lock().unwrap();
+                *guard = None;
+            });
+            let result = try_remove_with_retry(&dir_path, Some(locked_file_error));
+
+            handle.join().unwrap();
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+
+            std::thread::sleep(Duration::from_millis(200));
+            assert!(!dir_path.exists(), "Directory still exists!");
+
+            Ok(())
+        }
+    }
 }
