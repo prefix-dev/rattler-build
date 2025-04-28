@@ -169,5 +169,5 @@ rattler-build upload s3 \
   --channel s3://my-bucket/my-channel \
   --region auto \
   --endpoint-url https://xyz.r2.cloudflarestorage.com \
-  --force-path-style true
+  --force-path-style
 ```
