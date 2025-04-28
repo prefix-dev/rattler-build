@@ -264,9 +264,7 @@ impl CommonData {
             mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
-        // s3 config
         let s3_config = config.compute_s3_config();
-
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
