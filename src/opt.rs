@@ -235,7 +235,7 @@ impl CommonData {
         allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
         // mirror config
-        // todo: this is a duplicate in pixi: do it like in `compute_s3_config`
+        // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
         tracing::info!("Using mirrors: {:?}", config.mirror_map());
 
