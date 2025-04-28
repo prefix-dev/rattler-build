@@ -254,14 +254,14 @@ impl CommonData {
             let mut mirrors = Vec::new();
             for v in value {
                 mirrors.push(mirror_middleware::Mirror {
-                    url: ensure_trailing_slash(&v),
+                    url: ensure_trailing_slash(v),
                     no_jlap: false,
                     no_bz2: false,
                     no_zstd: false,
                     max_failures: None,
                 });
             }
-            mirror_config.insert(ensure_trailing_slash(&key), mirrors);
+            mirror_config.insert(ensure_trailing_slash(key), mirrors);
         }
 
         // s3 config
