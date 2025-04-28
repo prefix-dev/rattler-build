@@ -238,7 +238,7 @@ impl CommonData {
         // todo: this is a duplicate in pixi: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
         tracing::info!("Using mirrors: {:?}", config.mirror_map());
-    
+
         fn ensure_trailing_slash(url: &url::Url) -> url::Url {
             if url.path().ends_with('/') {
                 url.clone()
@@ -249,7 +249,7 @@ impl CommonData {
                     .expect("Failed to add trailing slash to URL")
             }
         }
-    
+
         for (key, value) in config.mirror_map() {
             let mut mirrors = Vec::new();
             for v in value {
@@ -559,8 +559,9 @@ impl BuildData {
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format
-                .or(config.clone().and_then(|config| config.build.package_format)),
+            opts.package_format.or(config
+                .clone()
+                .and_then(|config| config.build.package_format)),
             opts.compression_threads,
             opts.io_concurrency_limit,
             opts.no_include_recipe,

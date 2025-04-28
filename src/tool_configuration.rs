@@ -7,7 +7,9 @@ use clap::ValueEnum;
 use rattler::package_cache::PackageCache;
 use rattler_conda_types::{ChannelConfig, Platform};
 use rattler_networking::{
-    authentication_storage::{self, AuthenticationStorageError}, mirror_middleware, s3_middleware, AuthenticationMiddleware, AuthenticationStorage
+    AuthenticationMiddleware, AuthenticationStorage,
+    authentication_storage::{self, AuthenticationStorageError},
+    mirror_middleware, s3_middleware,
 };
 use rattler_repodata_gateway::Gateway;
 use rattler_solve::ChannelPriority;
@@ -67,8 +69,10 @@ impl BaseClient {
         let auth_storage = get_auth_store(auth_file)?;
         let timeout = 5 * 60;
 
-        let s3_middleware = s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
-        let mirror_middleware = mirror_middleware::MirrorMiddleware::from_map(mirror_middleware_config);
+        let s3_middleware =
+            s3_middleware::S3Middleware::new(s3_middleware_config, auth_storage.clone());
+        let mirror_middleware =
+            mirror_middleware::MirrorMiddleware::from_map(mirror_middleware_config);
 
         let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
             builder
@@ -217,7 +221,12 @@ pub fn reqwest_client_from_auth_storage(
     mirror_middleware_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     allow_insecure_host: Option<Vec<String>>,
 ) -> Result<BaseClient, AuthenticationStorageError> {
-    BaseClient::new(auth_file, allow_insecure_host, s3_middleware_config, mirror_middleware_config)
+    BaseClient::new(
+        auth_file,
+        allow_insecure_host,
+        s3_middleware_config,
+        mirror_middleware_config,
+    )
 }
 
 /// A builder for a [`Configuration`].

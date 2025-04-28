@@ -136,7 +136,13 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
-        Some(SubCommands::Test(test_args)) => run_test(TestData::from_opts_and_config(test_args, config), log_handler).await,
+        Some(SubCommands::Test(test_args)) => {
+            run_test(
+                TestData::from_opts_and_config(test_args, config),
+                log_handler,
+            )
+            .await
+        }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild(
                 RebuildData::from_opts_and_config(rebuild_args, config),
