@@ -81,7 +81,7 @@ pub fn get_current_timestamp() -> miette::Result<u64> {
 
 /// Removes a directory and all its contents, including read-only files.
 pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
-    match fs::remove_dir_all(path) {
+    let result = match fs::remove_dir_all(path) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
             // If the normal removal fails, try to forcefully remove it.
@@ -106,7 +106,47 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
             fs::remove_dir_all(path)
         }
         Err(e) => Err(e),
+    };
+
+    #[cfg(windows)]
+    {
+        if result.is_err() {
+            return try_remove_with_retry(path, None);
+        }
     }
+
+    result
+}
+
+#[cfg(windows)]
+/// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
+fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
+    let max_retries = 5;
+    let mut attempts: i32 = if first_err.is_some() { 1 } else { 0 };
+    let mut last_err = first_err;
+
+    while attempts < max_retries {
+        if let Some(e) = &last_err {
+            tracing::debug!("Retrying deletion {}/{}: {}", attempts + 1, max_retries, e);
+            std::thread::sleep(
+                std::time::Duration::from_millis(500 * (1 << attempts.saturating_sub(1)))
+                    .min(std::time::Duration::from_secs(3)),
+            );
+        }
+
+        match fs::remove_dir_all(path) {
+            Ok(_) => return Ok(()),
+            Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
+                last_err = Some(e);
+                attempts += 1;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "Directory could not be deleted")
+    }))
 }
 
 #[cfg(test)]
