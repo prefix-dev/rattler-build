@@ -131,6 +131,8 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
+        build_data.common.s3_config.clone(),
+        build_data.common.mirror_config.clone(),
         build_data.common.allow_insecure_host.clone(),
     )
     .into_diagnostic()?;
@@ -619,6 +621,8 @@ pub async fn run_test(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 test_data.common.auth_file,
+                test_data.common.s3_config,
+                test_data.common.mirror_config,
                 test_data.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
@@ -664,16 +668,16 @@ pub async fn run_test(
 
 /// Rebuild.
 pub async fn rebuild(
-    args: RebuildData,
+    rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
+    tracing::info!("Rebuilding {}", rebuild_data.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
     // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+    rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
 
     let temp_dir = temp_folder.into_path();
 
@@ -688,7 +692,7 @@ pub async fn rebuild(
     output.build_configuration.directories.recipe_dir = temp_dir;
 
     // create output dir and set it in the config
-    let output_dir = args.common.output_dir;
+    let output_dir = rebuild_data.common.output_dir;
 
     fs::create_dir_all(&output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
@@ -697,15 +701,17 @@ pub async fn rebuild(
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
-        .with_compression_threads(args.compression_threads)
+        .with_compression_threads(rebuild_data.compression_threads)
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
-                args.common.auth_file,
-                args.common.allow_insecure_host.clone(),
+                rebuild_data.common.auth_file,
+                rebuild_data.common.s3_config.clone(),
+                rebuild_data.common.mirror_config.clone(),
+                rebuild_data.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
         )
-        .with_test_strategy(args.test)
+        .with_test_strategy(rebuild_data.test)
         .finish();
 
     output

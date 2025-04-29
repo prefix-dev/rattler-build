@@ -1,6 +1,6 @@
 //! Command-line options.
 
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
 use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
@@ -8,6 +8,7 @@ use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
+use rattler_networking::{mirror_middleware, s3_middleware};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{Value, json};
@@ -218,19 +219,9 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    pub s3_config: HashMap<String, s3_middleware::S3Config>,
+    pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
-}
-
-impl From<CommonOpts> for CommonData {
-    fn from(value: CommonOpts) -> Self {
-        Self::new(
-            value.output_dir,
-            value.experimental,
-            value.auth_file,
-            value.channel_priority.map(|c| c.value),
-            value.allow_insecure_host,
-        )
-    }
 }
 
 impl CommonData {
@@ -239,16 +230,61 @@ impl CommonData {
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
+        config: pixi_config::Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
+        // mirror config
+        // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
+        let mut mirror_config = HashMap::new();
+        tracing::info!("Using mirrors: {:?}", config.mirror_map());
+
+        fn ensure_trailing_slash(url: &url::Url) -> url::Url {
+            if url.path().ends_with('/') {
+                url.clone()
+            } else {
+                // Do not use `join` because it removes the last element
+                format!("{}/", url)
+                    .parse()
+                    .expect("Failed to add trailing slash to URL")
+            }
+        }
+
+        for (key, value) in config.mirror_map() {
+            let mut mirrors = Vec::new();
+            for v in value {
+                mirrors.push(mirror_middleware::Mirror {
+                    url: ensure_trailing_slash(v),
+                    no_jlap: false,
+                    no_bz2: false,
+                    no_zstd: false,
+                    max_failures: None,
+                });
+            }
+            mirror_config.insert(ensure_trailing_slash(key), mirrors);
+        }
+
+        let s3_config = config.compute_s3_config();
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
+            s3_config,
+            mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
             allow_insecure_host,
         }
+    }
+
+    fn from_opts_and_config(value: CommonOpts, config: pixi_config::Config) -> Self {
+        Self::new(
+            value.output_dir,
+            value.experimental,
+            value.auth_file,
+            config,
+            value.channel_priority.map(|c| c.value),
+            value.allow_insecure_host,
+        )
     }
 }
 
@@ -521,8 +557,9 @@ impl BuildData {
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format
-                .or(config.and_then(|config| config.build.package_format)),
+            opts.package_format.or(config
+                .clone()
+                .and_then(|config| config.build.package_format)),
             opts.compression_threads,
             opts.io_concurrency_limit,
             opts.no_include_recipe,
@@ -531,7 +568,7 @@ impl BuildData {
             } else {
                 None
             }),
-            opts.common.into(),
+            CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
@@ -590,18 +627,18 @@ pub struct TestData {
     pub common: CommonData,
 }
 
-impl From<TestOpts> for TestData {
-    fn from(value: TestOpts) -> Self {
+impl TestData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: TestOpts, config: Option<pixi_config::Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
             value.compression_threads,
-            value.common.into(),
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl TestData {
     /// Create a new instance of `TestData`
     pub fn new(
         package_file: PathBuf,
@@ -655,8 +692,10 @@ pub struct RebuildData {
     pub common: CommonData,
 }
 
-impl From<RebuildOpts> for RebuildData {
-    fn from(value: RebuildOpts) -> Self {
+impl RebuildData {
+    /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
+    /// RebuildOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<pixi_config::Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -665,12 +704,10 @@ impl From<RebuildOpts> for RebuildData {
                 TestStrategy::default()
             }),
             value.compression_threads,
-            value.common.into(),
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl RebuildData {
     /// Create a new instance of `RebuildData`
     pub fn new(
         package_file: PathBuf,
@@ -1172,8 +1209,10 @@ pub struct DebugData {
     pub output_name: Option<String>,
 }
 
-impl From<DebugOpts> for DebugData {
-    fn from(opts: DebugOpts) -> Self {
+impl DebugData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<pixi_config::Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
@@ -1185,7 +1224,7 @@ impl From<DebugOpts> for DebugData {
             channels: opts.channels.unwrap_or(vec![
                 NamedChannelOrUrl::from_str("conda-forge").expect("conda-forge is parseable"),
             ]),
-            common: opts.common.into(),
+            common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
         }
     }
