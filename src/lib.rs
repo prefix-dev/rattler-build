@@ -44,7 +44,10 @@ mod package_cache_reporter;
 pub mod source_code;
 
 use std::{
-    collections::{BTreeMap, HashMap}, path::{Path, PathBuf}, str::FromStr, sync::{Arc, Mutex}
+    collections::{BTreeMap, HashMap},
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::{Arc, Mutex},
 };
 
 use build::{run_build, skip_existing};
@@ -63,7 +66,8 @@ use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
-    package::ArchiveType, GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform
+    GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
+    package::ArchiveType,
 };
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
@@ -312,12 +316,14 @@ pub async fn get_build_output(
             .used_vars
             .get(&NormalizedKey("channel_sources".to_string()))
         {
-            Some(channel_sources
-                .to_string()
-                .split(',')
-                .map(str::trim)
-                .map(|s| NamedChannelOrUrl::from_str(s).into_diagnostic())
-                .collect::<miette::Result<Vec<_>>>()?)
+            Some(
+                channel_sources
+                    .to_string()
+                    .split(',')
+                    .map(str::trim)
+                    .map(|s| NamedChannelOrUrl::from_str(s).into_diagnostic())
+                    .collect::<miette::Result<Vec<_>>>()?,
+            )
         } else {
             None
         };
@@ -328,7 +334,9 @@ pub async fn get_build_output(
         // 3. channels from pixi_config
         // 4. conda-forge as fallback
         if variant_channels.is_some() && build_data.channels.is_some() {
-            return Err(miette::miette!("channel_sources and channels cannot both be set at the same time"));
+            return Err(miette::miette!(
+                "channel_sources and channels cannot both be set at the same time"
+            ));
         }
         let channels = if let Some(variant_channels) = variant_channels {
             variant_channels
@@ -339,9 +347,11 @@ pub async fn get_build_output(
                 .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
         };
 
-        let channels = channels.into_iter().map(|c| c.into_base_url(&tool_config.channel_config))
-        .collect::<Result<Vec<_>, _>>()
-        .into_diagnostic()?;
+        let channels = channels
+            .into_iter()
+            .map(|c| c.into_base_url(&tool_config.channel_config))
+            .collect::<Result<Vec<_>, _>>()
+            .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
 
@@ -654,12 +664,14 @@ pub async fn run_test(
         .with_channel_priority(test_data.common.channel_priority)
         .finish();
 
-    let channels = test_data.channels.unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]);
+    let channels = test_data
+        .channels
+        .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]);
     let channels = channels
-            .into_iter()
-            .map(|c| c.into_base_url(&tool_config.channel_config))
-            .collect::<Result<Vec<_>, _>>()
-            .into_diagnostic()?;
+        .into_iter()
+        .map(|c| c.into_base_url(&tool_config.channel_config))
+        .collect::<Result<Vec<_>, _>>()
+        .into_diagnostic()?;
 
     let tempdir = tempfile::tempdir().into_diagnostic()?;
 
