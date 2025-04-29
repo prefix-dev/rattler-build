@@ -44,9 +44,7 @@ mod package_cache_reporter;
 pub mod source_code;
 
 use std::{
-    collections::{BTreeMap, HashMap},
-    path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    collections::{BTreeMap, HashMap}, path::{Path, PathBuf}, str::FromStr, sync::{Arc, Mutex}
 };
 
 use build::{run_build, skip_existing};
@@ -65,7 +63,7 @@ use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
 use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
-    Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform, package::ArchiveType,
+    package::ArchiveType, GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform
 };
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
@@ -310,14 +308,37 @@ pub async fn get_build_output(
             recipe.package().name().as_normalized().to_string()
         };
 
-        // Add the channels from the args and by default always conda-forge
-        let channels = build_data
-            .channels
-            .clone()
-            .into_iter()
-            .map(|c| c.into_base_url(&tool_config.channel_config))
-            .collect::<Result<Vec<_>, _>>()
-            .into_diagnostic()?;
+        let variant_channels = if let Some(channel_sources) = discovered_output
+            .used_vars
+            .get(&NormalizedKey("channel_sources".to_string()))
+        {
+            Some(channel_sources
+                .to_string()
+                .split(',')
+                .map(str::trim)
+                .map(|s| NamedChannelOrUrl::from_str(s).into_diagnostic())
+                .collect::<miette::Result<Vec<_>>>()?)
+        } else {
+            None
+        };
+
+        // priorities
+        // 1. channel_sources from variant file
+        // 2. channels from args
+        // 3. channels from pixi_config
+        // 4. conda-forge as fallback
+        let channels = if let Some(variant_channels) = variant_channels {
+            variant_channels
+        } else {
+            build_data
+                .channels
+                .clone()
+                .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
+        };
+
+        let channels = channels.into_iter().map(|c| c.into_base_url(&tool_config.channel_config))
+        .collect::<Result<Vec<_>, _>>()
+        .into_diagnostic()?;
 
         let timestamp = chrono::Utc::now();
 
@@ -630,12 +651,12 @@ pub async fn run_test(
         .with_channel_priority(test_data.common.channel_priority)
         .finish();
 
-    let channels = test_data
-        .channels
-        .into_iter()
-        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
-        .collect::<Result<Vec<_>, _>>()
-        .into_diagnostic()?;
+    let channels = test_data.channels.unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]);
+    let channels = channels
+            .into_iter()
+            .map(|c| c.into_base_url(&tool_config.channel_config))
+            .collect::<Result<Vec<_>, _>>()
+            .into_diagnostic()?;
 
     let tempdir = tempfile::tempdir().into_diagnostic()?;
 
