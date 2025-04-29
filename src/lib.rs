@@ -327,6 +327,9 @@ pub async fn get_build_output(
         // 2. channels from args
         // 3. channels from pixi_config
         // 4. conda-forge as fallback
+        if variant_channels.is_some() && build_data.channels.is_some() {
+            return Err(miette::miette!("channel_sources and channels cannot both be set at the same time"));
+        }
         let channels = if let Some(variant_channels) = variant_channels {
             variant_channels
         } else {

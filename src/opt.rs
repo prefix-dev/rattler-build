@@ -237,7 +237,7 @@ impl CommonData {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
-        tracing::info!("Using mirrors: {:?}", config.mirror_map());
+        tracing::debug!("Using mirrors: {:?}", config.mirror_map());
 
         fn ensure_trailing_slash(url: &url::Url) -> url::Url {
             if url.path().ends_with('/') {
