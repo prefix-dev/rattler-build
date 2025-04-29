@@ -8,6 +8,8 @@ use std::{
 use fs_err::File;
 
 use goblin::pe::{PE, header::DOS_MAGIC};
+use rattler_conda_types::Platform;
+use rattler_shell::activation::prefix_path_entries;
 use scroll::Pread;
 
 use crate::{
@@ -84,8 +86,8 @@ impl Relinker for Dll {
 
     fn resolve_libraries(
         &self,
-        _prefix: &Path,
-        _encoded_prefix: &Path,
+        prefix: &Path,
+        encoded_prefix: &Path,
     ) -> HashMap<PathBuf, Option<PathBuf>> {
         let mut result = HashMap::new();
         for lib in &self.libraries {
@@ -97,7 +99,43 @@ impl Relinker for Dll {
             }) {
                 continue;
             }
-            result.insert(lib.clone(), Some(lib.clone()));
+
+            let dll_name = lib.file_name().unwrap_or_default();
+
+            // 1. Check in the same directory as the original DLL
+            let path_in_prefix = self.path.strip_prefix(prefix).unwrap();
+            let path = encoded_prefix.join(path_in_prefix);
+            let same_dir = path.parent().map(|p| p.join(dll_name));
+
+            if let Some(path) = same_dir {
+                if path.exists() {
+                    result.insert(lib.clone(), Some(path));
+                    continue;
+                }
+            }
+
+            // 2. Check all directories in the search path
+            let mut found = false;
+            let path_entries = prefix_path_entries(encoded_prefix, &Platform::Win64);
+            let path = std::env::var("PATH").unwrap_or_default();
+            let search_dirs = path_entries
+                .into_iter()
+                .chain(std::env::split_paths(&path))
+                .collect::<Vec<_>>();
+
+            for search_dir in search_dirs {
+                let potential_path = search_dir.join(dll_name);
+                if potential_path.exists() {
+                    result.insert(lib.clone(), Some(potential_path));
+                    found = true;
+                    break;
+                }
+            }
+
+            if !found {
+                // If not found anywhere, keep the original name but mark as None
+                result.insert(lib.clone(), None);
+            }
         }
         result
     }
