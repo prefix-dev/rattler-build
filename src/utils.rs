@@ -127,7 +127,7 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
 
     while attempts < max_retries {
         if let Some(e) = &last_err {
-            tracing::debug!("Retrying deletion {}/{}: {}", attempts + 1, max_retries, e);
+            tracing::info!("Retrying deletion {}/{}: {}", attempts + 1, max_retries, e);
             std::thread::sleep(
                 std::time::Duration::from_millis(500 * (1 << attempts.saturating_sub(1)))
                     .min(std::time::Duration::from_secs(3)),
@@ -182,6 +182,7 @@ mod tests {
         use super::*;
         use std::fs::File;
         use std::fs::OpenOptions;
+        use std::io::Write;
         use std::os::windows::fs::OpenOptionsExt;
         use std::sync::{Arc, Mutex};
         use std::time::Duration;
@@ -242,6 +243,75 @@ mod tests {
             std::thread::sleep(Duration::from_millis(200));
             assert!(!dir_path.exists(), "Directory still exists!");
 
+            Ok(())
+        }
+
+        #[test]
+        // Original code for GO permission issues is tested here
+        fn test_readonly_file_removal() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("readonly.txt");
+            {
+                let mut file = File::create(&file_path)?;
+                file.write_all(b"Test content")?;
+            }
+
+            let metadata = fs::metadata(&file_path)?;
+            let mut permissions = metadata.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&file_path, permissions)?;
+            std::mem::forget(temp_dir);
+
+            let metadata = fs::metadata(&file_path)?;
+            assert!(
+                metadata.permissions().readonly(),
+                "File should be read-only"
+            );
+
+            let result = remove_dir_all_force(&dir_path);
+
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+            assert!(!dir_path.exists(), "Directory still exists!");
+            Ok(())
+        }
+
+        #[test]
+        // We are using remove_dir_all on retry logic, so it will even clear read-only files
+        // This is for testing’s sake only for permission-related issues
+        fn test_readonly_file_removal_with_retry() -> std::io::Result<()> {
+            let temp_dir = TempDir::new()?;
+            let dir_path = temp_dir.path().to_path_buf();
+            let file_path = dir_path.join("readonly.txt");
+            {
+                let mut file = File::create(&file_path)?;
+                file.write_all(b"Test content")?;
+            }
+
+            let metadata = fs::metadata(&file_path)?;
+            let mut permissions = metadata.permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&file_path, permissions)?;
+            std::mem::forget(temp_dir);
+
+            let metadata = fs::metadata(&file_path)?;
+            assert!(
+                metadata.permissions().readonly(),
+                "File should be read-only"
+            );
+
+            let result = try_remove_with_retry(&dir_path, None);
+
+            assert!(
+                result.is_ok(),
+                "Directory removal failed: {:?}",
+                result.err()
+            );
+            assert!(!dir_path.exists(), "Directory still exists!");
             Ok(())
         }
     }
