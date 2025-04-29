@@ -1513,4 +1513,3 @@ def test_channel_sources(
         recipes / "channel_sources",
         tmp_path,
     )
-
