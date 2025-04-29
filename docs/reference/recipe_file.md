@@ -805,7 +805,7 @@ tests:
         - bsdiff4
         - bspatch4
       pip_check: true  # can be left out because this is the default
-      python_version: 3.12  # optional, otherwise will be resolved to match the environment
+      python_version: 3.12.*  # optional: use list for multiple versions, default resolves to environment
 ```
 
 Internally this will write a small Python script that imports the modules:
