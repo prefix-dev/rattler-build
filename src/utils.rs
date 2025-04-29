@@ -5,9 +5,11 @@ use fs_err as fs;
 use retry_policies::{RetryDecision, RetryPolicy, policies::ExponentialBackoff};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(windows)]
+use std::time::Duration;
 use std::{
     path::{Component, Path, PathBuf},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use walkdir::WalkDir;
 
