@@ -164,7 +164,10 @@ fn test_package_py(
         Some(channel) => Some(
             channel
                 .iter()
-                .map(|c| NamedChannelOrUrl::from_str(c).map_err(|e| PyRuntimeError::new_err(e.to_string())))
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+                })
                 .collect::<PyResult<_>>()?,
         ),
     };
