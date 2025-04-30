@@ -239,14 +239,19 @@ mod tests {
             let file_handle_clone = file_handle.clone();
             let locked_file_error = std::io::Error::from_raw_os_error(32);
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(500));
+                std::thread::sleep(Duration::from_millis(300));
                 let mut guard = file_handle_clone.lock().unwrap();
                 *guard = None;
             });
-            let result = try_remove_with_retry(&dir_path, Some(locked_file_error));
+
+            let dir_path_clone = dir_path.clone();
+            let remove_result = std::thread::spawn(move || {
+                try_remove_with_retry(&dir_path_clone, Some(locked_file_error))
+            });
 
             handle.join().unwrap();
-            std::thread::sleep(Duration::from_millis(500));
+            let result = remove_result.join().unwrap();
+            std::thread::sleep(Duration::from_millis(1000));
 
             assert!(
                 result.is_ok(),
@@ -254,7 +259,6 @@ mod tests {
                 result.err()
             );
 
-            std::thread::sleep(Duration::from_millis(300));
             assert!(!dir_path.exists(), "Directory still exists!");
 
             Ok(())
