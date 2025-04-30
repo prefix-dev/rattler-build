@@ -7,3 +7,13 @@
   
   '''
 # ---
+# name: test_r_tests
+  '''
+  - script:
+      interpreter: r
+      content: |-
+        library(ggplot2)
+        TRUE
+  
+  '''
+# ---
