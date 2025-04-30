@@ -1518,7 +1518,7 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
 
     pkg_file = get_package(tmp_path, "r-test")
     test_result = rattler_build.test(pkg_file)
-    assert "Running script test for recipe:" in test_result
+    assert "Running R test" in test_result
     assert "all tests passed!" in test_result
 
 
