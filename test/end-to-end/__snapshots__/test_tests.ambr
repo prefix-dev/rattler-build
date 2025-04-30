@@ -11,9 +11,7 @@
   '''
   - script:
       interpreter: r
-      content: |-
-        library(ggplot2)
-        TRUE
+      content: library(ggplot2)
   
   '''
 # ---
