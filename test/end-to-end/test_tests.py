@@ -18,3 +18,13 @@ def test_perl_tests(
     content = (pkg / "info" / "tests" / "tests.yaml").read_text()
 
     assert snapshot == content
+
+
+def test_r_tests(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, snapshot):
+    rattler_build.build(recipes / "r-test", tmp_path)
+    pkg = get_extracted_package(tmp_path, "r-test")
+
+    assert (pkg / "info" / "tests" / "tests.yaml").exists()
+    content = (pkg / "info" / "tests" / "tests.yaml").read_text()
+
+    assert snapshot == content
