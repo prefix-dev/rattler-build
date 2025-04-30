@@ -277,14 +277,14 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let perl = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::Perl { perl };
                 }
-                "r" | "R" => {
-                    let rtest = as_mapping(value, key_str)?.try_convert(key_str)?;
-                    test = TestType::R { r: rtest };
+                "rscript" => {
+                    let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::R { r: rscript };
                 }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `rscript`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())

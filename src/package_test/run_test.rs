@@ -953,7 +953,7 @@ impl RTest {
 
         let script = Script {
             content: ScriptContent::Command(libraries.clone()),
-            interpreter: Some("r".into()),
+            interpreter: Some("rscript".into()),
             ..Script::default()
         };
 

@@ -125,7 +125,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 #[cfg(windows)]
 /// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
 fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
     let mut current_try = if first_err.is_some() { 1 } else { 0 };
     let mut last_err = first_err;
     let request_start = SystemTime::now();
@@ -144,7 +144,7 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
                     std::thread::sleep(sleep_for);
                 }
             }
@@ -239,20 +239,22 @@ mod tests {
             let file_handle_clone = file_handle.clone();
             let locked_file_error = std::io::Error::from_raw_os_error(32);
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(300));
+                std::thread::sleep(Duration::from_millis(500));
                 let mut guard = file_handle_clone.lock().unwrap();
                 *guard = None;
             });
             let result = try_remove_with_retry(&dir_path, Some(locked_file_error));
 
             handle.join().unwrap();
+            std::thread::sleep(Duration::from_millis(500));
+
             assert!(
                 result.is_ok(),
                 "Directory removal failed: {:?}",
                 result.err()
             );
 
-            std::thread::sleep(Duration::from_millis(200));
+            std::thread::sleep(Duration::from_millis(300));
             assert!(!dir_path.exists(), "Directory still exists!");
 
             Ok(())

@@ -5,7 +5,7 @@ package:
 build:
   number: 0
   script:
-    interpreter: r
+    interpreter: rscript
     content: |
       print("Testing R Interpreter", quote = FALSE)
 
@@ -38,6 +38,6 @@ requirements:
     - r-ggplot2
 
 tests:
-  - r:
+  - rscript:
       libraries:
         - ggplot2
