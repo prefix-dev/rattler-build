@@ -146,9 +146,9 @@ impl Hash for CaseInsensitivePathBuf {
     }
 }
 
-impl Into<CaseInsensitivePathBuf> for PathBuf {
-    fn into(self) -> CaseInsensitivePathBuf {
-        CaseInsensitivePathBuf { path: self }
+impl From<PathBuf> for CaseInsensitivePathBuf {
+    fn from(path: PathBuf) -> Self {
+        CaseInsensitivePathBuf { path }
     }
 }
 

@@ -103,7 +103,10 @@ impl Relinker for Dll {
             let dll_name = lib.file_name().unwrap_or_default();
 
             // 1. Check in the same directory as the original DLL
-            let path_in_prefix = self.path.strip_prefix(prefix).unwrap();
+            let path_in_prefix = self
+                .path
+                .strip_prefix(prefix)
+                .expect("DLL path should be in prefix");
             let path = encoded_prefix.join(path_in_prefix);
             let same_dir = path.parent().map(|p| p.join(dll_name));
 
