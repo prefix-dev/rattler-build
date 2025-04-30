@@ -10,9 +10,14 @@ source:
 
 build:
   script:
-    - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${CMAKE_ARGS}
+    - if: win
+      then:
+        - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release %CMAKE_ARGS%
+    - if: unix
+      then:
+        - cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release ${CMAKE_ARGS}
     - cmake --build build --config Release
-    - cmake --install build --prefix ${PREFIX}
+    - cmake --install build
 
 requirements:
   build:
