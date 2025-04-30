@@ -1,0 +1,13 @@
+package:
+  name: test-if-script
+  version: 0.1.0
+
+tests:
+  - requirements:
+      run:
+        - bzip2
+    script:
+      - if: unix
+        then:
+          - echo "This is a Unix test"
+          - test "1" = "1"
