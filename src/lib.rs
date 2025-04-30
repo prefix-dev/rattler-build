@@ -338,14 +338,12 @@ pub async fn get_build_output(
                 "channel_sources and channels cannot both be set at the same time"
             ));
         }
-        let channels = if let Some(variant_channels) = variant_channels {
-            variant_channels
-        } else {
+        let channels = variant_channels.unwrap_or_else(|| {
             build_data
                 .channels
                 .clone()
                 .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
-        };
+        });
 
         let channels = channels
             .into_iter()
