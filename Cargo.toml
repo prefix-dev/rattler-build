@@ -3,7 +3,7 @@ members = ["rust-tests"]
 
 [package]
 name = "rattler-build"
-version = "0.40.0"
+version = "0.41.0"
 authors = ["rattler-build contributors <hi@prefix.dev>"]
 repository = "https://github.com/prefix-dev/rattler-build"
 edition = "2024"
@@ -71,7 +71,7 @@ content_inspector = "0.2.4"
 serde_with = "3.12.0"
 url = "2.5.4"
 tracing = "0.1.41"
-clap = { version = "4.5.36", features = ["derive", "env", "cargo"] }
+clap = { version = "4.5.37", features = ["derive", "env", "cargo"] }
 minijinja = { version = "2.9.0", features = [
   "unstable_machinery",
   "custom_syntax",
@@ -83,7 +83,7 @@ tracing-subscriber = { version = "0.3.19", features = [
   "json",
 ] }
 marked-yaml = { version = "0.7.2" }
-miette = { version = "7.5.0", features = ["fancy"] }
+miette = { version = "7.6.0", features = ["fancy"] }
 num_cpus = "1.16.0"
 goblin = "0.9.3"
 scroll = "0.12.0"
@@ -94,7 +94,7 @@ indicatif = "0.17.11"
 console = { version = "0.15.11", features = ["windows-console-colors"] }
 thiserror = "2.0.12"
 tempfile = "3.19.1"
-chrono = "0.4.40"
+chrono = "0.4.41"
 sha1 = "0.10.6"
 spdx = "0.10.8"
 ignore = "0.4.23"
@@ -106,9 +106,9 @@ indexmap = "2.9.0"
 dunce = "1.0.5"
 fs-err = "3.1.0"
 which = "7.0.3"
-clap_complete = "4.5.47"
+clap_complete = "4.5.48"
 clap_complete_nushell = "4.5.5"
-tokio-util = { version = "0.7.14", features = ["codec", "compat"] }
+tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
 
 tar = "0.4.44"
 zip = { version = "2.6.1", default-features = false, features = [
@@ -120,7 +120,7 @@ base64 = "0.22.1"
 flate2 = "1.1.1"
 xz2 = "0.1.7"
 zstd = "0.13.3"
-toml = "0.8.20"
+toml = "0.8.22"
 memmap2 = "0.9.5"
 reqwest-middleware = { version = "0.4.2", features = ["json"] }
 async-once-cell = "0.5.4"
@@ -136,11 +136,12 @@ rayon = "1.10.0"
 gitpatch = "0.7.1"
 regex = "1.11.1"
 async-recursion = "1.1.1"
-opendal = { version = "0.53.0", default-features = false, features = [
+opendal = { version = "0.53.1", default-features = false, features = [
   "services-s3",
 ] }
 
 # Rattler crates
+pixi_config = { git = "https://github.com/prefix-dev/pixi", branch = "main" }
 rattler = { version = "0.33.5", default-features = false, features = [
   "cli-tools",
   "indicatif",
@@ -152,7 +153,7 @@ rattler_conda_types = { version = "0.32.0", default-features = false, features =
 rattler_digest = { version = "1.1.1", default-features = false, features = [
   "serde",
 ] }
-rattler_index = { version = "0.22.4", default-features = false }
+rattler_index = { version = "0.22.5", default-features = false }
 rattler_networking = { version = "0.22.12", default-features = false }
 rattler_redaction = { version = "0.1.10" }
 rattler_repodata_gateway = { version = "0.22.5", default-features = false, features = [
@@ -164,7 +165,7 @@ rattler_sandbox = { version = "0.1.7", default-features = false, features = [
 rattler_shell = { version = "0.22.26", default-features = false, features = [
   "sysinfo",
 ] }
-rattler_solve = { version = "1.4.4", default-features = false, features = [
+rattler_solve = { version = "1.4.5", default-features = false, features = [
   "resolvo",
   "serde",
 ] }
@@ -183,7 +184,7 @@ sha2 = { version = "0.10.8", features = ["asm"] }
 sha2 = { version = "0.10.8" }
 
 [dev-dependencies]
-insta = { version = "1.42.2", features = ["yaml"] }
+insta = { version = "1.43.1", features = ["yaml"] }
 rstest = "0.25.0"
 tracing-test = "0.2.5"
 tracing-indicatif = "0.3.9"

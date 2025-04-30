@@ -7,14 +7,16 @@ use std::{
 
 use clap::{CommandFactory, Parser};
 use miette::IntoDiagnostic;
+use pixi_config::Config;
 use rattler_build::{
     build_recipes,
     console_utils::init_logging,
     debug_recipe, get_recipe_path,
-    opt::{App, BuildData, DebugData, ShellCompletion, SubCommands},
+    opt::{App, BuildData, DebugData, RebuildData, ShellCompletion, SubCommands, TestData},
     rebuild, run_test, upload_from_args,
 };
 use tempfile::{TempDir, tempdir};
+use tokio::fs::read_to_string;
 
 fn main() -> miette::Result<()> {
     // Initialize sandbox in sync/single-threaded context before anything else
@@ -76,6 +78,15 @@ async fn async_main() -> miette::Result<()> {
         None
     };
 
+    let config = if let Some(config_path) = app.config_file {
+        let config_str = read_to_string(&config_path).await.into_diagnostic()?;
+        let (config, _unused_keys) =
+            Config::from_toml(config_str.as_str(), Some(&config_path.clone()))?;
+        Some(config)
+    } else {
+        None
+    };
+
     match app.subcommand {
         Some(SubCommands::Completion(ShellCompletion { shell })) => {
             let mut cmd = App::command();
@@ -97,7 +108,7 @@ async fn async_main() -> miette::Result<()> {
         Some(SubCommands::Build(build_args)) => {
             let recipes = build_args.recipes.clone();
             let recipe_dir = build_args.recipe_dir.clone();
-            let build_data = BuildData::from(build_args);
+            let build_data = BuildData::from_opts_and_config(build_args, config);
 
             // Get all recipe paths and keep tempdir alive until end of the function
             let (recipe_paths, _temp_dir) = recipe_paths(recipes, recipe_dir)?;
@@ -125,10 +136,16 @@ async fn async_main() -> miette::Result<()> {
 
             build_recipes(recipe_paths, build_data, &log_handler).await
         }
-        Some(SubCommands::Test(test_args)) => run_test(test_args.into(), log_handler).await,
+        Some(SubCommands::Test(test_args)) => {
+            run_test(
+                TestData::from_opts_and_config(test_args, config),
+                log_handler,
+            )
+            .await
+        }
         Some(SubCommands::Rebuild(rebuild_args)) => {
             rebuild(
-                rebuild_args.into(),
+                RebuildData::from_opts_and_config(rebuild_args, config),
                 log_handler.expect("logger is not initialized"),
             )
             .await
@@ -140,7 +157,7 @@ async fn async_main() -> miette::Result<()> {
         }
         Some(SubCommands::Auth(args)) => rattler::cli::auth::execute(args).await.into_diagnostic(),
         Some(SubCommands::Debug(opts)) => {
-            let debug_data = DebugData::from(opts);
+            let debug_data = DebugData::from_opts_and_config(opts, config);
             debug_recipe(debug_data, &log_handler).await?;
             Ok(())
         }

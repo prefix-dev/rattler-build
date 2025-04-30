@@ -1,12 +1,14 @@
 //! Command-line options.
 
-use std::{error::Error, path::PathBuf, str::FromStr};
+use std::{collections::HashMap, error::Error, path::PathBuf, str::FromStr};
 
 use clap::{Parser, ValueEnum, arg, builder::ArgPredicate, crate_version};
 use clap_complete::{Generator, shells};
 use clap_complete_nushell::Nushell;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
-use rattler_conda_types::{Platform, package::ArchiveType};
+use pixi_config::PackageFormatAndCompression;
+use rattler_conda_types::{NamedChannelOrUrl, Platform, package::ArchiveType};
+use rattler_networking::{mirror_middleware, s3_middleware};
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::ChannelPriority;
 use serde_json::{Value, json};
@@ -148,6 +150,10 @@ pub struct App {
     )]
     pub wrap_log_lines: Option<bool>,
 
+    /// The rattler-build configuration file to use
+    #[arg(long, global = true)]
+    pub config_file: Option<PathBuf>,
+
     /// Enable or disable colored output from rattler-build.
     /// Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable.
     #[clap(
@@ -213,19 +219,9 @@ pub struct CommonData {
     pub experimental: bool,
     pub auth_file: Option<PathBuf>,
     pub channel_priority: ChannelPriority,
+    pub s3_config: HashMap<String, s3_middleware::S3Config>,
+    pub mirror_config: HashMap<Url, Vec<mirror_middleware::Mirror>>,
     pub allow_insecure_host: Option<Vec<String>>,
-}
-
-impl From<CommonOpts> for CommonData {
-    fn from(value: CommonOpts) -> Self {
-        Self::new(
-            value.output_dir,
-            value.experimental,
-            value.auth_file,
-            value.channel_priority.map(|c| c.value),
-            value.allow_insecure_host,
-        )
-    }
 }
 
 impl CommonData {
@@ -234,16 +230,61 @@ impl CommonData {
         output_dir: Option<PathBuf>,
         experimental: bool,
         auth_file: Option<PathBuf>,
+        config: pixi_config::Config,
         channel_priority: Option<ChannelPriority>,
         allow_insecure_host: Option<Vec<String>>,
     ) -> Self {
+        // mirror config
+        // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
+        let mut mirror_config = HashMap::new();
+        tracing::debug!("Using mirrors: {:?}", config.mirror_map());
+
+        fn ensure_trailing_slash(url: &url::Url) -> url::Url {
+            if url.path().ends_with('/') {
+                url.clone()
+            } else {
+                // Do not use `join` because it removes the last element
+                format!("{}/", url)
+                    .parse()
+                    .expect("Failed to add trailing slash to URL")
+            }
+        }
+
+        for (key, value) in config.mirror_map() {
+            let mut mirrors = Vec::new();
+            for v in value {
+                mirrors.push(mirror_middleware::Mirror {
+                    url: ensure_trailing_slash(v),
+                    no_jlap: false,
+                    no_bz2: false,
+                    no_zstd: false,
+                    max_failures: None,
+                });
+            }
+            mirror_config.insert(ensure_trailing_slash(key), mirrors);
+        }
+
+        let s3_config = config.compute_s3_config();
         Self {
             output_dir: output_dir.unwrap_or_else(|| PathBuf::from("./output")),
             experimental,
             auth_file,
+            s3_config,
+            mirror_config,
             channel_priority: channel_priority.unwrap_or(ChannelPriority::Strict),
             allow_insecure_host,
         }
+    }
+
+    fn from_opts_and_config(value: CommonOpts, config: pixi_config::Config) -> Self {
+        Self::new(
+            value.output_dir,
+            value.experimental,
+            value.auth_file,
+            config,
+            value.channel_priority.map(|c| c.value),
+            value.allow_insecure_host,
+        )
     }
 }
 
@@ -267,70 +308,6 @@ impl FromStr for ChannelPriorityWrapper {
             }),
             _ => Err("Channel priority must be either 'strict' or 'disabled'".to_string()),
         }
-    }
-}
-
-/// Container for the CLI package format and compression level
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct PackageFormatAndCompression {
-    /// The archive type that is selected
-    pub archive_type: ArchiveType,
-    /// The compression level that is selected
-    pub compression_level: CompressionLevel,
-}
-
-// deserializer for the package format and compression level
-impl FromStr for PackageFormatAndCompression {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut split = s.split(':');
-        let package_format = split.next().ok_or("invalid")?;
-
-        let compression = split.next().unwrap_or("default");
-
-        // remove all non-alphanumeric characters
-        let package_format = package_format
-            .chars()
-            .filter(|c| c.is_alphanumeric())
-            .collect::<String>();
-
-        let archive_type = match package_format.to_lowercase().as_str() {
-            "tarbz2" => ArchiveType::TarBz2,
-            "conda" => ArchiveType::Conda,
-            _ => return Err(format!("Unknown package format: {}", package_format)),
-        };
-
-        let compression_level = match compression {
-            "max" | "highest" => CompressionLevel::Highest,
-            "default" | "normal" => CompressionLevel::Default,
-            "fast" | "lowest" | "min" => CompressionLevel::Lowest,
-            number if number.parse::<i32>().is_ok() => {
-                let number = number.parse::<i32>().unwrap_or_default();
-                match archive_type {
-                    ArchiveType::TarBz2 => {
-                        if !(1..=9).contains(&number) {
-                            return Err("Compression level for .tar.bz2 must be between 1 and 9"
-                                .to_string());
-                        }
-                    }
-                    ArchiveType::Conda => {
-                        if !(-7..=22).contains(&number) {
-                            return Err(
-                                "Compression level for conda packages (zstd) must be between -7 and 22".to_string()
-                            );
-                        }
-                    }
-                }
-                CompressionLevel::Numeric(number)
-            }
-            _ => return Err(format!("Unknown compression level: {}", compression)),
-        };
-
-        Ok(PackageFormatAndCompression {
-            archive_type,
-            compression_level,
-        })
     }
 }
 
@@ -371,7 +348,7 @@ pub struct BuildOpts {
 
     /// Add a channel to search for dependencies in.
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// Variant configuration files for the build.
     #[arg(short = 'm', long)]
@@ -472,7 +449,7 @@ pub struct BuildData {
     pub build_platform: Platform,
     pub target_platform: Platform,
     pub host_platform: Platform,
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
@@ -502,7 +479,7 @@ impl BuildData {
         build_platform: Option<Platform>,
         target_platform: Option<Platform>,
         host_platform: Option<Platform>,
-        channels: Option<Vec<String>>,
+        channels: Option<Vec<NamedChannelOrUrl>>,
         variant_config: Option<Vec<PathBuf>>,
         ignore_recipe_variants: bool,
         render_only: bool,
@@ -531,7 +508,7 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             variant_config: variant_config.unwrap_or_default(),
             ignore_recipe_variants,
             render_only,
@@ -558,21 +535,31 @@ impl BuildData {
     }
 }
 
-impl From<BuildOpts> for BuildData {
-    fn from(opts: BuildOpts) -> Self {
+impl BuildData {
+    /// Generate a new BuildData struct from BuildOpts and an optional pixi config.
+    /// BuildOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(opts: BuildOpts, config: Option<pixi_config::Config>) -> Self {
         Self::new(
             opts.up_to,
             opts.build_platform,
-            opts.target_platform,
+            opts.target_platform, // todo: read this from config as well
             opts.host_platform,
-            opts.channels,
+            opts.channels.or(config.clone().and_then(|config| {
+                if config.default_channels.is_empty() {
+                    None
+                } else {
+                    Some(config.default_channels)
+                }
+            })),
             opts.variant_config,
             opts.ignore_recipe_variants,
             opts.render_only,
             opts.with_solve,
             opts.keep_build,
             opts.no_build_id,
-            opts.package_format,
+            opts.package_format.or(config
+                .clone()
+                .and_then(|config| config.build.package_format)),
             opts.compression_threads,
             opts.io_concurrency_limit,
             opts.no_include_recipe,
@@ -581,7 +568,7 @@ impl From<BuildOpts> for BuildData {
             } else {
                 None
             }),
-            opts.common.into(),
+            CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             opts.tui,
             opts.skip_existing,
             opts.noarch_build_platform,
@@ -616,7 +603,7 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
 pub struct TestOpts {
     /// Channels to use when testing
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// The package file to test
     #[arg(short, long)]
@@ -634,34 +621,34 @@ pub struct TestOpts {
 #[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub struct TestData {
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
 }
 
-impl From<TestOpts> for TestData {
-    fn from(value: TestOpts) -> Self {
+impl TestData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: TestOpts, config: Option<pixi_config::Config>) -> Self {
         Self::new(
             value.package_file,
             value.channels,
             value.compression_threads,
-            value.common.into(),
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl TestData {
     /// Create a new instance of `TestData`
     pub fn new(
         package_file: PathBuf,
-        channels: Option<Vec<String>>,
+        channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
         common: CommonData,
     ) -> Self {
         Self {
             package_file,
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             compression_threads,
             common,
         }
@@ -705,8 +692,10 @@ pub struct RebuildData {
     pub common: CommonData,
 }
 
-impl From<RebuildOpts> for RebuildData {
-    fn from(value: RebuildOpts) -> Self {
+impl RebuildData {
+    /// Generate a new RebuildData struct from RebuildOpts and an optional pixi config.
+    /// RebuildOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(value: RebuildOpts, config: Option<pixi_config::Config>) -> Self {
         Self::new(
             value.package_file,
             value.test.unwrap_or(if value.no_test {
@@ -715,12 +704,10 @@ impl From<RebuildOpts> for RebuildData {
                 TestStrategy::default()
             }),
             value.compression_threads,
-            value.common.into(),
+            CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
-}
 
-impl RebuildData {
     /// Create a new instance of `RebuildData`
     pub fn new(
         package_file: PathBuf,
@@ -1190,7 +1177,7 @@ pub struct DebugOpts {
 
     /// Channels to use when building
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// Common options
     #[clap(flatten)]
@@ -1215,15 +1202,17 @@ pub struct DebugData {
     /// Host platform for runtime dependencies
     pub host_platform: Platform,
     /// List of channels to search for dependencies
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Common configuration options
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
     pub output_name: Option<String>,
 }
 
-impl From<DebugOpts> for DebugData {
-    fn from(opts: DebugOpts) -> Self {
+impl DebugData {
+    /// Generate a new TestData struct from TestOpts and an optional pixi config.
+    /// TestOpts have higher priority than the pixi config.
+    pub fn from_opts_and_config(opts: DebugOpts, config: Option<pixi_config::Config>) -> Self {
         Self {
             recipe_path: opts.recipe,
             output_dir: opts.output.unwrap_or_else(|| PathBuf::from("./output")),
@@ -1232,103 +1221,9 @@ impl From<DebugOpts> for DebugData {
             host_platform: opts
                 .host_platform
                 .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
-            channels: opts.channels.unwrap_or(vec!["conda-forge".to_string()]),
-            common: opts.common.into(),
+            channels: opts.channels,
+            common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::str::FromStr;
-
-    use rattler_conda_types::package::ArchiveType;
-    use rattler_package_streaming::write::CompressionLevel;
-
-    use super::PackageFormatAndCompression;
-
-    #[test]
-    fn test_parse_packaging() {
-        let package_format = PackageFormatAndCompression::from_str("tar-bz2").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Default
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Default
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("tar-bz2:1").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Numeric(1)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str(".tar.bz2:max").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Highest
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("tarbz2:5").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::TarBz2,
-                compression_level: CompressionLevel::Numeric(5)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:1").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Numeric(1)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:max").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Highest
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:-5").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Numeric(-5)
-            }
-        );
-
-        let package_format = PackageFormatAndCompression::from_str("conda:fast").unwrap();
-        assert_eq!(
-            package_format,
-            PackageFormatAndCompression {
-                archive_type: ArchiveType::Conda,
-                compression_level: CompressionLevel::Lowest
-            }
-        );
     }
 }

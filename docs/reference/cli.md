@@ -50,6 +50,11 @@ This document contains the help content for the `rattler-build` command-line pro
 	- Possible values: `true`, `false`
 
 
+- `--config-file <CONFIG_FILE>`
+
+	The rattler-build configuration file to use
+
+
 - `--color <COLOR>`
 
 	Enable or disable colored output from rattler-build. Also honors the `CLICOLOR` and `CLICOLOR_FORCE` environment variable

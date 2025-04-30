@@ -46,6 +46,7 @@ pub mod source_code;
 use std::{
     collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -63,8 +64,10 @@ pub use normalized_key::NormalizedKey;
 use opt::*;
 use package_test::TestConfiguration;
 use petgraph::{algo::toposort, graph::DiGraph, visit::DfsPostOrder};
+use pixi_config::PackageFormatAndCompression;
 use rattler_conda_types::{
-    Channel, GenericVirtualPackage, MatchSpec, PackageName, Platform, package::ArchiveType,
+    GenericVirtualPackage, MatchSpec, NamedChannelOrUrl, PackageName, Platform,
+    package::ArchiveType,
 };
 use rattler_package_streaming::write::CompressionLevel;
 use rattler_solve::SolveStrategy;
@@ -130,6 +133,8 @@ pub fn get_tool_config(
 ) -> miette::Result<Configuration> {
     let client = tool_configuration::reqwest_client_from_auth_storage(
         build_data.common.auth_file.clone(),
+        build_data.common.s3_config.clone(),
+        build_data.common.mirror_config.clone(),
         build_data.common.allow_insecure_host.clone(),
     )
     .into_diagnostic()?;
@@ -307,12 +312,42 @@ pub async fn get_build_output(
             recipe.package().name().as_normalized().to_string()
         };
 
-        // Add the channels from the args and by default always conda-forge
-        let channels = build_data
-            .channels
-            .clone()
+        let variant_channels = if let Some(channel_sources) = discovered_output
+            .used_vars
+            .get(&NormalizedKey("channel_sources".to_string()))
+        {
+            Some(
+                channel_sources
+                    .to_string()
+                    .split(',')
+                    .map(str::trim)
+                    .map(|s| NamedChannelOrUrl::from_str(s).into_diagnostic())
+                    .collect::<miette::Result<Vec<_>>>()?,
+            )
+        } else {
+            None
+        };
+
+        // priorities
+        // 1. channel_sources from variant file
+        // 2. channels from args
+        // 3. channels from pixi_config
+        // 4. conda-forge as fallback
+        if variant_channels.is_some() && build_data.channels.is_some() {
+            return Err(miette::miette!(
+                "channel_sources and channels cannot both be set at the same time"
+            ));
+        }
+        let channels = variant_channels.unwrap_or_else(|| {
+            build_data
+                .channels
+                .clone()
+                .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())])
+        });
+
+        let channels = channels
             .into_iter()
-            .map(|c| Channel::from_str(c, &tool_config.channel_config).map(|c| c.base_url))
+            .map(|c| c.into_base_url(&tool_config.channel_config))
             .collect::<Result<Vec<_>, _>>()
             .into_diagnostic()?;
 
@@ -618,6 +653,8 @@ pub async fn run_test(
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
                 test_data.common.auth_file,
+                test_data.common.s3_config,
+                test_data.common.mirror_config,
                 test_data.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
@@ -627,8 +664,10 @@ pub async fn run_test(
 
     let channels = test_data
         .channels
+        .unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]);
+    let channels = channels
         .into_iter()
-        .map(|name| Channel::from_str(name, &tool_config.channel_config).map(|c| c.base_url))
+        .map(|c| c.into_base_url(&tool_config.channel_config))
         .collect::<Result<Vec<_>, _>>()
         .into_diagnostic()?;
 
@@ -663,16 +702,16 @@ pub async fn run_test(
 
 /// Rebuild.
 pub async fn rebuild(
-    args: RebuildData,
+    rebuild_data: RebuildData,
     fancy_log_handler: LoggingOutputHandler,
 ) -> miette::Result<()> {
-    tracing::info!("Rebuilding {}", args.package_file.to_string_lossy());
+    tracing::info!("Rebuilding {}", rebuild_data.package_file.to_string_lossy());
     // we extract the recipe folder from the package file (info/recipe/*)
     // and then run the rendered recipe with the same arguments as the original
     // build
     let temp_folder = tempfile::tempdir().into_diagnostic()?;
 
-    rebuild::extract_recipe(&args.package_file, temp_folder.path()).into_diagnostic()?;
+    rebuild::extract_recipe(&rebuild_data.package_file, temp_folder.path()).into_diagnostic()?;
 
     let temp_dir = temp_folder.into_path();
 
@@ -687,7 +726,7 @@ pub async fn rebuild(
     output.build_configuration.directories.recipe_dir = temp_dir;
 
     // create output dir and set it in the config
-    let output_dir = args.common.output_dir;
+    let output_dir = rebuild_data.common.output_dir;
 
     fs::create_dir_all(&output_dir).into_diagnostic()?;
     output.build_configuration.directories.output_dir =
@@ -696,15 +735,17 @@ pub async fn rebuild(
     let tool_config = Configuration::builder()
         .with_logging_output_handler(fancy_log_handler)
         .with_keep_build(true)
-        .with_compression_threads(args.compression_threads)
+        .with_compression_threads(rebuild_data.compression_threads)
         .with_reqwest_client(
             tool_configuration::reqwest_client_from_auth_storage(
-                args.common.auth_file,
-                args.common.allow_insecure_host.clone(),
+                rebuild_data.common.auth_file,
+                rebuild_data.common.s3_config.clone(),
+                rebuild_data.common.mirror_config.clone(),
+                rebuild_data.common.allow_insecure_host.clone(),
             )
             .into_diagnostic()?,
         )
-        .with_test_strategy(args.test)
+        .with_test_strategy(rebuild_data.test)
         .finish();
 
     output

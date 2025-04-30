@@ -1520,3 +1520,27 @@ def test_r_interpreter(rattler_build: RattlerBuild, recipes: Path, tmp_path: Pat
     test_result = rattler_build.test(pkg_file)
     assert "Running script test for recipe:" in test_result
     assert "all tests passed!" in test_result
+
+
+def test_channel_sources(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    with pytest.raises(CalledProcessError):
+        # channel_sources and channels cannot both be set at the same time
+        rattler_build.build(
+            recipes / "channel_sources",
+            tmp_path,
+            custom_channels=["conda-forge"],
+        )
+
+    output = rattler_build.build(
+        recipes / "channel_sources",
+        tmp_path,
+        extra_args=["--render-only"],
+    )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]
