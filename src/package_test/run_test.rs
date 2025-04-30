@@ -916,7 +916,7 @@ impl RTest {
         prefix: &Path,
         config: &TestConfiguration,
     ) -> Result<(), TestError> {
-        let span = tracing::info_span!("Running R test");
+        let span = tracing::info_span!("Running script test for", recipe = pkg.to_string());
         let _guard = span.enter();
 
         let match_spec = MatchSpec::from_str(

@@ -1,17 +1,9 @@
 # serializer version: 1
-# name: test_perl_tests
-  '''
-  - perl:
-      uses:
-      - Call::Context
-  
-  '''
-# ---
 # name: test_r_tests
   '''
-  - script:
-      interpreter: r
-      content: library(ggplot2)
+  - r:
+      libraries:
+      - ggplot2
   
   '''
 # ---

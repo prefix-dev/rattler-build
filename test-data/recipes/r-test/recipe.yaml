@@ -38,7 +38,6 @@ requirements:
     - r-ggplot2
 
 tests:
-  - script:
-      interpreter: r
-      content: |
-        library(ggplot2)
+  - r:
+      libraries:
+        - ggplot2
