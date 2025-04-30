@@ -1496,3 +1496,27 @@ def test_line_breaks(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path)
         assert found_lines[i], f"Expected to find 'line {i}' in the output"
 
     assert any("done" in line for line in output_lines)
+
+
+def test_channel_sources(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch
+):
+    with pytest.raises(CalledProcessError):
+        # channel_sources and channels cannot both be set at the same time
+        rattler_build.build(
+            recipes / "channel_sources",
+            tmp_path,
+            custom_channels=["conda-forge"],
+        )
+
+    output = rattler_build.build(
+        recipes / "channel_sources",
+        tmp_path,
+        extra_args=["--render-only"],
+    )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]

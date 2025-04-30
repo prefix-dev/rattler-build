@@ -55,10 +55,13 @@ fn build_recipes_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // todo: allow custom config here
+    let config = pixi_config::Config::default();
     let common = CommonData::new(
         output_dir,
         false,
         auth_file.map(|a| a.into()),
+        config,
         channel_priority,
         allow_insecure_host,
     );
@@ -146,13 +149,28 @@ fn test_package_py(
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
         .transpose()
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+    // todo: allow custom config here
+    let config = pixi_config::Config::default();
     let common = CommonData::new(
         None,
         false,
         auth_file,
+        config,
         channel_priority,
         allow_insecure_host,
     );
+    let channel = match channel {
+        None => None,
+        Some(channel) => Some(
+            channel
+                .iter()
+                .map(|c| {
+                    NamedChannelOrUrl::from_str(c)
+                        .map_err(|e| PyRuntimeError::new_err(e.to_string()))
+                })
+                .collect::<PyResult<_>>()?,
+        ),
+    };
     let test_data = TestData::new(package_file, channel, compression_threads, common);
 
     let rt = tokio::runtime::Runtime::new().unwrap();

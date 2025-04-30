@@ -237,7 +237,7 @@ impl CommonData {
         // mirror config
         // todo: this is a duplicate in pixi and pixi-pack: do it like in `compute_s3_config`
         let mut mirror_config = HashMap::new();
-        tracing::info!("Using mirrors: {:?}", config.mirror_map());
+        tracing::debug!("Using mirrors: {:?}", config.mirror_map());
 
         fn ensure_trailing_slash(url: &url::Url) -> url::Url {
             if url.path().ends_with('/') {
@@ -449,7 +449,7 @@ pub struct BuildData {
     pub build_platform: Platform,
     pub target_platform: Platform,
     pub host_platform: Platform,
-    pub channels: Vec<NamedChannelOrUrl>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub variant_config: Vec<PathBuf>,
     pub ignore_recipe_variants: bool,
     pub render_only: bool,
@@ -508,7 +508,7 @@ impl BuildData {
             host_platform: host_platform
                 .or(target_platform)
                 .unwrap_or(Platform::current()),
-            channels: channels.unwrap_or(vec![NamedChannelOrUrl::Name("conda-forge".to_string())]),
+            channels,
             variant_config: variant_config.unwrap_or_default(),
             ignore_recipe_variants,
             render_only,
@@ -603,7 +603,7 @@ fn parse_key_val(s: &str) -> Result<(String, Value), Box<dyn Error + Send + Sync
 pub struct TestOpts {
     /// Channels to use when testing
     #[arg(short = 'c', long = "channel")]
-    pub channels: Option<Vec<String>>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
 
     /// The package file to test
     #[arg(short, long)]
@@ -621,7 +621,7 @@ pub struct TestOpts {
 #[derive(Debug, Clone)]
 #[allow(missing_docs)]
 pub struct TestData {
-    pub channels: Vec<String>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
@@ -642,13 +642,13 @@ impl TestData {
     /// Create a new instance of `TestData`
     pub fn new(
         package_file: PathBuf,
-        channels: Option<Vec<String>>,
+        channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
         common: CommonData,
     ) -> Self {
         Self {
             package_file,
-            channels: channels.unwrap_or(vec!["conda-forge".to_string()]),
+            channels,
             compression_threads,
             common,
         }
@@ -1202,7 +1202,7 @@ pub struct DebugData {
     /// Host platform for runtime dependencies
     pub host_platform: Platform,
     /// List of channels to search for dependencies
-    pub channels: Vec<NamedChannelOrUrl>,
+    pub channels: Option<Vec<NamedChannelOrUrl>>,
     /// Common configuration options
     pub common: CommonData,
     /// Name of the specific output to debug (if recipe has multiple outputs)
@@ -1221,9 +1221,7 @@ impl DebugData {
             host_platform: opts
                 .host_platform
                 .unwrap_or_else(|| opts.target_platform.unwrap_or(Platform::current())),
-            channels: opts.channels.unwrap_or(vec![
-                NamedChannelOrUrl::from_str("conda-forge").expect("conda-forge is parseable"),
-            ]),
+            channels: opts.channels,
             common: CommonData::from_opts_and_config(opts.common, config.unwrap_or_default()),
             output_name: opts.output_name,
         }
