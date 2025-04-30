@@ -1509,7 +1509,14 @@ def test_channel_sources(
             custom_channels=["conda-forge"],
         )
 
-    rattler_build.build(
+    output = rattler_build.build(
         recipes / "channel_sources",
         tmp_path,
+        extra_args=["--render-only"],
     )
+
+    output_json = json.loads(output)
+    assert output_json[0]["build_configuration"]["channels"] == [
+        "https://conda.anaconda.org/conda-forge/label/rust_dev",
+        "https://conda.anaconda.org/conda-forge",
+    ]
