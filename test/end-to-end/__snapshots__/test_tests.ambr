@@ -9,7 +9,7 @@
 # ---
 # name: test_r_tests
   '''
-  - rscript:
+  - r:
       libraries:
       - ggplot2
   
