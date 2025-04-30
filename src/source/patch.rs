@@ -55,6 +55,8 @@ pub(crate) fn apply_patches(
     for patch in patches {
         let patch = recipe_dir.join(patch);
 
+        tracing::info!("Applying patch: {}", patch.to_string_lossy());
+
         if !patch.exists() {
             return Err(SourceError::PatchNotFound(patch));
         }
