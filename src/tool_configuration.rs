@@ -407,14 +407,6 @@ impl ConfigurationBuilder {
         }
     }
 
-    /// Set the base client to use for network requests.
-    pub fn with_base_client(self, base_client: BaseClient) -> Self {
-        Self {
-            client: Some(base_client),
-            ..self
-        }
-    }
-
     /// Construct a [`Configuration`] from the builder.
     pub fn finish(self) -> Configuration {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
