@@ -123,7 +123,11 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-/// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
+/// Retries clean up when encountered with common Windows filesystem errors
+/// - OS 32: The process cannot access the file because it is being used by another process
+/// - OS 5: Access is denied
+/// - OS 145: The directory is not empty
+/// - OS 1392: The file or directory is corrupted and unreadable
 fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
     let mut current_try = if first_err.is_some() { 1 } else { 0 };
@@ -150,10 +154,15 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                 }
             }
         }
-
+        std::thread::sleep(Duration::from_millis(100));
         match fs::remove_dir_all(path) {
             Ok(_) => return Ok(()),
-            Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5) | Some(145)) => {
+            Err(e)
+                if matches!(
+                    e.raw_os_error(),
+                    Some(32) | Some(5) | Some(145) | Some(1392) | Some(267)
+                ) =>
+            {
                 last_err = Some(e);
                 current_try += 1;
             }
@@ -240,7 +249,7 @@ mod tests {
             let file_handle_clone = file_handle.clone();
             let locked_file_error = std::io::Error::from_raw_os_error(32);
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(750));
+                std::thread::sleep(Duration::from_millis(1500));
                 let mut guard = file_handle_clone.lock().unwrap();
                 *guard = None;
                 tracing::info!("File lock released");
@@ -248,12 +257,16 @@ mod tests {
 
             let dir_path_clone = dir_path.clone();
             let remove_result = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(200));
                 try_remove_with_retry(&dir_path_clone, Some(locked_file_error))
             });
 
             handle.join().unwrap();
             let result = remove_result.join().unwrap();
-            std::thread::sleep(Duration::from_millis(2000));
+            std::thread::sleep(Duration::from_millis(3000));
+            if let Err(e) = &result {
+                tracing::error!("Clearing error: {}, OS code: {:?}", e, e.raw_os_error());
+            }
 
             assert!(
                 result.is_ok(),
