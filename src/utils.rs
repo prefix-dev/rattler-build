@@ -125,7 +125,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 #[cfg(windows)]
 /// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
 fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(20);
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(5);
     let mut current_try = if first_err.is_some() { 1 } else { 0 };
     let mut last_err = first_err;
     let request_start = SystemTime::now();
@@ -144,7 +144,8 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 20, e);
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
+                    println!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
                     std::thread::sleep(sleep_for);
                 }
             }
@@ -152,7 +153,7 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
 
         match fs::remove_dir_all(path) {
             Ok(_) => return Ok(()),
-            Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5)) => {
+            Err(e) if matches!(e.raw_os_error(), Some(32) | Some(5) | Some(145)) => {
                 last_err = Some(e);
                 current_try += 1;
             }
