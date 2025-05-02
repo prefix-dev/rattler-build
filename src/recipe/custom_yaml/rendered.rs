@@ -669,6 +669,18 @@ impl Render<RenderedNode> for ScalarNode {
                 label = jinja_error_to_label(&err),
             )]
         })?;
+
+        if rendered.starts_with("\"") && rendered.ends_with("\"") {
+            // remove quotes
+            let rendered = rendered[1..rendered.len() - 1].to_string();
+            return Ok(RenderedNode::Scalar(RenderedScalarNode::new(
+                *self.span(),
+                self.as_str().to_string(),
+                rendered,
+                false,
+            )));
+        }
+
         // unsure whether this should be allowed to coerce // check if it's quoted?
         let rendered = RenderedScalarNode::new(
             *self.span(),

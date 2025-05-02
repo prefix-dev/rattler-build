@@ -161,6 +161,17 @@ impl Render<Node> for ScalarNode {
                 label = jinja_error_to_label(&err)
             )]
         })?;
+        println!("Rendered: {}", rendered);
+        if rendered.starts_with("\"") && rendered.ends_with("\"") {
+            // remove quotes and don't coerce string
+            let rendered = rendered[1..rendered.len() - 1].to_string();
+            println!("Rendered without quotes: {}", rendered);
+            return Ok(Node::from(ScalarNode::new(
+                *self.span(),
+                rendered,
+                false,
+            )));
+        }
 
         Ok(Node::from(ScalarNode::new(
             *self.span(),
@@ -183,6 +194,17 @@ impl Render<Option<ScalarNode>> for ScalarNode {
                 label = jinja_error_to_label(&err)
             )]
         })?;
+
+        // if rendered string starts with `"` and ends with `"` then remove them and turn may_coerce to false
+        if rendered.starts_with("\"") && rendered.ends_with("\"") {
+            // remove quotes and don't coerce string
+            let rendered = rendered[1..rendered.len() - 1].to_string();
+            return Ok(Some(ScalarNode::new(
+                *self.span(),
+                rendered,
+                false,
+            )));
+        }
 
         if rendered.is_empty() {
             Ok(None)
@@ -228,6 +250,7 @@ impl Render<Node> for SequenceNode {
 
 impl Render<Node> for SequenceNodeInternal {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
+        println!("Rendering: {:?}", self);
         match self {
             Self::Simple(n) => n.render(jinja, name),
             Self::Conditional(if_sel) => {

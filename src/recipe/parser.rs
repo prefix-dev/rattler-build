@@ -182,8 +182,9 @@ impl Recipe {
 
         // add context values
         let mut context: IndexMap<String, Variable> = IndexMap::new();
-
         if let Some(context_map) = root_node.get("context") {
+            println!("Rendering context: {:#?}", context);
+
             let context_map = context_map.as_mapping().ok_or_else(|| {
                 vec![_partialerror!(
                     *context_map.span(),
@@ -234,6 +235,9 @@ impl Recipe {
                     continue;
                 };
                 context.insert(k.as_str().to_string(), variable.clone());
+
+                println!("Context variable with type: k {} {:#?}", k.as_str(), variable);
+
                 // also immediately insert into jinja context so that the value can be used
                 // in later jinja expressions
                 jinja

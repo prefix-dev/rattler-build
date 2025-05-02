@@ -54,6 +54,11 @@ pub struct Jinja {
     context: BTreeMap<String, Value>,
 }
 
+struct ForceString {
+    value: String,
+    force: bool,
+}
+
 impl Jinja {
     /// Create a new Jinja instance with the given selector configuration.
     pub fn new(config: SelectorConfig) -> Self {
@@ -96,6 +101,22 @@ impl Jinja {
 
     /// Render a template with the current context.
     pub fn render_str(&self, template: &str) -> Result<String, minijinja::Error> {
+        if template.starts_with("${{") && template.ends_with("}}") {
+            // render as expression so that we know the type of the result, and can stringify accordingly
+            // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
+            println!("eval: {:?}", template);
+            let tmplt = &template[3..template.len() - 2];
+            let expr = self.env.compile_expression(tmplt)?;
+            let evaled = expr.eval(self.context())?;
+            if let Some(s) = evaled.to_str() {
+                // quote the string so that YAML is not getting confused
+                println!("evaled: {:?}", s);
+                return Ok(format!("\"{}\"", s));
+            } else {
+                return Ok(evaled.to_string());
+            }
+        }
+
         self.env.render_str(template, &self.context)
     }
 
@@ -741,7 +762,7 @@ impl Env {
         match std::env::var(env_var) {
             Ok(r) => Ok(Value::from(r)),
             Err(_) => match default_value {
-                Some(default_value) => Ok(Value::from(default_value)),
+                Some(default_value) => Ok(Value::from_safe_string(default_value)),
                 None => Err(minijinja::Error::new(
                     minijinja::ErrorKind::InvalidOperation,
                     format!("Environment variable {env_var} not found"),
