@@ -48,7 +48,7 @@ pub enum TestStrategy {
 }
 
 /// A client that can handle both secure and insecure connections
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BaseClient {
     /// The standard client with SSL verification enabled
     client: ClientWithMiddleware,
@@ -412,7 +412,7 @@ impl ConfigurationBuilder {
         let cache_dir = self.cache_dir.unwrap_or_else(|| {
             rattler_cache::default_cache_dir().expect("failed to determine default cache directory")
         });
-        let client = self.client.expect("client not initialized");
+        let client = self.client.unwrap_or_default();
         let package_cache = PackageCache::new(cache_dir.join(rattler_cache::PACKAGE_CACHE_DIR));
         let channel_config = self.channel_config.unwrap_or_else(|| {
             ChannelConfig::default_with_root_dir(
