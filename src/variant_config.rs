@@ -536,6 +536,11 @@ impl VariantConfig {
                         .ignore_run_exports
                         .from_package
                         .insert("python".parse().unwrap());
+                    recipe
+                        .requirements
+                        .ignore_run_exports
+                        .by_name
+                        .insert("python".parse().unwrap());
                 }
 
                 recipes.insert(DiscoveredOutput {
