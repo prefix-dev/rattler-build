@@ -148,8 +148,11 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
+                    #[cfg(debug_assertions)]
                     tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
-                    println!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
+                    #[cfg(not(debug_assertions))]
+                    eprintln!("Retrying deletion {}/{}: {}", current_try + 1, 5, e);
+
                     std::thread::sleep(sleep_for);
                 }
             }
@@ -238,32 +241,79 @@ mod tests {
             let temp_dir = TempDir::new()?;
             let dir_path = temp_dir.path().to_path_buf();
             let file_path = dir_path.join("locked.txt");
+            {
+                let mut file = File::create(&file_path)?;
+                file.write_all(b"test content")?;
+            }
+
             let file = OpenOptions::new()
                 .write(true)
-                .create(true)
-                .truncate(true)
+                .create(false)
+                .truncate(false)
                 .share_mode(0)
                 .open(&file_path)?;
 
             let file_handle = Arc::new(Mutex::new(Some(file)));
             let file_handle_clone = file_handle.clone();
-            let locked_file_error = std::io::Error::from_raw_os_error(32);
+
+            let lock_released = Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let lock_released_clone = lock_released.clone();
+
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(1500));
+                tracing::info!("Lock release thread started, sleeping for 500ms");
+                std::thread::sleep(Duration::from_millis(500));
                 let mut guard = file_handle_clone.lock().unwrap();
+                tracing::info!("About to release file lock");
                 *guard = None;
-                tracing::info!("File lock released");
+                drop(guard);
+                lock_released_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+                tracing::info!("File lock released and flag set");
             });
+
+            std::thread::sleep(Duration::from_millis(100));
+            tracing::info!("Starting removal thread");
 
             let dir_path_clone = dir_path.clone();
-            let remove_result = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(200));
-                try_remove_with_retry(&dir_path_clone, Some(locked_file_error))
+            let locked_file_error = std::io::Error::from_raw_os_error(32);
+            let removal_thread = std::thread::spawn(move || {
+                tracing::info!("Removal thread started, waiting for lock release signal");
+                let mut counter = 0;
+                while !lock_released.load(std::sync::atomic::Ordering::SeqCst) {
+                    std::thread::sleep(Duration::from_millis(100));
+                    counter += 1;
+                    if counter % 10 == 0 {
+                        tracing::info!("Still waiting for lock release after {}ms", counter * 100);
+                    }
+                }
+
+                tracing::info!("Lock release detected, waiting 500ms for Windows to catch up");
+                std::thread::sleep(Duration::from_millis(500));
+
+                tracing::info!(
+                    "Attempting to remove directory: {}",
+                    dir_path_clone.display()
+                );
+                let result = try_remove_with_retry(&dir_path_clone, Some(locked_file_error));
+
+                if let Err(e) = &result {
+                    tracing::error!(
+                        "Directory removal attempt failed: {}, OS code: {:?}",
+                        e,
+                        e.raw_os_error()
+                    );
+                } else {
+                    tracing::info!("Directory removal succeeded");
+                }
+
+                result
             });
 
+            tracing::info!("Waiting for lock release thread to complete");
             handle.join().unwrap();
-            let result = remove_result.join().unwrap();
-            std::thread::sleep(Duration::from_millis(3000));
+
+            tracing::info!("Waiting for directory removal thread to complete");
+            let result = removal_thread.join().unwrap();
+
             if let Err(e) = &result {
                 tracing::error!("Clearing error: {}, OS code: {:?}", e, e.raw_os_error());
             }
