@@ -125,7 +125,7 @@ pub fn remove_dir_all_force(path: &Path) -> std::io::Result<()> {
 #[cfg(windows)]
 /// Retries clean up when encountered with OS 32 and OS 5 errors on Windows
 fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std::io::Result<()> {
-    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+    let retry_policy = ExponentialBackoff::builder().build_with_max_retries(20);
     let mut current_try = if first_err.is_some() { 1 } else { 0 };
     let mut last_err = first_err;
     let request_start = SystemTime::now();
@@ -144,7 +144,7 @@ fn try_remove_with_retry(path: &Path, first_err: Option<std::io::Error>) -> std:
                         .duration_since(SystemTime::now())
                         .unwrap_or(Duration::ZERO);
 
-                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 10, e);
+                    tracing::info!("Retrying deletion {}/{}: {}", current_try + 1, 20, e);
                     std::thread::sleep(sleep_for);
                 }
             }
@@ -239,9 +239,10 @@ mod tests {
             let file_handle_clone = file_handle.clone();
             let locked_file_error = std::io::Error::from_raw_os_error(32);
             let handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(300));
+                std::thread::sleep(Duration::from_millis(750));
                 let mut guard = file_handle_clone.lock().unwrap();
                 *guard = None;
+                tracing::info!("File lock released");
             });
 
             let dir_path_clone = dir_path.clone();
@@ -251,7 +252,7 @@ mod tests {
 
             handle.join().unwrap();
             let result = remove_result.join().unwrap();
-            std::thread::sleep(Duration::from_millis(1000));
+            std::thread::sleep(Duration::from_millis(2000));
 
             assert!(
                 result.is_ok(),
@@ -259,7 +260,8 @@ mod tests {
                 result.err()
             );
 
-            assert!(!dir_path.exists(), "Directory still exists!");
+            let dir_exists = dir_path.exists();
+            assert!(!dir_exists, "Directory still exists after removal attempt!");
 
             Ok(())
         }
