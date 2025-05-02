@@ -1544,3 +1544,56 @@ def test_channel_sources(
         "https://conda.anaconda.org/conda-forge/label/rust_dev",
         "https://conda.anaconda.org/conda-forge",
     ]
+
+
+def test_relative_file_loading(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # build the package with experimental flag to enable the feature
+    rattler_build.build(
+        recipes / "relative_file_loading",
+        tmp_path,
+        extra_args=["--experimental"],
+    )
+
+    pkg = get_extracted_package(tmp_path, "relative-file-loading")
+    assert (pkg / "info/index.json").exists()
+    index_json = json.loads((pkg / "info/index.json").read_text())
+    assert index_json["name"] == "relative-file-loading"
+    assert index_json["version"] == "1.0.0"
+
+    assert (pkg / "info/about.json").exists()
+    about_json = json.loads((pkg / "info/about.json").read_text())
+    assert "Loaded from relative file" in about_json["description"]
+    assert (pkg / "info/recipe/data/package_data.yaml").exists()
+    recipe_data = yaml.safe_load(
+        (pkg / "info/recipe/data/package_data.yaml").read_text()
+    )
+    assert recipe_data["name"] == "test-relative-loading"
+    assert recipe_data["version"] == "1.0.0"
+    assert recipe_data["description"] == "Loaded from relative file"
+
+    # Check the rendered recipe
+    assert (pkg / "info/recipe/rendered_recipe.yaml").exists()
+    rendered_recipe = yaml.safe_load(
+        (pkg / "info/recipe/rendered_recipe.yaml").read_text()
+    )
+    print("\nRendered recipe structure:")
+    print(yaml.dump(rendered_recipe, default_flow_style=False))
+
+    assert "recipe" in rendered_recipe
+    assert "context" in rendered_recipe["recipe"]
+
+    context = rendered_recipe["recipe"]["context"]
+    assert "loaded_data" in context
+    assert "loaded_name" in context
+    assert "loaded_version" in context
+    assert "loaded_description" in context
+    assert context["loaded_name"] == "test-relative-loading"
+    assert context["loaded_version"] == "1.0.0"
+    assert context["loaded_description"] == "Loaded from relative file"
+    assert "about" in rendered_recipe["recipe"]
+    assert "description" in rendered_recipe["recipe"]["about"]
+    assert (
+        rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
+    )
