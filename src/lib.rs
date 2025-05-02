@@ -209,6 +209,7 @@ pub async fn get_build_output(
         experimental: build_data.common.experimental,
         // allow undefined while finding the variants
         allow_undefined: true,
+        recipe_path: Some(recipe_path.to_path_buf()),
     };
 
     let span = tracing::info_span!("Finding outputs from recipe");

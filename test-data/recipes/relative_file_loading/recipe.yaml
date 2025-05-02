@@ -1,0 +1,13 @@
+context:
+  loaded_data: ${{ load_from_file('data/package_data.yaml') }}
+  loaded_name: ${{ load_from_file('data/package_data.yaml').name }}
+  loaded_version: ${{ load_from_file('data/package_data.yaml').version }}
+  loaded_description: ${{ load_from_file('data/package_data.yaml').description }}
+
+package:
+  name: relative-file-loading
+  version: "1.0.0"
+
+about:
+  summary: "Test for relative file loading"
+  description: ${{ load_from_file('data/package_data.yaml').description }}

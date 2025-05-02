@@ -195,6 +195,10 @@ criterion = { version = "0.5.1", features = ["html_reports"] }
 name = "line_breaks"
 harness = false
 
+[[bench]]
+name = "parse_file"
+harness = false
+
 [patch.crates-io]
 # rattler = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }
 # rattler_sandbox = { git = "https://github.com/wolfv/rattler", branch = "pub-schema" }

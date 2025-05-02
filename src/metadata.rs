@@ -395,6 +395,7 @@ impl BuildConfiguration {
             hash: Some(self.hash.clone()),
             experimental: false,
             allow_undefined: false,
+            recipe_path: None,
         }
     }
 }

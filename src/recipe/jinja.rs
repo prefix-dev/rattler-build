@@ -3,6 +3,7 @@
 use fs_err as fs;
 use indexmap::IndexMap;
 use minijinja::syntax::SyntaxConfig;
+use std::io::Read;
 use std::process::Command;
 use std::sync::Arc;
 use std::{collections::BTreeMap, str::FromStr};
@@ -392,6 +393,7 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
         variant,
         experimental,
         allow_undefined,
+        recipe_path,
         ..
     } = config.clone();
 
@@ -521,36 +523,100 @@ fn set_jinja(config: &SelectorConfig) -> minijinja::Environment<'static> {
     env.add_function("is_unix", |platform: &str| {
         Ok(parse_platform(platform)?.is_unix())
     });
+    #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+    enum FileFormat {
+        Yaml,
+        Json,
+        Toml,
+        Unknown,
+    }
 
-    env.add_function("load_from_file", move |path: String| {
+    // Helper function to determine the file format based on the file extension
+    fn get_file_format(file_path: &std::path::Path) -> FileFormat {
+        file_path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .map(|ext| match ext.to_lowercase().as_str() {
+                "yaml" | "yml" => FileFormat::Yaml,
+                "json" => FileFormat::Json,
+                "toml" => FileFormat::Toml,
+                _ => FileFormat::Unknown,
+            })
+            .unwrap_or(FileFormat::Unknown)
+    }
+
+    // Helper function to handle file errors
+    fn handle_file_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to open file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    // Helper function to handle file reading errors
+    fn handle_read_error(e: std::io::Error, file_path: &std::path::Path) -> minijinja::Error {
+        minijinja::Error::new(
+            minijinja::ErrorKind::UndefinedError,
+            format!("Failed to read file '{}': {}", file_path.display(), e),
+        )
+    }
+
+    // Helper function to handle deserialization errors
+    fn handle_deserialize_error(e: impl std::fmt::Display) -> minijinja::Error {
+        minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
+    }
+
+    // Read and parse the file based on its format
+    fn read_and_parse_file(
+        file_path: &std::path::Path,
+    ) -> Result<minijinja::Value, minijinja::Error> {
+        let file = fs::File::open(file_path).map_err(|e| handle_file_error(e, file_path))?;
+        let mut reader = std::io::BufReader::new(file);
+
+        match get_file_format(file_path) {
+            FileFormat::Yaml => serde_yaml::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Json => serde_json::from_reader(reader).map_err(handle_deserialize_error),
+            FileFormat::Toml => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                toml::from_str(&content).map_err(handle_deserialize_error)
+            }
+            FileFormat::Unknown => {
+                let mut content = String::new();
+                reader
+                    .read_to_string(&mut content)
+                    .map_err(|e| handle_read_error(e, file_path))?;
+                Ok(Value::from(content))
+            }
+        }
+    }
+    // Check if the experimental feature is enabled
+    fn check_experimental(experimental: bool) -> Result<(), minijinja::Error> {
         if !experimental {
             return Err(minijinja::Error::new(
                 minijinja::ErrorKind::InvalidOperation,
                 "Experimental feature: provide the `--experimental` flag to enable this feature",
             ));
         }
-        let src = fs::read_to_string(&path).map_err(|e| {
-            minijinja::Error::new(minijinja::ErrorKind::UndefinedError, e.to_string())
-        })?;
-        // tracing::info!("loading from path: {path}");
-        let filename = path
-            .split('/')
-            .next_back()
-            .expect("unreachable: split will always atleast return empty string");
-        // tracing::info!("loading filename: {filename}");
-        let value: minijinja::Value = match filename.split_once('.') {
-            Some((_, "yaml")) | Some((_, "yml")) => serde_yaml::from_str(&src).map_err(|e| {
-                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
-            })?,
-            Some((_, "json")) => serde_json::from_str(&src).map_err(|e| {
-                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
-            })?,
-            Some((_, "toml")) => toml::from_str(&src).map_err(|e| {
-                minijinja::Error::new(minijinja::ErrorKind::CannotDeserialize, e.to_string())
-            })?,
-            _ => Value::from(src),
-        };
-        Ok(value)
+        Ok(())
+    }
+
+    env.add_function("load_from_file", move |path: String| {
+        check_experimental(experimental)?;
+
+        if let Some(recipe_path) = recipe_path.as_ref() {
+            if let Some(parent) = recipe_path.parent() {
+                let relative_path = parent.join(&path);
+                if let Ok(value) = read_and_parse_file(&relative_path) {
+                    return Ok(value);
+                }
+            }
+        }
+
+        let file_path = std::path::Path::new(&path);
+        read_and_parse_file(file_path)
     });
 
     env
@@ -849,8 +915,68 @@ mod tests {
         let path_str = to_forward_slash_lossy(&path);
         fs::write(&path, "hello = 'world'").unwrap();
         assert_eq!(
-            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 2").as_str(),
+            jinja.eval(&format!("load_from_file('{}')['hello']", path_str)).expect("test 3").as_str(),
             Some("world"),
+        );
+    }
+
+    #[test]
+    fn eval_load_from_file_relative_to_recipe() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        fs::write(&recipe_path, "dummy: content").unwrap();
+
+        let data_dir = temp_dir.path().join("data");
+        fs::create_dir(&data_dir).unwrap();
+        let json_path = data_dir.join("test.json");
+        fs::write(&json_path, "{ \"hello\": \"world\" }").unwrap();
+
+        let options = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            experimental: true,
+            recipe_path: Some(recipe_path),
+            ..Default::default()
+        };
+
+        let jinja = Jinja::new(options);
+
+        assert_eq!(
+            jinja
+                .eval("load_from_file('data/test.json')['hello']")
+                .expect("test relative path")
+                .as_str(),
+            Some("world"),
+        );
+    }
+
+    #[test]
+    fn eval_load_from_file_relative_to_recipe_without_experimental() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let recipe_path = temp_dir.path().join("recipe.yaml");
+        fs::write(&recipe_path, "dummy: content").unwrap();
+
+        let data_dir = temp_dir.path().join("data");
+        fs::create_dir(&data_dir).unwrap();
+        let json_path = data_dir.join("test.json");
+        fs::write(&json_path, "{ \"hello\": \"world\" }").unwrap();
+
+        let options_wo_experimental = SelectorConfig {
+            target_platform: Platform::Linux64,
+            build_platform: Platform::Linux64,
+            experimental: false,
+            recipe_path: Some(recipe_path),
+            ..Default::default()
+        };
+
+        let jinja_wo_experimental = Jinja::new(options_wo_experimental);
+
+        assert_eq!(
+            jinja_wo_experimental
+                .eval("load_from_file('data/test.json')")
+                .expect_err("should error without experimental flag")
+                .to_string(),
+            "invalid operation: Experimental feature: provide the `--experimental` flag to enable this feature (in <expression>:1)",
         );
     }
 
