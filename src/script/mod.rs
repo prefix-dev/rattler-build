@@ -219,7 +219,7 @@ impl Script {
         if let Some(jinja_context) = jinja_context {
             match script_content? {
                 ResolvedScriptContents::Inline(script) => {
-                    let rendered = jinja_context.render_str(&script).map_err(|e| {
+                    let (rendered, _) = jinja_context.render_str(&script).map_err(|e| {
                         std::io::Error::new(
                             std::io::ErrorKind::Other,
                             format!("Failed to render jinja template in build `script`: {}", e),

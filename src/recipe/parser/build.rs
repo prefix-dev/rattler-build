@@ -172,7 +172,7 @@ impl BuildString {
     pub fn resolve(&self, hash: &HashInfo, build_number: u64, jinja: &Jinja) -> Cow<'_, str> {
         match self {
             // TODO
-            BuildString::UserSpecified(template) => jinja.render_str(template).unwrap().into(),
+            BuildString::UserSpecified(template) => jinja.render_str(template).unwrap().0.into(),
             BuildString::Resolved(s) => s.as_str().into(),
             BuildString::Derived => Self::compute(hash, build_number).into(),
         }

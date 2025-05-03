@@ -154,29 +154,18 @@ impl Render<Node> for Node {
 
 impl Render<Node> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<Node, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
                 label = jinja_error_to_label(&err)
             )]
         })?;
-        println!("Rendered: {}", rendered);
-        if rendered.starts_with("\"") && rendered.ends_with("\"") {
-            // remove quotes and don't coerce string
-            let rendered = rendered[1..rendered.len() - 1].to_string();
-            println!("Rendered without quotes: {}", rendered);
-            return Ok(Node::from(ScalarNode::new(
-                *self.span(),
-                rendered,
-                false,
-            )));
-        }
 
         Ok(Node::from(ScalarNode::new(
             *self.span(),
             rendered,
-            self.may_coerce,
+            self.may_coerce && may_coerce,
         )))
     }
 }
@@ -187,7 +176,7 @@ impl Render<Option<ScalarNode>> for ScalarNode {
         jinja: &Jinja,
         _name: &str,
     ) -> Result<std::option::Option<ScalarNode>, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -195,24 +184,13 @@ impl Render<Option<ScalarNode>> for ScalarNode {
             )]
         })?;
 
-        // if rendered string starts with `"` and ends with `"` then remove them and turn may_coerce to false
-        if rendered.starts_with("\"") && rendered.ends_with("\"") {
-            // remove quotes and don't coerce string
-            let rendered = rendered[1..rendered.len() - 1].to_string();
-            return Ok(Some(ScalarNode::new(
-                *self.span(),
-                rendered,
-                false,
-            )));
-        }
-
         if rendered.is_empty() {
             Ok(None)
         } else {
             Ok(Some(ScalarNode::new(
                 *self.span(),
                 rendered,
-                self.may_coerce,
+                self.may_coerce && may_coerce,
             )))
         }
     }

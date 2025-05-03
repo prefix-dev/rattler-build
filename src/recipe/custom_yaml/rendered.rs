@@ -662,7 +662,7 @@ impl Render<RenderedNode> for Node {
 
 impl Render<RenderedNode> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -670,23 +670,12 @@ impl Render<RenderedNode> for ScalarNode {
             )]
         })?;
 
-        if rendered.starts_with("\"") && rendered.ends_with("\"") {
-            // remove quotes
-            let rendered = rendered[1..rendered.len() - 1].to_string();
-            return Ok(RenderedNode::Scalar(RenderedScalarNode::new(
-                *self.span(),
-                self.as_str().to_string(),
-                rendered,
-                false,
-            )));
-        }
-
         // unsure whether this should be allowed to coerce // check if it's quoted?
         let rendered = RenderedScalarNode::new(
             *self.span(),
             self.as_str().to_string(),
             rendered,
-            self.may_coerce,
+            self.may_coerce && may_coerce,
         );
 
         if rendered.is_empty() {
@@ -703,7 +692,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
         jinja: &Jinja,
         _name: &str,
     ) -> Result<Option<RenderedNode>, Vec<PartialParsingError>> {
-        let rendered = jinja.render_str(self.as_str()).map_err(|err| {
+        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -715,7 +704,7 @@ impl Render<Option<RenderedNode>> for ScalarNode {
             *self.span(),
             self.as_str().to_string(),
             rendered,
-            self.may_coerce,
+            self.may_coerce && may_coerce,
         );
 
         if rendered.is_empty() {
