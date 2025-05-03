@@ -304,27 +304,18 @@ pub async fn install_packages(
 ) -> anyhow::Result<()> {
     // Make sure the target prefix exists, regardless of whether we'll actually
     // install anything in there.
-    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix)
-        .with_context(|| {
-            format!(
-                "failed to create target prefix: {}",
-                target_prefix.display()
-            )
-        })?;
+    let prefix = rattler_conda_types::prefix::Prefix::create(target_prefix).with_context(|| {
+        format!(
+            "failed to create target prefix: {}",
+            target_prefix.display()
+        )
+    })?;
 
     if !prefix.path().join("conda-meta/history").exists() {
         // Create an empty history file if it doesn't exist
+        fs_err::create_dir_all(prefix.path().join("conda-meta"))?;
         fs_err::File::create(prefix.path().join("conda-meta/history"))?;
     }
-
-    tokio::fs::create_dir_all(&target_prefix)
-        .await
-        .with_context(|| {
-            format!(
-                "failed to create target prefix: {}",
-                target_prefix.display()
-            )
-        })?;
 
     let installed_packages = PrefixRecord::collect_from_prefix(target_prefix)?;
 
