@@ -138,24 +138,24 @@ impl Jinja {
     }
 
     /// Render a template with the current context.
-    // pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
-    //     if template.starts_with("${{") && template.ends_with("}}") {
-    //         // render as expression so that we know the type of the result, and can stringify accordingly
-    //         // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
-    //         let tmplt = &template[3..template.len() - 2];
-    //         let expr = self.env.compile_expression(tmplt)?;
-    //         let evaled = expr.eval(self.context())?;
-    //         if let Some(s) = evaled.to_str() {
-    //             // Make sure that the string stays a string by returning can_coerce: false
-    //             return Ok((s.to_string(), false));
-    //         } else {
-    //             return Ok((evaled.to_string(), true));
-    //         }
-    //     }
+    pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
+        if template.starts_with("${{") && template.ends_with("}}") {
+            // render as expression so that we know the type of the result, and can stringify accordingly
+            // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
+            let tmplt = &template[3..template.len() - 2];
+            let expr = self.env.compile_expression(tmplt)?;
+            let evaled = expr.eval(self.context())?;
+            if let Some(s) = evaled.to_str() {
+                // Make sure that the string stays a string by returning can_coerce: false
+                return Ok((s.to_string(), false));
+            } else {
+                return Ok((evaled.to_string(), true));
+            }
+        }
 
-    //     let rendered = self.env.render_str(template, &self.context)?;
-    //     Ok((rendered, !template.contains("${{")))
-    // }
+        let rendered = self.env.render_str(template, &self.context)?;
+        Ok((rendered, !template.contains("${{")))
+    }
 
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
