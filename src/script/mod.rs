@@ -269,10 +269,9 @@ impl Script {
         let interpreter_is_nushell = interpreter == "nushell" || interpreter == "nu";
 
         // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = vec!["py", "pl", "r"];
+        let mut valid_script_extensions = Vec::new();
         if cfg!(windows) {
             valid_script_extensions.push("bat");
-            valid_script_extensions.push("cmd");
         } else {
             valid_script_extensions.push("sh");
         }

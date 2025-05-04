@@ -1603,7 +1603,7 @@ def test_relative_file_loading(
     "interpreter",
     [
         pytest.param(
-            "sh", marks=pytest.mark.skipif(os.name == "nt", reason="sh only on unix")
+            "bash", marks=pytest.mark.skipif(os.name == "nt", reason="bash only on unix")
         ),
         pytest.param(
             "bat",
