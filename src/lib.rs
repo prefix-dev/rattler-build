@@ -552,6 +552,16 @@ pub async fn run_build_from_args(
 
             // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
             for (output, archive) in &to_test {
+                if cfg!(windows) {
+                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                }
+
+                let test_channels =
+                    build_reindexed_channels(&output.build_configuration, &tool_configuration)
+                        .await
+                        .into_diagnostic()
+                        .context("failed to reindex output channel")?;
+
                 package_test::run_test(
                     archive,
                     &TestConfiguration {
@@ -560,13 +570,7 @@ pub async fn run_build_from_args(
                         host_platform: Some(output.build_configuration.host_platform.clone()),
                         current_platform: output.build_configuration.build_platform.clone(),
                         keep_test_prefix: tool_configuration.no_clean,
-                        channels: build_reindexed_channels(
-                            &output.build_configuration,
-                            &tool_configuration,
-                        )
-                        .await
-                        .into_diagnostic()
-                        .context("failed to reindex output channel")?,
+                        channels: test_channels,
                         channel_priority: tool_configuration.channel_priority,
                         solve_strategy: SolveStrategy::Highest,
                         tool_configuration: tool_configuration.clone(),
