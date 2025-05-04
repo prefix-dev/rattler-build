@@ -1597,3 +1597,76 @@ def test_relative_file_loading(
     assert (
         rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
     )
+
+
+@pytest.mark.parametrize(
+    "interpreter",
+    [
+        pytest.param(
+            "sh", marks=pytest.mark.skipif(os.name == "nt", reason="sh only on unix")
+        ),
+        pytest.param(
+            "bat",
+            marks=pytest.mark.skipif(os.name != "nt", reason="bat only on windows"),
+        ),
+        "py",
+        "pl",
+        "nu",
+        "r",
+    ],
+)
+def test_interpreter_detection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, interpreter: str
+):
+    """
+    Tests that rattler-build automatically detects the required interpreter
+    for build and test scripts based on their file extension, without explicit
+    interpreter specification in the recipe.
+    """
+    recipe_dir = recipes / "interpreter-detection" / interpreter
+    pkg_name = f"test-interpreter-{interpreter}"
+
+    rattler_build.build(recipe_dir, tmp_path)
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    if interpreter == "bat":
+        expected_output = "Hello from Cmd!"
+    elif interpreter == "py":
+        expected_output = "Hello from Python!"
+    elif interpreter == "pl":
+        expected_output = "Hello from Perl!"
+    elif interpreter == "nu":
+        expected_output = "Hello from Nushell!"
+    elif interpreter == "r":
+        expected_output = "Hello from R!"
+    else:
+        expected_output = f"Hello from {interpreter.upper()}!"
+
+    assert expected_output in test_output
+    assert "all tests passed!" in test_output
+
+
+def test_interpreter_detection_all_tests(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests that rattler-build can run multiple test scripts requiring
+    different interpreters within the same test phase.
+    """
+    recipe_dir = recipes / "interpreter-detection"
+    pkg_name = "test-interpreter-all"
+
+    rattler_build.build(recipe_dir, tmp_path)
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    assert "Hello from Python!" in test_output
+    assert "Hello from Perl!" in test_output
+    assert "Hello from R!" in test_output
+    assert "Hello from Nushell!" in test_output
+    assert "all tests passed!" in test_output

@@ -254,7 +254,8 @@ impl Script {
         //  executable is in a known place.
         let nushell_path = format!("bin/nu{}", std::env::consts::EXE_SUFFIX);
         let has_nushell = build_prefix
-            .map(|p| p.join(nushell_path))
+            .map(|p| p.join(&nushell_path))
+            .or_else(|| Some(run_prefix.join(&nushell_path)))
             .map(|p| p.is_file())
             .unwrap_or(false);
         if has_nushell {
@@ -268,9 +269,10 @@ impl Script {
         let interpreter_is_nushell = interpreter == "nushell" || interpreter == "nu";
 
         // Determine the valid script extensions based on the available interpreters.
-        let mut valid_script_extensions = Vec::new();
+        let mut valid_script_extensions = vec!["py", "pl", "r"];
         if cfg!(windows) {
             valid_script_extensions.push("bat");
+            valid_script_extensions.push("cmd");
         } else {
             valid_script_extensions.push("sh");
         }
