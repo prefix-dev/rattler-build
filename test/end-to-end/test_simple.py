@@ -1626,7 +1626,14 @@ def test_interpreter_detection(
     recipe_dir = recipes / "interpreter-detection" / interpreter
     pkg_name = f"test-interpreter-{interpreter}"
 
-    rattler_build.build(recipe_dir, tmp_path)
+    try:
+        rattler_build.build(recipe_dir, tmp_path)
+    except CalledProcessError as e:
+        print(f"Build failed for interpreter: {interpreter}")
+        print(f"STDOUT:\n{e.stdout.decode() if e.stdout else ''}")
+        print(f"STDERR:\n{e.stderr.decode() if e.stderr else ''}")
+        raise
+
     pkg_file = get_package(tmp_path, pkg_name)
     assert pkg_file.exists()
 
