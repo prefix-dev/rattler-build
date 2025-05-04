@@ -228,10 +228,10 @@ fn determine_interpreter_from_path(path: &Path) -> Option<String> {
         .and_then(|s| s.to_str())
         .map(|ext| ext.to_lowercase())
         .and_then(|ext_lower| match ext_lower.as_str() {
-            "py" | "pyw" | "pyc" => Some("python".to_string()),
+            "py" => Some("python".to_string()),
             "pl" => Some("perl".to_string()),
             "r" => Some("rscript".to_string()),
-            "sh" | "bash" | "zsh" => Some("bash".to_string()),
+            "sh" | "bash" => Some("bash".to_string()),
             "bat" | "cmd" => Some("cmd".to_string()),
             "ps1" => Some("powershell".to_string()),
             "nu" => Some("nushell".to_string()),
