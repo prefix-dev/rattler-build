@@ -6,4 +6,4 @@ build:
   script: build.sh
 
 tests:
-  - script: build.sh 
+  - script: build.sh

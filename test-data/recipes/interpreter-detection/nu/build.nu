@@ -1,1 +1,1 @@
-echo "Hello from Nushell!" 
+echo "Hello from Nushell!"

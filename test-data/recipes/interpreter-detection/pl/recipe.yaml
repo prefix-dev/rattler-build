@@ -13,4 +13,4 @@ tests:
   - script: build.pl
     requirements:
       run:
-        - perl 
+        - perl

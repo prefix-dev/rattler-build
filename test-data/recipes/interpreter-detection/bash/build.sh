@@ -1,1 +1,1 @@
-echo "Hello from Bash!" 
+echo "Hello from Bash!"

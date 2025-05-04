@@ -1,1 +1,1 @@
-@echo Hello from Cmd! 
+@echo Hello from Cmd!

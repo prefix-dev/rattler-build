@@ -7,10 +7,10 @@ build:
 
 requirements:
   build:
-    - python 
+    - python
 
 tests:
   - script: build.py
     requirements:
       run:
-        - python 
+        - python
