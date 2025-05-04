@@ -55,6 +55,8 @@ pub use self::{
 
 use crate::recipe::{custom_yaml::Node, variable::Variable};
 
+use super::custom_yaml::string_to_bool;
+
 /// A recipe that has been parsed and validated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Recipe {
@@ -149,19 +151,35 @@ impl Recipe {
                 help = "`context` values must always be scalars (booleans, integers or strings) or uniform lists of scalars"
             )]
         })?;
-        let rendered: Option<ScalarNode> = val.render(jinja, &format!("context.{}", k.as_str()))?;
-        if let Some(rendered) = rendered {
-            let variable = if let Some(value) = rendered.as_bool() {
-                Variable::from(value)
-            } else if let Some(value) = rendered.as_integer() {
-                Variable::from(value)
+        // val.render(jinja, &format!("context.{}", k.as_str()))?;
+        let (value, can_coerce) = jinja.render_to_value(&val).unwrap();
+
+        // See if we have to coerce a string-type to a boolean or integer
+        if can_coerce && value.as_str().is_some() {
+            // let's see if the value should be an integer or a boolean
+            let stringified = value.to_string();
+            if let Some(boolean) = string_to_bool(&stringified) {
+                return Ok(Some(Variable::from(boolean)));
+            } else if let Some(integer) = stringified.parse::<i64>().ok() {
+                return Ok(Some(Variable::from(integer)));
             } else {
-                Variable::from_string(&rendered)
-            };
-            Ok(Some(variable))
-        } else {
-            Ok(None)
+                return Ok(Some(Variable::from_string(&stringified)));
+            }
         }
+        // TODO handle null
+        return Ok(Some(Variable::from_value(value)));
+        // if let Some(rendered) = rendered {
+        //     let variable = if let Some(value) = rendered.as_bool() {
+        //         Variable::from(value)
+        //     } else if let Some(value) = rendered.as_integer() {
+        //         Variable::from(value)
+        //     } else {
+        //         Variable::from_string(&rendered)
+        //     };
+        //     Ok(Some(variable))
+        // } else {
+        //     Ok(None)
+        // }
     }
 
     /// Create recipes from a YAML [`Node`] structure.

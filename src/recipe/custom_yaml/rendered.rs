@@ -133,6 +133,59 @@ impl RenderedNode {
             _ => None,
         }
     }
+
+    pub fn from_jinja_value(
+        source: String,
+        value: minijinja::Value,
+        span: Span,
+        coercible: bool,
+    ) -> Result<Self, PartialParsingError> {
+        if !coercible {
+            return Ok(RenderedNode::Scalar(RenderedScalarNode::new(
+                span,
+                value.to_string(),
+                value.to_string(),
+                false,
+            )));
+        }
+
+        match value.kind() {
+            minijinja::value::ValueKind::Map => {
+                todo!("Maps not supported yet");
+            }
+            minijinja::value::ValueKind::Seq => {
+                let mut rendered: Vec<RenderedNode> = Vec::new();
+                for elem in value.try_iter().unwrap() {
+                    let node =
+                        RenderedNode::from_jinja_value(source.clone(), elem, span.clone(), true)?;
+                    rendered.push(node);
+                }
+                Ok(RenderedNode::Sequence(RenderedSequenceNode::from(rendered)))
+            }
+            minijinja::value::ValueKind::String
+            | minijinja::value::ValueKind::Bool
+            | minijinja::value::ValueKind::Number => {
+                let value = value.to_string();
+                if value.is_empty() {
+                    return Ok(RenderedNode::Null(RenderedScalarNode::new(
+                        span,
+                        source,
+                        String::new(),
+                        false,
+                    )));
+                }
+                Ok(RenderedNode::Scalar(RenderedScalarNode::new(
+                    span, source, value, true,
+                )))
+            }
+            minijinja::value::ValueKind::None | minijinja::value::ValueKind::Undefined => Ok(
+                RenderedNode::Null(RenderedScalarNode::new(span, source, String::new(), false)),
+            ),
+            _ => {
+                todo!("Other types not supported yet");
+            }
+        }
+    }
 }
 
 impl HasSpan for RenderedNode {
@@ -263,6 +316,14 @@ impl RenderedScalarNode {
             String::new(),
             false,
         )
+    }
+
+    pub fn new_string(value: String) -> Self {
+        Self::new(marked_yaml::Span::new_blank(), value.clone(), value, false)
+    }
+
+    pub fn new_coerceable(value: String) -> Self {
+        Self::new(marked_yaml::Span::new_blank(), value.clone(), value, true)
     }
 
     /// Treat the scalar node as a string
@@ -662,7 +723,16 @@ impl Render<RenderedNode> for Node {
 
 impl Render<RenderedNode> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
-        let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
+        // println!("Rendering scalar node: {}", self.as_str());
+        // let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
+        //     vec![_partialerror!(
+        //         *self.span(),
+        //         ErrorKind::JinjaRendering(err),
+        //         label = jinja_error_to_label(&err),
+        //     )]
+        // })?;
+
+        let (value, can_coerce) = jinja.render_to_value(self).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
                 ErrorKind::JinjaRendering(err),
@@ -670,19 +740,27 @@ impl Render<RenderedNode> for ScalarNode {
             )]
         })?;
 
-        // unsure whether this should be allowed to coerce // check if it's quoted?
-        let rendered = RenderedScalarNode::new(
+        return Ok(RenderedNode::from_jinja_value(
+            self.to_string(),
+            value,
             *self.span(),
-            self.as_str().to_string(),
-            rendered,
-            self.may_coerce && may_coerce,
-        );
+            self.may_coerce && can_coerce,
+        )
+        .unwrap());
 
-        if rendered.is_empty() {
-            Ok(RenderedNode::Null(rendered))
-        } else {
-            Ok(RenderedNode::Scalar(rendered))
-        }
+        // unsure whether this should be allowed to coerce // check if it's quoted?
+        // let rendered = RenderedScalarNode::new(
+        //     *self.span(),
+        //     self.as_str().to_string(),
+        //     rendered,
+        //     self.may_coerce && may_coerce,
+        // );
+
+        // if rendered.is_empty() {
+        //     Ok(RenderedNode::Null(rendered))
+        // } else {
+        //     Ok(RenderedNode::Scalar(rendered))
+        // }
     }
 }
 

@@ -228,7 +228,6 @@ impl Render<Node> for SequenceNode {
 
 impl Render<Node> for SequenceNodeInternal {
     fn render(&self, jinja: &Jinja, name: &str) -> Result<Node, Vec<PartialParsingError>> {
-        println!("Rendering: {:?}", self);
         match self {
             Self::Simple(n) => n.render(jinja, name),
             Self::Conditional(if_sel) => {
@@ -391,6 +390,15 @@ pub struct ScalarNode {
     may_coerce: bool,
 }
 
+/// Convert a string to a boolean
+pub fn string_to_bool(value: &str) -> Option<bool> {
+    match value {
+        "true" | "True" | "TRUE" => Some(true),
+        "false" | "False" | "FALSE" => Some(false),
+        _ => None,
+    }
+}
+
 impl ScalarNode {
     /// Create a new scalar node with a span
     pub fn new(span: marked_yaml::Span, value: String, may_coerce: bool) -> Self {
@@ -427,11 +435,8 @@ impl ScalarNode {
         if !self.may_coerce {
             return None;
         }
-        match self.value.as_str() {
-            "true" | "True" | "TRUE" => Some(true),
-            "false" | "False" | "FALSE" => Some(false),
-            _ => None,
-        }
+
+        string_to_bool(&self.value)
     }
 
     /// Convert the scalar node to an integer and follow coercion rules

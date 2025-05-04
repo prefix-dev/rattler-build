@@ -17,6 +17,7 @@ use crate::render::pin::PinArgs;
 pub use crate::render::pin::{Pin, PinExpression};
 pub use crate::selectors::SelectorConfig;
 
+use super::custom_yaml::ScalarNode;
 use super::parser::{Dependency, PinCompatible, PinSubpackage};
 use super::variable::Variable;
 
@@ -52,6 +53,32 @@ impl InternalRepr {
 pub struct Jinja {
     env: Environment<'static>,
     context: BTreeMap<String, Value>,
+}
+
+/// If we have a template that is _only_ an expression, we want to strip the
+/// `${{` and `}}` from it so that we can evaluate it as an expression instead of
+/// rendering it as a string.
+///
+/// The function checks for:
+/// - Whitespace before/after the expression
+/// - Single expression with no nested expressions
+/// - Proper opening `${{` and closing `}}`
+fn strip_expression(template: &str) -> Option<&str> {
+    let trimmed = template.trim();
+    if !trimmed.starts_with("${{") || !trimmed.ends_with("}}") {
+        return None;
+    }
+
+    // Extract content between ${{ and }}
+    let content = &trimmed[3..trimmed.len() - 2];
+    let content = content.trim();
+
+    // Check for nested expressions
+    if content.contains("${{") || content.contains("}}") {
+        return None;
+    }
+
+    Some(content)
 }
 
 impl Jinja {
@@ -94,25 +121,41 @@ impl Jinja {
         &mut self.context
     }
 
-    /// Render a template with the current context.
-    pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
-        if template.starts_with("${{") && template.ends_with("}}") {
-            // render as expression so that we know the type of the result, and can stringify accordingly
-            // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
-            let tmplt = &template[3..template.len() - 2];
-            let expr = self.env.compile_expression(tmplt)?;
-            let evaled = expr.eval(self.context())?;
-            if let Some(s) = evaled.to_str() {
-                // Make sure that the string stays a string by returning can_coerce: false
-                return Ok((s.to_string(), false));
-            } else {
-                return Ok((evaled.to_string(), true));
-            }
+    /// Render the given template to a Jinja value.
+    pub fn render_to_value(
+        &self,
+        template: &ScalarNode,
+    ) -> Result<(Value, bool), minijinja::Error> {
+        if let Some(simple_expr) = strip_expression(template) {
+            // render as expression so that we know the type of the result
+            let expr = self.env.compile_expression(simple_expr)?;
+            return Ok((expr.eval(self.context())?, true));
         }
 
+        // Otherwise just render it as string
         let rendered = self.env.render_str(template, &self.context)?;
-        Ok((rendered, !template.contains("${{")))
+        Ok((Value::from(rendered), !template.contains("${{")))
     }
+
+    /// Render a template with the current context.
+    // pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
+    //     if template.starts_with("${{") && template.ends_with("}}") {
+    //         // render as expression so that we know the type of the result, and can stringify accordingly
+    //         // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
+    //         let tmplt = &template[3..template.len() - 2];
+    //         let expr = self.env.compile_expression(tmplt)?;
+    //         let evaled = expr.eval(self.context())?;
+    //         if let Some(s) = evaled.to_str() {
+    //             // Make sure that the string stays a string by returning can_coerce: false
+    //             return Ok((s.to_string(), false));
+    //         } else {
+    //             return Ok((evaled.to_string(), true));
+    //         }
+    //     }
+
+    //     let rendered = self.env.render_str(template, &self.context)?;
+    //     Ok((rendered, !template.contains("${{")))
+    // }
 
     /// Render, compile and evaluate a expr string with the current context.
     pub fn eval(&self, str: &str) -> Result<Value, minijinja::Error> {
@@ -1380,5 +1423,24 @@ mod tests {
             "cuda",
             default_compiler(platform, "cuda").unwrap().to_string()
         );
+    }
+
+    #[test]
+    fn test_strip_expression() {
+        // Valid cases
+        assert_eq!(strip_expression("${{ expr }}"), Some("expr"));
+        assert_eq!(strip_expression("  ${{ expr }}  "), Some("expr"));
+        assert_eq!(strip_expression("${{expr}}"), Some("expr"));
+        assert_eq!(
+            strip_expression("${{ expr with spaces }}"),
+            Some("expr with spaces")
+        );
+
+        // Invalid cases
+        assert_eq!(strip_expression("not an expression"), None);
+        assert_eq!(strip_expression("${{ nested ${{ expr }} }}"), None);
+        assert_eq!(strip_expression("${{ unmatched"), None);
+        assert_eq!(strip_expression("unmatched }}"), None);
+        assert_eq!(strip_expression("text ${{ expr }} text"), None);
     }
 }
