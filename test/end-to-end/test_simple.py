@@ -1397,13 +1397,11 @@ package:
 
 build:
   script:
-    - if: unix
-      then:
-        mkdir -p FOO
-        mkdir -p foo
-        echo "content1" > FOO/bar.txt
-        echo "content2" > foo/BAR.txt
-        echo "content3" > test.txt
+    - mkdir -p FOO
+    - mkdir -p foo
+    - echo "content1" > FOO/bar.txt
+    - echo "content2" > foo/BAR.txt
+    - echo "content3" > test.txt
 
 about:
   summary: A test package for case-insensitive file collisions
