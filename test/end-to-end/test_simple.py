@@ -1379,6 +1379,51 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["platform"] == host_subdir().split("-")[0]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows natively takes care of case-insensitive collisions, skipping test")
+def test_case_insensitive_collision_warning(
+    rattler_build: RattlerBuild, tmp_path: Path, capfd
+):
+    recipe_content = """
+context:
+  name: test-case-collision
+  version: 0.1.0
+
+package:
+  name: test-case-collision
+  version: 0.1.0
+
+build:
+  script:
+    - if: unix
+      then:
+        mkdir -p FOO
+        mkdir -p foo
+        echo "content1" > FOO/bar.txt
+        echo "content2" > foo/BAR.txt
+        echo "content3" > test.txt
+
+about:
+  summary: A test package for case-insensitive file collisions
+"""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(recipe_content)
+
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+    )
+
+    output = rattler_build(*args, stderr=STDOUT)
+
+    assert (
+        "Mixed-case filenames detected, case-insensitive filesystems may break: foo/BAR.txt, FOO/bar.txt"
+        in output
+    ) or (
+        "Mixed-case filenames detected, case-insensitive filesystems may break: FOO/bar.txt, foo/BAR.txt"
+        in output
+    ), "Case collision error message not found in build output"
+
+
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
 def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
