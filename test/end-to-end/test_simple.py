@@ -1380,8 +1380,8 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
 
 
 @pytest.mark.skipif(
-    os.name == "nt",
-    reason="Windows natively takes care of case-insensitive collisions, skipping test",
+    os.name == "nt" or platform.system() == "Darwin",
+    reason="Filesystem case-insensitivity prevents testing collision warning trigger",
 )
 def test_case_insensitive_collision_warning(
     rattler_build: RattlerBuild, tmp_path: Path
