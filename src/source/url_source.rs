@@ -11,7 +11,7 @@ use crate::{
     console_utils::LoggingOutputHandler,
     recipe::parser::UrlSource,
     source::extract::{extract_tar, extract_zip},
-    tool_configuration::{self, APP_USER_AGENT},
+    tool_configuration,
 };
 use reqwest_middleware::Error as MiddlewareError;
 use tokio::io::AsyncWriteExt;
@@ -72,7 +72,7 @@ async fn fetch_remote(
     let (mut response, download_size) = {
         let resp = client
             .get(url.as_str())
-            .header(reqwest::header::USER_AGENT, APP_USER_AGENT)
+            .version(reqwest::Version::HTTP_11)
             .send()
             .await
             .map_err(|e| {
