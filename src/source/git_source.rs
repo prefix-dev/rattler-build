@@ -344,6 +344,9 @@ mod tests {
     fn test_host_git_source() {
         let temp_dir = tempfile::tempdir().unwrap();
         let cache_dir = temp_dir.path().join("rattler-build-test-git-source");
+        let recipe_dir = temp_dir.path().join("recipe");
+        fs_err::create_dir_all(&recipe_dir).unwrap();
+
         let cases = vec![
             (
                 GitSource::create(
@@ -390,30 +393,11 @@ mod tests {
                 ),
                 "rattler-build",
             ),
-            (
-                GitSource::create(
-                    GitUrl::Path("../rattler-build".parse().unwrap()),
-                    GitRev::default(),
-                    None,
-                    vec![],
-                    None,
-                    false,
-                ),
-                "rattler-build",
-            ),
         ];
         let system_tools = crate::system_tools::SystemTools::new();
 
         for (source, repo_name) in cases {
-            let res = git_src(
-                &system_tools,
-                &source,
-                cache_dir.as_ref(),
-                // TODO: this test assumes current dir is the root folder of the project which may
-                // not be necessary for local runs.
-                std::env::current_dir().unwrap().as_ref(),
-            )
-            .unwrap();
+            let res = git_src(&system_tools, &source, cache_dir.as_ref(), &recipe_dir).unwrap();
             assert_eq!(
                 res.0.to_string_lossy(),
                 cache_dir.join(repo_name).to_string_lossy()

@@ -12,6 +12,7 @@ import boto3
 import pytest
 import requests
 import yaml
+import subprocess
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -1597,3 +1598,121 @@ def test_relative_file_loading(
     assert (
         rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
     )
+
+
+def test_relative_git_path_py(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests building a recipe with a relative Git source path.
+    """
+    repo_dir = tmp_path / "repo"
+    recipe_dir = tmp_path / "recipe_dir" / "subdir"
+    recipe_dir.mkdir(parents=True, exist_ok=True)
+    repo_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        subprocess.run(
+            ["git", "init", "--initial-branch=main"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("Git executable not found, skipping test")
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    readme_path = repo_dir / "README.md"
+    readme_path.write_text("test content")
+    try:
+        subprocess.run(
+            ["git", "add", "README.md"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # get the original commit hash
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        original_commit = result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    # We are gonna create the recipe file here, because we are gonna use git with commit history too.
+    recipe_path = recipe_dir / "recipe.yaml"
+    recipe_content = """
+package:
+  name: test-relative-git
+  version: 1.0.0
+
+source:
+  git: ../../repo
+
+build:
+  script:
+    - if: unix
+      then:
+        - cp README.md $PREFIX/README_from_build.md
+      else:
+        - copy README.md %PREFIX%\\README_from_build.md
+"""
+    recipe_path.write_text(recipe_content)
+
+    build_output_path = tmp_path / "build_output"
+    rattler_build.build(recipe_path, build_output_path)
+
+    pkg = get_extracted_package(build_output_path, "test-relative-git")
+
+    cloned_readme = pkg / "README_from_build.md"
+    assert (
+        cloned_readme.exists()
+    ), "README_from_build.md should exist in the built package"
+    assert cloned_readme.read_text() == "test content", "Cloned README content mismatch"
+
+    rendered_recipe_path = pkg / "info/recipe/rendered_recipe.yaml"
+    assert (
+        rendered_recipe_path.exists()
+    ), "rendered_recipe.yaml not found in package info"
+    rendered_recipe = yaml.safe_load(rendered_recipe_path.read_text())
+
+    assert (
+        "finalized_sources" in rendered_recipe
+    ), "'finalized_sources' missing in rendered recipe"
+    assert (
+        len(rendered_recipe["finalized_sources"]) == 1
+    ), "Expected exactly one finalized source"
+    final_source = rendered_recipe["finalized_sources"][0]
+    assert "rev" in final_source, "'rev' missing in finalized source"
+    resolved_commit = final_source["rev"]
+    assert (
+        resolved_commit == original_commit
+    ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
