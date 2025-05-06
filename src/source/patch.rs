@@ -74,9 +74,9 @@ pub(crate) fn apply_patches(
             .output()?;
 
         if !output.status.success() {
-            tracing::error!("Failed to apply patch: {}", patch.to_string_lossy());
-            tracing::error!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
-            tracing::error!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
+            eprintln!("Failed to apply patch: {}", patch.to_string_lossy());
+            eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
+            eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
             return Err(SourceError::PatchFailed(
                 patch.to_string_lossy().to_string(),
             ));
@@ -87,8 +87,12 @@ pub(crate) fn apply_patches(
 
 #[cfg(test)]
 mod tests {
+    use crate::source::copy_dir::CopyDir;
+
     use super::*;
     use gitpatch::Patch;
+    use line_ending::LineEnding;
+    use tempfile::TempDir;
 
     #[test]
     fn test_parse_patch() {
@@ -108,5 +112,40 @@ mod tests {
 
             println!("Parsing patch: {} {}", patch_path.display(), parsed.is_ok());
         }
+    }
+
+    #[test]
+    fn test_apply_patches() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patch_test_dir = manifest_dir.join("test-data/patch_application");
+
+        apply_patches(
+            &SystemTools::new(),
+            &[PathBuf::from("test.patch")],
+            &patch_test_dir.join("workdir"),
+            &patch_test_dir.join("patches"),
+        )
+        .unwrap();
+
+        // convert patch to clrf line ending
+        let tempdir = TempDir::new().unwrap();
+
+        // copy all files to tempdir
+        let copied_files = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
+        println!("Copied files: {:?}", copied_files.copied_paths());
+
+        let patch = tempdir.path().join("patches/test.patch");
+        let text = fs_err::read_to_string(&patch).unwrap();
+        let clrf_patch = LineEnding::CRLF.apply(&text);
+
+        fs_err::write(tempdir.path().join("patches/test_clrf.patch"), clrf_patch).unwrap();
+
+        apply_patches(
+            &SystemTools::new(),
+            &[PathBuf::from("test_clrf.patch")],
+            tempdir.path().join("workdir").as_path(),
+            tempdir.path().join("patches").as_path(),
+        )
+        .unwrap();
     }
 }
