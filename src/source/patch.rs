@@ -86,9 +86,6 @@ pub(crate) fn apply_patches(
             .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
             .arg("-l")
-            .arg("-N")
-            .arg("--no-backup-if-mismatch")
-            .arg("-binary")
             .arg("-i")
             .arg(String::from(temp_patch_path.to_string_lossy()))
             .arg("-d")
