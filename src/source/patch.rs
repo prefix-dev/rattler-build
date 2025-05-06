@@ -120,7 +120,6 @@ mod tests {
 
         let tempdir = TempDir::new().unwrap();
         let copied_files = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
-        println!("Copied files: {:?}", copied_files.copied_paths());
 
         (tempdir, patch_test_dir)
     }
@@ -137,6 +136,11 @@ mod tests {
             &tempdir.path().join("patches"),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_apply_patches_with_crlf() {
+        let (tempdir, _) = setup_patch_test_dir();
 
         // Test with CRLF patch
         let patch = tempdir.path().join("patches/test.patch");
@@ -145,11 +149,12 @@ mod tests {
 
         fs_err::write(tempdir.path().join("patches/test_clrf.patch"), clrf_patch).unwrap();
 
+        // Test with CRLF patch
         apply_patches(
             &SystemTools::new(),
-            &[PathBuf::from("test_clrf.patch")],
-            tempdir.path().join("workdir").as_path(),
-            tempdir.path().join("patches").as_path(),
+            &[PathBuf::from("test_crlf.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
         )
         .unwrap();
     }
