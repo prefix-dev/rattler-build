@@ -64,22 +64,22 @@ pub(crate) fn apply_patches(
         }
 
         let patch_content = fs_err::read_to_string(&original_patch_path)
-            .map_err(|e| SourceError::Io(original_patch_path.clone(), e))?;
+            .map_err(SourceError::Io)?;
 
         // Normalize line endings to LF
         let normalized_content = LineEnding::LF.apply(&patch_content);
 
         // Create a temporary file for the normalized patch
         let mut temp_patch_file = NamedTempFile::new()
-            .map_err(|e| SourceError::Io(PathBuf::from("temp_patch_creation"), e))?;
+            .map_err(SourceError::Io)?;
 
         fs_err::write(&mut temp_patch_file, normalized_content.as_bytes())
-            .map_err(|e| SourceError::Io(temp_patch_file.path().to_path_buf(), e))?;
+            .map_err(SourceError::Io)?;
 
         let temp_patch_path = temp_patch_file.path();
 
         let strip_level = guess_strip_level(temp_patch_path, work_dir)
-            .map_err(|e| SourceError::Io(temp_patch_path.to_path_buf(), e))?;
+            .map_err(SourceError::Io)?;
 
         let output = system_tools
             .call(Tool::Patch)
@@ -94,7 +94,7 @@ pub(crate) fn apply_patches(
             .arg("-d")
             .arg(String::from(work_dir.to_string_lossy()))
             .output()
-            .map_err(|e| SourceError::Io(PathBuf::from("patch_command_execution"), e))?;
+            .map_err(SourceError::Io)?;
 
         if !output.status.success() {
             eprintln!(
