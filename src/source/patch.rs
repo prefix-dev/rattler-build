@@ -114,26 +114,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_apply_patches() {
+    fn setup_patch_test_dir() -> (TempDir, PathBuf) {
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let patch_test_dir = manifest_dir.join("test-data/patch_application");
 
-        apply_patches(
-            &SystemTools::new(),
-            &[PathBuf::from("test.patch")],
-            &patch_test_dir.join("workdir"),
-            &patch_test_dir.join("patches"),
-        )
-        .unwrap();
-
-        // convert patch to clrf line ending
         let tempdir = TempDir::new().unwrap();
-
-        // copy all files to tempdir
         let copied_files = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
         println!("Copied files: {:?}", copied_files.copied_paths());
 
+        (tempdir, patch_test_dir)
+    }
+
+    #[test]
+    fn test_apply_patches() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        // Test with normal patch
+        apply_patches(
+            &SystemTools::new(),
+            &[PathBuf::from("test.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+        )
+        .unwrap();
+
+        // Test with CRLF patch
         let patch = tempdir.path().join("patches/test.patch");
         let text = fs_err::read_to_string(&patch).unwrap();
         let clrf_patch = LineEnding::CRLF.apply(&text);
