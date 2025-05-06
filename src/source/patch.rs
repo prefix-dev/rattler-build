@@ -147,7 +147,7 @@ mod tests {
         let text = fs_err::read_to_string(&patch).unwrap();
         let clrf_patch = LineEnding::CRLF.apply(&text);
 
-        fs_err::write(tempdir.path().join("patches/test_clrf.patch"), clrf_patch).unwrap();
+        fs_err::write(tempdir.path().join("patches/test_crlf.patch"), clrf_patch).unwrap();
 
         // Test with CRLF patch
         apply_patches(
