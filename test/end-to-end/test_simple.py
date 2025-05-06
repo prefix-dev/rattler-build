@@ -1859,6 +1859,9 @@ build:
     ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
 
 
+@pytest.mark.skipif(
+    os.name == "nt", reason="Test requires Unix-like environment for shell commands"
+)
 def test_merge_build_and_host(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
 ):
