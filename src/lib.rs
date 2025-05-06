@@ -76,7 +76,7 @@ use recipe::parser::{Dependency, TestType, find_outputs_from_src};
 use selectors::SelectorConfig;
 use source_code::Source;
 use system_tools::SystemTools;
-use tool_configuration::{Configuration, SkipExisting, TestStrategy};
+use tool_configuration::{Configuration, ContinueOnFailure, SkipExisting, TestStrategy};
 use variant_config::VariantConfig;
 
 use crate::metadata::Debug;
@@ -145,6 +145,7 @@ pub fn get_tool_config(
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
         .with_skip_existing(build_data.skip_existing)
+        .with_continue_on_failure(build_data.continue_on_failure)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone());
@@ -496,6 +497,11 @@ pub async fn run_build_from_args(
                 (output, archive)
             }
             Err(e) => {
+                if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
+                    output.record_warning(&format!("Build failed: {}", e));
+                    continue;
+                }
                 return Err(e);
             }
         };
@@ -988,6 +994,7 @@ pub async fn debug_recipe(
         noarch_build_platform: None,
         extra_meta: None,
         sandbox_configuration: None,
+        continue_on_failure: ContinueOnFailure::No,
     };
 
     let tool_config = get_tool_config(&build_data, log_handler)?;

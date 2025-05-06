@@ -47,6 +47,28 @@ pub enum TestStrategy {
     NativeAndEmulated,
 }
 
+/// Whether we want to continue building on failure of a package or stop the build
+/// entirely
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ContinueOnFailure {
+    /// Continue building on failure of a package
+    Yes,
+    /// Stop the build entirely on failure of a package
+    #[default]
+    No,
+}
+
+// This is the key part - implement From<bool> for your type
+impl From<bool> for ContinueOnFailure {
+    fn from(value: bool) -> Self {
+        if value {
+            ContinueOnFailure::Yes
+        } else {
+            ContinueOnFailure::No
+        }
+    }
+}
+
 /// A client that can handle both secure and insecure connections
 #[derive(Clone, Default)]
 pub struct BaseClient {
@@ -193,6 +215,9 @@ pub struct Configuration {
 
     /// List of hosts for which SSL certificate verification should be skipped
     pub allow_insecure_host: Option<Vec<String>>,
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub continue_on_failure: ContinueOnFailure,
 }
 
 /// Get the authentication storage from the given file
@@ -246,6 +271,7 @@ pub struct ConfigurationBuilder {
     io_concurrency_limit: Option<usize>,
     channel_priority: ChannelPriority,
     allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: ContinueOnFailure,
 }
 
 impl Configuration {
@@ -274,6 +300,7 @@ impl ConfigurationBuilder {
             io_concurrency_limit: None,
             channel_priority: ChannelPriority::Strict,
             allow_insecure_host: None,
+            continue_on_failure: ContinueOnFailure::No,
         }
     }
 
@@ -282,6 +309,14 @@ impl ConfigurationBuilder {
     pub fn with_cache_dir(self, cache_dir: PathBuf) -> Self {
         Self {
             cache_dir: Some(cache_dir),
+            ..self
+        }
+    }
+
+    /// Whether to continue building on failure of a package or stop the build
+    pub fn with_continue_on_failure(self, continue_on_failure: ContinueOnFailure) -> Self {
+        Self {
+            continue_on_failure,
             ..self
         }
     }
@@ -456,6 +491,7 @@ impl ConfigurationBuilder {
             repodata_gateway,
             channel_priority: self.channel_priority,
             allow_insecure_host: self.allow_insecure_host,
+            continue_on_failure: self.continue_on_failure,
         }
     }
 }
