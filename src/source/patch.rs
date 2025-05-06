@@ -5,8 +5,6 @@ use std::{
 };
 
 use gitpatch::Patch;
-use line_ending::LineEnding;
-use tempfile::NamedTempFile;
 
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
@@ -54,54 +52,33 @@ pub(crate) fn apply_patches(
     work_dir: &Path,
     recipe_dir: &Path,
 ) -> Result<(), SourceError> {
-    for patch_path_relative in patches {
-        let original_patch_path = recipe_dir.join(patch_path_relative);
+    for patch in patches {
+        let patch = recipe_dir.join(patch);
 
-        tracing::info!("Applying patch: {}", original_patch_path.to_string_lossy());
+        tracing::info!("Applying patch: {}", patch.to_string_lossy());
 
-        if !original_patch_path.exists() {
-            return Err(SourceError::PatchNotFound(original_patch_path));
+        if !patch.exists() {
+            return Err(SourceError::PatchNotFound(patch));
         }
 
-        let patch_content = fs_err::read_to_string(&original_patch_path)
-            .map_err(SourceError::Io)?;
-
-        // Normalize line endings to LF
-        let normalized_content = LineEnding::LF.apply(&patch_content);
-
-        // Create a temporary file for the normalized patch
-        let mut temp_patch_file = NamedTempFile::new()
-            .map_err(SourceError::Io)?;
-
-        fs_err::write(&mut temp_patch_file, normalized_content.as_bytes())
-            .map_err(SourceError::Io)?;
-
-        let temp_patch_path = temp_patch_file.path();
-
-        let strip_level = guess_strip_level(temp_patch_path, work_dir)
-            .map_err(SourceError::Io)?;
-
+        let strip_level = guess_strip_level(&patch, work_dir)?;
         let output = system_tools
             .call(Tool::Patch)
             .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
-            .arg("-l")
+            .arg("-binary")
             .arg("-i")
-            .arg(String::from(temp_patch_path.to_string_lossy()))
+            .arg(String::from(patch.to_string_lossy()))
             .arg("-d")
             .arg(String::from(work_dir.to_string_lossy()))
-            .output()
-            .map_err(SourceError::Io)?;
+            .output()?;
 
         if !output.status.success() {
-            eprintln!(
-                "Failed to apply patch: {}",
-                original_patch_path.to_string_lossy()
-            );
+            eprintln!("Failed to apply patch: {}", patch.to_string_lossy());
             eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
             eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
             return Err(SourceError::PatchFailed(
-                original_patch_path.to_string_lossy().to_string(),
+                patch.to_string_lossy().to_string(),
             ));
         }
     }
