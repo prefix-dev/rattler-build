@@ -62,7 +62,6 @@ pub(crate) fn apply_patches(
         }
 
         let strip_level = guess_strip_level(&patch, work_dir)?;
-        
         let output = system_tools
             .call(Tool::Patch)
             .map_err(|_| SourceError::PatchExeNotFound)?
@@ -170,7 +169,7 @@ mod tests {
     }
 
     #[test]
-    fn test_failing_patch() {
+    fn test_apply_0001_increase_minimum_cmake_version_patch() {
         let (tempdir, _) = setup_patch_test_dir();
 
         apply_patches(
@@ -179,7 +178,7 @@ mod tests {
             &tempdir.path().join("workdir"),
             &tempdir.path().join("patches"),
         )
-        .unwrap();
+        .expect("Patch 0001-increase-minimum-cmake-version.patch should apply successfully");
 
         // Read the cmake list file and make sure that it contains `cmake_minimum_required(VERSION 3.12)`
         let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
