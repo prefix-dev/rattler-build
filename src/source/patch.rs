@@ -67,6 +67,7 @@ pub(crate) fn apply_patches(
             .call(Tool::Patch)
             .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
+            .arg("-l")
             .arg("-i")
             .arg(String::from(patch.to_string_lossy()))
             .arg("-d")
