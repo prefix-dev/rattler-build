@@ -53,6 +53,7 @@ def build_recipes(
     channel_priority: Union[str, None] = None,
     skip_existing: Union[str, None] = None,
     noarch_build_platform: Union[str, None] = None,
+    continue_on_failure: bool = False,
 ) -> None:
     """
     Build packages from a list of recipes.
@@ -80,6 +81,7 @@ def build_recipes(
         channel_priority: The channel priority.
         skip_existing: Whether to skip packages that already exist in any channel. If set to `none`, do not skip any packages, default when not specified. If set to `local`, only skip packages that already exist locally, default when using `--skip-existing`. If set to `all`, skip packages that already exist in any channel.
         noarch_build_platform: Define a "noarch platform" for which the noarch packages will be built for. The noarch builds will be skipped on the other platforms.
+        continue_on_failure: Continue building other recipes even if one fails.
 
     Returns:
         None
@@ -108,6 +110,7 @@ def build_recipes(
         channel_priority,
         skip_existing,
         noarch_build_platform,
+        continue_on_failure,
     )
 
 

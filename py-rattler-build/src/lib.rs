@@ -50,6 +50,7 @@ fn build_recipes_py(
     skip_existing: Option<String>,
     noarch_build_platform: Option<String>,
     allow_insecure_host: Option<Vec<String>>,
+    continue_on_failure: bool,
 ) -> PyResult<()> {
     let channel_priority = channel_priority
         .map(|c| ChannelPriorityWrapper::from_str(&c).map(|c| c.value))
@@ -124,6 +125,7 @@ fn build_recipes_py(
         None,
         None,
         true,
+        continue_on_failure,
     );
 
     let rt = tokio::runtime::Runtime::new().unwrap();
