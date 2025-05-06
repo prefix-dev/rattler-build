@@ -145,6 +145,7 @@ pub fn get_tool_config(
         .with_reqwest_client(client)
         .with_test_strategy(build_data.test)
         .with_skip_existing(build_data.skip_existing)
+        .with_continue_on_failure(build_data.continue_on_failure)
         .with_noarch_build_platform(build_data.noarch_build_platform)
         .with_channel_priority(build_data.common.channel_priority)
         .with_allow_insecure_host(build_data.common.allow_insecure_host.clone());
@@ -497,7 +498,7 @@ pub async fn run_build_from_args(
             }
             Err(e) => {
                 if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
-                    tracing::warn!("Build failed for {}: {}", output.identifier(), e);
+                    tracing::error!("Build failed for {}: {}", output.identifier(), e);
                     output.record_warning(&format!("Build failed: {}", e));
                     continue;
                 }
