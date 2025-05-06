@@ -77,6 +77,7 @@ impl BaseClient {
         let common_settings = |builder: reqwest::ClientBuilder| -> reqwest::ClientBuilder {
             builder
                 .no_gzip()
+                .http1_only()
                 .pool_max_idle_per_host(20)
                 .user_agent(APP_USER_AGENT)
                 .read_timeout(std::time::Duration::from_secs(timeout))

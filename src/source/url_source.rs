@@ -72,7 +72,6 @@ async fn fetch_remote(
     let (mut response, download_size) = {
         let resp = client
             .get(url.as_str())
-            .version(reqwest::Version::HTTP_11)
             .send()
             .await
             .map_err(|e| {
