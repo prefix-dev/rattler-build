@@ -552,7 +552,7 @@ pub async fn run_build_from_args(
 
             // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
             for (output, archive) in &to_test {
-            // we need a delay here to stop reindexing process undermine the filesystem lock in windows
+                // we need a delay here to stop reindexing process undermine the filesystem lock in windows
                 if cfg!(windows) {
                     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
                 }
