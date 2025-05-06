@@ -375,6 +375,7 @@ pub async fn get_build_output(
                     &output_dir,
                     build_data.no_build_id,
                     &timestamp,
+                    recipe.build().merge_build_and_host_envs(),
                 )
                 .into_diagnostic()?,
                 channels,

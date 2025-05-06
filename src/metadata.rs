@@ -120,6 +120,7 @@ impl Directories {
         output_dir: &Path,
         no_build_id: bool,
         timestamp: &DateTime<Utc>,
+        merge_build_and_host: bool,
     ) -> Result<Directories, std::io::Error> {
         if !output_dir.exists() {
             fs::create_dir_all(output_dir)?;
@@ -157,7 +158,11 @@ impl Directories {
 
         let directories = Directories {
             build_dir: build_dir.clone(),
-            build_prefix: build_dir.join("build_env"),
+            build_prefix: if merge_build_and_host {
+                host_prefix.clone()
+            } else {
+                build_dir.join("build_env")
+            },
             cache_dir,
             host_prefix,
             work_dir: build_dir.join("work"),
@@ -831,6 +836,7 @@ mod test {
             &tempdir.path().join("output"),
             false,
             &chrono::Utc::now(),
+            false,
         )
         .unwrap();
         directories.create_build_dir(false).unwrap();
