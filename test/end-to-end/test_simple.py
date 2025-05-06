@@ -1380,6 +1380,68 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["platform"] == host_subdir().split("-")[0]
 
 
+@pytest.mark.skipif(
+    os.name == "nt" or platform.system() == "Darwin",
+    reason="Filesystem case-insensitivity prevents testing collision warning trigger",
+)
+def test_case_insensitive_collision_warning(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe_content = """
+context:
+  name: test-case-collision
+  version: 0.1.0
+
+package:
+  name: test-case-collision
+  version: 0.1.0
+
+build:
+  script:
+    # Create directories with case difference
+    - mkdir -p case_test
+    - echo "UPPER CASE FILE" > case_test/CASE-FILE.txt
+    - echo "lower case file" > case_test/case-file.txt
+    # Install the directory into the prefix to trigger packaging
+    - cp -r case_test $PREFIX/
+    # Add another test file to ensure packaging works
+    - echo "test content" > regular-file.txt
+    - cp regular-file.txt $PREFIX/
+
+about:
+  summary: A test package for case-insensitive file collisions
+"""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(recipe_content)
+
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+        extra_args=["-vvv"],
+    )
+
+    output = rattler_build(*args, stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path / "output", "test-case-collision")
+    extracted_files_list = [str(f.relative_to(pkg)) for f in pkg.glob("**/*")]
+
+    assert (
+        "case_test/CASE-FILE.txt" in extracted_files_list
+    ), "CASE-FILE.txt not found in package"
+    assert (
+        "case_test/case-file.txt" in extracted_files_list
+    ), "case-file.txt not found in package"
+    assert (
+        "regular-file.txt" in extracted_files_list
+    ), "regular-file.txt not found in package"
+
+    collision_warning_pattern1 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/CASE-FILE.txt, case_test/case-file.txt"
+    collision_warning_pattern2 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/case-file.txt, case_test/CASE-FILE.txt"
+
+    assert (
+        collision_warning_pattern1 in output or collision_warning_pattern2 in output
+    ), f"Case collision warning not found in build output. Output contains:\n{output}"
+
+
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
 def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path

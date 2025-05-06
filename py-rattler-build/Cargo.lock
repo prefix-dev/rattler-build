@@ -4130,6 +4130,7 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tracing-subscriber",
+ "unicode-normalization",
  "url",
  "walkdir",
  "which",
