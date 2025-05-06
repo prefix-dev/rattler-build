@@ -1,5 +1,6 @@
 //! Functions for applying patches to a work directory.
 use std::{
+    io::Write,
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -8,6 +9,7 @@ use gitpatch::Patch;
 
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
+use tempfile::NamedTempFile;
 
 /// We try to guess the "strip level" for a patch application. This is done by checking
 /// what files are present in the work directory and comparing them to the paths in the patch.
@@ -62,15 +64,21 @@ pub(crate) fn apply_patches(
         }
 
         let strip_level = guess_strip_level(&patch, work_dir)?;
-
+        
+        // Read original patch content and normalize its line endings to LF
+        let original_patch_content = fs_err::read_to_string(&patch)?;
+        let lf_patch_content = original_patch_content.replace("\r", "");
+        
+        let mut temp_patch_file = NamedTempFile::new()?;
+        temp_patch_file.write_all(lf_patch_content.as_bytes())?;
+        
         let output = system_tools
             .call(Tool::Patch)
             .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
             .arg("-l")
-            .arg("-binary")
             .arg("-i")
-            .arg(String::from(patch.to_string_lossy()))
+            .arg(temp_patch_file.path().to_string_lossy().to_string())
             .arg("-d")
             .arg(String::from(work_dir.to_string_lossy()))
             .output()?;
