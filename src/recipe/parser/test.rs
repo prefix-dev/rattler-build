@@ -130,6 +130,20 @@ pub struct PerlTest {
     pub uses: Vec<String>,
 }
 
+/// A special CMake test that checks if the libraries are available
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CMakeTest {
+    /// List of CMake libraries to find
+    pub find_package: Vec<String>,
+}
+
+/// A special PkgConfig test that checks if the libraries are available
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PkgConfigTest {
+    /// List of PkgConfig libraries to find
+    pub pkg_config: Vec<String>,
+}
+
 /// A test that runs the tests of a downstream package.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DownstreamTest {
@@ -172,6 +186,16 @@ pub enum TestType {
         /// The package contents to test against
         // Note we use a struct for better serialization
         package_contents: PackageContentsTest,
+    },
+    /// A test that checks the CMake libraries
+    CMake {
+        /// The CMake libraries to find
+        cmake: CMakeTest,
+    },
+    /// A test that checks the PkgConfig libraries
+    PkgConfig {
+        /// The PkgConfig libraries to find
+        pkg_config: PkgConfigTest,
     },
 }
 
@@ -281,10 +305,18 @@ impl TryConvertNode<TestType> for RenderedMappingNode {
                     let rscript = as_mapping(value, key_str)?.try_convert(key_str)?;
                     test = TestType::R { r: rscript };
                 }
+                "cmake" => {
+                    let cmake = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::CMake { cmake };
+                }
+                "pkg_config" => {
+                    let pkg_config = as_mapping(value, key_str)?.try_convert(key_str)?;
+                    test = TestType::PkgConfig { pkg_config };
+                }
                 invalid => Err(vec![_partialerror!(
                     *key.span(),
                     ErrorKind::InvalidField(invalid.to_string().into()),
-                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `script`, `downstream`, `package_contents`")
+                    help = format!("expected fields for {name} is one of `python`, `perl`, `r`, `cmake`, `pkg_config`, `script`, `downstream`, `package_contents`")
                 )])?
             }
             Ok(())
@@ -477,6 +509,42 @@ impl TryConvertNode<PackageContentsTest> for RenderedMappingNode {
             include
         );
         Ok(package_contents)
+    }
+}
+
+///////////////////////////
+/// CMake Test          ///
+///////////////////////////
+impl TryConvertNode<CMakeTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<CMakeTest, Vec<PartialParsingError>> {
+        let mut cmake_test = CMakeTest::default();
+        validate_keys!(cmake_test, self.iter(), find_package);
+        if cmake_test.find_package.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("find_package".into()),
+                help = "expected field `find_package` in cmake test to be a list of packages"
+            )])?;
+        }
+        Ok(cmake_test)
+    }
+}
+
+///////////////////////////
+/// PkgConfig Test      ///
+///////////////////////////
+impl TryConvertNode<PkgConfigTest> for RenderedMappingNode {
+    fn try_convert(&self, _name: &str) -> Result<PkgConfigTest, Vec<PartialParsingError>> {
+        let mut pkg_config_test = PkgConfigTest::default();
+        validate_keys!(pkg_config_test, self.iter(), pkg_config);
+        if pkg_config_test.pkg_config.is_empty() {
+            Err(vec![_partialerror!(
+                *self.span(),
+                ErrorKind::MissingField("pkg_config".into()),
+                help = "expected field `pkg_config` in pkg-config test to be a list of packages"
+            )])?;
+        }
+        Ok(pkg_config_test)
     }
 }
 

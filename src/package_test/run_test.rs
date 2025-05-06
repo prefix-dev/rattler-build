@@ -33,8 +33,8 @@ use crate::{
     env_vars,
     metadata::{Debug, PlatformWithVirtualPackages},
     recipe::parser::{
-        CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest, Script,
-        ScriptContent, TestType,
+        CMakeTest, CommandsTest, DownstreamTest, PerlTest, PythonTest, PythonVersion, RTest,
+        Script, ScriptContent, TestType, PkgConfigTest,
     },
     render::solver::create_environment,
     source::copy_dir::CopyDir,
@@ -457,6 +457,16 @@ pub async fn run_test(
                         .await?
                 }
                 TestType::R { r } => r.run_test(&pkg, &package_folder, &prefix, &config).await?,
+                TestType::CMake { cmake } => {
+                    cmake
+                        .run_test(&pkg, &package_folder, &prefix, &config)
+                        .await?
+                }
+                TestType::PkgConfig { pkg_config } => {
+                    pkg_config
+                        .run_test(&pkg, &package_folder, &prefix, &config)
+                        .await?
+                }
                 TestType::Downstream(downstream) if downstream_package.is_none() => {
                     downstream
                         .run_test(&pkg, package_file, &prefix, &config)
@@ -975,3 +985,158 @@ impl RTest {
         Ok(())
     }
 }
+
+impl CMakeTest {
+    /// Execute the CMake test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running CMake test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["cmake".parse().unwrap(), match_spec];
+
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let tmp_dir = tempfile::tempdir()?;
+        let cmake_file = tmp_dir.path().join("CMakeLists.txt");
+
+        let mut cmake_content = String::from("cmake_minimum_required(VERSION 3.15)\nproject(cmake_test)\n\n");
+        for package in &self.find_package {
+            writeln!(cmake_content, "find_package({} REQUIRED)", package)?;
+            writeln!(cmake_content, "message(STATUS \"Found {} version: ${{{}_VERSION}}\")", package, package)?;
+            writeln!(cmake_content, "message(STATUS \"Found {} components: ${{{}_LIBRARIES}}\")", package, package)?;
+            writeln!(cmake_content, "message(STATUS \"Found {} location: ${{{}_INCLUDE_DIRS}}\")", package, package)?;
+        }
+
+        fs::write(cmake_file, cmake_content)?;
+
+        let script = Script {
+            content: ScriptContent::Command("cmake .".into()),
+            ..Script::default()
+        };
+
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(prefix, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.insert(
+            "PREFIX".to_string(),
+            Some(prefix.to_string_lossy().to_string()),
+        );
+        env_vars.insert(
+            "CMAKE_PREFIX_PATH".to_string(),
+            Some(prefix.to_string_lossy().to_string()),
+        );
+
+        script
+            .run_script(
+                env_vars,
+                tmp_dir.path(),
+                path,
+                prefix,
+                None,
+                None,
+                None,
+                Debug::new(true),
+            )
+            .await
+            .map_err(|e| TestError::TestFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+impl PkgConfigTest {
+    /// Execute the pkg-config test
+    pub async fn run_test(
+        &self,
+        pkg: &ArchiveIdentifier,
+        path: &Path,
+        prefix: &Path,
+        config: &TestConfiguration,
+    ) -> Result<(), TestError> {
+        let span = tracing::info_span!("Running pkg-config test");
+        let _guard = span.enter();
+
+        let match_spec = MatchSpec::from_str(
+            format!("{}={}={}", pkg.name, pkg.version, pkg.build_string).as_str(),
+            ParseStrictness::Lenient,
+        )?;
+
+        let dependencies = vec!["pkg-config".parse().unwrap(), match_spec];
+
+        create_environment(
+            "test",
+            &dependencies,
+            config
+                .host_platform
+                .as_ref()
+                .unwrap_or(&config.current_platform),
+            prefix,
+            &config.channels,
+            &config.tool_configuration,
+            config.channel_priority,
+            config.solve_strategy,
+        )
+        .await
+        .map_err(TestError::TestEnvironmentSetup)?;
+
+        let platform = Platform::current();
+        let mut env_vars = env_vars::os_vars(prefix, &platform);
+        env_vars.retain(|key, _| key != ShellEnum::default().path_var(&platform));
+        env_vars.insert(
+            "PREFIX".to_string(),
+            Some(prefix.to_string_lossy().to_string()),
+        );
+
+        for package in &self.pkg_config {
+            let script = Script {
+                content: ScriptContent::Command(format!("pkg-config --exists {}", package)),
+                ..Script::default()
+            };
+
+            let tmp_dir = tempfile::tempdir()?;
+            script
+                .run_script(
+                    env_vars.clone(),
+                    tmp_dir.path(),
+                    path,
+                    prefix,
+                    None,
+                    None,
+                    None,
+                    Debug::new(true),
+                )
+                .await
+                .map_err(|e| TestError::TestFailed(format!("Package {} not found: {}", package, e)))?;
+
+            tracing::info!("Found pkg-config package: {}", package);
+        }
+
+        Ok(())
+    }
+}
+
