@@ -137,6 +137,10 @@ mod tests {
             &tempdir.path().join("patches"),
         )
         .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
     }
 
     #[test]
@@ -158,5 +162,27 @@ mod tests {
             &tempdir.path().join("patches"),
         )
         .unwrap();
+
+        let text_md = tempdir.path().join("workdir/text.md");
+        let text_md = fs_err::read_to_string(&text_md).unwrap();
+        assert!(text_md.contains("Oh, wow, I was patched! Thank you soooo much!"));
+    }
+
+    #[test]
+    fn test_failing_patch() {
+        let (tempdir, _) = setup_patch_test_dir();
+
+        apply_patches(
+            &SystemTools::new(),
+            &[PathBuf::from("0001-increase-minimum-cmake-version.patch")],
+            &tempdir.path().join("workdir"),
+            &tempdir.path().join("patches"),
+        )
+        .unwrap();
+
+        // Read the cmake list file and make sure that it contains `cmake_minimum_required(VERSION 3.12)`
+        let cmake_list = tempdir.path().join("workdir/CMakeLists.txt");
+        let cmake_list = fs_err::read_to_string(&cmake_list).unwrap();
+        assert!(cmake_list.contains("cmake_minimum_required(VERSION 3.12)"));
     }
 }
