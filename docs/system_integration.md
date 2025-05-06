@@ -1,4 +1,21 @@
-# System integration for packages
+# System Integration for Packages
+
+Packages provide software designed for different uses.
+Each of these types may be used to satisfy broad use-cases.
+As such each use benefits from specific actions.
+
+* CLI Applications : Shell Completion
+<!-- * Services (daemons) : Service Manager Registration -->
+* GUI Applications : Integration with Window Manager
+<!-- * Application Augmentation : Integration with the Target Framework -->
+* Libraries : Dependencies
+
+## Dependencies
+
+This is the base functionity of the conda package.
+
+
+## Integration with Window Manager
 
 When you are building packages, you might want to integrate with the system to install shortcuts, desktop icons, etc.
 
@@ -17,7 +34,7 @@ build:
 
 To learn more about installing menu items, please take a look at the [`menuinst` documentation](https://conda.github.io/menuinst/).
 
-## Installing shell completion scripts
+## Installation of Shell Completion
 
 Shell completion scripts are scripts that are sourced by the shell to provide tab-completion for commands.
 They are automatically picked up by `pixi` and other tools when they appear in the right location in your package.
