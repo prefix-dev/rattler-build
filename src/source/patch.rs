@@ -119,7 +119,7 @@ mod tests {
         let patch_test_dir = manifest_dir.join("test-data/patch_application");
 
         let tempdir = TempDir::new().unwrap();
-        let copied_files = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
+        let _ = CopyDir::new(&patch_test_dir, tempdir.path()).run().unwrap();
 
         (tempdir, patch_test_dir)
     }
