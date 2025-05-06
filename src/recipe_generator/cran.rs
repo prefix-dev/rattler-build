@@ -42,11 +42,11 @@ pub struct PackageInfo {
     pub _distro: String,
     pub _host: String,
     pub _status: String,
-    pub _pkgdocs: String,
+    pub _pkgdocs: Option<String>,
     pub _srconly: Option<String>,
-    pub _winbinary: String,
-    pub _macbinary: String,
-    pub _wasmbinary: String,
+    pub _winbinary: Option<String>,
+    pub _macbinary: Option<String>,
+    pub _wasmbinary: Option<String>,
     pub _buildurl: String,
     pub _registered: bool,
     pub _dependencies: Vec<Dependency>,
@@ -303,8 +303,10 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     recipe.about.description = Some(package_info.Description.clone());
     (recipe.about.license, recipe.about.license_file) = map_license(&package_info.License);
     recipe.about.repository = Some(package_info._upstream.clone());
-    if url::Url::parse(&package_info._pkgdocs).is_ok() {
-        recipe.about.documentation = Some(package_info._pkgdocs.clone());
+    if let Some(pkgdocs) = &package_info._pkgdocs {
+        if url::Url::parse(pkgdocs).is_ok() {
+            recipe.about.documentation = Some(pkgdocs.clone());
+        }
     }
 
     recipe.tests.push(Test::Script(ScriptTest {
