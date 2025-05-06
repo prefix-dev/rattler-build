@@ -68,6 +68,7 @@ pub(crate) fn apply_patches(
             .map_err(|_| SourceError::PatchExeNotFound)?
             .arg(format!("-p{}", strip_level))
             .arg("-l")
+            .arg("--ignore-whitespace")
             .arg("-i")
             .arg(String::from(patch.to_string_lossy()))
             .arg("-d")
