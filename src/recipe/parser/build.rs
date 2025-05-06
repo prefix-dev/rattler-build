@@ -77,6 +77,10 @@ pub struct Build {
     /// It's possible to override this by setting it manually, but not recommended.
     #[serde(default, skip_serializing_if = "BuildString::is_derived")]
     pub string: BuildString,
+
+    /// Flags to use as additional solver hints.
+    pub flags: Vec<String>,
+
     /// List of conditions under which to skip the build of the package.
     #[serde(default, skip)]
     pub skip: Skip,
@@ -302,6 +306,7 @@ impl TryConvertNode<Build> for RenderedMappingNode {
             self.iter(),
             number,
             string,
+            flags,
             skip,
             script,
             noarch,
