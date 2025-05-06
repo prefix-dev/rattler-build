@@ -70,47 +70,43 @@ async fn fetch_remote(
     let client = tool_configuration.client.for_host(url);
 
     let (mut response, download_size) = {
-        let resp = client
-            .get(url.as_str())
-            .send()
-            .await
-            .map_err(|e| {
-                let err_string = match &e {
-                    MiddlewareError::Reqwest(e) => {
-                        let err_str = e.to_string();
-                        if err_str.contains("SSL")
-                            || err_str.contains("certificate")
-                            || err_str.contains("handshake")
+        let resp = client.get(url.as_str()).send().await.map_err(|e| {
+            let err_string = match &e {
+                MiddlewareError::Reqwest(e) => {
+                    let err_str = e.to_string();
+                    if err_str.contains("SSL")
+                        || err_str.contains("certificate")
+                        || err_str.contains("handshake")
+                    {
+                        format!("SSL certificate error: {}", err_str)
+                    } else {
+                        err_str
+                    }
+                }
+                MiddlewareError::Middleware(e) => {
+                    let mut err_msg = e.to_string();
+                    let mut source = e.source();
+
+                    while let Some(err) = source {
+                        let source_str = err.to_string();
+                        if source_str.contains("SSL")
+                            || source_str.contains("certificate")
+                            || source_str.contains("handshake")
+                            || source_str.contains("CERTIFICATE")
                         {
-                            format!("SSL certificate error: {}", err_str)
-                        } else {
-                            err_str
+                            err_msg = format!("SSL certificate error: {}", source_str);
+                            break;
+                        } else if !source_str.contains("retry") {
+                            err_msg = source_str;
                         }
+                        source = err.source();
                     }
-                    MiddlewareError::Middleware(e) => {
-                        let mut err_msg = e.to_string();
-                        let mut source = e.source();
+                    err_msg
+                }
+            };
 
-                        while let Some(err) = source {
-                            let source_str = err.to_string();
-                            if source_str.contains("SSL")
-                                || source_str.contains("certificate")
-                                || source_str.contains("handshake")
-                                || source_str.contains("CERTIFICATE")
-                            {
-                                err_msg = format!("SSL certificate error: {}", source_str);
-                                break;
-                            } else if !source_str.contains("retry") {
-                                err_msg = source_str;
-                            }
-                            source = err.source();
-                        }
-                        err_msg
-                    }
-                };
-
-                SourceError::UnknownError(format!("Error downloading {}: {}", url, err_string))
-            })?;
+            SourceError::UnknownError(format!("Error downloading {}: {}", url, err_string))
+        })?;
 
         match resp.error_for_status() {
             Ok(resp) => {
