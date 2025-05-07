@@ -143,7 +143,7 @@ impl RenderedNode {
         if !coercible {
             return Ok(RenderedNode::Scalar(RenderedScalarNode::new(
                 span,
-                value.to_string(),
+                source,
                 value.to_string(),
                 false,
             )));
