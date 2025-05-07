@@ -156,8 +156,7 @@ impl RenderedNode {
             minijinja::value::ValueKind::Seq => {
                 let mut rendered: Vec<RenderedNode> = Vec::new();
                 for elem in value.try_iter().unwrap() {
-                    let node =
-                        RenderedNode::from_jinja_value(source.clone(), elem, span.clone(), true)?;
+                    let node = RenderedNode::from_jinja_value(source.clone(), elem, span, true)?;
                     rendered.push(node);
                 }
                 Ok(RenderedNode::Sequence(RenderedSequenceNode::from(rendered)))
@@ -715,15 +714,6 @@ impl Render<RenderedNode> for Node {
 
 impl Render<RenderedNode> for ScalarNode {
     fn render(&self, jinja: &Jinja, _name: &str) -> Result<RenderedNode, Vec<PartialParsingError>> {
-        // println!("Rendering scalar node: {}", self.as_str());
-        // let (rendered, may_coerce) = jinja.render_str(self.as_str()).map_err(|err| {
-        //     vec![_partialerror!(
-        //         *self.span(),
-        //         ErrorKind::JinjaRendering(err),
-        //         label = jinja_error_to_label(&err),
-        //     )]
-        // })?;
-
         let (value, can_coerce) = jinja.render_to_value(self).map_err(|err| {
             vec![_partialerror!(
                 *self.span(),
@@ -732,27 +722,13 @@ impl Render<RenderedNode> for ScalarNode {
             )]
         })?;
 
-        return Ok(RenderedNode::from_jinja_value(
+        Ok(RenderedNode::from_jinja_value(
             self.to_string(),
             value,
             *self.span(),
             self.may_coerce && can_coerce,
         )
-        .unwrap());
-
-        // unsure whether this should be allowed to coerce // check if it's quoted?
-        // let rendered = RenderedScalarNode::new(
-        //     *self.span(),
-        //     self.as_str().to_string(),
-        //     rendered,
-        //     self.may_coerce && may_coerce,
-        // );
-
-        // if rendered.is_empty() {
-        //     Ok(RenderedNode::Null(rendered))
-        // } else {
-        //     Ok(RenderedNode::Scalar(rendered))
-        // }
+        .unwrap())
     }
 }
 

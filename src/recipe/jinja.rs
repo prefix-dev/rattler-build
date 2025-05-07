@@ -134,7 +134,7 @@ impl Jinja {
                 // Make sure that the string stays a string by returning can_coerce: false
                 return Ok((evaled.to_str().unwrap().to_string().into(), false));
             } else {
-                return Ok((expr.eval(self.context())?, true && template.may_coerce));
+                return Ok((expr.eval(self.context())?, template.may_coerce));
             }
         }
 
