@@ -129,7 +129,13 @@ impl Jinja {
         if let Some(simple_expr) = strip_expression(template) {
             // render as expression so that we know the type of the result
             let expr = self.env.compile_expression(simple_expr)?;
-            return Ok((expr.eval(self.context())?, true));
+            let evaled = expr.eval(self.context())?;
+            if evaled.as_str().is_some() {
+                // Make sure that the string stays a string by returning can_coerce: false
+                return Ok((evaled.to_str().unwrap().to_string().into(), false));
+            } else {
+                return Ok((expr.eval(self.context())?, true));
+            }
         }
 
         // Otherwise just render it as string
