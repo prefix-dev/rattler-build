@@ -134,13 +134,16 @@ impl Jinja {
                 // Make sure that the string stays a string by returning can_coerce: false
                 return Ok((evaled.to_str().unwrap().to_string().into(), false));
             } else {
-                return Ok((expr.eval(self.context())?, true));
+                return Ok((expr.eval(self.context())?, true && template.may_coerce));
             }
         }
 
         // Otherwise just render it as string
         let rendered = self.env.render_str(template, &self.context)?;
-        Ok((Value::from(rendered), !template.contains("${{")))
+        Ok((
+            Value::from(rendered),
+            !template.contains("${{") && template.may_coerce,
+        ))
     }
 
     /// Render a template with the current context.

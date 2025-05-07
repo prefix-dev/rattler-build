@@ -318,14 +318,6 @@ impl RenderedScalarNode {
         )
     }
 
-    pub fn new_string(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.clone(), value, false)
-    }
-
-    pub fn new_coerceable(value: String) -> Self {
-        Self::new(marked_yaml::Span::new_blank(), value.clone(), value, true)
-    }
-
     /// Treat the scalar node as a string
     ///
     /// Since scalars are always stringish, this is always safe.

@@ -387,7 +387,7 @@ impl TryFrom<&marked_yaml::Node> for Node {
 pub struct ScalarNode {
     span: marked_yaml::Span,
     value: String,
-    may_coerce: bool,
+    pub(crate) may_coerce: bool,
 }
 
 /// Convert a string to a boolean
