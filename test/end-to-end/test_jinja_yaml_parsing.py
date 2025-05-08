@@ -1,7 +1,5 @@
-import pytest
 from pathlib import Path
 import tempfile
-import yaml
 
 from helpers import RattlerBuild
 
@@ -146,4 +144,4 @@ build:
 
         assert "var" in final_context
         assert final_context["var"] == "1234"
-        assert isinstance(final_context["var"], str) 
+        assert isinstance(final_context["var"], str)
