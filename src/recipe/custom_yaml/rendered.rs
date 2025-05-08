@@ -861,3 +861,230 @@ impl Render<RenderedSequenceNode> for SequenceNodeInternal {
         Ok(RenderedSequenceNode::from(rendered))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use marked_yaml::Span;
+    use minijinja::Value;
+
+    fn blank_span() -> Span {
+        Span::new_blank()
+    }
+
+    #[test]
+    fn test_from_jin_value_not_coercible() {
+        let val = Value::from_safe_string("test".to_string());
+        let node =
+            RenderedNode::from_jinja_value("test_source".to_string(), val, blank_span(), false)
+                .unwrap();
+        match node {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source");
+                assert_eq!(s.as_str(), "test");
+                assert!(!s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode"),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_string() {
+        let val = Value::from_safe_string("hello".to_string());
+        let node = RenderedNode::from_jinja_value(
+            "test_source_hello".to_string(),
+            val,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source_hello");
+                assert_eq!(s.as_str(), "hello");
+                assert!(s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode"),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_empty_string_to_null() {
+        // minijinja::Value::from_safe_string("") results in a string value whose .to_string() is ""
+        let val = Value::from_safe_string("".to_string());
+        let node = RenderedNode::from_jinja_value(
+            "test_source_empty".to_string(),
+            val,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node {
+            RenderedNode::Null(s) => {
+                assert_eq!(s.source(), "test_source_empty");
+                assert_eq!(s.as_str(), "");
+                assert!(!s.may_coerce);
+            }
+            _ => panic!("Expected NullNode, got {:?}", node),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_bool() {
+        let val_true = Value::from(true);
+        let node_true = RenderedNode::from_jinja_value(
+            "test_source_true".to_string(),
+            val_true,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_true {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source_true");
+                assert_eq!(s.as_str(), "true");
+                assert!(s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode for true"),
+        }
+
+        let val_false = Value::from(false);
+        let node_false = RenderedNode::from_jinja_value(
+            "test_source_false".to_string(),
+            val_false,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_false {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source_false");
+                assert_eq!(s.as_str(), "false");
+                assert!(s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode for false"),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_number() {
+        let val_int = Value::from(123);
+        let node_int = RenderedNode::from_jinja_value(
+            "test_source_int".to_string(),
+            val_int,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_int {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source_int");
+                assert_eq!(s.as_str(), "123");
+                assert!(s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode for integer"),
+        }
+
+        let val_float = Value::from(45.67);
+        let node_float = RenderedNode::from_jinja_value(
+            "test_source_float".to_string(),
+            val_float,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_float {
+            RenderedNode::Scalar(s) => {
+                assert_eq!(s.source(), "test_source_float");
+                assert_eq!(s.as_str(), "45.67");
+                assert!(s.may_coerce);
+            }
+            _ => panic!("Expected ScalarNode for float"),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_none_undefined() {
+        let val_none = Value::from(());
+        let node_none = RenderedNode::from_jinja_value(
+            "test_source_none".to_string(),
+            val_none,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_none {
+            RenderedNode::Null(s) => {
+                assert_eq!(s.source(), "test_source_none");
+                assert_eq!(s.as_str(), "");
+                assert!(!s.may_coerce);
+            }
+            _ => panic!("Expected NullNode for None"),
+        }
+
+        let val_undefined = Value::UNDEFINED;
+        let node_undefined = RenderedNode::from_jinja_value(
+            "test_source_undefined".to_string(),
+            val_undefined,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_undefined {
+            RenderedNode::Null(s) => {
+                assert_eq!(s.source(), "test_source_undefined");
+                assert_eq!(s.as_str(), "");
+                assert!(!s.may_coerce);
+            }
+            _ => panic!("Expected NullNode for Undefined"),
+        }
+    }
+
+    #[test]
+    fn test_from_jinja_value_coercible_sequence() {
+        let val_seq = Value::from(vec![
+            Value::from_safe_string("apple".to_string()),
+            Value::from(true),
+            Value::from(100),
+        ]);
+        let node_seq = RenderedNode::from_jinja_value(
+            "test_source_seq".to_string(),
+            val_seq,
+            blank_span(),
+            true,
+        )
+        .unwrap();
+        match node_seq {
+            RenderedNode::Sequence(seq) => {
+                assert_eq!(seq.len(), 3);
+                match &seq[0] {
+                    RenderedNode::Scalar(s) => {
+                        assert_eq!(s.source(), "test_source_seq");
+                        assert_eq!(s.as_str(), "apple");
+                        assert!(s.may_coerce);
+                    }
+                    _ => panic!("Expected ScalarNode for seq[0]"),
+                }
+
+                match &seq[1] {
+                    RenderedNode::Scalar(s) => {
+                        assert_eq!(s.source(), "test_source_seq");
+                        assert_eq!(s.as_str(), "true");
+                        assert!(s.may_coerce);
+                    }
+                    _ => panic!("Expected ScalarNode for seq[1]"),
+                }
+
+                match &seq[2] {
+                    RenderedNode::Scalar(s) => {
+                        assert_eq!(s.source(), "test_source_seq");
+                        assert_eq!(s.as_str(), "100");
+                        assert!(s.may_coerce);
+                    }
+                    _ => panic!("Expected ScalarNode for seq[2]"),
+                }
+            }
+            _ => panic!("Expected SequenceNode"),
+        }
+    }
+}

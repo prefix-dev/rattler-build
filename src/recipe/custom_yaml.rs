@@ -1384,3 +1384,34 @@ impl TryConvertNode<VersionWithSource> for RenderedScalarNode {
             .map_err(|e| vec![e])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_string_to_bool_true_values() {
+        assert_eq!(string_to_bool("true"), Some(true));
+        assert_eq!(string_to_bool("True"), Some(true));
+        assert_eq!(string_to_bool("TRUE"), Some(true));
+    }
+
+    #[test]
+    fn test_string_to_bool_false_values() {
+        assert_eq!(string_to_bool("false"), Some(false));
+        assert_eq!(string_to_bool("False"), Some(false));
+        assert_eq!(string_to_bool("FALSE"), Some(false));
+    }
+
+    #[test]
+    fn test_string_to_bool_none_values() {
+        assert_eq!(string_to_bool("tRuE"), None);
+        assert_eq!(string_to_bool("fAlSe"), None);
+        assert_eq!(string_to_bool("yes"), None);
+        assert_eq!(string_to_bool("no"), None);
+        assert_eq!(string_to_bool("1"), None);
+        assert_eq!(string_to_bool("0"), None);
+        assert_eq!(string_to_bool(""), None);
+        assert_eq!(string_to_bool("  true  "), None);
+    }
+}
