@@ -1660,7 +1660,7 @@ def test_relative_file_loading(
     assert (
         rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
     )
-    
+
 
 def test_cuda_version(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch, capfd
@@ -1674,8 +1674,8 @@ def test_cuda_version(
     rattler_build.build(recipes / "cuda_version/recipe.yaml", tmp_path)
     captured = capfd.readouterr()
     assert "cuda_major is NOT a STRING or is not 12 (value was 11)" in captured.err
-    
- 
+
+
 @pytest.mark.parametrize(
     "interpreter",
     [
@@ -1884,4 +1884,3 @@ def test_merge_build_and_host(
         recipes / "merge_build_and_host/recipe.yaml",
         tmp_path,
     )
-    
