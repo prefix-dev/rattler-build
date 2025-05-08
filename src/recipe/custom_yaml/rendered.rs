@@ -151,7 +151,20 @@ impl RenderedNode {
 
         match value.kind() {
             minijinja::value::ValueKind::Map => {
-                todo!("Maps not supported yet");
+                let mut rendered = IndexMap::new();
+                for (key, value) in value.try_iter().unwrap().map(|v| {
+                    let key = v.get_attr("key").unwrap();
+                    let value = v.get_attr("value").unwrap();
+                    (key, value)
+                }) {
+                    let key =
+                        RenderedScalarNode::new(span, key.to_string(), key.to_string(), false);
+                    let value = RenderedNode::from_jinja_value(source.clone(), value, span, true)?;
+                    rendered.insert(key, value);
+                }
+                Ok(RenderedNode::Mapping(RenderedMappingNode::new(
+                    span, rendered,
+                )))
             }
             minijinja::value::ValueKind::Seq => {
                 let mut rendered: Vec<RenderedNode> = Vec::new();

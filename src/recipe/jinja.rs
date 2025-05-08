@@ -71,14 +71,20 @@ fn strip_expression(template: &str) -> Option<&str> {
 
     // Extract content between ${{ and }}
     let content = &trimmed[3..trimmed.len() - 2];
-    let content = content.trim();
+    let content_trimmed = content.trim();
 
-    // Check for nested expressions
-    if content.contains("${{") || content.contains("}}") {
+    // If, after stripping ${{}} and trimming, the expression is empty,
+    // it's not a valid expression to compile. Treat it as if it wasn't an expression block.
+    if content_trimmed.is_empty() {
         return None;
     }
 
-    Some(content)
+    // Check for nested expressions
+    if content_trimmed.contains("${{") || content_trimmed.contains("}}") {
+        return None;
+    }
+
+    Some(content_trimmed)
 }
 
 impl Jinja {
@@ -124,46 +130,51 @@ impl Jinja {
     /// Render the given template to a Jinja value.
     pub fn render_to_value(
         &self,
-        template: &ScalarNode,
+        template_node: &ScalarNode,
     ) -> Result<(Value, bool), minijinja::Error> {
-        if let Some(simple_expr) = strip_expression(template) {
-            // render as expression so that we know the type of the result
+        let template_str = template_node.as_str();
+        if let Some(simple_expr) = strip_expression(template_str) {
             let expr = self.env.compile_expression(simple_expr)?;
             let evaled = expr.eval(self.context())?;
-            if evaled.as_str().is_some() {
-                // Make sure that the string stays a string by returning can_coerce: false
-                return Ok((evaled.to_str().unwrap().to_string().into(), false));
+            // If the expression evaluated to a String, it's considered a final string value.
+            // The associated bool (false) means it should not be further type-coerced by recipe logic.
+            if evaled.kind() == minijinja::value::ValueKind::String {
+                return Ok((evaled, false));
             } else {
-                return Ok((expr.eval(self.context())?, template.may_coerce));
+                // For non-string results (bool, number, etc.), its further coercibility
+                // depends on the original YAML scalar's coercibility.
+                return Ok((evaled, template_node.may_coerce));
             }
         }
 
         // Otherwise just render it as string
-        let rendered = self.env.render_str(template, &self.context)?;
+        let rendered_as_string = self.env.render_str(template_str, &self.context)?;
         Ok((
-            Value::from(rendered),
-            !template.contains("${{") && template.may_coerce,
+            Value::from(rendered_as_string),
+            !template_str.contains("${{") && template_node.may_coerce,
         ))
     }
 
     /// Render a template with the current context.
     pub fn render_str(&self, template: &str) -> Result<(String, bool), minijinja::Error> {
-        if template.starts_with("${{") && template.ends_with("}}") {
-            // render as expression so that we know the type of the result, and can stringify accordingly
-            // If we find something like "${{ foo }}" then we want to evaluate it type-safely and make sure that the MiniJinja type is kept
-            let tmplt = &template[3..template.len() - 2];
-            let expr = self.env.compile_expression(tmplt)?;
+        if let Some(simple_expr) = strip_expression(template) {
+            let expr = self.env.compile_expression(simple_expr)?;
             let evaled = expr.eval(self.context())?;
-            if let Some(s) = evaled.to_str() {
-                // Make sure that the string stays a string by returning can_coerce: false
-                return Ok((s.to_string(), false));
+            if evaled.kind() == minijinja::value::ValueKind::String {
+                return Ok((
+                    evaled
+                        .as_str()
+                        .expect("Value kind String implies as_str is Some")
+                        .to_string(),
+                    false,
+                ));
             } else {
                 return Ok((evaled.to_string(), true));
             }
         }
 
-        let rendered = self.env.render_str(template, &self.context)?;
-        Ok((rendered, !template.contains("${{")))
+        let rendered_string = self.env.render_str(template, &self.context)?;
+        Ok((rendered_string, !template.contains("${{")))
     }
 
     /// Render, compile and evaluate a expr string with the current context.
