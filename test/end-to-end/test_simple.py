@@ -1597,3 +1597,17 @@ def test_relative_file_loading(
     assert (
         rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
     )
+
+
+def test_cuda_version(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch, capfd
+):
+    monkeypatch.setenv("RAPIDS_CUDA_VERSION", "12.0")
+    rattler_build.build(recipes / "cuda_version/recipe.yaml", tmp_path)
+    captured = capfd.readouterr()
+    assert "cuda_major is a STRING and is 12" in captured.err
+
+    monkeypatch.setenv("RAPIDS_CUDA_VERSION", "11.8")
+    rattler_build.build(recipes / "cuda_version/recipe.yaml", tmp_path)
+    captured = capfd.readouterr()
+    assert "cuda_major is NOT a STRING or is not 12 (value was 11)" in captured.err
