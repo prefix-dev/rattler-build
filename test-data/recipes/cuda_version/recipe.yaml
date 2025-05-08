@@ -12,4 +12,4 @@ build:
       then:
         - echo "cuda_major is a STRING and is 12"
       else:
-        - echo "cuda_major is NOT a STRING or is not 12 (value was ${{ cuda_major }})" 
+        - echo "cuda_major is NOT a STRING or is not 12 (value was ${{ cuda_major }})"
