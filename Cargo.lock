@@ -4336,6 +4336,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "tui-input",
+ "unicode-normalization",
  "url",
  "walkdir",
  "which",

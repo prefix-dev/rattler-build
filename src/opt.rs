@@ -21,7 +21,7 @@ use crate::{
     console_utils::{Color, LogStyle},
     metadata::Debug,
     script::{SandboxArguments, SandboxConfiguration},
-    tool_configuration::{SkipExisting, TestStrategy},
+    tool_configuration::{ContinueOnFailure, SkipExisting, TestStrategy},
     url_with_trailing_slash::UrlWithTrailingSlash,
 };
 
@@ -441,6 +441,11 @@ pub struct BuildOpts {
     /// Enable debug output in build scripts
     #[arg(long, help_heading = "Modifying result")]
     pub debug: bool,
+
+    /// Continue building even if (one) of the packages fails to build.
+    /// This is useful when building many packages with `--recipe-dir`.`
+    #[clap(long)]
+    pub continue_on_failure: bool,
 }
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
@@ -469,6 +474,7 @@ pub struct BuildData {
     pub extra_meta: Option<Vec<(String, Value)>>,
     pub sandbox_configuration: Option<SandboxConfiguration>,
     pub debug: Debug,
+    pub continue_on_failure: ContinueOnFailure,
 }
 
 impl BuildData {
@@ -498,6 +504,7 @@ impl BuildData {
         extra_meta: Option<Vec<(String, Value)>>,
         sandbox_configuration: Option<SandboxConfiguration>,
         debug: bool,
+        continue_on_failure: ContinueOnFailure,
     ) -> Self {
         Self {
             up_to,
@@ -531,6 +538,7 @@ impl BuildData {
             extra_meta,
             sandbox_configuration,
             debug: Debug::new(debug),
+            continue_on_failure,
         }
     }
 }
@@ -575,6 +583,7 @@ impl BuildData {
             opts.extra_meta,
             opts.sandbox_arguments.into(),
             opts.debug,
+            opts.continue_on_failure.into(),
         )
     }
 }

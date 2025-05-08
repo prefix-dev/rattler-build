@@ -12,6 +12,7 @@ import boto3
 import pytest
 import requests
 import yaml
+import subprocess
 from helpers import RattlerBuild, check_build_output, get_extracted_package, get_package
 
 
@@ -1379,6 +1380,68 @@ def test_abi3(rattler_build: RattlerBuild, recipes: Path, tmp_path: Path):
     assert index["platform"] == host_subdir().split("-")[0]
 
 
+@pytest.mark.skipif(
+    os.name == "nt" or platform.system() == "Darwin",
+    reason="Filesystem case-insensitivity prevents testing collision warning trigger",
+)
+def test_case_insensitive_collision_warning(
+    rattler_build: RattlerBuild, tmp_path: Path
+):
+    recipe_content = """
+context:
+  name: test-case-collision
+  version: 0.1.0
+
+package:
+  name: test-case-collision
+  version: 0.1.0
+
+build:
+  script:
+    # Create directories with case difference
+    - mkdir -p case_test
+    - echo "UPPER CASE FILE" > case_test/CASE-FILE.txt
+    - echo "lower case file" > case_test/case-file.txt
+    # Install the directory into the prefix to trigger packaging
+    - cp -r case_test $PREFIX/
+    # Add another test file to ensure packaging works
+    - echo "test content" > regular-file.txt
+    - cp regular-file.txt $PREFIX/
+
+about:
+  summary: A test package for case-insensitive file collisions
+"""
+    recipe_path = tmp_path / "recipe.yaml"
+    recipe_path.write_text(recipe_content)
+
+    args = rattler_build.build_args(
+        recipe_path,
+        tmp_path / "output",
+        extra_args=["-vvv"],
+    )
+
+    output = rattler_build(*args, stderr=STDOUT, text=True)
+    pkg = get_extracted_package(tmp_path / "output", "test-case-collision")
+    extracted_files_list = [str(f.relative_to(pkg)) for f in pkg.glob("**/*")]
+
+    assert (
+        "case_test/CASE-FILE.txt" in extracted_files_list
+    ), "CASE-FILE.txt not found in package"
+    assert (
+        "case_test/case-file.txt" in extracted_files_list
+    ), "case-file.txt not found in package"
+    assert (
+        "regular-file.txt" in extracted_files_list
+    ), "regular-file.txt not found in package"
+
+    collision_warning_pattern1 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/CASE-FILE.txt, case_test/case-file.txt"
+    collision_warning_pattern2 = "Mixed-case filenames detected, case-insensitive filesystems may break: case_test/case-file.txt, case_test/CASE-FILE.txt"
+
+    assert (
+        collision_warning_pattern1 in output or collision_warning_pattern2 in output
+    ), f"Case collision warning not found in build output. Output contains:\n{output}"
+
+
 # This is how cf-scripts is using rattler-build - rendering recipes from stdin
 def test_rendering_from_stdin(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
@@ -1597,7 +1660,7 @@ def test_relative_file_loading(
     assert (
         rendered_recipe["recipe"]["about"]["description"] == "Loaded from relative file"
     )
-
+    
 
 def test_cuda_version(
     rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, monkeypatch, capfd
@@ -1611,3 +1674,214 @@ def test_cuda_version(
     rattler_build.build(recipes / "cuda_version/recipe.yaml", tmp_path)
     captured = capfd.readouterr()
     assert "cuda_major is NOT a STRING or is not 12 (value was 11)" in captured.err
+    
+ 
+@pytest.mark.parametrize(
+    "interpreter",
+    [
+        pytest.param(
+            "bash",
+            marks=pytest.mark.skipif(os.name == "nt", reason="bash only on unix"),
+        ),
+        pytest.param(
+            "bat",
+            marks=pytest.mark.skipif(os.name != "nt", reason="bat only on windows"),
+        ),
+        "py",
+        "pl",
+        "nu",
+        "r",
+    ],
+)
+def test_interpreter_detection(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path, interpreter: str
+):
+    """
+    Tests that rattler-build automatically detects the required interpreter
+    for build and test scripts based on their file extension, without explicit
+    interpreter specification in the recipe.
+    """
+    recipe_dir = recipes / "interpreter-detection" / interpreter
+    pkg_name = f"test-interpreter-{interpreter}"
+
+    try:
+        rattler_build.build(recipe_dir, tmp_path)
+    except CalledProcessError as e:
+        print(f"Build failed for interpreter: {interpreter}")
+        print(f"STDOUT:\n{e.stdout.decode() if e.stdout else ''}")
+        print(f"STDERR:\n{e.stderr.decode() if e.stderr else ''}")
+        raise
+
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    if interpreter == "bat":
+        expected_output = "Hello from Cmd!"
+    elif interpreter == "py":
+        expected_output = "Hello from Python!"
+    elif interpreter == "pl":
+        expected_output = "Hello from Perl!"
+    elif interpreter == "nu":
+        expected_output = "Hello from Nushell!"
+    elif interpreter == "r":
+        expected_output = "Hello from R!"
+    else:
+        expected_output = f"Hello from {interpreter.upper()}!"
+
+    assert expected_output in test_output
+    assert "all tests passed!" in test_output
+
+
+def test_interpreter_detection_all_tests(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests that rattler-build can run multiple test scripts requiring
+    different interpreters within the same test phase.
+    """
+    recipe_dir = recipes / "interpreter-detection"
+    pkg_name = "test-interpreter-all"
+
+    rattler_build.build(recipe_dir, tmp_path)
+    pkg_file = get_package(tmp_path, pkg_name)
+    assert pkg_file.exists()
+
+    test_output = rattler_build.test(pkg_file)
+
+    assert "Hello from Python!" in test_output
+    assert "Hello from Perl!" in test_output
+    assert "Hello from R!" in test_output
+    assert "Hello from Nushell!" in test_output
+    assert "all tests passed!" in test_output
+
+
+def test_relative_git_path_py(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    """
+    Tests building a recipe with a relative Git source path.
+    """
+    repo_dir = tmp_path / "repo"
+    recipe_dir = tmp_path / "recipe_dir" / "subdir"
+    recipe_dir.mkdir(parents=True, exist_ok=True)
+    repo_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        subprocess.run(
+            ["git", "init", "--initial-branch=main"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Test User"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        pytest.skip("Git executable not found, skipping test")
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    readme_path = repo_dir / "README.md"
+    readme_path.write_text("test content")
+    try:
+        subprocess.run(
+            ["git", "add", "README.md"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # get the original commit hash
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        original_commit = result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        pytest.fail(f"Git command failed: {e.stderr}")
+
+    # We are gonna create the recipe file here, because we are gonna use git with commit history too.
+    recipe_path = recipe_dir / "recipe.yaml"
+    recipe_content = """
+package:
+  name: test-relative-git
+  version: 1.0.0
+source:
+  git: ../../repo
+build:
+  script:
+    - if: unix
+      then:
+        - cp README.md $PREFIX/README_from_build.md
+      else:
+        - copy README.md %PREFIX%\\README_from_build.md
+"""
+    recipe_path.write_text(recipe_content)
+
+    build_output_path = tmp_path / "build_output"
+    rattler_build.build(recipe_path, build_output_path)
+
+    pkg = get_extracted_package(build_output_path, "test-relative-git")
+
+    cloned_readme = pkg / "README_from_build.md"
+    assert (
+        cloned_readme.exists()
+    ), "README_from_build.md should exist in the built package"
+    assert cloned_readme.read_text() == "test content", "Cloned README content mismatch"
+
+    rendered_recipe_path = pkg / "info/recipe/rendered_recipe.yaml"
+    assert (
+        rendered_recipe_path.exists()
+    ), "rendered_recipe.yaml not found in package info"
+    rendered_recipe = yaml.safe_load(rendered_recipe_path.read_text())
+
+    assert (
+        "finalized_sources" in rendered_recipe
+    ), "'finalized_sources' missing in rendered recipe"
+    assert (
+        len(rendered_recipe["finalized_sources"]) == 1
+    ), "Expected exactly one finalized source"
+    final_source = rendered_recipe["finalized_sources"][0]
+    assert "rev" in final_source, "'rev' missing in finalized source"
+    resolved_commit = final_source["rev"]
+    assert (
+        resolved_commit == original_commit
+    ), f"Resolved commit hash mismatch: expected {original_commit}, got {resolved_commit}"
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="Test requires Unix-like environment for shell commands"
+)
+def test_merge_build_and_host(
+    rattler_build: RattlerBuild, recipes: Path, tmp_path: Path
+):
+    # simply run the recipe "merge_build_and_host/recipe.yaml"
+    rattler_build.build(
+        recipes / "merge_build_and_host/recipe.yaml",
+        tmp_path,
+    )
+    

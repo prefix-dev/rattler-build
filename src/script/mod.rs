@@ -254,7 +254,8 @@ impl Script {
         //  executable is in a known place.
         let nushell_path = format!("bin/nu{}", std::env::consts::EXE_SUFFIX);
         let has_nushell = build_prefix
-            .map(|p| p.join(nushell_path))
+            .map(|p| p.join(&nushell_path))
+            .or_else(|| Some(run_prefix.join(&nushell_path)))
             .map(|p| p.is_file())
             .unwrap_or(false);
         if has_nushell {
