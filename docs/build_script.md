@@ -1,4 +1,4 @@
-# Build scripts
+# Scripts for building and testing packages
 
 The `build.sh` file is the build script for Linux and macOS and `build.bat` is
 the build script for Windows. These scripts contain the logic that carries out
@@ -77,6 +77,21 @@ So far, the following interpreters are supported:
 - `cmd.exe` (default on Windows)
 - `nushell`
 - `python`
+- `perl`
+- `rscript` (for R scripts)
+
+`rattler-build` automatically detects the interpreter based on the file extension
+(`.sh`, `.bat`, `.nu`, `.py`, `.pl`, `.r`) or you can specify it in the
+`interpreter` key in the `script` section of your recipe.
+
+```yaml title="recipe.yaml"
+build:
+  script: myscript.py  # automatically selects the Python interpreter
+
+requirements:
+  build:
+    - python  # required to execute the `myscript.py` script
+```
 
 !!! note
     Using alternative interpreters is less battle-tested than using `bash` or

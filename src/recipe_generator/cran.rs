@@ -229,10 +229,18 @@ pub async fn generate_r_recipe(opts: &CranOpts) -> miette::Result<()> {
     ))
     .expect("Failed to parse URL");
 
+    // It looks like CRAN moves the package to the archive for old versions
+    // so let's add that as a fallback mirror
+    let url_archive = Url::parse(&format!(
+        "https://cran.r-project.org/src/contrib/Archive/{}",
+        package_info._file
+    ))
+    .expect("Failed to parse URL");
+
     let sha256 = fetch_package_sha256sum(&url).await?;
 
     let source = SourceElement {
-        url: url.to_string(),
+        url: vec![url.to_string(), url_archive.to_string()],
         md5: None,
         sha256: Some(format!("{:x}", sha256)),
     };

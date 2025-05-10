@@ -176,6 +176,11 @@ Build a package from a recipe
 	Extra metadata to include in about.json
 
 
+- `--continue-on-failure`
+
+	Continue building even if (one) of the packages fails to build. This is useful when building many packages with `--recipe-dir`.`
+
+
 ###### **Modifying result**
 
 - `--package-format <PACKAGE_FORMAT>`

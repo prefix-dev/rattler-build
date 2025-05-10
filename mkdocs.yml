@@ -104,6 +104,7 @@ nav:
     - "Rust": tutorials/rust.md
     - "Go": tutorials/go.md
     - "Perl": tutorials/perl.md
+    - "R": tutorials/r.md
     - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:

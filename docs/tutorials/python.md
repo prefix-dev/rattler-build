@@ -3,6 +3,18 @@
 Writing a Python package is fairly straightforward, especially for "Python-only" packages.
 In the second example we will build a package for `numpy` which contains compiled code.
 
+## Generating a starter recipe
+
+Rattler-build provides a command to generate a recipe for a package from PyPI.
+The generated recipe can be used as a starting point for your recipe.
+The recipe generator will fetch the metadata from PyPI and generate a recipe that will build the package from the `sdist` source distriution.
+
+```bash
+rattler-build generate-recipe pypi ipywidgets
+# select an older version of the package
+rattler-build generate-recipe pypi ipywidgets --version 8.0.0
+```
+
 ## A Python-only package
 
 The following recipe uses the `noarch: python` setting to build a `noarch` package that can be installed on any platform without modification.
@@ -210,3 +222,118 @@ numpy-1.26.4-py312h440f24a_0
 │ target_platform ┆ osx-arm64 │
 ╰─────────────────┴───────────╯
 ```
+
+## An ABI3-compatible package
+
+Certain packages contain compiled code that is compatible with multiple Python versions.
+This is the case e.g. for a lot of Rust / PyO3 based Python extensions.
+
+In this case, you can use the special `abi3` settings to build a package that is specific to a certain operating system and architecture, but compatible with multiple Python versions.
+
+Note: this feature relies on the `python-abi3` package which exists in the `conda-forge` channel.
+The full recipe can be found on [`conda-forge/py-rattler-feedstock`](https://github.com/conda-forge/py-rattler-feedstock)
+
+```yaml title="recipe.yaml"
+context:
+  name: py-rattler
+  python_name: py_rattler
+  version: "0.11.0"
+  python_min: "3.8"
+
+package:
+  name: py-rattler
+  version: ${{ version }}
+
+source:
+  url: https://pypi.org/packages/source/${{ name[0] }}/${{ name }}/${{ python_name }}-${{ version }}.tar.gz
+  sha256: b00f91e19863741ce137a504eff3082c0b0effd84777444919bd83357530867f
+
+build:
+  number: 0
+  script: build.sh
+  python:
+    version_independent: true
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('rust') }}
+    - cargo-bundle-licenses
+  host:
+    - python      ${{ python_min }}.*
+    - python-abi3 ${{ python_min }}.*  # (1)!
+    - maturin >=1.2.2,<2
+    - pip
+    - if: unix
+      then:
+        - openssl
+  run:
+    - python >=${{ python_min }}
+
+tests:
+  - python:
+      imports:
+        - rattler
+      python_version: ["${{ python_min ~ '.*' }}"]  # (2)!
+  # You could run `abi3audit` here, but it is not necessary
+  # - script:
+  #     - abi3audit ${{ SP_DIR }}/spam.abi3.so -s -v --assume-minimum-abi3 ${{ python_min }}
+  #   requirements:
+  #     run:
+  #       - abi3audit
+
+about:
+  homepage: https://github.com/conda/rattler
+  license: BSD-3-Clause
+  license_file:
+    - LICENSE
+    - py-rattler/THIRDPARTY.yml
+  summary: A blazing fast library to work with the conda ecosystem
+  description: |
+    Rattler is a library that provides common functionality used within the conda
+    ecosystem. The goal of the library is to enable programs and other libraries to
+    easily interact with the conda ecosystem without being dependent on Python. Its
+    primary use case is as a library that you can use to provide conda related
+    workflows in your own tools.
+  repository: https://github.com/conda/rattler
+```
+
+1. The `python-abi3` package is a special package that ensures that the   run dependencies
+   are compatible with the ABI3 standard. 
+2. The `python_version` setting is used to test against the oldest compatible Python version.
+
+## Testing Python packages
+
+Testing Python packages is done using the `tests` section of the recipe.
+We can either use a special "python" test or a regular script test to test the package.
+
+All tests will have the current package and all it's run dependencies installed in an isolated environment.
+
+```yaml title="recipe.yaml"
+# contents of the recipe.yaml file
+tests:
+  - python:
+      # The Python test type will simply import packages as a sanity check.
+      imports:
+        - rattler
+        - rattler.version.Version
+      # You can select different Python versions to test against.
+      python_version: ["${{ python_min ~ '.*' }}", "3.12.*"]  # (1)!
+
+  # You can run a script test to run arbitrary code.
+  - script:
+      - pytest ./tests
+    requirements:  # (2)!
+      run:
+         - pytest
+    files:  # (3)!
+      source:
+        - tests/
+  # You can also directly execute a Python script and run some tests from it.
+  # The script is searched in the `recipe` directory.
+  - script: mytest.py
+```
+
+1. The `python_version` setting is used to test against different Python versions. It is useful to test against the minimum version of Python that the package supports.
+2. We can add additional requirements for the test run. such as pytest, pytest-cov, ... – you can also specify a `python` version here by adding e.g. `python 3.12.*` to the run requirements.
+3. This will copy over the tests from the source directory into the package. Note that this makes the package larger, so you might want to use a different approach for larger packages.

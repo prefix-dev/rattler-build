@@ -2,10 +2,13 @@ use std::{fmt, path::PathBuf};
 
 use indexmap::IndexMap;
 use serde::Serialize;
+use serde_with::{serde_as, OneOrMany, formats::PreferOne};
 
+#[serde_as]
 #[derive(Default, Debug, Serialize)]
 pub struct SourceElement {
-    pub url: String,
+    #[serde_as(as = "OneOrMany<_, PreferOne>")]
+    pub url: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
