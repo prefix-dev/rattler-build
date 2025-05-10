@@ -14,10 +14,11 @@ use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
 use rattler_conda_types::{
+    ChannelUrl, NoArchType, Platform,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
-    }, ChannelUrl, NoArchType, Platform
+    },
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
 use url::Url;
@@ -192,7 +193,7 @@ pub fn create_prefix_placeholder(
 
 /// Clean credentials out of a channel url and return the string representation
 fn clean_url(url: &ChannelUrl) -> String {
-    let mut url : Url = url.url().clone().into();
+    let mut url: Url = url.url().clone().into();
     // remove credentials from the url
     url.set_username("").expect("username is empty");
     url.set_password(None).expect("password is empty");
@@ -259,9 +260,7 @@ impl Output {
                 .build_configuration
                 .channels
                 .iter()
-                .map(|c| {
-                    clean_url(c)
-                })
+                .map(clean_url)
                 .collect(),
             extra: self.extra_meta.clone().unwrap_or_default(),
         };
@@ -560,7 +559,8 @@ mod test {
         assert_eq!(cleaned_url, "https://example.com/conda-forge/");
 
         // user+password@host
-        let url = ChannelUrl::from(Url::parse("https://user:password@foobar.com/mychannel").unwrap());
+        let url =
+            ChannelUrl::from(Url::parse("https://user:password@foobar.com/mychannel").unwrap());
         let cleaned_url = clean_url(&url);
         assert_eq!(cleaned_url, "https://foobar.com/mychannel/");
     }
