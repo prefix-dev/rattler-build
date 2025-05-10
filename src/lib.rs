@@ -577,6 +577,7 @@ pub async fn run_build_from_args(
                         channel_priority: tool_configuration.channel_priority,
                         solve_strategy: SolveStrategy::Highest,
                         tool_configuration: tool_configuration.clone(),
+                        debug: output.build_configuration.debug,
                     },
                     None,
                 )
@@ -691,6 +692,7 @@ pub async fn run_test(
         channel_priority: tool_config.channel_priority,
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
+        debug: test_data.debug,
     };
 
     let package_name = package_file
