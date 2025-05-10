@@ -14,13 +14,13 @@ use fs_err as fs;
 use fs_err::File;
 use itertools::Itertools;
 use rattler_conda_types::{
-    NoArchType, Platform,
     package::{
         AboutJson, FileMode, IndexJson, LinkJson, NoArchLinks, PackageFile, PathType, PathsEntry,
         PathsJson, PrefixPlaceholder, PythonEntryPoints, RunExportsJson,
-    },
+    }, ChannelUrl, NoArchType, Platform
 };
 use rattler_digest::{compute_bytes_digest, compute_file_digest};
+use url::Url;
 
 use super::{PackagingError, TempFiles};
 use crate::{hash::HashInput, metadata::Output, recipe::parser::PrefixDetection};
@@ -190,6 +190,26 @@ pub fn create_prefix_placeholder(
     }))
 }
 
+/// Clean credentials out of a channel url and return the string representation
+fn clean_url(url: &ChannelUrl) -> String {
+    let mut url : Url = url.url().clone().into();
+    // remove credentials from the url
+    url.set_username("").expect("username is empty");
+    url.set_password(None).expect("password is empty");
+
+    // remove `/t/<TOKEN>` from the url if present
+    let mut path = url.path_segments().unwrap().collect::<Vec<_>>();
+    if path.len() > 2 && path[0] == "t" {
+        // Remove the first two segments
+        path.remove(0);
+        path.remove(0);
+        // Join the remaining segments back into a path
+        url.set_path(&path.join("/"));
+    }
+
+    url.to_string()
+}
+
 impl Output {
     /// Create the run_exports.json file for the given output.
     pub fn run_exports_json(&self) -> Result<&RunExportsJson, PackagingError> {
@@ -239,7 +259,9 @@ impl Output {
                 .build_configuration
                 .channels
                 .iter()
-                .map(|c| c.to_string())
+                .map(|c| {
+                    clean_url(c)
+                })
                 .collect(),
             extra: self.extra_meta.clone().unwrap_or_default(),
         };
@@ -508,10 +530,11 @@ impl Output {
 #[cfg(test)]
 mod test {
     use content_inspector::ContentType;
-    use rattler_conda_types::Platform;
+    use rattler_conda_types::{ChannelUrl, Platform};
+    use url::Url;
 
     use super::create_prefix_placeholder;
-    use crate::recipe::parser::PrefixDetection;
+    use crate::{packaging::metadata::clean_url, recipe::parser::PrefixDetection};
 
     #[test]
     fn detect_prefix() {
@@ -528,5 +551,17 @@ mod test {
             &PrefixDetection::default(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn test_clean_url() {
+        let url = ChannelUrl::from(Url::parse("https://example.com/t/TOKEN/conda-forge").unwrap());
+        let cleaned_url = clean_url(&url);
+        assert_eq!(cleaned_url, "https://example.com/conda-forge/");
+
+        // user+password@host
+        let url = ChannelUrl::from(Url::parse("https://user:password@foobar.com/mychannel").unwrap());
+        let cleaned_url = clean_url(&url);
+        assert_eq!(cleaned_url, "https://foobar.com/mychannel/");
     }
 }
