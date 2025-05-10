@@ -9,6 +9,7 @@ use crate::{
     metadata::{Output, build_reindexed_channels},
     recipe::parser::TestType,
     render::solver::load_repodatas,
+    script::InterpreterError,
     tool_configuration,
 };
 
@@ -130,7 +131,18 @@ pub async fn run_build(
         .await
         .into_diagnostic()?;
 
-    output.run_build_script().await.into_diagnostic()?;
+    match output.run_build_script().await {
+        Ok(_) => {}
+        Err(InterpreterError::Debug(info)) => {
+            tracing::info!("{}", info);
+            return Err(miette::miette!(
+                "Script not executed because debug mode is enabled"
+            ));
+        }
+        Err(InterpreterError::ExecutionFailed(_)) => {
+            return Err(miette::miette!("Script failed to execute"));
+        }
+    }
 
     // Package all the new files
     let (result, paths_json) = output

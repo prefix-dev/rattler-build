@@ -557,9 +557,8 @@ pub async fn run_build_from_args(
                 to_test
             };
 
-            // let testable = can_test(&test_queue, &all_output_names, &outputs_to_build);
             for (output, archive) in &to_test {
-                package_test::run_test(
+                match package_test::run_test(
                     archive,
                     &TestConfiguration {
                         test_prefix: output.build_configuration.directories.work_dir.join("test"),
@@ -577,11 +576,32 @@ pub async fn run_build_from_args(
                         channel_priority: tool_configuration.channel_priority,
                         solve_strategy: SolveStrategy::Highest,
                         tool_configuration: tool_configuration.clone(),
+                        debug: output.build_configuration.debug,
                     },
                     None,
                 )
                 .await
-                .into_diagnostic()?;
+                {
+                    Ok(_) => {}
+                    Err(e) => {
+                        // move the package file to the failed directory
+                        let failed_dir = output
+                            .build_configuration
+                            .directories
+                            .output_dir
+                            .join("broken");
+                        fs::create_dir_all(&failed_dir).into_diagnostic()?;
+                        fs::rename(archive, failed_dir.join(archive.file_name().unwrap()))
+                            .into_diagnostic()?;
+
+                        if tool_configuration.continue_on_failure == ContinueOnFailure::Yes {
+                            tracing::error!("Test failed for {}: {}", output.identifier(), e);
+                            output.record_warning(&format!("Test failed: {}", e));
+                        } else {
+                            return Err(miette::miette!("Test failed: {}", e));
+                        }
+                    }
+                }
             }
         }
     }
@@ -691,6 +711,7 @@ pub async fn run_test(
         channel_priority: tool_config.channel_priority,
         solve_strategy: SolveStrategy::Highest,
         tool_configuration: tool_config,
+        debug: test_data.debug,
     };
 
     let package_name = package_file
