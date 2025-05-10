@@ -622,6 +622,10 @@ pub struct TestOpts {
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
 
+    /// Build test environment and output debug information for manual debugging.
+    #[arg(long)]
+    pub debug: bool,
+
     /// Common options.
     #[clap(flatten)]
     pub common: CommonOpts,
@@ -634,6 +638,7 @@ pub struct TestData {
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
+    pub debug: Debug,
 }
 
 impl TestData {
@@ -644,6 +649,7 @@ impl TestData {
             value.package_file,
             value.channels,
             value.compression_threads,
+            Debug::new(value.debug),
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
@@ -653,6 +659,7 @@ impl TestData {
         package_file: PathBuf,
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
+        debug: Debug,
         common: CommonData,
     ) -> Self {
         Self {
@@ -660,6 +667,7 @@ impl TestData {
             channels,
             compression_threads,
             common,
+            debug,
         }
     }
 }

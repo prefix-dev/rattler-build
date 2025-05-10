@@ -229,6 +229,8 @@ pub struct TestConfiguration {
     pub solve_strategy: SolveStrategy,
     /// The tool configuration
     pub tool_configuration: tool_configuration::Configuration,
+    /// Debug mode yes, or no
+    pub debug: Debug,
 }
 
 fn env_vars_from_package(index_json: &IndexJson) -> HashMap<String, String> {
@@ -603,7 +605,7 @@ impl PythonTest {
                 None,
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -627,7 +629,7 @@ impl PythonTest {
                     None,
                     None,
                     None,
-                    Debug::new(true),
+                    config.debug,
                 )
                 .await
                 .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -701,7 +703,7 @@ impl PerlTest {
                 None,
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -811,7 +813,7 @@ impl CommandsTest {
                 build_prefix.as_ref(),
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
@@ -967,7 +969,7 @@ impl RTest {
                 None,
                 None,
                 None,
-                Debug::new(true),
+                config.debug,
             )
             .await
             .map_err(|e| TestError::TestFailed(e.to_string()))?;
