@@ -133,7 +133,6 @@ throbber-widgets-tui = { version = "0.8", optional = true }
 tui-input = { version = "0.11.1", optional = true }
 reflink-copy = "0.1.26"
 rayon = "1.10.0"
-gitpatch = "0.7.1"
 regex = "1.11.1"
 async-recursion = "1.1.1"
 opendal = { version = "0.53.1", default-features = false, features = [
