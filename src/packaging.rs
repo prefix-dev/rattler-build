@@ -98,65 +98,90 @@ fn copy_license_files(
     output: &Output,
     tmp_dir_path: &Path,
 ) -> Result<Option<HashSet<PathBuf>>, PackagingError> {
+    // Early return if no license files are specified
     if output.recipe.about().license_file.is_empty() {
-        Ok(None)
-    } else {
-        let licenses_folder = tmp_dir_path.join("info/licenses/");
-        fs::create_dir_all(&licenses_folder)?;
+        return Ok(None);
+    }
 
-        let copy_dir = copy_dir::CopyDir::new(
+    // Create licenses directory
+    let licenses_folder = tmp_dir_path.join("info/licenses/");
+    fs::create_dir_all(&licenses_folder)?;
+
+    // Define source directories to search for license files
+    let sources = [
+        (
+            &output.build_configuration.directories.host_prefix,
+            "prefix directory",
+            false,
+        ),
+        (
             &output.build_configuration.directories.work_dir,
-            &licenses_folder,
-        )
-        .with_globvec(&output.recipe.about().license_file)
-        .use_gitignore(false)
-        .run()?;
-
-        let copied_files_work_dir = copy_dir.copied_paths();
-        let any_include_matched_recipe_dir = copy_dir.any_include_glob_matched();
-
-        let copy_dir = copy_dir::CopyDir::new(
+            "work directory",
+            true,
+        ),
+        (
             &output.build_configuration.directories.recipe_dir,
-            &licenses_folder,
-        )
-        .with_globvec(&output.recipe.about().license_file)
-        .use_gitignore(false)
-        .overwrite(true)
-        .run()?;
+            "recipe directory",
+            true,
+        ),
+    ];
 
-        let copied_files_recipe_dir = copy_dir.copied_paths();
-        let any_include_matched_work_dir = copy_dir.any_include_glob_matched();
+    let license_globs = &output.recipe.about().license_file;
+    let mut all_copied_files = HashSet::new();
+    let mut any_glob_matched = false;
+    let mut copied_files_by_source = Vec::with_capacity(sources.len());
 
-        // if a file was copied from the recipe dir, and the work dir, we should
-        // issue a warning
-        for file in copied_files_recipe_dir {
-            if copied_files_work_dir.contains(file) {
-                let warn_str = format!(
-                    "License file from source directory was overwritten by license file from recipe folder ({})",
-                    file.display()
-                );
-                tracing::warn!(warn_str);
-                output.record_warning(&warn_str);
+    // Copy license files from each source directory
+    for (source_dir, source_name, overwrite) in sources {
+        let copy_dir = copy_dir::CopyDir::new(source_dir, &licenses_folder)
+            .with_globvec(license_globs)
+            .use_gitignore(false)
+            .overwrite(overwrite);
+
+        let result = copy_dir.run()?;
+
+        let copied_files = result.copied_paths().to_vec();
+        any_glob_matched |= result.any_include_glob_matched();
+
+        // Add all copied files to our result set
+        all_copied_files.extend(copied_files.iter().map(PathBuf::from));
+
+        copied_files_by_source.push((source_name, copied_files));
+    }
+
+    // Check for and warn about file conflicts
+    for i in 0..copied_files_by_source.len() {
+        for j in i + 1..copied_files_by_source.len() {
+            let (source_i_name, files_i) = &copied_files_by_source[i];
+            let (source_j_name, files_j) = &copied_files_by_source[j];
+
+            for file in files_i {
+                if files_j.contains(file) {
+                    let warn_str = format!(
+                        "License file '{}' from {} was overwritten by license file from {}",
+                        file.display(),
+                        source_i_name,
+                        source_j_name
+                    );
+                    tracing::warn!(warn_str);
+                    output.record_warning(&warn_str);
+                }
             }
         }
+    }
 
-        let copied_files = copied_files_recipe_dir
-            .iter()
-            .chain(copied_files_work_dir)
-            .map(PathBuf::from)
-            .collect::<HashSet<PathBuf>>();
+    // Warn if no globs matched
+    if !any_glob_matched {
+        let warn_str = "No include glob matched for copying license files";
+        tracing::warn!(warn_str);
+        output.record_warning(warn_str);
+    }
 
-        if !any_include_matched_work_dir && !any_include_matched_recipe_dir {
-            let warn_str = "No include glob matched for copying license files";
-            tracing::warn!(warn_str);
-            output.record_warning(warn_str);
-        }
-
-        if copied_files.is_empty() {
-            Err(PackagingError::LicensesNotFound)
-        } else {
-            Ok(Some(copied_files))
-        }
+    // Return error if no files were copied
+    if all_copied_files.is_empty() {
+        Err(PackagingError::LicensesNotFound)
+    } else {
+        Ok(Some(all_copied_files))
     }
 }
 
