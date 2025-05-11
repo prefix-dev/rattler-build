@@ -1,9 +1,47 @@
 # Testing packages
 
 When you are developing a package, you should write tests for it. The tests are
-automatically executed right after the package build has finished.
+automatically executed as soon as the package build and all it's run dependencies
+are ready.
 
-The tests from the test section are actually packaged _into_ your package and
+## Writing tests
+
+You can add one or more tests to your package in the `tests` section of the recipe (or output).
+Each test is run independently, in a separate environment.
+
+One notable difference are the `package_contents` tests that are executed right after the package
+is prepared and do not create a new environment (as we only analyze the contents of the package).
+
+```yaml title="recipe.yaml"
+tests:
+  - script:
+      - echo "Hello world"
+  - script:
+      - pytest ./tests
+    requirements:
+      run:
+        - pytest
+    files:
+      recipe:
+        - tests/
+  # Python specific tests
+  - python:
+      imports:
+        - mypkg
+  - r:
+      libraries:
+        - dplyr
+  - perl:
+      modules:
+        - JSON
+  - package_contents:
+      files:
+        - share/package/*.txt
+```
+
+## Testing existing packages
+
+The tests from the test section are actually added _into_ your package and
 can also be executed straight from the existing package.
 
 The idea behind adding the tests into the package is that you can execute the
