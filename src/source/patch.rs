@@ -186,7 +186,6 @@ mod tests {
     use crate::source::copy_dir::CopyDir;
 
     use super::*;
-    use gitpatch::Patch;
     use line_ending::LineEnding;
     use tempfile::TempDir;
 
@@ -203,8 +202,10 @@ mod tests {
                 continue;
             }
 
-            let ps = fs_err::read_to_string(&patch_path).unwrap();
-            let parsed = Patch::from_multiple(&ps);
+            let parsed = parse_patch_file(&patch_path);
+            if let Err(e) = &parsed {
+                eprintln!("Failed to parse patch: {} {}", patch_path.display(), e);
+            }
 
             println!("Parsing patch: {} {}", patch_path.display(), parsed.is_ok());
         }
