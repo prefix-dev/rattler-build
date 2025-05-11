@@ -698,7 +698,6 @@ Using a runtime dependency name:
 !!! note
     `ignore_run_exports` only applies to runtime dependencies coming from an upstream package.
 
-
 ## Tests section
 
 `rattler-build` supports four different types of tests. The "script test" installs
@@ -742,6 +741,19 @@ tests:
       - echo "hello world"
       - bsdiff4 -h
       - bspatch4 -h
+```
+
+#### External scripts
+
+You can also easily run a script from your recipe directory.
+Note that your package should either depend on the interpreter (e.g. Python or R)
+or you need to add a `requirements` section to the test that installs the interpreter.
+
+```yaml
+tests:
+  - script: tests/run_test.py
+  - script: tests/run_test.R
+  - script: tests/run_test.sh
 ```
 
 #### Extra test files
@@ -813,6 +825,41 @@ Internally this will write a small Python script that imports the modules:
 ```python
 import bsdiff4
 import bspatch4
+```
+
+### Perl tests
+
+For this test type you can list a set of Perl modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+tests:
+  - perl:
+      uses:
+        - Call::Context
+```
+
+Internally this will write a small Perl script that imports the modules:
+
+```perl
+use Call::Context;
+```
+
+### R tests
+
+For this test type you can list a set of R modules that need to be
+importable. The test will fail if any of the modules cannot be imported.
+
+```yaml
+- r:
+    libraries:
+      - knitr
+```
+
+Internally this will write a small R script that imports the modules:
+
+```r
+library(knitr)
 ```
 
 ### Check for package contents
