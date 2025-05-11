@@ -650,6 +650,28 @@
   
   
     <li class="md-nav__item">
+      <a href="../repackaging/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Repackaging
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../converting_from_conda_build/" class="md-nav__link">
         
   
@@ -1637,8 +1659,9 @@ This is very handy for packages that are pure Python and do not contain any comp
 </span></code></pre></div>
 <h2 id="a-python-package-with-compiled-extensions">A Python package with compiled extensions<a class="headerlink" href="#a-python-package-with-compiled-extensions" title="Permanent link">#</a></h2>
 <p>We will build a package for <code>numpy</code> – which contains compiled code.
-Since compiled code is <code>python</code> version-specific, we will need to specify the <code>python</code> version explicitly.
-The best way to do this is with a "variant_config.yaml" file:</p>
+Since compiled code is <code>python</code> version-specific, we will need to specify the <code>python</code> version explicitly.</p>
+<p>The best way to do this is with a "variant_config.yaml" file.
+The variant config file allows us to easily compile the package against multiple Python versions.</p>
 <div class="language-yaml highlight"><span class="filename">variants.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nt">python</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.11</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3.12</span>
