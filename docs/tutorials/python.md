@@ -317,6 +317,7 @@ tests:
       imports:
         - rattler
         - rattler.version.Version
+      pip_check: true # (4)!
       # You can select different Python versions to test against.
       python_version: ["${{ python_min ~ '.*' }}", "3.12.*"]  # (1)!
 
@@ -337,3 +338,4 @@ tests:
 1. The `python_version` setting is used to test against different Python versions. It is useful to test against the minimum version of Python that the package supports.
 2. We can add additional requirements for the test run. such as pytest, pytest-cov, ... – you can also specify a `python` version here by adding e.g. `python 3.12.*` to the run requirements.
 3. This will copy over the tests from the source directory into the package. Note that this makes the package larger, so you might want to use a different approach for larger packages.
+4. The `pip_check` will run `pip check` in the environment to make sure that all dependencies are installed correctly. By default, this is set to `true`.
