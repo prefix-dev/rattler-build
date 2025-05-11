@@ -2,7 +2,7 @@ use std::{fmt, path::PathBuf};
 
 use indexmap::IndexMap;
 use serde::Serialize;
-use serde_with::{serde_as, OneOrMany, formats::PreferOne};
+use serde_with::{OneOrMany, formats::PreferOne, serde_as};
 
 #[serde_as]
 #[derive(Default, Debug, Serialize)]

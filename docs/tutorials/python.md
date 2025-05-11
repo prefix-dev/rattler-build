@@ -299,7 +299,7 @@ about:
 ```
 
 1. The `python-abi3` package is a special package that ensures that the   run dependencies
-   are compatible with the ABI3 standard. 
+   are compatible with the ABI3 standard.
 2. The `python_version` setting is used to test against the oldest compatible Python version.
 
 ## Testing Python packages
