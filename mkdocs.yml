@@ -105,6 +105,7 @@ nav:
     - "Go": tutorials/go.md
     - "Perl": tutorials/perl.md
     - "R": tutorials/r.md
+    - "Repackaging": tutorials/repackaging.md
     - "Converting from conda-build": converting_from_conda_build.md
 
   - Build options:
