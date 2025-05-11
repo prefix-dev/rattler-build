@@ -181,7 +181,7 @@ requirements. The `build` requirements can be used to install emulators and
 similar tools that need to run to execute tests in a cross-compilation
 environment.
 
-# Automatic feedstock convertion
+# Automatic feedstock conversion
 
 Use the tool [`feedrattler`](https://github.com/hadim/feedrattler) by [hadim](https://github.com/hadim) to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by rattler-build.
 
@@ -190,7 +190,7 @@ You can install and use it directly by running `pixi exec`:
 pixi exec feedrattler my-awesome-feedstock
 ```
 
-It uses the `conda-recipe-manager` for the generation of the recipe and `gh` or a `GITHUB_TOKEN` for creating the convertion PR in your name.
+It uses the `conda-recipe-manager` for the generation of the recipe and `gh` or a `GITHUB_TOKEN` for creating the conversion PR in your name.
 
 Alternative installation:
 ```
