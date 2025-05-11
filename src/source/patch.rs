@@ -18,20 +18,24 @@ fn parse_patch_file<P: AsRef<Path>>(patch_file: P) -> std::io::Result<HashSet<Pa
     let unified_pattern = "--- ";
     let git_pattern = "diff --git ";
     let traditional_pattern = "Index: ";
-
+    let mut is_git = false;
     for line in reader.lines() {
         let line = line?;
 
-        if line.starts_with(git_pattern) {
-            if let Some(file_path) = extract_git_file_path(&line[git_pattern.len()..]) {
+        if let Some(git_line) = line.strip_prefix(git_pattern) {
+            is_git = true;
+            if let Some(file_path) = extract_git_file_path(git_line) {
                 affected_files.insert(file_path);
             }
-        } else if line.starts_with(unified_pattern) && !line.contains("/dev/null") {
-            if let Some(file_path) = clean_file_path(&line[unified_pattern.len()..]) {
+        } else if let Some(unified_line) = line.strip_prefix(unified_pattern) {
+            if is_git || unified_line.contains("/dev/null") {
+                continue;
+            }
+            if let Some(file_path) = clean_file_path(unified_line) {
                 affected_files.insert(file_path);
             }
-        } else if line.starts_with(traditional_pattern) {
-            if let Some(file_path) = clean_file_path(&line[traditional_pattern.len()..]) {
+        } else if let Some(traditional_line) = line.strip_prefix(traditional_pattern) {
+            if let Some(file_path) = clean_file_path(traditional_line) {
                 affected_files.insert(file_path);
             }
         }
@@ -58,13 +62,6 @@ fn extract_git_file_path(content: &str) -> Option<PathBuf> {
     // Format: "a/file.txt b/file.txt"
     let parts: Vec<&str> = content.split(' ').collect();
     if parts.len() >= 2 {
-        // Take the second part (b/file.txt) and remove the b/ prefix
-        let b_file = parts[1];
-        if b_file.starts_with("b/") && b_file != "b/dev/null" {
-            return Some(PathBuf::from(&b_file));
-        }
-
-        // If b/file.txt is /dev/null, use a/file.txt instead
         let a_file = parts[0];
         if a_file.starts_with("a/") && a_file != "a/dev/null" {
             return Some(PathBuf::from(&a_file));
@@ -217,16 +214,14 @@ mod tests {
         let patches_dir = manifest_dir.join("test-data/patch_application/patches");
 
         let patched_paths = parse_patch_file(patches_dir.join("test.patch")).unwrap();
-        assert_eq!(patched_paths.len(), 2);
+        assert_eq!(patched_paths.len(), 1);
         assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
-        assert!(patched_paths.contains(&PathBuf::from("b/text.md")));
 
         let patched_paths =
             parse_patch_file(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
                 .unwrap();
-        assert_eq!(patched_paths.len(), 2);
+        assert_eq!(patched_paths.len(), 1);
         assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
-        assert!(patched_paths.contains(&PathBuf::from("b/CMakeLists.txt")));
     }
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
