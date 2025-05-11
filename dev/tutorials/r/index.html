@@ -8,28 +8,28 @@
       
       
       
-        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/highlevel/">
+        <link rel="canonical" href="https://prefix-dev.github.io/rattler-build/dev/tutorials/r/">
       
       
-        <link rel="prev" href="..">
+        <link rel="prev" href="../perl/">
       
       
-        <link rel="next" href="../tutorials/python/">
+        <link rel="next" href="../../converting_from_conda_build/">
       
       
-      <link rel="icon" href="../assets/favicon.png">
+      <link rel="icon" href="../../assets/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.4">
     
     
       
-        <title>High-level overview - rattler-build</title>
+        <title>R - rattler-build</title>
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.8608ea7d.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8608ea7d.min.css">
       
         
-        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,11 +48,11 @@
       
     
     
-      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-      <link rel="stylesheet" href="../stylesheets/extra.css">
+      <link rel="stylesheet" href="../../stylesheets/extra.css">
     
-    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -61,11 +61,11 @@
       
         <meta  property="og:type"  content="website" >
       
-        <meta  property="og:title"  content="High-level overview - rattler-build" >
+        <meta  property="og:title"  content="R - rattler-build" >
       
         <meta  property="og:description"  content="None" >
       
-        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/highlevel.png" >
+        <meta  property="og:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/r.png" >
       
         <meta  property="og:image:type"  content="image/png" >
       
@@ -73,15 +73,15 @@
       
         <meta  property="og:image:height"  content="630" >
       
-        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/highlevel/" >
+        <meta  property="og:url"  content="https://prefix-dev.github.io/rattler-build/dev/tutorials/r/" >
       
         <meta  name="twitter:card"  content="summary_large_image" >
       
-        <meta  name="twitter:title"  content="High-level overview - rattler-build" >
+        <meta  name="twitter:title"  content="R - rattler-build" >
       
         <meta  name="twitter:description"  content="None" >
       
-        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/highlevel.png" >
+        <meta  name="twitter:image"  content="https://prefix-dev.github.io/rattler-build/dev/assets/images/social/tutorials/r.png" >
       
     
     
@@ -104,7 +104,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#what-is-rattler-build" class="md-skip">
+        <a href="#packaging-a-r-cran-package" class="md-skip">
           Skip to content
         </a>
       
@@ -126,7 +126,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="https://prefix.dev" title="rattler-build" class="md-header__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../assets/powerdrill.png" alt="logo">
+  <img src="../../assets/powerdrill.png" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -143,7 +143,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              High-level overview
+              R
             
           </span>
         </div>
@@ -268,7 +268,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="https://prefix.dev" title="rattler-build" class="md-nav__button md-logo" aria-label="rattler-build" data-md-component="logo">
       
-  <img src="../assets/powerdrill.png" alt="logo">
+  <img src="../../assets/powerdrill.png" alt="logo">
 
     </a>
     rattler-build
@@ -295,7 +295,7 @@
   
   
     <li class="md-nav__item">
-      <a href=".." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -311,6 +311,202 @@
     
       
       
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../highlevel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    High-level overview
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Examples
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Python
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cpp/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    C++
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../javascript/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Javascript
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../rust/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Rust
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../go/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Go
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../perl/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Perl
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
   
   
     
@@ -329,7 +525,7 @@
           
   
   <span class="md-ellipsis">
-    High-level overview
+    R
     
   </span>
   
@@ -341,7 +537,7 @@
         
   
   <span class="md-ellipsis">
-    High-level overview
+    R
     
   </span>
   
@@ -364,27 +560,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
+  <a href="#generating-a-starting-point" class="md-nav__link">
     <span class="md-ellipsis">
-      How does rattler-build work?
+      Generating a starting point
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
+  <a href="#building-a-r-package" class="md-nav__link">
     <span class="md-ellipsis">
-      How to run rattler-build
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      Overview of a recipe.yaml
+      Building a R Package
     </span>
   </a>
   
@@ -397,68 +584,6 @@
     </li>
   
 
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-      
-        
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
-        
-          
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
-            
-  
-  <span class="md-ellipsis">
-    Examples
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
-            Examples
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/python/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Python
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
               
             
               
@@ -468,139 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tutorials/cpp/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    C++
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/javascript/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Javascript
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/rust/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Rust
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/go/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Go
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/perl/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Perl
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/r/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    R
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../converting_from_conda_build/" class="md-nav__link">
+      <a href="../../converting_from_conda_build/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -670,7 +663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_options/" class="md-nav__link">
+      <a href="../../build_options/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -692,7 +685,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../selectors/" class="md-nav__link">
+      <a href="../../selectors/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -714,7 +707,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../build_script/" class="md-nav__link">
+      <a href="../../build_script/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -736,7 +729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../variants/" class="md-nav__link">
+      <a href="../../variants/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -758,7 +751,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../config/" class="md-nav__link">
+      <a href="../../config/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -780,7 +773,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../compilers/" class="md-nav__link">
+      <a href="../../compilers/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -802,7 +795,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../experimental_features/" class="md-nav__link">
+      <a href="../../experimental_features/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -824,7 +817,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../multiple_output_cache/" class="md-nav__link">
+      <a href="../../multiple_output_cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -846,7 +839,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../sandbox/" class="md-nav__link">
+      <a href="../../sandbox/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -868,7 +861,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../recipe_generation/" class="md-nav__link">
+      <a href="../../recipe_generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -890,7 +883,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tips_and_tricks/" class="md-nav__link">
+      <a href="../../tips_and_tricks/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -960,7 +953,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../testing/" class="md-nav__link">
+      <a href="../../testing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -982,7 +975,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../rebuild/" class="md-nav__link">
+      <a href="../../rebuild/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1052,7 +1045,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../tui/" class="md-nav__link">
+      <a href="../../tui/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1074,7 +1067,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../authentication_and_upload/" class="md-nav__link">
+      <a href="../../authentication_and_upload/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1096,7 +1089,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../automatic_linting/" class="md-nav__link">
+      <a href="../../automatic_linting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1166,7 +1159,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../package_spec/" class="md-nav__link">
+      <a href="../../package_spec/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1188,7 +1181,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../special_files/" class="md-nav__link">
+      <a href="../../special_files/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1210,7 +1203,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../internals/" class="md-nav__link">
+      <a href="../../internals/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1232,7 +1225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../system_integration/" class="md-nav__link">
+      <a href="../../system_integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1302,7 +1295,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/recipe_file/" class="md-nav__link">
+      <a href="../../reference/recipe_file/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1324,7 +1317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/cli/" class="md-nav__link">
+      <a href="../../reference/cli/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1346,7 +1339,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/jinja/" class="md-nav__link">
+      <a href="../../reference/jinja/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1368,7 +1361,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../reference/python_bindings/" class="md-nav__link">
+      <a href="../../reference/python_bindings/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1417,27 +1410,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#how-does-rattler-build-work" class="md-nav__link">
+  <a href="#generating-a-starting-point" class="md-nav__link">
     <span class="md-ellipsis">
-      How does rattler-build work?
+      Generating a starting point
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-run-rattler-build" class="md-nav__link">
+  <a href="#building-a-r-package" class="md-nav__link">
     <span class="md-ellipsis">
-      How to run rattler-build
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#overview-of-a-recipeyaml" class="md-nav__link">
-    <span class="md-ellipsis">
-      Overview of a recipe.yaml
+      Building a R Package
     </span>
   </a>
   
@@ -1459,7 +1443,7 @@
 
 
   
-    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/highlevel.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/prefix-dev/rattler-build/edit/main/docs/tutorials/r.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20.71 7.04c.39-.39.39-1.04 0-1.41l-2.34-2.34c-.37-.39-1.02-.39-1.41 0l-1.84 1.83 3.75 3.75M3 17.25V21h3.75L17.81 9.93l-3.75-3.75z"/></svg>
     </a>
@@ -1467,140 +1451,65 @@
   
 
 
-<h1 id="what-is-rattler-build">What is <code>rattler-build</code>?<a class="headerlink" href="#what-is-rattler-build" title="Permanent link">#</a></h1>
-<p><code>rattler-build</code> is a tool to build and package software so that it can be
-installed on any operating system – with any compatible package manager such as
-<code>mamba</code>, <code>conda</code>, or <code>rattler</code>. We are also intending for <code>rattler-build</code> to be
-used as a library to drive builds of packages from any other recipe format in
-the future.</p>
-<h3 id="how-does-rattler-build-work">How does <code>rattler-build</code> work?<a class="headerlink" href="#how-does-rattler-build-work" title="Permanent link">#</a></h3>
-<p>Building of packages consists of several steps. It all begins with a
-<code>recipe.yaml</code> file that specifies how the package is to be built and what the
-dependencies are. From the recipe file, <code>rattler-build</code> executes several steps:</p>
+<h1 id="packaging-a-r-cran-package">Packaging a R (CRAN) package<a class="headerlink" href="#packaging-a-r-cran-package" title="Permanent link">#</a></h1>
+<p>Packaging a R package is similar to packaging a Python package!</p>
+<h2 id="generating-a-starting-point">Generating a starting point<a class="headerlink" href="#generating-a-starting-point" title="Permanent link">#</a></h2>
+<p>You can use rattler-build to generate a starting point for your recipe from the metadata on CRAN.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>generate-recipe<span class="w"> </span>cran<span class="w"> </span>r-knitr
+</span></code></pre></div>
+<h2 id="building-a-r-package">Building a R Package<a class="headerlink" href="#building-a-r-package" title="Permanent link">#</a></h2>
+<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">context</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.47&quot;</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="nt">package</span><span class="p">:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-knitr</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">noarch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">generic</span><span class="w">  </span><span class="c1"># (4)!</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="nt">source</span><span class="p">:</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://cran.r-project.org/src/contrib/Archive/knitr/knitr_${{ version }}.tar.gz</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fadd849bf94a4e02520088a6626577c3c636227fe11c5cd7e8fcc5d51a7aa6cf</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="nt">build</span><span class="p">:</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">R CMD INSTALL --build .</span><span class="w">  </span><span class="c1"># (1)!</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nt">requirements</span><span class="p">:</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="nt">host</span><span class="p">:</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-base</span><span class="w">  </span><span class="c1"># (2)!</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-evaluate &gt;=0.15</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-highr &gt;=0.11</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-xfun &gt;=0.44</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-yaml &gt;=2.1.19</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="w">  </span><span class="nt">run</span><span class="p">:</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-base</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-evaluate &gt;=0.15</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-highr &gt;=0.11</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-xfun &gt;=0.44</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">r-yaml &gt;=2.1.19</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="nt">tests</span><span class="p">:</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="c1"># This is a shorthand test for R packages to ensure that the library loads correctly.</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">r</span><span class="p">:</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">    </span><span class="nt">libraries</span><span class="p">:</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">knitr</span>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="c1"># You can also run arbitrary R code in the test section.</span>
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test_package.R</span><span class="w">  </span><span class="c1"># (3)!</span>
+</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>
+</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="nt">about</span><span class="p">:</span>
+</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">  </span><span class="nt">homepage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://yihui.org/knitr/</span>
+</span><span id="__span-1-40"><a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">  </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A General-Purpose Package for Dynamic Report Generation in R</span>
+</span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="w">  </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|-</span>
+</span><span id="__span-1-42"><a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">    </span><span class="no">Provides a general-purpose tool for dynamic report</span>
+</span><span id="__span-1-43"><a id="__codelineno-1-43" name="__codelineno-1-43" href="#__codelineno-1-43"></a><span class="w">    </span><span class="no">generation in R using Literate Programming techniques.</span>
+</span><span id="__span-1-44"><a id="__codelineno-1-44" name="__codelineno-1-44" href="#__codelineno-1-44"></a><span class="w">  </span><span class="nt">license</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GPL-2.0</span>
+</span><span id="__span-1-45"><a id="__codelineno-1-45" name="__codelineno-1-45" href="#__codelineno-1-45"></a><span class="w">  </span><span class="nt">repository</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/cran/knitr</span>
+</span></code></pre></div>
 <ol>
-<li>
-<p><strong>Rendering</strong>:
-Parse the recipe file and evaluate conditionals, Jinja expressions, and
-variables, and variants.</p>
-</li>
-<li>
-<p><strong>Fetch source</strong>:
-Retrieve specified source files, such as <code>.tar.gz</code> files, <code>git</code> repositories, local paths.
-Additionally, this step will apply patches that can be specified alongside the source file.</p>
-</li>
-<li>
-<p><strong>Install build environments</strong>:
-Download and install dependencies into temporary "host" and "build" workspaces.
-Any dependencies that are needed at build time are installed in this step.</p>
-</li>
-<li>
-<p><strong>Build source</strong>:
-Execute the build script to <em>build/compile</em> the source code and <em>install</em> it into the host environment.</p>
-</li>
-<li>
-<p><strong>Prepare package files</strong>:
-Collect <em>all</em> files that are new in the "host" environment and apply some transformations if necessary;
-specifically, we edit the <code>rpath</code> on <code>Linux</code> and <code>macOS</code> to make binaries relocatable.</p>
-</li>
-<li>
-<p><strong>Package</strong>:
-Bundle all the files in a package and write out any additional metadata into the <code>info/index.json</code>, <code>info/about.json</code>, and <code>info/paths.json</code> files.
-This also creates the test files that are bundled with the package.</p>
-</li>
-<li>
-<p><strong>Test</strong>:
-Run any tests specified in the recipe.
-The package is considered <em>done</em> if it passes all the tests, otherwise its moved to <code>broken/</code> in the output directory.</p>
-</li>
+<li>The <code>script</code> section is where you specify the build commands to run. In this case, we are using <code>R CMD INSTALL --build .</code> to build the package.</li>
+<li>The <code>r-base</code> package is required to run R and is specified in the <code>host</code> requirements.</li>
+<li>The <code>script</code> key automatically detects the language based on the file extension. In the case of <code>.R</code>, it will execute the R script with <code>rscript</code>.</li>
+<li>The <code>noarch: generic</code> directive indicates that the package is architecture-independent. This is useful for R packages that do not contain compiled code and can run on any architecture. It allows the package to be installed on any platform without needing to rebuild it for each architecture.</li>
 </ol>
-<p>After this process, a package is created. This package can be uploaded to somewhere like a custom <a href="https://prefix.dev">prefix.dev</a> private or public channel.</p>
-<h3 id="how-to-run-rattler-build">How to run <code>rattler-build</code><a class="headerlink" href="#how-to-run-rattler-build" title="Permanent link">#</a></h3>
-<p>Running <code>rattler-build</code> is straightforward. It can be done on the command line:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
-</span></code></pre></div>
-<p>A custom channel that is not conda-forge (the default) can be specified like so:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>-c<span class="w"> </span>robostack<span class="w"> </span>--recipe<span class="w"> </span>myrecipe/recipe.yaml
-</span></code></pre></div>
-<p>You can also use the <code>--recipe-dir</code> argument if you want to build all the packages in a directory:</p>
-<div class="language-sh highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>rattler-build<span class="w"> </span>build<span class="w"> </span>--recipe-dir<span class="w"> </span>myrecipes/
-</span></code></pre></div>
-<h3 id="overview-of-a-recipeyaml">Overview of a <code>recipe.yaml</code><a class="headerlink" href="#overview-of-a-recipeyaml" title="Permanent link">#</a></h3>
-<p>A <code>recipe.yaml</code> file is separated into multiple sections and can conditionally
-include or exclude sections. Recipe files also support a limited amount of
-string interpolation with Jinja (specifically <code>minijinja</code> in our case).</p>
-<p>A simple example of a recipe file for the <code>zlib</code> package would look as follows:</p>
-<div class="language-yaml highlight"><span class="filename">recipe.yaml</span><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># variables from the context section can be used in the rest of the recipe</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># in jinja expressions</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="nt">context</span><span class="p">:</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.2.13</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="nt">package</span><span class="p">:</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zlib</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ version }}</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="nt">source</span><span class="p">:</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://zlib.net/zlib-${{ version }}.tar.gz</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span><span class="nt">sha256</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">  </span><span class="c1"># build numbers can be set arbitrarily</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">  </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">  </span><span class="nt">script</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="c1"># build script to install the package into the $PREFIX (host prefix)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./configure --prefix=$PREFIX</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make -j$CPU_COUNT</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake -G &quot;Ninja&quot; -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=%LIBRARY_PREFIX%</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja install</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="nt">requirements</span><span class="p">:</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="nt">build</span><span class="p">:</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="w">    </span><span class="c1"># compiler is a special function.</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ compiler(&quot;c&quot;) }}</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a><span class="w">    </span><span class="c1"># The following two dependencies are only needed on Windows,</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a><span class="w">    </span><span class="c1"># and thus conditionally selected</span>
-</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">win</span>
-</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cmake</span>
-</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ninja</span>
-</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unix</span>
-</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a><span class="w">      </span><span class="nt">then</span><span class="p">:</span>
-</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">make</span>
-</span></code></pre></div>
-<p>The sections of a recipe are:</p>
-<table>
-<thead>
-<tr>
-<th>sections</th>
-<th>description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>context</code></td>
-<td>Defines variables that can be used in the Jinja context later in the recipe (e.g. name and version are commonly interpolated in strings)</td>
-</tr>
-<tr>
-<td><code>package</code></td>
-<td>This section defines the name and version of the package you are currently building and will be the name of the final output</td>
-</tr>
-<tr>
-<td><code>source</code></td>
-<td>Defines where the source code is going to be downloaded from and checksums</td>
-</tr>
-<tr>
-<td><code>build</code></td>
-<td>Settings for the build and the build script</td>
-</tr>
-<tr>
-<td><code>requirements</code></td>
-<td>Allows the definition of build, host, run and run-constrained dependencies</td>
-</tr>
-</tbody>
-</table>
 
 
 
@@ -1672,9 +1581,9 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href=".."
+              href="../perl/"
               class="md-footer__link md-footer__link--prev"
-              aria-label="Previous: Home"
+              aria-label="Previous: Perl"
             >
               <div class="md-footer__button md-icon">
                 
@@ -1685,7 +1594,7 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
                   Previous
                 </span>
                 <div class="md-ellipsis">
-                  Home
+                  Perl
                 </div>
               </div>
             </a>
@@ -1695,16 +1604,16 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
           
             
             <a
-              href="../tutorials/python/"
+              href="../../converting_from_conda_build/"
               class="md-footer__link md-footer__link--next"
-              aria-label="Next: Python"
+              aria-label="Next: Converting from conda-build"
             >
               <div class="md-footer__title">
                 <span class="md-footer__direction">
                   Next
                 </span>
                 <div class="md-ellipsis">
-                  Python
+                  Converting from conda-build
                 </div>
               </div>
               <div class="md-footer__button md-icon">
@@ -1733,7 +1642,7 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
         <!-- prefix logo -->
         <div class="md-footer-meta__item md-footer-meta__item--prefix-logo">
             <a href="https://prefix.dev" target="_blank">
-                <img src="../assets/logo_dark.svg" alt="">
+                <img src="../../assets/logo_dark.svg" alt="">
             </a>
         </div>
 
@@ -1788,10 +1697,10 @@ string interpolation with Jinja (specifically <code>minijinja</code> in our case
       <div class="md-progress" data-md-component="progress" role="progressbar"></div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["content.tabs.link", "content.code.copy", "content.action.edit", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.footer"], "search": "../../assets/javascripts/workers/search.f8cc74c7.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.f1b6f286.min.js"></script>
+      <script src="../../assets/javascripts/bundle.f1b6f286.min.js"></script>
       
     
   </body>
