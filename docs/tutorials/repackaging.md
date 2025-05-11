@@ -1,6 +1,6 @@
 # Repackaging existing software
 
-It's totally possible to repackage existing software using rattler-build, and make it easy to install 
+It's totally possible to repackage existing software using rattler-build, and make it easy to install
 with conda, mamba or pixi.
 
 Repackaging existing binaries is not recommended on `conda-forge`, but totally acceptable for your own channels / repositories.
@@ -34,7 +34,7 @@ build:
     # make sure that the `$PREFIX/bin` directory exists
     - mkdir -p $PREFIX/bin
     # move or copy the binary to the `$PREFIX/bin` directory
-    - mv linkerd $PREFIX/bin/ 
+    - mv linkerd $PREFIX/bin/
 
 tests:
   - script:
@@ -50,7 +50,7 @@ about:
     It adds observability, reliability, and security to your
     applications without requiring any code changes.
     Linkerd is open source and free to use.
-  # Note: since we are downloading a binary, we don't have a license file. 
+  # Note: since we are downloading a binary, we don't have a license file.
   # You can put the license in the recipe directory, and it will be picked up from there.
   license_file: LICENSE
   # documentation: ...
