@@ -1673,6 +1673,20 @@ Each test runs in its own environment.</p>
 requirements. The <code>build</code> requirements can be used to install emulators and
 similar tools that need to run to execute tests in a cross-compilation
 environment.</p>
+<h1 id="automatic-feedstock-conversion">Automatic feedstock conversion<a class="headerlink" href="#automatic-feedstock-conversion" title="Permanent link">#</a></h1>
+<p>Use the tool <a href="https://github.com/hadim/feedrattler"><code>feedrattler</code></a> by <a href="https://github.com/hadim">hadim</a> to go directly from an existing conda-forge v0 recipe feedstock to the new v1 recipe used by rattler-build.</p>
+<p>You can install and use it directly by running <code>pixi exec</code>:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pixi exec feedrattler my-awesome-feedstock
+</span></code></pre></div></p>
+<p>It uses the <code>conda-recipe-manager</code> for the generation of the recipe and <code>gh</code> or a <code>GITHUB_TOKEN</code> for creating the conversion PR in your name.</p>
+<p>Alternative installation:
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a># Globally install the tool
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>pixi global install feedrattler
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a># or in a workspace
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>pixi add feedrattler
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a># or using conda/mamba
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>conda install -c conda-forge feedrattler
+</span></code></pre></div></p>
 
 
 
