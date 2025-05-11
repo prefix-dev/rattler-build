@@ -220,6 +220,8 @@ pub struct TestConfiguration {
     pub current_platform: PlatformWithVirtualPackages,
     /// If true, the test prefix will not be deleted after the test is run
     pub keep_test_prefix: bool,
+    /// The index of the test to execute. If not set, all tests will be executed.
+    pub test_index: Option<usize>,
     /// The channels to use for the test – do not forget to add the local build
     /// outputs channel if desired
     pub channels: Vec<ChannelUrl>,
@@ -443,6 +445,22 @@ pub async fn run_test(
         let tests = fs::read_to_string(package_folder.join("info/tests/tests.yaml"))?;
         let tests: Vec<TestType> = serde_yaml::from_str(&tests)?;
 
+        if let Some(test_index) = config.test_index {
+            if test_index >= tests.len() {
+                return Err(TestError::TestFailed(format!(
+                    "Test index {} out of range (0..{})",
+                    test_index,
+                    tests.len()
+                )));
+            }
+        }
+
+        let tests = if let Some(test_index) = config.test_index {
+            vec![tests[test_index].clone()]
+        } else {
+            tests
+        };
+
         for test in tests {
             match test {
                 TestType::Command(c) => {
@@ -642,6 +660,30 @@ impl PythonTest {
         Ok(())
     }
 }
+
+// fn run_script(content: &str, interpreter: &str, cwd: &Path) -> Result<(), TestError> {
+//     let script = Script {
+//         content: ScriptContent::Command(content.to_string()),
+//         interpreter: Some(interpreter.into()),
+//         ..Script::default()
+//     };
+
+//     let tmp_dir = tempfile::tempdir()?;
+//     script
+//         .run_script(
+//             Default::default(),
+//             tmp_dir.path(),
+//             path,
+//             prefix,
+//             None,
+//             None,
+//             None,
+//             config.debug,
+//         )
+//         .await
+//         .map_err(|e| TestError::TestFailed(e.to_string()))?;
+//     Ok(())
+// }
 
 impl PerlTest {
     /// Execute the Perl test

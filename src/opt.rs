@@ -622,6 +622,10 @@ pub struct TestOpts {
     #[clap(long, env = "RATTLER_COMPRESSION_THREADS")]
     pub compression_threads: Option<u32>,
 
+    /// The index of the test to run. This is used to run a specific test from the package.
+    #[clap(long)]
+    pub test_index: Option<usize>,
+
     /// Build test environment and output debug information for manual debugging.
     #[arg(long)]
     pub debug: bool,
@@ -638,6 +642,7 @@ pub struct TestData {
     pub package_file: PathBuf,
     pub compression_threads: Option<u32>,
     pub common: CommonData,
+    pub test_index: Option<usize>,
     pub debug: Debug,
 }
 
@@ -650,6 +655,7 @@ impl TestData {
             value.channels,
             value.compression_threads,
             Debug::new(value.debug),
+            value.test_index,
             CommonData::from_opts_and_config(value.common, config.unwrap_or_default()),
         )
     }
@@ -660,6 +666,7 @@ impl TestData {
         channels: Option<Vec<NamedChannelOrUrl>>,
         compression_threads: Option<u32>,
         debug: Debug,
+        test_index: Option<usize>,
         common: CommonData,
     ) -> Self {
         Self {
@@ -667,6 +674,7 @@ impl TestData {
             channels,
             compression_threads,
             common,
+            test_index,
             debug,
         }
     }
