@@ -1,15 +1,75 @@
 //! Functions for applying patches to a work directory.
 use std::{
-    io::Write,
-    ops::Deref,
+    collections::HashSet,
+    io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
     process::Stdio,
 };
 
-use gitpatch::Patch;
-
 use super::SourceError;
 use crate::system_tools::{SystemTools, Tool};
+
+fn parse_patch_file<P: AsRef<Path>>(patch_file: P) -> std::io::Result<HashSet<PathBuf>> {
+    let file = fs_err::File::open(patch_file.as_ref())?;
+    let reader = BufReader::new(file);
+    let mut affected_files = HashSet::new();
+
+    // Common patch file patterns
+    let unified_pattern = "--- ";
+    let git_pattern = "diff --git ";
+    let traditional_pattern = "Index: ";
+    let mut is_git = false;
+    for line in reader.lines() {
+        let line = line?;
+
+        if let Some(git_line) = line.strip_prefix(git_pattern) {
+            is_git = true;
+            if let Some(file_path) = extract_git_file_path(git_line) {
+                affected_files.insert(file_path);
+            }
+        } else if let Some(unified_line) = line.strip_prefix(unified_pattern) {
+            if is_git || unified_line.contains("/dev/null") {
+                continue;
+            }
+            if let Some(file_path) = clean_file_path(unified_line) {
+                affected_files.insert(file_path);
+            }
+        } else if let Some(traditional_line) = line.strip_prefix(traditional_pattern) {
+            if let Some(file_path) = clean_file_path(traditional_line) {
+                affected_files.insert(file_path);
+            }
+        }
+    }
+
+    Ok(affected_files)
+}
+
+fn clean_file_path(path_str: &str) -> Option<PathBuf> {
+    let path = path_str.trim();
+
+    // Handle timestamp in unified diff format (file.txt\t2023-05-10 10:00:00)
+    let path = path.split('\t').next().unwrap_or(path);
+
+    // Skip /dev/null entries
+    if path.is_empty() || path == "/dev/null" {
+        return None;
+    }
+
+    Some(PathBuf::from(path))
+}
+
+fn extract_git_file_path(content: &str) -> Option<PathBuf> {
+    // Format: "a/file.txt b/file.txt"
+    let parts: Vec<&str> = content.split(' ').collect();
+    if parts.len() >= 2 {
+        let a_file = parts[0];
+        if a_file.starts_with("a/") && a_file != "a/dev/null" {
+            return Some(PathBuf::from(&a_file));
+        }
+    }
+
+    None
+}
 
 /// We try to guess the "strip level" for a patch application. This is done by checking
 /// what files are present in the work directory and comparing them to the paths in the patch.
@@ -21,21 +81,22 @@ use crate::system_tools::{SystemTools, Tool};
 /// But in our work directory, we only have `contents/file.c`. In this case, we can guess that the
 /// strip level is 2 and we can apply the patch successfully.
 fn guess_strip_level(patch: &Path, work_dir: &Path) -> Result<usize, std::io::Error> {
-    let text = fs_err::read_to_string(patch)?;
-    let Ok(patches) = Patch::from_multiple(&text) else {
-        return Ok(1);
-    };
+    let patched_files = parse_patch_file(patch).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Failed to parse patch file: {}", e),
+        )
+    })?;
 
     // Try to guess the strip level by checking if the path exists in the work directory
-    for p in patches {
-        let path = PathBuf::from(p.old.path.deref());
+    for file in patched_files {
         // This means the patch is creating an entirely new file so we can't guess the strip level
-        if path == Path::new("/dev/null") {
+        if file == Path::new("/dev/null") {
             continue;
         }
-        for strip_level in 0..path.components().count() {
+        for strip_level in 0..file.components().count() {
             let mut new_path = work_dir.to_path_buf();
-            new_path.extend(path.components().skip(strip_level));
+            new_path.extend(file.components().skip(strip_level));
             if new_path.exists() {
                 return Ok(strip_level);
             }
@@ -122,7 +183,6 @@ mod tests {
     use crate::source::copy_dir::CopyDir;
 
     use super::*;
-    use gitpatch::Patch;
     use line_ending::LineEnding;
     use tempfile::TempDir;
 
@@ -139,11 +199,29 @@ mod tests {
                 continue;
             }
 
-            let ps = fs_err::read_to_string(&patch_path).unwrap();
-            let parsed = Patch::from_multiple(&ps);
+            let parsed = parse_patch_file(&patch_path);
+            if let Err(e) = &parsed {
+                eprintln!("Failed to parse patch: {} {}", patch_path.display(), e);
+            }
 
             println!("Parsing patch: {} {}", patch_path.display(), parsed.is_ok());
         }
+    }
+
+    #[test]
+    fn get_affected_files() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let patches_dir = manifest_dir.join("test-data/patch_application/patches");
+
+        let patched_paths = parse_patch_file(patches_dir.join("test.patch")).unwrap();
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("a/text.md")));
+
+        let patched_paths =
+            parse_patch_file(patches_dir.join("0001-increase-minimum-cmake-version.patch"))
+                .unwrap();
+        assert_eq!(patched_paths.len(), 1);
+        assert!(patched_paths.contains(&PathBuf::from("a/CMakeLists.txt")));
     }
 
     fn setup_patch_test_dir() -> (TempDir, PathBuf) {
