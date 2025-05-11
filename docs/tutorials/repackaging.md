@@ -57,6 +57,14 @@ about:
   repository: https://github.com/linkerd/linkerd2
 ```
 
+!!! note
+
+    To repackage the `linkerd` package on `osx-arm64` for `linux-64`, you can pass the `--target-platform` argument to `rattler-build`:
+
+    ```bash
+    rattler-build build --target-platform linux-64 linkerd
+    ```
+
 ## Adding system requirements
 
 Some packages have system requirements (e.g. on `glibc` on Linux, or the macOS SDK on macOS).
