@@ -118,7 +118,10 @@ impl Relinker for SharedObject {
                 .strip_prefix(prefix)
                 .expect("library not in prefix"),
         );
-        if let Ok(rpath_without_loader) = rpath.strip_prefix("$ORIGIN") {
+        if let Ok(rpath_without_loader) = rpath
+            .strip_prefix("$ORIGIN")
+            .or_else(|_| rpath.strip_prefix("${ORIGIN}"))
+        {
             if let Some(library_parent) = self_path.parent() {
                 return to_lexical_absolute(rpath_without_loader, library_parent);
             } else {
@@ -169,7 +172,7 @@ impl Relinker for SharedObject {
         let mut final_rpaths = Vec::new();
 
         for rpath in rpaths.iter().chain(runpaths.iter()) {
-            if rpath.starts_with("$ORIGIN") {
+            if rpath.starts_with("$ORIGIN") || rpath.starts_with("${ORIGIN}") {
                 let resolved = self.resolve_rpath(rpath, prefix, encoded_prefix);
                 if resolved.starts_with(encoded_prefix) {
                     final_rpaths.push(rpath.clone());
