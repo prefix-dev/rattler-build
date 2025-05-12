@@ -1,4 +1,7 @@
-use std::path::{Component, Path, PathBuf};
+use std::{
+    io::ErrorKind,
+    path::{Component, Path, PathBuf},
+};
 
 use rattler_conda_types::Platform;
 use rattler_shell::shell;
@@ -23,11 +26,11 @@ impl Interpreter for BaseBashInterpreter {
         tokio::fs::write(&build_env_path, script).await?;
 
         let preamble =
-            BASH_PREAMBLE.replace("((script_path))", &to_posix_path_string(&build_env_path));
+            BASH_PREAMBLE.replace("((script_path))", &to_posix_path_string(&build_env_path)?);
         let script = format!("{}\n{}", preamble, args.script.script());
         tokio::fs::write(&build_script_path, script).await?;
 
-        let build_script_path_str = to_posix_path_string(&build_script_path);
+        let build_script_path_str = to_posix_path_string(&build_script_path)?;
         let mut cmd_args = vec!["bash", "-e"];
         if args.debug.is_enabled() {
             cmd_args.push("-x");
@@ -75,7 +78,7 @@ impl Interpreter for BashInterpreter {
         let args = ExecutionArgs {
             script: ResolvedScriptContents::Inline(format!(
                 "bash {:?}",
-                to_posix_path_string(&bash_script).as_str()
+                to_posix_path_string(&bash_script)?.as_str()
             )),
             ..args
         };
@@ -97,9 +100,9 @@ impl Interpreter for BashInterpreter {
     }
 }
 
-fn to_posix_path_string(path_buf: &Path) -> String {
+fn to_posix_path_string(path_buf: &Path) -> Result<String, std::io::Error> {
     if cfg!(not(windows)) {
-        return path_buf.to_string_lossy().into();
+        return Ok(path_buf.to_string_lossy().into());
     }
 
     let mut posix_path = String::new();
@@ -108,11 +111,32 @@ fn to_posix_path_string(path_buf: &Path) -> String {
     for component in path_buf.components() {
         match component {
             Component::Prefix(prefix_comp) => match prefix_comp.kind() {
-                std::path::Prefix::Verbatim(_os_str) => todo!(),
-                std::path::Prefix::VerbatimUNC(_os_str, _os_str1) => todo!(),
-                std::path::Prefix::VerbatimDisk(_) => todo!(),
-                std::path::Prefix::DeviceNS(_os_str) => todo!(),
-                std::path::Prefix::UNC(_os_str, _os_str1) => todo!(),
+                std::path::Prefix::DeviceNS(_) => {
+                    return Err(std::io::Error::new(
+                        ErrorKind::Other,
+                        format!("unspport file path {:?}", path_buf),
+                    ));
+                }
+                std::path::Prefix::VerbatimUNC(_os_str_1, _os_str_2) => {
+                    return Err(std::io::Error::new(
+                        ErrorKind::Other,
+                        format!("unspport file path {:?}", path_buf),
+                    ));
+                }
+                std::path::Prefix::UNC(s1, s2) => {
+                    posix_path.push('/');
+                    posix_path.push_str(&s1.to_string_lossy());
+                    posix_path.push('/');
+                    posix_path.push_str(&s2.to_string_lossy());
+                }
+                std::path::Prefix::Verbatim(s) => {
+                    posix_path.push('/');
+                    posix_path.push_str(&s.to_string_lossy());
+                }
+                std::path::Prefix::VerbatimDisk(disk) => {
+                    posix_path.push('/');
+                    posix_path.push(disk.into());
+                }
                 // D: => /D
                 std::path::Prefix::Disk(disk) => {
                     posix_path.push('/');
@@ -147,10 +171,10 @@ fn to_posix_path_string(path_buf: &Path) -> String {
     }
 
     if path_buf.as_os_str().is_empty() {
-        return String::new(); // Handle empty PathBuf
+        return Ok(String::new()); // Handle empty PathBuf
     }
 
-    posix_path
+    Ok(posix_path)
 }
 
 #[cfg(test)]
@@ -169,10 +193,11 @@ mod tests {
             (PathBuf::from(r"C:\foo\bar.txt"), "/C/foo/bar.txt"),
             (PathBuf::from(r"C:"), "/C"),
             (PathBuf::from(r"C:\"), "/C/"),
+            (PathBuf::from(r"\\1.1.1.1\a"), "//1.1.1.1/a"),
         ];
 
         for (input, expected) in cases {
-            assert_eq!(to_posix_path_string(&input), expected);
+            assert_eq!(to_posix_path_string(&input).unwrap(), expected);
         }
     }
 }
