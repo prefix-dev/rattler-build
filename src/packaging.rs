@@ -116,7 +116,7 @@ fn copy_license_files(
         ),
         (
             &output.build_configuration.directories.work_dir,
-            "work directory",
+            "source directory",
             true,
         ),
         (
@@ -159,7 +159,7 @@ fn copy_license_files(
                 if files_j.contains(file) {
                     let warn_str = format!(
                         "License file '{}' from {} was overwritten by license file from {}",
-                        file.display(),
+                        file.file_name().unwrap_or_default().to_string_lossy(),
                         source_i_name,
                         source_j_name
                     );
