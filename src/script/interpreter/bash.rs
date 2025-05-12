@@ -25,12 +25,11 @@ impl Interpreter for BaseBashInterpreter {
 
         tokio::fs::write(&build_env_path, script).await?;
 
-        let preamble =
-            BASH_PREAMBLE.replace("((script_path))", &to_posix_path_string(&build_env_path)?);
+        let preamble = BASH_PREAMBLE.replace("((script_path))", &build_env_path.to_string_lossy());
         let script = format!("{}\n{}", preamble, args.script.script());
         tokio::fs::write(&build_script_path, script).await?;
 
-        let build_script_path_str = to_posix_path_string(&build_script_path)?;
+        let build_script_path_str = build_script_path.to_string_lossy().to_string();
         let mut cmd_args = vec!["bash", "-e"];
         if args.debug.is_enabled() {
             cmd_args.push("-x");
@@ -124,7 +123,7 @@ fn to_posix_path_string(path_buf: &Path) -> Result<String, std::io::Error> {
                     ));
                 }
                 std::path::Prefix::UNC(s1, s2) => {
-                    posix_path.push('/');
+                    posix_path.push_str("//");
                     posix_path.push_str(&s1.to_string_lossy());
                     posix_path.push('/');
                     posix_path.push_str(&s2.to_string_lossy());
@@ -174,6 +173,12 @@ fn to_posix_path_string(path_buf: &Path) -> Result<String, std::io::Error> {
         return Ok(String::new()); // Handle empty PathBuf
     }
 
+    if (!posix_path.ends_with('/'))
+        && (path_buf.to_string_lossy().ends_with(r"\") || path_buf.to_string_lossy().ends_with("/"))
+    {
+        posix_path.push('/');
+    }
+
     Ok(posix_path)
 }
 
@@ -190,10 +195,14 @@ mod tests {
                 PathBuf::from("relative/path/to/file"),
                 "relative/path/to/file",
             ),
-            (PathBuf::from(r"C:\foo\bar.txt"), "/C/foo/bar.txt"),
-            (PathBuf::from(r"C:"), "/C"),
             (PathBuf::from(r"C:\"), "/C/"),
-            (PathBuf::from(r"\\1.1.1.1\a"), "//1.1.1.1/a"),
+            (PathBuf::from(r"C:\foo\"), "/C/foo/"),
+            (PathBuf::from(r"C:\foo\bar.txt"), "/C/foo/bar.txt"),
+            (PathBuf::from(r"\\1.1.1.1\a"), "//1.1.1.1/a/"),
+            (PathBuf::from(r"\\1.1.1.1\a\b"), "//1.1.1.1/a/b"),
+            (PathBuf::from(r"\\1.1.1.1\a\b\"), "//1.1.1.1/a/b/"),
+            (PathBuf::from(r"\\1.1.1.1\a\b\c"), "//1.1.1.1/a/b/c"),
+            (PathBuf::from(r"\\1.1.1.1\a\b\c\"), "//1.1.1.1/a/b/c/"),
         ];
 
         for (input, expected) in cases {
